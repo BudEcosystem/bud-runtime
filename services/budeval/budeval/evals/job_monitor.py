@@ -28,6 +28,7 @@ class MonitorRequest(TypedDict, total=False):
     failed_jobs: list[str]  # Track failed jobs
     job_timing_map: dict[str, dict]  # Track job timing: {job_id: {startTime, completionTime, status}}
     passthrough: dict  # caller-defined bag (not used here)
+    last_notification: dict  # Track last sent notification for deduplication
 
 
 class MonitorResult(TypedDict, total=False):
@@ -111,6 +112,59 @@ def parse_job_logs_activity(ctx: wf.WorkflowActivityContext, parse_request: str)
     except Exception as e:
         logger_local.error(f"parse_job_logs_activity error: {e}", exc_info=True)
         return {"success": False, "log_data": {}, "error": str(e)}
+
+
+# ---- Helper: determine if notification should be sent ------------------------
+def should_send_notification(
+    current_progress: float,
+    current_remaining_min: int,
+    current_completed: int,
+    last_notification: dict,
+    attempt: int,
+) -> tuple[bool, str]:
+    """Determine if an ETA notification should be sent.
+
+    Pure function - safe for Dapr workflow determinism.
+
+    Rules:
+    1. First notification (attempt == 1) - ALWAYS send
+    2. No previous notification data - send
+    3. Progress went from 0 to non-zero (job started) - send
+    4. Job completed (completed count changed) - send
+    5. Progress increased by >= 5% - send
+    6. No notification for 10+ cycles (5 min) - send keepalive
+    7. Otherwise - skip
+    """
+    PROGRESS_THRESHOLD = 5.0
+    KEEPALIVE_CYCLES = 10  # 5 minutes at 30s intervals
+
+    if attempt == 1:
+        return True, "first_notification"
+
+    if not last_notification:
+        return True, "no_previous"
+
+    last_progress = last_notification.get("progress_percentage", 0)
+    last_completed = last_notification.get("completed_jobs", 0)
+    last_attempt = last_notification.get("attempt_sent", 0)
+
+    # Job started (0 -> non-zero)
+    if last_progress == 0 and current_progress > 0:
+        return True, "job_started"
+
+    # Job completed
+    if current_completed > last_completed:
+        return True, "job_completed"
+
+    # Significant progress (>= 5%)
+    if current_progress - last_progress >= PROGRESS_THRESHOLD:
+        return True, f"progress_{current_progress - last_progress:.1f}pct"
+
+    # Keepalive (5 minutes)
+    if attempt - last_attempt >= KEEPALIVE_CYCLES:
+        return True, "keepalive"
+
+    return False, "no_change"
 
 
 # ---- Activity: send ETA notification -----------------------------------------
@@ -345,11 +399,11 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
                 else:
                     logger_local.debug(f"Job {job_id}: No progress data yet")
 
-    # NEW: Send notification with progress update (EVERY CYCLE)
+    # Send notification with progress update (smart deduplication)
     if workflow_id and source_topic:
         # Calculate aggregate progress (only for jobs that have started)
         total_progress = 0
-        total_remaining = 0
+        max_remaining = 0  # Use MAX instead of average (user waits for slowest job)
         jobs_with_progress = 0
         pending_jobs = 0
 
@@ -368,29 +422,57 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
 
                 latest = progress_info.get("latest_progress")
                 if latest:
-                    total_remaining += latest.get("remaining_seconds", 0)
+                    remaining_sec = latest.get("remaining_seconds", 0)
+                    max_remaining = max(max_remaining, remaining_sec)  # Track slowest job
                     jobs_with_progress += 1
 
-        # Calculate averages (excluding pending jobs)
+        # Calculate average progress (excluding pending jobs)
         running_jobs_count = len(remaining_jobs) - pending_jobs
         avg_progress = total_progress / running_jobs_count if running_jobs_count > 0 else 0
-        avg_remaining = total_remaining / jobs_with_progress if jobs_with_progress > 0 else 0
 
-        # Trigger notification via external activity
-        notification_data = {
-            "workflow_id": workflow_id,
-            "source_topic": source_topic,
-            "source": source or "budeval",  # Fallback to "budeval" if source is None
-            "remaining_seconds": int(avg_remaining),
-            "progress_percentage": round(avg_progress, 1),
-            "completed_jobs": len(completed_jobs),
-            "total_jobs": len(job_ids),
-            "running_jobs": len(remaining_jobs),
-            "failed_jobs": len(failed_jobs),
-            "evaluate_model_request_json_raw": data.get("evaluate_model_request_json_raw"),
-        }
+        # Smart notification: only send when there's meaningful change
+        last_notification = data.get("last_notification", {})
+        should_send, reason = should_send_notification(
+            current_progress=round(avg_progress, 1),
+            current_remaining_min=int(max_remaining / 60),
+            current_completed=len(completed_jobs),
+            last_notification=last_notification,
+            attempt=attempt,
+        )
 
-        yield ctx.call_activity(send_eta_notification, input=json.dumps(notification_data))
+        if should_send:
+            notification_data = {
+                "workflow_id": workflow_id,
+                "source_topic": source_topic,
+                "source": source or "budeval",
+                "remaining_seconds": int(max_remaining),  # Use max (slowest job)
+                "progress_percentage": round(avg_progress, 1),
+                "completed_jobs": len(completed_jobs),
+                "total_jobs": len(job_ids),
+                "running_jobs": len(remaining_jobs),
+                "failed_jobs": len(failed_jobs),
+                "evaluate_model_request_json_raw": data.get("evaluate_model_request_json_raw"),
+            }
+
+            yield ctx.call_activity(send_eta_notification, input=json.dumps(notification_data))
+
+            # Update last notification state for next cycle
+            data["last_notification"] = {
+                "progress_percentage": round(avg_progress, 1),
+                "remaining_minutes": int(max_remaining / 60),
+                "completed_jobs": len(completed_jobs),
+                "attempt_sent": attempt,
+            }
+
+            if not ctx.is_replaying:
+                logger_local.info(
+                    f"Sent ETA notification ({reason}): {avg_progress:.1f}%, {int(max_remaining / 60)}m remaining"
+                )
+        else:
+            if not ctx.is_replaying:
+                logger_local.debug(
+                    f"Skipped notification ({reason}): {avg_progress:.1f}%, {int(max_remaining / 60)}m remaining"
+                )
 
     if not remaining_jobs:
         if not ctx.is_replaying:
@@ -423,7 +505,8 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
     data["completed_jobs"] = completed_jobs
     data["failed_jobs"] = failed_jobs
     data["job_timing_map"] = job_timing_map
-    data["job_progress_map"] = job_progress_map  # NEW: Persist progress
+    data["job_progress_map"] = job_progress_map  # Persist progress
+    data["last_notification"] = data.get("last_notification", {})  # Persist notification state for deduplication
     # CRITICAL: Persist notification parameters across continue_as_new cycles
     data["workflow_id"] = workflow_id
     data["source_topic"] = source_topic
