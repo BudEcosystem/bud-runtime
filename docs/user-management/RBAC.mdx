@@ -32,36 +32,32 @@ title: "User Management & RBAC"
 
 ⸻
 
-2. USPs (Unique Selling Propositions)
+3. USPs (Unique Selling Propositions)
    1. Enterprise-grade multi-level RBAC
 
-Model your real org hierarchy: Super Admins, specialized Admins (Infra, Models, Evaluations, Routes), project teams (HR, Sales, DevOps), and non-technical consumers—all with clearly scoped access.
+      Model your real org hierarchy: Super Admins, specialized Admins (Infra, Models, Evaluations, Routes), project teams (HR, Sales, DevOps), and non-technical consumers—all with clearly scoped access.
+   2. Project and task-level granularity
 
-2. Project and task-level granularity
+      Control access not just at the platform level, but per project (team) and task (infra/model/evaluation/route/etc.), ensuring isolation between teams and workloads.
+   3. API-level security and governance
 
-Control access not just at the platform level, but per project (team) and task (infra/model/evaluation/route/etc.), ensuring isolation between teams and workloads.
+      Classify APIs as internal or public, manage API keys, rate limits, quotas, and costs per client, team, or app—so embedded GenAI features remain secure and auditable.
+   2. Unified experience for all personas
 
-3. API-level security and governance
+      • Platform & Security teams: centralized policy, IAM, SSO, auditing.
 
-Classify APIs as internal or public, manage API keys, rate limits, quotas, and costs per client, team, or app—so embedded GenAI features remain secure and auditable.
+      • Developers: OpenAI-style dev dashboard with safe self-serve APIs.
 
-4. Unified experience for all personas
+      • Business users: curated chat-based experiences and playgrounds.
+   5. Centralized IAM & SSO with enterprise standards
 
-- Platform & Security teams: centralized policy, IAM, SSO, auditing.
-- Developers: OpenAI-style dev dashboard with safe self-serve APIs.
-- Business users: curated chat-based experiences and playgrounds.
+      Supports SSO, user federation with LDAP / Active Directory, and identity brokering with third-party IdPs, using OpenID Connect, OAuth 2.0, and SAML 2.0.
+   6. Built-in security & compliance posture
 
-5. Centralized IAM & SSO with enterprise standards
+      MFA, strong password policies, brute-force detection, signed JWTs, and detailed audit logs support regulatory frameworks such as GDPR and HIPAA, as well as internal governance requirements.
+   7. Usage analytics and cost visibility for “Client” users
 
-Supports SSO, user federation with LDAP / Active Directory, and identity brokering with third-party IdPs, using OpenID Connect, OAuth 2.0, and SAML 2.0.
-
-6. Built-in security & compliance posture
-
-MFA, strong password policies, brute-force detection, signed JWTs, and detailed audit logs support regulatory frameworks such as GDPR and HIPAA, as well as internal governance requirements.
-
-7. Usage analytics and cost visibility for “Client” users
-
-Fine-grained analytics per client/department/project: tokens consumed, costs incurred, quotas, and plans—so you can implement chargeback/showback models for GenAI usage.
+      Fine-grained analytics per client/department/project: tokens consumed, costs incurred, quotas, and plans—so you can implement chargeback/showback models for GenAI usage.
 
 ⸻
 
