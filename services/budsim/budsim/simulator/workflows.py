@@ -17,6 +17,31 @@ logger = logging.get_logger(__name__)
 dapr_workflow = DaprWorkflow()
 
 
+def _normalize_device_type(device_type: str) -> str:
+    """Normalize device type to generic type for matching.
+    
+    Maps specific device type variants to their generic types:
+    - cpu_high, cpu_low -> cpu
+    - cuda -> cuda  
+    - rocm -> rocm
+    
+    Args:
+        device_type: The device type string (e.g., 'cpu_high', 'CUDA', 'cpu')
+        
+    Returns:
+        Normalized device type in lowercase (e.g., 'cpu', 'cuda', 'rocm')
+    """
+    device_type_lower = device_type.lower()
+    
+    # Map CPU variants to generic 'cpu'
+    if device_type_lower.startswith('cpu'):
+        return 'cpu'
+    
+    # Map other device types to their base type
+    # rocm variants, cuda variants, etc.
+    return device_type_lower
+
+
 def ensure_json_serializable(obj: Any) -> Any:
     """Ensure object is JSON serializable by converting non-serializable types."""
     if isinstance(obj, dict):
@@ -179,7 +204,8 @@ class SimulationWorkflows:
                         continue
 
                     for engine_device_combo in compatible_engines:
-                        if engine_device_combo["device"].lower() == device_type.lower():
+                        # Normalize both device types for comparison (e.g., cpu_high -> cpu, CPU -> cpu)
+                        if _normalize_device_type(engine_device_combo["device"]) == _normalize_device_type(device_type):
                             task_count += 1
 
                             # Get representative device for specs (use first device)
