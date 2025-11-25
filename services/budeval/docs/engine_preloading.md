@@ -78,7 +78,7 @@ Engines are registered using the `@EngineRegistry.register` decorator:
 @EngineRegistry.register(EngineMetadata(
     name="OpenCompass",
     version="0.4.2",
-    docker_image_url="ghcr.io/rahulvramesh/opencompass:latest",
+    docker_image_url="ghcr.io/budecosystem/opencompass:latest",
     # ... other metadata
 ))
 class OpenCompassEngine:
@@ -132,7 +132,7 @@ Response:
   "engines": {
     "opencompass": {
       "preloaded": true,
-      "docker_image": "ghcr.io/rahulvramesh/opencompass:latest",
+      "docker_image": "ghcr.io/budecosystem/opencompass:latest",
       "version": "0.4.2",
       "description": "OpenCompass is an LLM evaluation platform..."
     }
@@ -173,7 +173,7 @@ data:
   engines: |
     {
       "opencompass": {
-        "image": "ghcr.io/rahulvramesh/opencompass:latest",
+        "image": "ghcr.io/budecosystem/opencompass:latest",
         "version": "0.4.2",
         "preloaded_at": "2024-01-01T12:00:00Z",
         "method": "kubernetes-jobs"
@@ -202,7 +202,7 @@ spec:
     spec:
       containers:
       - name: image-puller
-        image: ghcr.io/rahulvramesh/opencompass:latest
+        image: ghcr.io/budecosystem/opencompass:latest
         imagePullPolicy: Always
         command: ["/bin/sh", "-c", "echo 'Image cached'; sleep 10"]
       restartPolicy: Never

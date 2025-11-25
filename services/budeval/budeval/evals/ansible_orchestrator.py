@@ -268,7 +268,7 @@ class AnsibleOrchestrator:
                             "containers": [
                                 {
                                     "name": "engine",
-                                    "image": "ghcr.io/rahulvramesh/opencompass:latest",
+                                    "image": "ghcr.io/budecosystem/opencompass:latest",
                                     "command": ["bash"],
                                     "args": ["-c", bash_script],
                                     "env": [
