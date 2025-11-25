@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button, Image, Empty, Spin } from "antd";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAgentStore } from "@/stores/useAgentStore";
@@ -22,13 +22,27 @@ interface ModelWrapper {
   [key: string]: any;
 }
 
-
-
+const DEFAULT_MODEL_ICON = "/icons/modelRepoWhite.png";
+const CLOUD_PROVIDER_TYPES = ["hugging_face", "cloud_model"];
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
   const { updateSession, sessions } = useAgentStore();
   const { selectedProject } = useAddAgent();
   const session = sessions.find(s => s.id === sessionId);
+
+  const modelIconUrl = useMemo(() => {
+    const model = session?.selectedDeployment?.model;
+    if (!model) {
+      return DEFAULT_MODEL_ICON;
+    }
+    if (model.icon) {
+      return assetBaseUrl + model.icon;
+    }
+    if (CLOUD_PROVIDER_TYPES.includes(model.provider_type) && model.provider?.icon) {
+      return assetBaseUrl + model.provider.icon;
+    }
+    return DEFAULT_MODEL_ICON;
+  }, [session?.selectedDeployment?.model]);
 
   const [sortBy] = useState("recency");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -326,20 +340,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
             }}
           >
             <Image
-              src={(() => {
-                const model = session.selectedDeployment.model;
-                // Use model icon if available
-                if (model?.icon) {
-                  return assetBaseUrl + model.icon;
-                }
-                // Fallback to provider icon for cloud models
-                if ((model?.provider_type === "hugging_face" || model?.provider_type === "cloud_model") && model?.provider?.icon) {
-                  return assetBaseUrl + model.provider.icon;
-                }
-                // Default fallback
-                return "/icons/modelRepoWhite.png";
-              })()}
-              fallback="/icons/modelRepoWhite.png"
+              src={modelIconUrl}
+              fallback={DEFAULT_MODEL_ICON}
               preview={false}
               alt="model"
               style={{
