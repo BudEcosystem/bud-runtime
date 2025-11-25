@@ -127,34 +127,35 @@ def should_send_notification(
     Pure function - safe for Dapr workflow determinism.
 
     Rules:
-    1. First notification (attempt == 1) - ALWAYS send
-    2. No previous notification data - send
-    3. Progress went from 0 to non-zero (job started) - send
-    4. Job completed (completed count changed) - send
-    5. Progress increased by >= 5% - send
-    6. No notification for 10+ cycles (5 min) - send keepalive
-    7. Otherwise - skip
+    0. NEVER send 0%/0min notifications - skip all zeros
+    1. Job completed (completed count changed) - send
+    2. Progress went from 0 to non-zero (job started) - send
+    3. Progress increased by >= 5% - send
+    4. No notification for 10+ cycles (5 min) - send keepalive
+    5. Otherwise - skip
     """
     PROGRESS_THRESHOLD = 5.0
     KEEPALIVE_CYCLES = 10  # 5 minutes at 30s intervals
 
-    if attempt == 1:
-        return True, "first_notification"
+    # Rule 0: NEVER send 0% / 0min notifications
+    if current_progress == 0 and current_remaining_min == 0:
+        return False, "skip_zeros"
 
+    # Job completed (always notify completions)
+    last_completed = last_notification.get("completed_jobs", 0) if last_notification else 0
+    if current_completed > last_completed:
+        return True, "job_completed"
+
+    # First meaningful notification (has actual progress data)
     if not last_notification:
-        return True, "no_previous"
+        return True, "first_meaningful"
 
     last_progress = last_notification.get("progress_percentage", 0)
-    last_completed = last_notification.get("completed_jobs", 0)
     last_attempt = last_notification.get("attempt_sent", 0)
 
     # Job started (0 -> non-zero)
     if last_progress == 0 and current_progress > 0:
         return True, "job_started"
-
-    # Job completed
-    if current_completed > last_completed:
-        return True, "job_completed"
 
     # Significant progress (>= 5%)
     if current_progress - last_progress >= PROGRESS_THRESHOLD:
