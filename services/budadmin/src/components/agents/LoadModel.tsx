@@ -6,7 +6,7 @@ import { useAddAgent } from "@/stores/useAddAgent";
 import BlurModal from "./BlurModal";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import { AppRequest } from "src/pages/api/requests";
-import { tempApiBaseUrl } from "@/components/environment";
+import { tempApiBaseUrl, assetBaseUrl } from "@/components/environment";
 import { errorToast } from "@/components/toast";
 import { ModelListCard } from "../ui/bud/deploymentDrawer/ModelListCard";
 import { Model } from "src/hooks/useModels";
@@ -162,7 +162,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
   const handleSelectModel = async (endpoint: ModelWrapper | Model) => {
     // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint : endpoint;
+    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
     // Get the endpoint ID from the root level (for wrapped objects)
     const endpointId = 'model' in endpoint ? endpoint.id : endpoint.id;
 
@@ -191,8 +191,9 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         id: endpointId, // Store endpoint ID, not model ID
         name: modelData.name,
         model: {
-          icon: modelData.icon || modelData.uri,
-          provider: modelData.provider
+          icon: modelData.icon,
+          provider: modelData.provider,
+          provider_type: modelData.provider_type
         }
       }
     });
@@ -326,11 +327,19 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
             }}
           >
             <Image
-              src={
-                session.selectedDeployment.model?.icon ||
-                session.selectedDeployment.model?.provider?.icon ||
-                "/icons/modelRepoWhite.png"
-              }
+              src={(() => {
+                const model = session.selectedDeployment.model;
+                // Use model icon if available
+                if (model?.icon) {
+                  return assetBaseUrl + model.icon;
+                }
+                // Fallback to provider icon for cloud models
+                if ((model?.provider_type === "hugging_face" || model?.provider_type === "cloud_model") && model?.provider?.icon) {
+                  return assetBaseUrl + model.provider.icon;
+                }
+                // Default fallback
+                return "/icons/modelRepoWhite.png";
+              })()}
               fallback="/icons/modelRepoWhite.png"
               preview={false}
               alt="model"
