@@ -194,7 +194,7 @@ function EvalExplorerTable({ datasets }: LeaderboardDetailsProps) {
         showSorterTooltip={true}
         locale={{
           emptyText: (
-            <NoDataFount classNames="h-[20vh]" textMessage={`No deployments`} />
+            <NoDataFount classNames="h-[20vh]" textMessage={`No data available`} />
           ),
         }}
       />
