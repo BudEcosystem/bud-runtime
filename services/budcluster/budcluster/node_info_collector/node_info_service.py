@@ -180,7 +180,7 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
         labels = node_info.get("labels", {})
         cpu_vendor = cpu_info.get("cpu_vendor", "")
         cpu_type = "cpu"  # Default type
-        
+
         # Extract instruction sets from NFD labels
         INSTRUCTION_SET_MAP = {
             "AVX": ["feature.node.kubernetes.io/cpu-cpuid.AVX"],
@@ -195,18 +195,19 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
         }
 
         instruction_sets = [
-            name for name, nfd_labels in INSTRUCTION_SET_MAP.items()
+            name
+            for name, nfd_labels in INSTRUCTION_SET_MAP.items()
             if any(labels.get(label) == "true" for label in nfd_labels)
         ]
-        
+
         # Check for Intel CPUs with high-performance features (AMX or AVX2)
         if cpu_vendor == "Intel":
             has_amx = any(s.startswith("AMX") for s in instruction_sets)
             has_avx2 = "AVX2" in instruction_sets
-            
+
             if has_amx or has_avx2:
                 cpu_type = "cpu_high"
-        
+
         # Get cores and threads from node capacity
         capacity = node_info.get("capacity", {})
         cpu_capacity_str = capacity.get("cpu", "0")
@@ -214,7 +215,7 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
             cpu_cores = int(cpu_capacity_str)
         except (ValueError, TypeError):
             cpu_cores = 0
-        
+
         # Check if hyperthreading is enabled
         has_hyperthreading = labels.get("feature.node.kubernetes.io/cpu-hardware_multithreading") == "true"
         if has_hyperthreading and cpu_cores > 0:
@@ -225,7 +226,7 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
         else:
             # No hyperthreading, cores == threads
             cpu_threads = cpu_cores
-        
+
         # Determine generation from model ID for Intel CPUs
         generation = ""
         if cpu_vendor == "Intel":
@@ -251,7 +252,7 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
                             break
             except (ValueError, TypeError):
                 pass
-        
+
         devices["cpus"].append(
             {
                 "name": cpu_info.get("cpu_name", ""),

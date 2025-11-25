@@ -74,20 +74,20 @@ class NFDLabelParser:
         """
         # Try to get CPU model from local hook first (if configured)
         cpu_model_raw = labels.get("feature.node.kubernetes.io/local-cpu.model", "")
-        
+
         # Fallback to constructing from standard NFD labels
         if not cpu_model_raw:
             vendor_id = labels.get("feature.node.kubernetes.io/cpu-model.vendor_id", "")
             family = labels.get("feature.node.kubernetes.io/cpu-model.family", "")
             model_id = labels.get("feature.node.kubernetes.io/cpu-model.id", "")
-            
+
             # Map vendor ID to readable name
             vendor_map = {
                 "GenuineIntel": "Intel",
                 "AuthenticAMD": "AMD",
             }
             vendor_name = vendor_map.get(vendor_id, vendor_id)
-            
+
             if vendor_name:
                 parts = [vendor_name]
                 if family:
