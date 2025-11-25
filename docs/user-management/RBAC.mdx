@@ -1,7 +1,7 @@
 ---
-description: "Description of your new file."
 title: "Bud AI Foundry – User Management & RBAC"
 ---
+
 
 1. Description
 
@@ -9,25 +9,25 @@ Bud AI Foundry’s User Management and Role-Based Access Control (RBAC) system i
 
 As GenAI moves from POCs into production, access control becomes a governance and risk problem, not just a technical one:
 
-	•	Who can deploy or change models?
+               • Who can deploy or change models?
 
-	•	Who can see sensitive data or logs?
+               • Who can see sensitive data or logs?
 
-	•	How do we stop “experiment” endpoints from becoming shadow production?
+               • How do we stop “experiment” endpoints from becoming shadow production?
 
-	•	How do we give Sales/HR/Support safe AI tools without exposing infra?
+               • How do we give Sales/HR/Support safe AI tools without exposing infra?
 
 Bud AI Foundry addresses these challenges with:
 
-	•	A multi-level RBAC hierarchy (Super Admin → Admins → Teams → End users),
+               • A multi-level RBAC hierarchy (Super Admin → Admins → Teams → End users),
 
-	•	Project and task-level access control for teams like HR, Sales, DevOps, etc.,
+               • Project and task-level access control for teams like HR, Sales, DevOps, etc.,
 
-	•	API-level governance and quotas for internal and public endpoints,
+               • API-level governance and quotas for internal and public endpoints,
 
-	•	A developer dashboard for internal devs and app teams,
+               • A developer dashboard for internal devs and app teams,
 
-	•	And centralized IAM with SSO and enterprise security (MFA, audit logging, directory integration, standards-based protocols).
+               • And centralized IAM with SSO and enterprise security (MFA, audit logging, directory integration, standards-based protocols).
 
 The result: fast GenAI adoption across the organization, with the level of control your security, risk, and compliance teams expect.
 
@@ -35,35 +35,35 @@ The result: fast GenAI adoption across the organization, with the level of contr
 
 2. USPs (Unique Selling Propositions)
 
-	1.	Enterprise-grade multi-level RBAC
+               1. Enterprise-grade multi-level RBAC
 
 Model your real org hierarchy: Super Admins, specialized Admins (Infra, Models, Evaluations, Routes), project teams (HR, Sales, DevOps), and non-technical consumers—all with clearly scoped access.
 
-	2.	Project and task-level granularity
+               2. Project and task-level granularity
 
 Control access not just at the platform level, but per project (team) and task (infra/model/evaluation/route/etc.), ensuring isolation between teams and workloads.
 
-	3.	API-level security and governance
+               3. API-level security and governance
 
 Classify APIs as internal or public, manage API keys, rate limits, quotas, and costs per client, team, or app—so embedded GenAI features remain secure and auditable.
 
-	4.	Unified experience for all personas
+               4. Unified experience for all personas
 
-	•	Platform & Security teams: centralized policy, IAM, SSO, auditing.
+·        Platform & Security teams: centralized policy, IAM, SSO, auditing.
 
-	•	Developers: OpenAI-style dev dashboard with safe self-serve APIs.
+·        Developers: OpenAI-style dev dashboard with safe self-serve APIs.
 
-	•	Business users: curated chat-based experiences and playgrounds.
+·        Business users: curated chat-based experiences and playgrounds.
 
-	5.	Centralized IAM & SSO with enterprise standards
+               5. Centralized IAM & SSO with enterprise standards
 
 Supports SSO, user federation with LDAP / Active Directory, and identity brokering with third-party IdPs, using OpenID Connect, OAuth 2.0, and SAML 2.0.
 
-	6.	Built-in security & compliance posture
+               6. Built-in security & compliance posture
 
 MFA, strong password policies, brute-force detection, signed JWTs, and detailed audit logs support regulatory frameworks such as GDPR and HIPAA, as well as internal governance requirements.
 
-	7.	Usage analytics and cost visibility for “Client” users
+               7. Usage analytics and cost visibility for “Client” users
 
 Fine-grained analytics per client/department/project: tokens consumed, costs incurred, quotas, and plans—so you can implement chargeback/showback models for GenAI usage.
 
@@ -75,39 +75,39 @@ Fine-grained analytics per client/department/project: tokens consumed, costs inc
 
 a. Super Admin
 
-	•	Highest-privilege role with organization-wide control.
+               • Highest-privilege role with organization-wide control.
 
-	•	Configures:
+               • Configures:
 
-	•	Identity and SSO settings,
+               • Identity and SSO settings,
 
-	•	Global policies and guardrails,
+               • Global policies and guardrails,
 
-	•	Creation and assignment of specialized Admin roles,
+               • Creation and assignment of specialized Admin roles,
 
-	•	Default roles and access templates.
+               • Default roles and access templates.
 
 b. Admin-level roles
 
 Controlled by Super Admin, Admins can be specialized per module or capability, for example:
 
-	•	Infra Admin – clusters, runtimes, scaling policies.
+               • Infra Admin – clusters, runtimes, scaling policies.
 
-	•	Model Admin – onboarding models, model catalogs, versioning.
+               • Model Admin – onboarding models, model catalogs, versioning.
 
-	•	Evaluation Admin – benchmarks, evaluation suites, quality checks.
+               • Evaluation Admin – benchmarks, evaluation suites, quality checks.
 
-	•	Routes/Orchestration Admin – flows, routing, and agents.
+               • Routes/Orchestration Admin – flows, routing, and agents.
 
-	•	User & Project Admin – manages users, roles, and project assignments.
+               • User & Project Admin – manages users, roles, and project assignments.
 
 Admins can be scoped at:
 
-	•	Module level (e.g., only infra, only models),
+               • Module level (e.g., only infra, only models),
 
-	•	Task level (e.g., view-only vs manage permissions),
+               • Task level (e.g., view-only vs manage permissions),
 
-	•	Project (Team) level (e.g., only HR project, only Sales project).
+               • Project (Team) level (e.g., only HR project, only Sales project).
 
 This supports separation of duties and alignment with internal operating models.
 
@@ -115,33 +115,33 @@ This supports separation of duties and alignment with internal operating models.
 
 3.2 Project Teams & Task-level Access
 
-	•	Create Projects (Teams) like:
+               • Create Projects (Teams) like:
 
-	•	HR
+               • HR
 
-	•	Sales
+               • Sales
 
-	•	DevOps
+               • DevOps
 
-	•	Customer Support
+               • Customer Support
 
-	•	Product / Ops
+               • Product / Ops
 
-	•	Assign users to projects and define:
+               • Assign users to projects and define:
 
-	•	Which models, agents, and routes they can see/use,
+               • Which models, agents, and routes they can see/use,
 
-	•	Which evaluations or datasets are visible,
+               • Which evaluations or datasets are visible,
 
-	•	Whether they can view, configure, or manage resources.
+               • Whether they can view, configure, or manage resources.
 
 Within a project, you can define task-level permissions, for example:
 
-	•	Sales leads: can view usage dashboards and reports.
+               • Sales leads: can view usage dashboards and reports.
 
-	•	Sales reps: can only use chat assistants.
+               • Sales reps: can only use chat assistants.
 
-	•	A technical owner: can configure prompts, routes, and model selections.
+               • A technical owner: can configure prompts, routes, and model selections.
 
 ⸻
 
@@ -149,71 +149,71 @@ Within a project, you can define task-level permissions, for example:
 
 a. Admin users
 
-	•	Manage operational aspects like:
+               • Manage operational aspects like:
 
-	•	Cluster & infrastructure management,
+               • Cluster & infrastructure management,
 
-	•	Model onboarding & lifecycle,
+               • Model onboarding & lifecycle,
 
-	•	User and project management,
+               • User and project management,
 
-	•	Evaluation and benchmark configuration,
+               • Evaluation and benchmark configuration,
 
-	•	API and route configuration.
+               • API and route configuration.
 
-	•	Permissions can be view-only or manage per module.
+               • Permissions can be view-only or manage per module.
 
 b. Client / Consumer users
 
 Ideal for:
 
-	•	External customers consuming your GenAI models/agents, or
+               • External customers consuming your GenAI models/agents, or
 
-	•	Internal departments/projects consuming GenAI services.
+               • Internal departments/projects consuming GenAI services.
 
 For Client users, the platform provides:
 
-	•	A dedicated dashboard to:
+               • A dedicated dashboard to:
 
-	•	Access assigned models and agents,
+               • Access assigned models and agents,
 
-	•	Track usage (tokens, requests),
+               • Track usage (tokens, requests),
 
-	•	Monitor cost, quotas, and billing cycle.
+               • Monitor cost, quotas, and billing cycle.
 
-	•	For non-technical users, access via:
+               • For non-technical users, access via:
 
-	•	Chat-based interfaces, or
+               • Chat-based interfaces, or
 
-	•	The Bud Playground with curated assistants.
+               • The Bud Playground with curated assistants.
 
 Bud AI Foundry exposes detailed analytics per client:
 
-	•	Tokens consumed,
+               • Tokens consumed,
 
-	•	Total cost incurred,
+               • Total cost incurred,
 
-	•	Billing plan details,
+               • Billing plan details,
 
-	•	Token and cost quotas (configurable),
+               • Token and cost quotas (configurable),
 
-	•	Billing cycles.
+               • Billing cycles.
 
 ⸻
 
 3.4 Developer / End-user Dev Dashboard
 
-	•	OpenAI-like developer dashboard for internal devs and application teams.
+               • OpenAI-like developer dashboard for internal devs and application teams.
 
-	•	Key capabilities:
+               • Key capabilities:
 
-	•	Discover approved models, routes, and agents.
+               • Discover approved models, routes, and agents.
 
-	•	Create and manage APIs on top of these models.
+               • Create and manage APIs on top of these models.
 
-	•	Configure prompts, parameters, evaluation hooks, and routing logic.
+               • Configure prompts, parameters, evaluation hooks, and routing logic.
 
-	•	Monitor performance, usage, and latency.
+               • Monitor performance, usage, and latency.
 
 This enables self-service for developers, within a governed environment defined by Super Admins and Admins.
 
@@ -223,25 +223,25 @@ This enables self-service for developers, within a governed environment defined 
 
 For every deployed model, route, or agent:
 
-	•	Define who can generate API keys.
+               • Define who can generate API keys.
 
-	•	Specify which teams, services, or apps can call the API.
+               • Specify which teams, services, or apps can call the API.
 
-	•	Set rate limits, quotas, and cost ceilings per API key or client.
+               • Set rate limits, quotas, and cost ceilings per API key or client.
 
-	•	Classify APIs as:
+               • Classify APIs as:
 
-	•	Internal APIs – restricted to internal services/teams.
+               • Internal APIs – restricted to internal services/teams.
 
-	•	Public APIs – available to broader app developers or external customers (if configured).
+               • Public APIs – available to broader app developers or external customers (if configured).
 
 All API usage is attributed to:
 
-	•	A team/project,
+               • A team/project,
 
-	•	A client, and
+               • A client, and
 
-	•	A user or API key,
+               • A user or API key,
 
 enabling full auditability and chargeback.
 
@@ -251,49 +251,49 @@ enabling full auditability and chargeback.
 
 Bud AI Foundry integrates with a centralized IAM layer and supports Single Sign-On:
 
-	•	Users authenticate once via your corporate IdP.
+               • Users authenticate once via your corporate IdP.
 
-	•	Based on role mappings and attributes, they get access to:
+               • Based on role mappings and attributes, they get access to:
 
-	•	Admin console (if applicable),
+               • Admin console (if applicable),
 
-	•	Developer dashboard,
+               • Developer dashboard,
 
-	•	Client dashboards,
+               • Client dashboards,
 
-	•	Chat and playground experiences.
+               • Chat and playground experiences.
 
 Key IAM capabilities:
 
-	•	Central user lifecycle management (provisioning/deprovisioning).
+               • Central user lifecycle management (provisioning/deprovisioning).
 
-	•	Centralized policy application and review.
+               • Centralized policy application and review.
 
-	•	Reduced operational overhead and fewer fragmented accounts.
+               • Reduced operational overhead and fewer fragmented accounts.
 
-⸻
+⸻ 
 
 3.7 Security & Compliance Features
 
-	•	Multi-Factor Authentication (MFA).
+               • Multi-Factor Authentication (MFA).
 
-	•	Strong password policies and configurable lockout thresholds.
+               • Strong password policies and configurable lockout thresholds.
 
-	•	Brute-force attack detection and throttling.
+               • Brute-force attack detection and throttling.
 
-	•	JWT-based secure token management for sessions and API access.
+               • JWT-based secure token management for sessions and API access.
 
-	•	Fine-grained access control down to resource and action level.
+               • Fine-grained access control down to resource and action level.
 
-	•	Comprehensive audit logging for:
+               • Comprehensive audit logging for:
 
-	•	Logins and authentication events,
+               • Logins and authentication events,
 
-	•	Model and deployment changes,
+               • Model and deployment changes,
 
-	•	API key creations/rotations,
+               • API key creations/rotations,
 
-	•	Permission changes and role assignments.
+               • Permission changes and role assignments.
 
 These capabilities support compliance and audit requirements such as GDPR, HIPAA, and internal security policies.
 
@@ -301,13 +301,13 @@ These capabilities support compliance and audit requirements such as GDPR, HIPAA
 
 3.8 Standards Compliance & IdP Integrations
 
-	•	Supports OpenID Connect (OIDC), OAuth 2.0, and SAML 2.0.
+               • Supports OpenID Connect (OIDC), OAuth 2.0, and SAML 2.0.
 
-	•	Integrates with:
+               • Integrates with:
 
-	•	Enterprise directories like LDAP and Microsoft Active Directory via user federation,
+               • Enterprise directories like LDAP and Microsoft Active Directory via user federation,
 
-	•	Third-party identity providers (Okta, Azure AD, Google Workspace, etc.) via identity brokering.
+               • Third-party identity providers (Okta, Azure AD, Google Workspace, etc.) via identity brokering.
 
 This ensures Bud AI Foundry fits seamlessly into your existing identity landscape.
 
@@ -317,143 +317,143 @@ This ensures Bud AI Foundry fits seamlessly into your existing identity landscap
 
 4.1 Accessing the User Management Module
 
-	1.	Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+               1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
 
-	2.	Click on your profile/avatar in the top-right corner.
+               2. Click on your profile/avatar in the top-right corner.
 
-	3.	Select “User Management” from the menu.
+               3. Select “User Management” from the menu.
 
-	4.	If you are an Admin or Super Admin, you’ll see user lists, roles, and access settings.
+               4. If you are an Admin or Super Admin, you’ll see user lists, roles, and access settings.
 
 ⸻
 
 4.2 Adding a New Admin User with Scoped Access
 
-	1.	Go to User Management → click “Add User”.
+               1. Go to User Management → click “Add User”.
 
-	2.	Enter the user’s name and email address.
+               2. Enter the user’s name and email address.
 
-	3.	Under Role, select the appropriate base role (e.g., Admin, Developer, DevOps).
+               3. Under Role, select the appropriate base role (e.g., Admin, Developer, DevOps).
 
-	4.	Under User Type, choose Admin.
+               4. Under User Type, choose Admin.
 
-	5.	Configure module-level permissions:
+               5. Configure module-level permissions:
 
-	•	For each module (e.g., Models, Infrastructure, Evaluations, Routes, User Management):
+·        For each module (e.g., Models, Infrastructure, Evaluations, Routes, User Management):
 
-	•	Select View for read-only access, or
+·        Select View for read-only access, or
 
-	•	Select Manage for full operational control.
+·        Select Manage for full operational control.
 
-	6.	Optionally, scope the user to specific Projects (Teams):
+               6. Optionally, scope the user to specific Projects (Teams):
 
-	•	Assign them to HR, Sales, DevOps, or other relevant projects.
+·        Assign them to HR, Sales, DevOps, or other relevant projects.
 
-	•	Within each project, specify which components they can see/manage.
+·        Within each project, specify which components they can see/manage.
 
-	7.	Click “Save”.
+               7. Click “Save”.
 
-	8.	The user will receive an invitation email. Once accepted, they can sign in and operate within the permissions you defined.
+               8. The user will receive an invitation email. Once accepted, they can sign in and operate within the permissions you defined.
 
 ⸻
 
 4.3 Adding a Client / Consumer User and Configuring Quotas
 
-	1.	In User Management, click “Add User.”
+               1. In User Management, click “Add User.”
 
-	2.	Enter the name and email.
+               2. Enter the name and email.
 
-	3.	Assign an appropriate Role (e.g., Client, Business User), if configured.
+               3. Assign an appropriate Role (e.g., Client, Business User), if configured.
 
-	4.	Set User Type = Client.
+               4. Set User Type = Client.
 
-	5.	Select which projects or services this client can access:
+               5. Select which projects or services this client can access:
 
-	•	Specific models, routes, or agents,
+·        Specific models, routes, or agents,
 
-	•	Specific chat assistants or playground spaces.
+·        Specific chat assistants or playground spaces.
 
-	6.	Go to the Client Settings / Analytics section for that user:
+               6. Go to the Client Settings / Analytics section for that user:
 
-	•	Define token quotas (e.g., monthly token limit).
+·        Define token quotas (e.g., monthly token limit).
 
-	•	Set cost limits and billing plans.
+·        Set cost limits and billing plans.
 
-	•	Configure billing cycle (e.g., monthly).
+·        Configure billing cycle (e.g., monthly).
 
-	7.	Click “Save.”
+               7. Click “Save.”
 
-	8.	The client can now:
+               8. The client can now:
 
-	•	Log into their client dashboard,
+·        Log into their client dashboard,
 
-	•	View usage and costs,
+·        View usage and costs,
 
-	•	Access their assigned assistants via chat or playground.
+·        Access their assigned assistants via chat or playground.
 
 ⸻
 
 4.4 Creating and Managing Project-level Teams
 
-	1.	Navigate to Projects / Teams in the admin console.
+               1. Navigate to Projects / Teams in the admin console.
 
-	2.	Click “Create Project / Team”.
+               2. Click “Create Project / Team”.
 
-	3.	Name the project, e.g., “HR Assistants”, “Sales Copilot”, or “DevOps Automations”.
+               3. Name the project, e.g., “HR Assistants”, “Sales Copilot”, or “DevOps Automations”.
 
-	4.	Assign Project Owners (Admins or technical leads).
+               4. Assign Project Owners (Admins or technical leads).
 
-	5.	Attach:
+               5. Attach:
 
-	•	Relevant models and agents,
+·        Relevant models and agents,
 
-	•	Specific datasets, evaluations, or routes.
+·        Specific datasets, evaluations, or routes.
 
-	6.	Add users to the project and define their project roles:
+               6. Add users to the project and define their project roles:
 
-	•	For example:
+               For example:
 
-	•	HR Lead – View analytics + manage assistants,
+·        HR Lead – View analytics + manage assistants,
 
-	•	HR Partners – Use chat assistants only,
+·        HR Partners – Use chat assistants only,
 
-	•	Data Scientist – manage prompts and evaluations.
+·        Data Scientist – manage prompts and evaluations.
 
-	7.	Save the configuration.
+               7. Save the configuration.
 
-	8.	Project-level isolation is now enforced: users only see what their project access allows.
+               8. Project-level isolation is now enforced: users only see what their project access allows.
 
 ⸻
 
 4.5 Managing API Access: Internal vs Public
 
-	1.	Go to the APIs / Routes section in the dashboard.
+               1. Go to the APIs / Routes section in the dashboard.
 
-	2.	Select a deployed model, route, or agent.
+               2. Select a deployed model, route, or agent.
 
-	3.	Under Access Type, choose:
+               3. Under Access Type, choose:
 
-	•	Internal – restricts usage to internal services and teams.
+·        Internal – restricts usage to internal services and teams.
 
-	•	Public – exposes the API to broader developer audiences (internal or external) as configured.
+·        Public – exposes the API to broader developer audiences (internal or external) as configured.
 
-	4.	Configure API keys:
+               4. Configure API keys:
 
-	•	Generate keys for specific teams, apps, or clients.
+·        Generate keys for specific teams, apps, or clients.
 
-	•	Label them clearly (e.g., sales-copilot-prod, hr-portal-staging).
+·        Label them clearly (e.g., sales-copilot-prod, hr-portal-staging).
 
-	5.	Set rate limits and quotas per key:
+               5. Set rate limits and quotas per key:
 
-	•	Max requests/second,
+·        Max requests/second,
 
-	•	Monthly token limits,
+·        Monthly token limits,
 
-	•	Optional cost caps.
+·        Optional cost caps.
 
-	6.	Save changes.
+               6. Save changes.
 
-	7.	Distribute API keys through your secure internal process (never hard-code into public repos).
+               7. Distribute API keys through your secure internal process (never hard-code into public repos).
 
 ⸻
 
@@ -461,63 +461,63 @@ This ensures Bud AI Foundry fits seamlessly into your existing identity landscap
 
 Note: Exact steps vary by IdP (Okta, Azure AD, etc.), but the flow is broadly similar.
 
-	1.	In Bud AI Foundry, go to Identity & Access / SSO Settings.
+               1. In Bud AI Foundry, go to Identity & Access / SSO Settings.
 
-	2.	Choose the protocol your IdP supports:
+               2. Choose the protocol your IdP supports:
 
-	•	OIDC, OAuth 2.0, or SAML 2.0.
+·        OIDC, OAuth 2.0, or SAML 2.0.
 
-	3.	In your IdP:
+               3. In your IdP:
 
-	•	Create a new application/integration for Bud AI Foundry.
+·        Create a new application/integration for Bud AI Foundry.
 
-	•	Configure redirect URIs and logout URLs as provided by Bud.
+·        Configure redirect URIs and logout URLs as provided by Bud.
 
-	•	Set up user attributes and group claims (e.g., email, name, role, department).
+·        Set up user attributes and group claims (e.g., email, name, role, department).
 
-	4.	Copy the IdP configuration back into Bud AI Foundry:
+               4. Copy the IdP configuration back into Bud AI Foundry:
 
-	•	Client ID, Client Secret (if applicable), Issuer URL, Certificates/Metadata.
+·        Client ID, Client Secret (if applicable), Issuer URL, Certificates/Metadata.
 
-	5.	Map IdP groups/attributes to Bud AI Foundry roles and projects:
+               5. Map IdP groups/attributes to Bud AI Foundry roles and projects:
 
-	•	e.g., group:platform-admins → Super Admin / Admin,
+·        e.g., group:platform-admins → Super Admin / Admin,
 
-	•	group:sales → Sales project user.
+·        group:sales → Sales project user.
 
-	6.	Enable the integration and test:
+               6. Enable the integration and test:
 
-	•	Perform a test login with a pilot user.
+·        Perform a test login with a pilot user.
 
-	•	Confirm that the expected role and project assignments are applied.
+·        Confirm that the expected role and project assignments are applied.
 
-	7.	Roll out to wider user groups once validated.
+               7. Roll out to wider user groups once validated.
 
 ⸻
 
 4.7 Modifying Permissions or Offboarding Users
 
-	1.	Go to User Management.
+               1. Go to User Management.
 
-	2.	Search for the user by name or email.
+               2. Search for the user by name or email.
 
-	3.	Open their profile.
+               3. Open their profile.
 
-	4.	To modify access:
+               4. To modify access:
 
-	•	Adjust role, user type, module-level permissions, or project assignments.
+·        Adjust role, user type, module-level permissions, or project assignments.
 
-	•	Click Save.
+·        Click Save.
 
-	5.	To offboard:
+               5. To offboard:
 
-	•	Remove sensitive roles and project access.
+·        Remove sensitive roles and project access.
 
-	•	Optionally disable the user or remove them from your IdP group.
+·        Optionally disable the user or remove them from your IdP group.
 
-	•	Revoke associated API keys if applicable.
+·        Revoke associated API keys if applicable.
 
-	6.	Confirm that their access is removed by viewing their current roles and projects.
+               6. Confirm that their access is removed by viewing their current roles and projects.
 
 ⸻
 
@@ -539,9 +539,9 @@ Q3. How are non-technical users like Sales reps or HR partners expected to use t
 
 A. Non-technical users are typically assigned Client / Consumer roles and interact through:
 
-	•	Chat-based assistants integrated into their tools, or
+               • Chat-based assistants integrated into their tools, or
 
-	•	The Bud Playground, where they can safely use curated AI experiences without dealing with prompts, models, or infra.
+               • The Bud Playground, where they can safely use curated AI experiences without dealing with prompts, models, or infra.
 
 ⸻
 
@@ -555,13 +555,13 @@ Q5. Can I see who changed what and when?
 
 A. Yes. Bud AI Foundry maintains comprehensive audit logs covering:
 
-	•	Authentication events,
+               • Authentication events,
 
-	•	Model and deployment changes,
+               • Model and deployment changes,
 
-	•	API key operations,
+               • API key operations,
 
-	•	Permission, role, and project changes.
+               • Permission, role, and project changes.
 
 These logs support internal audits and external compliance reviews.
 
@@ -571,11 +571,11 @@ Q6. How does Bud AI Foundry integrate with our existing SSO and directory?
 
 A. The platform supports:
 
-	•	OIDC, OAuth 2.0, and SAML 2.0 for SSO,
+               • OIDC, OAuth 2.0, and SAML 2.0 for SSO,
 
-	•	User federation with LDAP and Microsoft Active Directory,
+               • User federation with LDAP and Microsoft Active Directory,
 
-	•	Identity brokering for third-party IdPs like Okta, Azure AD, and Google Workspace.
+               • Identity brokering for third-party IdPs like Okta, Azure AD, and Google Workspace.
 
 Users sign in with their existing corporate identities and receive roles based on group/attribute mappings.
 
@@ -585,13 +585,13 @@ Q7. Can we limit API usage for specific clients or apps?
 
 A. Yes. You can:
 
-	•	Issue API keys per client/application,
+               • Issue API keys per client/application,
 
-	•	Set rate limits, token quotas, and cost caps,
+               • Set rate limits, token quotas, and cost caps,
 
-	•	Classify APIs as internal or public,
+               • Classify APIs as internal or public,
 
-	•	Attribute usage and cost to specific keys, teams, or clients for chargeback.
+               • Attribute usage and cost to specific keys, teams, or clients for chargeback.
 
 ⸻
 
@@ -599,15 +599,15 @@ Q8. How does the system support compliance frameworks like GDPR or HIPAA?
 
 A. Key features that support compliance include:
 
-	•	MFA, strong password policies, and brute-force detection,
+               • MFA, strong password policies, and brute-force detection,
 
-	•	Role-based least-privilege access,
+               • Role-based least-privilege access,
 
-	•	Centralized IAM and SSO with secure token handling (JWT),
+               • Centralized IAM and SSO with secure token handling (JWT),
 
-	•	Detailed audit logs for access and configuration changes,
+               • Detailed audit logs for access and configuration changes,
 
-	•	Ability to separate projects and control which data each project can access.
+               • Ability to separate projects and control which data each project can access.
 
 These capabilities help you implement and demonstrate appropriate controls to auditors and regulators.
 
@@ -623,12 +623,12 @@ Q10. Can external customers get their own dashboards?
 
 A. Yes. External customers can be configured as Client users with:
 
-	•	Their own dashboards,
+               • Their own dashboards,
 
-	•	Usage visibility (tokens, costs),
+               • Usage visibility (tokens, costs),
 
-	•	Quotas, plans, and billing cycles,
+               • Quotas, plans, and billing cycles,
 
-	•	Access only to the models/agents you expose to them.
+               • Access only to the models/agents you expose to them.
 
 This enables you to offer GenAI as a managed capability to your customers while maintaining full control and observability.
