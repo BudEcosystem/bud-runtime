@@ -182,31 +182,26 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
         cpu_type = "cpu"  # Default type
         
         # Extract instruction sets from NFD labels
-        instruction_sets = []
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.AVX") == "true":
-            instruction_sets.append("AVX")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.AVX2") == "true":
-            instruction_sets.append("AVX2")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.AVX512F") == "true":
-            instruction_sets.append("AVX512")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.VNNI") == "true":
-            instruction_sets.append("VNNI")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXTILE") == "true" or \
-           labels.get("feature.node.kubernetes.io/cpu-cpuid.AMX") == "true":
-            instruction_sets.append("AMX")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXBF16") == "true":
-            instruction_sets.append("AMX-BF16")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.AMXINT8") == "true":
-            instruction_sets.append("AMX-INT8")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.FMA3") == "true":
-            instruction_sets.append("FMA3")
-        if labels.get("feature.node.kubernetes.io/cpu-cpuid.SSE4.2") == "true" or \
-           labels.get("feature.node.kubernetes.io/cpu-cpuid.SSE42") == "true":
-            instruction_sets.append("SSE4.2")
+        INSTRUCTION_SET_MAP = {
+            "AVX": ["feature.node.kubernetes.io/cpu-cpuid.AVX"],
+            "AVX2": ["feature.node.kubernetes.io/cpu-cpuid.AVX2"],
+            "AVX512": ["feature.node.kubernetes.io/cpu-cpuid.AVX512F"],
+            "VNNI": ["feature.node.kubernetes.io/cpu-cpuid.VNNI"],
+            "AMX": ["feature.node.kubernetes.io/cpu-cpuid.AMXTILE", "feature.node.kubernetes.io/cpu-cpuid.AMX"],
+            "AMX-BF16": ["feature.node.kubernetes.io/cpu-cpuid.AMXBF16"],
+            "AMX-INT8": ["feature.node.kubernetes.io/cpu-cpuid.AMXINT8"],
+            "FMA3": ["feature.node.kubernetes.io/cpu-cpuid.FMA3"],
+            "SSE4.2": ["feature.node.kubernetes.io/cpu-cpuid.SSE4.2", "feature.node.kubernetes.io/cpu-cpuid.SSE42"],
+        }
+
+        instruction_sets = [
+            name for name, nfd_labels in INSTRUCTION_SET_MAP.items()
+            if any(labels.get(label) == "true" for label in nfd_labels)
+        ]
         
         # Check for Intel CPUs with high-performance features (AMX or AVX2)
         if cpu_vendor == "Intel":
-            has_amx = "AMX" in instruction_sets or "AMX-BF16" in instruction_sets or "AMX-INT8" in instruction_sets
+            has_amx = any(s.startswith("AMX") for s in instruction_sets)
             has_avx2 = "AVX2" in instruction_sets
             
             if has_amx or has_avx2:
@@ -239,19 +234,21 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
             try:
                 model_int = int(model_id) if model_id else 0
                 family_int = int(family_id) if family_id else 0
+
+                INTEL_GEN_MAP = {
+                    (173, 174, 175): "5th Gen (Emerald Rapids)",
+                    (143,): "4th Gen (Sapphire Rapids)",
+                    (106, 108): "3rd Gen (Ice Lake)",
+                    (85,): "2nd Gen (Cascade Lake)",
+                    (79,): "Broadwell",
+                    (63,): "Haswell",
+                }
+
                 if family_int == 6:  # Intel x86-64
-                    if model_int in [173, 174, 175]:  # Emerald Rapids / Sapphire Rapids Refresh
-                        generation = "5th Gen (Emerald Rapids)"
-                    elif model_int == 143:
-                        generation = "4th Gen (Sapphire Rapids)"
-                    elif model_int in [106, 108]:
-                        generation = "3rd Gen (Ice Lake)"
-                    elif model_int == 85:
-                        generation = "2nd Gen (Cascade Lake)"
-                    elif model_int == 79:
-                        generation = "Broadwell"
-                    elif model_int == 63:
-                        generation = "Haswell"
+                    for model_ids, gen_name in INTEL_GEN_MAP.items():
+                        if model_int in model_ids:
+                            generation = gen_name
+                            break
             except (ValueError, TypeError):
                 pass
         

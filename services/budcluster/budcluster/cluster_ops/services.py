@@ -1008,7 +1008,7 @@ class ClusterOpsService:
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
-                                    "raw_name": cpu.get("name", cpu.get("raw_name", "")),
+                                    "raw_name": cpu.get("raw_name", ""),
                                     "frequency_ghz": cpu.get("frequency_ghz"),
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
