@@ -26,5 +26,5 @@ dependencies:
 - name: mcp-stack
   repository: file://charts/mcp-stack
   version: 0.9.0
-digest: sha256:540f0f61b428a0e7f09d3454dd36504e871e82bf6240ba7fb614d562a09a01c7
-generated: "2025-11-26T16:00:23.434628107+05:30"
+digest: sha256:957e67ea495f2b28cadbde46625d6c2cfdc142b2c77f713970ac5542623f8955
+generated: "2025-11-26T16:46:35.961225217+05:30"

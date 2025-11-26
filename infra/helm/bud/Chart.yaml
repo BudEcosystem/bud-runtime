@@ -44,4 +44,4 @@ dependencies:
   - name: mcp-stack
     version: 0.9.0
     repository: file://charts/mcp-stack
-    condition: mcp-stack.enabled
+    condition: mcpStackEnabled

@@ -60,8 +60,8 @@ deploymentAnnotations:
     keel.sh/match-tag: true
     keel.sh/pollSchedule: "@every 1m"
 
+mcpStackEnabled: true
 mcp-stack:
-    enabled: true
     mcpContextForge:
         config:
             APP_DOMAIN: https://mcpgateway.dev.bud.studio
