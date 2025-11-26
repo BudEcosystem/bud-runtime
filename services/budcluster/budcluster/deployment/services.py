@@ -59,7 +59,6 @@ from .schemas import (
     DeleteWorkerRequest,
     DeploymentCreateRequest,
     DeployQuantizationRequest,
-    UpdateDeploymentStatusRequest,
     WorkerData,
     WorkerInfo,
     WorkerStatusEnum,
@@ -125,17 +124,344 @@ class DeploymentOpsService:
         return SuccessResponse(message="Create deployment resources cleaned up")
 
     @classmethod
-    async def trigger_update_deployment_status(cls, deployment_name: str, cluster_id: UUID, cloud_model: bool = False):
-        """Trigger the update deployment status workflow."""
-        from .workflows import UpdateDeploymentStatusWorkflow
+    async def trigger_periodic_deployment_status_update(cls) -> Union[SuccessResponse, ErrorResponse]:
+        """Trigger deployment status update for all active deployments.
 
-        update_deployment_request = UpdateDeploymentStatusRequest(
-            deployment_name=deployment_name,
-            cluster_id=cluster_id,
-            cloud_model=cloud_model,
-        )
-        response = await UpdateDeploymentStatusWorkflow().__call__(update_deployment_request.model_dump_json())
-        return response
+        This method is called by a periodic cron job to keep deployment status
+        up-to-date. It implements state management and batch processing to
+        prevent resource exhaustion.
+
+        Returns:
+            SuccessResponse: If updates were triggered successfully
+            ErrorResponse: If there was an error triggering updates
+        """
+        from datetime import UTC, timedelta
+
+        from budmicroframe.shared.dapr_service import DaprService
+
+        # Configuration
+        BATCH_SIZE = 2  # Process max 2 deployments concurrently
+        STALE_THRESHOLD_MINUTES = 20  # Consider sync stale after 20 minutes
+        STATE_STORE_KEY = "deployment_status_sync_state"
+        ERROR_RETRY_HOURS = 24  # Retry FAILED deployments every 24 hours
+
+        try:
+            # Initialize state management (optional - gracefully handle if not available)
+            sync_state = {"active_syncs": {}, "last_sync_times": {}, "failed_deployments": {}}
+            use_state_store = False
+            dapr_service = None
+
+            try:
+                dapr_service = DaprService()
+                if hasattr(app_settings, "statestore_name") and app_settings.statestore_name:
+                    try:
+                        state_response = dapr_service.get_state(
+                            store_name=app_settings.statestore_name, key=STATE_STORE_KEY
+                        )
+                        if state_response:
+                            sync_state = state_response.json()
+                        use_state_store = True
+                        logger.debug(f"Retrieved deployment sync state from state store: {sync_state}")
+                    except Exception as e:
+                        logger.debug(f"State store not available or empty, using in-memory state: {e}")
+                else:
+                    logger.debug("State store not configured, using in-memory state")
+            except Exception as e:
+                logger.debug(f"DaprService not available, using in-memory state: {e}")
+
+            # Clean up stale active syncs (older than threshold)
+            current_time = datetime.now(UTC)
+            stale_time = current_time - timedelta(minutes=STALE_THRESHOLD_MINUTES)
+
+            for deployment_key, sync_info in list(sync_state.get("active_syncs", {}).items()):
+                sync_time_str = sync_info.get("started_at", "")
+                if sync_time_str:
+                    sync_time = datetime.fromisoformat(sync_time_str)
+                    if sync_time.tzinfo is None:
+                        sync_time = sync_time.replace(tzinfo=UTC)
+                    if sync_time < stale_time:
+                        logger.warning(f"Removing stale sync for deployment {deployment_key}")
+                        del sync_state["active_syncs"][deployment_key]
+
+            # Get all active deployments from database
+            with DBSession() as session:
+                active_deployments = await WorkerInfoDataManager(session).get_active_deployments()
+
+            # Get FAILED deployments that are due for retry
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=ERROR_RETRY_HOURS)
+            with DBSession() as session:
+                failed_deployments = await WorkerInfoDataManager(session).get_failed_deployments_due_for_retry(
+                    cutoff_time
+                )
+
+            # Combine active and failed deployments
+            all_deployments = active_deployments + failed_deployments
+
+            logger.info(
+                f"Found {len(active_deployments)} active deployments + {len(failed_deployments)} FAILED deployments "
+                f"for status update (total: {len(all_deployments)})"
+            )
+
+            # Filter out deployments that are already being synced
+            deployments_to_sync = []
+            for cluster_id, deployment_name in all_deployments:
+                deployment_key = f"{cluster_id}-{deployment_name}"
+
+                # Skip if already being synced
+                if deployment_key in sync_state.get("active_syncs", {}):
+                    logger.debug(f"Skipping deployment {deployment_key} - already being synced")
+                    continue
+
+                deployments_to_sync.append((cluster_id, deployment_name))
+
+            logger.info(
+                f"Will sync {len(deployments_to_sync)} deployments "
+                f"(excluding {len(all_deployments) - len(deployments_to_sync)} already in progress)"
+            )
+
+            # Process deployments in batches
+            update_count = 0
+            failed_count = 0
+
+            for i in range(0, len(deployments_to_sync), BATCH_SIZE):
+                batch = deployments_to_sync[i : i + BATCH_SIZE]
+                logger.info(f"Processing batch {i // BATCH_SIZE + 1} with {len(batch)} deployments")
+
+                # Process batch concurrently
+                batch_tasks = []
+                for cluster_id, deployment_name in batch:
+                    deployment_key = f"{cluster_id}-{deployment_name}"
+
+                    # Mark as active in state
+                    sync_state["active_syncs"][deployment_key] = {
+                        "started_at": current_time.isoformat(),
+                        "cluster_id": str(cluster_id),
+                        "deployment_name": deployment_name,
+                    }
+
+                    # Create async task for this deployment
+                    batch_tasks.append(cls._sync_single_deployment(cluster_id, deployment_name))
+
+                # Save state BEFORE processing batch to lock these deployments
+                if use_state_store and dapr_service:
+                    try:
+                        await dapr_service.save_to_statestore(
+                            store_name=app_settings.statestore_name, key=STATE_STORE_KEY, value=sync_state
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not save sync state to state store (locking): {e}")
+
+                # Execute batch concurrently and collect results
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+                # Process batch results
+                for (cluster_id, deployment_name), result in zip(batch, batch_results, strict=False):
+                    deployment_key = f"{cluster_id}-{deployment_name}"
+
+                    # Remove from active syncs
+                    sync_state["active_syncs"].pop(deployment_key, None)
+
+                    if isinstance(result, Exception):
+                        logger.error(f"Failed to sync deployment {deployment_key}: {result}")
+                        failed_count += 1
+                        sync_state["failed_deployments"][deployment_key] = {
+                            "error": str(result),
+                            "failed_at": current_time.isoformat(),
+                        }
+                    else:
+                        update_count += 1
+                        sync_state["last_sync_times"][deployment_key] = current_time.isoformat()
+                        # Clear from failed if it was there
+                        sync_state["failed_deployments"].pop(deployment_key, None)
+
+                # Save state after each batch (if state store is available)
+                if use_state_store and dapr_service:
+                    try:
+                        await dapr_service.save_to_statestore(
+                            store_name=app_settings.statestore_name, key=STATE_STORE_KEY, value=sync_state
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not save sync state to state store: {e}")
+
+            # Final state save (if state store is available)
+            if use_state_store and dapr_service:
+                try:
+                    await dapr_service.save_to_statestore(
+                        store_name=app_settings.statestore_name, key=STATE_STORE_KEY, value=sync_state
+                    )
+                    logger.debug("Deployment sync state saved successfully to state store")
+                except Exception as e:
+                    logger.debug(f"Could not save final sync state to state store: {e}")
+
+            message = f"Triggered deployment status update for {update_count} deployments"
+            if failed_count > 0:
+                message += f" ({failed_count} failed)"
+
+            logger.info(message)
+            return SuccessResponse(
+                message=message,
+                param={
+                    "total": len(all_deployments),
+                    "updated": update_count,
+                    "failed": failed_count,
+                    "skipped": len(all_deployments) - len(deployments_to_sync),
+                    "batch_size": BATCH_SIZE,
+                },
+            )
+
+        except Exception as e:
+            logger.exception("Failed to trigger periodic deployment status update")
+            return ErrorResponse(message=f"Failed to trigger periodic deployment status update: {str(e)}")
+
+    @classmethod
+    async def _sync_single_deployment(cls, cluster_id: UUID, deployment_name: str) -> bool:
+        """Sync a single deployment's status by directly calling get_deployment_status.
+
+        This method performs synchronous updates instead of spawning workflows,
+        ensuring true batch processing with controlled concurrency.
+
+        Args:
+            cluster_id: The cluster UUID where the deployment is running
+            deployment_name: The name/namespace of the deployment
+
+        Returns:
+            bool: True if successful, raises exception on failure
+        """
+        import json
+
+        from budmicroframe.shared.dapr_service import DaprServiceCrypto
+
+        deployment_key = f"{cluster_id}-{deployment_name}"
+        logger.debug(f"Syncing deployment status for {deployment_key}")
+
+        try:
+            # Get cluster and decrypt config
+            with DBSession() as session:
+                db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields(
+                    {"id": cluster_id}, missing_ok=True
+                )
+
+                if not db_cluster:
+                    logger.warning(f"Cluster {cluster_id} not found, skipping deployment {deployment_name}")
+                    return True
+
+                # Decrypt config if needed
+                config_dict = {}
+                if db_cluster.configuration:
+                    try:
+                        with DaprServiceCrypto() as dapr_crypto:
+                            configuration_decrypted = dapr_crypto.decrypt_data(db_cluster.configuration)
+                            config_dict = json.loads(configuration_decrypted)
+                    except Exception as e:
+                        logger.error(f"Failed to decrypt config for cluster {cluster_id}: {e}")
+                        raise
+                elif db_cluster.config_file_dict:
+                    config_dict = db_cluster.config_file_dict
+
+                platform = db_cluster.platform
+                ingress_url = db_cluster.ingress_url
+
+            # Get deployment status from K8s
+            deployment_handler = DeploymentHandler(config=config_dict)
+            try:
+                # Determine if cloud model (default to False for periodic sync)
+                cloud_model = False
+                # Optimization: check_pods=False to skip Ansible check and rely on ingress health
+                deployment_status = await deployment_handler.get_deployment_status_async(
+                    deployment_name, ingress_url, cloud_model=cloud_model, platform=platform, check_pods=False
+                )
+                logger.debug(f"Deployment {deployment_key} status: {deployment_status}")
+                current_replica = deployment_status.get("replicas", {}).get("total", 0)
+                current_workers_info = deployment_status.get("worker_data_list")
+            except Exception as e:
+                logger.error(f"Error getting deployment status for {deployment_key}: {e}")
+                raise
+
+            # Get workers info from db and update
+            with DBSession() as session:
+                worker_info_filters = {
+                    "cluster_id": cluster_id,
+                    "namespace": deployment_name,
+                }
+                workers_info, _ = await WorkerInfoDataManager(session).get_all_workers(filters=worker_info_filters)
+                previous_replica = len(workers_info)
+                prev_deployment_status = workers_info[0].deployment_status if workers_info else None
+
+                db_workers_info = []
+                if current_workers_info is not None:
+                    # Full update if we have worker data
+                    workers_info_list = [
+                        WorkerInfoModel(
+                            cluster_id=cluster_id,
+                            namespace=deployment_name,
+                            **worker,
+                            deployment_status=deployment_status["status"],
+                            last_updated_datetime=datetime.now(timezone.utc),
+                        )
+                        for worker in current_workers_info
+                    ]
+                    db_workers_info = await WorkerInfoService(session).update_worker_info(
+                        workers_info_list, workers_info, cluster_id
+                    )
+                elif workers_info:
+                    # Optimized update: just update status and timestamp for existing workers
+                    # This avoids deleting workers when we skipped the pod check
+                    for worker in workers_info:
+                        worker.deployment_status = deployment_status["status"]
+                        worker.last_updated_datetime = datetime.now(timezone.utc)
+                        await WorkerInfoDataManager(session).update_worker_info(worker)
+                    db_workers_info = workers_info
+
+                # Send notification if status changed
+                if (
+                    (prev_deployment_status is not None and deployment_status["status"] != prev_deployment_status)
+                    or (prev_deployment_status is None and deployment_status)
+                    or (current_workers_info is not None and current_replica != previous_replica)
+                ):
+                    logger.info(f"Deployment {deployment_key} status changed, sending notification")
+
+                    deployment_status["worker_data_list"] = [
+                        (WorkerInfo.model_validate(worker)).model_dump(mode="json") for worker in db_workers_info
+                    ]
+
+                    event_name = "deployment-status-update"
+                    content = NotificationContent(
+                        title="Deployment status updated",
+                        message=f"Deployment {deployment_name} status update",
+                        status=WorkflowStatus.COMPLETED,
+                        result={
+                            "deployment_name": deployment_name,
+                            "cluster_id": str(cluster_id),
+                            **deployment_status,
+                        },
+                    )
+                    notification_request = NotificationRequest(
+                        notification_type=NotificationType.EVENT,
+                        name=event_name,
+                        payload=NotificationPayload(
+                            category=NotificationCategory.INTERNAL,
+                            type=event_name,
+                            event="results",
+                            content=content,
+                            workflow_id="",  # No workflow for periodic updates
+                        ),
+                        topic_keys=["budAppMessages"],
+                    )
+                    with DaprService() as dapr_service:
+                        dapr_service.publish_to_topic(
+                            data=notification_request.model_dump(mode="json"),
+                            target_topic_name="budAppMessages",
+                            target_name=None,
+                            event_type=notification_request.payload.type,
+                        )
+                    logger.info(f"Deployment status notification sent for {deployment_key}")
+
+            logger.debug(f"Successfully synced deployment {deployment_key}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to sync deployment {deployment_key}: {e}")
+            raise
 
 
 class DeploymentService(SessionMixin):

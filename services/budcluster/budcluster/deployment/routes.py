@@ -21,7 +21,7 @@ from uuid import UUID
 
 from budmicroframe.commons import logging
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse, WorkflowMetadataResponse
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..commons.dependencies import get_session, parse_ordering_fields
@@ -128,11 +128,11 @@ def cancel_deployment(
 
 
 @deployment_router.post(
-    "/update-deployment-status",
+    "/periodic-deployment-status-update",
     responses={
         status.HTTP_200_OK: {
-            "model": WorkflowMetadataResponse,
-            "description": "Deployment status updated successfully",
+            "model": SuccessResponse,
+            "description": "Periodic deployment status update triggered successfully",
         },
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
             "model": ErrorResponse,
@@ -140,22 +140,40 @@ def cancel_deployment(
         },
     },
     status_code=status.HTTP_200_OK,
-    description="Update the status of a node",
+    description="Periodic job endpoint to update deployment status for all active deployments",
     tags=["Deployments"],
 )
-async def update_deployment_status(
-    deployment_name: Annotated[str, Body(embed=True)],  # noqa: B008
-    cluster_id: Annotated[UUID, Body(embed=True)],  # noqa: B008
-    cloud_model: Annotated[bool, Body(embed=True)] = False,  # noqa: B008
-):
-    """Update the status of a node."""
+async def periodic_deployment_status_update():
+    """Periodic job endpoint to update deployment status for all active deployments.
+
+    This endpoint is triggered by a Dapr cron binding every 3 minutes to keep
+    deployment status up-to-date. It implements batch processing and state
+    management to prevent resource exhaustion.
+
+    Returns:
+        SuccessResponse: If updates were triggered successfully with counts
+        ErrorResponse: If there was an error triggering updates
+    """
+    from datetime import datetime
+
     try:
-        response = await DeploymentOpsService.trigger_update_deployment_status(
-            deployment_name, cluster_id, cloud_model
+        trigger_time = datetime.utcnow()
+        logger.info(f"Periodic deployment status update triggered at {trigger_time.isoformat()}")
+
+        response = await DeploymentOpsService.trigger_periodic_deployment_status_update()
+
+        completion_time = datetime.utcnow()
+        duration = (completion_time - trigger_time).total_seconds()
+
+        logger.info(
+            f"Periodic deployment status update completed in {duration:.2f}s: "
+            f"{response.message if hasattr(response, 'message') else 'success'}"
         )
+
+        return response.to_http_response()
     except Exception as e:
-        return ErrorResponse(message=str(e), param={"deployment_name": deployment_name, "cluster_id": str(cluster_id)})
-    return response.to_http_response()
+        logger.exception(f"Error in periodic deployment status update: {e}")
+        return ErrorResponse(message=f"Error in periodic deployment status update: {str(e)}").to_http_response()
 
 
 @deployment_router.post(

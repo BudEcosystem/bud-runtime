@@ -966,14 +966,42 @@ class KubernetesHandler(BaseClusterHandler):
 
         return replicas
 
-    def get_deployment_status(self, values: dict, cloud_model: bool = False, ingress_health: bool = True) -> str:
+    def get_deployment_status(
+        self, values: dict, cloud_model: bool = False, ingress_health: bool = True, check_pods: bool = True
+    ) -> str:
         """Get the status of a deployment on the Kubernetes cluster."""
         logger.info(
             f"get_deployment_status called for {values.get('namespace', 'unknown')}: "
-            f"cloud_model={cloud_model}, ingress_health={ingress_health}"
+            f"cloud_model={cloud_model}, ingress_health={ingress_health}, check_pods={check_pods}"
         )
         if not self.ingress_url:
             raise KubernetesException("Ingress URL is not set")
+
+        # Optimization: Skip pod checks if check_pods is False
+        if not check_pods:
+            if not ingress_health:
+                # If both are False, we can't determine status
+                logger.warning("Both check_pods and ingress_health are False, returning unknown status")
+                return {
+                    "status": DeploymentStatusEnum.UNKNOWN,
+                    "replicas": {},
+                    "ingress_health": False,
+                    "worker_data_list": None,
+                }
+
+            # Only check ingress health
+            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            status = DeploymentStatusEnum.COMPLETED if ingress_healthy else DeploymentStatusEnum.FAILED
+            logger.info(
+                f"Optimized status check for {values['namespace']}: {status} (ingress_healthy={ingress_healthy})"
+            )
+
+            return {
+                "status": status,
+                "replicas": {},
+                "ingress_health": ingress_healthy,
+                "worker_data_list": None,  # Return None to indicate no worker data update
+            }
 
         while True:
             result = self.ansible_executor.run_playbook(

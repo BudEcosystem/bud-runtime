@@ -808,6 +808,20 @@ api_key_location = "env::API_KEY"
             )
         )
 
+    async def get_deployment_status_async(
+        self,
+        namespace: str,
+        ingress_url: str,
+        cloud_model: bool = False,
+        platform: Optional[ClusterPlatformEnum] = None,
+        ingress_health: bool = True,
+        check_pods: bool = True,
+    ):
+        """Get the status of a deployment by namespace asynchronously."""
+        return await get_deployment_status(
+            self.config, ingress_url, {"namespace": namespace}, cloud_model, platform, ingress_health, check_pods
+        )
+
     async def get_pod_status(self, namespace: str, pod_name: str, platform: Optional[ClusterPlatformEnum] = None):
         """Get the status of a pod by namespace and pod name."""
         return await get_pod_status(self.config, namespace, pod_name, platform)
