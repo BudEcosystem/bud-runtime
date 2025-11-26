@@ -1336,6 +1336,16 @@ class ClusterOpsService:
         """
         from datetime import timedelta
 
+        from budmicroframe.commons.schemas import (
+            NotificationCategory,
+            NotificationContent,
+            NotificationPayload,
+            NotificationRequest,
+            NotificationType,
+            WorkflowStatus,
+        )
+        from budmicroframe.shared.dapr_service import DaprService
+
         cutoff_time = datetime.utcnow() - timedelta(hours=threshold_hours)
 
         try:
@@ -1361,14 +1371,39 @@ class ClusterOpsService:
                             f"Cluster {cluster.id} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE"
                         )
 
-                        # Send notification about the state change
-                        await cls._send_cluster_state_notification(
-                            cluster_id=cluster.id,
-                            cluster_name=cluster.host,
-                            old_status=ClusterStatusEnum.NOT_AVAILABLE.value,
-                            new_status=ClusterStatusEnum.ERROR.value,
-                            message=f"Cluster {cluster.host} moved to ERROR state after {threshold_hours} hours in NOT_AVAILABLE",
+                        # Send notification using cluster-status-update event type
+                        cluster_id_str = str(cluster.id)
+                        event_name = "cluster-status-update"
+                        content = NotificationContent(
+                            title="Cluster status updated",
+                            message=f"Cluster {cluster.host} moved to ERROR state",
+                            status=WorkflowStatus.COMPLETED,
+                            result={
+                                "cluster_id": cluster_id_str,
+                                "status": ClusterStatusEnum.ERROR.value,
+                                "node_info": {"id": cluster_id_str, "nodes": []},
+                            },
                         )
+                        notification_request = NotificationRequest(
+                            notification_type=NotificationType.EVENT,
+                            name=event_name,
+                            payload=NotificationPayload(
+                                category=NotificationCategory.INTERNAL,
+                                type=event_name,
+                                event="results",
+                                content=content,
+                                workflow_id="",
+                            ),
+                            topic_keys=["budAppMessages"],
+                        )
+                        with DaprService() as dapr_service:
+                            dapr_service.publish_to_topic(
+                                data=notification_request.model_dump(mode="json"),
+                                target_topic_name="budAppMessages",
+                                target_name=None,
+                                event_type=notification_request.payload.type,
+                            )
+                        logger.info(f"Sent ERROR notification for cluster {cluster_id_str}")
 
                 if moved_count > 0:
                     logger.info(f"Moved {moved_count} clusters from NOT_AVAILABLE to ERROR")
@@ -1413,6 +1448,16 @@ class ClusterOpsService:
         Args:
             cluster_id: ID of the cluster that failed
         """
+        from budmicroframe.commons.schemas import (
+            NotificationCategory,
+            NotificationContent,
+            NotificationPayload,
+            NotificationRequest,
+            NotificationType,
+            WorkflowStatus,
+        )
+        from budmicroframe.shared.dapr_service import DaprService
+
         try:
             with DBSession() as session:
                 cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
@@ -1420,6 +1465,9 @@ class ClusterOpsService:
                 if not cluster:
                     logger.error(f"Cluster {cluster_id} not found for failure handling")
                     return
+
+                cluster_id_str = str(cluster_id)
+                new_status = None
 
                 # If currently AVAILABLE, move to NOT_AVAILABLE and record timestamp
                 if cluster.status == ClusterStatusEnum.AVAILABLE:
@@ -1430,9 +1478,10 @@ class ClusterOpsService:
                             "not_available_since": datetime.utcnow(),
                         },
                     )
+                    new_status = ClusterStatusEnum.NOT_AVAILABLE
                     logger.info(f"Cluster {cluster_id} moved to NOT_AVAILABLE")
 
-                # If ERROR, just update retry time
+                # If ERROR, update retry time and keep status as ERROR
                 elif cluster.status == ClusterStatusEnum.ERROR:
                     await ClusterDataManager(session).update_cluster_by_fields(
                         cluster,
@@ -1440,7 +1489,42 @@ class ClusterOpsService:
                             "last_retry_time": datetime.utcnow(),
                         },
                     )
+                    new_status = ClusterStatusEnum.ERROR
                     logger.debug(f"Updated retry time for ERROR cluster {cluster_id}")
+
+                # Send notification to budapp for both NOT_AVAILABLE and ERROR cases
+                if new_status:
+                    event_name = "cluster-status-update"
+                    content = NotificationContent(
+                        title="Cluster status updated",
+                        message=f"Cluster {cluster_id_str} status: {new_status.value}",
+                        status=WorkflowStatus.COMPLETED,
+                        result={
+                            "cluster_id": cluster_id_str,
+                            "status": new_status.value,
+                            "node_info": {"id": cluster_id_str, "nodes": []},
+                        },
+                    )
+                    notification_request = NotificationRequest(
+                        notification_type=NotificationType.EVENT,
+                        name=event_name,
+                        payload=NotificationPayload(
+                            category=NotificationCategory.INTERNAL,
+                            type=event_name,
+                            event="results",
+                            content=content,
+                            workflow_id="",
+                        ),
+                        topic_keys=["budAppMessages"],
+                    )
+                    with DaprService() as dapr_service:
+                        dapr_service.publish_to_topic(
+                            data=notification_request.model_dump(mode="json"),
+                            target_topic_name="budAppMessages",
+                            target_name=None,
+                            event_type=notification_request.payload.type,
+                        )
+                    logger.info(f"Sent {new_status.value} notification for cluster {cluster_id_str}")
 
         except Exception as e:
             logger.error(f"Failed to handle cluster failure for {cluster_id}: {e}")
@@ -1452,6 +1536,16 @@ class ClusterOpsService:
         Args:
             cluster_id: ID of the cluster that succeeded
         """
+        from budmicroframe.commons.schemas import (
+            NotificationCategory,
+            NotificationContent,
+            NotificationPayload,
+            NotificationRequest,
+            NotificationType,
+            WorkflowStatus,
+        )
+        from budmicroframe.shared.dapr_service import DaprService
+
         try:
             with DBSession() as session:
                 cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
@@ -1462,6 +1556,8 @@ class ClusterOpsService:
 
                 # Reset to AVAILABLE and clear timestamps
                 previous_status = cluster.status
+                cluster_id_str = str(cluster_id)
+
                 await ClusterDataManager(session).update_cluster_by_fields(
                     cluster,
                     {
@@ -1474,14 +1570,38 @@ class ClusterOpsService:
                 if previous_status in [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR]:
                     logger.info(f"Cluster {cluster_id} recovered from {previous_status} to AVAILABLE")
 
-                    # Send notification about the recovery
-                    await cls._send_cluster_state_notification(
-                        cluster_id=cluster.id,
-                        cluster_name=cluster.host,
-                        old_status=previous_status.value,
-                        new_status=ClusterStatusEnum.AVAILABLE.value,
-                        message=f"Cluster {cluster.host} recovered from {previous_status.value} to AVAILABLE",
+                    # Send notification using cluster-status-update event type
+                    event_name = "cluster-status-update"
+                    content = NotificationContent(
+                        title="Cluster status updated",
+                        message=f"Cluster {cluster_id_str} recovered to AVAILABLE",
+                        status=WorkflowStatus.COMPLETED,
+                        result={
+                            "cluster_id": cluster_id_str,
+                            "status": ClusterStatusEnum.AVAILABLE.value,
+                            "node_info": {"id": cluster_id_str, "nodes": []},
+                        },
                     )
+                    notification_request = NotificationRequest(
+                        notification_type=NotificationType.EVENT,
+                        name=event_name,
+                        payload=NotificationPayload(
+                            category=NotificationCategory.INTERNAL,
+                            type=event_name,
+                            event="results",
+                            content=content,
+                            workflow_id="",
+                        ),
+                        topic_keys=["budAppMessages"],
+                    )
+                    with DaprService() as dapr_service:
+                        dapr_service.publish_to_topic(
+                            data=notification_request.model_dump(mode="json"),
+                            target_topic_name="budAppMessages",
+                            target_name=None,
+                            event_type=notification_request.payload.type,
+                        )
+                    logger.info(f"Sent AVAILABLE notification for cluster {cluster_id_str}")
 
         except Exception as e:
             logger.error(f"Failed to handle cluster success for {cluster_id}: {e}")

@@ -67,6 +67,11 @@ class KubernetesHandler(BaseClusterHandler):
             # Disable SSL cert validation and hostname verification
             self.api_configuration.verify_ssl = app_settings.validate_certs
 
+            # Set connection and read timeout to prevent indefinite blocking
+            # This prevents hanging when clusters are unreachable
+            # Format: (connect_timeout, read_timeout) in seconds
+            self.api_configuration.timeout = (30, 30)  # 30 seconds for connect and read
+
             # Store an API client instance for this configuration
             self.api_client = client.ApiClient(self.api_configuration)
 
