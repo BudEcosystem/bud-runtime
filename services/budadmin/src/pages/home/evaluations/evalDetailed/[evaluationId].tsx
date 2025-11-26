@@ -204,7 +204,7 @@ const EvalDetailed = () => {
         <div className="w-full px-[3.6rem] flex-1 overflow-y-auto no-scrollbar">
           <div className="w-full pt-[1.8rem]">
             <div className="w-full flex justify-between items-center">
-              <Text_28_600_FFFFFF>
+              <Text_28_600_FFFFFF className="capitalize">
                 {selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name || "Loading..."}
               </Text_28_600_FFFFFF>
             </div>
