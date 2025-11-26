@@ -59,7 +59,9 @@ interface GuardrailStore {
     projectId?: string,
     overrideFilters?: Partial<GuardrailFilters>
   ) => Promise<void>;
-  deleteGuardrail: (id: string) => Promise<any>;
+  deleteGuardrail: (id: string, projectId: string) => Promise<any>;
+  fetchGuardrailDetail: (id: string) => Promise<void>;
+  selectedGuardrail: GuardrailProfile | null;
 }
 
 // Default filters
@@ -81,6 +83,7 @@ const defaultPagination: PaginationState = {
 export const useGuardrails = create<GuardrailStore>((set, get) => ({
   // Initial state
   guardrails: [],
+  selectedGuardrail: null,
   filters: defaultFilters,
   pagination: defaultPagination,
   isLoading: false,
@@ -122,8 +125,8 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         : filters;
 
       const params: any = {
-        page: 1,
-        limit: 100, // Fetch more records since pagination is disabled
+        page: pagination.page,
+        limit: pagination.limit,
       };
 
       // Add optional filters
@@ -218,7 +221,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       set({ error: errorMsg, isLoading: false, guardrails: [] });
     }
   },
-  deleteGuardrail: async (id: string): Promise<any> => {
+  deleteGuardrail: async (id: string, projectId: string): Promise<any> => {
     try {
       const response: any = await AppRequest.Delete(
         `/guardrails/profile/${id}`,
@@ -226,7 +229,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         {
           headers: {
             "x-resource-type": "project",
-            "x-entity-id": id,
+            "x-entity-id": projectId,
           },
         }
       );
@@ -234,6 +237,26 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       return response;
     } catch (error) {
       console.error("Error deleting guardrail:", error);
+    }
+  },
+
+  // Fetch guardrail detail
+  fetchGuardrailDetail: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await AppRequest.Get(`/guardrails/profile/${id}`);
+      if (response.data && response.data.profile) {
+        set({ selectedGuardrail: response.data.profile, isLoading: false });
+      } else {
+        throw new Error("Invalid response structure");
+      }
+    } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch guardrail details";
+      message.error(errorMsg);
+      set({ error: errorMsg, isLoading: false });
     }
   },
 }));

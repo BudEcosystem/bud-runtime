@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import DashBoardLayout from "../../layout";
 import { useEvaluations } from "src/hooks/useEvaluations";
@@ -115,6 +115,26 @@ const ExperimentDetailsPage = () => {
         }
     }, [experimentId]);
 
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const scrollPositionRef = useRef(0);
+
+    const refreshETA = async() => {
+        const container = scrollContainerRef.current;
+        if (container) {
+            scrollPositionRef.current = container.scrollTop;
+        }
+        if (experimentId && typeof experimentId === "string") {
+            await getExperimentDetails(experimentId);
+            requestAnimationFrame(() => {
+                const container = scrollContainerRef.current;
+                if (container) {
+                    container.scrollTop = scrollPositionRef.current;
+                }
+            });
+
+        }
+    }
+
     if (loading) {
         return (
             <DashBoardLayout>
@@ -193,7 +213,7 @@ const ExperimentDetailsPage = () => {
                 <div className="border-b-[1px] border-b-[#2c2654] px-[1.15rem] py-[1.05rem] flex-shrink-0">
                     <ExperimentHeader />
                 </div>
-                <div className="w-full px-[3.6rem] flex-1 overflow-y-auto no-scrollbar">
+                <div className="w-full px-[3.6rem] flex-1 overflow-y-auto no-scrollbar" ref={scrollContainerRef}>
                     {/* Metrics Cards */}
                     <div className="w-full pt-[1.8rem]">
                         <div className="w-full flex justify-between items-center">
@@ -362,6 +382,7 @@ const ExperimentDetailsPage = () => {
                                             <BenchmarkProgress
                                                 key={benchmark.id}
                                                 benchmark={benchmark}
+                                                refreshETA={refreshETA}
                                             />
                                         );
                                     },

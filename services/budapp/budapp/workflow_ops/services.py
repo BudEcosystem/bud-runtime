@@ -158,6 +158,7 @@ class WorkflowService(SessionMixin):
             max_input_tokens = required_data.get("max_input_tokens")
             max_output_tokens = required_data.get("max_output_tokens")
             datasets = required_data.get("datasets")
+            dataset_ids = required_data.get("dataset_ids")
             nodes = required_data.get("nodes")
             credential_id = required_data.get("credential_id")
             user_confirmation = required_data.get("user_confirmation")
@@ -427,6 +428,7 @@ class WorkflowService(SessionMixin):
                 enable_tool_calling=enable_tool_calling if enable_tool_calling else None,
                 enable_reasoning=enable_reasoning if enable_reasoning else None,
                 hardware_mode=hardware_mode if hardware_mode else None,
+                dataset_ids=dataset_ids,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -540,9 +542,7 @@ class WorkflowService(SessionMixin):
                 "user_confirmation",
                 "run_as_simulation",
             ],
-            "evaluation": [
-                BudServeWorkflowStepEventName.EVALUATION_EVENTS.value,
-            ],
+            "evaluation": [BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, "dataset_ids"],
             "add_adapter": [
                 "adapter_model_id",
                 "adapter_name",

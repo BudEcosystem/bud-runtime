@@ -107,11 +107,15 @@ class Dataset(BaseModel):
     url: str
     size_mb: float
     checksum: str
-    sample_count: int
+    sample_count: Optional[int] = None
     traits: List[str]
     metadata: DatasetMetadata
     eval_type: Optional[Dict[str, str]] = None  # Evaluation type configurations
     original_data: Optional[Dict[str, Any]] = None  # Original metadata from source
+
+    # Evaluation configuration fields
+    metrics: Optional[List[str]] = None  # List of metric names (e.g., ["accuracy"])
+    evaluator: Optional[str] = None  # Evaluator class name (e.g., "GPQAEvaluator")
 
 
 class DatasetCollection(BaseModel):

@@ -653,18 +653,21 @@ class ModelExtractionService:
         except (Exception, SaveRegistryException) as e:
             logger.exception("Error saving the model to the registry: %s", str(e))
 
-            # Delete the model from local path if it exists
-            downloaded_model_path = os.path.join(app_settings.model_download_dir, model_path)
-            safe_delete(downloaded_model_path)
-            DownloadHistory.delete_download_history(model_path)
+            # DON'T delete local files or download history - preserve for retry/resume
+            # Mark download as FAILED instead
+            try:
+                DownloadHistory.mark_download_failed(model_path)
+                logger.info("Marked download as FAILED for %s (files preserved for retry)", model_path)
+            except Exception as mark_error:
+                logger.warning("Failed to mark download as FAILED: %s", mark_error)
 
             notification_req.payload.event = "save_model"
             error_message = str(e)
             notification_req.payload.content = NotificationContent(
                 title="Failed to save the model to the registry",
-                message=f"{error_message}. Fix: Retry saving the model"
+                message=f"{error_message}. Files preserved for retry. Fix: Retry the workflow to resume upload"
                 if error_message
-                else "Fix: Retry saving the model",
+                else "Files preserved for retry. Fix: Retry the workflow to resume upload",
                 status=WorkflowStatus.FAILED,
                 primary_action="retry",
             )
@@ -1505,7 +1508,11 @@ class ModelSecurityScanService:
                 dapr_service = DaprService()
                 state_store_key = f"eta_{workflow_id}"
                 start_time = datetime.now(timezone.utc).isoformat()
-                state = dapr_service.get_state(app_settings.statestore_name, key=state_store_key).json()
+                response = dapr_service.get_state(app_settings.statestore_name, key=state_store_key)
+                if not response.data:
+                    logger.warning("State store data is empty for key: %s", state_store_key)
+                    return downloaded_files
+                state = response.json()
                 state["current_step"] = "minio_download"
                 state["steps_data"]["minio_download"]["start_time"] = start_time
                 state["steps_data"]["minio_download"]["download_path"] = local_destination
@@ -2025,16 +2032,52 @@ class ModelExtractionETAObserver:
         notification_request: NotificationRequest,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
+        model_uri: Optional[str] = None,
+        provider_type: Optional[str] = None,
+        hf_token: Optional[str] = None,
     ) -> int:
         """Calculate the ETA for the model extraction process."""
         try:
             # Get the state store data
             state_store_key = f"eta_{workflow_id}"
             dapr_service = DaprService()
-            state_store_data = dapr_service.get_state(
+            response = dapr_service.get_state(
                 store_name=app_settings.statestore_name,
                 key=state_store_key,
-            ).json()
+            )
+
+            if not response.data:
+                logger.warning(
+                    "State store data is empty for key: %s. Attempting lazy initialization.", state_store_key
+                )
+
+                if model_uri and provider_type:
+                    try:
+                        logger.info("Lazy initializing ETA state for workflow: %s", workflow_id)
+                        ModelExtractionService.calculate_initial_eta(
+                            provider_type=provider_type,
+                            model_uri=model_uri,
+                            workflow_id=workflow_id,
+                            hf_token=hf_token,
+                        )
+                        # Fetch the state again after initialization
+                        response = dapr_service.get_state(
+                            store_name=app_settings.statestore_name,
+                            key=state_store_key,
+                        )
+                        if not response.data:
+                            logger.error(
+                                "State store data still empty after lazy initialization for key: %s", state_store_key
+                            )
+                            return
+                    except Exception as e:
+                        logger.exception("Error during lazy initialization of ETA state: %s", e)
+                        return
+                else:
+                    logger.warning("Cannot lazy initialize ETA state: missing model_uri or provider_type")
+                    return
+
+            state_store_data = response.json()
         except Exception as e:
             logger.exception("Unable to get state store data while calculating ETA: %s", e)
             return
@@ -2104,16 +2147,16 @@ class SecurityScanETAObserver:
     def calculate_model_download_eta(state_store_data: Dict[str, Any]):
         """Calculate the ETA for model download."""
         total_size = state_store_data["steps_data"]["minio_download"]["total_size"]
-        downloaded_size = state_store_data["steps_data"]["minio_download"]["downloaded_size"]
+        downloaded_size = state_store_data["steps_data"]["minio_download"]["downloaded_size"] or 0
         start_time_utc = state_store_data["steps_data"]["minio_download"]["start_time"]
         start_time = datetime.fromisoformat(start_time_utc)
         current_time = datetime.now(timezone.utc)
 
         time_diff = (current_time - start_time).total_seconds()
-        download_speed = downloaded_size / time_diff
 
-        if time_diff > 0:
+        if time_diff > 0 and downloaded_size > 0:
             try:
+                download_speed = downloaded_size / time_diff
                 eta = (total_size - downloaded_size) / download_speed
                 logger.debug("Minio download workflow ETA:%s", eta)
                 return math.ceil(eta)
@@ -2138,16 +2181,45 @@ class SecurityScanETAObserver:
         notification_request: NotificationRequest,
         target_topic_name: Optional[str] = None,
         target_name: Optional[str] = None,
+        model_path: Optional[str] = None,
     ) -> int:
         """Calculate estimated time of arrival for workflow completion."""
         try:
             # Get the state store data
             state_store_key = f"eta_{workflow_id}"
             dapr_service = DaprService()
-            state_store_data = dapr_service.get_state(
+            response = dapr_service.get_state(
                 store_name=app_settings.statestore_name,
                 key=state_store_key,
-            ).json()
+            )
+
+            if not response.data:
+                logger.warning(
+                    "State store data is empty for key: %s. Attempting lazy initialization.", state_store_key
+                )
+
+                if model_path:
+                    try:
+                        logger.info("Lazy initializing ETA state for security scan workflow: %s", workflow_id)
+                        ModelSecurityScanService.calculate_initial_eta(workflow_id=workflow_id, model_path=model_path)
+                        # Fetch the state again after initialization
+                        response = dapr_service.get_state(
+                            store_name=app_settings.statestore_name,
+                            key=state_store_key,
+                        )
+                        if not response.data:
+                            logger.error(
+                                "State store data still empty after lazy initialization for key: %s", state_store_key
+                            )
+                            return
+                    except Exception as e:
+                        logger.exception("Error during lazy initialization of ETA state: %s", e)
+                        return
+                else:
+                    logger.warning("Cannot lazy initialize ETA state: missing model_path")
+                    return
+
+            state_store_data = response.json()
         except Exception as e:
             logger.exception("Unable to get state store data while calculating ETA: %s", e)
             return

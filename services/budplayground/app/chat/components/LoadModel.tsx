@@ -1,7 +1,7 @@
 import { Button, Image } from "antd";
 import React, { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { assetBaseUrl } from "@/app/lib/environment";
+import { useConfig } from "@/app/context/ConfigContext";
 import SearchHeaderInput from "../../components/bud/components/input/SearchHeaderInput";
 import { ModelListCard } from "../../components/bud/components/ModelListCard";
 import BlurModal from "../../components/bud/components/modal/BlurModal";
@@ -17,6 +17,7 @@ interface LoadModelProps {
 
 
 export default function LoadModel(props: LoadModelProps) {
+    const { assetBaseUrl } = useConfig();
     const { endpoints, getEndPoints, isReady } = useEndPoints();
     const chat = useChatStore.getState().getChat(props.chatId);
     const { setDeployment, isDeploymentLocked } = useChatStore();

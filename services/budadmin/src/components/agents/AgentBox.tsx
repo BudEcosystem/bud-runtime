@@ -140,15 +140,15 @@ function AgentBoxInner({
     }
   }, [session, updateSession]);
 
-  // Load prompt config from backend on mount to restore data after page refresh
+  // Load prompt config from backend on mount and when drawer re-opens
   React.useEffect(() => {
     const loadPromptConfig = async () => {
-      // Skip if no promptId or already loaded for this promptId
+      // Skip if no promptId
       if (!session?.promptId || !session?.id) return;
-      if (hasLoadedConfigRef.current === session.promptId) return;
 
-      // Skip if session already has deployment set (user has already configured)
-      if (session.selectedDeployment?.name) return;
+      // Skip only if we've already loaded for this exact promptId in this component instance
+      // This allows reloading when returning from playground (component remounts)
+      if (hasLoadedConfigRef.current === session.promptId) return;
 
       try {
         const response = await getPromptConfig(session.promptId);
@@ -194,6 +194,7 @@ function AgentBoxInner({
             const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
             if (inputVars.length > 0) {
               updates.inputVariables = inputVars;
+              setStructuredInputEnabled(true);
             }
           }
 
@@ -202,6 +203,7 @@ function AgentBoxInner({
             const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
             if (outputVars.length > 0) {
               updates.outputVariables = outputVars;
+              setStructuredOutputEnabled(true);
             }
           }
 
@@ -775,100 +777,27 @@ function AgentBoxInner({
     }
   };
 
-  const handleClearInputSchema = async () => {
-    if (!session) {
-      errorToast("No session data available");
-      return;
-    }
+  // Helper to create a default variable for clearing schemas
+  const createDefaultVariable = (type: 'input' | 'output'): AgentVariable => ({
+    id: generateVarId(),
+    name: type === 'input' ? 'Input Variable 1' : 'Output Variable 1',
+    value: '',
+    type,
+    description: '',
+    dataType: 'string',
+    defaultValue: '',
+  });
 
-    if (!session.selectedDeployment?.name) {
-      errorToast("Please select a deployment model first");
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      // Build payload with null schema to clear/delete the saved schema
-      const payload = createSchemaPayload("input", null, false);
-
-      // Make the API call
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-schema`,
-        payload
-      );
-
-      if (response && response.data) {
-        // Reset session input variables to default
-        updateSession(session.id, {
-          inputVariables: [
-            {
-              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-              name: "Input Variable 1",
-              value: "",
-              type: "input",
-              description: "",
-              dataType: "string",
-              defaultValue: ""
-            }
-          ]
-        });
-        successToast("Input schema cleared");
-      }
-    } catch (error: any) {
-      console.error("Error clearing input schema:", error);
-      errorToast(error?.response?.data?.detail || "Failed to clear input schema");
-    } finally {
-      setIsSaving(false);
-    }
+  const handleClearInputSchema = () => {
+    if (!session) return;
+    // Only update local state - API call will be made on Update button click
+    updateSession(session.id, { inputVariables: [createDefaultVariable('input')] });
   };
 
-  const handleClearOutputSchema = async () => {
-    if (!session) {
-      errorToast("No session data available");
-      return;
-    }
-
-    if (!session.selectedDeployment?.name) {
-      errorToast("Please select a deployment model first");
-      return;
-    }
-
-    setIsSavingOutput(true);
-
-    try {
-      // Build payload with null schema to clear/delete the saved schema
-      const payload = createSchemaPayload("output", null, false);
-
-      // Make the API call
-      const response = await AppRequest.Post(
-        `${tempApiBaseUrl}/prompts/prompt-schema`,
-        payload
-      );
-
-      if (response && response.data) {
-        // Reset session output variables to default
-        updateSession(session.id, {
-          outputVariables: [
-            {
-              id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-              name: "Output Variable 1",
-              value: "",
-              type: "output",
-              description: "",
-              dataType: "string",
-              defaultValue: ""
-            }
-          ]
-        });
-        successToast("Output schema cleared");
-      }
-    } catch (error: any) {
-      console.error("Error clearing output schema:", error);
-      errorToast(error?.response?.data?.detail || "Failed to clear output schema");
-    } finally {
-      setIsSavingOutput(false);
-    }
+  const handleClearOutputSchema = () => {
+    if (!session) return;
+    // Only update local state - API call will be made on Update button click
+    updateSession(session.id, { outputVariables: [createDefaultVariable('output')] });
   };
 
   const handleSaveSystemPrompt = async () => {

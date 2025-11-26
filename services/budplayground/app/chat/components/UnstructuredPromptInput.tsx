@@ -67,9 +67,9 @@ export default function UnstructuredPromptInput({
         handleSubmit={handleSubmit}
         input={input}
       />
-      <span className="text-white text-[0.75rem] opacity-50 mt-1 mb-2">
+      {/* <span className="text-white text-[0.75rem] opacity-50 mt-1 mb-2">
         You are chatting using the unstructured prompt format.
-      </span>
+      </span> */}
     </>
   );
 }

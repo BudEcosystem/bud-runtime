@@ -51,6 +51,7 @@ const EvalDetailed = () => {
   const [activeTab, setActiveTab] = useState("1");
   const [showAllTags, setShowAllTags] = useState(false);
   const [datasets, setDatasets] = useState<any>(null);
+  const [leaderBoardData, setLeaderBoardData] = useState<any[] | null>(null);
   const [datasetDetails, setDatasetDetails] = useState<any>(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState<any>(null);
   const router = useRouter();
@@ -109,7 +110,7 @@ const EvalDetailed = () => {
               </div>
             </button>
             <CustomBreadcrumb
-              urls={["/evaluations", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
+              urls={["/evaluations?tab=3", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
               data={["Evaluations", selectedEvaluation?.name || datasetDetails?.dataset?.name || datasets?.datasets?.[0]?.name]}
             />
           </div>
@@ -132,28 +133,42 @@ const EvalDetailed = () => {
 
   // Fetch datasets when id is available
   useEffect(() => {
-    const fetchDatasets = async () => {
-      if (id) {
-        try {
-          const response = await AppRequest.Get(`/experiments/datasets/${id}`);
-          console.log("Datasets API Response:", response.data);
-          setDatasets(response.data.dataset);
-          // If we have datasets, fetch the first dataset's details as an example
-          if (response.data && response.data.datasets && response.data.datasets.length > 0) {
-            const firstDatasetId = response.data.datasets[0].dataset_id;
-            await fetchDatasetById(firstDatasetId);
-          }
-        } catch (error) {
-          console.error("Error fetching datasets:", error);
+    const fetchAll = async () => {
+      if (!id) return;
+
+      try {
+        const datasetPromise = AppRequest.Get(`/experiments/datasets/${id}`);
+        const leaderboardPromise = AppRequest.Get(`/experiments/datasets/${id}/scores`);
+
+        const [datasetsRes, leaderboardRes] = await Promise.all([
+          datasetPromise,
+          leaderboardPromise
+        ]);
+
+        console.log("Datasets API Response:", datasetsRes.data);
+
+        // Set datasets list
+        setDatasets(datasetsRes.data.dataset);
+
+        // Fetch first dataset details if exists
+        if (datasetsRes?.data?.datasets?.length > 0) {
+          const firstDatasetId = datasetsRes.data.datasets[0].dataset_id;
+          await fetchDatasetById(firstDatasetId);
         }
-        finally {
-          hideLoader();
-        }
+
+        // Set leaderboard
+        setLeaderBoardData(leaderboardRes.data.scores);
+
+      } catch (error) {
+        console.error("Error fetching experiment datasets or leaderboard:", error);
+      } finally {
+        hideLoader(); // 🔥 only one call, after ALL requests finish
       }
     };
 
-    fetchDatasets();
+    fetchAll();
   }, [id, hideLoader]);
+
 
   // Function to fetch a specific dataset by ID
   const fetchDatasetById = async (datasetId: string) => {
@@ -242,7 +257,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "1",
-                  children: <LeaderboardDetails datasets={datasets}/>,
+                  children: <LeaderboardDetails datasets={datasets} leaderBoards={leaderBoardData}/>,
                   // children: <></>,
                 },
                 {
@@ -261,7 +276,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "2",
-                  children: <LeaderboardTable />,
+                  children: <LeaderboardTable leaderBoards={leaderBoardData}/>,
                 },
                 {
                   label: (
@@ -281,7 +296,7 @@ const EvalDetailed = () => {
                     </div>
                   ),
                   key: "3",
-                  children: <EvalExplorerTable />,
+                  children: <EvalExplorerTable datasets={datasets}/>,
                 },
               ]}
             />
