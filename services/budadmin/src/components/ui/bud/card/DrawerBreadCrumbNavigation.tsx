@@ -55,14 +55,14 @@ export function CustomBreadcrumb({
               !isLast && hasUrl ? (
                 <Link href={hasUrl}>
                   <Text_12_400_787B83
-                    className='hover:cursor-pointer hover:text-[#EEEEEE]'
+                    className='hover:cursor-pointer hover:text-[#EEEEEE] capitalize'
                   >
                     {item}
                   </Text_12_400_787B83>
                 </Link>
               ) : (
                 <Text_12_400_787B83
-                  className='cursor-default text-[#EEEEEE]'
+                  className='cursor-default text-[#EEEEEE] capitalize'
                 >
                   {item}
                 </Text_12_400_787B83>
