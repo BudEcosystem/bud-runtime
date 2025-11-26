@@ -120,7 +120,7 @@ const Evaluations = () => {
   useEffect(()=> {
     setActiveTab(router.query?.tab?.toString() || '2');
   }, [router])
-  
+
     useEffect(() => {
       setIsMounted(true);
     }, []);
