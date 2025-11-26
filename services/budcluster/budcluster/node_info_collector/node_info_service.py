@@ -4,6 +4,7 @@ This service replaces the Ansible-based node info collection,
 providing better performance and lower memory usage.
 """
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -11,6 +12,7 @@ import os
 import tempfile
 from typing import Any, Dict, List, Optional
 
+import urllib3.exceptions
 import yaml
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -46,9 +48,17 @@ async def get_node_info_python(
         api_client = _create_k8s_client_from_dict(kubeconfig_dict)
         v1 = client.CoreV1Api(api_client)
 
-        # List all nodes
+        # List all nodes - run in thread pool to avoid blocking event loop
         logger.debug("Listing all nodes")
-        nodes = v1.list_node()
+        try:
+            # Use asyncio.to_thread to run blocking API call in thread pool
+            nodes = await asyncio.to_thread(v1.list_node)
+        except Exception as e:
+            # Handle connection timeouts and other network errors
+            if isinstance(e.__cause__, (urllib3.exceptions.ConnectTimeoutError, urllib3.exceptions.ReadTimeoutError)):
+                logger.error(f"Connection timeout while listing nodes: {e}")
+                raise Exception(f"Connection timeout - cluster may be unreachable: {e}") from e
+            raise
 
         if not nodes.items:
             logger.warning("No nodes found in cluster")
@@ -104,7 +114,7 @@ def _create_k8s_client_from_dict(kubeconfig_dict: Dict[str, Any]) -> client.ApiC
         kubeconfig_dict: Kubeconfig as a dictionary
 
     Returns:
-        Kubernetes API client
+        Kubernetes API client with timeout configured
     """
     # Write kubeconfig to temporary file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -112,9 +122,23 @@ def _create_k8s_client_from_dict(kubeconfig_dict: Dict[str, Any]) -> client.ApiC
         kubeconfig_path = f.name
 
     try:
-        # Load kubeconfig from file
-        config.load_kube_config(config_file=kubeconfig_path)
-        return client.ApiClient()
+        # Create a new Configuration object
+        configuration = client.Configuration()
+
+        # Load kubeconfig into this specific configuration
+        config.load_kube_config(config_file=kubeconfig_path, client_configuration=configuration)
+
+        # Set connection timeout to prevent indefinite blocking
+        # This prevents the event loop from hanging when clusters are unreachable
+        configuration.connection_pool_maxsize = 10
+        # CRITICAL: Set socket timeout (not just connection timeout)
+        # This is a tuple: (connect_timeout, read_timeout) in seconds
+        configuration.timeout = (30, 30)  # 30 seconds for connect and read
+
+        # Create API client with this configuration
+        api_client = client.ApiClient(configuration)
+
+        return api_client
     finally:
         # Clean up temp file
         with contextlib.suppress(OSError):

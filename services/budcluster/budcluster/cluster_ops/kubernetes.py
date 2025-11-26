@@ -67,6 +67,11 @@ class KubernetesHandler(BaseClusterHandler):
             # Disable SSL cert validation and hostname verification
             self.api_configuration.verify_ssl = app_settings.validate_certs
 
+            # Set connection and read timeout to prevent indefinite blocking
+            # This prevents hanging when clusters are unreachable
+            # Format: (connect_timeout, read_timeout) in seconds
+            self.api_configuration.timeout = (30, 30)  # 30 seconds for connect and read
+
             # Store an API client instance for this configuration
             self.api_client = client.ApiClient(self.api_configuration)
 
@@ -79,7 +84,6 @@ class KubernetesHandler(BaseClusterHandler):
             raise KubernetesException("Found error while loading Kubernetes config file") from err
 
     def _get_container_status(self, container_name: str, node: Dict[str, Any]) -> str:
-        print(node["status"])
         if "containerStatuses" in node["status"]:
             for container in node["status"]["containerStatuses"]:
                 if container_name in container["name"]:
