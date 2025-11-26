@@ -650,7 +650,9 @@ dapr:
   enabled: false
 keel:
   enabled: false
+
 mcp-stack:
+  enabled: false
   pgadmin:
     enabled: false
   redisCommander:
@@ -665,12 +667,12 @@ mcp-stack:
   mcpContextForge:
     image:
       repository: budstudio/mcpgateway
+    metrics:
+      enabled: false
 
     replicaCount: 1
     hpa:
       minReplicas: 1
-    metrics:
-      enabled: false
 
     env:
       postgres:
@@ -681,7 +683,6 @@ mcp-stack:
     config:
       ENVIRONMENT: production
       ENABLE_METRICS: "false"
-      APP_DOMAIN: http://mcpgateway.dev.bud.studio
       REDIS_URL: "redis://default:bud@{{ .Release.Name }}-valkey-primary:6379/9"
 
       EMAIL_AUTH_ENABLED: "false"
