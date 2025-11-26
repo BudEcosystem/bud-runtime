@@ -84,7 +84,6 @@ class KubernetesHandler(BaseClusterHandler):
             raise KubernetesException("Found error while loading Kubernetes config file") from err
 
     def _get_container_status(self, container_name: str, node: Dict[str, Any]) -> str:
-        print(node["status"])
         if "containerStatuses" in node["status"]:
             for container in node["status"]["containerStatuses"]:
                 if container_name in container["name"]:

@@ -4,6 +4,7 @@ This service replaces the Ansible-based node info collection,
 providing better performance and lower memory usage.
 """
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -11,6 +12,7 @@ import os
 import tempfile
 from typing import Any, Dict, List, Optional
 
+import urllib3.exceptions
 import yaml
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -50,13 +52,9 @@ async def get_node_info_python(
         logger.debug("Listing all nodes")
         try:
             # Use asyncio.to_thread to run blocking API call in thread pool
-            import asyncio
-
             nodes = await asyncio.to_thread(v1.list_node)
         except Exception as e:
             # Handle connection timeouts and other network errors
-            import urllib3.exceptions
-
             if isinstance(e.__cause__, (urllib3.exceptions.ConnectTimeoutError, urllib3.exceptions.ReadTimeoutError)):
                 logger.error(f"Connection timeout while listing nodes: {e}")
                 raise Exception(f"Connection timeout - cluster may be unreachable: {e}") from e
