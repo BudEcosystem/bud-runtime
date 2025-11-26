@@ -4852,6 +4852,7 @@ export const flowMapping: {
   "delete_adapter": "delete-adapter",
   "model_benchmark": "model_benchmark",
   "evaluate_model": "run-evaluation",
+  "prompt_creation": "add-agent",
 }
 
 export const inProgressSteps = [
