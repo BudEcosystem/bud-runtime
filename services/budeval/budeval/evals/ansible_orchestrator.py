@@ -26,6 +26,7 @@ from typing import Any, Dict, Optional
 import ansible_runner
 import yaml
 
+from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
 from budeval.commons.storage_config import StorageConfig
 
@@ -268,7 +269,7 @@ class AnsibleOrchestrator:
                             "containers": [
                                 {
                                     "name": "engine",
-                                    "image": "ghcr.io/budecosystem/opencompass:latest",
+                                    "image": app_settings.opencompass_docker_image,
                                     "command": ["bash"],
                                     "args": ["-c", bash_script],
                                     "env": [
