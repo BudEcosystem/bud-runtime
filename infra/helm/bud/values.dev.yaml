@@ -63,5 +63,9 @@ deploymentAnnotations:
 mcpStackEnabled: true
 mcp-stack:
     mcpContextForge:
+        ingress:
+            host: mcpgateway.dev.bud.studio
+            tls:
+                enabled: true
         config:
             APP_DOMAIN: https://mcpgateway.dev.bud.studio
