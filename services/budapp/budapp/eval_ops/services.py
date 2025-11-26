@@ -703,6 +703,20 @@ class ExperimentService:
             evaluations_batch = self.session.query(Evaluation).filter(Evaluation.id.in_(evaluation_ids)).all()
             evaluations_dict = {eval.id: eval for eval in evaluations_batch}
 
+        # Collect all trait IDs from evaluations for batch lookup
+        all_trait_ids = set()
+        for eval_obj in evaluations_dict.values():
+            if eval_obj.trait_ids:
+                all_trait_ids.update(eval_obj.trait_ids)
+
+        # Batch fetch trait names by ID
+        traits_by_id = {}
+        if all_trait_ids:
+            # Convert string UUIDs to UUID objects for query
+            trait_uuid_list = [uuid.UUID(tid) for tid in all_trait_ids if tid]
+            traits_batch = self.session.query(TraitModel).filter(TraitModel.id.in_(trait_uuid_list)).all()
+            traits_by_id = {str(trait.id): trait.name for trait in traits_batch}
+
         # Batch fetch endpoints
         endpoints_dict = {}
         endpoints_batch = []
@@ -721,29 +735,12 @@ class ExperimentService:
 
         # Batch fetch dataset versions and datasets
         datasets_dict = {}
-        dataset_ids_for_traits = []
         if dataset_version_ids:
             dataset_versions_batch = (
                 self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id.in_(dataset_version_ids)).all()
             )
             for dv in dataset_versions_batch:
                 datasets_dict[dv.id] = dv.dataset
-                if dv.dataset:
-                    dataset_ids_for_traits.append(dv.dataset.id)
-
-        # Batch fetch traits for all datasets
-        traits_by_dataset = {}
-        if dataset_ids_for_traits:
-            traits_pivot = (
-                self.session.query(PivotModel, TraitModel)
-                .join(TraitModel, PivotModel.trait_id == TraitModel.id)
-                .filter(PivotModel.dataset_id.in_(dataset_ids_for_traits))
-                .all()
-            )
-            for pivot, trait in traits_pivot:
-                if pivot.dataset_id not in traits_by_dataset:
-                    traits_by_dataset[pivot.dataset_id] = []
-                traits_by_dataset[pivot.dataset_id].append(trait.name)
 
         # Batch fetch all metrics for all runs
         metrics_by_run = {}
@@ -772,14 +769,19 @@ class ExperimentService:
                     model_name = models_dict[endpoint.model_id].name
                 deployment_name = endpoint.name
 
-            # Get dataset and its traits from batched data
+            # Get dataset name from batched data
             dataset_name = "Unknown Dataset"
-            traits_list = []
             if run.dataset_version_id and run.dataset_version_id in datasets_dict:
                 dataset = datasets_dict[run.dataset_version_id]
                 if dataset:
                     dataset_name = dataset.name
-                    traits_list = traits_by_dataset.get(dataset.id, [])
+
+            # Get traits from evaluation's user-selected trait_ids
+            traits_list = []
+            if run.evaluation_id and run.evaluation_id in evaluations_dict:
+                evaluation = evaluations_dict[run.evaluation_id]
+                if evaluation.trait_ids:
+                    traits_list = [traits_by_id.get(tid, "") for tid in evaluation.trait_ids if tid in traits_by_id]
 
             # Get metrics from batched data
             metrics = metrics_by_run.get(run.id, [])
