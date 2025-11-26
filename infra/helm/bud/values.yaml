@@ -509,6 +509,7 @@ postgresqlExtra:
     - budeval
     - buddoc
     - budprompt
+    - mcpgateway
 keycloak:
   image:
     repository: bitnamilegacy/keycloak
@@ -649,3 +650,40 @@ dapr:
   enabled: false
 keel:
   enabled: false
+mcp-stack:
+  pgadmin:
+    enabled: false
+  redisCommander:
+    enabled: false
+  postgres:
+    enabled: false
+  redis:
+    enabled: false
+  minio:
+    enabled: false
+
+  mcpContextForge:
+    image:
+      repository: budstudio/mcpgateway
+
+    replicaCount: 1
+    hpa:
+      minReplicas: 1
+    metrics:
+      enabled: false
+
+    env:
+      postgres:
+        host: "{{ $.Release.Name }}-postgresql"
+        db: mcpgateway
+        userKey: mcpgateway
+        passwordKey: mcpgateway
+    config:
+      ENVIRONMENT: production
+      ENABLE_METRICS: "false"
+      APP_DOMAIN: http://mcpgateway.dev.bud.studio
+      REDIS_URL: "redis://default:bud@{{ .Release.Name }}-valkey-primary:6379/9"
+
+      EMAIL_AUTH_ENABLED: "false"
+      PASSWORD_REQUIRE_NUMBERS: true
+      MIN_PASSWORD_LENGTH: 8
