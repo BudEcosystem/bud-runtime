@@ -223,7 +223,7 @@ export function BudWidget({
               {data?.title || flow?.title}
             </Text_12_400_A4A4A9>
             {/* <Text_14_600_EEEEEE className="tracking-[-.01rem]">{currentStep?.description || `${flow?.title} In Progress`}</Text_14_600_EEEEEE> */}
-            <Text_14_600_EEEEEE className="tracking-[-.01rem]">{`${flow?.title} ${faiedStep ? "Failed" : "In Progress"}`}</Text_14_600_EEEEEE>
+            <Text_14_600_EEEEEE className="tracking-[-.01rem]">{`${data?.title || flow?.title} ${faiedStep ? "Failed" : "In Progress"}`}</Text_14_600_EEEEEE>
           </div>
         </div>
         <div className="flex flex-col items-end justify-start">
