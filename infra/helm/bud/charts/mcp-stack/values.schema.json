@@ -28,7 +28,7 @@
           "default": ""
         }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "mcpContextForge": {
       "type": "object",

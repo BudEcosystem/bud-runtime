@@ -651,8 +651,8 @@ dapr:
 keel:
   enabled: false
 
+mcpStackEnabled: false
 mcp-stack:
-  enabled: false
   pgadmin:
     enabled: false
   redisCommander:
@@ -674,17 +674,13 @@ mcp-stack:
     hpa:
       minReplicas: 1
 
-    env:
-      postgres:
-        host: "{{ $.Release.Name }}-postgresql"
-        db: mcpgateway
-        userKey: mcpgateway
-        passwordKey: mcpgateway
     config:
       ENVIRONMENT: production
       ENABLE_METRICS: "false"
       REDIS_URL: "redis://default:bud@{{ .Release.Name }}-valkey-primary:6379/9"
+      DATABASE_URL: "postgresql://mcpgateway:mcpgateway@{{ $.Release.Name }}-postgresql:5432/mcpgateway"
 
+    secret:
       EMAIL_AUTH_ENABLED: "false"
       PASSWORD_REQUIRE_NUMBERS: true
       MIN_PASSWORD_LENGTH: 8
