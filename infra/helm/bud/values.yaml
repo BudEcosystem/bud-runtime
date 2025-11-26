@@ -669,6 +669,8 @@ mcp-stack:
       repository: budstudio/mcpgateway
     metrics:
       enabled: false
+    ingress:
+      className: traefik
 
     replicaCount: 1
     hpa:
