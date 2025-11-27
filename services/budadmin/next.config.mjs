@@ -50,6 +50,10 @@ export default {
         destination: '/home/agentDetails/[id]',
       },
       {
+        source: '/projects/:projectId/guardrailDetails/:guardrailId',
+        destination: '/home/guardrailDetails/[guardrailId]',
+      },
+      {
         source: '/projects/:projectId',
         destination: '/home/projects/[projectId]',
       },

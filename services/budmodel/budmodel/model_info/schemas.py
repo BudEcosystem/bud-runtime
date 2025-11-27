@@ -213,6 +213,7 @@ class ModelExtractionETAObserverRequest(ModelExtractionRequest):
         protected_namespaces = ()
 
     workflow_id: str
+    start_time: Optional[float] = None
 
 
 class ModelscanETAObserverRequest(ModelSecurityScanRequest):
@@ -224,6 +225,7 @@ class ModelscanETAObserverRequest(ModelSecurityScanRequest):
         protected_namespaces = ()
 
     workflow_id: str
+    start_time: Optional[float] = None
 
 
 class CloudModelExtractionRequest(CloudEventBase):

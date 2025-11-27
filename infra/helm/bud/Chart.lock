@@ -20,5 +20,8 @@ dependencies:
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 16.5.31
-digest: sha256:3f1090951186dc94096cfe9e876883a8a06153136dddfa69b035e1f1d0d06974
-generated: "2025-10-01T15:11:39.352317008+05:30"
+- name: novu
+  repository: file://charts/novu
+  version: 0.1.6
+digest: sha256:f7410145c2fdaabc5cfd8a43ad3c639677094f0bb2602393ce54de5ae49d6ae3
+generated: "2025-11-27T11:56:08.887492279+05:30"

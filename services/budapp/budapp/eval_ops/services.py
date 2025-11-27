@@ -703,6 +703,20 @@ class ExperimentService:
             evaluations_batch = self.session.query(Evaluation).filter(Evaluation.id.in_(evaluation_ids)).all()
             evaluations_dict = {eval.id: eval for eval in evaluations_batch}
 
+        # Collect all trait IDs from evaluations for batch lookup
+        all_trait_ids = set()
+        for eval_obj in evaluations_dict.values():
+            if eval_obj.trait_ids:
+                all_trait_ids.update(eval_obj.trait_ids)
+
+        # Batch fetch trait names by ID
+        traits_by_id = {}
+        if all_trait_ids:
+            # Convert string UUIDs to UUID objects for query
+            trait_uuid_list = [uuid.UUID(tid) for tid in all_trait_ids if tid]
+            traits_batch = self.session.query(TraitModel).filter(TraitModel.id.in_(trait_uuid_list)).all()
+            traits_by_id = {str(trait.id): trait.name for trait in traits_batch}
+
         # Batch fetch endpoints
         endpoints_dict = {}
         endpoints_batch = []
@@ -721,29 +735,12 @@ class ExperimentService:
 
         # Batch fetch dataset versions and datasets
         datasets_dict = {}
-        dataset_ids_for_traits = []
         if dataset_version_ids:
             dataset_versions_batch = (
                 self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.id.in_(dataset_version_ids)).all()
             )
             for dv in dataset_versions_batch:
                 datasets_dict[dv.id] = dv.dataset
-                if dv.dataset:
-                    dataset_ids_for_traits.append(dv.dataset.id)
-
-        # Batch fetch traits for all datasets
-        traits_by_dataset = {}
-        if dataset_ids_for_traits:
-            traits_pivot = (
-                self.session.query(PivotModel, TraitModel)
-                .join(TraitModel, PivotModel.trait_id == TraitModel.id)
-                .filter(PivotModel.dataset_id.in_(dataset_ids_for_traits))
-                .all()
-            )
-            for pivot, trait in traits_pivot:
-                if pivot.dataset_id not in traits_by_dataset:
-                    traits_by_dataset[pivot.dataset_id] = []
-                traits_by_dataset[pivot.dataset_id].append(trait.name)
 
         # Batch fetch all metrics for all runs
         metrics_by_run = {}
@@ -772,14 +769,19 @@ class ExperimentService:
                     model_name = models_dict[endpoint.model_id].name
                 deployment_name = endpoint.name
 
-            # Get dataset and its traits from batched data
+            # Get dataset name from batched data
             dataset_name = "Unknown Dataset"
-            traits_list = []
             if run.dataset_version_id and run.dataset_version_id in datasets_dict:
                 dataset = datasets_dict[run.dataset_version_id]
                 if dataset:
                     dataset_name = dataset.name
-                    traits_list = traits_by_dataset.get(dataset.id, [])
+
+            # Get traits from evaluation's user-selected trait_ids
+            traits_list = []
+            if run.evaluation_id and run.evaluation_id in evaluations_dict:
+                evaluation = evaluations_dict[run.evaluation_id]
+                if evaluation.trait_ids:
+                    traits_list = [traits_by_id.get(tid, "") for tid in evaluation.trait_ids if tid in traits_by_id]
 
             # Get metrics from batched data
             metrics = metrics_by_run.get(run.id, [])
@@ -1781,6 +1783,8 @@ class ExperimentService:
                 why_run_this_eval=dataset.why_run_this_eval,
                 what_to_expect=dataset.what_to_expect,
                 additional_info=dataset.additional_info,
+                metrics=dataset.metrics,
+                evaluator=dataset.evaluator,
                 traits=traits,
             )
 
@@ -1895,12 +1899,14 @@ class ExperimentService:
                     humans_vs_llm_qualifications=dataset.humans_vs_llm_qualifications,
                     task_type=dataset.task_type,
                     modalities=dataset.modalities,
-                    sample_questions_answers=dataset.sample_questions_answers,
+                    # sample_questions_answers=dataset.sample_questions_answers,
                     advantages_disadvantages=dataset.advantages_disadvantages,
                     eval_types=dataset.eval_types,
                     why_run_this_eval=dataset.why_run_this_eval,
                     what_to_expect=dataset.what_to_expect,
                     additional_info=dataset.additional_info,
+                    metrics=dataset.metrics,
+                    evaluator=dataset.evaluator,
                     traits=traits,
                 )
                 dataset_schemas.append(dataset_schema)
@@ -1943,6 +1949,8 @@ class ExperimentService:
                 modalities=req.modalities,
                 sample_questions_answers=req.sample_questions_answers,
                 advantages_disadvantages=req.advantages_disadvantages,
+                metrics=req.metrics,
+                evaluator=req.evaluator,
             )
             self.session.add(dataset)
             self.session.flush()  # Get the dataset ID
@@ -2030,6 +2038,10 @@ class ExperimentService:
                 dataset.sample_questions_answers = req.sample_questions_answers
             if req.advantages_disadvantages is not None:
                 dataset.advantages_disadvantages = req.advantages_disadvantages
+            if "metrics" in req.model_fields_set:
+                dataset.metrics = req.metrics
+            if "evaluator" in req.model_fields_set:
+                dataset.evaluator = req.evaluator
 
             # Update trait associations if provided
             if req.trait_ids is not None:
@@ -2604,6 +2616,193 @@ class ExperimentService:
                 exc_info=True,
             )
             return []  # Return empty list instead of failing
+
+    def get_dataset_scores(
+        self,
+        dataset_id: uuid.UUID,
+        user_id: uuid.UUID,
+        page: int = 1,
+        limit: int = 50,
+    ) -> Tuple[List[Dict[str, Any]], int, Dict[str, Any]]:
+        """Get all model scores for a specific dataset.
+
+        This method retrieves all completed evaluation runs for a dataset, groups them by model,
+        averages the metrics (non-zero values only), and ranks models by accuracy.
+
+        Parameters:
+            dataset_id (uuid.UUID): ID of the dataset to get scores for.
+            user_id (uuid.UUID): ID of the requesting user (for access control).
+            page (int): Page number for pagination (default: 1).
+            limit (int): Items per page (default: 50, max: 100).
+
+        Returns:
+            Tuple containing:
+                - List[Dict]: List of model scores with rankings
+                - int: Total count of models
+                - Dict: Dataset information (id, name)
+
+        Raises:
+            HTTPException(status_code=404): If dataset not found.
+            HTTPException(status_code=500): If database query fails.
+        """
+        try:
+            # Verify dataset exists
+            dataset = self.session.get(DatasetModel, dataset_id)
+            if not dataset:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Dataset with ID {dataset_id} not found",
+                )
+
+            # Get all dataset versions for this dataset
+            dataset_versions = (
+                self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.dataset_id == dataset_id).all()
+            )
+
+            if not dataset_versions:
+                # No versions means no runs, return empty result
+                return [], 0, {"id": dataset.id, "name": dataset.name}
+
+            dataset_version_ids = [dv.id for dv in dataset_versions]
+
+            # Query all completed runs for this dataset's versions
+            # Join with Endpoint, Model, and Experiment for access control and model info
+            runs_query = (
+                self.session.query(
+                    RunModel.id.label("run_id"),
+                    RunModel.created_at,
+                    RunModel.endpoint_id,
+                    EndpointModel.name.label("endpoint_name"),
+                    ModelTable.id.label("model_id"),
+                    ModelTable.name.label("model_name"),
+                    ModelTable.icon.label("model_icon"),
+                    ExperimentModel.id.label("experiment_id"),
+                )
+                .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
+                .filter(
+                    RunModel.dataset_version_id.in_(dataset_version_ids),
+                    RunModel.status == RunStatusEnum.COMPLETED.value,
+                    ExperimentModel.created_by == user_id,  # Access control
+                    ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+                )
+                .all()
+            )
+
+            if not runs_query:
+                # No completed runs for this user
+                return [], 0, {"id": dataset.id, "name": dataset.name}
+
+            # Group runs by model_id
+            models_data: Dict[uuid.UUID, Dict[str, Any]] = {}
+
+            for run_row in runs_query:
+                model_id = run_row.model_id
+
+                if model_id not in models_data:
+                    models_data[model_id] = {
+                        "model_id": model_id,
+                        "model_name": run_row.model_name,
+                        "model_icon": run_row.model_icon,
+                        "endpoint_name": run_row.endpoint_name,
+                        "run_ids": [],
+                        "latest_created_at": run_row.created_at,
+                        "metrics_by_name": {},  # {metric_name: [values]}
+                    }
+                else:
+                    # Track latest created_at
+                    if run_row.created_at > models_data[model_id]["latest_created_at"]:
+                        models_data[model_id]["latest_created_at"] = run_row.created_at
+                        models_data[model_id]["endpoint_name"] = run_row.endpoint_name
+
+                models_data[model_id]["run_ids"].append(run_row.run_id)
+
+            # Fetch all metrics for all runs
+            all_run_ids = [run_row.run_id for run_row in runs_query]
+            metrics_query = self.session.query(MetricModel).filter(MetricModel.run_id.in_(all_run_ids)).all()
+
+            # Group metrics by run_id, then aggregate by model
+            metrics_by_run: Dict[uuid.UUID, List[MetricModel]] = {}
+            for metric in metrics_query:
+                if metric.run_id not in metrics_by_run:
+                    metrics_by_run[metric.run_id] = []
+                metrics_by_run[metric.run_id].append(metric)
+
+            # Aggregate metrics for each model
+            for _model_id, model_info in models_data.items():
+                for run_id in model_info["run_ids"]:
+                    if run_id in metrics_by_run:
+                        for metric in metrics_by_run[run_id]:
+                            metric_name = metric.metric_name
+
+                            if metric_name not in model_info["metrics_by_name"]:
+                                model_info["metrics_by_name"][metric_name] = []
+
+                            # Only include non-zero values for averaging
+                            if metric.metric_value and metric.metric_value > 0:
+                                model_info["metrics_by_name"][metric_name].append(float(metric.metric_value))
+
+            # Calculate averaged metrics and extract accuracy
+            model_scores = []
+            for model_id, model_info in models_data.items():
+                averaged_metrics = []
+                accuracy_value = None
+
+                for metric_name, values in model_info["metrics_by_name"].items():
+                    if values:  # Only if we have non-zero values
+                        avg_value = sum(values) / len(values)
+                        averaged_metrics.append(
+                            {
+                                "metric_name": metric_name,
+                                "metric_value": round(avg_value, 2),
+                            }
+                        )
+
+                        # Extract accuracy for ranking
+                        if metric_name.lower() == "accuracy":
+                            accuracy_value = avg_value
+
+                model_scores.append(
+                    {
+                        "model_id": model_id,
+                        "model_name": model_info["model_name"],
+                        "model_icon": model_info["model_icon"],
+                        "endpoint_name": model_info["endpoint_name"],
+                        "accuracy": accuracy_value,
+                        "metrics": averaged_metrics,
+                        "num_runs": len(model_info["run_ids"]),
+                        "created_at": model_info["latest_created_at"],
+                    }
+                )
+
+            # Sort by accuracy (nulls last)
+            model_scores.sort(key=lambda x: (x["accuracy"] is None, -x["accuracy"] if x["accuracy"] else 0))
+
+            # Assign ranks
+            for rank, model_score in enumerate(model_scores, start=1):
+                model_score["rank"] = rank
+
+            # Calculate pagination
+            total_count = len(model_scores)
+            offset = (page - 1) * limit
+            paginated_scores = model_scores[offset : offset + limit]
+
+            dataset_info = {
+                "id": dataset.id,
+                "name": dataset.name,
+            }
+
+            return paginated_scores, total_count, dataset_info
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get dataset scores for dataset {dataset_id}: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve dataset scores",
+            ) from e
 
 
 class ExperimentWorkflowService:

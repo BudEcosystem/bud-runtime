@@ -33,6 +33,8 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
     fetchInferences,
     exportInferences,
     setFilters,
+    pagination,
+    setPagination,
   } = useInferences();
 
   useLoaderOnLoding(isLoading);
@@ -42,7 +44,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
     if (projectId && typeof projectId === 'string') {
       fetchInferences(projectId);
     }
-  }, [projectId, fetchInferences]);
+  }, [projectId]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -54,7 +56,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       fetchInferences(projectId);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchValue, projectId, fetchInferences]);
+  }, [searchValue, projectId]);
 
   // Copy inference ID to clipboard
   const copyToClipboard = async (text: string) => {
@@ -161,7 +163,17 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   ];
 
   // Handle table change (pagination, sorting)
-  const handleTableChange = (_newPagination: any, _filters: any, sorter: any) => {
+  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+    // Handle pagination
+    if (newPagination.current !== (pagination.offset / pagination.limit) + 1 || newPagination.pageSize !== pagination.limit) {
+      setPagination({
+        offset: (newPagination.current - 1) * newPagination.pageSize,
+        limit: newPagination.pageSize
+      });
+      // Zustand state updates are synchronous, so we can fetch immediately
+      fetchInferences(projectId as string);
+    }
+
     // Handle sorting
     if (sorter.field) {
       const sortMap: Record<string, string> = {
@@ -182,7 +194,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
 
 
   return (
-    <div className="pb-[60px] pt-[.4rem]">
+    <div className="pb-[60px] pt-[.4rem] relative CommonCustomPagination">
       {showFilters && (
         <div className="mb-4">
           <InferenceFilters
@@ -197,7 +209,14 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
         dataSource={inferences}
         rowKey="inference_id"
         loading={false}
-        pagination={false}
+        pagination={{
+          className: 'small-pagination',
+          current: (pagination.offset / pagination.limit) + 1,
+          pageSize: pagination.limit,
+          total: pagination.total_count,
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20', '50'],
+        }}
         virtual
         bordered={false}
         footer={null}
@@ -227,7 +246,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
               >
                 <span style={{ display: 'flex', alignItems: 'center' }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 3h8M3 6h6M4 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M2 3h8M3 6h6M4 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                   <span className="ml-2">Filters</span>
                 </span>

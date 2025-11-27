@@ -100,7 +100,12 @@ const sampleResponse = [
   },
 ];
 
-function EvalExplorerTable() {
+type LeaderboardDetailsProps = {
+  datasets: {
+    sample_questions_answers: any
+  } | null;
+};
+function EvalExplorerTable({ datasets }: LeaderboardDetailsProps) {
   const router = useRouter();
   const [order, setOrder] = useState<"-" | "">("");
   const [orderBy, setOrderBy] = useState<string>("created_at");
@@ -117,7 +122,7 @@ function EvalExplorerTable() {
             width: "20%",
             render: (text) => (
               <div className="flex justify-start">
-                <Tags name={text.name} color={text.color} />
+                <Tags name={'Misuse Safety'} color={'#965CDE'} />
               </div>
             ),
             sortOrder:
@@ -131,11 +136,11 @@ function EvalExplorerTable() {
           },
           {
             title: "Prompt",
-            dataIndex: "prompt",
-            key: "prompt",
+            dataIndex: "question",
+            key: "question",
             width: "40%",
             render: (text) => (
-              <Text_12_400_EEEEEE className="leading-[140%]">
+              <Text_12_400_EEEEEE className="leading-[140%] p-2">
                 {text}
               </Text_12_400_EEEEEE>
             ),
@@ -144,8 +149,8 @@ function EvalExplorerTable() {
           },
           {
             title: "Response",
-            dataIndex: "response",
-            key: "response",
+            dataIndex: "answer",
+            key: "answer",
             width: "40%",
             sorter: true,
             sortOrder:
@@ -156,14 +161,14 @@ function EvalExplorerTable() {
                 : undefined,
             render: (text) => (
               <Text_12_400_EEEEEE className="leading-[140%] py-[.5rem]">
-                {text}
+                {text || '-'}
               </Text_12_400_EEEEEE>
             ),
             sortIcon: SortIcon,
           },
         ]}
         pagination={false}
-        dataSource={sampleResponse}
+        dataSource={datasets?.sample_questions_answers?.examples}
         bordered={false}
         footer={null}
         virtual
@@ -189,7 +194,7 @@ function EvalExplorerTable() {
         showSorterTooltip={true}
         locale={{
           emptyText: (
-            <NoDataFount classNames="h-[20vh]" textMessage={`No deployments`} />
+            <NoDataFount classNames="h-[20vh]" textMessage={`No data available`} />
           ),
         }}
       />

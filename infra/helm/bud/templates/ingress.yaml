@@ -13,6 +13,33 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: {{ .Release.Name }}-mcpgateway
+  {{- if eq .Values.ingress.https "internal" }}
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-https-redirect@kubernetescrd
+  {{- end }}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ include "bud.ingress.hosts.mcpgateway" $ }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-mcpgateway
+                port:
+                  number: 4444
+  tls:
+    - hosts:
+        - {{ include "bud.ingress.hosts.mcpgateway" $ }}
+      secretName: {{ .Release.Name }}-mcpgateway-acme-cert
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
   name: {{ .Release.Name }}-bud
   {{- if eq .Values.ingress.https "internal" }}
   annotations:

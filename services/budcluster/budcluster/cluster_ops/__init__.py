@@ -52,6 +52,10 @@ async def get_node_info(config: Dict, platform: Optional[ClusterPlatformEnum] = 
     """Get the node information from the Kubernetes cluster.
 
     This function collects node information including hardware details.
+
+    By default, uses the Python-based implementation for better performance
+    and lower memory usage.
+
     If HAMI GPU time-slicing is enabled, it also enriches device objects
     with real-time GPU utilization and allocation metrics.
 
@@ -62,8 +66,10 @@ async def get_node_info(config: Dict, platform: Optional[ClusterPlatformEnum] = 
     Returns:
         List of node information dictionaries with enriched device data
     """
-    cluster_handler = await get_cluster_handler(config, platform=platform)
-    node_data = cluster_handler.get_node_info()
+    from ..node_info_collector import get_node_info_python
+
+    logger.info("Using Python-based node info collection")
+    node_data = await get_node_info_python(config, platform)
 
     # Enrich with HAMI metrics if enabled
     if is_hami_metrics_enabled():
@@ -159,10 +165,11 @@ async def get_deployment_status(
     cloud_model: bool = False,
     platform: Optional[ClusterPlatformEnum] = None,
     ingress_health: bool = True,
+    check_pods: bool = True,
 ) -> str:
     """Get the status of a deployment on the Kubernetes cluster."""
     cluster_handler = await get_cluster_handler(config, ingress_url, platform=platform)
-    return cluster_handler.get_deployment_status(values, cloud_model, ingress_health)
+    return cluster_handler.get_deployment_status(values, cloud_model, ingress_health, check_pods)
 
 
 async def delete_namespace(config: Dict, namespace: str, platform: Optional[ClusterPlatformEnum] = None) -> None:

@@ -121,6 +121,9 @@ class EvalDataSyncService:
             "why_run_this_eval": None,
             "what_to_expect": None,
             "additional_info": {},
+            # Evaluation configuration fields
+            "metrics": dataset.metrics,
+            "evaluator": dataset.evaluator,
         }
 
         # Extract creator info and links from original_data if available
@@ -143,7 +146,7 @@ class EvalDataSyncService:
                 dataset_fields["meta_links"]["update_date"] = original_data["updateDate"]
 
             # Extract enriched evaluation fields from original_data
-            for key in ["why_run_this_eval", "what_to_expect"]:
+            for key in ["why_run_this_eval", "what_to_expect", "advantages_disadvantages"]:
                 if (value := original_data.get(key)) is not None:
                     dataset_fields[key] = value
 

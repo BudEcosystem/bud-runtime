@@ -16,6 +16,8 @@ from budapp.eval_ops.schemas import (
     CreateExperimentRequest,
     CreateExperimentResponse,
     DatasetFilter,
+    DatasetModelScore,
+    DatasetScoresResponse,
     DeleteExperimentResponse,
     DeleteRunResponse,
     EvalTagCreate,
@@ -999,6 +1001,101 @@ def get_dataset_by_id(
     )
 
 
+@router.get(
+    "/datasets/{dataset_id}/scores",
+    response_model=DatasetScoresResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_dataset_scores(
+    dataset_id: Annotated[uuid.UUID, Path(..., description="ID of dataset to get scores for")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
+):
+    """Get all model scores for a specific dataset.
+
+    This endpoint retrieves scores for all models that have been evaluated against the specified dataset.
+    Results are consolidated by model (averaging metrics across multiple runs), ranked by accuracy,
+    and paginated.
+
+    **Features:**
+    - One entry per model (multiple runs averaged)
+    - Metrics averaged across all completed runs (non-zero values only)
+    - Ranked by accuracy metric (1 = best)
+    - Includes all dataset versions
+    - Only shows completed evaluation runs
+    - Access control: only shows data from user's own experiments
+
+    **Query Parameters:**
+    - `page`: Page number for pagination (default: 1)
+    - `limit`: Items per page (default: 50, max: 100)
+
+    **Returns:**
+    - `dataset_id`: UUID of the dataset
+    - `dataset_name`: Name of the dataset
+    - `scores`: List of model scores with:
+        - `rank`: Ranking by accuracy (1=best)
+        - `model_id`, `model_name`, `model_display_name`, `model_icon`: Model information
+        - `endpoint_name`: Deployment name
+        - `accuracy`: Accuracy metric value (used for ranking)
+        - `metrics`: List of all averaged metrics
+        - `num_runs`: Number of runs averaged
+        - `created_at`: Timestamp from most recent run
+    - `pagination`: Standard pagination metadata
+
+    **Example Response:**
+    ```json
+    {
+      "success": true,
+      "dataset_id": "uuid",
+      "dataset_name": "MMLU Benchmark",
+      "scores": [
+        {
+          "rank": 1,
+          "model_name": "meta-llama/Llama-3.1-70B",
+          "accuracy": 87.4,
+          "metrics": [{"metric_name": "accuracy", "metric_value": 87.4}],
+          "num_runs": 3
+        }
+      ],
+      "pagination": {"page": 1, "limit": 50, "total": 5}
+    }
+    ```
+    """
+    try:
+        scores, total, dataset_info = ExperimentService(session).get_dataset_scores(
+            dataset_id=dataset_id,
+            user_id=current_user.id,
+            page=page,
+            limit=limit,
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Failed to get dataset scores: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve dataset scores") from e
+
+    # Convert to Pydantic models
+    score_models = [DatasetModelScore(**score) for score in scores]
+
+    return DatasetScoresResponse(
+        code=status.HTTP_200_OK,
+        object="dataset.scores",
+        message="Successfully retrieved dataset scores",
+        dataset_id=dataset_info["id"],
+        dataset_name=dataset_info["name"],
+        scores=score_models,
+        page=page,
+        limit=limit,
+        total_record=total,  # Use total_record, not total (total_pages is computed automatically)
+    )
+
+
 # ------------------------ Evaluation Workflow Routes ------------------------
 
 
@@ -1222,13 +1319,9 @@ async def sync_evaluation_datasets(
 
         logger.info(f"Evaluation dataset sync workflow triggered: {response}")
 
+        workflow_id = response.get("workflow_id") if isinstance(response, dict) else str(response)
         return SuccessResponse(
-            message="Evaluation dataset sync workflow triggered successfully",
-            data={
-                "workflow_id": response.get("workflow_id") if isinstance(response, dict) else str(response),
-                "force_sync": force_sync,
-                "note": "Sync is running as a background workflow. Check workflow status for completion.",
-            },
+            message=f"Evaluation dataset sync workflow triggered successfully. Workflow ID: {workflow_id}. Force sync: {force_sync}.",
             code=status.HTTP_200_OK,
         ).to_http_response()
 

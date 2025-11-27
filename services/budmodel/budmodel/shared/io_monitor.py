@@ -520,6 +520,90 @@ class IOMonitor:
 
         return recommended_speed, stress_level
 
+    def calculate_upload_speed_limit(
+        self,
+        current_metrics: Optional[IOMetrics] = None,
+        min_speed: int = 5 * 1024 * 1024,  # 5 MB/s minimum
+        max_speed: int = 0,  # 0 = unlimited (auto-detect)
+        disk_path: str = "/",
+    ) -> Tuple[int, float]:
+        """Calculate recommended upload speed based on I/O metrics.
+
+        Uses same logic as downloads but with upload-specific defaults.
+        Adapts to any disk speed (SATA, NVMe, cloud) automatically.
+
+        Args:
+            current_metrics: Pre-calculated metrics (if None, will fetch current)
+            min_speed: Minimum upload speed in bytes/sec (default 5 MB/s)
+            max_speed: Maximum upload speed in bytes/sec (0 = unlimited, auto-detect)
+            disk_path: Path to check disk usage for
+
+        Returns:
+            Tuple of (recommended_speed_bytes_per_sec, stress_level)
+        """
+        if current_metrics is None:
+            current_metrics = self.get_current_metrics(disk_path)
+
+        stress_level = current_metrics.io_stress_level
+
+        # Auto-detect max speed from disk if unlimited
+        # Use a reasonable baseline that will be throttled based on stress
+        # This adapts to actual disk capacity
+        effective_max = 500 * 1024 * 1024 if max_speed == 0 else max_speed
+
+        # Use dynamic throttling if available
+        if self.enable_dynamic_throttling and self.throttle_detector:
+            throttle_status = self.throttle_detector.detect_throttling(disk_path)
+
+            if throttle_status.is_throttling:
+                # Apply throttling factor
+                recommended_speed = int(
+                    min_speed + (effective_max - min_speed) * throttle_status.recommended_speed_factor
+                )
+                logger.debug(
+                    "Upload throttling: factor=%.2f, latency_spike=%s, high_busy=%s",
+                    throttle_status.recommended_speed_factor,
+                    throttle_status.latency_spike,
+                    throttle_status.high_busy_time,
+                )
+            else:
+                # No throttling needed
+                recommended_speed = effective_max if max_speed > 0 else 0  # 0 = unlimited
+        else:
+            # Legacy: Calculate based on stress level
+            if stress_level >= 0.9:
+                # Critical stress - minimum speed
+                recommended_speed = min_speed
+            elif stress_level >= 0.7:
+                # High stress - 20% of max
+                speed_factor = 1.0 - (stress_level - 0.7) * 3.0
+                recommended_speed = int(min_speed + (effective_max - min_speed) * speed_factor * 0.2)
+            elif stress_level >= 0.5:
+                # Medium stress - 50% of max
+                speed_factor = 1.0 - (stress_level - 0.5) * 2.0
+                recommended_speed = int(min_speed + (effective_max - min_speed) * speed_factor * 0.5)
+            elif stress_level >= 0.3:
+                # Low-medium stress - 75% of max
+                speed_factor = 1.0 - (stress_level - 0.3) * 2.5
+                recommended_speed = int(min_speed + (effective_max - min_speed) * speed_factor * 0.75)
+            else:
+                # Very low stress - full speed
+                recommended_speed = effective_max if max_speed > 0 else 0  # 0 = unlimited
+
+        # Ensure within bounds
+        if max_speed > 0:
+            recommended_speed = max(min_speed, min(max_speed, recommended_speed))
+        elif recommended_speed > 0:
+            recommended_speed = max(min_speed, recommended_speed)
+
+        logger.debug(
+            "Upload speed recommendation: %s (stress: %.2f)",
+            "Unlimited" if recommended_speed == 0 else f"{recommended_speed / (1024 * 1024):.1f} MB/s",
+            stress_level,
+        )
+
+        return recommended_speed, stress_level
+
     def should_pause_downloads(self, current_metrics: Optional[IOMetrics] = None, disk_path: str = "/") -> bool:
         """Determine if downloads should be paused due to extreme I/O stress.
 

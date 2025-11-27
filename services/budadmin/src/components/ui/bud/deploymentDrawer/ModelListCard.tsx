@@ -38,7 +38,6 @@ export function ModelListCard({
     data.provider_type === "url"
       ? "/images/drawer/url-2.png"
       : "/images/drawer/disk-2.png";
-  // const fallbackImageUrl = assetBaseUrl + "/icons/providers/openai.png";
 
   return (
     <div

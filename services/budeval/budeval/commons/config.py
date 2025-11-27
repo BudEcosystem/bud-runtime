@@ -74,6 +74,12 @@ class AppConfig(BaseAppConfig):
     # Storage Backend Selection
     storage_backend: str = Field(default="clickhouse", alias="STORAGE_BACKEND")
 
+    # OpenCompass Docker Image Configuration
+    opencompass_docker_image: str = Field(
+        default="docker.io/budstudio/opencompass:latest",
+        alias="OPENCOMPASS_DOCKER_IMAGE",
+    )
+
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]

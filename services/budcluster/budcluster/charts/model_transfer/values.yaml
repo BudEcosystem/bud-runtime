@@ -1,6 +1,6 @@
 namespace: default
 pvcName: models-pvc
-image: budstudio/minio-downloader:0.2.0
+image: budstudio/minio-downloader:0.3.0
 podName: model-transfer
 pvcSize: 10
 storageClass: default

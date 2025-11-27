@@ -61,8 +61,21 @@
 {{- printf "s3.%s" .Values.ingress.hosts.root }}
 {{- end }}
 {{- end }}
+{{- define "bud.ingress.hosts.mcpgateway" -}}
+{{- if .Values.ingress.hosts.mcpgateway }}
+{{- .Values.ingress.hosts.mcpgateway }}
+{{- else }}
+{{- printf "mcpgateway.%s" .Values.ingress.hosts.root }}
+{{- end }}
+{{- end }}
 
-
+{{- define "bud.ingress.url.mcpgateway" -}}
+{{- if ne .Values.ingress.https "disabled" }}
+{{- printf "https://%s" (include "bud.ingress.hosts.mcpgateway" $) }}
+{{- else }}
+{{- printf "http://%s" (include "bud.ingress.hosts.mcpgateway" $) }}
+{{- end }}
+{{- end }}
 {{- define "bud.ingress.url.budadmin" -}}
 {{- if ne .Values.ingress.https "disabled" }}
 {{- printf "https://%s" (include "bud.ingress.hosts.budadmin" $) }}

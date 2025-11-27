@@ -288,9 +288,8 @@ class SimulationWorkflows:
             if len(parallel_tasks) == 0:
                 raise ValueError(
                     "No devices available for simulation. All devices were skipped because: "
-                    "(1) devices have 0 available_count (already in use or unavailable), "
-                    "(2) CPU devices are not supported for LLM inference, or "
-                    "(3) no compatible device types found for the selected model. "
+                    "(1) devices have 0 available_count (already in use or unavailable), or "
+                    "(2) no compatible device types found for the selected model. "
                     "Please check cluster health and device availability."
                 )
 

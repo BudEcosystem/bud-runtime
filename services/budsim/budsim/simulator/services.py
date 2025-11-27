@@ -179,8 +179,8 @@ class SimulationService:
                     # Filter devices based on user's hardware mode preference
                     if user_hardware_mode == "dedicated":
                         # Dedicated mode: Only use devices with 0% utilization
-                        core_util = device.get("core_utilization_percent", 0.0)
-                        memory_util = device.get("memory_utilization_percent", 0.0)
+                        core_util = device.get("core_utilization_percent") or 0.0
+                        memory_util = device.get("memory_utilization_percent") or 0.0
 
                         # If utilization metrics are available, enforce strict 0% requirement
                         if "core_utilization_percent" in device or "memory_utilization_percent" in device:
@@ -255,14 +255,8 @@ class SimulationService:
                         )
                         continue
 
-                    # Skip CPU devices as they're not supported for LLM inference
-                    if device_type in ["cpu", "cpu_high"]:
-                        device_name = device.get("name", "unknown")
-                        if device_type == "cpu_high":
-                            logger.info(f"Skipping CPU_HIGH device {device_name}: CPU inference not supported")
-                        else:
-                            logger.info(f"Skipping CPU device {device_name}: CPU inference not supported")
-                        continue
+                    # CPU devices are now supported for LLM inference
+                    # The CPU compatibility checks in vllm.py will enforce proper constraints
 
                     # Initialize device group if not exists
                     if device_type not in device_groups:

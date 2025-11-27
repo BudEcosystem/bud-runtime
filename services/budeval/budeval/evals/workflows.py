@@ -85,7 +85,7 @@ class EvaluationWorkflow:
 
         # Set initial ETA
         notification_req.payload.event = "eta"
-        eta_minutes = 30 * 60 * len(evaluate_model_request_json.eval_datasets)
+        eta_minutes = 3 * 60
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
             message=f"{eta_minutes}",
@@ -336,6 +336,7 @@ class EvaluationWorkflow:
             # NEW: Pass notification metadata for child workflow to use
             "workflow_id": instance_id,
             "source_topic": evaluate_model_request_json.source_topic,
+            "evaluate_model_request_json_raw": evaluate_model_request_json.model_dump(mode="json"),
             "source": evaluate_model_request_json.source,
         }
 

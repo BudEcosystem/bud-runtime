@@ -1,6 +1,6 @@
 import { Image, notification, Tag } from "antd";
 import React from "react";
-import { assetBaseUrl } from "../../../lib/environment";
+import { useConfig } from "../../../context/ConfigContext";
 import { getChromeColor } from "../utils/color";
 import { Endpoint } from "@/app/types/deployment";
 import { toast } from "react-toastify";
@@ -32,6 +32,7 @@ export function ModelListCard({
   hideSeeMore?: boolean;
   hideSelect?: boolean;
 }) {
+  const { assetBaseUrl } = useConfig();
   const [hover, setHover] = React.useState(false);
 
   const { name, model } = data;

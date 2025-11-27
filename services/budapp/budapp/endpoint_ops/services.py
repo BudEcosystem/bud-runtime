@@ -666,53 +666,7 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
-        # Create request to trigger endpoint status update periodic task
-        is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
-
-        if db_endpoint.bud_cluster_id:
-            await self._perform_endpoint_status_update_request(
-                db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
-            )
-
         return db_endpoint
-
-    async def _perform_endpoint_status_update_request(
-        self, cluster_id: UUID, namespace: str, is_cloud_model: bool
-    ) -> Dict:
-        """Perform update endpoint status request to bud_cluster app.
-
-        Args:
-            cluster_id: The ID of the cluster to update.
-            namespace: The namespace of the cluster to update.
-            current_user_id: The ID of the current user.
-        """
-        update_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/update-deployment-status"
-
-        try:
-            payload = {
-                "deployment_name": namespace,
-                "cluster_id": str(cluster_id),
-                "cloud_model": is_cloud_model,
-            }
-            logger.debug(
-                f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
-            )
-            async with aiohttp.ClientSession() as session:
-                async with session.post(update_cluster_endpoint, json=payload) as response:
-                    response_data = await response.json()
-                    if response.status != 200 or response_data.get("object") == "error":
-                        logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
-                        raise ClientException(
-                            "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                        )
-
-                    logger.debug("Successfully updated endpoint status")
-                    return response_data
-        except Exception as e:
-            logger.exception(f"Failed to send update endpoint status request: {e}")
-            raise ClientException(
-                "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
 
     async def update_endpoint_status_from_notification_event(self, payload: NotificationPayload) -> None:
         """Update an endpoint status in database.
@@ -904,24 +858,10 @@ class EndpointService(SessionMixin):
     async def get_model_cluster_detail(self, endpoint_id: UUID) -> ModelClusterDetail:
         """Get model cluster detail."""
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(EndpointModel, {"id": endpoint_id})
-        # Commented out since it is same as a db retrieve
-        # model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
-        # model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
         cluster_id = db_endpoint.cluster_id
         cluster_detail = None
         if cluster_id:
             cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
-
-        # Get running and crashed worker count
-        running_worker_count, crashed_worker_count = None, None
-        if db_endpoint.bud_cluster_id:
-            running_worker_count, crashed_worker_count = await self.get_endpoint_worker_count(
-                db_endpoint.namespace, str(db_endpoint.bud_cluster_id)
-            )
-
-        # An endpoint always have at least one worker
-        if running_worker_count == 0 and crashed_worker_count == 0:
-            running_worker_count, crashed_worker_count = None, None
 
         return ModelClusterDetail(
             id=db_endpoint.id,
@@ -930,60 +870,7 @@ class EndpointService(SessionMixin):
             model=db_endpoint.model,
             cluster=cluster_detail,
             deployment_config=db_endpoint.deployment_config,
-            running_worker_count=running_worker_count,
-            crashed_worker_count=crashed_worker_count,
         )
-
-    @staticmethod
-    async def get_endpoint_worker_count(namespace: str, cluster_id: str) -> Tuple[int, int]:
-        """Get endpoint worker count."""
-        get_workers_endpoint = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/worker-info"
-        )
-        page = 1
-        PAGE_LIMIT = 20
-
-        # Initialize worker counts
-        running_worker_count = 0
-        crashed_worker_count = 0
-
-        # Fetch workers in batches
-        while True:
-            try:
-                payload = {"namespace": namespace, "cluster_id": cluster_id, "page": page, "limit": PAGE_LIMIT}
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(get_workers_endpoint, params=payload) as response:
-                        bud_cluster_response = await response.json()
-                        logger.debug("bud_cluster_response: %s", bud_cluster_response)
-
-                        if response.status != 200 or bud_cluster_response.get("object") == "error":
-                            error_message = bud_cluster_response.get("message", "Failed to get endpoint workers")
-                            logger.error(f"Failed to get endpoint workers: {error_message}")
-                            break
-
-                        logger.debug("Successfully retrieved %s workers for page %s", PAGE_LIMIT, page)
-                        workers_data = bud_cluster_response.get("workers", [])
-            except Exception as e:
-                logger.exception(
-                    "Failed to fetch workers for namespace %s and cluster_id %s: %s", namespace, cluster_id, e
-                )
-                break
-
-            # Count running and crashed workers
-            for worker in workers_data:
-                status = worker.get("status")
-                if status == "Running":
-                    running_worker_count += 1
-                else:
-                    crashed_worker_count += 1
-
-            # Check if there are more pages
-            total_pages = bud_cluster_response.get("total_pages", 1)
-            if page >= total_pages:
-                break
-            page += 1
-
-        return running_worker_count, crashed_worker_count
 
     async def delete_worker_from_notification_event(self, payload: NotificationPayload) -> None:
         """Delete a worker in database.

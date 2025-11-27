@@ -1,7 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import { ConfigProvider, Popover, Select, Slider, Tag } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import React from "react";
 import { useRouter } from "next/router";
@@ -29,7 +28,8 @@ import {
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
+import { ConfigProvider, Popover, Select, Slider, Tag, Dropdown, type MenuProps } from "antd";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
 import { IconOnlyRender } from "src/flows/components/BudIconRender";
@@ -42,6 +42,7 @@ import { errorToast } from "@/components/toast";
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
   const router = useRouter();
+  const { openDrawer } = useDrawer();
 
   const getTypeColor = (type?: string) => {
     return type === 'agent' ? '#965CDE' : '#5CADFF';
@@ -52,7 +53,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
 
   const handleCardClick = () => {
     // Navigate to agent detail page
-    router.push(`/home/agentDetails/${item.id}`);
+    // router.push(`/home/agentDetails/${item.id}`);
   };
 
   return (
@@ -79,6 +80,42 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
                   {item.prompt_type === 'agent' ? '🤖' : '📝'}
                 </div>
               )}
+            </div>
+            <div className="flex items-start pt-[.5rem]">
+              <ConfigProvider
+                theme={{
+                  token: {
+                    colorBgElevated: "#111113",
+                    colorText: "#EEEEEE",
+                    controlItemBgHover: "#1F1F1F",
+                    boxShadowSecondary: "0 0 0 1px #1F1F1F",
+                  },
+                }}
+              >
+                <Dropdown
+                  menu={{
+                    items: [
+                      {
+                        key: "edit",
+                        label: "Edit",
+                        onClick: (e) => {
+                          e.domEvent.stopPropagation();
+                          openDrawer("edit-agent", { agent: item });
+                        },
+                      },
+                    ],
+                  }}
+                  trigger={["hover"]}
+                  placement="bottomRight"
+                >
+                  <div
+                    className="w-[1.5rem] h-[1.5rem] flex items-center justify-center rounded hover:bg-[#1F1F1F] transition-colors cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreOutlined className="text-[#B3B3B3] text-[1.2rem]" rotate={180} />
+                  </div>
+                </Dropdown>
+              </ConfigProvider>
             </div>
           </div>
 
@@ -150,33 +187,6 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
           <PromptAgentTags promptAgent={item} maxTags={3} limit={false} />
         </div>
       </div>
-
-      {/* <div className="pt-[1.1rem] pr-[1.5em] pl-[1.5em] pb-[1.45em] bg-[#161616] flex justify-between items-center">
-        <div>
-          <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
-            {(item.usage_count || 0).toLocaleString()}
-          </Text_17_600_FFFFFF>
-          <Text_13_400_B3B3B3 className="pt-[.3rem]">
-            Uses
-          </Text_13_400_B3B3B3>
-        </div>
-        <div>
-          <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
-            {item.rating || 0}
-          </Text_17_600_FFFFFF>
-          <Text_13_400_B3B3B3 className="pt-[.3rem]">
-            Rating
-          </Text_13_400_B3B3B3>
-        </div>
-        <div>
-          <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
-            v{item.default_version || item.version || '1.0'}
-          </Text_17_600_FFFFFF>
-          <Text_13_400_B3B3B3 className="pt-[.3rem]">
-            Version
-          </Text_13_400_B3B3B3>
-        </div>
-      </div> */}
     </div>
   );
 }
@@ -825,8 +835,8 @@ export default function PromptsAgents() {
                     <NoDataFount
                       classNames="h-[60vh]"
                       textMessage={`No prompts or agents found for the ${filter.name
-                          ? `search term "${filter.name}"`
-                          : "selected filters"
+                        ? `search term "${filter.name}"`
+                        : "selected filters"
                         }`}
                     />
                   ) : (

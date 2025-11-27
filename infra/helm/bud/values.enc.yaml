@@ -16,6 +16,13 @@ microservices:
         env:
             STORE_ENCRYPTION_KEY: ENC[AES256_GCM,data:JYUMVOqeE+3YcnzWE+cW3/hmg88mdirJcQHFl7rKxTw=,iv:kbbnGbSObmV9I0Y0mGn9Xqxht8yljc853vkj8fpU4ag=,tag:8jcFsoUgIlRuP04M3HW2OA==,type:str]
             JWT_SECRET: ENC[AES256_GCM,data:IghKjD9FozMly6Y+EW0aeykUPlNVSlVGbOm4XEhzB8GnE/WtNodGM/XmNJfLVQHrWyIzLS2pun8At6pWuv6PXw==,iv:QH/wdVGNcvrzt8aBZ8COXeMgYWx8Brkm4oWXBAdafjM=,tag:mWhySnuWn1fULLJuYS3v6Q==,type:str]
+    mcpgateway:
+        env:
+            BASIC_AUTH_USER: ENC[AES256_GCM,data:EHBZRQ==,iv:ZfCLkLaTOS7sD9i3vL4em+l4hgakM2sSz4/2eWKVAck=,tag:gbQcv+c7ho1zBhBrMCp2Fw==,type:str]
+            BASIC_AUTH_PASSWORD: ENC[AES256_GCM,data:cp+icKMDcE79MS80XnXCDA==,iv:5FCToF9ytw70/57/JIeqHtPQUV1lUNvh80M3NQjVHTM=,tag:n7uvbwJ3LBd0aGms2q0b/g==,type:str]
+            JWT_SECRET_KEY: ENC[AES256_GCM,data:hOfPrCxbOZzWvax5FiXXTdWGEViFRSTzM4W1+aphDBI=,iv:+PmheegG4hKDXdZVlMsVd1F4hvtZVl0aMIKmBok7rGE=,tag:LR3Kb8l2BE+xmZVGSQ6iVA==,type:str]
+            PLATFORM_ADMIN_EMAIL: ENC[AES256_GCM,data:KDyh2tVWMu6SlrPYyLgn,iv:GOH9iaYW8eVHG7e1todJN4mOVeIiDblnMfm8J7ZqVNQ=,tag:JFzgEprcm6kybz0JS6AHSw==,type:str]
+            PLATFORM_ADMIN_PASSWORD: ENC[AES256_GCM,data:KD9iU0rfdRC64bn3ofp+U6t8FNdcJpyZ,iv:MRniI3YAvnmROko2s+BfXI8l0UXOfD6neLg41KEluVg=,tag:6P9xLH5ssjZyPiWZ4I8Fqg==,type:str]
     global:
         env:
             OPENAI_API_KEY: ENC[AES256_GCM,data:7rdgd7krOibAuOG1,iv:QmI2wjZzXLTDLStI7nKulddVIuJHu74e0MZhiTDi+ho=,tag:t1T4ToIeLmaac2kBBPKEWQ==,type:str]
@@ -87,7 +94,7 @@ sops:
             azNnZS8zRkl0aFFSWE9aWFJlbWEvak0KLZpbg5sUnFXY824DQfiproWfk9Yf2o1k
             aQ1torDEnZV3EFgfCs+ncc58isI3hx71zb9vw3Y4ROpkRcO5BuUgug==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2025-11-19T11:32:55Z"
-    mac: ENC[AES256_GCM,data:EUK/afBkfrqzMJAeBkaG8lQJCOl3q311VhGtPllYEWDZ1Ihljx48Jyy/xDiSLG8WjaOPhnHHsI0puDAlHJ5poVs7OQB/8caPa2lHNCmsW9Q/YBcBheCVFImIDnKCKsSoSrHJxQhtdiH+qCFNnoWkDUcG2k5iPqrvITMV0LlaHlU=,iv:BnLBZyOGDNI9Gn69RGvh8YvG1DUG/XCjlCGqZwGxqiA=,tag:YpItLNtqnHdAC+vZOr1fYg==,type:str]
+    lastmodified: "2025-11-27T10:03:09Z"
+    mac: ENC[AES256_GCM,data:bNbhwbiL2CRjqt7eaOLvJyYs9WnilgZnMSNaaI5PC2suIKEcUAxp30Lbr5rp3zmbGt4vjR3qPS7QVl7are+hbk2/KVVFPUu6ZkgoAJVKelYuW/0SvTrr15+QJwdZSAn8FETokk4L7STnrQlYrjUVKwOvn7m7WVrzye6Kxs4ijlw=,iv:DSG+i6/pZjpMuIK/7GItICX2JnIl2yQ3PUZCKA+OP80=,tag:CERazW6O2qmqfvQXzrrJlg==,type:str]
     unencrypted_suffix: _unencrypted
-    version: 3.10.2
+    version: 3.11.0

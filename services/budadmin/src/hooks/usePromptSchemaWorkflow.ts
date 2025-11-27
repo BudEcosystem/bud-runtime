@@ -125,13 +125,11 @@ export const usePromptSchemaWorkflow = ({
         const eventStatus = payload.content?.status;
 
         if (eventStatus === 'RUNNING' || eventStatus === 'IN_PROGRESS') {
-          console.log(`[usePromptSchemaWorkflow] Workflow is running`);
           setStatus('loading');
         }
 
         // Check for completion
         if (payload.event === "results" && eventStatus === "COMPLETED") {
-          console.log(`[usePromptSchemaWorkflow] Workflow completed successfully`);
           setStatus('success');
           onCompleted?.();
         }
@@ -150,13 +148,11 @@ export const usePromptSchemaWorkflow = ({
 
   useEffect(() => {
     if (socket) {
-      console.log(`[usePromptSchemaWorkflow] Attaching socket listener`);
       socket.on("notification_received", handleNotification);
     }
 
     return () => {
       if (socket) {
-        console.log(`[usePromptSchemaWorkflow] Removing socket listener`);
         socket.off("notification_received");
       }
       if (timeoutRef.current) {
@@ -167,34 +163,28 @@ export const usePromptSchemaWorkflow = ({
 
   // Method to manually reset status
   const resetStatus = useCallback(() => {
-    console.log(`[usePromptSchemaWorkflow] Resetting status to idle`);
     setStatus('idle');
   }, []);
 
   // Method to manually set loading status (when API call starts)
   const startWorkflow = useCallback(() => {
-    console.log(`[usePromptSchemaWorkflow] Starting workflow - setting status to loading`);
     setStatus('loading');
   }, []);
 
   // Method to manually set success status (for operations without workflow events)
   const setSuccess = useCallback(() => {
-    console.log(`[usePromptSchemaWorkflow] Manually setting status to success`);
     setStatus('success');
     // Auto-reset after 3 seconds
     timeoutRef.current = window.setTimeout(() => {
-      console.log(`[usePromptSchemaWorkflow] Auto-resetting status to idle`);
       setStatus('idle');
     }, 3000);
   }, []);
 
   // Method to manually set failed status (for operations without workflow events)
   const setFailed = useCallback(() => {
-    console.log(`[usePromptSchemaWorkflow] Manually setting status to failed`);
     setStatus('failed');
     // Auto-reset after 3 seconds
     timeoutRef.current = window.setTimeout(() => {
-      console.log(`[usePromptSchemaWorkflow] Auto-resetting status to idle`);
       setStatus('idle');
     }, 3000);
   }, []);

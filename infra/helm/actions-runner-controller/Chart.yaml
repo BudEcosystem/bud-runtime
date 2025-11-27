@@ -1,0 +1,17 @@
+apiVersion: v2
+
+name: actions-runner-controller
+description: actions-runner-controller Chart for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"
+
+dependencies:
+  - name: gha-runner-scale-set-controller
+    version: 0.13.0
+    repository: oci://ghcr.io/actions/actions-runner-controller-charts
+    condition: gha-runner-scale-set-controller.enabled
