@@ -161,8 +161,8 @@ function AgentBoxInner({
           if (configData.deployment_name) {
             updates.selectedDeployment = {
               id: configData.deployment_id || undefined,
-              name: configData.deployment_name,
-              model: { name: configData.deployment_name }
+              name: configData.deployment_name, // deployment name (e.g., 'gpt-4-mini')
+              model: {} // model details will be populated when user selects from LoadModel
             };
           }
 
@@ -608,7 +608,6 @@ function AgentBoxInner({
       workflow_total_steps: 0,
       trigger_workflow: triggerWorkflow
     };
-
     // Add version and permanent parameters if in edit version mode
     if (isEditVersionMode && editVersionData) {
       payload.version = editVersionData.versionNumber;
@@ -833,7 +832,7 @@ function AgentBoxInner({
         prompt_id: session.promptId,
         version: 1,
         set_default: isEditVersionMode ? setAsDefault : false,
-        deployment_name: session.selectedDeployment.model.name,
+        deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: [
@@ -940,7 +939,7 @@ function AgentBoxInner({
         prompt_id: session.promptId,
         version: 1,
         set_default: isEditVersionMode ? setAsDefault : false,
-        deployment_name: session.selectedDeployment.model.name,
+        deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: messages.map((msg: any) => ({
