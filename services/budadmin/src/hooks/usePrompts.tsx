@@ -152,6 +152,11 @@ export const usePrompts = create<{
   },
 
   getPromptById: async (promptId: string, projectId?): Promise<IPrompt> => {
+    // Skip API call for locally generated prompt IDs (they start with 'prompt_')
+    if (promptId.includes('prompt_')) {
+      throw new Error('Local prompt ID - not saved to backend yet');
+    }
+
     try {
       const url = `${tempApiBaseUrl}/prompts/${promptId}`;
       const headers: any = {};

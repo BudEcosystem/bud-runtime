@@ -178,12 +178,14 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
     // Handle both direct model object and wrapped model object
     const modelData = 'model' in endpoint ? endpoint.model : endpoint;
     const endpointId = endpoint.id;
+    // Get deployment name from endpoint (root level), not from model
+    const deploymentName = 'model' in endpoint ? (endpoint as any).name : endpoint.name;
 
     try {
       // Call the prompt-config API with the deployment name and prompt_id
       const payload = {
         prompt_id: session?.promptId,
-        deployment_name: modelData.name,
+        deployment_name: deploymentName,
         stream: session?.settings?.stream ?? false
       };
 
@@ -202,8 +204,9 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       modelName: modelData.name,
       selectedDeployment: {
         id: endpointId, // Store endpoint ID, not model ID
-        name: modelData.name,
+        name: deploymentName, // Use deployment name, not model name
         model: {
+          name: modelData.name, // Store model name separately
           icon: modelData.icon,
           provider: modelData.provider,
           provider_type: modelData.provider_type
