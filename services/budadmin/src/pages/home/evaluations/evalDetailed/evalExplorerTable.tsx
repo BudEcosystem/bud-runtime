@@ -124,7 +124,7 @@ function EvalExplorerTable({ datasets }: LeaderboardDetailsProps) {
             render: () => {
               return (
                 <div className="flex justify-start gap-2 max-w-[250px] flex-wrap py-2">
-                  {datasets.metrics.map(item => <Tags name={item} color={"#965CDE"} />)}
+                  {datasets?.metrics?.map((item, index) => <Tags key={`${item}-${index}`} name={item} color={"#965CDE"} />)}
                 </div>
               );
             },
