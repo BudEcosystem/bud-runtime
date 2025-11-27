@@ -929,7 +929,7 @@ class ExperimentService:
                     current_model=current_model_name,
                     processing_rate_per_min=0,
                     average_score_pct=evaluation_avg_score,
-                    eta_minutes=25,
+                    eta_minutes=evaluation.eta_seconds // 60 if evaluation.eta_seconds else 0,
                     status=evaluation.status,
                     actions=None,
                 )
