@@ -34,6 +34,7 @@ from pydantic_ai.messages import (
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
+    ToolCallPart,
     ToolCallPartDelta,
 )
 from pydantic_ai.output import NativeOutput
@@ -152,6 +153,9 @@ class StreamingValidationExecutor:
         # Track what we've sent to client for delta computation
         self.last_sent_fields: Dict[str, Any] = {}
 
+        # Track whether message item lifecycle has been emitted
+        self.message_item_started = False
+
     async def stream(self) -> AsyncGenerator[str, None]:
         """Execute streaming with validation and retry.
 
@@ -192,10 +196,8 @@ class StreamingValidationExecutor:
             for event in mcp_events:
                 yield self.formatter.format_sse_from_event(event)
 
-        # EVENTS: Message item lifecycle starts (for text output)
-        # Create message item ONCE upfront - all deltas will emit to this item
-        yield self.formatter.format_output_item_added()
-        yield self.formatter.format_content_part_added()
+        # Note: Message item lifecycle events (output_item.added, content_part.added)
+        # will be emitted on-demand before field deltas in AgentRunResultEvent handler
 
         # Try streaming up to retry_limit times
         for attempt in range(self.retry_limit):
@@ -271,6 +273,8 @@ class StreamingValidationExecutor:
                 if attempt < self.retry_limit - 1:
                     # Reset formatter state for retry
                     self.formatter.reset_for_retry()
+                    # Reset flag to allow lifecycle events on retry
+                    self.message_item_started = False
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -286,6 +290,8 @@ class StreamingValidationExecutor:
                 # If not last attempt, retry
                 if attempt < self.retry_limit - 1:
                     self.formatter.reset_for_retry()
+                    # Reset flag to allow lifecycle events on retry
+                    self.message_item_started = False
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -377,6 +383,17 @@ class StreamingValidationExecutor:
                         if self.validated_fields:
                             final_validated_data = {**final_validated_data, **self.validated_fields}
 
+                        # EMIT lifecycle events ONCE before first field delta
+                        # This ensures they appear immediately after MCP tools and before validated output
+                        if not self.message_item_started:
+                            logger.debug("Emitting message item lifecycle events before field deltas")
+
+                            # Emit lifecycle events with proper sequences
+                            yield self.formatter.format_output_item_added()
+                            yield self.formatter.format_content_part_added()
+
+                            self.message_item_started = True
+
                         logger.debug(f"Emitting field-by-field deltas for {len(final_validated_data)} fields")
 
                         # Emit field-by-field validated deltas (for MCP + structured output)
@@ -444,9 +461,36 @@ class StreamingValidationExecutor:
             # Handle PartStartEvent to populate formatter state (required for validation)
             if isinstance(event, PartStartEvent):
                 # Let formatter process to populate parts_state
-                # Don't assign sequences - we don't know yet if we'll suppress
-                await self.formatter.map_event(event, assign_sequence=False)
-                # Don't emit yet - continue to next event
+                # Don't assign sequences initially - we need to check if we should suppress
+                openai_events = await self.formatter.map_event(event, assign_sequence=False)
+
+                # Check if this is a ToolCallPart (potential MCP tool)
+                if isinstance(event.part, ToolCallPart):
+                    output_index = event.index
+                    if output_index in self.formatter.parts_state:
+                        state = self.formatter.parts_state[output_index]
+
+                        # Only suppress if this is final_result tool (structured output)
+                        if state.is_final_result_tool:
+                            logger.debug("Suppressing final_result tool lifecycle events")
+                            # Suppress final_result tool lifecycle - we'll emit validated output later
+                            continue
+
+                        # Regular MCP tool - need to emit lifecycle events
+                        # Reassign sequences and yield the events
+                        logger.debug(f"Emitting MCP tool lifecycle events for {state.tool_name}")
+                        events_with_sequences = []
+                        for openai_event in openai_events:
+                            event_dict = openai_event.model_dump()
+                            event_dict["sequence_number"] = self.formatter._next_sequence()
+                            events_with_sequences.append(type(openai_event)(**event_dict))
+
+                        for event_with_seq in events_with_sequences:
+                            yield self.formatter.format_sse_from_event(event_with_seq)
+
+                        continue
+
+                # TextPart or ThinkingPart - suppress, we'll emit validated deltas later
                 continue
 
             # For structured output validation, intercept PartDeltaEvent with text content (JSON)
@@ -488,6 +532,13 @@ class StreamingValidationExecutor:
                                     field_delta = self._compute_field_delta(current_validated)
 
                                     if field_delta:
+                                        # EMIT lifecycle events ONCE before first field delta
+                                        if not self.message_item_started:
+                                            logger.debug("Emitting message item lifecycle events before field deltas")
+                                            yield self.formatter.format_output_item_added()
+                                            yield self.formatter.format_content_part_added()
+                                            self.message_item_started = True
+
                                         # Convert delta to JSON string
                                         delta_json = json.dumps(field_delta, separators=(",", ":"))
 
