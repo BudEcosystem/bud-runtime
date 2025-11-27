@@ -210,8 +210,11 @@ function AgentBoxInner({
     } catch (error) {
       console.error("Error refreshing prompt config:", error);
     }
+  // Note: session?.settings and session?.selectedDeployment?.model are intentionally omitted
+  // to avoid unnecessary callback recreations. They're only used to preserve existing values
+  // when updating the session, not to determine when the callback should change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id, session?.promptId, session?.name, session?.settings, session?.selectedDeployment?.model, updateSession, getPromptConfig]);
+  }, [session?.id, session?.promptId, session?.name, updateSession, getPromptConfig]);
 
   // Ensure session has a promptId (migration for old sessions)
   React.useEffect(() => {
