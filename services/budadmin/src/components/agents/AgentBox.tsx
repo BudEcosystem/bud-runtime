@@ -429,7 +429,7 @@ function AgentBoxInner({
     ) => {
       // Only trigger refresh when status changes TO 'success' (not when it was already 'success')
       if (currentStatus === 'success' && prevStatusRef.current !== 'success') {
-        console.log(`[AgentBox] ${workflowName} workflow succeeded, refreshing prompt config`);
+        console.debug(`[AgentBox] ${workflowName} workflow succeeded, refreshing prompt config`);
         await refreshPromptConfig();
       }
       prevStatusRef.current = currentStatus;
