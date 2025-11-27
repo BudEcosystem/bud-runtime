@@ -102,7 +102,8 @@ const sampleResponse = [
 
 type LeaderboardDetailsProps = {
   datasets: {
-    sample_questions_answers: any
+    sample_questions_answers: any;
+    metrics: string[];
   } | null;
 };
 function EvalExplorerTable({ datasets }: LeaderboardDetailsProps) {
@@ -120,11 +121,13 @@ function EvalExplorerTable({ datasets }: LeaderboardDetailsProps) {
             dataIndex: "metric",
             key: "metric",
             width: "20%",
-            render: (text) => (
-              <div className="flex justify-start">
-                <Tags name={'Misuse Safety'} color={'#965CDE'} />
-              </div>
-            ),
+            render: () => {
+              return (
+                <div className="flex justify-start gap-2 max-w-[250px] flex-wrap py-2">
+                  {datasets.metrics.map(item => <Tags name={item} color={"#965CDE"} />)}
+                </div>
+              );
+            },
             sortOrder:
               orderBy === "name"
                 ? order === "-"
@@ -161,7 +164,14 @@ function EvalExplorerTable({ datasets }: LeaderboardDetailsProps) {
                 : undefined,
             render: (text) => (
               <Text_12_400_EEEEEE className="leading-[140%] py-[.5rem]">
-                {text || '-'}
+                {(text || "-")
+                  .split("\n")
+                  .map((line, i) => (
+                    <span key={i}>
+                      {line}
+                      <br />
+                    </span>
+                  ))}
               </Text_12_400_EEEEEE>
             ),
             sortIcon: SortIcon,
