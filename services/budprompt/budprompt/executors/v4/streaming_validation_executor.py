@@ -444,7 +444,8 @@ class StreamingValidationExecutor:
             # Handle PartStartEvent to populate formatter state (required for validation)
             if isinstance(event, PartStartEvent):
                 # Let formatter process to populate parts_state
-                await self.formatter.map_event(event)
+                # Don't assign sequences - we don't know yet if we'll suppress
+                await self.formatter.map_event(event, assign_sequence=False)
                 # Don't emit yet - continue to next event
                 continue
 
@@ -455,9 +456,9 @@ class StreamingValidationExecutor:
                     f"TextPartDelta: index={output_index}, content_delta={event.delta.content_delta[:50] if event.delta.content_delta else None}"
                 )
 
-                # CRITICAL: Let formatter accumulate the delta FIRST
+                # CRITICAL: Let formatter accumulate the delta WITHOUT assigning sequences
                 # This populates state.accumulated_content with the latest JSON
-                openai_events = await self.formatter.map_event(event)
+                openai_events = await self.formatter.map_event(event, assign_sequence=False)
 
                 # NOW get state and validate accumulated content
                 if output_index in self.formatter.parts_state:
@@ -528,8 +529,8 @@ class StreamingValidationExecutor:
                     f"ToolCallPartDelta: index={output_index}, tool_name={event.delta.tool_name if hasattr(event.delta, 'tool_name') else 'unknown'}"
                 )
 
-                # Let formatter accumulate the delta (needed for state tracking)
-                openai_events = await self.formatter.map_event(event)
+                # Let formatter accumulate the delta WITHOUT sequences (needed for state tracking)
+                openai_events = await self.formatter.map_event(event, assign_sequence=False)
 
                 # Check if this is final_result tool (structured output)
                 if output_index in self.formatter.parts_state:
@@ -543,9 +544,18 @@ class StreamingValidationExecutor:
                         # We'll validate and emit field deltas in AgentRunResultEvent handler
                         continue
 
-                # Not final_result tool - emit normally (regular MCP tools, function calls)
+                # Not final_result tool - need to assign sequences now and emit
+                # Reassign sequences to the events we just generated
+                events_with_sequences = []
                 for openai_event in openai_events:
-                    yield self.formatter.format_sse_from_event(openai_event)
+                    # Recreate event with proper sequence number
+                    event_dict = openai_event.model_dump()
+                    event_dict["sequence_number"] = self.formatter._next_sequence()
+                    events_with_sequences.append(type(openai_event)(**event_dict))
+
+                # Emit events with proper sequences
+                for event_with_seq in events_with_sequences:
+                    yield self.formatter.format_sse_from_event(event_with_seq)
                 continue
 
             # For all other events (reasoning, text, etc), pass through V4 formatter

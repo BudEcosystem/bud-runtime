@@ -86,6 +86,50 @@ class OpenAIStreamingValidationFormatter_V4(OpenAIStreamingFormatter_V4):
 
         self.text_item_id = f"msg_{uuid.uuid4().hex}"
 
+        # Flag to control sequence assignment (for lazy sequence assignment)
+        self.should_assign_sequence = True  # Default: always assign sequences
+
+    def _next_sequence(self) -> int:
+        """Override parent's _next_sequence to support conditional assignment.
+
+        When should_assign_sequence is False, returns -1 (placeholder) without
+        incrementing the counter. This prevents sequence gaps when events are
+        generated but not yielded to the client.
+
+        Returns:
+            Next sequence number (0, 1, 2...) or -1 if not assigning
+        """
+        if not self.should_assign_sequence:
+            return -1  # Don't increment counter, return placeholder
+
+        # Call parent's increment logic
+        return super()._next_sequence()
+
+    async def map_event(self, event: AgentStreamEvent, assign_sequence: bool = True) -> List[ResponseStreamEvent]:
+        """Override parent's map_event to control sequence assignment via flag.
+
+        Sets the should_assign_sequence flag before calling parent's map_event,
+        which causes all _next_sequence() calls in the parent to respect the flag.
+
+        Args:
+            event: Pydantic-ai stream event (PartStartEvent, PartDeltaEvent, etc.)
+            assign_sequence: If False, events are generated without sequence numbers
+                             (sequence_number=-1). If True, sequences are assigned normally.
+
+        Returns:
+            List of OpenAI SDK ResponseStreamEvent instances
+        """
+        # Set flag before calling parent
+        self.should_assign_sequence = assign_sequence
+
+        try:
+            # Call parent's map_event - it will use our overridden _next_sequence()
+            events = await super().map_event(event)
+            return events
+        finally:
+            # Reset flag to default (always reset even if exception occurs)
+            self.should_assign_sequence = True
+
     def _format_sse(self, event_type: str, data: Dict[str, Any]) -> str:
         r"""Format as Server-Sent Event with event and data lines.
 
@@ -355,10 +399,13 @@ class OpenAIStreamingValidationFormatter_V4(OpenAIStreamingFormatter_V4):
 
         This resets the formatter's internal state (parts, sequences, etc.)
         while preserving validation context for the retry prompt.
+
+        NOTE: sequence_number is NOT reset - it continues monotonically increasing
+        across retry attempts to ensure proper event ordering on client side.
         """
         # Reset parent formatter state
         self.parts_state.clear()
-        self.sequence_number = -1
+        # DON'T reset sequence_number - keep it monotonically increasing across retries
         self.accumulated_text = ""
         self.accumulated_thinking = []
         self.accumulated_reasoning = ""
