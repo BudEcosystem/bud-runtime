@@ -31,6 +31,7 @@ from budmicroframe.commons.schemas import (
     SuccessResponse,
 )
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
+from openai.types.responses.response_input_param import ResponseInputParam
 from pydantic import ValidationError
 
 from ..commons.config import app_settings
@@ -182,7 +183,8 @@ class PromptExecutorService:
     async def execute_prompt(
         self,
         request: PromptExecuteData,
-        input_data: Optional[Union[Dict[str, Any], str]],
+        input_data: Optional[Union[str, ResponseInputParam]] = None,
+        variables: Optional[Dict[str, Any]] = None,
         api_key: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
@@ -217,6 +219,7 @@ class PromptExecutorService:
                 api_key=api_key,
                 tools=request.tools,
                 system_prompt=request.system_prompt,
+                variables=variables,
             )
 
             return result

@@ -51,6 +51,7 @@ from budprompt.commons.exceptions import (
 from budprompt.shared.providers import BudServeProvider
 
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
+from ...responses.schemas import ResponseInputParam
 from .field_validation import ModelValidationEnhancer
 from .openai_response_formatter import OpenAIResponseFormatter_V4
 from .openai_streaming_formatter import OpenAIStreamingFormatter_V4
@@ -83,7 +84,7 @@ class SimplePromptExecutor_V4:
         input_schema: Optional[Dict[str, Any]],
         output_schema: Optional[Dict[str, Any]],
         messages: List[Message],
-        input_data: Optional[Union[Dict[str, Any], str]] = None,
+        input_data: Optional[Union[str, ResponseInputParam]] = None,
         stream: bool = False,
         output_validation: Optional[Dict[str, Any]] = None,
         input_validation: Optional[Dict[str, Any]] = None,
@@ -94,6 +95,7 @@ class SimplePromptExecutor_V4:
         api_key: Optional[str] = None,
         tools: Optional[List[MCPToolConfig]] = None,
         system_prompt: Optional[str] = None,
+        variables: Optional[Dict[str, Any]] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -129,11 +131,11 @@ class SimplePromptExecutor_V4:
 
             # Handle input validation
             validated_input = None
-            if input_schema is not None and input_data is not None:
+            if input_schema is not None and variables is not None:
                 # Structured input: create model with validation and validate
                 input_model = await self._get_input_model_with_validation(input_schema, input_validation)
                 try:
-                    validated_input = input_model.model_validate(input_data)
+                    validated_input = input_model.model_validate(variables)
                 except ValidationError:
                     # Let the ValidationError bubble up directly
                     raise
