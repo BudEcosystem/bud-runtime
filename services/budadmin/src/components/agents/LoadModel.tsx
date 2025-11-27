@@ -18,7 +18,9 @@ interface LoadModelProps {
 }
 
 interface ModelWrapper {
-  model: Model;
+  id: string;           // endpoint/deployment ID
+  name: string;         // deployment name (e.g., 'gpt-4-mini')
+  model: Model;         // nested model data (model.name is the model name, e.g., 'gpt-4.1-mini')
   [key: string]: any;
 }
 
@@ -174,12 +176,12 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
     }
   }, [currentPage, totalPages, isLoadingMore, searchValue, fetchModels]);
 
-  const handleSelectModel = async (endpoint: ModelWrapper | Model) => {
-    // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+  const handleSelectModel = async (endpoint: ModelWrapper) => {
+    // endpoint.name is the deployment name (e.g., 'gpt-4-mini')
+    // endpoint.model.name is the model name (e.g., 'gpt-4.1-mini')
+    const deploymentName = endpoint.name;
+    const modelData = endpoint.model;
     const endpointId = endpoint.id;
-    // Get deployment name from endpoint (root level), not from model
-    const deploymentName = 'model' in endpoint ? (endpoint as any).name : endpoint.name;
 
     try {
       // Call the prompt-config API with the deployment name and prompt_id
