@@ -135,15 +135,15 @@ class DeploymentOpsService:
             SuccessResponse: If updates were triggered successfully
             ErrorResponse: If there was an error triggering updates
         """
-        from datetime import UTC, timedelta
+        from datetime import timedelta
 
         from budmicroframe.shared.dapr_service import DaprService
 
-        # Configuration
-        BATCH_SIZE = 2  # Process max 2 deployments concurrently
-        STALE_THRESHOLD_MINUTES = 20  # Consider sync stale after 20 minutes
-        STATE_STORE_KEY = "deployment_status_sync_state"
-        ERROR_RETRY_HOURS = 24  # Retry FAILED deployments every 24 hours
+        # Configuration from app_settings
+        BATCH_SIZE = app_settings.deployment_sync_batch_size
+        STALE_THRESHOLD_MINUTES = app_settings.deployment_sync_stale_threshold_minutes
+        STATE_STORE_KEY = app_settings.deployment_sync_state_store_key
+        ERROR_RETRY_HOURS = app_settings.deployment_sync_error_retry_hours
 
         try:
             # Initialize state management (optional - gracefully handle if not available)
@@ -170,7 +170,7 @@ class DeploymentOpsService:
                 logger.debug(f"DaprService not available, using in-memory state: {e}")
 
             # Clean up stale active syncs (older than threshold)
-            current_time = datetime.now(UTC)
+            current_time = datetime.now(timezone.utc)
             stale_time = current_time - timedelta(minutes=STALE_THRESHOLD_MINUTES)
 
             for deployment_key, sync_info in list(sync_state.get("active_syncs", {}).items()):
@@ -178,7 +178,7 @@ class DeploymentOpsService:
                 if sync_time_str:
                     sync_time = datetime.fromisoformat(sync_time_str)
                     if sync_time.tzinfo is None:
-                        sync_time = sync_time.replace(tzinfo=UTC)
+                        sync_time = sync_time.replace(tzinfo=timezone.utc)
                     if sync_time < stale_time:
                         logger.warning(f"Removing stale sync for deployment {deployment_key}")
                         del sync_state["active_syncs"][deployment_key]
@@ -255,7 +255,7 @@ class DeploymentOpsService:
                 batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
                 # Process batch results
-                for (cluster_id, deployment_name), result in zip(batch, batch_results, strict=False):
+                for (cluster_id, deployment_name), result in zip(batch, batch_results, strict=True):
                     deployment_key = f"{cluster_id}-{deployment_name}"
 
                     # Remove from active syncs

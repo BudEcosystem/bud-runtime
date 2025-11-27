@@ -16,6 +16,7 @@
 
 """Defines metadata routes for the microservices, providing endpoints for retrieving service-level information."""
 
+from datetime import datetime, timezone
 from typing import Annotated, List, Optional
 from uuid import UUID
 
@@ -154,15 +155,13 @@ async def periodic_deployment_status_update():
         SuccessResponse: If updates were triggered successfully with counts
         ErrorResponse: If there was an error triggering updates
     """
-    from datetime import datetime
-
     try:
-        trigger_time = datetime.utcnow()
+        trigger_time = datetime.now(timezone.utc)
         logger.info(f"Periodic deployment status update triggered at {trigger_time.isoformat()}")
 
         response = await DeploymentOpsService.trigger_periodic_deployment_status_update()
 
-        completion_time = datetime.utcnow()
+        completion_time = datetime.now(timezone.utc)
         duration = (completion_time - trigger_time).total_seconds()
 
         logger.info(
