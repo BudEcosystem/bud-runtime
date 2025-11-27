@@ -275,6 +275,8 @@ class StreamingValidationExecutor:
                     self.formatter.reset_for_retry()
                     # Reset flag to allow lifecycle events on retry
                     self.message_item_started = False
+                    # CRITICAL: Reset last_sent_fields to re-emit all fields on retry
+                    self.last_sent_fields = {}
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -292,6 +294,8 @@ class StreamingValidationExecutor:
                     self.formatter.reset_for_retry()
                     # Reset flag to allow lifecycle events on retry
                     self.message_item_started = False
+                    # CRITICAL: Reset last_sent_fields to re-emit all fields on retry
+                    self.last_sent_fields = {}
                     # Note: Don't reset validated_fields/failed_fields - they're used in retry prompt
                     continue
                 else:
@@ -397,7 +401,7 @@ class StreamingValidationExecutor:
                         logger.debug(f"Emitting field-by-field deltas for {len(final_validated_data)} fields")
 
                         # Emit field-by-field validated deltas (for MCP + structured output)
-                        # This provides incremental streaming even though tool already completed
+                        # Build cumulative JSON fragments for proper streaming concatenation
                         for field_name, field_value in final_validated_data.items():
                             logger.debug(f"Processing field: {field_name} = {field_value}")
                             # Skip if already sent (for retry scenarios)
@@ -407,21 +411,26 @@ class StreamingValidationExecutor:
                             ):
                                 continue
 
-                            # Emit single field as delta
-                            field_delta = {field_name: field_value}
-                            delta_json = json.dumps(field_delta, separators=(",", ":"))
+                            # Update tracking BEFORE building cumulative JSON
+                            self.last_sent_fields[field_name] = field_value
 
-                            # Emit as text delta using V4 formatter
-                            delta_event = self.formatter.format_output_text_delta(delta_json)
+                            # Build CUMULATIVE JSON with all sent fields so far
+                            # Formatter will extract only the delta (new text since last call)
+                            cumulative_json = self._build_cumulative_json_from_fields(
+                                self.last_sent_fields, close_object=False
+                            )
+
+                            # Emit cumulative JSON - formatter extracts the delta
+                            delta_event = self.formatter.format_output_text_delta(cumulative_json)
                             if delta_event:
                                 yield delta_event
 
-                            # Update what we've sent
-                            self.last_sent_fields[field_name] = field_value
-
-                        # Set accumulated_text to complete final JSON for done events
-                        complete_json = json.dumps(final_validated_data, separators=(",", ":"))
-                        self.formatter.accumulated_text = complete_json
+                        # After all fields emitted, close the JSON object
+                        final_json = self._build_cumulative_json_from_fields(self.last_sent_fields, close_object=True)
+                        # Emit the closing brace as a delta
+                        closing_delta = self.formatter.format_output_text_delta(final_json)
+                        if closing_delta:
+                            yield closing_delta
 
                         # Store for retry context
                         self.last_attempted_data = final_validated_data
@@ -539,16 +548,19 @@ class StreamingValidationExecutor:
                                             yield self.formatter.format_content_part_added()
                                             self.message_item_started = True
 
-                                        # Convert delta to JSON string
-                                        delta_json = json.dumps(field_delta, separators=(",", ":"))
+                                        # Update what we've sent BEFORE building cumulative JSON
+                                        self.last_sent_fields.update(field_delta)
 
-                                        # Emit as text delta using V4 formatter
-                                        delta_event = self.formatter.format_output_text_delta(delta_json)
+                                        # Build CUMULATIVE JSON with all sent fields so far
+                                        # Formatter will extract only the delta (new text since last call)
+                                        cumulative_json = self._build_cumulative_json_from_fields(
+                                            self.last_sent_fields, close_object=False
+                                        )
+
+                                        # Emit cumulative JSON - formatter extracts the delta
+                                        delta_event = self.formatter.format_output_text_delta(cumulative_json)
                                         if delta_event:
                                             yield delta_event
-
-                                        # Update what we've sent
-                                        self.last_sent_fields.update(field_delta)
 
                                     # Update our validated fields
                                     self.validated_fields.update(current_validated)
@@ -696,3 +708,54 @@ Generate the complete corrected {model_name} object with all fields."""
                 delta[field_name] = field_value
 
         return delta
+
+    def _build_cumulative_json_from_fields(self, fields_dict: Dict[str, Any], close_object: bool = False) -> str:
+        """Build cumulative JSON string from validated fields.
+
+        This builds a JSON fragment with proper syntax for streaming:
+        - First field: '{"field_name":"value"'
+        - Middle fields: ',"field_name":"value"'
+        - Last field: adds closing '}' if close_object=True
+
+        Args:
+            fields_dict: Dict of field_name -> field_value (all fields emitted so far)
+            close_object: If True, append closing '}' to complete the JSON object
+
+        Returns:
+            Cumulative JSON string with proper syntax for streaming
+
+        Examples:
+            _build_cumulative_json_from_fields({"name": "dummy"})
+            -> '{"name":"dummy"'
+
+            _build_cumulative_json_from_fields({"name": "dummy", "age": 100})
+            -> '{"name":"dummy","age":100'
+
+            _build_cumulative_json_from_fields({"name": "dummy", "age": 100}, close_object=True)
+            -> '{"name":"dummy","age":100}'
+        """
+        if not fields_dict:
+            return "{}" if close_object else "{"
+
+        # CRITICAL: Use dict insertion order (Python 3.7+)
+        # Sorting would break delta extraction as field order changes
+        # Dict maintains insertion order, ensuring cumulative JSON builds progressively
+        fields_items = list(fields_dict.items())
+
+        # Build JSON manually with proper streaming syntax
+        parts = []
+        for i, (field_name, field_value) in enumerate(fields_items):
+            if i == 0:
+                # First field: open brace + field
+                parts.append(f'{{"{field_name}":{json.dumps(field_value, separators=(",", ":"))}')
+            else:
+                # Subsequent fields: comma + field
+                parts.append(f',"{field_name}":{json.dumps(field_value, separators=(",", ":"))}')
+
+        json_str = "".join(parts)
+
+        # Add closing brace if requested
+        if close_object:
+            json_str += "}"
+
+        return json_str
