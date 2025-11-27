@@ -18,7 +18,9 @@ interface LoadModelProps {
 }
 
 interface ModelWrapper {
-  model: Model;
+  id: string;           // endpoint/deployment ID
+  name: string;         // deployment name (e.g., 'gpt-4-mini')
+  model: Model;         // nested model data (model.name is the model name, e.g., 'gpt-4.1-mini')
   [key: string]: any;
 }
 
@@ -174,22 +176,20 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
     }
   }, [currentPage, totalPages, isLoadingMore, searchValue, fetchModels]);
 
-  const handleSelectModel = async (endpoint: ModelWrapper | Model) => {
-    // Handle both direct model object and wrapped model object
-    const modelData = 'model' in endpoint ? endpoint.model : endpoint;
+  const handleSelectModel = async (endpoint: ModelWrapper) => {
+    // endpoint.name is the deployment name (e.g., 'gpt-4-mini')
+    // endpoint.model.name is the model name (e.g., 'gpt-4.1-mini')
+    const deploymentName = endpoint.name;
+    const modelData = endpoint.model;
     const endpointId = endpoint.id;
 
     try {
       // Call the prompt-config API with the deployment name and prompt_id
       const payload = {
         prompt_id: session?.promptId,
-        deployment_name: modelData.name,
+        deployment_name: deploymentName,
         stream: session?.settings?.stream ?? false
       };
-
-      console.log("=== LoadModel Prompt Config Payload ===");
-      console.log("Stream enabled:", session?.settings?.stream ?? false);
-      console.log("Full payload:", payload);
 
       await AppRequest.Post(`${tempApiBaseUrl}/prompts/prompt-config`, payload);
     } catch (error) {
@@ -202,8 +202,9 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       modelName: modelData.name,
       selectedDeployment: {
         id: endpointId, // Store endpoint ID, not model ID
-        name: modelData.name,
+        name: deploymentName, // Use deployment name, not model name
         model: {
+          name: modelData.name, // Store model name separately
           icon: modelData.icon,
           provider: modelData.provider,
           provider_type: modelData.provider_type
