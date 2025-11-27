@@ -39,8 +39,6 @@ spec:
           ports:
             - containerPort: 4444
           env:
-            - name: EMAIL_AUTH_ENABLED
-              value: "false"
             - name: PASSWORD_REQUIRE_NUMBERS
               value: "false"
             - name: MIN_PASSWORD_LENGTH
@@ -56,6 +54,8 @@ spec:
               value: "production"
             - name: APP_DOMAIN
               value: {{ include "bud.ingress.url.mcpgateway" $ }}
+            - name: PLATFORM_ADMIN_FULL_NAME
+              value: "Platform Administrator"
 
             - name: REDIS_URL
               value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/9"
