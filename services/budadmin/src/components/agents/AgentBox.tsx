@@ -156,7 +156,7 @@ function AgentBoxInner({
         if (response?.data) {
           const configData = response.data;
           const updates: Partial<typeof session> = {};
-          console.log('configData', configData)
+
           // Map deployment_name to selectedDeployment
           if (configData.deployment_name) {
             updates.selectedDeployment = {

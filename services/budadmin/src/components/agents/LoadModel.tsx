@@ -191,10 +191,6 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         stream: session?.settings?.stream ?? false
       };
 
-      console.log("=== LoadModel Prompt Config Payload ===");
-      console.log("Stream enabled:", session?.settings?.stream ?? false);
-      console.log("Full payload:", payload);
-
       await AppRequest.Post(`${tempApiBaseUrl}/prompts/prompt-config`, payload);
     } catch (error) {
       console.error("Error calling prompt-config API:", error);
