@@ -666,53 +666,7 @@ class EndpointService(SessionMixin):
         )
         await BudNotifyService().send_notification(notification_request)
 
-        # Create request to trigger endpoint status update periodic task
-        is_cloud_model = db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL
-
-        if db_endpoint.bud_cluster_id:
-            await self._perform_endpoint_status_update_request(
-                db_endpoint.bud_cluster_id, db_endpoint.namespace, is_cloud_model
-            )
-
         return db_endpoint
-
-    async def _perform_endpoint_status_update_request(
-        self, cluster_id: UUID, namespace: str, is_cloud_model: bool
-    ) -> Dict:
-        """Perform update endpoint status request to bud_cluster app.
-
-        Args:
-            cluster_id: The ID of the cluster to update.
-            namespace: The namespace of the cluster to update.
-            current_user_id: The ID of the current user.
-        """
-        update_cluster_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/update-deployment-status"
-
-        try:
-            payload = {
-                "deployment_name": namespace,
-                "cluster_id": str(cluster_id),
-                "cloud_model": is_cloud_model,
-            }
-            logger.debug(
-                f"Performing update endpoint status request. payload: {payload}, endpoint: {update_cluster_endpoint}"
-            )
-            async with aiohttp.ClientSession() as session:
-                async with session.post(update_cluster_endpoint, json=payload) as response:
-                    response_data = await response.json()
-                    if response.status != 200 or response_data.get("object") == "error":
-                        logger.error(f"Failed to update endpoint status: {response.status} {response_data}")
-                        raise ClientException(
-                            "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                        )
-
-                    logger.debug("Successfully updated endpoint status")
-                    return response_data
-        except Exception as e:
-            logger.exception(f"Failed to send update endpoint status request: {e}")
-            raise ClientException(
-                "Failed to update endpoint status", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-            ) from e
 
     async def update_endpoint_status_from_notification_event(self, payload: NotificationPayload) -> None:
         """Update an endpoint status in database.
