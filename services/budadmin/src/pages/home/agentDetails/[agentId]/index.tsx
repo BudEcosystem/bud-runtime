@@ -13,38 +13,49 @@ import CacheTab from "./cache";
 import LogsTracesTab from "./logsTraces";
 import SettingsTab from "./settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import BackButton from "@/components/ui/bud/drawer/BackButton";
 
 const AgentDetailsPage = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("1");
 
-  const operations = (
-    <PrimaryButton
-      onClick={() => {
-        // TODO: Implement add version or settings action
-        console.log("Action button clicked");
-      }}
-      classNames="mt-[.2rem] shadow-purple-glow"
-    >
-      <span className="flex items-center gap-2">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M8 3V13M3 8H13"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-        Add Version
-      </span>
-    </PrimaryButton>
-  );
+  const handleGoBack = () => {
+    router.back();
+  };
+
+  const tabBarExtraContent = {
+    left: (
+      <BackButton onClick={handleGoBack} classNames="ml-4" />
+    ),
+    right: (
+      // <PrimaryButton
+      //   onClick={() => {
+      //     // TODO: Implement add version or settings action
+      //     console.log("Action button clicked");
+      //   }}
+      //   classNames="mt-[.2rem] shadow-purple-glow"
+      // >
+      //   <span className="flex items-center gap-2">
+      //     <svg
+      //       width="16"
+      //       height="16"
+      //       viewBox="0 0 16 16"
+      //       fill="none"
+      //       xmlns="http://www.w3.org/2000/svg"
+      //     >
+      //       <path
+      //         d="M8 3V13M3 8H13"
+      //         stroke="currentColor"
+      //         strokeWidth="2"
+      //         strokeLinecap="round"
+      //       />
+      //     </svg>
+      //     Add Version
+      //   </span>
+      // </PrimaryButton>
+      <></>
+    ),
+  };
 
   const agentTabs = [
     // {
@@ -156,12 +167,12 @@ const AgentDetailsPage = () => {
   return (
     <DashBoardLayout>
       <div className="temp-bg h-full w-full">
-        <div className="evalTab agentTab h-full">
+        <div className="evalTab agentTab h-full ">
           <Tabs
             defaultActiveKey="1"
             activeKey={activeTab}
             onChange={(key) => setActiveTab(key)}
-            // tabBarExtraContent={operations}
+            tabBarExtraContent={tabBarExtraContent}
             className="h-full"
             items={agentTabs}
           />
