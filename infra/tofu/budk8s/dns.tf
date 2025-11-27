@@ -21,6 +21,7 @@ locals {
     "gateway",
     "app",
     "ask",
+    "mcpgateway",
     "api.novu",
     "ws.novu",
   ]

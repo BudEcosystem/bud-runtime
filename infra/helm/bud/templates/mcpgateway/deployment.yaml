@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-mcpgateway
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mcpgateway
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-mcpgateway
+      annotations:
+        date: "{{ now }}"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $nodeSelector := include "bud.nodeSelector" (dict "service" .Values.microservices.mcpgateway "global" .Values.global "context" $) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "bud.affinity" (dict "service" .Values.microservices.mcpgateway "global" .Values.global "context" $) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mcpgateway
+          image: {{ .Values.microservices.mcpgateway.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: 4444
+          env:
+            - name: EMAIL_AUTH_ENABLED
+              value: "false"
+            - name: PASSWORD_REQUIRE_NUMBERS
+              value: "false"
+            - name: MIN_PASSWORD_LENGTH
+              value: "8"
+
+            - name: MCPGATEWAY_UI_AIRGAPPED
+              value: "true"
+            - name: MCPGATEWAY_UI_ENABLED
+              value: "true"
+            - name: MCPGATEWAY_ADMIN_API_ENABLED
+              value: "true"
+            - name: ENVIRONMENT
+              value: "production"
+            - name: APP_DOMAIN
+              value: {{ include "bud.ingress.url.mcpgateway" $ }}
+
+            - name: REDIS_URL
+              value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/9"
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.externalServices.postgresql.databases.mcpgateway.username }}:{{ .Values.externalServices.postgresql.databases.mcpgateway.password }}@{{ $.Release.Name }}-postgresql:5432/{{ .Values.externalServices.postgresql.databases.mcpgateway.name }}"
+          {{ $root := . }}
+          {{- range $key, $value := .Values.microservices.mcpgateway.env }}
+            - name: {{ $key }}
+              value: {{ tpl $value $root | quote }}
+          {{- end }}
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4096Mi
+            requests:
+              cpu: 1000m
+              memory: 2048Mi
