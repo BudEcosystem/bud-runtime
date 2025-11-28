@@ -129,16 +129,16 @@ const ProbesTab: React.FC = () => {
         title: 'Rule Name',
         dataIndex: 'name',
         key: 'name',
-        width: 250,
+        width: 180,
         render: (name: string) => (
-          <Text_12_400_EEEEEE>{name}</Text_12_400_EEEEEE>
+          <Text_12_400_EEEEEE className="truncate max-w-[160px]">{name}</Text_12_400_EEEEEE>
         ),
       },
       {
         title: 'Description',
         dataIndex: 'description',
         key: 'description',
-        width: 350,
+        width: 250,
         render: (description: string) => (
           <Popover
             content={
@@ -150,7 +150,7 @@ const ProbesTab: React.FC = () => {
             rootClassName="traits-popover"
           >
             <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <Text_12_300_EEEEEE className="truncate max-w-[330px]">
+              <Text_12_300_EEEEEE className="truncate max-w-[230px]">
                 {description || '-'}
               </Text_12_300_EEEEEE>
             </div>
@@ -261,10 +261,10 @@ const ProbesTab: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      width: 250,
+      width: 180,
       render: (name: string) => (
         <Tooltip title={name}>
-          <Text_12_400_EEEEEE className="truncate max-w-[230px]">
+          <Text_12_400_EEEEEE className="truncate max-w-[160px]">
             {name}
           </Text_12_400_EEEEEE>
         </Tooltip>
@@ -276,7 +276,7 @@ const ProbesTab: React.FC = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 300,
+      width: 250,
       render: (description: string) => (
         <Popover
           content={
@@ -288,7 +288,7 @@ const ProbesTab: React.FC = () => {
           rootClassName="traits-popover"
         >
           <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <Text_12_300_EEEEEE className="truncate max-w-[280px]">
+            <Text_12_300_EEEEEE className="truncate max-w-[230px]">
               {description || '-'}
             </Text_12_300_EEEEEE>
           </div>
