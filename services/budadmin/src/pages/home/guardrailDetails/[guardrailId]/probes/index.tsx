@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Tooltip, Popover, Spin } from 'antd';
-import { ReloadOutlined, DownOutlined } from '@ant-design/icons';
+import { ReloadOutlined } from '@ant-design/icons';
+import { ChevronRight } from 'lucide-react';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
 import { useGuardrails, Probe, ProbeRule } from '@/stores/useGuardrails';
@@ -406,11 +407,25 @@ const ProbesTab: React.FC = () => {
           onExpand: handleExpand,
           onExpandedRowsChange: (keys) => setExpandedRowKeys(keys as string[]),
           expandIcon: ({ expanded, onExpand, record }) => (
-            <DownOutlined
-              className={`transition-transform duration-200 cursor-pointer text-[#B3B3B3] hover:text-[#EEEEEE] ${expanded ? 'rotate-180' : ''
-                }`}
+            <div
+              className={`
+                w-6 h-6 flex items-center justify-center
+                rounded-md cursor-pointer
+                bg-[#1A1A1A] hover:bg-[#252525]
+                border border-[#2A2A2A] hover:border-[#3A3A3A]
+                transition-all duration-200 ease-in-out
+                group
+              `}
               onClick={(e) => onExpand(record, e)}
-            />
+            >
+              <ChevronRight
+                className={`
+                  w-4 h-4 text-[#808080] group-hover:text-[#EEEEEE]
+                  transition-transform duration-200 ease-in-out
+                  ${expanded ? 'rotate-90' : 'rotate-0'}
+                `}
+              />
+            </div>
           ),
         }}
         virtual
