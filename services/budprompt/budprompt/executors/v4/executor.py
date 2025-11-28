@@ -133,12 +133,12 @@ class SimplePromptExecutor_V4:
             validate_template_variables(variables, system_prompt, messages)
 
             # Handle input validation
-            validated_input = None
             if input_schema is not None and variables is not None:
                 # Structured input: create model with validation and validate
                 input_model = await self._get_input_model_with_validation(input_schema, input_validation)
                 try:
-                    validated_input = input_model.model_validate(variables)
+                    validated_input = input_model.model_validate(variables, extra="forbid")
+                    validated_variables = validated_input.model_dump()
                 except ValidationError as e:
                     # Extract validation error details (message, param, code)
                     message, param, code = extract_validation_error_details(e)
@@ -150,15 +150,20 @@ class SimplePromptExecutor_V4:
                         param=f"prompt.variables.{param}" if param else "prompt.variables",
                         code=code,
                     ) from e
+
+            if variables:
+                rendered_system_prompt = render_template(system_prompt, validated_variables) if system_prompt else None
+                # Preserve Message structure while rendering content
+                rendered_messages = [
+                    Message(role=message.role, content=render_template(message.content, validated_variables))
+                    for message in messages
+                ]
             else:
-                # Unstructured input: use string directly
-                validated_input = input_data
+                rendered_system_prompt = system_prompt
+                rendered_messages = messages
 
-            # Prepare context for template rendering
-            context = self._prepare_template_context(validated_input, input_schema is not None)
-
-            # Render system_prompt if provided
-            rendered_system_prompt = render_template(system_prompt, context) if system_prompt else None
+            # Build message history from all messages
+            message_history = self._build_message_history(rendered_messages, rendered_system_prompt)
 
             # Handle output type and validation
             output_type = await self._get_output_type(output_schema, output_validation, tools)
@@ -178,9 +183,6 @@ class SimplePromptExecutor_V4:
                 toolsets=toolsets,
             )
 
-            # Build message history from all messages
-            message_history = self._build_message_history(messages, context, rendered_system_prompt)
-
             # Get user prompt from input_data
             user_prompt = self._prepare_user_prompt(input_data)
 
@@ -194,7 +196,7 @@ class SimplePromptExecutor_V4:
                         output_type=output_type,
                         prompt=user_prompt or "",
                         validation_prompt=output_validation,
-                        messages=messages,
+                        messages=rendered_messages,
                         message_history=message_history,
                         api_key=api_key,
                         agent_kwargs=agent_kwargs,
@@ -214,9 +216,9 @@ class SimplePromptExecutor_V4:
                         output_schema,
                         deployment_name,
                         model_settings,
-                        messages,
+                        rendered_messages,
                         tools,
-                        system_prompt,
+                        rendered_system_prompt,
                     )
             else:
                 # Execute the agent with both history and current prompt
@@ -231,11 +233,11 @@ class SimplePromptExecutor_V4:
                 openai_response = await self.response_formatter.format_response(
                     pydantic_result=result,
                     model_settings=model_settings,
-                    messages=messages,
+                    messages=rendered_messages,
                     deployment_name=deployment_name,
                     tools=tools,
                     output_schema=output_schema,
-                    system_prompt=system_prompt,
+                    system_prompt=rendered_system_prompt,
                 )
 
                 return openai_response
@@ -493,7 +495,7 @@ class SimplePromptExecutor_V4:
         return context
 
     def _build_message_history(
-        self, messages: List[Message], context: Dict[str, Any], system_prompt: Optional[str] = None
+        self, messages: List[Message], system_prompt: Optional[str] = None
     ) -> List[ModelMessage]:
         """Build message history from messages list.
 
@@ -512,25 +514,23 @@ class SimplePromptExecutor_V4:
             message_history.append(ModelRequest(parts=[SystemPromptPart(content=system_prompt)]))
 
         # Process all messages
-        for msg in messages:
-            # Render message content with Jinja2
-            rendered_content = render_template(msg.content, context)
-
-            if msg.role in ["system", "developer"]:
-                # System and developer messages both use SystemPromptPart
-                # The actual OpenAI role (system/developer) is controlled by system_prompt_role
-                message_history.append(ModelRequest(parts=[SystemPromptPart(content=rendered_content)]))
-            elif msg.role == "user":
-                # Create user message
-                message_history.append(ModelRequest(parts=[UserPromptPart(content=rendered_content)]))
-            elif msg.role == "assistant":
-                # Create assistant message
-                message_history.append(
-                    ModelResponse(
-                        parts=[TextPart(content=rendered_content)],
-                        timestamp=datetime.now(timezone.utc),
+        if messages:
+            for msg in messages:
+                if msg.role in ["system", "developer"]:
+                    # System and developer messages both use SystemPromptPart
+                    # The actual OpenAI role (system/developer) is controlled by system_prompt_role
+                    message_history.append(ModelRequest(parts=[SystemPromptPart(content=msg.content)]))
+                elif msg.role == "user":
+                    # Create user message
+                    message_history.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
+                elif msg.role == "assistant":
+                    # Create assistant message
+                    message_history.append(
+                        ModelResponse(
+                            parts=[TextPart(content=msg.content)],
+                            timestamp=datetime.now(timezone.utc),
+                        )
                     )
-                )
 
         return message_history
 
