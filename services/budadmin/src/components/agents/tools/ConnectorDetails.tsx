@@ -530,45 +530,60 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       color: 'white',
     };
 
+    const renderLabel = () => (
+      <Text_12_400_EEEEEE className="mb-1 block">
+        {field.label}
+        {field.required && <span className="text-[#E82E2E] ml-0.5">*</span>}
+      </Text_12_400_EEEEEE>
+    );
+
     switch (field.type) {
       case 'dropdown':
         return (
-          <CustomSelect
-            key={field.field}
-            name={field.field}
-            placeholder={field.label}
-            value={formData[field.field]}
-            onChange={(value) => handleInputChange(field.field, value)}
-            selectOptions={field.options?.map(opt => ({ label: opt, value: opt }))}
-            InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <CustomSelect
+              name={field.field}
+              placeholder={field.label}
+              value={formData[field.field]}
+              onChange={(value) => handleInputChange(field.field, value)}
+              selectOptions={field.options?.map(opt => ({ label: opt.replace(/_/g, ' '), value: opt }))}
+              InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
+            />
+          </div>
         );
 
       case 'password':
         return (
-          <Input
-            key={field.field}
-            type="password"
-            placeholder={field.label}
-            value={formData[field.field] || ''}
-            onChange={(e) => handleInputChange(field.field, e.target.value)}
-            className={inputClassName}
-            style={inputStyle}
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              type="password"
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={inputStyle}
+              autoComplete="new-password"
+            />
+          </div>
         );
 
       case 'url':
       case 'text':
       default:
         return (
-          <Input
-            key={field.field}
-            placeholder={field.label}
-            value={formData[field.field] || ''}
-            onChange={(e) => handleInputChange(field.field, e.target.value)}
-            className={inputClassName}
-            style={inputStyle}
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={inputStyle}
+              autoComplete="off"
+            />
+          </div>
         );
     }
   };
