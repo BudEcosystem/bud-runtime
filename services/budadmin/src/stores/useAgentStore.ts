@@ -473,7 +473,11 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
           isAddVersionMode: false,
           addVersionPromptId: null,
           isEditVersionMode: false,
-          editVersionData: null
+          editVersionData: null,
+          // Clear session data to prevent stale data in subsequent create operations
+          sessions: [],
+          activeSessionIds: [],
+          selectedSessionId: null
         });
 
         // If we're in a workflow and have a next step, trigger it after closing
