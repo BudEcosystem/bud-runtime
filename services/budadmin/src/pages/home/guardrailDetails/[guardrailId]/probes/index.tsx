@@ -242,19 +242,6 @@ const ProbesTab: React.FC = () => {
     }
   };
 
-  // Get tag color
-  const getTagColor = (tag: string) => {
-    const colors = [
-      '#3B82F6', // blue
-      '#8B5CF6', // purple
-      '#EC4899', // pink
-      '#14B8A6', // teal
-      '#F59E0B', // amber
-    ];
-    const index = tag.length % colors.length;
-    return colors[index];
-  };
-
   // Table columns definition
   const columns: ColumnsType<Probe> = [
     {
@@ -306,31 +293,6 @@ const ProbesTab: React.FC = () => {
             {provider_name || record.provider_type?.replace(/_/g, ' ') || '-'}
           </Text_12_400_EEEEEE>
         </Tooltip>
-      ),
-    },
-    {
-      title: 'Tags',
-      dataIndex: 'tags',
-      key: 'tags',
-      width: 250,
-      render: (tags: Array<{ name: string; color: string }>) => (
-        <div className="flex flex-wrap gap-1">
-          {tags && tags.length > 0 ? (
-            tags.slice(0, 3).map((tag, index) => (
-              <Tags
-                key={index}
-                name={tag.name}
-                color={tag.color || getTagColor(tag.name)}
-                textClass="text-[.65rem]"
-              />
-            ))
-          ) : (
-            <Text_12_300_EEEEEE>-</Text_12_300_EEEEEE>
-          )}
-          {tags && tags.length > 3 && (
-            <span className="text-[.65rem] text-[#757575]">+{tags.length - 3}</span>
-          )}
-        </div>
       ),
     },
     {
