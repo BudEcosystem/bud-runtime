@@ -372,6 +372,7 @@ const ProbesTab: React.FC = () => {
           expandedRowKeys,
           onExpand: handleExpand,
           onExpandedRowsChange: (keys) => setExpandedRowKeys(keys as string[]),
+          columnWidth: 48,
           expandIcon: ({ expanded, onExpand, record }) => (
             <div
               className={`
