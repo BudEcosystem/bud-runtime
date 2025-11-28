@@ -75,7 +75,7 @@ class EndpointDataManager(DataManagerUtils):
         filters: Dict[str, Any] = {},
         order_by: List[Tuple[str, str]] = [],
         search: bool = False,
-        status_filter: Optional[EndpointStatusEnum] = None,
+        status_filter: Optional[str] = None,
     ) -> Tuple[List[EndpointModel], int]:
         """Get all active endpoints from the database.
 
