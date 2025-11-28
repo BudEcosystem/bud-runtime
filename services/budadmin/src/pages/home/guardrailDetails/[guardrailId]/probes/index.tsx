@@ -395,6 +395,7 @@ const ProbesTab: React.FC = () => {
             </div>
           ),
         }}
+        tableLayout="fixed"
         virtual
         bordered={false}
         footer={null}
