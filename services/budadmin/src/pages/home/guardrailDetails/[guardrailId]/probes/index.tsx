@@ -263,6 +263,7 @@ const ProbesTab: React.FC = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
+      width: 150,
       render: (description: string) => (
         <Popover
           content={
