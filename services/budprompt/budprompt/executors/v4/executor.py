@@ -53,7 +53,7 @@ from budprompt.shared.providers import BudServeProvider
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
 from ...responses.schemas import ResponseInputParam
 from .field_validation import ModelValidationEnhancer
-from .openai_response_formatter import OpenAIResponseFormatter_V4
+from .openai_response_formatter import OpenAIResponseFormatter_V4, extract_validation_error_details
 from .openai_streaming_formatter import OpenAIStreamingFormatter_V4
 from .schema_builder import CustomModelGenerator
 from .streaming_validation_executor import StreamingValidationExecutor
@@ -139,9 +139,17 @@ class SimplePromptExecutor_V4:
                 input_model = await self._get_input_model_with_validation(input_schema, input_validation)
                 try:
                     validated_input = input_model.model_validate(variables)
-                except ValidationError:
-                    # Let the ValidationError bubble up directly
-                    raise
+                except ValidationError as e:
+                    # Extract validation error details (message, param, code)
+                    message, param, code = extract_validation_error_details(e)
+                    logger.error(f"Input validation failed: {message}")
+                    raise PromptExecutionException(
+                        message=message,
+                        status_code=400,
+                        err_type="invalid_request_error",
+                        param=f"prompt.variables.{param}" if param else "prompt.variables",
+                        code=code,
+                    ) from e
             else:
                 # Unstructured input: use string directly
                 validated_input = input_data
