@@ -30,6 +30,7 @@ const ProbesTab: React.FC = () => {
     isLoadingProbes,
     fetchProbes,
     fetchProbeRules,
+    probeFilters,
     setProbeFilters,
     probePagination,
     setProbePagination,
@@ -330,23 +331,20 @@ const ProbesTab: React.FC = () => {
 
   // Handle table change (pagination, sorting)
   const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
-    // Handle pagination
-    if (newPagination.current !== probePagination.page || newPagination.pageSize !== probePagination.limit) {
+    const paginationChanged = newPagination.current !== probePagination.page || newPagination.pageSize !== probePagination.limit;
+    const newOrderBy = sorter.field && sorter.order ? `${sorter.field}:${sorter.order === 'ascend' ? 'asc' : 'desc'}` : undefined;
+    const sortChanged = newOrderBy !== probeFilters.order_by;
+
+    if (sortChanged && newOrderBy) {
+      // When sorting changes, reset to page 1
+      setProbeFilters({
+        order_by: newOrderBy,
+      });
+      fetchProbes(guardrailId as string);
+    } else if (paginationChanged) {
       setProbePagination({
         page: newPagination.current,
         limit: newPagination.pageSize
-      });
-      // Zustand state updates are synchronous, so we can fetch immediately
-      fetchProbes(guardrailId as string);
-    }
-
-    // Handle sorting
-    if (sorter.field) {
-      const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
-      const orderBy = `${sorter.field}:${sortOrder}`;
-
-      setProbeFilters({
-        order_by: orderBy,
       });
       fetchProbes(guardrailId as string);
     }
