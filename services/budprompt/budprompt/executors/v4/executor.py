@@ -59,7 +59,7 @@ from .schema_builder import CustomModelGenerator
 from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
-from .utils import contains_pydantic_model, validate_input_data_type
+from .utils import contains_pydantic_model, validate_input_data_type, validate_template_variables
 
 
 logger = logging.get_logger(__name__)
@@ -126,8 +126,11 @@ class SimplePromptExecutor_V4:
             PromptExecutionException: If prompt execution fails
         """
         try:
-            # Validate input data type matches schema presence
-            validate_input_data_type(input_data, input_schema)
+            # Validate variables/schema relationship
+            validate_input_data_type(input_schema, variables)
+
+            # Validate template variables match what's used in templates
+            validate_template_variables(variables, system_prompt, messages)
 
             # Handle input validation
             validated_input = None

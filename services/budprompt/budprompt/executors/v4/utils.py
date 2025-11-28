@@ -22,9 +22,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union, get_args, get_origin
 
 from budmicroframe.commons import logging
+from jinja2 import Environment, meta
 from pydantic import BaseModel, Field
 
-from budprompt.commons.exceptions import SchemaGenerationException
+from budprompt.commons.exceptions import PromptExecutionException
+from budprompt.prompt.schemas import Message
 
 
 logger = logging.get_logger(__name__)
@@ -78,26 +80,101 @@ def contains_pydantic_model(output_type: Any) -> bool:
     return False
 
 
-def validate_input_data_type(input_data: Any, input_schema: Dict[str, Any] = None) -> None:
-    """Validate that input_data type matches the schema presence.
+def validate_input_data_type(input_schema: Dict[str, Any] = None, variables: Optional[Dict[str, Any]] = None) -> None:
+    """Validate variables/schema relationship.
 
     Args:
-        input_data: The input data to validate
         input_schema: The input schema (None for unstructured)
+        variables: Template variables for structured input validation
 
     Raises:
-        SchemaGenerationException: If input_data type doesn't match schema presence
+        PromptExecutionException: If variables provided without input_schema
     """
-    if input_schema is not None:
-        # Structured input expected
-        if not isinstance(input_data, dict):
-            logger.error(f"Expected dict for structured input, got {type(input_data).__name__}")
-            raise SchemaGenerationException("Input data must be a dictionary when input_schema is provided")
-    else:
-        # Unstructured input expected
-        if input_data is not None and not isinstance(input_data, str):
-            logger.error(f"Expected string for unstructured input, got {type(input_data).__name__}")
-            raise SchemaGenerationException("Input data must be a string when input_schema is not provided")
+    # Validate variables/input_schema relationship
+    if variables is not None and input_schema is None:
+        logger.error("Variables provided but input_schema is missing")
+        raise PromptExecutionException(
+            message="Variables provided but input structure not predefined",
+            status_code=400,
+            err_type="invalid_request_error",
+            param="input_schema",
+            code="schema_required",
+        )
+
+
+def validate_template_variables(
+    variables: Optional[Dict[str, Any]],
+    system_prompt: Optional[str],
+    messages: Optional[List[Message]],
+) -> None:
+    """Validate that template variables match what's used in templates.
+
+    Performs bidirectional validation:
+    1. All provided variables are used in templates (no unknown variables)
+    2. All template variables have values provided (no missing variables)
+
+    Args:
+        variables: Dictionary of variable values to use in templates
+        system_prompt: Optional system prompt template
+        messages: Optional list of message templates
+
+    Raises:
+        PromptExecutionException: If validation fails with specific error codes:
+            - code="prompt_variable_missing": Template uses variables not provided
+            - code="prompt_variable_unknown": Variables provided but not used in templates
+    """
+    # If no variables provided, check if templates need any
+    provided_variables = set(variables.keys()) if variables else set()
+
+    # Extract all template variables from system_prompt and messages
+    env = Environment()
+    used_variables = set()
+
+    # Check system_prompt for template variables
+    if system_prompt:
+        try:
+            ast = env.parse(system_prompt)
+            used_variables.update(meta.find_undeclared_variables(ast))
+        except Exception as e:
+            logger.warning(f"Failed to parse system_prompt template: {e}")
+
+    # Check messages for template variables
+    if messages:
+        for msg in messages:
+            if msg.content:
+                try:
+                    ast = env.parse(msg.content)
+                    used_variables.update(meta.find_undeclared_variables(ast))
+                except Exception as e:
+                    logger.warning(f"Failed to parse message template: {e}")
+
+    # Validation 1: Check for missing variables (used in templates but not provided)
+    missing_variables = used_variables - provided_variables
+    if missing_variables:
+        missing_vars_str = ", ".join(sorted(missing_variables))
+        error_message = f"Missing prompt variables: {missing_vars_str}"
+        logger.error(error_message)
+        raise PromptExecutionException(
+            message=error_message,
+            status_code=400,
+            err_type="invalid_request_error",
+            param="prompt.variables",
+            code="prompt_variable_missing",
+        )
+
+    # Validation 2: Check for unknown variables (provided but not used in templates)
+    unknown_variables = provided_variables - used_variables
+    if unknown_variables:
+        unknown_vars_str = ", ".join(sorted(unknown_variables))
+        error_message = f"Unknown prompt variables: {unknown_vars_str}"
+        logger.error(error_message)
+        raise PromptExecutionException(
+            message=error_message,
+            status_code=400,
+            err_type="invalid_request_error",
+            param="prompt.variables",
+            code="prompt_variable_unknown",
+        )
 
 
 class SerializedPydanticResult(BaseModel):
