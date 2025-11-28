@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tooltip, Button, Spin } from 'antd';
+import { Table, Tooltip, Popover, Spin } from 'antd';
 import { ReloadOutlined, DownOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
@@ -138,11 +138,21 @@ const ProbesTab: React.FC = () => {
         key: 'description',
         width: 350,
         render: (description: string) => (
-          <Tooltip title={description || 'No description'}>
-            <Text_12_300_EEEEEE className="truncate max-w-[330px]">
-              {description || '-'}
-            </Text_12_300_EEEEEE>
-          </Tooltip>
+          <Popover
+            content={
+              <div className="max-w-[400px] break-words p-[.8rem]">
+                <Text_12_400_EEEEEE>{description || 'No description'}</Text_12_400_EEEEEE>
+              </div>
+            }
+            placement="top"
+            rootClassName="traits-popover"
+          >
+            <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Text_12_300_EEEEEE className="truncate max-w-[330px]">
+                {description || '-'}
+              </Text_12_300_EEEEEE>
+            </div>
+          </Popover>
         ),
       },
       {
@@ -263,11 +273,21 @@ const ProbesTab: React.FC = () => {
       key: 'description',
       width: 300,
       render: (description: string) => (
-        <Tooltip title={description || 'No description'}>
-          <Text_12_300_EEEEEE className="truncate max-w-[280px]">
-            {description || '-'}
-          </Text_12_300_EEEEEE>
-        </Tooltip>
+        <Popover
+          content={
+            <div className="max-w-[400px] break-words p-[.8rem]">
+              <Text_12_400_EEEEEE>{description || 'No description'}</Text_12_400_EEEEEE>
+            </div>
+          }
+          placement="top"
+          rootClassName="traits-popover"
+        >
+          <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Text_12_300_EEEEEE className="truncate max-w-[280px]">
+              {description || '-'}
+            </Text_12_300_EEEEEE>
+          </div>
+        </Popover>
       ),
     },
     {
