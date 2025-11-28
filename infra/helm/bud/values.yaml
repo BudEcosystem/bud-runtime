@@ -359,7 +359,6 @@ microservices:
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
-      MCP_FOUNDRY_BASE_URL: https://mcp-foundry.bud.studio/
       MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
       MINIO_BUCKET: models-registry
       MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
