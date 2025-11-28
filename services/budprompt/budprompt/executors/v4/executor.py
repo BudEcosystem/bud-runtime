@@ -132,6 +132,9 @@ class SimplePromptExecutor_V4:
             # Validate template variables match what's used in templates
             validate_template_variables(variables, system_prompt, messages)
 
+            # Initialize validated_variables with raw variables as default
+            validated_variables = variables
+
             # Handle input validation
             if input_schema is not None and variables is not None:
                 # Structured input: create model with validation and validate
@@ -469,39 +472,13 @@ class SimplePromptExecutor_V4:
         # Return both agent and kwargs for reuse by other executors
         return agent, agent_kwargs
 
-    def _prepare_template_context(self, input_data: Any, is_structured: bool) -> Dict[str, Any]:
-        """Prepare context for Jinja2 template rendering.
-
-        Args:
-            input_data: Validated input data
-            is_structured: Whether the input is structured
-
-        Returns:
-            Context dictionary for template rendering
-        """
-        context = {}
-
-        if input_data is not None:
-            if is_structured and hasattr(input_data, "model_dump"):
-                # Structured input: use model fields as context
-                context = input_data.model_dump()
-            elif isinstance(input_data, dict):
-                # Direct dict input
-                context = input_data
-            elif isinstance(input_data, str):
-                # Unstructured string input
-                context["input"] = input_data
-
-        return context
-
     def _build_message_history(
         self, messages: List[Message], system_prompt: Optional[str] = None
     ) -> List[ModelMessage]:
         """Build message history from messages list.
 
         Args:
-            messages: List of messages with roles and content
-            context: Context for template rendering
+            messages: List of messages with roles and content (already rendered)
             system_prompt: Optional system prompt to prepend as first message
 
         Returns:
