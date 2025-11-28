@@ -35,13 +35,13 @@ export default function SelectProject() {
 
   // Clear any leftover agent sessions from previous add-agent flows
   // This ensures a fresh start for every new add-agent flow
+  // Only clear if there's no currentWorkflow (i.e., starting a new flow, not navigating back)
   // Note: Does not affect edit/version modes since they don't use SelectProject
   useEffect(() => {
-    useAgentStore.setState({
-      sessions: [],
-      activeSessionIds: [],
-      selectedSessionId: null,
-    });
+    const { currentWorkflow } = useAddAgent.getState();
+    if (!currentWorkflow) {
+      useAgentStore.getState().resetSessionState();
+    }
   }, []);
 
   // Fetch projects on component mount and when search changes
