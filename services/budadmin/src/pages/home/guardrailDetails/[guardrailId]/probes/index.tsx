@@ -47,7 +47,7 @@ const ProbesTab: React.FC = () => {
 
   // Handle search with debounce
   useEffect(() => {
-    if (!guardrailId) return;
+    if (typeof guardrailId !== 'string') return;
 
     const timer = setTimeout(() => {
       if (searchValue) {
@@ -55,13 +55,13 @@ const ProbesTab: React.FC = () => {
           name: searchValue,
           search: true
         });
-        fetchProbes(guardrailId as string);
+        fetchProbes(guardrailId);
       } else {
         setProbeFilters({
           name: undefined,
           search: false
         });
-        fetchProbes(guardrailId as string);
+        fetchProbes(guardrailId);
       }
     }, 500);
     return () => clearTimeout(timer);
@@ -69,10 +69,11 @@ const ProbesTab: React.FC = () => {
 
   // Handle row expansion to load rules
   const handleExpand = async (expanded: boolean, record: Probe) => {
+    if (typeof guardrailId !== 'string') return;
     if (expanded && !probeRulesCache[record.id]) {
       // Load first page of rules for this probe
       setLoadingRules(prev => ({ ...prev, [record.id]: true }));
-      const { rules, pagination } = await fetchProbeRules(guardrailId as string, record.id, 1, 10);
+      const { rules, pagination } = await fetchProbeRules(guardrailId, record.id, 1, 10);
       setProbeRulesCache(prev => ({ ...prev, [record.id]: rules }));
       setRulesPagination(prev => ({ ...prev, [record.id]: pagination }));
       setLoadingRules(prev => ({ ...prev, [record.id]: false }));
@@ -81,8 +82,9 @@ const ProbesTab: React.FC = () => {
 
   // Handle pagination change for rules
   const handleRulesPaginationChange = async (probeId: string, page: number, pageSize: number) => {
+    if (typeof guardrailId !== 'string') return;
     setLoadingRules(prev => ({ ...prev, [probeId]: true }));
-    const { rules, pagination } = await fetchProbeRules(guardrailId as string, probeId, page, pageSize);
+    const { rules, pagination } = await fetchProbeRules(guardrailId, probeId, page, pageSize);
     setProbeRulesCache(prev => ({ ...prev, [probeId]: rules }));
     setRulesPagination(prev => ({ ...prev, [probeId]: pagination }));
     setLoadingRules(prev => ({ ...prev, [probeId]: false }));
@@ -331,6 +333,7 @@ const ProbesTab: React.FC = () => {
 
   // Handle table change (pagination, sorting)
   const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+    if (typeof guardrailId !== 'string') return;
     const paginationChanged = newPagination.current !== probePagination.page || newPagination.pageSize !== probePagination.limit;
     const newOrderBy = sorter.field && sorter.order ? `${sorter.field}:${sorter.order === 'ascend' ? 'asc' : 'desc'}` : undefined;
     const sortChanged = newOrderBy !== probeFilters.order_by;
@@ -340,13 +343,13 @@ const ProbesTab: React.FC = () => {
       setProbeFilters({
         order_by: newOrderBy,
       });
-      fetchProbes(guardrailId as string);
+      fetchProbes(guardrailId);
     } else if (paginationChanged) {
       setProbePagination({
         page: newPagination.current,
         limit: newPagination.pageSize
       });
-      fetchProbes(guardrailId as string);
+      fetchProbes(guardrailId);
     }
   };
 
@@ -411,7 +414,7 @@ const ProbesTab: React.FC = () => {
                 setSearchValue={setSearchValue}
               />
               <PrimaryButton
-                onClick={() => fetchProbes(guardrailId as string)}
+                onClick={() => typeof guardrailId === 'string' && fetchProbes(guardrailId)}
               >
                 <ReloadOutlined />
                 <span className="ml-2">Refresh</span>
