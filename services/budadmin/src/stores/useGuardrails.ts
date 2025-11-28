@@ -139,6 +139,72 @@ const defaultPagination: PaginationState = {
   has_more: false,
 };
 
+// Utility function to parse paginated API responses
+interface ParsedResponse<T> {
+  items: T[];
+  pagination: PaginationState;
+}
+
+function parseApiResponse<T>(
+  responseData: any,
+  primaryKey: string,
+  fallbackPagination: PaginationState
+): ParsedResponse<T> {
+  // Check for primary key array (e.g., 'profiles', 'probes', 'rules')
+  if (responseData[primaryKey] && Array.isArray(responseData[primaryKey])) {
+    const totalCount = responseData.total_record ?? responseData.total_count ?? 0;
+    const page = responseData.page ?? fallbackPagination.page;
+    const limit = responseData.limit ?? fallbackPagination.limit;
+    return {
+      items: responseData[primaryKey],
+      pagination: {
+        page,
+        limit,
+        total_count: totalCount,
+        total_pages: responseData.total_pages ?? Math.ceil(totalCount / limit),
+        has_more: responseData.has_more ?? (page * limit < totalCount),
+      },
+    };
+  }
+
+  // Check for 'items' array (alternative structure)
+  if (responseData.items && Array.isArray(responseData.items)) {
+    const totalCount = responseData.total_count ?? responseData.total_record ?? 0;
+    const page = responseData.page ?? fallbackPagination.page;
+    const limit = responseData.limit ?? fallbackPagination.limit;
+    return {
+      items: responseData.items,
+      pagination: {
+        page,
+        limit,
+        total_count: totalCount,
+        total_pages: responseData.total_pages ?? Math.ceil(totalCount / limit),
+        has_more: responseData.has_more ?? (page * limit < totalCount),
+      },
+    };
+  }
+
+  // Check if response data itself is an array
+  if (Array.isArray(responseData)) {
+    return {
+      items: responseData,
+      pagination: {
+        ...fallbackPagination,
+        total_count: responseData.length,
+        total_pages: Math.ceil(responseData.length / fallbackPagination.limit),
+        has_more: false,
+      },
+    };
+  }
+
+  // Unexpected structure
+  console.warn(`Unexpected response structure for ${primaryKey}:`, responseData);
+  return {
+    items: [],
+    pagination: fallbackPagination,
+  };
+}
+
 export const useGuardrails = create<GuardrailStore>((set, get) => ({
   // Initial state
   guardrails: [],
@@ -243,58 +309,12 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       const response = await AppRequest.Get("/guardrails/profiles", { params });
 
       if (response.data) {
-        // Check if response has profiles array (actual API response structure)
-        if (response.data.profiles && Array.isArray(response.data.profiles)) {
-          const data = response.data;
-          console.log("Fetched guardrails data:", data);
-          set({
-            guardrails: data.profiles,
-            pagination: {
-              page: data.page || pagination.page,
-              limit: data.limit || pagination.limit,
-              total_count: data.total_record || 0,
-              total_pages: data.total_pages || Math.ceil((data.total_record || 0) / pagination.limit),
-              has_more: (data.page * data.limit < data.total_record) || false,
-            },
-            isLoading: false,
-          });
-        }
-        // Check if response has items array (alternative structure)
-        else if (response.data.items && Array.isArray(response.data.items)) {
-          const data = response.data;
-          set({
-            guardrails: data.items,
-            pagination: {
-              page: data.page || pagination.page,
-              limit: data.limit || pagination.limit,
-              total_count: data.total_count || 0,
-              total_pages: data.total_pages || Math.ceil((data.total_count || 0) / pagination.limit),
-              has_more: data.has_more || (data.page * data.limit < data.total_count),
-            },
-            isLoading: false,
-          });
-        }
-        // Check if response data itself is an array
-        else if (Array.isArray(response.data)) {
-          set({
-            guardrails: response.data,
-            pagination: {
-              ...pagination,
-              total_count: response.data.length,
-              total_pages: Math.ceil(response.data.length / pagination.limit),
-              has_more: false,
-            },
-            isLoading: false,
-          });
-        }
-        // Handle unexpected response structure
-        else {
-          console.warn("Unexpected response structure for guardrails:", response.data);
-          set({
-            guardrails: [],
-            isLoading: false,
-          });
-        }
+        const parsed = parseApiResponse<GuardrailProfile>(response.data, "profiles", pagination);
+        set({
+          guardrails: parsed.items,
+          pagination: parsed.pagination,
+          isLoading: false,
+        });
       } else {
         throw new Error("Invalid response structure");
       }
@@ -389,57 +409,12 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       const response = await AppRequest.Get(`/guardrails/profile/${profileId}/probes`, { params });
 
       if (response.data) {
-        // Check if response has probes array
-        if (response.data.probes && Array.isArray(response.data.probes)) {
-          const data = response.data;
-          set({
-            probes: data.probes,
-            probePagination: {
-              page: data.page || probePagination.page,
-              limit: data.limit || probePagination.limit,
-              total_count: data.total_record || 0,
-              total_pages: data.total_pages || Math.ceil((data.total_record || 0) / probePagination.limit),
-              has_more: (data.page * data.limit < data.total_record) || false,
-            },
-            isLoadingProbes: false,
-          });
-        }
-        // Check if response has items array (alternative structure)
-        else if (response.data.items && Array.isArray(response.data.items)) {
-          const data = response.data;
-          set({
-            probes: data.items,
-            probePagination: {
-              page: data.page || probePagination.page,
-              limit: data.limit || probePagination.limit,
-              total_count: data.total_count || 0,
-              total_pages: data.total_pages || Math.ceil((data.total_count || 0) / probePagination.limit),
-              has_more: data.has_more || (data.page * data.limit < data.total_count),
-            },
-            isLoadingProbes: false,
-          });
-        }
-        // Check if response data itself is an array
-        else if (Array.isArray(response.data)) {
-          set({
-            probes: response.data,
-            probePagination: {
-              ...probePagination,
-              total_count: response.data.length,
-              total_pages: Math.ceil(response.data.length / probePagination.limit),
-              has_more: false,
-            },
-            isLoadingProbes: false,
-          });
-        }
-        // Handle unexpected response structure
-        else {
-          console.warn("Unexpected response structure for probes:", response.data);
-          set({
-            probes: [],
-            isLoadingProbes: false,
-          });
-        }
+        const parsed = parseApiResponse<Probe>(response.data, "probes", probePagination);
+        set({
+          probes: parsed.items,
+          probePagination: parsed.pagination,
+          isLoadingProbes: false,
+        });
       } else {
         throw new Error("Invalid response structure");
       }
@@ -460,6 +435,8 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
     page: number = 1,
     limit: number = 10
   ): Promise<{ rules: ProbeRule[]; pagination: PaginationState }> => {
+    const fallbackPagination: PaginationState = { page, limit, total_count: 0, total_pages: 0, has_more: false };
+
     try {
       const response = await AppRequest.Get(
         `/guardrails/profile/${profileId}/probe/${probeId}/rules`,
@@ -472,50 +449,11 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       );
 
       if (response.data) {
-        let rules: ProbeRule[] = [];
-        let paginationData: any = {};
-
-        // Check different possible response structures
-        if (response.data.rules && Array.isArray(response.data.rules)) {
-          rules = response.data.rules;
-          paginationData = response.data;
-        } else if (response.data.items && Array.isArray(response.data.items)) {
-          rules = response.data.items;
-          paginationData = response.data;
-        } else if (Array.isArray(response.data)) {
-          rules = response.data;
-          paginationData = {
-            page: 1,
-            limit: rules.length,
-            total_record: rules.length,
-            total_pages: 1,
-          };
-        } else {
-          console.warn("Unexpected response structure for probe rules:", response.data);
-        }
-
-        // Build pagination state
-        const pagination: PaginationState = {
-          page: paginationData.page || page,
-          limit: paginationData.limit || limit,
-          total_count: paginationData.total_record || paginationData.total_count || rules.length,
-          total_pages: paginationData.total_pages || Math.ceil((paginationData.total_record || rules.length) / limit),
-          has_more: paginationData.has_more || ((paginationData.page || page) * (paginationData.limit || limit) < (paginationData.total_record || rules.length)),
-        };
-
-        return { rules, pagination };
+        const parsed = parseApiResponse<ProbeRule>(response.data, "rules", fallbackPagination);
+        return { rules: parsed.items, pagination: parsed.pagination };
       }
 
-      return {
-        rules: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total_count: 0,
-          total_pages: 0,
-          has_more: false,
-        }
-      };
+      return { rules: [], pagination: fallbackPagination };
     } catch (error: any) {
       const errorMsg =
         error?.response?.data?.message ||
@@ -523,16 +461,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         "Failed to fetch probe rules";
       console.error(errorMsg, error);
       // Don't show error toast for rules fetch to avoid cluttering UI
-      return {
-        rules: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total_count: 0,
-          total_pages: 0,
-          has_more: false,
-        }
-      };
+      return { rules: [], pagination: fallbackPagination };
     }
   },
 }));
