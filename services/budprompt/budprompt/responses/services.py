@@ -17,10 +17,11 @@
 """Services for responses module - OpenAI-compatible API."""
 
 import json
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
+from openai.types.responses import ResponseInputItem
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import ClientException, OpenAIResponseException
@@ -29,7 +30,7 @@ from budprompt.shared.redis_service import RedisService
 from ..prompt.openai_response_formatter import extract_validation_error_details
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
-from .schemas import BudResponsePromptParam, ResponseInputParam
+from .schemas import BudResponsePromptParam
 
 
 logger = logging.get_logger(__name__)
@@ -49,7 +50,7 @@ class ResponsesService:
     async def execute_prompt(
         self,
         prompt_params: BudResponsePromptParam,
-        input: Optional[Union[str, ResponseInputParam]] = None,
+        input: Optional[Union[str, List[ResponseInputItem]]] = None,
         api_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute prompt using template from Redis.

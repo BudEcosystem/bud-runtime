@@ -91,7 +91,7 @@ def validate_input_data_type(input_schema: Dict[str, Any] = None, variables: Opt
         PromptExecutionException: If variables provided without input_schema
     """
     # Validate variables/input_schema relationship
-    if variables is not None and input_schema is None:
+    if variables and input_schema is None:
         logger.error("Variables provided but input_schema is missing")
         raise PromptExecutionException(
             message="Variables provided but input structure not predefined",

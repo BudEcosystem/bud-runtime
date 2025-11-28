@@ -22,11 +22,33 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 from budmicroframe.commons import logging
 from httpx import ConnectTimeout
 from openai.types.responses import (
+    EasyInputMessage,
+    ResponseCodeInterpreterToolCall,
     ResponseCompletedEvent,
+    ResponseComputerToolCall,
     ResponseCreatedEvent,
+    ResponseCustomToolCall,
     ResponseFailedEvent,
+    ResponseFileSearchToolCall,
+    ResponseFunctionToolCall,
+    ResponseFunctionWebSearch,
     ResponseInProgressEvent,
+    ResponseInputItem,
+    ResponseOutputMessage,
+    ResponseReasoningItem,
 )
+from openai.types.responses.response_input_item import (
+    FunctionCallOutput,
+    ImageGenerationCall,
+    LocalShellCall,
+    McpApprovalRequest,
+    McpCall,
+    McpListTools,
+)
+from openai.types.responses.response_input_item import (
+    Message as ResponseInputMessage,
+)
+from openai.types.responses.response_output_message import ResponseOutputText
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
@@ -34,8 +56,11 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    ModelResponsePart,
     SystemPromptPart,
     TextPart,
+    ThinkingPart,
+    ToolCallPart,
     UserPromptPart,
 )
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
@@ -50,7 +75,6 @@ from budprompt.commons.exceptions import (
 from budprompt.shared.providers import BudServeProvider
 
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
-from ...responses.schemas import ResponseInputParam
 from .field_validation import ModelValidationEnhancer
 from .openai_response_formatter import OpenAIResponseFormatter_V4, extract_validation_error_details
 from .openai_streaming_formatter import OpenAIStreamingFormatter_V4
@@ -83,7 +107,7 @@ class SimplePromptExecutor_V4:
         input_schema: Optional[Dict[str, Any]],
         output_schema: Optional[Dict[str, Any]],
         messages: List[Message],
-        input_data: Optional[Union[str, ResponseInputParam]] = None,
+        input_data: Optional[Union[str, List[ResponseInputItem]]] = None,
         stream: bool = False,
         output_validation: Optional[Dict[str, Any]] = None,
         input_validation: Optional[Dict[str, Any]] = None,
@@ -135,7 +159,7 @@ class SimplePromptExecutor_V4:
             validated_variables = variables
 
             # Handle input validation
-            if input_schema is not None and variables is not None:
+            if input_schema is not None and variables:
                 # Structured input: create model with validation and validate
                 input_model = await self._get_input_model_with_validation(input_schema, input_validation)
                 try:
@@ -204,7 +228,8 @@ class SimplePromptExecutor_V4:
 
                     executor = StreamingValidationExecutor(
                         output_type=output_type,
-                        prompt=user_prompt or "",
+                        # prompt=user_prompt or "",
+                        prompt=user_prompt,
                         validation_prompt=output_validation,
                         messages=rendered_messages,
                         message_history=message_history,
@@ -518,22 +543,194 @@ class SimplePromptExecutor_V4:
 
         return message_history
 
-    def _convert_response_input_to_message_history(self, response_input: ResponseInputParam) -> List[ModelMessage]:
-        """Convert ResponseInputParam to pydantic-ai message history.
+    def _convert_response_input_to_message_history(
+        self, response_input: List[ResponseInputItem]
+    ) -> List[ModelMessage]:
+        """Convert ResponseInputItem list to pydantic-ai message history.
 
-        This method closely follows pydantic-ai's _process_response() logic but adapted
-        for ResponseInputParam types (TypedDict) instead of Response types (BaseModel).
+        This method closely follows pydantic-ai's _process_response() logic
+        using Pydantic BaseModel types with proper isinstance() checks.
 
         Args:
-            response_input: List of ResponseInputItemParam from OpenAI API
+            response_input: List of ResponseInputItem from OpenAI API
 
         Returns:
             List of ModelMessage (ModelRequest/ModelResponse) objects
-
-        Raises:
-            PromptExecutionException: If input contains unsupported message types
         """
-        pass
+        # Import pydantic-ai helpers locally to avoid circular imports
+        from pydantic_ai.models.openai import (
+            _map_code_interpreter_tool_call,
+            _map_image_generation_tool_call,
+            _map_mcp_call,
+            _map_mcp_list_tools,
+            _map_web_search_tool_call,
+        )
+
+        input_message_history: List[ModelMessage] = []
+        provider_name = "openai"
+
+        for item in response_input:
+            # === Output types (from pydantic-ai's _process_response) → ModelResponse ===
+
+            if isinstance(item, ResponseReasoningItem):
+                # Lines 1185-1210 from pydantic-ai
+                parts: List[ModelResponsePart] = []
+                signature = item.encrypted_content
+                if item.summary:
+                    for summary in item.summary:
+                        parts.append(
+                            ThinkingPart(
+                                content=summary.text,
+                                id=item.id,
+                                signature=signature,
+                                provider_name=provider_name if signature else None,
+                            )
+                        )
+                        signature = None
+                elif signature:
+                    parts.append(
+                        ThinkingPart(
+                            content="",
+                            id=item.id,
+                            signature=signature,
+                            provider_name=provider_name,
+                        )
+                    )
+                if parts:
+                    input_message_history.append(ModelResponse(parts=parts))
+
+            elif isinstance(item, ResponseOutputMessage):
+                # Lines 1211-1214 from pydantic-ai
+                parts = []
+                for content in item.content:
+                    if isinstance(content, ResponseOutputText):
+                        parts.append(TextPart(content.text, id=item.id))
+                if parts:
+                    input_message_history.append(ModelResponse(parts=parts))
+
+            elif isinstance(item, ResponseFunctionToolCall):
+                # Lines 1215-1223 from pydantic-ai
+                input_message_history.append(
+                    ModelResponse(
+                        parts=[
+                            ToolCallPart(
+                                item.name,
+                                item.arguments,
+                                tool_call_id=item.call_id,
+                                id=item.id,
+                            )
+                        ]
+                    )
+                )
+
+            elif isinstance(item, ResponseCodeInterpreterToolCall):
+                # Lines 1224-1229 from pydantic-ai
+                call_part, return_part, file_parts = _map_code_interpreter_tool_call(item, provider_name)
+                parts = [call_part]
+                if file_parts:
+                    parts.extend(file_parts)
+                parts.append(return_part)
+                input_message_history.append(ModelResponse(parts=parts))
+
+            elif isinstance(item, ResponseFunctionWebSearch):
+                # Lines 1230-1233 from pydantic-ai
+                call_part, return_part = _map_web_search_tool_call(item, provider_name)
+                input_message_history.append(ModelResponse(parts=[call_part, return_part]))
+
+            elif isinstance(item, ImageGenerationCall):
+                # Lines 1234-1239 from pydantic-ai
+                call_part, return_part, file_part = _map_image_generation_tool_call(item, provider_name)
+                parts = [call_part]
+                if file_part:
+                    parts.append(file_part)
+                parts.append(return_part)
+                input_message_history.append(ModelResponse(parts=parts))
+
+            elif isinstance(item, ResponseComputerToolCall):
+                # Pydantic AI doesn't yet support the ComputerUse built-in tool
+                pass
+
+            elif isinstance(item, ResponseCustomToolCall):
+                # Support is being implemented
+                pass
+
+            elif isinstance(item, LocalShellCall):
+                # Pydantic AI doesn't yet support LocalShell built-in tool
+                pass
+
+            elif isinstance(item, ResponseFileSearchToolCall):
+                # Pydantic AI doesn't yet support FileSearch built-in tool
+                pass
+
+            elif isinstance(item, McpCall):
+                # Lines 1252-1255 from pydantic-ai
+                call_part, return_part = _map_mcp_call(item, provider_name)
+                input_message_history.append(ModelResponse(parts=[call_part, return_part]))
+
+            elif isinstance(item, McpListTools):
+                # Lines 1256-1259 from pydantic-ai
+                call_part, return_part = _map_mcp_list_tools(item, provider_name)
+                input_message_history.append(ModelResponse(parts=[call_part, return_part]))
+
+            elif isinstance(item, McpApprovalRequest):
+                # Pydantic AI doesn't yet support McpApprovalRequest
+                pass
+
+            # === Input-only types (not in pydantic-ai's _process_response) ===
+
+            elif isinstance(item, EasyInputMessage):
+                # Simplified message format - content can be str or list
+                role = item.role
+                content = item.content
+
+                # EasyInputMessage.content can be str or list of content parts
+                if isinstance(content, str):
+                    text_content = content
+                else:
+                    # List of content parts - extract text from input_text items
+                    text_parts = []
+                    for content_item in content:
+                        if content_item.type == "input_text":
+                            text_parts.append(content_item.text)
+                    text_content = "\n".join(text_parts) if text_parts else ""
+
+                if role in ["system", "developer"]:
+                    input_message_history.append(ModelRequest(parts=[SystemPromptPart(content=text_content)]))
+                elif role == "user":
+                    input_message_history.append(ModelRequest(parts=[UserPromptPart(content=text_content)]))
+                elif role == "assistant":
+                    input_message_history.append(ModelResponse(parts=[TextPart(content=text_content)]))
+
+            elif isinstance(item, ResponseInputMessage):
+                # Message with typed content list
+                role = item.role
+                content_list = item.content
+
+                # Extract text from input_text content items
+                text_parts = []
+                for content_item in content_list:
+                    if content_item.type == "input_text":
+                        text_parts.append(content_item.text)
+                text_content = "\n".join(text_parts) if text_parts else ""
+
+                if role in ["system", "developer"]:
+                    input_message_history.append(ModelRequest(parts=[SystemPromptPart(content=text_content)]))
+                elif role == "user":
+                    input_message_history.append(ModelRequest(parts=[UserPromptPart(content=text_content)]))
+                elif role == "assistant":
+                    input_message_history.append(ModelResponse(parts=[TextPart(content=text_content)]))
+
+            elif isinstance(item, FunctionCallOutput):
+                # FunctionCallOutput -> handled separately (tool return)
+                logger.debug("FunctionCallOutput handling not yet implemented")
+
+            else:
+                logger.warning(f"Unsupported item type in ResponseInputItem: {type(item).__name__}")
+
+        logger.debug(
+            f"Converted {len(response_input)} ResponseInputItem items to {len(input_message_history)} messages"
+        )
+        return input_message_history
 
     async def _run_agent(
         self,

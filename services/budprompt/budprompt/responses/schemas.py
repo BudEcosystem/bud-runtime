@@ -16,9 +16,9 @@
 
 """Schemas for responses module - OpenAI-compatible API."""
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from openai.types.responses import Response, ResponseInputParam, ResponsePromptParam
+from openai.types.responses import Response, ResponseInputItem, ResponsePromptParam
 from openai.types.responses.response_prompt_param import Variables
 from pydantic import BaseModel, Field, field_serializer
 
@@ -69,7 +69,7 @@ class ResponseCreateRequest(BaseModel):
     prompt: Optional[BudResponsePromptParam] = Field(
         ..., description="Prompt template reference with id, optional variables, and version"
     )
-    input: Union[str, ResponseInputParam] = Field(
+    input: Union[str, List[ResponseInputItem]] = Field(
         None,
         description="Text input to the model. Can be a simple string or array of message objects. "
         "String format: 'What is 2+2?' | "
