@@ -90,21 +90,6 @@ const ProbesTab: React.FC = () => {
     setLoadingRules(prev => ({ ...prev, [probeId]: false }));
   };
 
-  // Get status color for rules
-  const getRuleStatusConfig = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'enabled':
-      case 'active':
-        return { color: '#479d5f', label: 'Active' };
-      case 'disabled':
-        return { color: '#F59E0B', label: 'Disabled' };
-      case 'deleted':
-        return { color: '#EF4444', label: 'Deleted' };
-      default:
-        return { color: '#6B7280', label: status || 'Unknown' };
-    }
-  };
-
   // Nested table for rules
   const expandedRowRender = (record: Probe) => {
     const rules = probeRulesCache[record.id] || [];
@@ -191,7 +176,7 @@ const ProbesTab: React.FC = () => {
         key: 'status',
         width: 120,
         render: (status: string) => {
-          const config = getRuleStatusConfig(status);
+          const config = getStatusConfig(status);
           return (
             <ProjectTags
               name={capitalize(config.label)}
@@ -234,6 +219,7 @@ const ProbesTab: React.FC = () => {
   // Get status color and label
   const getStatusConfig = (status: string) => {
     switch (status?.toLowerCase()) {
+      case 'enabled':
       case 'active':
         return { color: '#479d5f', label: 'Active' };
       case 'disabled':
