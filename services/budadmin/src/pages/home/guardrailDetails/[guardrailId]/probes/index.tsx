@@ -248,10 +248,10 @@ const ProbesTab: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      width: 180,
+      width: 150,
       render: (name: string) => (
         <Tooltip title={name}>
-          <Text_12_400_EEEEEE className="truncate max-w-[160px]">
+          <Text_12_400_EEEEEE className="truncate max-w-[130px]">
             {name}
           </Text_12_400_EEEEEE>
         </Tooltip>
