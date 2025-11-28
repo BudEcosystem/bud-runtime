@@ -152,6 +152,7 @@ interface AgentStore {
 
   // Bulk Actions
   clearAllSessions: () => void;
+  resetSessionState: () => void;
   setActiveSessionIds: (ids: string[]) => void;
 
   // Prompt cleanup tracking
@@ -541,6 +542,14 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
           sessions: [newSession],
           activeSessionIds: [newSession.id],
           selectedSessionId: newSession.id
+        });
+      },
+
+      resetSessionState: () => {
+        set({
+          sessions: [],
+          activeSessionIds: [],
+          selectedSessionId: null,
         });
       },
 
