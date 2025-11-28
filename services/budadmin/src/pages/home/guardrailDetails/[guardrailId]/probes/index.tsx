@@ -91,7 +91,8 @@ const ProbesTab: React.FC = () => {
   const getRuleStatusConfig = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'enabled':
-        return { color: '#479d5f', label: 'Enabled' };
+      case 'active':
+        return { color: '#479d5f', label: 'Active' };
       case 'disabled':
         return { color: '#F59E0B', label: 'Disabled' };
       case 'deleted':
@@ -165,10 +166,10 @@ const ProbesTab: React.FC = () => {
           <div className="flex flex-wrap gap-1">
             {guard_types && guard_types.length > 0 ? (
               guard_types.slice(0, 2).map((type, index) => (
-                <ProjectTags
+                <Tags
                   key={index}
                   name={capitalize(type?.replace(/_/g, ' ') || '')}
-                  color="#6B7280"
+                  color="#D1B854"
                   textClass="text-[.65rem]"
                 />
               ))
