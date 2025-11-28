@@ -164,10 +164,8 @@ class EndpointService(SessionMixin):
         Returns:
             Tuple of endpoint list and total count
         """
-        if search:
-            # Only include name, exclude other filters
-            # Otherwise it will perform global search on all fields
-            filters.pop("status", None)
+        # Extract status filter to apply separately (exact match, not search)
+        status_filter = filters.pop("status", None) if search else None
 
         # Superusers can access all endpoints without project restrictions
         if is_superuser:
@@ -199,7 +197,7 @@ class EndpointService(SessionMixin):
                 project_id = user_project_ids
 
         return await EndpointDataManager(self.session).get_all_active_endpoints(
-            project_id, offset, limit, filters, order_by, search
+            project_id, offset, limit, filters, order_by, search, status_filter
         )
 
     async def delete_endpoint(self, endpoint_id: UUID, current_user_id: UUID) -> WorkflowModel:
