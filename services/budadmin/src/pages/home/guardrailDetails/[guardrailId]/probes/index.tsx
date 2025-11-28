@@ -158,13 +158,27 @@ const ProbesTab: React.FC = () => {
       },
       {
         title: 'Guardrail Type',
-        dataIndex: 'guardrail_type',
-        key: 'guardrail_type',
-        width: 150,
-        render: (guardrail_type: string) => (
-          <Text_12_400_EEEEEE className="capitalize">
-            {guardrail_type?.replace(/_/g, ' ') || '-'}
-          </Text_12_400_EEEEEE>
+        dataIndex: 'guard_types',
+        key: 'guard_types',
+        width: 200,
+        render: (guard_types: string[]) => (
+          <div className="flex flex-wrap gap-1">
+            {guard_types && guard_types.length > 0 ? (
+              guard_types.slice(0, 2).map((type, index) => (
+                <ProjectTags
+                  key={index}
+                  name={capitalize(type?.replace(/_/g, ' ') || '')}
+                  color="#6B7280"
+                  textClass="text-[.65rem]"
+                />
+              ))
+            ) : (
+              <Text_12_300_EEEEEE>-</Text_12_300_EEEEEE>
+            )}
+            {guard_types && guard_types.length > 2 && (
+              <span className="text-[.65rem] text-[#757575]">+{guard_types.length - 2}</span>
+            )}
+          </div>
         ),
       },
       {
