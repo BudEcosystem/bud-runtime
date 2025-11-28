@@ -16,7 +16,6 @@
 
 """Prompt executors for running AI prompts."""
 
-import json
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
@@ -168,6 +167,17 @@ class SimplePromptExecutor_V4:
             # Build message history from all messages
             message_history = self._build_message_history(rendered_messages, rendered_system_prompt)
 
+            # Handle input_data: either convert to history or use as prompt
+            if isinstance(input_data, list):
+                # Scenario 1: ResponseInputParam - convert to message history and append
+                logger.debug(f"Converting ResponseInputParam with {len(input_data)} items to message history")
+                input_message_history = self._convert_response_input_to_message_history(input_data)
+                message_history.extend(input_message_history)
+                user_prompt = None
+            else:
+                # Scenario 2 & 3: String or None - use directly
+                user_prompt = input_data
+
             # Handle output type and validation
             output_type = await self._get_output_type(output_schema, output_validation, tools)
 
@@ -185,9 +195,6 @@ class SimplePromptExecutor_V4:
                 api_key=api_key,
                 toolsets=toolsets,
             )
-
-            # Get user prompt from input_data
-            user_prompt = self._prepare_user_prompt(input_data)
 
             # Check if streaming is requested
             if stream:
@@ -511,22 +518,22 @@ class SimplePromptExecutor_V4:
 
         return message_history
 
-    def _prepare_user_prompt(self, input_data: Optional[Union[Dict[str, Any], str]]) -> Optional[str]:
-        """Prepare the user prompt from input data.
+    def _convert_response_input_to_message_history(self, response_input: ResponseInputParam) -> List[ModelMessage]:
+        """Convert ResponseInputParam to pydantic-ai message history.
+
+        This method closely follows pydantic-ai's _process_response() logic but adapted
+        for ResponseInputParam types (TypedDict) instead of Response types (BaseModel).
 
         Args:
-            input_data: The input data from the request (string or dict)
+            response_input: List of ResponseInputItemParam from OpenAI API
 
         Returns:
-            The user prompt as a string, or None if no input data
+            List of ModelMessage (ModelRequest/ModelResponse) objects
+
+        Raises:
+            PromptExecutionException: If input contains unsupported message types
         """
-        if input_data is None:
-            return None
-        elif isinstance(input_data, str):
-            return input_data
-        else:
-            # Convert dict to JSON string for structured input
-            return json.dumps(input_data)
+        pass
 
     async def _run_agent(
         self,
