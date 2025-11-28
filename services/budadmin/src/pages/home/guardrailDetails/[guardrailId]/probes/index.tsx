@@ -263,7 +263,7 @@ const ProbesTab: React.FC = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 150,
+      width: 200,
       render: (description: string) => (
         <Popover
           content={
@@ -274,8 +274,8 @@ const ProbesTab: React.FC = () => {
           placement="top"
           rootClassName="traits-popover"
         >
-          <div className="cursor-pointer truncate">
-            <Text_12_300_EEEEEE>
+          <div className="cursor-pointer">
+            <Text_12_300_EEEEEE className="truncate block max-w-[180px]">
               {description || '-'}
             </Text_12_300_EEEEEE>
           </div>
