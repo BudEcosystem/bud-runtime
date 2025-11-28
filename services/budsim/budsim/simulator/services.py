@@ -201,58 +201,138 @@ class SimulationService:
                     device_type = device["type"]
                     available_count = device["available_count"]
 
+                    # Skip master/control-plane nodes for CPU deployments only
+                    device_type_lower = device_type.lower()
+                    if device_type_lower in ("cpu", "cpu_high"):
+                        is_master = node.get("is_master", False)
+                        if is_master:
+                            logger.debug(
+                                f"Skipping master node {node_name} for CPU deployment"
+                            )
+                            continue
+
                     # Filter devices based on user's hardware mode preference
                     if user_hardware_mode == "dedicated":
-                        # Dedicated mode: Only use devices with 0% utilization
-                        core_util = device.get("core_utilization_percent") or 0.0
-                        memory_util = device.get("memory_utilization_percent") or 0.0
+                        # cpu_high dedicated mode check using utilized_cores/utilized_memory_gb
+                        # Note: Only cpu_high type is considered for utilization-based filtering
+                        if device_type_lower == "cpu_high":
+                            total_cores = device.get("cores") or 0
+                            utilized_cores = device.get("utilized_cores") or 0.0
+                            total_memory_gb = device.get("memory_gb") or device.get("mem_per_GPU_in_GB") or 0.0
+                            utilized_memory_gb = device.get("utilized_memory_gb") or 0.0
 
-                        # If utilization metrics are available, enforce strict 0% requirement
-                        if "core_utilization_percent" in device or "memory_utilization_percent" in device:
-                            if core_util > 0 or memory_util > 0:
+                            # Calculate utilization percentage
+                            core_util_percent = (utilized_cores / total_cores * 100) if total_cores > 0 else 100.0
+
+                            # cpu_high dedicated threshold: < 5% core utilization
+                            CPU_HIGH_DEDICATED_CORE_THRESHOLD_PERCENT = 5.0
+
+                            if core_util_percent >= CPU_HIGH_DEDICATED_CORE_THRESHOLD_PERCENT:
                                 logger.debug(
-                                    f"Dedicated mode: Skipping device {device.get('name')} - "
-                                    f"core utilization: {core_util}%, memory utilization: {memory_util}% "
-                                    f"(requires 0% for both)"
+                                    f"Dedicated mode: Skipping cpu_high {device.get('name')} - "
+                                    f"core utilization: {core_util_percent:.1f}% >= {CPU_HIGH_DEDICATED_CORE_THRESHOLD_PERCENT}% threshold "
+                                    f"(utilized: {utilized_cores}/{total_cores} cores)"
                                 )
                                 continue
-                        # If no utilization metrics, use available_count (backward compatibility)
-                        elif available_count <= 0:
-                            logger.debug(
-                                f"Dedicated mode: Skipping device {device.get('name')} - "
-                                f"available_count: {available_count}"
+
+                            # Store available memory for later model weight validation
+                            available_memory_gb = total_memory_gb - utilized_memory_gb
+                            device["available_memory_gb"] = available_memory_gb
+
+                            logger.info(
+                                f"Dedicated mode: cpu_high {device.get('name')} available - "
+                                f"core utilization: {core_util_percent:.1f}%, "
+                                f"memory: {available_memory_gb:.1f}GB free of {total_memory_gb:.1f}GB"
                             )
-                            continue
+
+                        elif device_type_lower == "cpu":
+                            # Regular cpu type: skip utilization filtering, use available_count fallback
+                            if available_count <= 0:
+                                logger.debug(
+                                    f"Dedicated mode: Skipping cpu {device.get('name')} - "
+                                    f"available_count: {available_count}"
+                                )
+                                continue
+
+                        else:
+                            # GPU/HPU dedicated mode check (existing HAMI logic)
+                            core_util = device.get("core_utilization_percent") or 0.0
+                            memory_util = device.get("memory_utilization_percent") or 0.0
+
+                            # If utilization metrics are available, enforce strict 0% requirement
+                            if "core_utilization_percent" in device or "memory_utilization_percent" in device:
+                                if core_util > 0 or memory_util > 0:
+                                    logger.debug(
+                                        f"Dedicated mode: Skipping device {device.get('name')} - "
+                                        f"core utilization: {core_util}%, memory utilization: {memory_util}% "
+                                        f"(requires 0% for both)"
+                                    )
+                                    continue
+                            # If no utilization metrics, use available_count (backward compatibility)
+                            elif available_count <= 0:
+                                logger.debug(
+                                    f"Dedicated mode: Skipping device {device.get('name')} - "
+                                    f"available_count: {available_count}"
+                                )
+                                continue
 
                     elif user_hardware_mode == "shared":
-                        # Shared mode: Require HAMI metrics to calculate available memory
-                        memory_allocated_value = device.get("memory_allocated_gb")
-                        if memory_allocated_value is None:
-                            logger.debug(
-                                f"Shared mode: Skipping device {device.get('name')} - "
-                                f"HAMI metrics (memory_allocated_gb) not available or None"
+                        device_type_lower = device_type.lower()
+
+                        # CPU shared mode: skip utilization check, allow CPU devices with available memory
+                        if device_type_lower in ("cpu", "cpu_high"):
+                            total_cores = device.get("cores") or 0
+                            utilized_cores = device.get("utilized_cores") or 0.0
+                            total_memory_gb = device.get("memory_gb") or device.get("mem_per_GPU_in_GB") or 0.0
+                            utilized_memory_gb = device.get("utilized_memory_gb") or 0.0
+
+                            # Calculate available memory
+                            available_memory_gb = total_memory_gb - utilized_memory_gb
+                            device["available_memory_gb"] = available_memory_gb
+
+                            if available_memory_gb <= 0:
+                                logger.debug(
+                                    f"Shared mode: Skipping {device_type_lower} {device.get('name')} - "
+                                    f"no available memory (total: {total_memory_gb}GB, utilized: {utilized_memory_gb}GB)"
+                                )
+                                continue
+
+                            logger.info(
+                                f"Shared mode: {device_type_lower} {device.get('name')} available - "
+                                f"memory: {available_memory_gb:.1f}GB free of {total_memory_gb:.1f}GB "
+                                f"(cores: {total_cores - utilized_cores:.1f}/{total_cores} available)"
                             )
-                            continue
+                            # Set available_count to 1 for shared mode
+                            available_count = 1
+                        else:
+                            # GPU/HPU shared mode: Require HAMI metrics to calculate available memory
+                            memory_allocated_value = device.get("memory_allocated_gb")
+                            if memory_allocated_value is None:
+                                logger.debug(
+                                    f"Shared mode: Skipping device {device.get('name')} - "
+                                    f"HAMI metrics (memory_allocated_gb) not available or None"
+                                )
+                                continue
 
-                        # For shared mode, we'll use 100% of available memory (no threshold)
-                        # Memory calculation will be done later in get_topk_engine_configs_per_cluster
-                        total_memory_gb, _, available_memory_gb = calculate_available_gpu_memory(device)
-                        memory_allocated_gb = memory_allocated_value  # Already validated as not None
+                            # For shared mode, we'll use 100% of available memory (no threshold)
+                            # Memory calculation will be done later in get_topk_engine_configs_per_cluster
+                            total_memory_gb, _, available_memory_gb = calculate_available_gpu_memory(device)
+                            memory_allocated_gb = memory_allocated_value  # Already validated as not None
 
-                        if available_memory_gb <= 0:
+                            if available_memory_gb <= 0:
+                                logger.debug(
+                                    f"Shared mode: Skipping device {device.get('name')} - "
+                                    f"no available memory (total: {total_memory_gb}GB, "
+                                    f"allocated: {memory_allocated_gb}GB)"
+                                )
+                                continue
+
                             logger.debug(
-                                f"Shared mode: Skipping device {device.get('name')} - "
-                                f"no available memory (total: {total_memory_gb}GB, "
-                                f"allocated: {memory_allocated_gb}GB)"
+                                f"Shared mode: Device {device.get('name')} has {available_memory_gb:.2f}GB "
+                                f"available (total: {total_memory_gb:.2f}GB, allocated: {memory_allocated_gb:.2f}GB)"
                             )
-                            continue
-
-                        logger.debug(
-                            f"Shared mode: Device {device.get('name')} has {available_memory_gb:.2f}GB "
-                            f"available (total: {total_memory_gb:.2f}GB, allocated: {memory_allocated_gb:.2f}GB)"
-                        )
-                        # Set available_count to 1 for shared mode since we can use partial GPU
-                        available_count = 1
+                            # Set available_count to 1 for shared mode since we can use partial GPU
+                            available_count = 1
 
                     # Handle backward compatibility: map generic 'gpu' to specific type
                     if device_type == "gpu":
@@ -580,6 +660,7 @@ class SimulationService:
                     use_heuristic=True,  # DirectSearchOptimizer uses heuristic calculations
                     supports_pipeline_parallelism=supports_pipeline_parallelism,
                     hardware_mode=hardware_mode,
+                    is_quantization=bool(quantization_type),
                 )
                 top_k_configs = optimizer.search()
                 # Convert SearchResult dataclasses to dicts for JSON serialization in workflow mode
@@ -1530,7 +1611,7 @@ class SimulationService:
                     memory_gb = device_info.get("mem_per_GPU_in_GB", 0)
                     if memory_gb == 0 and "memory" in device_info:
                         # Convert from MB to GB if needed
-                        memory_mb = device_info.get("memory", 0)
+                        memory_mb = device_info.get("memory") or 0
                         memory_gb = memory_mb / 1024.0 if memory_mb > 0 else 0
 
                     error_msg = result.get("error", "Model cannot fit in device memory")
@@ -1930,7 +2011,9 @@ class SimulationService:
             args=args_and_envs.get("args", {}),
             replicas=replica_count,
             image=template_result.engine_image,
-            memory=top_k_configs.get("kv_cache_memory", 0),
+            memory=top_k_configs.get("total_memory", 0) / (1024 ** 3),  # Convert bytes to GB
+            weight_memory_gb=top_k_configs.get("weight_memory", 0) / (1024 ** 3),
+            kv_cache_memory_gb=top_k_configs.get("kv_cache_memory", 0) / (1024 ** 3),
             hardware_mode=top_k_configs.get("hardware_mode", "dedicated"),
             ttft=float(top_k_configs.get("ttft", 0)),
             throughput_per_user=float(top_k_configs.get("throughput_per_user", 0)),
@@ -1947,6 +2030,12 @@ class SimulationService:
             chat_template=getattr(template_result, "chat_template", None),
             supports_lora=getattr(template_result, "supports_lora", None),
             supports_pipeline_parallelism=getattr(template_result, "supports_pipeline_parallelism", None),
+            # Available CPU cores for cpu/cpu_high deployments (total - utilized)
+            cores=(
+                int(getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0))
+                if template_result.device_type in ("cpu", "cpu_high") and getattr(template_result, "cores", None)
+                else None
+            ),
         )
 
     @staticmethod
@@ -2133,7 +2222,7 @@ class SimulationService:
                 name=entry.device_name,
                 type=entry.device_type,
                 image=entry.engine_image,
-                memory=entry.top_k_configs["kv_cache_memory"],
+                memory=entry.top_k_configs["total_memory"],
                 num_cpus=args_and_envs["envs"].get("NUM_CPUS", -1),
                 args=args_and_envs["args"],
                 envs=args_and_envs["envs"],
@@ -2335,7 +2424,7 @@ class SimulationService:
                 name=entry.device_name,
                 type=entry.device_type,
                 image=entry.engine_image,
-                memory=entry.top_k_configs["kv_cache_memory"],
+                memory=entry.top_k_configs["total_memory"],
                 num_cpus=device_args_and_envs[entry.device_id]["envs"].get("NUM_CPUS", -1),
                 args=device_args_and_envs[entry.device_id]["args"],
                 envs=device_args_and_envs[entry.device_id]["envs"],

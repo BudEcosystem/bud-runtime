@@ -285,8 +285,12 @@ class NFDSchedulableResourceDetector:
             # Get CPU information from NFD
             cpu_model = labels.get("feature.node.kubernetes.io/cpu-model", "Unknown-CPU")
 
-            # Get available CPU resources
-            total_cores, available_cores = self._get_cpu_resources(node_name)
+            # Get available and utilized resources
+            resources = self._get_resource_utilization(node_name)
+            total_cores = resources["total_cpu_cores"]
+            available_cores = resources["available_cpu_cores"]
+            utilized_cores = resources["allocated_cpu_cores"]
+            utilized_memory_gb = resources["allocated_memory_gb"]
 
             if total_cores == 0:
                 return devices
@@ -302,10 +306,15 @@ class NFDSchedulableResourceDetector:
 
             device_type = "cpu_high" if is_intel and has_high_perf_features else "cpu"
 
+            # Calculate physical cores based on hyperthreading
+            has_hyperthreading = labels.get("feature.node.kubernetes.io/cpu-hardware_multithreading") == "true"
+            physical_cores = total_cores // 2 if has_hyperthreading and total_cores > 0 else total_cores
+
             device_config = {
                 "name": self._normalize_cpu_name(cpu_model),
                 "type": device_type,
-                "cores": total_cores,
+                "physical_cores": physical_cores,
+                "cores": total_cores,  # Actual capacity for utilization comparison
                 "available_count": available_cores,
                 "total_count": total_cores,
                 "product_name": cpu_model,
@@ -314,6 +323,8 @@ class NFDSchedulableResourceDetector:
                 # Enhanced NFD information
                 "kernel_support": self._get_cpu_kernel_support(labels),
                 "architecture": labels.get("kubernetes.io/arch", "unknown"),
+                "utilized_cores": utilized_cores,
+                "utilized_memory_gb": utilized_memory_gb,
             }
 
             devices.append(device_config)
@@ -384,8 +395,15 @@ class NFDSchedulableResourceDetector:
             logger.warning(f"Failed to calculate available GPU count for {node_name}: {e}")
             return total_gpus  # Fallback to total if calculation fails
 
-    def _get_cpu_resources(self, node_name: str) -> Tuple[int, int]:
-        """Get total and available CPU cores."""
+    def _get_resource_utilization(self, node_name: str) -> Dict[str, Any]:
+        """Get total, available, and utilized resources (CPU/Memory)."""
+        result = {
+            "total_cpu_cores": 0,
+            "available_cpu_cores": 0,
+            "allocated_cpu_cores": 0.0,
+            "allocated_memory_gb": 0.0,
+        }
+        
         try:
             v1 = client.CoreV1Api()
 
@@ -394,29 +412,41 @@ class NFDSchedulableResourceDetector:
             allocatable_cpu = node.status.allocatable.get("cpu", "0")
             total_cpu_millicores = self._parse_cpu_resource(allocatable_cpu)
 
-            # Get allocated CPU from all pods
+            # Get allocated resources from all pods
             field_selector = f"spec.nodeName={node_name}"
             pods = v1.list_pod_for_all_namespaces(field_selector=field_selector)
 
             allocated_cpu_millicores = 0
+            allocated_memory_bytes = 0.0
+            
             for pod in pods.items:
                 if pod.status.phase in ["Running", "Pending"]:
                     for container in pod.spec.containers:
                         if container.resources and container.resources.requests:
+                            # CPU
                             cpu_request = container.resources.requests.get("cpu", "0")
                             allocated_cpu_millicores += self._parse_cpu_resource(cpu_request)
+                            
+                            # Memory
+                            memory_request = container.resources.requests.get("memory", "0")
+                            allocated_memory_bytes += self._parse_memory_resource(memory_request)
 
             available_millicores = max(0, total_cpu_millicores - allocated_cpu_millicores)
 
-            total_cores = total_cpu_millicores // 1000
-            available_cores = available_millicores // 1000
+            result["total_cpu_cores"] = total_cpu_millicores // 1000
+            result["available_cpu_cores"] = available_millicores // 1000
+            result["allocated_cpu_cores"] = allocated_cpu_millicores / 1000.0
+            result["allocated_memory_gb"] = allocated_memory_bytes / (1024**3)
 
-            logger.debug(f"Node {node_name}: {available_cores}/{total_cores} CPU cores available")
-            return total_cores, available_cores
+            logger.debug(f"Node {node_name}: {result['available_cpu_cores']}/{result['total_cpu_cores']} CPU cores available")
+            return result
 
         except Exception as e:
-            logger.warning(f"Failed to get CPU resources for {node_name}: {e}")
-            return 1, 1  # Fallback
+            logger.warning(f"Failed to get resource utilization for {node_name}: {e}")
+            # Fallback to defaults
+            result["total_cpu_cores"] = 1
+            result["available_cpu_cores"] = 1
+            return result
 
     def _get_available_hpu_count(self, node_name: str, total_hpus: int) -> int:
         """Calculate available HPUs."""
@@ -447,6 +477,27 @@ class NFDSchedulableResourceDetector:
             return int(cpu_str[:-1])
         else:
             return int(float(cpu_str) * 1000)
+
+    def _parse_memory_resource(self, memory_str: str) -> float:
+        """Parse Kubernetes memory resource string to bytes."""
+        if not memory_str:
+            return 0.0
+            
+        try:
+            if "Ki" in memory_str:
+                return float(memory_str.replace("Ki", "")) * 1024
+            elif "Mi" in memory_str:
+                return float(memory_str.replace("Mi", "")) * 1024 * 1024
+            elif "Gi" in memory_str:
+                return float(memory_str.replace("Gi", "")) * 1024 * 1024 * 1024
+            elif "Ti" in memory_str:
+                return float(memory_str.replace("Ti", "")) * 1024 * 1024 * 1024 * 1024
+            elif "m" in memory_str:  # millibytes? unlikely but possible in k8s resource math
+                return float(memory_str.replace("m", "")) / 1000
+            else:
+                return float(memory_str)
+        except (ValueError, TypeError):
+            return 0.0
 
     def _extract_cpu_features(self, labels: Dict[str, str]) -> List[str]:
         """Extract CPU instruction set features from NFD labels."""

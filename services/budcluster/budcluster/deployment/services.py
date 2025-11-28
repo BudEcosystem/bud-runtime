@@ -1075,7 +1075,7 @@ class QuantizationService(SessionMixin):
 
         # Add scale factor based on device type and model size
         device_scale_factor = 1.0
-        if device_type == "cpu":
+        if device_type in ("cpu", "cpu_high"):
             device_scale_factor = 1.0
             # Increase scale factor for larger models on CPU
             if model_size > 7000000000:  # 7B

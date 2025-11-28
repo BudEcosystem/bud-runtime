@@ -8,6 +8,27 @@ metadata:
 spec:
   restartPolicy: Never
   serviceAccountName: model-transfer
+  {{- if eq $.Values.deviceType "cpu_high" }}
+  affinity:
+    {{- if eq $.Values.hardwareMode "shared" }}
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              bud.studio/shared-cpu: "true"
+          topologyKey: kubernetes.io/hostname
+    {{- end }}
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/control-plane
+            operator: DoesNotExist
+          - key: node-role.kubernetes.io/master
+            operator: DoesNotExist
+  {{- end }}
   imagePullSecrets:
     - name: {{ $.Values.imagePullSecrets.name }}
   containers:
