@@ -345,7 +345,7 @@ const ProbesTab: React.FC = () => {
         columns={columns}
         dataSource={probes}
         rowKey="id"
-        loading={false}
+        loading={isLoadingProbes}
         pagination={{
           className: 'small-pagination',
           current: probePagination.page,
