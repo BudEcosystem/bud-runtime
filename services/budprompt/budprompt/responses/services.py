@@ -21,7 +21,6 @@ from typing import Any, Dict, Optional, Union
 
 from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
-from openai.types.responses import ResponsePrompt
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import ClientException, OpenAIResponseException
@@ -30,7 +29,7 @@ from budprompt.shared.redis_service import RedisService
 from ..prompt.openai_response_formatter import extract_validation_error_details
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
-from .schemas import ResponseInputParam, ResponsePromptParam
+from .schemas import BudResponsePromptParam, ResponseInputParam
 
 
 logger = logging.get_logger(__name__)
@@ -49,7 +48,7 @@ class ResponsesService:
 
     async def execute_prompt(
         self,
-        prompt_params: ResponsePromptParam,
+        prompt_params: BudResponsePromptParam,
         input: Optional[Union[str, ResponseInputParam]] = None,
         api_key: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -142,7 +141,7 @@ class ResponsesService:
                 logger.debug("Non Streaming response requested")
                 result = result.model_copy(
                     update={
-                        "prompt": ResponsePrompt(
+                        "prompt": BudResponsePromptParam(
                             id=prompt_id,
                             variables=prompt_params.get("variables"),
                             version=version,
@@ -152,7 +151,7 @@ class ResponsesService:
                 return result
 
         except ValidationError as e:
-            logger.error("Validation error during response creation: %s", str(e))
+            logger.exception("Validation error during response creation")
             message, param, code = extract_validation_error_details(e)
             raise OpenAIResponseException(
                 status_code=400,

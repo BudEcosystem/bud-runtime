@@ -16,11 +16,10 @@
 
 """Schemas for responses module - OpenAI-compatible API."""
 
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
-from openai.types.responses import Response
-from openai.types.responses.response_input_param import ResponseInputParam
-from openai.types.responses.response_prompt_param import ResponsePromptParam
+from openai.types.responses import Response, ResponseInputParam, ResponsePromptParam
+from openai.types.responses.response_prompt_param import Variables
 from pydantic import BaseModel, Field, field_serializer
 
 
@@ -45,13 +44,29 @@ class OpenAIResponse(Response):
         return int(value)
 
 
+class BudResponsePromptParam(ResponsePromptParam):
+    """Extended ResponsePromptParam that supports Variables + any value types.
+
+    Inherits from OpenAI's ResponsePromptParam but overrides the variables field
+    to accept both the standard Variables types AND any additional Python types.
+    """
+
+    variables: Optional[Dict[str, Union[Variables, Any]]]
+    """Optional map of values to substitute in for variables in your prompt.
+
+    Values can be:
+    - OpenAI Variables types: str, ResponseInputTextParam, ResponseInputImageParam, ResponseInputFileParam
+    - Any other type: int, float, bool, None, dict, list, etc.
+    """
+
+
 class ResponseCreateRequest(BaseModel):
     """Request model for creating responses via OpenAI-compatible API.
 
     This model follows OpenAI's responses API structure for 100% compatibility.
     """
 
-    prompt: Optional[ResponsePromptParam] = Field(
+    prompt: Optional[BudResponsePromptParam] = Field(
         ..., description="Prompt template reference with id, optional variables, and version"
     )
     input: Union[str, ResponseInputParam] = Field(

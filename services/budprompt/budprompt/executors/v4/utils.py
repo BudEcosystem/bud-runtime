@@ -166,7 +166,7 @@ def validate_template_variables(
     unknown_variables = provided_variables - used_variables
     if unknown_variables:
         unknown_vars_str = ", ".join(sorted(unknown_variables))
-        error_message = f"Unknown prompt variables: {unknown_vars_str}"
+        error_message = f"Variables {unknown_vars_str} not specified in templates"
         logger.error(error_message)
         raise PromptExecutionException(
             message=error_message,
