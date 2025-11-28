@@ -459,9 +459,10 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       closeAgentDrawer: () => {
         const { workflowContext } = get();
         const nextStep = workflowContext.nextStep;
+        const isInWorkflow = workflowContext.isInWorkflow;
 
-        // Close the drawer first and clear edit mode, add version mode, and edit version mode
-        set({
+        // Base state to set when closing
+        const baseState: Partial<AgentStore> = {
           isAgentDrawerOpen: false,
           isTransitioningToAgentDrawer: false, // Clear transition flag
           workflowContext: {
@@ -474,11 +475,17 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
           addVersionPromptId: null,
           isEditVersionMode: false,
           editVersionData: null,
-          // Clear session data to prevent stale data in subsequent create operations
-          sessions: [],
-          activeSessionIds: [],
-          selectedSessionId: null
-        });
+        };
+
+        // Only clear session data if NOT in a workflow with a next step
+        // (i.e., when user is explicitly closing the drawer without proceeding)
+        if (!isInWorkflow || !nextStep) {
+          baseState.sessions = [];
+          baseState.activeSessionIds = [];
+          baseState.selectedSessionId = null;
+        }
+
+        set(baseState);
 
         // If we're in a workflow and have a next step, trigger it after closing
         if (workflowContext.isInWorkflow && nextStep) {
