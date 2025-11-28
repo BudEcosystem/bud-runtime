@@ -157,24 +157,13 @@ const ProbesTab: React.FC = () => {
         ),
       },
       {
-        title: 'Severity',
-        dataIndex: 'severity',
-        key: 'severity',
-        width: 120,
-        render: (severity: string) => (
+        title: 'Guardrail Type',
+        dataIndex: 'guardrail_type',
+        key: 'guardrail_type',
+        width: 150,
+        render: (guardrail_type: string) => (
           <Text_12_400_EEEEEE className="capitalize">
-            {severity || '-'}
-          </Text_12_400_EEEEEE>
-        ),
-      },
-      {
-        title: 'Action',
-        dataIndex: 'action',
-        key: 'action',
-        width: 120,
-        render: (action: string) => (
-          <Text_12_400_EEEEEE className="capitalize">
-            {action || '-'}
+            {guardrail_type?.replace(/_/g, ' ') || '-'}
           </Text_12_400_EEEEEE>
         ),
       },
@@ -199,7 +188,7 @@ const ProbesTab: React.FC = () => {
     const pagination = rulesPagination[record.id];
 
     return (
-      <div className="bg-[#0A0A0A] px-4 py-2">
+      <div className="bg-[transparent] px-4 py-2">
         <Text_14_600_EEEEEE className="mb-3 block">
           Rules ({pagination?.total_count ?? rules.length})
         </Text_14_600_EEEEEE>
@@ -411,7 +400,7 @@ const ProbesTab: React.FC = () => {
               className={`
                 w-6 h-6 flex items-center justify-center
                 rounded-md cursor-pointer
-                bg-[#1A1A1A] hover:bg-[#252525]
+                bg-[transparent] hover:bg-[#252525]
                 border border-[#2A2A2A] hover:border-[#3A3A3A]
                 transition-all duration-200 ease-in-out
                 group

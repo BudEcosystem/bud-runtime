@@ -48,8 +48,7 @@ export interface ProbeRule {
   name: string;
   description?: string;
   status: "enabled" | "disabled" | "deleted";
-  severity?: string;
-  action?: string;
+  guardrail_type?: string;
   created_at?: string;
   modified_at?: string;
   metadata?: Record<string, any>;
