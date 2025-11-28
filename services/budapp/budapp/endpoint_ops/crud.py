@@ -141,8 +141,8 @@ class EndpointDataManager(DataManagerUtils):
             )
             # Apply status filter if provided (exact match, not search)
             if status_filter:
-                stmt = stmt.filter(EndpointModel.status == status_filter)
-                count_stmt = count_stmt.filter(EndpointModel.status == status_filter)
+                stmt = stmt.filter(func.lower(EndpointModel.status) == func.lower(status_filter))
+                count_stmt = count_stmt.filter(func.lower(EndpointModel.status) == func.lower(status_filter))
         else:
             stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
             count_stmt = select(func.count()).select_from(EndpointModel).join(Model).outerjoin(ClusterModel)
