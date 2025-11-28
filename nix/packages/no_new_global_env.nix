@@ -14,7 +14,9 @@ writeShellApplication {
   text = ''
     set -o errexit
 
-    max_global_env_count="93"
+    ## this is just the count of global env as of Fri,28 Nov, 2025
+    ## this should be reduced when you remove env from .microservices.global.env
+    max_global_env_count="92"
     value_path="$(git rev-parse --show-toplevel)/infra/helm/bud/values.yaml"
     global_env_count="$(yq -r '.microservices.global.env | keys | length' "$value_path")"
 
