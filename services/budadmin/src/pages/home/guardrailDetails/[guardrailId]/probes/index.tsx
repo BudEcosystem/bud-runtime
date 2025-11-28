@@ -263,7 +263,6 @@ const ProbesTab: React.FC = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 250,
       render: (description: string) => (
         <Popover
           content={
@@ -274,8 +273,8 @@ const ProbesTab: React.FC = () => {
           placement="top"
           rootClassName="traits-popover"
         >
-          <div className="cursor-pointer" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <Text_12_300_EEEEEE className="truncate max-w-[230px]">
+          <div className="cursor-pointer truncate">
+            <Text_12_300_EEEEEE>
               {description || '-'}
             </Text_12_300_EEEEEE>
           </div>
@@ -399,7 +398,6 @@ const ProbesTab: React.FC = () => {
         bordered={false}
         footer={null}
         onChange={handleTableChange}
-        scroll={{ x: 1100 }}
         showSorterTooltip={true}
         title={() => (
           <div className="flex justify-between items-center px-[0.75rem] py-[1rem]">
