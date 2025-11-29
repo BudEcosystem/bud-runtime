@@ -16,6 +16,7 @@
 
 """Prompt executors for running AI prompts."""
 
+import json
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
@@ -37,11 +38,16 @@ from openai.types.responses import (
     ResponseOutputMessage,
     ResponseReasoningItem,
 )
+from openai.types.responses.response_custom_tool_call_output import ResponseCustomToolCallOutput
 from openai.types.responses.response_input_item import (
+    ComputerCallOutput,
     FunctionCallOutput,
     ImageGenerationCall,
+    ItemReference,
     LocalShellCall,
+    LocalShellCallOutput,
     McpApprovalRequest,
+    McpApprovalResponse,
     McpCall,
     McpListTools,
 )
@@ -51,6 +57,7 @@ from openai.types.responses.response_input_item import (
 from openai.types.responses.response_output_message import ResponseOutputText
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
+from pydantic_ai.builtin_tools import MCPServerTool
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
@@ -61,6 +68,7 @@ from pydantic_ai.messages import (
     TextPart,
     ThinkingPart,
     ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai.models.openai import ModelSettings as OpenAIModelSettings
@@ -557,23 +565,11 @@ class SimplePromptExecutor_V4:
         Returns:
             List of ModelMessage (ModelRequest/ModelResponse) objects
         """
-        # Import pydantic-ai helpers locally to avoid circular imports
-        from pydantic_ai.models.openai import (
-            _map_code_interpreter_tool_call,
-            _map_image_generation_tool_call,
-            _map_mcp_call,
-            _map_mcp_list_tools,
-            _map_web_search_tool_call,
-        )
-
         input_message_history: List[ModelMessage] = []
         provider_name = "openai"
 
         for item in response_input:
-            # === Output types (from pydantic-ai's _process_response) → ModelResponse ===
-
             if isinstance(item, ResponseReasoningItem):
-                # Lines 1185-1210 from pydantic-ai
                 parts: List[ModelResponsePart] = []
                 signature = item.encrypted_content
                 if item.summary:
@@ -600,7 +596,6 @@ class SimplePromptExecutor_V4:
                     input_message_history.append(ModelResponse(parts=parts))
 
             elif isinstance(item, ResponseOutputMessage):
-                # Lines 1211-1214 from pydantic-ai
                 parts = []
                 for content in item.content:
                     if isinstance(content, ResponseOutputText):
@@ -609,72 +604,85 @@ class SimplePromptExecutor_V4:
                     input_message_history.append(ModelResponse(parts=parts))
 
             elif isinstance(item, ResponseFunctionToolCall):
-                # Lines 1215-1223 from pydantic-ai
-                input_message_history.append(
-                    ModelResponse(
-                        parts=[
-                            ToolCallPart(
-                                item.name,
-                                item.arguments,
-                                tool_call_id=item.call_id,
-                                id=item.id,
-                            )
-                        ]
-                    )
-                )
+                logger.warning("ResponseFunctionToolCall input conversion history not supported")
 
             elif isinstance(item, ResponseCodeInterpreterToolCall):
-                # Lines 1224-1229 from pydantic-ai
-                call_part, return_part, file_parts = _map_code_interpreter_tool_call(item, provider_name)
-                parts = [call_part]
-                if file_parts:
-                    parts.extend(file_parts)
-                parts.append(return_part)
-                input_message_history.append(ModelResponse(parts=parts))
+                logger.warning("ResponseCodeInterpreterToolCall input conversion history not supported")
 
             elif isinstance(item, ResponseFunctionWebSearch):
-                # Lines 1230-1233 from pydantic-ai
-                call_part, return_part = _map_web_search_tool_call(item, provider_name)
-                input_message_history.append(ModelResponse(parts=[call_part, return_part]))
+                logger.warning("ResponseFunctionWebSearch input conversion history not supported")
 
             elif isinstance(item, ImageGenerationCall):
-                # Lines 1234-1239 from pydantic-ai
-                call_part, return_part, file_part = _map_image_generation_tool_call(item, provider_name)
-                parts = [call_part]
-                if file_part:
-                    parts.append(file_part)
-                parts.append(return_part)
-                input_message_history.append(ModelResponse(parts=parts))
+                logger.warning("ImageGenerationCall input conversion history not supported")
 
             elif isinstance(item, ResponseComputerToolCall):
-                # Pydantic AI doesn't yet support the ComputerUse built-in tool
-                pass
+                logger.warning("ResponseComputerToolCall input conversion history not supported")
 
             elif isinstance(item, ResponseCustomToolCall):
-                # Support is being implemented
-                pass
+                logger.warning("ResponseCustomToolCall input conversion history not supported")
+
+            elif isinstance(item, ResponseCustomToolCallOutput):
+                logger.warning("ResponseCustomToolCallOutput input conversion history not supported")
 
             elif isinstance(item, LocalShellCall):
-                # Pydantic AI doesn't yet support LocalShell built-in tool
-                pass
+                logger.warning("LocalShellCall input conversion history not supported")
 
             elif isinstance(item, ResponseFileSearchToolCall):
-                # Pydantic AI doesn't yet support FileSearch built-in tool
-                pass
+                logger.warning("ResponseFileSearchToolCall input conversion history not supported")
 
             elif isinstance(item, McpCall):
-                # Lines 1252-1255 from pydantic-ai
-                call_part, return_part = _map_mcp_call(item, provider_name)
-                input_message_history.append(ModelResponse(parts=[call_part, return_part]))
+                # NOTE: commented out since built-in tool not considering chat history
+                # from pydantic_ai.models.openai import _map_mcp_call
+                # call_part, return_part = _map_mcp_call(item, provider_name)
+
+                # Custom code
+                tool_name = "-".join([MCPServerTool.kind, item.server_label])
+                call_part = ToolCallPart(
+                    tool_name=tool_name,
+                    tool_call_id=item.id,
+                    args={
+                        "action": "call_tool",
+                        "tool_name": item.name,
+                        "tool_args": json.loads(item.arguments) if item.arguments else {},
+                    },
+                )
+                input_message_history.append(ModelResponse(parts=[call_part]))
+
+                return_part = ToolReturnPart(
+                    tool_name=tool_name,
+                    tool_call_id=item.id,
+                    content={
+                        "output": item.output,
+                        "error": item.error,
+                    },
+                )
+                input_message_history.append(ModelRequest(parts=[return_part]))
 
             elif isinstance(item, McpListTools):
-                # Lines 1256-1259 from pydantic-ai
-                call_part, return_part = _map_mcp_list_tools(item, provider_name)
-                input_message_history.append(ModelResponse(parts=[call_part, return_part]))
+                # NOTE: commented out since built-in tool not considering chat history
+                # To resolve this used ToolCallPart and ToolReturnPart
+                #  from pydantic_ai.models.openai import _map_mcp_list_tools
+                # call_part, return_part = _map_mcp_list_tools(item, provider_name)
 
+                # Custom code
+                # NOTE: Code commented out since mcp server is connected to agent and tool list always available in every agent execution
+                # tool_name = '-'.join([MCPServerTool.kind, item.server_label])
+                # call_part = ToolCallPart(
+                #         tool_name=tool_name,
+                #         tool_call_id=item.id,
+                #         args={'action': 'list_tools'},
+                #     )
+                # input_message_history.append(ModelResponse(parts=[call_part]))
+
+                # return_part = ToolReturnPart(
+                #         tool_name=tool_name,
+                #         tool_call_id=item.id,
+                #         content=item.model_dump(mode='json', include={'tools', 'error'}),
+                # )
+                # input_message_history.append(ModelRequest(parts=[return_part]))
+                logger.debug("Skipping McpListTools to add from input conversion history")
             elif isinstance(item, McpApprovalRequest):
-                # Pydantic AI doesn't yet support McpApprovalRequest
-                pass
+                logger.warning("ResponseFileSearchToolCall input conversion history not supported")
 
             # === Input-only types (not in pydantic-ai's _process_response) ===
 
@@ -717,12 +725,21 @@ class SimplePromptExecutor_V4:
                     input_message_history.append(ModelRequest(parts=[SystemPromptPart(content=text_content)]))
                 elif role == "user":
                     input_message_history.append(ModelRequest(parts=[UserPromptPart(content=text_content)]))
-                elif role == "assistant":
-                    input_message_history.append(ModelResponse(parts=[TextPart(content=text_content)]))
 
             elif isinstance(item, FunctionCallOutput):
-                # FunctionCallOutput -> handled separately (tool return)
-                logger.debug("FunctionCallOutput handling not yet implemented")
+                logger.warning("FunctionCallOutput input conversion history not supported")
+
+            elif isinstance(item, ComputerCallOutput):
+                logger.warning("ComputerCallOutput input conversion history not supported")
+
+            elif isinstance(item, LocalShellCallOutput):
+                logger.warning("LocalShellCallOutput input conversion history not supported")
+
+            elif isinstance(item, McpApprovalResponse):
+                logger.warning("McpApprovalResponse input conversion history not supported")
+
+            elif isinstance(item, ItemReference):
+                logger.warning("ItemReference input conversion history not supported")
 
             else:
                 logger.warning(f"Unsupported item type in ResponseInputItem: {type(item).__name__}")
