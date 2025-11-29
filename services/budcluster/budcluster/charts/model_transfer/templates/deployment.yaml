@@ -11,23 +11,9 @@ spec:
   {{- if eq $.Values.deviceType "cpu_high" }}
   affinity:
     {{- if eq $.Values.hardwareMode "shared" }}
-    podAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          labelSelector:
-            matchLabels:
-              bud.studio/shared-cpu: "true"
-          topologyKey: kubernetes.io/hostname
+    {{- include "model-transfer.shared-cpu-pod-affinity" . | nindent 4 }}
     {{- end }}
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: node-role.kubernetes.io/control-plane
-            operator: DoesNotExist
-          - key: node-role.kubernetes.io/master
-            operator: DoesNotExist
+    {{- include "model-transfer.cpu-node-affinity" . | nindent 4 }}
   {{- end }}
   imagePullSecrets:
     - name: {{ $.Values.imagePullSecrets.name }}

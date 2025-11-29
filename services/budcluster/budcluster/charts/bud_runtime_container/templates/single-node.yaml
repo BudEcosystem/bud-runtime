@@ -42,23 +42,10 @@ spec:
                 model.aibrix.ai/name: {{ $.Values.modelName }}
             topologyKey: kubernetes.io/hostname
           {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchLabels:
-                  bud.studio/shared-cpu: "true"
-              topologyKey: kubernetes.io/hostname
+          {{- include "bud-runtime-container.shared-cpu-pod-affinity" . | nindent 10 }}
           {{- end }}
         {{- if eq .node.type "cpu_high" }}
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: node-role.kubernetes.io/control-plane
-                operator: DoesNotExist
-              - key: node-role.kubernetes.io/master
-                operator: DoesNotExist
+        {{- include "bud-runtime-container.cpu-node-affinity" . | nindent 8 }}
         {{- end }}
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecrets.name }}

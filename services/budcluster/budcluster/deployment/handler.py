@@ -36,6 +36,11 @@ from .schemas import GetDeploymentConfigRequest, WorkerInfo
 
 logger = get_logger(__name__)
 
+# CPU deployment memory and resource constants
+CPU_MEMORY_MULTIPLIER = 1.7  # Accounts for runtime overhead, activation memory, safety margin
+CPU_MIN_MEMORY_GB = 10  # Minimum memory allocation for CPU nodes
+SHARED_MODE_CORE_RATIO = 0.1  # CPU request ratio for shared mode (10% of limit)
+
 
 class DeploymentHandler:
     """DeploymentHandler is responsible for handling the deployment of nodes using Helm.
@@ -134,8 +139,8 @@ class DeploymentHandler:
                 max_memory_bytes = max(max_memory_bytes, node_memory)
 
         if max_memory_bytes == 0:
-            logger.warning("No memory size found in node list, using default of 10GB")
-            max_memory_bytes = 10 * (1024**3)  # 10GB default (more reasonable for models)
+            logger.warning(f"No memory size found in node list, using default of {CPU_MIN_MEMORY_GB}GB")
+            max_memory_bytes = CPU_MIN_MEMORY_GB * (1024**3)  # Default for models
         else:
             logger.info(
                 f"Calculated maximum memory from {nodes_with_memory} nodes: {max_memory_bytes / (1024**3):.2f} GB"
@@ -284,7 +289,7 @@ class DeploymentHandler:
             # Memory is already in GB from BudSim, no conversion needed
             # Use tiered buffer: 1GB for ≤10GB, 2GB for >10GB
             buffer_gb = 1 if node["memory"] <= 10 else 2
-            allocation_memory_gb = node["memory"] + buffer_gb
+            allocation_memory_gb = max(node["memory"] + buffer_gb, 1)  # Ensure non-zero for division safety
 
             # Check for CPU device type and apply specific memory formula
             device_type = node.get("type", "cpu")
@@ -294,15 +299,15 @@ class DeploymentHandler:
 
                 # If we have the detailed memory components, use the new formula
                 if weight_memory_gb > 0 and kv_cache_memory_gb > 0:
-                    # Formula: memory_allocation = total_memory * 1.7 + kv_cache_memory
+                    # Formula: memory_allocation = total_memory * multiplier + kv_cache_memory
                     # Here "total_memory" is interpreted as model weights
-                    raw_memory_gb = (weight_memory_gb * 1.7) + kv_cache_memory_gb
+                    raw_memory_gb = (weight_memory_gb * CPU_MEMORY_MULTIPLIER) + kv_cache_memory_gb
                     allocation_memory_gb = raw_memory_gb + buffer_gb
-                    # Ensure a minimum allocation of 10 GB for CPU nodes, otherwise use the calculated value.
-                    allocation_memory_gb = max(allocation_memory_gb, 10)
+                    # Ensure a minimum allocation for CPU nodes
+                    allocation_memory_gb = max(allocation_memory_gb, CPU_MIN_MEMORY_GB)
                     logger.info(
                         f"CPU Node {node.get('name')}: Calculated memory using formula "
-                        f"({weight_memory_gb:.2f} * 1.7 + {kv_cache_memory_gb:.2f}) + {buffer_gb} = {allocation_memory_gb:.2f} GB"
+                        f"({weight_memory_gb:.2f} * {CPU_MEMORY_MULTIPLIER} + {kv_cache_memory_gb:.2f}) + {buffer_gb} = {allocation_memory_gb:.2f} GB"
                     )
 
                     # Update node memory for consistency
@@ -322,11 +327,11 @@ class DeploymentHandler:
                 core_count = node.get("cores") or node.get("physical_cores") or 14
                 node["core_count"] = core_count - 2
 
-                # For shared mode, set CPU request to 10% of limit (minimum 1 core)
+                # For shared mode, set CPU request to configured ratio of limit (minimum 1 core)
                 # For dedicated mode, request equals limit
                 hardware_mode = node.get("hardware_mode", "dedicated")
                 if hardware_mode == "shared":
-                    node["core_request"] = max(1, int(node["core_count"] * 0.1))
+                    node["core_request"] = max(1, int(node["core_count"] * SHARED_MODE_CORE_RATIO))
                     logger.info(
                         f"CPU Node {node.get('name')}: Shared mode - core_request={node['core_request']}, core_limit={node['core_count']}"
                     )

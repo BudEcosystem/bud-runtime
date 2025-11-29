@@ -51,34 +51,22 @@ spec:
               {{- end }}
             {{- if or (and (eq ($.Values.accessMode | default "ReadWriteOnce") "ReadWriteOnce") (gt (.node.replicas | int) 1)) (eq .node.type "cpu_high") }}
             affinity:
-              {{- if and (eq ($.Values.accessMode | default "ReadWriteOnce") "ReadWriteOnce") (gt (.node.replicas | int) 1) }}
-              # Pod affinity to ensure all replicas are scheduled on the same node for ReadWriteOnce volumes
+              {{- if or (and (eq ($.Values.accessMode | default "ReadWriteOnce") "ReadWriteOnce") (gt (.node.replicas | int) 1)) (and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared")) }}
               podAffinity:
+                {{- if and (eq ($.Values.accessMode | default "ReadWriteOnce") "ReadWriteOnce") (gt (.node.replicas | int) 1) }}
+                # Pod affinity to ensure all replicas are scheduled on the same node for ReadWriteOnce volumes
                 requiredDuringSchedulingIgnoredDuringExecution:
                 - labelSelector:
                     matchLabels:
                       model.aibrix.ai/name: {{ $.Values.modelName }}
                   topologyKey: kubernetes.io/hostname
-              {{- end }}
-              {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
-              podAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                - weight: 100
-                  podAffinityTerm:
-                    labelSelector:
-                      matchLabels:
-                        bud.studio/shared-cpu: "true"
-                    topologyKey: kubernetes.io/hostname
+                {{- end }}
+                {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
+                {{- include "bud-runtime-container.shared-cpu-pod-affinity" . | nindent 16 }}
+                {{- end }}
               {{- end }}
               {{- if eq .node.type "cpu_high" }}
-              nodeAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                  nodeSelectorTerms:
-                  - matchExpressions:
-                    - key: node-role.kubernetes.io/control-plane
-                      operator: DoesNotExist
-                    - key: node-role.kubernetes.io/master
-                      operator: DoesNotExist
+              {{- include "bud-runtime-container.cpu-node-affinity" . | nindent 14 }}
               {{- end }}
             {{- end }}
             imagePullSecrets:
@@ -170,7 +158,7 @@ spec:
               labels:
                 model.aibrix.ai/name: {{ .Values.modelName }}
                 {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
-                bud.ai/shared-cpu: "true"
+                bud.studio/shared-cpu: "true"
                 {{- end }}
             spec:
               nodeSelector:
@@ -193,23 +181,10 @@ spec:
                         model.aibrix.ai/name: {{ $.Values.modelName }}
                     topologyKey: kubernetes.io/hostname
                   {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
-                  preferredDuringSchedulingIgnoredDuringExecution:
-                  - weight: 100
-                    podAffinityTerm:
-                      labelSelector:
-                        matchLabels:
-                          bud.ai/shared-cpu: "true"
-                      topologyKey: kubernetes.io/hostname
+                  {{- include "bud-runtime-container.shared-cpu-pod-affinity" . | nindent 18 }}
                   {{- end }}
                 {{- if eq .node.type "cpu_high" }}
-                nodeAffinity:
-                  requiredDuringSchedulingIgnoredDuringExecution:
-                    nodeSelectorTerms:
-                    - matchExpressions:
-                      - key: node-role.kubernetes.io/control-plane
-                        operator: DoesNotExist
-                      - key: node-role.kubernetes.io/master
-                        operator: DoesNotExist
+                {{- include "bud-runtime-container.cpu-node-affinity" . | nindent 16 }}
                 {{- end }}
               imagePullSecrets:
               - name: {{ $.Values.imagePullSecrets.name }}
