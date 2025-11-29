@@ -39,6 +39,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from ..commons.config import app_settings
+from ..commons.device_utils import normalize_device_type
 from ..engine_ops import (
     get_compatible_engines,
     get_engine_args_and_envs,
@@ -137,31 +138,6 @@ def _is_heuristic_config(config: Dict[str, Any]) -> bool:
     return not has_evolution_params
 
 
-def _normalize_device_type(device_type: str) -> str:
-    """Normalize device type to generic type for matching.
-    
-    Maps specific device type variants to their generic types:
-    - cpu_high, cpu_low -> cpu
-    - cuda -> cuda  
-    - rocm -> rocm
-    
-    Args:
-        device_type: The device type string (e.g., 'cpu_high', 'CUDA', 'cpu')
-        
-    Returns:
-        Normalized device type in lowercase (e.g., 'cpu', 'cuda', 'rocm')
-    """
-    device_type_lower = device_type.lower()
-    
-    # Map CPU variants to generic 'cpu'
-    if device_type_lower.startswith('cpu'):
-        return 'cpu'
-    
-    # Map other device types to their base type
-    # rocm variants, cuda variants, etc.
-    return device_type_lower
-
-
 class SimulationService:
     @staticmethod
     def _group_devices_by_type_across_cluster(
@@ -206,9 +182,7 @@ class SimulationService:
                     if device_type_lower in ("cpu", "cpu_high"):
                         is_master = node.get("is_master", False)
                         if is_master:
-                            logger.debug(
-                                f"Skipping master node {node_name} for CPU deployment"
-                            )
+                            logger.debug(f"Skipping master node {node_name} for CPU deployment")
                             continue
 
                     # Filter devices based on user's hardware mode preference
@@ -867,6 +841,7 @@ class SimulationService:
         top_k_configs = [
             EvaluationResult(
                 config={"model": pretrained_model_uri},
+                total_memory=0.0,
                 kv_cache_memory=512,
                 ttft=0,
                 e2e_latency=0,
@@ -937,6 +912,7 @@ class SimulationService:
                     "quantization_method": quantization_method,
                     "quantization_type": quantization_type,
                 },
+                total_memory=0.0,
                 kv_cache_memory=512,
                 ttft=0,
                 e2e_latency=0,
@@ -1350,7 +1326,7 @@ class SimulationService:
                 for device_type, device_group in device_groups.items():
                     for engine_device_combo in compatible_engines:
                         # Normalize both device types for comparison (e.g., cpu_high -> cpu, CPU -> cpu)
-                        if _normalize_device_type(engine_device_combo["device"]) == _normalize_device_type(device_type):
+                        if normalize_device_type(engine_device_combo["device"]) == normalize_device_type(device_type):
                             logger.debug(
                                 f"Processing engine-device combination: Engine={engine_device_combo['engine_name']}, "
                                 f"Device={device_type}"
@@ -2011,9 +1987,9 @@ class SimulationService:
             args=args_and_envs.get("args", {}),
             replicas=replica_count,
             image=template_result.engine_image,
-            memory=top_k_configs.get("total_memory", 0) / (1024 ** 3),  # Convert bytes to GB
-            weight_memory_gb=top_k_configs.get("weight_memory", 0) / (1024 ** 3),
-            kv_cache_memory_gb=top_k_configs.get("kv_cache_memory", 0) / (1024 ** 3),
+            memory=top_k_configs.get("total_memory", 0) / (1024**3),  # Convert bytes to GB
+            weight_memory_gb=top_k_configs.get("weight_memory", 0) / (1024**3),
+            kv_cache_memory_gb=top_k_configs.get("kv_cache_memory", 0) / (1024**3),
             hardware_mode=top_k_configs.get("hardware_mode", "dedicated"),
             ttft=float(top_k_configs.get("ttft", 0)),
             throughput_per_user=float(top_k_configs.get("throughput_per_user", 0)),

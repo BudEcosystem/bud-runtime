@@ -81,23 +81,23 @@ async def get_node_info_python(
         # List all pods to calculate utilization
         logger.debug("Listing all pods for resource utilization calculation")
         pods = v1.list_pod_for_all_namespaces(field_selector="status.phase=Running")
-        
+
         # Calculate utilization per node
         node_utilization = defaultdict(lambda: {"cpu": 0.0, "memory": 0.0})
         for pod in pods.items:
             node_name = pod.spec.node_name
             if not node_name:
                 continue
-                
+
             for container in pod.spec.containers:
                 resources = container.resources
                 if not resources or not resources.requests:
                     continue
-                    
+
                 # Aggregate CPU requests
                 if "cpu" in resources.requests:
                     node_utilization[node_name]["cpu"] += _parse_cpu_string(resources.requests["cpu"])
-                    
+
                 # Aggregate Memory requests
                 if "memory" in resources.requests:
                     node_utilization[node_name]["memory"] += _parse_memory_string(resources.requests["memory"])
@@ -272,11 +272,11 @@ def _format_devices(node_info: Dict[str, Any], utilization: Dict[str, float] = N
 
             if has_amx or has_avx2:
                 cpu_type = "cpu_high"
-        
+
         # Extract system memory from capacity
         capacity = node_info.get("capacity", {})
         memory_gb = _parse_memory_string(capacity.get("memory", ""))
-        
+
         # Extract cores from capacity if not available from NFD labels
         cores = cpu_info.get("cores", 0)
         threads = cpu_info.get("threads", 0)
@@ -319,37 +319,28 @@ def _format_devices(node_info: Dict[str, Any], utilization: Dict[str, float] = N
                     # --- Xeon 6 generation ---
                     # Granite Rapids: P-core Xeon 6
                     (173, 174): "Xeon 6 (Granite Rapids, P-core)",
-
                     # Sierra Forest: E-core Xeon 6
                     (175,): "Xeon 6 (Sierra Forest, E-core)",
-
                     # --- 5th Gen Xeon Scalable ---
                     # Emerald Rapids
                     (207,): "5th Gen Xeon Scalable (Emerald Rapids)",
-
                     # --- 4th Gen Xeon Scalable ---
                     # Sapphire Rapids
                     (143,): "4th Gen Xeon Scalable (Sapphire Rapids)",
-
                     # --- 3rd Gen Xeon Scalable ---
                     # Ice Lake SP + Ice Lake DE
                     (106, 108): "3rd Gen Xeon Scalable (Ice Lake)",
-
                     # --- 1st & 2nd Gen Xeon Scalable (+ Cooper) ---
                     # Skylake-SP, Cascade Lake, Cooper Lake all share model 85
                     (85,): "Skylake/Cascade/Cooper (1st/2nd Gen Xeon Scalable)",
-
                     # --- Pre-Scalable server parts ---
                     # Broadwell server: classic EP/EX plus DE/Hewitt Lake
                     (79, 86): "Broadwell (Server)",
-
                     # Haswell server
                     (63,): "Haswell (Server)",
-
                     # Optional older gens if you still see them in the fleet:
                     # Ivy Bridge server
                     (62,): "Ivy Bridge (Server)",
-
                     # Sandy Bridge server
                     (45,): "Sandy Bridge (Server)",
                 }

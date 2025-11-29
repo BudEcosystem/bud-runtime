@@ -3,7 +3,7 @@
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from budmicroframe.commons.logging import get_logger
 from kubernetes import client, config
@@ -403,7 +403,7 @@ class NFDSchedulableResourceDetector:
             "allocated_cpu_cores": 0.0,
             "allocated_memory_gb": 0.0,
         }
-        
+
         try:
             v1 = client.CoreV1Api()
 
@@ -418,7 +418,7 @@ class NFDSchedulableResourceDetector:
 
             allocated_cpu_millicores = 0
             allocated_memory_bytes = 0.0
-            
+
             for pod in pods.items:
                 if pod.status.phase in ["Running", "Pending"]:
                     for container in pod.spec.containers:
@@ -426,7 +426,7 @@ class NFDSchedulableResourceDetector:
                             # CPU
                             cpu_request = container.resources.requests.get("cpu", "0")
                             allocated_cpu_millicores += self._parse_cpu_resource(cpu_request)
-                            
+
                             # Memory
                             memory_request = container.resources.requests.get("memory", "0")
                             allocated_memory_bytes += self._parse_memory_resource(memory_request)
@@ -438,7 +438,9 @@ class NFDSchedulableResourceDetector:
             result["allocated_cpu_cores"] = allocated_cpu_millicores / 1000.0
             result["allocated_memory_gb"] = allocated_memory_bytes / (1024**3)
 
-            logger.debug(f"Node {node_name}: {result['available_cpu_cores']}/{result['total_cpu_cores']} CPU cores available")
+            logger.debug(
+                f"Node {node_name}: {result['available_cpu_cores']}/{result['total_cpu_cores']} CPU cores available"
+            )
             return result
 
         except Exception as e:
@@ -482,7 +484,7 @@ class NFDSchedulableResourceDetector:
         """Parse Kubernetes memory resource string to bytes."""
         if not memory_str:
             return 0.0
-            
+
         try:
             if "Ki" in memory_str:
                 return float(memory_str.replace("Ki", "")) * 1024
