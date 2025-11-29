@@ -906,10 +906,7 @@ class KubernetesHandler(BaseClusterHandler):
                                 last_restart_datetime=last_restart_datetime or start_time,
                                 node_ip=pod["status"]["hostIP"],
                                 cores=int(
-                                    pod["spec"]["containers"][0]
-                                    .get("resources", {})
-                                    .get("requests", {})
-                                    .get("cpu", 0)
+                                    pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)
                                 ),
                                 memory=pod["spec"]["containers"][0]
                                 .get("resources", {})
@@ -1260,16 +1257,8 @@ class KubernetesHandler(BaseClusterHandler):
             created_datetime=start_time,
             last_restart_datetime=last_restart_datetime or start_time,
             node_ip=pod["status"]["hostIP"],
-            cores=int(
-                pod["spec"]["containers"][0]
-                .get("resources", {})
-                .get("requests", {})
-                .get("cpu", 0)
-            ),
-            memory=pod["spec"]["containers"][0]
-            .get("resources", {})
-            .get("requests", {})
-            .get("memory", 0),
+            cores=int(pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)),
+            memory=pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("memory", 0),
             deployment_name="litellm-container"
             if pod["metadata"]["name"].startswith("litellm-container")
             else "bud-runtime-container",

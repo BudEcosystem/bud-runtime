@@ -1352,7 +1352,7 @@ class ClickHouseClient:
             except Exception as e:
                 # Log the error
                 logger.error(f"Query execution failed: {e}. Query: {query[:100]}...")
-                
+
                 # CRITICAL FIX: Mark connection as bad so it won't be reused
                 # The asynch library doesn't expose a direct way to invalidate a connection,
                 # but closing it should prevent reuse
@@ -1361,7 +1361,7 @@ class ClickHouseClient:
                     logger.info("Closed connection after query failure to prevent reuse")
                 except Exception as close_error:
                     logger.warning(f"Failed to close connection after error: {close_error}")
-                
+
                 raise
 
     async def execute_iter(
