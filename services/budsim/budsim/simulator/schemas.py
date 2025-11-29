@@ -58,6 +58,11 @@ class Device(BaseModel):
     hardware_mode: Optional[str] = None
     device_uuid: Optional[str] = None
     last_metrics_update: Optional[str] = None
+    # CPU-specific fields (for cpu/cpu_high device types)
+    cores: Optional[int] = None  # Total CPU cores
+    utilized_cores: Optional[float] = None  # Currently utilized cores
+    memory_gb: Optional[float] = None  # Total system memory in GB
+    utilized_memory_gb: Optional[float] = None  # Currently utilized memory in GB
     # Device identification fields (for exact hardware matching)
     device_model: Optional[str] = None
     raw_name: Optional[str] = None
@@ -69,6 +74,7 @@ class Device(BaseModel):
     peak_i8_TFLOPS: float = 20.0
     peak_i4_TFLOPS: float = 40.0
     inter_node_bandwidth_in_GB_per_sec: float = 10.0
+    memory: Optional[float] = None
 
 
 class Node(BaseModel):
@@ -270,6 +276,11 @@ class NodeGroupConfiguration(BaseModel):
     # Engine capability flags from BudConnect API
     supports_lora: Optional[bool] = None
     supports_pipeline_parallelism: Optional[bool] = None
+    # Memory components for accurate allocation
+    weight_memory_gb: Optional[float] = None
+    kv_cache_memory_gb: Optional[float] = None
+    # CPU cores for CPU/cpu_high deployments
+    cores: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_parallelism_config(self):

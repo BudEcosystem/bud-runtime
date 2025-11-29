@@ -1297,7 +1297,7 @@ class ClickHouseClient:
                 if not result:
                     break
         except Exception as e:
-            # Ignore errors during cleanu
+            # Ignore errors during cleanup
             logger.warning(f"Cleanup state failed: {e}")
 
     async def close(self):
@@ -1342,10 +1342,6 @@ class ClickHouseClient:
                 await cursor.execute(query, params or {})
                 result = await cursor.fetchall()
 
-                # Clean up any remaining cursor state to prevent "records not fetched" errors
-                # when connection is returned to pool and reused for next query
-                await self._cleanup_cursor_state(cursor)
-
                 if with_column_types:
                     return result, cursor.description
                 else:
@@ -1354,22 +1350,19 @@ class ClickHouseClient:
                         await self._query_cache.set(query, result, params)
                     return result
             except Exception as e:
-                # Ensure cursor is properly closed on errors
+                # Log the error
                 logger.error(f"Query execution failed: {e}. Query: {query[:100]}...")
-                # Try to clean up cursor state before raising
+
+                # CRITICAL FIX: Mark connection as bad so it won't be reused
+                # The asynch library doesn't expose a direct way to invalidate a connection,
+                # but closing it should prevent reuse
                 try:
-                    await self._cleanup_cursor_state(cursor)
-                except Exception as cleanup_error:
-                    logger.warning(f"Cursor cleanup failed during error handling: {cleanup_error}")
+                    await conn.close()
+                    logger.info("Closed connection after query failure to prevent reuse")
+                except Exception as close_error:
+                    logger.warning(f"Failed to close connection after error: {close_error}")
+
                 raise
-            finally:
-                # Ensure all remaining results are consumed to avoid "records not fetched" errors
-                try:
-                    while await cursor.fetchone():
-                        pass  # Consume all remaining records
-                except Exception as e:
-                    # Ignore errors when consuming remaining results
-                    logger.warning(f"Failed to consume remaining cursor results: {e}")
 
     async def execute_iter(
         self,
@@ -1394,20 +1387,13 @@ class ClickHouseClient:
 
             except Exception as e:
                 logger.error(f"Iterator query execution failed: {e}. Query: {query[:100]}...")
-                # Try to consume any pending results to clean up cursor state
+                # Close connection to prevent reuse in dirty state
                 try:
-                    await self._cleanup_cursor_state(cursor)
-                except Exception as e:
-                    logger.warning(f"cleanup state failed: {e}")
+                    await conn.close()
+                    logger.info("Closed connection after iterator query failure")
+                except Exception as close_error:
+                    logger.warning(f"Failed to close connection after error: {close_error}")
                 raise
-            finally:
-                # Ensure all remaining results are consumed to avoid "records not fetched" errors
-                try:
-                    while await cursor.fetchone():
-                        pass  # Consume all remaining records
-                except Exception as e:
-                    # Ignore errors when consuming remaining results
-                    logger.warning(f"consume remaining failed: {e}")
 
     async def execute_many(self, queries: list[str]) -> list[list[tuple]]:
         """Execute multiple queries concurrently with proper error handling."""

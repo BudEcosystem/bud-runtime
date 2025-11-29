@@ -128,6 +128,7 @@ class NFDLabelParser:
             "cpu_name": cpu_name,
             "cpu_vendor": cpu_vendor,
             # Cores and threads will be populated from node capacity, not from NFD labels
+            "physical_cores": 0,
             "cores": 0,
             "threads": 0,
         }

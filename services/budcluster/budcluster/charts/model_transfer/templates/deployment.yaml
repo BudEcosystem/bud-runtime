@@ -8,6 +8,13 @@ metadata:
 spec:
   restartPolicy: Never
   serviceAccountName: model-transfer
+  {{- if eq $.Values.deviceType "cpu_high" }}
+  affinity:
+    {{- if eq $.Values.hardwareMode "shared" }}
+    {{- include "model-transfer.shared-cpu-pod-affinity" . | nindent 4 }}
+    {{- end }}
+    {{- include "model-transfer.cpu-node-affinity" . | nindent 4 }}
+  {{- end }}
   imagePullSecrets:
     - name: {{ $.Values.imagePullSecrets.name }}
   containers:

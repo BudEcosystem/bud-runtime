@@ -259,6 +259,7 @@ class ClusterOpsService:
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
                                     "generation": cpu.get("generation", ""),
+                                    "physical_cores": cpu.get("physical_cores", cpu.get("cores", 0)),
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
@@ -267,10 +268,12 @@ class ClusterOpsService:
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
                                     "instruction_sets": cpu.get("instruction_sets", []),
-                                    "memory_gb": 0,  # CPU doesn't have dedicated memory like GPU
-                                    "mem_per_GPU_in_GB": 0,
+                                    "memory_gb": cpu.get("memory_gb", 0),  # System memory from DeviceExtractor
+                                    "mem_per_GPU_in_GB": cpu.get("memory_gb", 0),  # System memory
                                     "inter_node_bandwidth_in_GB_per_sec": 100,
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
+                                    "utilized_cores": cpu.get("utilized_cores", 0.0),
+                                    "utilized_memory_gb": cpu.get("utilized_memory_gb", 0.0),
                                 },
                                 "available_count": 1,  # CPUs are counted differently
                                 "type": "cpu",
@@ -310,13 +313,15 @@ class ClusterOpsService:
                 else:
                     # Fallback to CPU if no devices detected
                     cpu_info = node.get("cpu_info", {})
+                    cpu_cores = int(cpu_info.get("cpu_cores", 0) or 0)
                     hardware_info = [
                         {
                             "device_config": {
                                 "type": "cpu",
                                 "name": cpu_info.get("cpu_name", "CPU"),
                                 "vendor": cpu_info.get("cpu_vendor", "Unknown"),
-                                "cores": int(cpu_info.get("cpu_cores", 0) or 0),
+                                "physical_cores": cpu_cores,
+                                "cores": cpu_cores,
                                 "architecture": cpu_info.get("architecture", "x86_64"),
                                 "raw_name": cpu_info.get("cpu_name", "CPU"),
                                 "mem_per_GPU_in_GB": 0,
@@ -672,7 +677,10 @@ class ClusterOpsService:
                         "name": device.get("name", "unknown"),
                         "type": device.get("type", "cpu"),
                         "mem_per_gpu_in_gb": device.get("mem_per_gpu_in_gb", 0),
+                        "physical_cores": device.get("physical_cores", device.get("cores", 0)),
                         "cores": device.get("cores", 0),
+                        "utilized_cores": device.get("utilized_cores", 0.0),
+                        "utilized_memory_gb": device.get("utilized_memory_gb", 0.0),
                     },
                     "available_count": device.get("available_count", 0),
                     "total_count": device.get("total_count", 0),
@@ -1014,6 +1022,7 @@ class ClusterOpsService:
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
                                     "generation": cpu.get("generation", ""),
+                                    "physical_cores": cpu.get("physical_cores", cpu.get("cores", 0)),
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
@@ -1022,10 +1031,12 @@ class ClusterOpsService:
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
                                     "instruction_sets": cpu.get("instruction_sets", []),
-                                    "memory_gb": 0,  # CPU doesn't have dedicated memory like GPU
-                                    "mem_per_GPU_in_GB": 0,
+                                    "memory_gb": cpu.get("memory_gb", 0),  # System memory from DeviceExtractor
+                                    "mem_per_GPU_in_GB": cpu.get("memory_gb", 0),  # System memory
                                     "inter_node_bandwidth_in_GB_per_sec": 100,
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
+                                    "utilized_cores": cpu.get("utilized_cores", 0.0),
+                                    "utilized_memory_gb": cpu.get("utilized_memory_gb", 0.0),
                                 },
                                 "available_count": 1,  # CPUs are counted differently
                                 "type": cpu_type,
@@ -1065,13 +1076,15 @@ class ClusterOpsService:
                 else:
                     # Fallback to CPU if no devices detected
                     cpu_info = node.get("cpu_info", {})
+                    cpu_cores = int(cpu_info.get("cpu_cores", 0) or 0)
                     hardware_info = [
                         {
                             "device_config": {
                                 "type": "cpu",
                                 "name": cpu_info.get("cpu_name", "CPU"),
                                 "vendor": cpu_info.get("cpu_vendor", "Unknown"),
-                                "cores": int(cpu_info.get("cpu_cores", 0) or 0),
+                                "physical_cores": cpu_cores,
+                                "cores": cpu_cores,
                                 "architecture": cpu_info.get("architecture", "x86_64"),
                                 "raw_name": cpu_info.get("cpu_name", "CPU"),
                                 "mem_per_GPU_in_GB": 0,
