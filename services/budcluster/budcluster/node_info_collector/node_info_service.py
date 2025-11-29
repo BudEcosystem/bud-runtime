@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import tempfile
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 import urllib3.exceptions
@@ -77,14 +78,51 @@ async def get_node_info_python(
                 "Please install NFD for hardware detection and node information gathering."
             )
 
+        # List all pods to calculate utilization
+        logger.debug("Listing all pods for resource utilization calculation")
+        pods = v1.list_pod_for_all_namespaces(field_selector="status.phase=Running")
+
+        # Calculate utilization per node
+        node_utilization = defaultdict(lambda: {"cpu": 0.0, "memory": 0.0})
+        for pod in pods.items:
+            node_name = pod.spec.node_name
+            if not node_name:
+                continue
+
+            for container in pod.spec.containers:
+                resources = container.resources
+                if not resources or not resources.requests:
+                    continue
+
+                # Aggregate CPU requests
+                if "cpu" in resources.requests:
+                    node_utilization[node_name]["cpu"] += _parse_cpu_string(resources.requests["cpu"])
+
+                # Aggregate Memory requests
+                if "memory" in resources.requests:
+                    node_utilization[node_name]["memory"] += _parse_memory_string(resources.requests["memory"])
+
         # Parse each node
         node_info_list = []
         for node in nodes.items:
             try:
                 node_info = NFDLabelParser.parse_node_info(node)
+                node_name = node_info["node_name"]
+
+                # Check if node is a master/control-plane node
+                node_labels = node.metadata.labels or {}
+                is_master = (
+                    "node-role.kubernetes.io/master" in node_labels
+                    or "node-role.kubernetes.io/control-plane" in node_labels
+                )
+                node_info["is_master"] = is_master
+                if is_master:
+                    logger.debug(f"Node {node_name} identified as master/control-plane")
 
                 # Format devices as JSON string (for compatibility with existing code)
-                devices = _format_devices(node_info)
+                # Pass utilization data for this node
+                utilization = node_utilization.get(node_name, {"cpu": 0.0, "memory": 0.0})
+                devices = _format_devices(node_info, utilization)
                 node_info["devices"] = json.dumps(devices)
 
                 node_info_list.append(node_info)
@@ -145,15 +183,18 @@ def _create_k8s_client_from_dict(kubeconfig_dict: Dict[str, Any]) -> client.ApiC
             os.unlink(kubeconfig_path)
 
 
-def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
+def _format_devices(node_info: Dict[str, Any], utilization: Dict[str, float] = None) -> Dict[str, Any]:
     """Format device information for compatibility with existing code.
 
     Args:
         node_info: Parsed node information
+        utilization: Dictionary containing 'cpu' and 'memory' utilization (requests)
 
     Returns:
         Formatted devices dictionary
     """
+    if utilization is None:
+        utilization = {"cpu": 0.0, "memory": 0.0}
     devices = {"gpus": [], "cpus": []}
 
     gpu_info = node_info.get("gpu_info", {})
@@ -232,6 +273,20 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
             if has_amx or has_avx2:
                 cpu_type = "cpu_high"
 
+        # Extract system memory from capacity
+        capacity = node_info.get("capacity", {})
+        memory_gb = _parse_memory_string(capacity.get("memory", ""))
+
+        # Extract cores from capacity if not available from NFD labels
+        cores = cpu_info.get("cores", 0)
+        threads = cpu_info.get("threads", 0)
+        if cores == 0 and "cpu" in capacity:
+            # Capacity CPU is in string format like "48"
+            cores = int(capacity.get("cpu", "0"))
+            # If hyperthreading info not available, assume threads = cores
+            if threads == 0:
+                threads = cores
+
         # Get cores and threads from node capacity
         capacity = node_info.get("capacity", {})
         cpu_capacity_str = capacity.get("cpu", "0")
@@ -261,12 +316,33 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
                 family_int = int(family_id) if family_id else 0
 
                 INTEL_GEN_MAP = {
-                    (173, 174, 175): "5th Gen (Emerald Rapids)",
-                    (143,): "4th Gen (Sapphire Rapids)",
-                    (106, 108): "3rd Gen (Ice Lake)",
-                    (85,): "2nd Gen (Cascade Lake)",
-                    (79,): "Broadwell",
-                    (63,): "Haswell",
+                    # --- Xeon 6 generation ---
+                    # Granite Rapids: P-core Xeon 6
+                    (173, 174): "Xeon 6 (Granite Rapids, P-core)",
+                    # Sierra Forest: E-core Xeon 6
+                    (175,): "Xeon 6 (Sierra Forest, E-core)",
+                    # --- 5th Gen Xeon Scalable ---
+                    # Emerald Rapids
+                    (207,): "5th Gen Xeon Scalable (Emerald Rapids)",
+                    # --- 4th Gen Xeon Scalable ---
+                    # Sapphire Rapids
+                    (143,): "4th Gen Xeon Scalable (Sapphire Rapids)",
+                    # --- 3rd Gen Xeon Scalable ---
+                    # Ice Lake SP + Ice Lake DE
+                    (106, 108): "3rd Gen Xeon Scalable (Ice Lake)",
+                    # --- 1st & 2nd Gen Xeon Scalable (+ Cooper) ---
+                    # Skylake-SP, Cascade Lake, Cooper Lake all share model 85
+                    (85,): "Skylake/Cascade/Cooper (1st/2nd Gen Xeon Scalable)",
+                    # --- Pre-Scalable server parts ---
+                    # Broadwell server: classic EP/EX plus DE/Hewitt Lake
+                    (79, 86): "Broadwell (Server)",
+                    # Haswell server
+                    (63,): "Haswell (Server)",
+                    # Optional older gens if you still see them in the fleet:
+                    # Ivy Bridge server
+                    (62,): "Ivy Bridge (Server)",
+                    # Sandy Bridge server
+                    (45,): "Sandy Bridge (Server)",
                 }
 
                 if family_int == 6:  # Intel x86-64
@@ -286,10 +362,14 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
                 "family": cpu_info.get("cpu_family", ""),
                 "generation": generation,
                 "architecture": cpu_info.get("architecture", ""),
-                "cores": cpu_cores,
+                "physical_cores": cpu_cores,
+                "cores": cpu_threads,  # Actual capacity for utilization comparison
                 "threads": cpu_threads,
-                "raw_name": cpu_info.get("cpu_model_raw", "CPU"),
+                "raw_name": cpu_info.get("cpu_model_raw", "CPU") + " " + generation,
                 "instruction_sets": instruction_sets,
+                "memory_gb": memory_gb,  # Add system memory
+                "utilized_cores": utilization.get("cpu", 0.0),
+                "utilized_memory_gb": utilization.get("memory", 0.0),
             }
         )
 
@@ -297,7 +377,7 @@ def _format_devices(node_info: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _parse_memory_string(memory_str: str) -> float:
-    """Parse memory string (e.g., '16384MiB') to GB.
+    """Parse memory string (e.g., '16384MiB', '128424816Ki') to GB.
 
     Args:
         memory_str: Memory string
@@ -310,7 +390,16 @@ def _parse_memory_string(memory_str: str) -> float:
 
     try:
         # Remove units and convert
-        if "MiB" in memory_str:
+        if "Ki" in memory_str:
+            # Kubernetes format (kibibytes)
+            return float(memory_str.replace("Ki", "")) / (1024 * 1024)
+        elif "Mi" in memory_str:
+            # Kubernetes format (mebibytes)
+            return float(memory_str.replace("Mi", "")) / 1024
+        elif "Gi" in memory_str:
+            # Kubernetes format (gibibytes)
+            return float(memory_str.replace("Gi", ""))
+        elif "MiB" in memory_str:
             return float(memory_str.replace("MiB", "")) / 1024
         elif "GiB" in memory_str:
             return float(memory_str.replace("GiB", ""))
@@ -318,5 +407,25 @@ def _parse_memory_string(memory_str: str) -> float:
             return float(memory_str.replace("GB", ""))
         else:
             return float(memory_str) / 1024  # Assume MiB
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _parse_cpu_string(cpu_str: str) -> float:
+    """Parse CPU string (e.g., '100m', '1') to cores.
+
+    Args:
+        cpu_str: CPU string
+
+    Returns:
+        CPU cores as float
+    """
+    if not cpu_str:
+        return 0.0
+
+    try:
+        if cpu_str.endswith("m"):
+            return float(cpu_str[:-1]) / 1000.0
+        return float(cpu_str)
     except (ValueError, TypeError):
         return 0.0

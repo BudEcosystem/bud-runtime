@@ -18,6 +18,9 @@ spec:
         model.aibrix.ai/name: {{ $.Values.modelName }}
         device_name: {{ .node.name }}
         concurrency: "{{ .node.concurrency }}"
+        {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
+        bud.studio/shared-cpu: "true"
+        {{- end }}
     spec:
       nodeSelector:
         # kubernetes.io/hostname: {{ .node.name }}
@@ -38,13 +41,19 @@ spec:
               matchLabels:
                 model.aibrix.ai/name: {{ $.Values.modelName }}
             topologyKey: kubernetes.io/hostname
+          {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
+          {{- include "bud-runtime-container.shared-cpu-pod-affinity" . | nindent 10 }}
+          {{- end }}
+        {{- if eq .node.type "cpu_high" }}
+        {{- include "bud-runtime-container.cpu-node-affinity" . | nindent 8 }}
+        {{- end }}
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecrets.name }}
       {{- if eq .node.type "cuda" }}
       runtimeClassName: nvidia
       {{- end }}
       containers:
-      {{- if eq .node.type "cpu" }}
+      {{- if eq .node.type "cpu_high" }}
       {{- include "bud-runtime-container.cpu-container" (dict "Values" $.Values "device" .node) | nindent 6 }}
       {{- else if eq .node.type "cuda" }}
       {{- include "bud-runtime-container.cuda-container" (dict "Values" $.Values "device" .node) | nindent 6 }}

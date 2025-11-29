@@ -1,0 +1,26 @@
+{{/*
+CPU Node Affinity - Excludes control-plane and master nodes
+*/}}
+{{- define "bud-runtime-container.cpu-node-affinity" }}
+nodeAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: DoesNotExist
+      - key: node-role.kubernetes.io/master
+        operator: DoesNotExist
+{{- end }}
+
+{{/*
+Shared CPU Pod Affinity - Bin-packing for shared CPU deployments
+*/}}
+{{- define "bud-runtime-container.shared-cpu-pod-affinity" }}
+preferredDuringSchedulingIgnoredDuringExecution:
+- weight: 100
+  podAffinityTerm:
+    labelSelector:
+      matchLabels:
+        bud.studio/shared-cpu: "true"
+    topologyKey: kubernetes.io/hostname
+{{- end }}

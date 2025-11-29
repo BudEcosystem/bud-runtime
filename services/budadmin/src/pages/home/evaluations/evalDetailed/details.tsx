@@ -159,7 +159,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
                 {data?.content.map((data, index) => (
                   <li className="mb-[.6rem]" key={index}>
                     <Text_12_400_EEEEEE className="leading-[140%] indent-0 pl-[.5rem]">
-                      {data}
+                      {capitalize(data)}
                     </Text_12_400_EEEEEE>
                   </li>
                 ))}

@@ -43,6 +43,8 @@ spec:
               value: "false"
             - name: MIN_PASSWORD_LENGTH
               value: "8"
+            - name: HOST
+              value: "0.0.0.0"
 
             - name: MCPGATEWAY_UI_AIRGAPPED
               value: "true"

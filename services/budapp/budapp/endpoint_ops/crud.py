@@ -75,6 +75,7 @@ class EndpointDataManager(DataManagerUtils):
         filters: Dict[str, Any] = {},
         order_by: List[Tuple[str, str]] = [],
         search: bool = False,
+        status_filter: Optional[str] = None,
     ) -> Tuple[List[EndpointModel], int]:
         """Get all active endpoints from the database.
 
@@ -85,6 +86,7 @@ class EndpointDataManager(DataManagerUtils):
             filters: Additional filters to apply
             order_by: Ordering fields
             search: Whether to perform search
+            status_filter: Optional status filter to apply (used with search mode)
 
         Returns:
             Tuple of endpoint list and total count
@@ -137,6 +139,10 @@ class EndpointDataManager(DataManagerUtils):
                 .filter(and_(*search_conditions))
                 .filter(EndpointModel.status != EndpointStatusEnum.DELETED)
             )
+            # Apply status filter if provided (exact match, not search)
+            if status_filter:
+                stmt = stmt.filter(func.lower(EndpointModel.status) == func.lower(status_filter))
+                count_stmt = count_stmt.filter(func.lower(EndpointModel.status) == func.lower(status_filter))
         else:
             stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
             count_stmt = select(func.count()).select_from(EndpointModel).join(Model).outerjoin(ClusterModel)

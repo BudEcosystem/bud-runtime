@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/text";
 import { Tabs } from "antd";
 import GeneralTab from "./general";
+import ProbesTab from "./probes";
 import { useGuardrails } from "@/stores/useGuardrails";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import BackButton from "@/components/ui/bud/drawer/BackButton";
@@ -29,6 +30,17 @@ const GuardrailDetailsPage = () => {
     }
   }, [router.query.guardrailId, router.query.id, fetchGuardrailDetail]);
 
+  const handleGoBack = () => {
+    router.back();
+  };
+
+  const tabBarExtraContent = {
+    left: (
+      <BackButton onClick={handleGoBack} classNames="ml-4" />
+    ),
+    right: null,
+  };
+
   const guardrailTabs = [
     {
       label: (
@@ -43,19 +55,19 @@ const GuardrailDetailsPage = () => {
       key: "1",
       children: <GeneralTab />,
     },
-    // {
-    //   label: (
-    //     <div className="flex items-center gap-[0.375rem]">
-    //       {activeTab === "2" ? (
-    //         <Text_14_600_EEEEEE>Versions</Text_14_600_EEEEEE>
-    //       ) : (
-    //         <Text_14_600_B3B3B3>Versions</Text_14_600_B3B3B3>
-    //       )}
-    //     </div>
-    //   ),
-    //   key: "2",
-    //   children: <div className="p-6 text-center text-gray-400">Versions - Coming Soon</div>,
-    // },
+    {
+      label: (
+        <div className="flex items-center gap-[0.375rem]">
+          {activeTab === "2" ? (
+            <Text_14_600_EEEEEE>Probes</Text_14_600_EEEEEE>
+          ) : (
+            <Text_14_600_B3B3B3>Probes</Text_14_600_B3B3B3>
+          )}
+        </div>
+      ),
+      key: "2",
+      children: <ProbesTab />,
+    },
     // {
     //   label: (
     //     <div className="flex items-center gap-[0.375rem]">
@@ -70,10 +82,6 @@ const GuardrailDetailsPage = () => {
     //   children: <div className="p-6 text-center text-gray-400">History - Coming Soon</div>,
     // },
   ];
-
-  const goBack = () => {
-    router.back();
-  };
 
   return (
     <DashBoardLayout>
@@ -90,12 +98,13 @@ const GuardrailDetailsPage = () => {
             </div>
           </div>
         </div> */}
-        <div className="temp-bg h-full w-full px-[1.2rem]">
+        <div className="temp-bg h-full w-full">
           <div className="evalTab agentTab h-full">
             <Tabs
               defaultActiveKey="1"
               activeKey={activeTab}
               onChange={(key) => setActiveTab(key)}
+              tabBarExtraContent={tabBarExtraContent}
               className="h-full"
               items={guardrailTabs}
             />

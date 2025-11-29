@@ -36,6 +36,11 @@ from .schemas import GetDeploymentConfigRequest, WorkerInfo
 
 logger = get_logger(__name__)
 
+# CPU deployment memory and resource constants
+CPU_MEMORY_MULTIPLIER = 1.7  # Accounts for runtime overhead, activation memory, safety margin
+CPU_MIN_MEMORY_GB = 10  # Minimum memory allocation for CPU nodes
+SHARED_MODE_CORE_RATIO = 0.1  # CPU request ratio for shared mode (10% of limit)
+
 
 class DeploymentHandler:
     """DeploymentHandler is responsible for handling the deployment of nodes using Helm.
@@ -134,8 +139,8 @@ class DeploymentHandler:
                 max_memory_bytes = max(max_memory_bytes, node_memory)
 
         if max_memory_bytes == 0:
-            logger.warning("No memory size found in node list, using default of 10GB")
-            max_memory_bytes = 10 * (1024**3)  # 10GB default (more reasonable for models)
+            logger.warning(f"No memory size found in node list, using default of {CPU_MIN_MEMORY_GB}GB")
+            max_memory_bytes = CPU_MIN_MEMORY_GB * (1024**3)  # Default for models
         else:
             logger.info(
                 f"Calculated maximum memory from {nodes_with_memory} nodes: {max_memory_bytes / (1024**3):.2f} GB"
@@ -284,9 +289,58 @@ class DeploymentHandler:
             # Memory is already in GB from BudSim, no conversion needed
             # Use tiered buffer: 1GB for ≤10GB, 2GB for >10GB
             buffer_gb = 1 if node["memory"] <= 10 else 2
-            allocation_memory_gb = node["memory"] + buffer_gb
+            allocation_memory_gb = max(node["memory"] + buffer_gb, 1)  # Ensure non-zero for division safety
+
+            # Check for CPU device type and apply specific memory formula
+            device_type = node.get("type", "cpu")
+            if device_type == "cpu_high":
+                weight_memory_gb = node.get("weight_memory_gb", 0)
+                kv_cache_memory_gb = node.get("kv_cache_memory_gb", 0) if node.get("kv_cache_memory_gb", 0) > 4 else 4
+
+                # If we have the detailed memory components, use the new formula
+                if weight_memory_gb > 0 and kv_cache_memory_gb > 0:
+                    # Formula: memory_allocation = total_memory * multiplier + kv_cache_memory
+                    # Here "total_memory" is interpreted as model weights
+                    raw_memory_gb = (weight_memory_gb * CPU_MEMORY_MULTIPLIER) + kv_cache_memory_gb
+                    allocation_memory_gb = raw_memory_gb + buffer_gb
+                    # Ensure a minimum allocation for CPU nodes
+                    allocation_memory_gb = max(allocation_memory_gb, CPU_MIN_MEMORY_GB)
+                    logger.info(
+                        f"CPU Node {node.get('name')}: Calculated memory using formula "
+                        f"({weight_memory_gb:.2f} * {CPU_MEMORY_MULTIPLIER} + {kv_cache_memory_gb:.2f}) + {buffer_gb} = {allocation_memory_gb:.2f} GB"
+                    )
+
+                    # Update node memory for consistency
+                    node["memory"] = allocation_memory_gb
+
+                    # Set VLLM_CPU_KVCACHE_SPACE env var
+                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb)
+                    logger.info(f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb} GB")
+                else:
+                    logger.warning(
+                        f"CPU Node {node.get('name')}: Missing detailed memory components (weight: {weight_memory_gb}, kv: {kv_cache_memory_gb}). "
+                        "Using default memory allocation."
+                    )
+
+                # Set core_count for CPU resource limits in Helm template
+                # Priority: cores from budsim > physical_cores > default 14
+                core_count = node.get("cores") or node.get("physical_cores") or 14
+                node["core_count"] = core_count - 2
+
+                # For shared mode, set CPU request to configured ratio of limit (minimum 1 core)
+                # For dedicated mode, request equals limit
+                hardware_mode = node.get("hardware_mode", "dedicated")
+                if hardware_mode == "shared":
+                    node["core_request"] = max(1, int(node["core_count"] * SHARED_MODE_CORE_RATIO))
+                    logger.info(
+                        f"CPU Node {node.get('name')}: Shared mode - core_request={node['core_request']}, core_limit={node['core_count']}"
+                    )
+                else:
+                    node["core_request"] = node["core_count"]
+                    logger.info(f"CPU Node {node.get('name')}: Dedicated mode - core_count={node['core_count']}")
 
             node["args"]["gpu-memory-utilization"] = 0.95
+            node["args"]["max-num-seqs"] = node_concurrency
 
             # For shared hardware mode, calculate GPU memory limit in MB
             hardware_mode = node.get("hardware_mode", "dedicated")
@@ -298,7 +352,6 @@ class DeploymentHandler:
                     f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
                 )
 
-                node["args"]["max-num-seqs"] = node_concurrency
                 node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
 
             # Enable LoRA configuration if engine supports it
@@ -702,6 +755,20 @@ api_key_location = "env::API_KEY"
                 f"PVC size ({pvc_size_gb} GB) is below recommended minimum of 1 GB. Setting the value to 1 GB"
             )
 
+        # Determine device type and hardware mode from node_list for model transfer affinity
+        # CPU deployments need nodeAffinity to avoid master nodes
+        # Shared mode needs podAffinity for bin-packing
+        device_type = ""
+        hardware_mode = "dedicated"
+        if node_list:
+            for node in node_list:
+                if isinstance(node, dict):
+                    if node.get("type"):
+                        device_type = node.get("type")
+                    if node.get("hardware_mode"):
+                        hardware_mode = node.get("hardware_mode")
+                    break
+
         values = {
             "source_model_path": model_uri,
             "namespace": namespace,
@@ -713,6 +780,8 @@ api_key_location = "env::API_KEY"
             "model_size": pvc_size_gb,
             "nodes": node_list,
             "volume_type": app_settings.volume_type,
+            "deviceType": device_type,
+            "hardwareMode": hardware_mode,
         }
 
         # Add storage class configuration if provided

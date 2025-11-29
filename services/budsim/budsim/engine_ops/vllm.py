@@ -569,7 +569,7 @@ class EngineCompatibility(BaseEngineCompatibility):
 
     def check_args_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check the compatibility of the engine args/envs combinations."""
-        if engine_args.get("target_device") == "cpu":
+        if engine_args.get("target_device") in ("cpu", "cpu_high"):
             self.check_cpu_compatibility(engine_args)
         elif engine_args.get("target_device") == "cuda":
             self.check_gpu_compatibility(engine_args)

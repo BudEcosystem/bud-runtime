@@ -14,7 +14,7 @@
   resources:
     requests:
       memory: "{{ .device.memory }}Gi"
-      cpu: {{ .device.core_count }}
+      cpu: {{ .device.core_request | default .device.core_count }}
     limits:
       memory: "{{ .device.memory }}Gi"
       cpu: {{ .device.core_count }}
@@ -30,6 +30,8 @@
   {{- range $key, $value := .device.args }}
   - {{ $value }}
   {{- end }}
+  - --uvicorn-log-level
+  - warning
   {{- end }}
   livenessProbe:
     httpGet:

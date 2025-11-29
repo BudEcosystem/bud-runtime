@@ -12,6 +12,7 @@ import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import { ModelFlowInfoCard } from "@/components/ui/bud/deploymentDrawer/DeployModelSpecificationInfo";
 import { useAddAgent } from "@/stores/useAddAgent";
 import { usePromptsAgents } from "@/stores/usePromptsAgents";
+import { useAgentStore } from "@/stores/useAgentStore";
 import CustomDropDown from "../components/CustomDropDown";
 import CustomPopover from "../components/customPopover";
 import { ChevronDown } from "lucide-react";
@@ -64,6 +65,7 @@ export default function AgentSuccess() {
   const router = useRouter();
   const { closeDrawer } = useDrawer();
   const { fetchPrompts } = usePromptsAgents();
+  const { resetSessionState } = useAgentStore();
 
   // Get data from the Add Agent store
   const {
@@ -110,6 +112,8 @@ export default function AgentSuccess() {
   const model = currentWorkflow?.workflow_steps?.model;
 
   const handleClose = () => {
+    // Clear agent session data to prevent stale data in new flows
+    resetSessionState();
     // Refresh the prompts list
     fetchPrompts();
     // Close the drawer
