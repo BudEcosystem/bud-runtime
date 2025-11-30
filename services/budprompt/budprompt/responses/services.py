@@ -17,11 +17,11 @@
 """Services for responses module - OpenAI-compatible API."""
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
-from openai.types.responses import ResponsePrompt
+from openai.types.responses import ResponseInputItem
 from pydantic import ValidationError
 
 from budprompt.commons.exceptions import ClientException, OpenAIResponseException
@@ -30,7 +30,7 @@ from budprompt.shared.redis_service import RedisService
 from ..prompt.openai_response_formatter import extract_validation_error_details
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
-from .schemas import ResponsePromptParam
+from .schemas import BudResponsePromptParam
 
 
 logger = logging.get_logger(__name__)
@@ -48,7 +48,10 @@ class ResponsesService:
         self.redis_service = RedisService()
 
     async def execute_prompt(
-        self, prompt_params: ResponsePromptParam, input: Optional[str] = None, api_key: Optional[str] = None
+        self,
+        prompt_params: BudResponsePromptParam,
+        input: Optional[Union[str, List[ResponseInputItem]]] = None,
+        api_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute prompt using template from Redis.
 
@@ -64,17 +67,9 @@ class ResponsesService:
             OpenAIResponseException: OpenAI-compatible exception with status code and error details
         """
         try:
-            if prompt_params.variables and input:
-                logger.error("Please provide either variables or input.")
-                raise OpenAIResponseException(
-                    status_code=400,
-                    message="Please provide either variables or input.",
-                    code="invalid_request",
-                )
-
             # Extract parameters
-            prompt_id = prompt_params.id
-            version = prompt_params.version
+            prompt_id = prompt_params["id"]
+            version = prompt_params.get("version")
 
             # Determine Redis key based on version
             if version:
@@ -119,11 +114,12 @@ class ResponsesService:
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
             logger.debug("Config data for prompt: %s: %s", prompt_id, prompt_execute_data)
 
-            input_data = prompt_params.variables if prompt_params.variables else input
+            variables = prompt_params.get("variables")
 
             result = await PromptExecutorService().execute_prompt(
                 prompt_execute_data,
-                input_data,
+                input,
+                variables=variables,
                 api_key=api_key,
             )
 
@@ -146,9 +142,9 @@ class ResponsesService:
                 logger.debug("Non Streaming response requested")
                 result = result.model_copy(
                     update={
-                        "prompt": ResponsePrompt(
+                        "prompt": BudResponsePromptParam(
                             id=prompt_id,
-                            variables=prompt_params.variables,
+                            variables=prompt_params.get("variables"),
                             version=version,
                         )
                     }
@@ -156,7 +152,7 @@ class ResponsesService:
                 return result
 
         except ValidationError as e:
-            logger.error("Validation error during response creation: %s", str(e))
+            logger.exception("Validation error during response creation")
             message, param, code = extract_validation_error_details(e)
             raise OpenAIResponseException(
                 status_code=400,

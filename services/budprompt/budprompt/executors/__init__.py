@@ -39,6 +39,7 @@ from .factory import PromptExecutorFactory
 from .v1 import SimplePromptExecutorDeprecated
 from .v2 import SimplePromptExecutor
 from .v3 import SimplePromptExecutor_V1
+from .v4 import SimplePromptExecutor_V4
 
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "SimplePromptExecutor_V1",
     "SimplePromptExecutor",
     "SimplePromptExecutorDeprecated",
+    "SimplePromptExecutor_V4",
 ]

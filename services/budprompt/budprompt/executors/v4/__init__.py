@@ -14,17 +14,9 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""The constants used in the budprompt module."""
+"""Simple Prompt Executor Module - Version 4 (Active)."""
 
-from pydantic_ai._output import DEFAULT_OUTPUT_TOOL_NAME
+from .executor import SimplePromptExecutor_V4
 
 
-# MCP Cleanup Registry
-CLEANUP_REGISTRY_KEY = "prompt:cleanup_registry"
-
-# Default internal tool name, description in pydantic ai to generate structured output
-STRUCTURED_OUTPUT_TOOL_NAME = DEFAULT_OUTPUT_TOOL_NAME
-STRUCTURED_OUTPUT_TOOL_DESCRIPTION = "Final result processed."
-
-# Model name for validator code generation
-VALIDATION_MODEL_NAME = "qwen3-32b"
+__all__ = ["SimplePromptExecutor_V4"]

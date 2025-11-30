@@ -21,7 +21,7 @@ import json
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Dict, Optional, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
 from budmicroframe.commons.constants import WorkflowStatus
@@ -31,6 +31,7 @@ from budmicroframe.commons.schemas import (
     SuccessResponse,
 )
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
+from openai.types.responses import ResponseInputItem
 from pydantic import ValidationError
 
 from ..commons.config import app_settings
@@ -82,7 +83,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = PromptExecutorFactory.get_executor(version=3)
+        self.executor = PromptExecutorFactory.get_executor()
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
@@ -182,7 +183,8 @@ class PromptExecutorService:
     async def execute_prompt(
         self,
         request: PromptExecuteData,
-        input_data: Optional[Union[Dict[str, Any], str]],
+        input_data: Optional[Union[str, List[ResponseInputItem]]] = None,
+        variables: Optional[Dict[str, Any]] = None,
         api_key: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
@@ -217,6 +219,7 @@ class PromptExecutorService:
                 api_key=api_key,
                 tools=request.tools,
                 system_prompt=request.system_prompt,
+                variables=variables,
             )
 
             return result
@@ -248,8 +251,9 @@ class PromptExecutorService:
             # Prompt execution errors -> 500 Internal Server Error
             logger.error(f"Prompt execution failed: {str(e)}")
             raise ClientException(
-                status_code=500,
-                message=e.message,  # Use the custom exception's message
+                status_code=e.status_code,
+                message=e.message,
+                params={"param": e.param},
             ) from e
 
         except Exception as e:
