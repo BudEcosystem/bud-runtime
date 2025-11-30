@@ -127,7 +127,7 @@ def validate_template_variables(
     provided_variables = set(variables.keys()) if variables else set()
 
     # Extract all template variables from system_prompt and messages
-    env = Environment()
+    env = Environment()  # nosec B701 - Only used for parsing/AST analysis, not rendering
     used_variables = set()
 
     # Check system_prompt for template variables
