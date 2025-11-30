@@ -69,7 +69,7 @@ class ResponseCreateRequest(BaseModel):
     prompt: Optional[BudResponsePromptParam] = Field(
         ..., description="Prompt template reference with id, optional variables, and version"
     )
-    input: Union[str, List[ResponseInputItem]] = Field(
+    input: Optional[Union[str, List[ResponseInputItem]]] = Field(
         None,
         description="Text input to the model. Can be a simple string or array of message objects. "
         "String format: 'What is 2+2?' | "
