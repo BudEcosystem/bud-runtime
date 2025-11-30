@@ -1218,6 +1218,7 @@ async def deploy_model_by_step(
             trigger_workflow=deploy_request.trigger_workflow,
             credential_id=deploy_request.credential_id,
             scaling_specification=deploy_request.scaling_specification,
+            hardware_mode=deploy_request.hardware_mode,
             enable_tool_calling=deploy_request.enable_tool_calling,
             enable_reasoning=deploy_request.enable_reasoning,
             tool_calling_parser_type=deploy_request.tool_calling_parser_type,

@@ -5,7 +5,7 @@ import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
-import { formatDate, formatMonthYear } from "@/utils/formatDate";
+import { formatDate, formatDateWithTime, formatMonthYear } from "@/utils/formatDate";
 
 interface RunHistoryItem {
     runId: string;
@@ -34,6 +34,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
     }, [data]);
 
     const columns: ColumnsType<RunHistoryItem> = [
+        {
+            title: "Runs",
+            dataIndex: "index",
+            key: "index",
+            render: (_: any, __: any, index: number) => (
+                <Text_12_400_EEEEEE>{index + 1}</Text_12_400_EEEEEE>
+            ),
+        },
         {
             title: "Model",
             dataIndex: "model",
@@ -73,9 +81,14 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
             title: "Started Date",
             dataIndex: "startedDate",
             key: "startedDate",
-            render: (date: string) => (
-                <Text_12_400_EEEEEE>{(date) || '-'}</Text_12_400_EEEEEE>
-            ),
+            render: (date: string) => {
+                if (!date) return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+                return (
+                <Text_12_400_EEEEEE>
+                    {formatDateWithTime(date)}
+                </Text_12_400_EEEEEE>
+                );
+            },
         },
         {
             title: "Duration",
@@ -104,7 +117,7 @@ const RunsHistoryTable: React.FC<RunsHistoryTableProps> = ({ data }) => {
                 }
 
                 return (
-                    <div className="flex space-x-2 flex-wrap">
+                    <div className="flex gap-2 py-2 flex-wrap">
                         {runs.map((el, index) => (
                             <ProjectTags
                                 key={index} // A unique ID from `el` would be better if available.

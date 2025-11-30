@@ -30,9 +30,10 @@ interface BenchmarkProgressProps {
     canPause?: boolean;
     pauseUrl?: string;
   };
+  refreshETA: () => void;
 }
 
-const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
+const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refreshETA}) => {
   return (
     <div className="bg-[#101010] rounded-lg px-[1.5rem] py-[1.2rem] border border-[#1F1F1F]">
       <div className="flex justify-between items-start mb-[0.85rem]">
@@ -132,6 +133,25 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
               <Text_12_400_B3B3B3>ETA</Text_12_400_B3B3B3>
             </div>
             <Text_12_400_EEEEEE>{benchmark.eta}</Text_12_400_EEEEEE>
+            <div className="ml-2 cursor-pointer" onClick={refreshETA}>
+              <div className="w-4 h-4">
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10"></path>
+                <path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"></path>
+              </svg>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -181,7 +201,11 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark }) => {
             <div>
               <ProjectTags
                 name={capitalize(benchmark.status)}
-                color={endpointStatusMapping[capitalize(benchmark.status)]}
+                color={endpointStatusMapping[
+                    capitalize(benchmark.status) === "Running"
+                        ? capitalize(benchmark.status) + "-yellow"
+                        : capitalize(benchmark.status)
+                ]}
                 textClass="text-[.75rem]"
               />
             </div>

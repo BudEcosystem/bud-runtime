@@ -79,6 +79,7 @@ class RetrieveWorkflowStepData(BaseModel):
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     datasets: list | None = None
+    dataset_ids: list | None = None
     nodes: list | None = None
     credential_id: UUID4 | None = None
     user_confirmation: bool | None = None
@@ -114,6 +115,8 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_prompt_version: int | str | None = None
     discarded_prompt_ids: list[dict] | None = None
     prompt_schema_events: dict | None = None
+    # Hardware resource mode (dedicated vs shared/time-slicing)
+    hardware_mode: str | None = None
     # Parser metadata from cluster/simulator
     tool_calling_parser_type: str | None = None
     reasoning_parser_type: str | None = None

@@ -84,6 +84,18 @@ class DatasetMetadata(BaseModel):
     estimated_input_tokens: Optional[int] = None
     estimated_output_tokens: Optional[int] = None
 
+    # Enriched evaluation fields
+    why_run_this_eval: Optional[List[str]] = None
+    what_to_expect: Optional[List[str]] = None
+    evaluation_description: Optional[str] = None
+    top_5_task_types: Optional[List[str]] = None
+    top_5_domains: Optional[List[str]] = None
+    top_5_skills: Optional[List[str]] = None
+    top_5_concepts: Optional[List[str]] = None
+    top_5_qualifications: Optional[List[str]] = None
+    top_5_languages: Optional[List[str]] = None
+    age_distribution: Optional[Dict[str, Any]] = None
+
 
 class Dataset(BaseModel):
     """Individual dataset information."""
@@ -95,11 +107,15 @@ class Dataset(BaseModel):
     url: str
     size_mb: float
     checksum: str
-    sample_count: int
+    sample_count: Optional[int] = None
     traits: List[str]
     metadata: DatasetMetadata
     eval_type: Optional[Dict[str, str]] = None  # Evaluation type configurations
     original_data: Optional[Dict[str, Any]] = None  # Original metadata from source
+
+    # Evaluation configuration fields
+    metrics: Optional[List[str]] = None  # List of metric names (e.g., ["accuracy"])
+    evaluator: Optional[str] = None  # Evaluator class name (e.g., "GPQAEvaluator")
 
 
 class DatasetCollection(BaseModel):

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { Form, FormRule, Image } from "antd";
 import { BudFormContext } from "../context/BudFormContext";
 import { Text_12_300_EEEEEE, Text_12_400_808080 } from "../../text";
@@ -44,6 +44,11 @@ export default function TagsInput(props: SelectProps) {
   const [selected, setSelected] = useState<Tag[]>(props.defaultValue || []);
   const [inputValue, setInputValue] = useState("");
   const ref = React.useRef(null);
+  // Track if we're updating from internal changes to prevent infinite loops
+  const isInternalUpdate = useRef(false);
+  // Ref to hold current selected for comparison without adding to dependencies
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   useEffect(() => {
     const element = document.getElementById("next-button");
@@ -73,7 +78,13 @@ export default function TagsInput(props: SelectProps) {
       form.setFieldsValue({
         [fieldName]: updated,
       });
+    // Set flag before calling onChange to prevent the defaultValue sync from triggering
+    isInternalUpdate.current = true;
     props.onChange && props.onChange(updated);
+    // Reset flag after a tick to allow future external updates
+    setTimeout(() => {
+      isInternalUpdate.current = false;
+    }, 0);
   }, [selected]);
 
   const handleCreate = (inputValue) => {
@@ -100,10 +111,24 @@ export default function TagsInput(props: SelectProps) {
   };
 
   useEffect(() => {
-    if (props.defaultValue) {
-      setSelected(props.defaultValue);
+    // Skip if this is triggered by our own onChange callback
+    if (isInternalUpdate.current) {
+      return;
     }
-  }, []);
+
+    if (props.defaultValue) {
+      // Compare by tag names to avoid infinite loops from array reference changes
+      // Use ref to get current selected without adding it as a dependency
+      const currentSelected = selectedRef.current;
+      const selectedNames = currentSelected.map(t => t.name).sort().join(',');
+      const defaultNames = props.defaultValue.map(t => t.name).sort().join(',');
+
+      // Only update if the tags are actually different
+      if (selectedNames !== defaultNames) {
+        setSelected(props.defaultValue);
+      }
+    }
+  }, [props.defaultValue]);
 
   return (
     <Form.Item
@@ -210,10 +235,28 @@ export default function TagsInput(props: SelectProps) {
                 (tag) => tag.name === props.data.label,
               );
 
+              const handleOptionClick = (e: React.MouseEvent<HTMLDivElement>) => {
+                if (selectedTag) {
+                  // Tag is already selected, deselect it
+                  e.stopPropagation();
+                  setSelected(
+                    selected.filter(
+                      (item) => item.name !== props.data.label,
+                    ),
+                  );
+                } else {
+                  // Tag is not selected, select it via react-select's handler
+                  if (innerProps.onClick) {
+                    innerProps.onClick(e);
+                  }
+                }
+              };
+
               return (
                 <div
                   {...innerProps}
                   ref={innerRef}
+                  onClick={handleOptionClick}
                   className="flex items-center justify-between cursor-pointer mb-1 py-[.3rem] px-[.3rem] hover:bg-[#1F1F1F] rounded-[8px]"
                   style={{
                     backgroundColor: props.isFocused ? "#1F1F1F" : "transparent",
@@ -223,16 +266,6 @@ export default function TagsInput(props: SelectProps) {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                    }}
-                    onClick={(e) => {
-                      if (selectedTag) {
-                        e.stopPropagation();
-                        setSelected(
-                          selected.filter(
-                            (item) => item.name !== props.data.label,
-                          ),
-                        );
-                      }
                     }}
                   >
                     <div
@@ -268,7 +301,7 @@ export default function TagsInput(props: SelectProps) {
             },
           }}
         />
-        </FloatLabel>
+      </FloatLabel>
     </Form.Item>
   );
 }

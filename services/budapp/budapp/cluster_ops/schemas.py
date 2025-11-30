@@ -600,6 +600,7 @@ class RecommendedClusterRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     is_proprietary_model: bool
+    hardware_mode: Optional[str] = Field(default="dedicated", description="Hardware mode: dedicated or shared")
 
 
 class GrafanaDashboardResponse(SuccessResponse):

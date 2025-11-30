@@ -17,9 +17,7 @@ export default function IconRender({
 }) {
   const remSize = pxToRem(size || 28);
   const imageRemSize = pxToRem(imageSize || 18);
-  const iconImage = icon
-    ? `${assetBaseUrl}${icon}`
-    : (type == "hugging_face" || type == "cloud_model") && model
+  const iconImage = icon ? `${assetBaseUrl}${icon}` : (type == "hugging_face" || type == "cloud_model") && model
       ? `${assetBaseUrl}${model?.provider.icon}`
       : "";
   if (icon?.length <= 3) {

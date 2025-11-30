@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import DashBoardLayout from "../../layout";
 import { useEvaluations } from "src/hooks/useEvaluations";
@@ -90,6 +90,8 @@ const ExperimentDetailsPage = () => {
         experimentRuns,
         getExperimentDetails,
         getExperimentRuns,
+        experimentSummary,
+        getExperimentSummary,
     } = useEvaluations();
 
     // Use actual metrics from experimentDetails
@@ -109,8 +111,29 @@ const ExperimentDetailsPage = () => {
             // Fetch all experiment data
             getExperimentDetails(experimentId);
             getExperimentRuns(experimentId);
+            getExperimentSummary(experimentId)
         }
     }, [experimentId]);
+
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const scrollPositionRef = useRef(0);
+
+    const refreshETA = async() => {
+        const container = scrollContainerRef.current;
+        if (container) {
+            scrollPositionRef.current = container.scrollTop;
+        }
+        if (experimentId && typeof experimentId === "string") {
+            await getExperimentDetails(experimentId);
+            requestAnimationFrame(() => {
+                const container = scrollContainerRef.current;
+                if (container) {
+                    container.scrollTop = scrollPositionRef.current;
+                }
+            });
+
+        }
+    }
 
     if (loading) {
         return (
@@ -190,11 +213,11 @@ const ExperimentDetailsPage = () => {
                 <div className="border-b-[1px] border-b-[#2c2654] px-[1.15rem] py-[1.05rem] flex-shrink-0">
                     <ExperimentHeader />
                 </div>
-                <div className="w-full px-[3.6rem] flex-1 overflow-y-auto no-scrollbar">
+                <div className="w-full px-[3.6rem] flex-1 overflow-y-auto no-scrollbar" ref={scrollContainerRef}>
                     {/* Metrics Cards */}
                     <div className="w-full pt-[1.8rem]">
                         <div className="w-full flex justify-between items-center">
-                            <Text_28_600_FFFFFF>
+                            <Text_28_600_FFFFFF className="capitalize">
                                 {experimentDetails?.name || "Loading..."}
                             </Text_28_600_FFFFFF>
                             <PrimaryButton
@@ -253,8 +276,14 @@ const ExperimentDetailsPage = () => {
                                     color="#965CDE"
                                 />
                                 <MetricCard
+                                    title="Runs Count"
+                                    value={`${(experimentSummary?.total_evaluations || 0)}`}
+                                    subtitle="runs"
+                                    color="#965CDE"
+                                />
+                                <MetricCard
                                     title="Runtime"
-                                    value={`${Math.floor((experimentMetrics.runtime || 0) / 60)}h ${(experimentMetrics.runtime || 0) % 60}m`}
+                                    value={`${Math.floor((experimentSummary?.total_duration_seconds || 0) / 3600)}h ${Math.floor(((experimentSummary?.total_duration_seconds || 0)  % 3600) / 60)}m`}
                                     subtitle="total runtime"
                                     color="#965CDE"
                                 />
@@ -353,6 +382,7 @@ const ExperimentDetailsPage = () => {
                                             <BenchmarkProgress
                                                 key={benchmark.id}
                                                 benchmark={benchmark}
+                                                refreshETA={refreshETA}
                                             />
                                         );
                                     },

@@ -11,12 +11,11 @@ import dapr.ext.workflow as wf
 import requests
 from budmicroframe.commons import logging
 from budmicroframe.commons.config import app_settings
-from budmicroframe.commons.constants import NotificationCategory, NotificationType, WorkflowStatus
+from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.exceptions import ClientException
 from budmicroframe.commons.schemas import (
     ErrorResponse,
     NotificationContent,
-    NotificationPayload,
     NotificationRequest,
     SuccessResponse,
     WorkflowMetadataResponse,
@@ -53,7 +52,6 @@ from .schemas import (
     DeployModelWorkflowResult,
     RunPerformanceBenchmarkRequest,
     TransferModelRequest,
-    UpdateDeploymentStatusRequest,
     UpdateModelTransferStatusRequest,
     VerifyDeploymentHealthRequest,
     WorkerInfo,
@@ -256,6 +254,7 @@ class CreateDeploymentWorkflow:
                 namespace=existing_deployment_namespace,
                 default_storage_class=transfer_model_request_json.default_storage_class,
                 default_access_mode=transfer_model_request_json.default_access_mode,
+                storage_size_gb=transfer_model_request_json.storage_size_gb,
             )
             if status is not None:
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
@@ -791,6 +790,7 @@ class CreateDeploymentWorkflow:
             existing_deployment_namespace=deployment_request_json.existing_deployment_namespace,
             default_storage_class=getattr(deployment_request_json, "default_storage_class", None),
             default_access_mode=getattr(deployment_request_json, "default_access_mode", None),
+            storage_size_gb=getattr(deployment_request_json, "storage_size_gb", None),
         )
         transfer_model_result = yield ctx.call_activity(
             CreateDeploymentWorkflow.transfer_model, input=transfer_model_request.model_dump_json()
@@ -1820,10 +1820,13 @@ class DeleteDeploymentWorkflow:
             platform = db_cluster.platform
 
         with DBSession() as session:
-            worker_info_filters = {"namespace": namespace}
+            worker_info_filters = {"cluster_id": cluster_id, "namespace": namespace}
             workers_info, _ = asyncio.run(WorkerInfoDataManager(session).get_all_workers(filters=worker_info_filters))
             if workers_info:
                 asyncio.run(WorkerInfoDataManager(session).delete_worker_info(workers_info))
+                logger.info(
+                    f"Deleted {len(workers_info)} worker_info records for cluster {cluster_id}, namespace {namespace}"
+                )
 
         delete_namespace_request = DeleteNamespaceRequest(
             cluster_config=config_file_dict, namespace=namespace, platform=platform
@@ -1924,135 +1927,6 @@ class DeleteDeploymentWorkflow:
             target_name=request.source,
         )
         return response
-
-
-class UpdateDeploymentStatusWorkflow:
-    @dapr_workflows.register_workflow
-    @staticmethod
-    def update_deployment_status(ctx: wf.DaprWorkflowContext, update_deployment_request: str):
-        """Update the deployment status."""
-        logger = logging.get_logger("UpdateDeploymentStatus")
-        instance_id = str(ctx.instance_id)
-        logger.info(f"Updating deployment status for workflow_id: {instance_id}")
-        update_deployment_request_json = UpdateDeploymentStatusRequest.model_validate_json(update_deployment_request)
-
-        with DBSession() as session:
-            db_cluster = asyncio.run(
-                DeploymentService(session)._get_cluster(update_deployment_request_json.cluster_id, missing_ok=True)
-            )
-            platform = db_cluster.platform
-            if db_cluster is None:
-                return
-        deployment_handler = DeploymentHandler(config=db_cluster.config_file_dict)
-        try:
-            deployment_status = deployment_handler.get_deployment_status(
-                update_deployment_request_json.deployment_name,
-                db_cluster.ingress_url,
-                update_deployment_request_json.cloud_model,
-                platform,
-            )
-            logger.info(f"Update deployment status: {deployment_status}")
-            current_replica = deployment_status.get("replicas", {}).get("total", 0)
-            current_workers_info = deployment_status.get("worker_data_list", [])
-        except Exception as e:
-            logger.error(f"Error updating deployment status: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-            return
-
-        # get workers info from db
-        workers_info = []
-        prev_deployment_status = None
-        with DBSession() as session:
-            worker_info_filters = {
-                "cluster_id": update_deployment_request_json.cluster_id,
-                "namespace": update_deployment_request_json.deployment_name,
-            }
-            workers_info, _ = asyncio.run(WorkerInfoDataManager(session).get_all_workers(filters=worker_info_filters))
-            previous_replica = len(workers_info)
-            if workers_info:
-                prev_deployment_status = workers_info[0].deployment_status
-            workers_info_list = [
-                WorkerInfoModel(
-                    cluster_id=update_deployment_request_json.cluster_id,
-                    namespace=update_deployment_request_json.deployment_name,
-                    **worker,
-                    deployment_status=deployment_status["status"],
-                    last_updated_datetime=datetime.now(timezone.utc),
-                )
-                for worker in current_workers_info
-            ]
-            db_workers_info = asyncio.run(
-                WorkerInfoService(session).update_worker_info(
-                    workers_info_list, workers_info, update_deployment_request_json.cluster_id
-                )
-            )
-            logger.info(f"DB worker info list: {db_workers_info}")
-            if (
-                (prev_deployment_status is not None and deployment_status["status"] != prev_deployment_status)
-                or (prev_deployment_status is None and deployment_status)
-                or (current_replica != previous_replica)
-            ):
-                deployment_status["worker_data_list"] = [
-                    (WorkerInfo.model_validate(worker)).model_dump(mode="json") for worker in db_workers_info
-                ]
-                logger.info(f"Deployment status updated: {deployment_status['worker_data_list']}")
-                event_name = "deployment-status-update"
-                event_type = "results"
-                content = NotificationContent(
-                    title="Deployment status updated",
-                    message=f"Deployment {update_deployment_request_json.deployment_name} status update",
-                    status=WorkflowStatus.COMPLETED,
-                    result={
-                        "deployment_name": update_deployment_request_json.deployment_name,
-                        "cluster_id": str(update_deployment_request_json.cluster_id),
-                        **deployment_status,
-                    },
-                )
-                notification_request = NotificationRequest(
-                    notification_type=NotificationType.EVENT,
-                    name=event_name,
-                    payload=NotificationPayload(
-                        category=NotificationCategory.INTERNAL,
-                        type=event_name,
-                        event=event_type,
-                        content=content,
-                        workflow_id=instance_id,
-                    ),
-                    topic_keys=["budAppMessages"],
-                )
-                with DaprService() as dapr_service:
-                    dapr_service.publish_to_topic(
-                        data=notification_request.model_dump(mode="json"),
-                        target_topic_name="budAppMessages",
-                        target_name=None,
-                        event_type=notification_request.payload.type,
-                    )
-                logger.info(f"Deployment update notification sent: {notification_request}")
-                # yield ctx.call_activity(notify_activity, input=notification_activity_request.model_dump_json())
-        yield ctx.create_timer(fire_at=ctx.current_utc_datetime + timedelta(minutes=3))
-        ctx.continue_as_new(update_deployment_request)
-
-    async def __call__(
-        self, request: str, workflow_id: Optional[str] = None
-    ) -> Union[WorkflowMetadataResponse, ErrorResponse]:
-        """Schedule the workflow to update the deployment status."""
-        return await dapr_workflows.schedule_workflow(
-            workflow_name="update_deployment_status",
-            workflow_input=request,
-            workflow_id=str(workflow_id or uuid.uuid4()),
-            workflow_steps=[
-                WorkflowStep(
-                    id="update_deployment_status",
-                    title="Updating deployment status",
-                    description="Update the deployment status",
-                ),
-            ],
-            eta=1 * 30,
-            target_topic_name=None,
-            target_name=None,
-        )
 
 
 class DeleteWorkerWorkflow:

@@ -48,6 +48,8 @@ spec:
             value: http://{{ .Release.Name }}-budapp:9082
           - name: NEXT_PUBLIC_COPY_CODE_API_BASE_URL
             value: http://{{ .Release.Name }}-budgateway:3000/v1/
+          - name: NEXT_PUBLIC_TEMP_API_ASSET_URL
+            value: {{ include "bud.ingress.url.budapp" $ }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budplayground.env }}
           - name: {{ $key }}

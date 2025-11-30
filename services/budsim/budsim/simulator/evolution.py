@@ -22,7 +22,7 @@ logger = logging.get_logger(__name__)
 @dataclass
 class EvaluationResult:
     config: Dict[str, Any]
-    kv_cache_memory: float
+    total_memory: float
     ttft: float
     e2e_latency: float
     throughput_per_user: float
@@ -30,6 +30,8 @@ class EvaluationResult:
     fitness: Tuple[float, float, float]
     error_rate: float
     cost_per_million_tokens: float
+    weight_memory: float = 0.0
+    kv_cache_memory: float = 0.0
 
 
 class Evolution:
@@ -801,6 +803,8 @@ class Evolution:
                 fitness,
                 error_rate,
                 cost_per_million_tokens,
+                weight_memory=data["weight_memory_per_gpu"],
+                kv_cache_memory=data["kv_cache_memory_per_gpu"],
             )
             self.evaluated_configs[config_tuple] = eval_result
             ind.fitness.values = fitness

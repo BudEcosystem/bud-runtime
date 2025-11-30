@@ -7,16 +7,14 @@ spec:
   version: v1
   metadata:
   - name: schedule
-    value: "@every 3m" # Every 3 minutes
+    value: "@every 10m" # Every 10 minutes
   - name: direction
     value: "input"
   - name: route
     value: "/cluster/periodic-node-status-update"
 scopes:
   - budcluster
-
 ---
-
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
@@ -38,6 +36,24 @@ scopes:
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
+  name: periodic-deployment-status-update
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 3m" # Every 3 minutes
+  - name: direction
+    value: "input"
+  - name: route
+    value: "/deployment/periodic-deployment-status-update"
+scopes:
+  - budcluster
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
   name: cluster-recommended-scheduler
 spec:
   type: bindings.cron
@@ -51,9 +67,7 @@ spec:
     value: "/clusters/recommended-scheduler"
 scopes:
   - budapp
-
 ---
-
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
@@ -70,3 +84,21 @@ spec:
     value: "/v1/prompt/prompt-cleanup-cron"
 scopes:
   - budprompt
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: leaderboard-extraction-scheduler
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 168h"  # Every 7 days (7 * 24 hours)
+  - name: direction
+    value: "input"
+  - name: route
+    value: "/leaderboard/extraction-cron"
+scopes:
+  - budmodel

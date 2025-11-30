@@ -85,7 +85,7 @@ class EvaluationWorkflow:
 
         # Set initial ETA
         notification_req.payload.event = "eta"
-        eta_minutes = 30 * 60 * len(evaluate_model_request_json.eval_datasets)
+        eta_minutes = 3 * 60
         notification_req.payload.content = NotificationContent(
             title="Estimated time to completion",
             message=f"{eta_minutes}",
@@ -323,24 +323,21 @@ class EvaluationWorkflow:
 
         # ====================  Start Monitoring For Each Job   ====================
 
-        # Notification
-        notification_req.payload.event = "monitor_eval_job_progress"
-        notification_req.payload.content = NotificationContent(
-            title="Waiting for evaluation to complete",
-            message=f"Waiting for evaluation to complete for {len(run_ids)} jobs",
-            status=WorkflowStatus.RUNNING,
-        )
-        dapr_workflows.publish_notification(
-            workflow_id=instance_id,
-            notification=notification_req,
-            target_topic_name=evaluate_model_request_json.source_topic,
-            target_name=evaluate_model_request_json.source,
-        )
+        # NOTE: Initial static notification removed - now sending real-time progress updates every 30s from monitoring workflow
+
+        from budeval.commons.storage_config import StorageConfig
 
         monitor_input = {
             "job_ids": run_ids,
             "poll_interval": 30,  # keep it simple
             "max_attempts": 1000,  # ~2h cap
+            "kubeconfig": None,  # Will use default kubeconfig resolution
+            "namespace": StorageConfig.get_current_namespace(),
+            # NEW: Pass notification metadata for child workflow to use
+            "workflow_id": instance_id,
+            "source_topic": evaluate_model_request_json.source_topic,
+            "evaluate_model_request_json_raw": evaluate_model_request_json.model_dump(mode="json"),
+            "source": evaluate_model_request_json.source,
         }
 
         monitoring_result = yield ctx.call_child_workflow(

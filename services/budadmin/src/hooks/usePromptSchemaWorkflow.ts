@@ -1,7 +1,16 @@
 import { useSocket } from "@novu/notification-center";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { AppRequest } from "src/pages/api/requests";
+import { tempApiBaseUrl } from "@/components/environment";
 
 export type WorkflowStatus = 'idle' | 'loading' | 'success' | 'failed';
+
+interface WorkflowStep {
+  id: string;
+  title: string;
+  payload: any;
+  description: string;
+}
 
 interface UsePromptSchemaWorkflowProps {
   workflowId?: string;
@@ -12,6 +21,11 @@ interface UsePromptSchemaWorkflowProps {
 /**
  * Hook to handle prompt schema workflow status via socket notifications
  * Based on the pattern from CommonStatus.tsx
+ *
+ * Workflow structure:
+ * - events_field_id: 'prompt_schema_events'
+ * - success_payload_type: 'perform_prompt_schema'
+ * - Step IDs: validation, code_generation, save_prompt_configuration
  */
 export const usePromptSchemaWorkflow = ({
   workflowId,
@@ -19,7 +33,51 @@ export const usePromptSchemaWorkflow = ({
   onFailed,
 }: UsePromptSchemaWorkflowProps = {}) => {
   const [status, setStatus] = useState<WorkflowStatus>('idle');
+  const [steps, setSteps] = useState<WorkflowStep[]>([]);
+  const [loading, setLoading] = useState(false);
   const { socket } = useSocket();
+  const timeoutRef = useRef<number | null>(null);
+
+  // Fetch workflow data when workflowId changes
+  useEffect(() => {
+    if (!workflowId || loading) return;
+
+    const getWorkflow = async () => {
+      setSteps([]);
+      setLoading(true);
+
+      try {
+        console.log(`[usePromptSchemaWorkflow] Fetching workflow: ${workflowId}`);
+        const response: any = await AppRequest.Get(`${tempApiBaseUrl}/workflows/${workflowId}`);
+        const data = response?.data;
+
+        if (data?.workflow_steps?.prompt_schema_events) {
+          const workflowSteps = data.workflow_steps.prompt_schema_events.steps || [];
+          console.log(`[usePromptSchemaWorkflow] Loaded ${workflowSteps.length} steps:`, workflowSteps);
+          setSteps(workflowSteps);
+
+          // Check if workflow is already completed/failed
+          const workflowStatus = data.workflow_steps.prompt_schema_events.status;
+          if (workflowStatus === 'COMPLETED') {
+            console.log(`[usePromptSchemaWorkflow] Workflow already completed`);
+            setStatus('success');
+          } else if (workflowStatus === 'FAILED') {
+            console.log(`[usePromptSchemaWorkflow] Workflow already failed`);
+            setStatus('failed');
+          }
+        } else {
+          console.warn(`[usePromptSchemaWorkflow] No prompt_schema_events found in workflow response`);
+        }
+      } catch (error) {
+        console.error('[usePromptSchemaWorkflow] Error fetching workflow:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getWorkflow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflowId]);
 
   const handleNotification = useCallback(async (data: any) => {
     try {
@@ -27,35 +85,64 @@ export const usePromptSchemaWorkflow = ({
         return;
       }
 
-      // Filter by workflow_id if provided
-      if (workflowId && data.message.payload.workflow_id !== workflowId) {
+      const payload = data.message.payload;
+
+      // Only process events if we have a workflowId AND it matches the payload
+      // This ensures each handler only processes events for its own workflow
+      if (!workflowId || payload.workflow_id !== workflowId) {
         return;
       }
 
+      console.log(`[usePromptSchemaWorkflow] Received notification:`, {
+        type: payload.type,
+        category: payload.category,
+        event: payload.event,
+        status: payload.content?.status,
+        workflow_id: payload.workflow_id,
+      });
+
       // Handle prompt schema workflow events
-      // Adjust the type based on actual backend event type
-      if (data.message.payload.type === 'prompt_schema_workflow' && data.message.payload.category === "internal") {
-        const eventStatus = data.message.payload.content?.status;
+      // Type should be 'perform_prompt_schema' based on actual socket events
+      if (payload.type === 'perform_prompt_schema' && payload.category === "internal") {
+        console.log(`[usePromptSchemaWorkflow] Processing perform_prompt_schema event`);
+
+        // Update steps based on the event
+        setSteps(prevSteps => {
+          const newSteps = prevSteps.map((step) =>
+            payload.event === step.id &&
+            (step.payload?.content?.status !== "COMPLETED" && step.payload?.content?.status !== "FAILED")
+              ? { ...step, payload: payload }
+              : step
+          );
+          console.log(`[usePromptSchemaWorkflow] Updated steps:`, newSteps.map(s => ({
+            id: s.id,
+            status: s.payload?.content?.status
+          })));
+          return newSteps;
+        });
+
+        // Update overall status
+        const eventStatus = payload.content?.status;
 
         if (eventStatus === 'RUNNING' || eventStatus === 'IN_PROGRESS') {
           setStatus('loading');
-        } else if (eventStatus === 'COMPLETED' || data.message.payload.event === 'results') {
+        }
+
+        // Check for completion
+        if (payload.event === "results" && eventStatus === "COMPLETED") {
           setStatus('success');
-          if (onCompleted) {
-            // Add a small delay before callback
-            setTimeout(() => {
-              onCompleted();
-            }, 1000);
-          }
-        } else if (eventStatus === 'FAILED') {
+          onCompleted?.();
+        }
+
+        // Check for failure
+        if (eventStatus === "FAILED") {
+          console.log(`[usePromptSchemaWorkflow] Workflow failed`);
           setStatus('failed');
-          if (onFailed) {
-            onFailed();
-          }
+          onFailed?.();
         }
       }
     } catch (error) {
-      console.error('Error handling prompt schema workflow notification:', error);
+      console.error('[usePromptSchemaWorkflow] Error handling notification:', error);
     }
   }, [workflowId, onCompleted, onFailed]);
 
@@ -67,6 +154,9 @@ export const usePromptSchemaWorkflow = ({
     return () => {
       if (socket) {
         socket.off("notification_received");
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [socket, handleNotification]);
@@ -81,6 +171,24 @@ export const usePromptSchemaWorkflow = ({
     setStatus('loading');
   }, []);
 
+  // Method to manually set success status (for operations without workflow events)
+  const setSuccess = useCallback(() => {
+    setStatus('success');
+    // Auto-reset after 3 seconds
+    timeoutRef.current = window.setTimeout(() => {
+      setStatus('idle');
+    }, 3000);
+  }, []);
+
+  // Method to manually set failed status (for operations without workflow events)
+  const setFailed = useCallback(() => {
+    setStatus('failed');
+    // Auto-reset after 3 seconds
+    timeoutRef.current = window.setTimeout(() => {
+      setStatus('idle');
+    }, 3000);
+  }, []);
+
   return {
     status,
     isLoading: status === 'loading',
@@ -88,5 +196,8 @@ export const usePromptSchemaWorkflow = ({
     isFailed: status === 'failed',
     resetStatus,
     startWorkflow,
+    setSuccess,
+    setFailed,
+    steps, // Expose steps for debugging if needed
   };
 };

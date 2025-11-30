@@ -13,6 +13,7 @@ from budapp.eval_ops.models import RunStatusEnum
 # ------------------------ Summary Schemas for Experiments ------------------------
 
 
+# Update
 class ModelSummary(BaseModel):
     """Summary of a model used in an experiment."""
 
@@ -27,6 +28,15 @@ class TraitSummary(BaseModel):
     id: UUID4 = Field(..., description="The UUID of the trait.")
     name: str = Field(..., description="The name of the trait.")
     icon: Optional[str] = Field(None, description="The icon for the trait.")
+
+
+class ExperimentModelListItem(BaseModel):
+    """Model item for filtering experiments."""
+
+    id: UUID4 = Field(..., description="The UUID of the model.")
+    name: str = Field(..., description="The name of the model.")
+    deployment_name: Optional[str] = Field(None, description="The deployment name/namespace if deployed.")
+    experiment_count: int = Field(..., description="Number of experiments using this model.")
 
 
 # ------------------------ New Experiment Detail Schemas ------------------------
@@ -222,7 +232,7 @@ class Experiment(BaseModel):
     tag_objects: Optional[List["EvalTag"]] = Field(None, description="Complete tag objects with details.")
     status: Optional[str] = Field(
         None,
-        description="Computed status based on runs (running/failed/completed/pending/no_runs).",
+        description="Computed status based on runs (running/completed/no_runs).",
     )
     models: Optional[List[ModelSummary]] = Field(default_factory=list, description="Models used in the experiment.")
     traits: Optional[List[TraitSummary]] = Field(
@@ -304,6 +314,13 @@ class DeleteExperimentResponse(SuccessResponse):
     """Response schema for deleting an experiment."""
 
     pass
+
+
+class ListExperimentModelsResponse(SuccessResponse):
+    """Response for listing models used in experiments."""
+
+    models: List[ExperimentModelListItem] = Field(..., description="List of models used in experiments.")
+    total_count: int = Field(..., description="Total number of unique models.")
 
 
 # ------------------------ Run Schemas ------------------------
@@ -598,6 +615,20 @@ class ExpDataset(BaseModel):
         None,
         description="Evaluation type configurations like {'gen': 'gsm8k_gen', 'agent': 'gsm8k_agent'}.",
     )
+    why_run_this_eval: Optional[List[str]] = Field(
+        None,
+        description="List of reasons why running this evaluation is valuable and what insights it provides.",
+    )
+    what_to_expect: Optional[List[str]] = Field(
+        None,
+        description="List of expectations when evaluating this dataset, including patterns, trends, and characteristics.",
+    )
+    additional_info: Optional[dict] = Field(
+        None,
+        description="Additional metadata including top_5_task_types, top_5_domains, top_5_skills, top_5_concepts, top_5_qualifications, top_5_languages, age_distribution, and evaluation_description.",
+    )
+    metrics: Optional[List[str]] = Field(None, description="List of metric names (e.g., ['accuracy']).")
+    evaluator: Optional[str] = Field(None, description="Evaluator class name (e.g., 'GPQAEvaluator').")
     traits: List[Trait] = Field([], description="Traits associated with this dataset.")
 
     class Config:
@@ -624,7 +655,9 @@ class ListDatasetsResponse(SuccessResponse):
 class DatasetFilter(BaseModel):
     """Filter parameters for dataset listing."""
 
-    name: Optional[str] = Field(None, description="Filter by dataset name (case-insensitive substring).")
+    name: Optional[str] = Field(
+        None, description="Search in dataset name and description (case-insensitive substring)."
+    )
     modalities: Optional[List[str]] = Field(None, description="Filter by modalities.")
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
@@ -658,6 +691,8 @@ class CreateDatasetRequest(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    metrics: Optional[List[str]] = Field(None, description="List of metric names (e.g., ['accuracy']).")
+    evaluator: Optional[str] = Field(None, description="Evaluator class name (e.g., 'GPQAEvaluator').")
     trait_ids: Optional[List[UUID4]] = Field([], description="List of trait IDs to associate with the dataset.")
 
 
@@ -684,6 +719,8 @@ class UpdateDatasetRequest(BaseModel):
         None,
         description="Advantages and disadvantages with structure {'advantages': ['str1'], 'disadvantages': ['str2']}.",
     )
+    metrics: Optional[List[str]] = Field(None, description="List of metric names (e.g., ['accuracy']).")
+    evaluator: Optional[str] = Field(None, description="Evaluator class name (e.g., 'GPQAEvaluator').")
     trait_ids: Optional[List[UUID4]] = Field(None, description="List of trait IDs to associate with the dataset.")
 
 
@@ -940,3 +977,58 @@ class RunHistoryResponse(SuccessResponse):
     """Response for run history endpoint."""
 
     runs_history: RunHistoryData = Field(..., description="Run history data")
+
+
+# ------------------------ Dataset Scores Schemas ------------------------
+
+
+class MetricValue(BaseModel):
+    """Individual metric value."""
+
+    metric_name: str = Field(..., description="Name of the metric (e.g., accuracy, f1_score)")
+    metric_value: float = Field(..., description="Value of the metric")
+
+
+class DatasetModelScore(BaseModel):
+    """Individual model score for a dataset."""
+
+    rank: int = Field(..., description="Ranking by accuracy (1=best)")
+    model_id: UUID4 = Field(..., description="UUID of the model")
+    model_name: str = Field(..., description="Model name")
+    model_display_name: Optional[str] = Field(None, description="Model display name")
+    model_icon: Optional[str] = Field(None, description="Model icon URL")
+    endpoint_name: str = Field(..., description="Endpoint/deployment name")
+    accuracy: Optional[float] = Field(None, description="Accuracy metric used for ranking")
+    metrics: List[MetricValue] = Field(default_factory=list, description="All averaged metrics")
+    num_runs: int = Field(..., description="Number of runs averaged")
+    created_at: datetime = Field(..., description="Creation timestamp from most recent run")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class DatasetScoresResponse(PaginatedSuccessResponse):
+    """Response for dataset scores endpoint."""
+
+    dataset_id: UUID4 = Field(..., description="UUID of the dataset")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    scores: List[DatasetModelScore] = Field(default_factory=list, description="List of model scores")
+
+
+class ExperimentSummary(BaseModel):
+    """Summary statistics for an experiment."""
+
+    total_evaluations: int = Field(..., description="Total number of evaluations in the experiment")
+    total_duration_seconds: int = Field(..., description="Total duration of all evaluations in seconds")
+    completed_evaluations: int = Field(..., description="Number of completed evaluations")
+    failed_evaluations: int = Field(..., description="Number of failed evaluations")
+    pending_evaluations: int = Field(..., description="Number of pending evaluations")
+    running_evaluations: int = Field(..., description="Number of currently running evaluations")
+
+
+class ExperimentSummaryResponse(SuccessResponse):
+    """Response for experiment summary endpoint."""
+
+    summary: ExperimentSummary = Field(..., description="Experiment summary data")

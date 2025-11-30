@@ -206,6 +206,7 @@ class HeuristicCalculator:
             seq_length=seq_length,
             precision=self._get_precision_bits(model_params),
             tensor_parallel=tp_size,  # Pass TP to get per-device memory
+            respect_weight_tying=False,
         )
 
         # Memory per device - already calculated correctly by calculate_memory with TP
@@ -216,8 +217,23 @@ class HeuristicCalculator:
         if available_memory_gb is None:
             raise ValueError("memory_in_GB not provided in model_params")
 
-        # Check if it fits (with some margin)
-        valid = total_memory_per_device_gb < available_memory_gb * 0.95
+        # Apply tiered buffer matching budcluster's allocation logic
+        # BudCluster adds: 1GB if memory ≤ 10GB, 2GB if memory > 10GB
+        buffer_gb = 1 if total_memory_per_device_gb <= 10 else 2
+
+        # Subtract buffer from available memory, then apply 95% safety margin
+        # This ensures: (required + buffer) < available * 0.95
+        usable_memory_gb = available_memory_gb - buffer_gb
+        threshold_memory_gb = usable_memory_gb * 0.95
+        valid = total_memory_per_device_gb < threshold_memory_gb
+
+        logger.debug(
+            f"Memory validation with buffer: required={total_memory_per_device_gb:.2f}GB, "
+            f"available={available_memory_gb:.2f}GB, buffer={buffer_gb}GB, "
+            f"usable={usable_memory_gb:.2f}GB, threshold(95%)={threshold_memory_gb:.2f}GB, "
+            f"valid={valid} (required < threshold), "
+            f"TP={tp_size}, PP={pp_size}, batch={batch_size}"
+        )
 
         return {
             "valid": valid,
@@ -300,6 +316,7 @@ class HeuristicCalculator:
                     seq_length=seq_length,
                     precision=self._get_precision_bits(model_params),
                     tensor_parallel=tp_size,  # Pass TP to get per-device memory
+                    respect_weight_tying=False,
                 )
                 # Cache the result
                 self._memory_cache[cache_key] = memory_report

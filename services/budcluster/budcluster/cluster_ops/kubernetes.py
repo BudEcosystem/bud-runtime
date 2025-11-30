@@ -1,13 +1,18 @@
+import asyncio
 import json
 import re
+import subprocess
+import tempfile
 import time
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Union
+from typing import Any, AsyncGenerator, Dict, List, Union
 from urllib.parse import urlparse
 from uuid import UUID
 
 import requests
+import yaml
 from budmicroframe.commons.logging import get_logger
 from kubernetes import client, config
 
@@ -62,6 +67,11 @@ class KubernetesHandler(BaseClusterHandler):
             # Disable SSL cert validation and hostname verification
             self.api_configuration.verify_ssl = app_settings.validate_certs
 
+            # Set connection and read timeout to prevent indefinite blocking
+            # This prevents hanging when clusters are unreachable
+            # Format: (connect_timeout, read_timeout) in seconds
+            self.api_configuration.timeout = (30, 30)  # 30 seconds for connect and read
+
             # Store an API client instance for this configuration
             self.api_client = client.ApiClient(self.api_configuration)
 
@@ -74,7 +84,6 @@ class KubernetesHandler(BaseClusterHandler):
             raise KubernetesException("Found error while loading Kubernetes config file") from err
 
     def _get_container_status(self, container_name: str, node: Dict[str, Any]) -> str:
-        print(node["status"])
         if "containerStatuses" in node["status"]:
             for container in node["status"]["containerStatuses"]:
                 if container_name in container["name"]:
@@ -896,8 +905,13 @@ class KubernetesHandler(BaseClusterHandler):
                                 created_datetime=start_time,
                                 last_restart_datetime=last_restart_datetime or start_time,
                                 node_ip=pod["status"]["hostIP"],
-                                cores=int(pod["spec"]["containers"][0]["resources"]["requests"].get("cpu", 0)),
-                                memory=pod["spec"]["containers"][0]["resources"]["requests"].get("memory", "0"),
+                                cores=int(
+                                    pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)
+                                ),
+                                memory=pod["spec"]["containers"][0]
+                                .get("resources", {})
+                                .get("requests", {})
+                                .get("memory", "0"),
                                 deployment_name=deploy_info["metadata"]["name"],
                                 concurrency=int(pod["metadata"]["labels"].get("concurrency") or 100),
                                 reason=reason,
@@ -957,14 +971,42 @@ class KubernetesHandler(BaseClusterHandler):
 
         return replicas
 
-    def get_deployment_status(self, values: dict, cloud_model: bool = False, ingress_health: bool = True) -> str:
+    def get_deployment_status(
+        self, values: dict, cloud_model: bool = False, ingress_health: bool = True, check_pods: bool = True
+    ) -> str:
         """Get the status of a deployment on the Kubernetes cluster."""
         logger.info(
             f"get_deployment_status called for {values.get('namespace', 'unknown')}: "
-            f"cloud_model={cloud_model}, ingress_health={ingress_health}"
+            f"cloud_model={cloud_model}, ingress_health={ingress_health}, check_pods={check_pods}"
         )
         if not self.ingress_url:
             raise KubernetesException("Ingress URL is not set")
+
+        # Optimization: Skip pod checks if check_pods is False
+        if not check_pods:
+            if not ingress_health:
+                # If both are False, we can't determine status
+                logger.warning("Both check_pods and ingress_health are False, returning unknown status")
+                return {
+                    "status": DeploymentStatusEnum.UNKNOWN,
+                    "replicas": {},
+                    "ingress_health": False,
+                    "worker_data_list": None,
+                }
+
+            # Only check ingress health
+            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            status = DeploymentStatusEnum.COMPLETED if ingress_healthy else DeploymentStatusEnum.FAILED
+            logger.info(
+                f"Optimized status check for {values['namespace']}: {status} (ingress_healthy={ingress_healthy})"
+            )
+
+            return {
+                "status": status,
+                "replicas": {},
+                "ingress_health": ingress_healthy,
+                "worker_data_list": None,  # Return None to indicate no worker data update
+            }
 
         while True:
             result = self.ansible_executor.run_playbook(
@@ -1215,8 +1257,8 @@ class KubernetesHandler(BaseClusterHandler):
             created_datetime=start_time,
             last_restart_datetime=last_restart_datetime or start_time,
             node_ip=pod["status"]["hostIP"],
-            cores=int(pod["spec"]["containers"][0]["resources"]["requests"].get("cpu", 0)),
-            memory=pod["spec"]["containers"][0]["resources"]["requests"].get("memory", 0),
+            cores=int(pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)),
+            memory=pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("memory", 0),
             deployment_name="litellm-container"
             if pod["metadata"]["name"].startswith("litellm-container")
             else "bud-runtime-container",
@@ -1527,3 +1569,141 @@ class KubernetesHandler(BaseClusterHandler):
         except Exception as err:
             logger.error(f"Error while fetching storage classes: {err}")
             raise KubernetesException("Failed to fetch storage classes") from err
+
+    @asynccontextmanager
+    async def create_port_forward(
+        self, service_name: str, namespace: str, target_port: int, label: str = ""
+    ) -> AsyncGenerator[int, None]:
+        """Create a port-forward to a Kubernetes service.
+
+        This method establishes a kubectl port-forward tunnel from localhost to a
+        service running in the target cluster. It writes the kubeconfig to a temporary
+        file, finds an available local port, and manages the port-forward process lifecycle.
+
+        Args:
+            service_name: Name of the Kubernetes service to forward to
+            namespace: Kubernetes namespace where the service is located
+            target_port: Target port on the service
+            label: Optional label for logging (e.g., "Prometheus", "HAMI")
+
+        Yields:
+            Local port number where the service is accessible
+
+        Raises:
+            KubernetesException: If port-forward fails to start
+
+        Example:
+            async with handler.create_port_forward("prometheus", "monitoring", 9090, "Prometheus") as local_port:
+                url = f"http://localhost:{local_port}/api/v1/query"
+                # Use the port...
+        """
+        # Write kubeconfig to temporary file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            if isinstance(self.config, dict):
+                yaml.dump(self.config, f)
+            else:
+                f.write(self.config)
+            kubeconfig_path = f.name
+
+        port_forward_process = None
+        local_port = None
+
+        try:
+            # Find an available local port
+            import socket
+
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("", 0))
+                local_port = s.getsockname()[1]
+
+            # Execute port-forward subprocess
+            port_forward_process = await self._execute_port_forward_subprocess(
+                kubeconfig_path, service_name, namespace, local_port, target_port, label
+            )
+
+            yield local_port
+
+        finally:
+            # Clean up port-forward process
+            self._cleanup_port_forward_subprocess(port_forward_process, label)
+
+            # Clean up temporary kubeconfig file
+            import os
+            from contextlib import suppress
+
+            with suppress(Exception):
+                os.unlink(kubeconfig_path)
+
+    async def _execute_port_forward_subprocess(
+        self,
+        kubeconfig_path: str,
+        service_name: str,
+        namespace: str,
+        local_port: int,
+        target_port: int,
+        label: str = "",
+    ) -> subprocess.Popen:
+        """Execute kubectl port-forward command and return the process.
+
+        Args:
+            kubeconfig_path: Path to temporary kubeconfig file
+            service_name: Name of the Kubernetes service
+            namespace: Kubernetes namespace
+            local_port: Local port to forward to
+            target_port: Target port on the service
+            label: Optional label for logging
+
+        Returns:
+            subprocess.Popen: The port-forward process
+
+        Raises:
+            KubernetesException: If port-forward fails to start
+        """
+        cmd = [
+            "kubectl",
+            f"--kubeconfig={kubeconfig_path}",
+        ]
+
+        # Add insecure flag if SSL verification is disabled
+        if not app_settings.validate_certs:
+            cmd.append("--insecure-skip-tls-verify")
+
+        cmd.extend(
+            [
+                "port-forward",
+                f"service/{service_name}",
+                f"{local_port}:{target_port}",
+                "-n",
+                namespace,
+            ]
+        )
+
+        log_prefix = f"{label} " if label else ""
+        logger.info(f"Creating {log_prefix}port-forward from localhost:{local_port} to {service_name}:{target_port}")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Wait for port-forward to be ready
+        await asyncio.sleep(2)
+
+        # Check if process is still running
+        if process.poll() is not None:
+            stderr = process.stderr.read().decode() if process.stderr else ""
+            raise KubernetesException(f"{log_prefix}port-forward failed to start: {stderr}")
+
+        return process
+
+    def _cleanup_port_forward_subprocess(self, process: subprocess.Popen, label: str = "") -> None:
+        """Clean up the port-forward subprocess.
+
+        Args:
+            process: The subprocess.Popen instance to clean up
+            label: Optional label for logging
+        """
+        if process:
+            log_prefix = f"{label} " if label else ""
+            logger.info(f"Cleaning up {log_prefix}port-forward")
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()

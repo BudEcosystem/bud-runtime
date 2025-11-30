@@ -11,10 +11,10 @@ import { useProjects } from "src/hooks/useProjects";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import { usePromptsAgents } from "@/stores/usePromptsAgents";
 import { useAddAgent } from "@/stores/useAddAgent";
-import { useRouter } from "next/router";
+import { useAgentStore } from "@/stores/useAgentStore";
+import { updateQueryParams } from "@/utils/urlUtils";
 
 export default function SelectProject() {
-  const router = useRouter();
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -32,6 +32,17 @@ export default function SelectProject() {
     setSelectedProject: setStoreSelectedProject,
     loading: workflowLoading
   } = useAddAgent();
+
+  // Clear any leftover agent sessions from previous add-agent flows
+  // This ensures a fresh start for every new add-agent flow
+  // Only clear if there's no currentWorkflow (i.e., starting a new flow, not navigating back)
+  // Note: Does not affect edit/version modes since they don't use SelectProject
+  useEffect(() => {
+    const { currentWorkflow } = useAddAgent.getState();
+    if (!currentWorkflow) {
+      useAgentStore.getState().resetSessionState();
+    }
+  }, []);
 
   // Fetch projects on component mount and when search changes
   useEffect(() => {
@@ -68,36 +79,9 @@ export default function SelectProject() {
 
       // Update URL with workflow ID
       if (workflowId) {
-        // Build URL manually to avoid encoding issues
-        // Use window.location.pathname to get the actual browser URL (not router.pathname which includes /home)
-        const currentPath = window.location.pathname;
-        const queryParts: string[] = [];
-
-        // Add all existing query params except 'agent'
-        Object.entries(router.query).forEach(([key, value]) => {
-          if (key !== 'agent' && value) {
-            // Don't encode commas in prompt parameter
-            if (key === 'prompt') {
-              queryParts.push(`${key}=${value}`);
-            } else {
-              queryParts.push(`${key}=${encodeURIComponent(String(value))}`);
-            }
-          }
-        });
-
-        // Add new agent param
-        queryParts.push(`agent=${workflowId}`);
-
-        // Build the final URL
-        const newUrl = queryParts.length > 0
-          ? `${currentPath}?${queryParts.join('&')}`
-          : currentPath;
-
-        // Use window.history.replaceState to update URL
-        window.history.replaceState(
-          { ...window.history.state },
-          '',
-          newUrl
+        updateQueryParams(
+          { agent: workflowId },
+          { replaceHistory: true }
         );
 
         console.log('Updated URL with workflow ID:', workflowId);

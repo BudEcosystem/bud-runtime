@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 interface ToolsContextType {
   isOpen: boolean;
@@ -17,7 +18,16 @@ const ToolsContext = createContext<ToolsContextType>({
 });
 
 export const ToolsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Auto-open sidebar if connector parameter is in URL
+  useEffect(() => {
+    const connectorId = searchParams?.get('connector');
+    if (connectorId) {
+      setIsOpen(true);
+    }
+  }, [searchParams]);
 
   const openTools = useCallback(() => {
     setIsOpen(true);

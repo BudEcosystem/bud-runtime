@@ -4,6 +4,7 @@ This module defines the standard Prometheus queries that are collected from each
 Queries can be customized per cluster type or overridden via environment variables.
 """
 
+import os
 from typing import Dict, List
 
 
@@ -138,6 +139,20 @@ QUERY_CATEGORIES: Dict[str, List[str]] = {
         "DCGM_FI_DEV_GPU_TEMP",
         "DCGM_FI_DEV_POWER_USAGE",
     ],
+    "hami_gpu": [
+        # HAMI device-level allocation metrics
+        "GPUDeviceCoreAllocated",
+        "GPUDeviceMemoryAllocated",
+        "GPUDeviceSharedNum",
+        "GPUDeviceCoreLimit",
+        "GPUDeviceMemoryLimit",
+        # HAMI vGPU pod-level allocation metrics
+        "vGPUCoreAllocated",
+        "vGPUMemoryAllocated",
+        # HAMI device overview metrics
+        "nodeGPUOverview",
+        "nodeGPUMemoryPercentage",
+    ],
 }
 
 
@@ -171,3 +186,51 @@ def get_queries_by_categories(categories: List[str]) -> List[str]:
             unique_queries.append(query)
 
     return unique_queries
+
+
+def is_hami_metrics_enabled() -> bool:
+    """Check if HAMI GPU metrics collection is enabled.
+
+    Returns:
+        True if HAMI metrics are enabled, False otherwise
+
+    Example:
+        >>> is_hami_metrics_enabled()  # Returns based on env var
+        True
+    """
+    return os.getenv("ENABLE_HAMI_METRICS", "true").lower() == "true"
+
+
+def get_hami_scheduler_port() -> int:
+    """Get the HAMI scheduler service port for metrics scraping.
+
+    Returns:
+        Port number for HAMI scheduler metrics endpoint (default: 31993)
+
+    Example:
+        >>> get_hami_scheduler_port()
+        31993
+    """
+    try:
+        return int(os.getenv("HAMI_SCHEDULER_PORT", "31993"))
+    except ValueError:
+        return 31993
+
+
+def get_queries_with_hami(base_queries: List[str]) -> List[str]:
+    """Get queries with HAMI metrics added if enabled.
+
+    Args:
+        base_queries: Base list of queries to extend
+
+    Returns:
+        Base queries with HAMI queries added if enabled
+
+    Example:
+        >>> queries = get_queries_with_hami(STANDARD_QUERIES)
+        >>> if is_hami_metrics_enabled():
+        ...     assert "GPUDeviceCoreAllocated" in queries
+    """
+    if is_hami_metrics_enabled():
+        return base_queries + QUERY_CATEGORIES["hami_gpu"]
+    return base_queries

@@ -32,7 +32,7 @@ class ModelStore:
     def __init__(self):
         """Initialize the ModelStore class."""
         self.client = Minio(
-            app_settings.minio_endpoint,
+            endpoint=app_settings.minio_endpoint,
             access_key=secrets_settings.minio_access_key,
             secret_key=secrets_settings.minio_secret_key,
             secure=app_settings.minio_secure,
@@ -139,3 +139,39 @@ class ModelStore:
             object_name (str): The name of the object to get the URL of
         """
         return self.client.presigned_get_object(bucket_name, object_name)
+
+    def get_folder_size(self, bucket_name: str, prefix: str) -> float:
+        """Get the total size of all objects under a prefix in GiB.
+
+        This method calculates the total storage size of all objects (files)
+        under a given prefix in a MinIO bucket. Useful for determining model
+        storage requirements.
+
+        Args:
+            bucket_name (str): The name of the bucket to calculate size for
+            prefix (str): The folder prefix (e.g., "models/llama-2-7b")
+
+        Returns:
+            float: Total size in gibibytes (GiB)
+
+        Raises:
+            MinioException: If there's an error listing or accessing objects
+        """
+        try:
+            total_size_bytes = 0
+            object_count = 0
+
+            # List all objects recursively under the prefix
+            for obj in self.client.list_objects(bucket_name, prefix, recursive=True):
+                total_size_bytes += obj.size
+                object_count += 1
+
+            total_size_gib = total_size_bytes / (1024**3)
+            logger.info(
+                f"Calculated folder size for {bucket_name}/{prefix}: {total_size_gib:.2f} GiB ({object_count} objects)"
+            )
+            return total_size_gib
+
+        except Exception as e:
+            logger.exception(f"Error calculating folder size for {bucket_name}/{prefix}: {e}")
+            raise MinioException(f"Error calculating folder size: {e}") from e

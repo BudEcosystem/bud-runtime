@@ -37,11 +37,32 @@ class SimulationMethod(str, Enum):
     HEURISTIC = "heuristic"
 
 
+class HardwareMode(str, Enum):
+    """Enum for hardware utilization modes."""
+
+    DEDICATED = "dedicated"
+    SHARED = "shared"
+
+
 class Device(BaseModel):
     name: str
     type: str
     available_count: int
     mem_per_GPU_in_GB: float
+    # HAMI time-slicing metrics (optional - only present on HAMI-enabled clusters)
+    memory_allocated_gb: Optional[float] = None
+    core_utilization_percent: Optional[float] = None
+    memory_utilization_percent: Optional[float] = None
+    cores_allocated_percent: Optional[float] = None
+    shared_containers_count: Optional[int] = None
+    hardware_mode: Optional[str] = None
+    device_uuid: Optional[str] = None
+    last_metrics_update: Optional[str] = None
+    # CPU-specific fields (for cpu/cpu_high device types)
+    cores: Optional[int] = None  # Total CPU cores
+    utilized_cores: Optional[float] = None  # Currently utilized cores
+    memory_gb: Optional[float] = None  # Total system memory in GB
+    utilized_memory_gb: Optional[float] = None  # Currently utilized memory in GB
     # Device identification fields (for exact hardware matching)
     device_model: Optional[str] = None
     raw_name: Optional[str] = None
@@ -53,6 +74,7 @@ class Device(BaseModel):
     peak_i8_TFLOPS: float = 20.0
     peak_i4_TFLOPS: float = 40.0
     inter_node_bandwidth_in_GB_per_sec: float = 10.0
+    memory: Optional[float] = None
 
 
 class Node(BaseModel):
@@ -89,6 +111,9 @@ class ClusterRecommendationRequest(CloudEventBase):
     quantization_method: Optional[str] = None
     quantization_type: Optional[str] = None
     simulation_method: Optional[SimulationMethod] = Field(None, description="Method to use for performance simulation")
+    hardware_mode: Optional[HardwareMode] = Field(
+        default=HardwareMode.DEDICATED, description="Hardware utilization mode: dedicated or shared"
+    )
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):
@@ -231,6 +256,7 @@ class NodeGroupConfiguration(BaseModel):
     replicas: int = 1  # Number of replicas for this node group
     image: str
     memory: float
+    hardware_mode: Optional[str] = Field(default="dedicated", description="Hardware mode: dedicated or shared")
     # Performance metrics
     ttft: float
     throughput_per_user: float
@@ -250,6 +276,11 @@ class NodeGroupConfiguration(BaseModel):
     # Engine capability flags from BudConnect API
     supports_lora: Optional[bool] = None
     supports_pipeline_parallelism: Optional[bool] = None
+    # Memory components for accurate allocation
+    weight_memory_gb: Optional[float] = None
+    kv_cache_memory_gb: Optional[float] = None
+    # CPU cores for CPU/cpu_high deployments
+    cores: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_parallelism_config(self):

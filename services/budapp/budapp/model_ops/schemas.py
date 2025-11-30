@@ -1075,6 +1075,8 @@ class ModelDeployStepRequest(BaseModel):
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
     scaling_specification: ScalingSpecification | None = None
+    # Hardware resource mode (dedicated vs shared/time-slicing)
+    hardware_mode: Literal["dedicated", "shared"] | None = Field(default=None)
     # Parser configuration options
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
@@ -1147,6 +1149,8 @@ class DeploymentWorkflowStepData(BaseModel):
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
     scaling_specification: ScalingSpecification | None = None
+    # Hardware resource mode (dedicated vs shared/time-slicing)
+    hardware_mode: Literal["dedicated", "shared"] | None = None
     enable_tool_calling: bool | None = None
     enable_reasoning: bool | None = None
     # Parser metadata from simulator/cluster
@@ -1167,6 +1171,7 @@ class ModelDeploymentRequest(BaseModel):
     hf_token: str | None = None
     model: str
     model_size: Optional[int] = None
+    storage_size_gb: Optional[float] = None
     target_ttft: Optional[int] = None
     target_e2e_latency: Optional[int] = None
     target_throughput_per_user: Optional[int] = None

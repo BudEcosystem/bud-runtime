@@ -1,13 +1,15 @@
 import uuid
+from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException
-from budapp.commons.schemas import ErrorResponse
+from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.eval_ops.schemas import (
     ConfigureRunsRequest,
     ConfigureRunsResponse,
@@ -15,6 +17,8 @@ from budapp.eval_ops.schemas import (
     CreateExperimentRequest,
     CreateExperimentResponse,
     DatasetFilter,
+    DatasetModelScore,
+    DatasetScoresResponse,
     DeleteExperimentResponse,
     DeleteRunResponse,
     EvalTagCreate,
@@ -23,12 +27,15 @@ from budapp.eval_ops.schemas import (
     EvaluationWorkflowResponse,
     EvaluationWorkflowStepRequest,
     ExperimentEvaluationsResponse,
+    ExperimentModelListItem,
+    ExperimentSummaryResponse,
     ExperimentWorkflowStepRequest,
     GetDatasetResponse,
     GetExperimentResponse,
     GetRunResponse,
     ListDatasetsResponse,
     ListEvaluationsResponse,
+    ListExperimentModelsResponse,
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
@@ -110,20 +117,40 @@ def list_experiments(
     search: Annotated[
         Optional[str], Query(min_length=1, max_length=100, description="Search experiments by name (case-insensitive)")
     ] = None,
+    experiment_status: Annotated[
+        Optional[str],
+        Query(description="Filter by status: running, completed, no_runs"),
+    ] = None,
+    model_id: Annotated[Optional[uuid.UUID], Query(description="Filter by model ID")] = None,
+    created_after: Annotated[
+        Optional[datetime], Query(description="Filter experiments created after this date (ISO 8601)")
+    ] = None,
+    created_before: Annotated[
+        Optional[datetime], Query(description="Filter experiments created before this date (ISO 8601)")
+    ] = None,
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
 ):
-    """List all experiments for the current user with pagination.
+    """List all experiments for the current user with pagination and advanced filtering.
 
     - **session**: Database session dependency.
     - **current_user**: The authenticated user whose experiments are listed.
     - **search**: Optional search query to filter by experiment name (case-insensitive substring match).
     - **project_id**: Optional filter by project ID.
     - **id**: Optional filter by experiment ID.
+    - **experiment_status**: Optional filter by computed status (running/completed/no_runs).
+    - **model_id**: Optional filter by model ID used in experiment runs.
+    - **created_after**: Optional filter for experiments created after this date (ISO 8601 format).
+    - **created_before**: Optional filter for experiments created before this date (ISO 8601 format).
     - **page**: Page number (default: 1).
     - **limit**: Items per page (default: 10, max: 100).
 
     Returns a `ListExperimentsResponse` containing a paginated list of experiments.
+
+    **Status Logic:**
+    - "running": At least one run is currently running
+    - "completed": All runs are finished (includes successful, failed, pending, cancelled, skipped)
+    - "no_runs": Experiment has no runs configured
     """
     try:
         offset = (page - 1) * limit
@@ -132,6 +159,10 @@ def list_experiments(
             project_id=project_id,
             experiment_id=id,
             search_query=search,
+            status=experiment_status,
+            model_id=model_id,
+            created_after=created_after,
+            created_before=created_before,
             offset=offset,
             limit=limit,
         )
@@ -148,6 +179,52 @@ def list_experiments(
         limit=limit,
         total_record=total_count,
     )
+
+
+@router.get(
+    "/models",
+    response_model=ListExperimentModelsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse}},
+)
+def list_experiment_models(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[Optional[uuid.UUID], Query(description="Filter by project ID")] = None,
+):
+    """List all unique models used across user's experiments.
+
+    This endpoint returns all unique models that have been used in the current user's
+    experiments, along with the count of experiments using each model. This is useful
+    for populating filter dropdowns in the frontend.
+
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user whose experiments are queried.
+    - **project_id**: Optional filter by project ID to limit models to specific project.
+
+    Returns a `ListExperimentModelsResponse` containing:
+    - List of models with their IDs, names, deployment names, and experiment counts
+    - Total count of unique models
+    """
+    try:
+        models, total_count = ExperimentService(session).list_experiment_models(
+            user_id=current_user.id,
+            project_id=project_id,
+        )
+
+        # Convert dict results to Pydantic models
+        model_items = [ExperimentModelListItem(**model) for model in models]
+
+        return ListExperimentModelsResponse(
+            code=status.HTTP_200_OK,
+            object="experiment.models.list",
+            message="Successfully listed experiment models",
+            models=model_items,
+            total_count=total_count,
+        )
+    except Exception as e:
+        logger.debug(f"Failed to list experiment models: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list experiment models") from e
 
 
 @router.get(
@@ -198,7 +275,7 @@ def list_datasets(
     current_user: Annotated[User, Depends(get_current_active_user)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
-    name: Annotated[Optional[str], Query(description="Filter by dataset name")] = None,
+    name: Annotated[Optional[str], Query(description="Search in dataset name and description")] = None,
     modalities: Annotated[
         Optional[str],
         Query(description="Filter by modalities (comma-separated)"),
@@ -701,6 +778,45 @@ def get_runs_history(
     )
 
 
+@router.get(
+    "/{experiment_id}/summary",
+    response_model=ExperimentSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
+def get_experiment_summary(
+    experiment_id: Annotated[uuid.UUID, Path(..., description="Experiment ID")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get summary statistics for an experiment.
+
+    Returns summary information including:
+    - Total number of evaluations
+    - Total duration of all evaluations in seconds
+    - Count of evaluations by status (completed, failed, pending, running)
+
+    - **experiment_id**: UUID of the experiment.
+    - **session**: Database session dependency.
+    - **current_user**: The authenticated user.
+
+    Returns an `ExperimentSummaryResponse` with experiment statistics.
+    """
+    try:
+        summary = ExperimentService(session).get_experiment_summary(experiment_id, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get experiment summary") from e
+
+    return ExperimentSummaryResponse(
+        code=status.HTTP_200_OK,
+        object="experiment.summary",
+        message="Successfully retrieved experiment summary",
+        summary=summary,
+    )
+
+
 @router.post(
     "/{experiment_id}/runs",
     response_model=ConfigureRunsResponse,
@@ -886,6 +1002,101 @@ def get_dataset_by_id(
     )
 
 
+@router.get(
+    "/datasets/{dataset_id}/scores",
+    response_model=DatasetScoresResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_dataset_scores(
+    dataset_id: Annotated[uuid.UUID, Path(..., description="ID of dataset to get scores for")],
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
+):
+    """Get all model scores for a specific dataset.
+
+    This endpoint retrieves scores for all models that have been evaluated against the specified dataset.
+    Results are consolidated by model (averaging metrics across multiple runs), ranked by accuracy,
+    and paginated.
+
+    **Features:**
+    - One entry per model (multiple runs averaged)
+    - Metrics averaged across all completed runs (non-zero values only)
+    - Ranked by accuracy metric (1 = best)
+    - Includes all dataset versions
+    - Only shows completed evaluation runs
+    - Access control: only shows data from user's own experiments
+
+    **Query Parameters:**
+    - `page`: Page number for pagination (default: 1)
+    - `limit`: Items per page (default: 50, max: 100)
+
+    **Returns:**
+    - `dataset_id`: UUID of the dataset
+    - `dataset_name`: Name of the dataset
+    - `scores`: List of model scores with:
+        - `rank`: Ranking by accuracy (1=best)
+        - `model_id`, `model_name`, `model_display_name`, `model_icon`: Model information
+        - `endpoint_name`: Deployment name
+        - `accuracy`: Accuracy metric value (used for ranking)
+        - `metrics`: List of all averaged metrics
+        - `num_runs`: Number of runs averaged
+        - `created_at`: Timestamp from most recent run
+    - `pagination`: Standard pagination metadata
+
+    **Example Response:**
+    ```json
+    {
+      "success": true,
+      "dataset_id": "uuid",
+      "dataset_name": "MMLU Benchmark",
+      "scores": [
+        {
+          "rank": 1,
+          "model_name": "meta-llama/Llama-3.1-70B",
+          "accuracy": 87.4,
+          "metrics": [{"metric_name": "accuracy", "metric_value": 87.4}],
+          "num_runs": 3
+        }
+      ],
+      "pagination": {"page": 1, "limit": 50, "total": 5}
+    }
+    ```
+    """
+    try:
+        scores, total, dataset_info = ExperimentService(session).get_dataset_scores(
+            dataset_id=dataset_id,
+            user_id=current_user.id,
+            page=page,
+            limit=limit,
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Failed to get dataset scores: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve dataset scores") from e
+
+    # Convert to Pydantic models
+    score_models = [DatasetModelScore(**score) for score in scores]
+
+    return DatasetScoresResponse(
+        code=status.HTTP_200_OK,
+        object="dataset.scores",
+        message="Successfully retrieved dataset scores",
+        dataset_id=dataset_info["id"],
+        dataset_name=dataset_info["name"],
+        scores=score_models,
+        page=page,
+        limit=limit,
+        total_record=total,  # Use total_record, not total (total_pages is computed automatically)
+    )
+
+
 # ------------------------ Evaluation Workflow Routes ------------------------
 
 
@@ -1051,3 +1262,141 @@ async def get_experiment_evaluations(
     except Exception as e:
         logger.debug(f"Failed to get experiment evaluations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get experiment evaluations") from e
+
+
+@router.post(
+    "/sync/datasets",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+    description="Manually trigger evaluation dataset synchronization from manifest",
+    tags=["Evaluation Sync"],
+)
+async def sync_evaluation_datasets(
+    force_sync: Annotated[
+        bool,
+        Query(
+            description="Force synchronization even if manifest versions match. Use this to re-sync datasets after manifest updates."
+        ),
+    ] = False,
+    current_user: Annotated[User, Depends(get_current_active_user)] = None,
+):
+    """Manually trigger synchronization of evaluation datasets from the manifest.
+
+    This endpoint allows administrators to manually trigger the evaluation dataset sync workflow.
+    The sync process:
+    1. Fetches the latest manifest (from cloud or local file based on config)
+    2. Compares versions with the current database state
+    3. Syncs datasets, traits, and metadata if needed
+    4. Records sync results in the database
+
+    **Parameters:**
+    - **force_sync**: If True, syncs even if versions match (useful after manual manifest updates)
+
+    **Sync Behavior:**
+    - Without force_sync: Only syncs if manifest version differs from database version
+    - With force_sync=true: Always syncs regardless of version match
+
+    **Configuration:**
+    - Respects `EVAL_SYNC_LOCAL_MODE` setting (uses local manifest if enabled)
+    - Uses `EVAL_MANIFEST_URL` for cloud mode
+
+    **Returns:**
+    - Workflow scheduling response with sync status
+    - Includes version information and datasets synced
+
+    **Note:** This is an asynchronous operation that runs as a Dapr workflow.
+    The actual sync happens in the background.
+    """
+    from .workflows import EvalDataSyncWorkflows
+
+    try:
+        logger.info(f"Manual evaluation dataset sync requested by user {current_user.id}, force_sync={force_sync}")
+
+        # Trigger the sync workflow
+        response = await EvalDataSyncWorkflows().__call__(force_sync=force_sync)
+
+        logger.info(f"Evaluation dataset sync workflow triggered: {response}")
+
+        workflow_id = response.get("workflow_id") if isinstance(response, dict) else str(response)
+        return SuccessResponse(
+            message=f"Evaluation dataset sync workflow triggered successfully. Workflow ID: {workflow_id}. Force sync: {force_sync}.",
+            code=status.HTTP_200_OK,
+        ).to_http_response()
+
+    except Exception as e:
+        logger.error(f"Failed to trigger evaluation dataset sync: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger evaluation dataset sync: {str(e)}",
+        ) from e
+
+
+# ------------------------ Internal Service-to-Service Routes ------------------------
+
+
+class UpdateEvaluationETARequest(BaseModel):
+    """Request schema for updating evaluation ETA from budeval service."""
+
+    evaluation_id: uuid.UUID = Field(..., description="ID of the evaluation to update")
+    eta_seconds: int = Field(..., ge=0, description="Remaining time in seconds")
+
+
+@router.patch(
+    "/internal/evaluations/eta",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+    tags=["Internal"],
+)
+def update_evaluation_eta(
+    request: UpdateEvaluationETARequest,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Update evaluation ETA (internal service-to-service endpoint).
+
+    Called by budeval service via Dapr service invocation to update the
+    ETA remaining seconds for an ongoing evaluation.
+
+    No authentication required - internal Dapr service invocation handles security.
+
+    - **request**: Payload with evaluation_id and eta_seconds.
+    - **session**: Database session dependency.
+
+    Returns a `SuccessResponse` confirming the update.
+    """
+    from budapp.eval_ops.models import Evaluation
+
+    try:
+        evaluation = session.query(Evaluation).filter(Evaluation.id == request.evaluation_id).first()
+
+        if not evaluation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Evaluation {request.evaluation_id} not found",
+            )
+
+        evaluation.eta_seconds = request.eta_seconds
+        session.commit()
+
+        logger.debug(f"Updated ETA for evaluation {request.evaluation_id}: {request.eta_seconds}s")
+
+        return SuccessResponse(
+            code=status.HTTP_200_OK,
+            message="ETA updated successfully",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to update evaluation ETA: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update evaluation ETA",
+        ) from e

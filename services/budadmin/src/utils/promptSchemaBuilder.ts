@@ -73,7 +73,7 @@ const buildValidations = (
   variableType: "input" | "output",
 ): Record<string, Record<string, string>> => {
   const validations: Record<string, Record<string, string>> = {};
-  const typeKey = variableType === "input" ? "InputSchema" : "OutputSchema";
+  const typeKey = variableType === "input" ? "Input" : "Output"; // Use "Input"/"Output" to match $defs key
 
   validations[typeKey] = {};
 
@@ -105,6 +105,7 @@ export const buildPromptSchemaPayload = (
 ) => {
   const variables = type === "input" ? inputVariables : outputVariables;
   const schemaTitle = type === "input" ? "InputSchema" : "OutputSchema";
+  const defsKey = type === "input" ? "Input" : "Output"; // Key for $defs object
 
   // Build the schema definition
   const schemaDefinition: SchemaDefinition = {
@@ -117,11 +118,11 @@ export const buildPromptSchemaPayload = (
   // Build the full schema with $defs (matching API sample structure)
   const schema = {
     $defs: {
-      [schemaTitle]: schemaDefinition,
+      [defsKey]: schemaDefinition,
     },
     properties: {
       content: {
-        $ref: `#/$defs/${schemaTitle}`,
+        $ref: `#/$defs/${defsKey}`,
       },
     },
     required: ["content"],

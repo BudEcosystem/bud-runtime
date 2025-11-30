@@ -19,6 +19,7 @@ import yaml
 from budmicroframe.commons.logging import get_logger
 
 from ..commons.config import app_settings
+from .exceptions import NamespaceNotFoundError
 
 
 logger = get_logger(__name__)
@@ -176,8 +177,16 @@ class OTelBridge:
                 return None
 
             # Check if kubectl is available
-            kubectl_check = subprocess.run(["which", "kubectl"], capture_output=True, text=True, timeout=5)
-            if kubectl_check.returncode != 0:
+            kubectl_proc = await asyncio.create_subprocess_exec(
+                "which", "kubectl", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                await asyncio.wait_for(kubectl_proc.communicate(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.error("kubectl check timed out")
+                return None
+
+            if kubectl_proc.returncode != 0:
                 logger.error("kubectl not found in PATH")
                 return None
 
@@ -203,10 +212,45 @@ class OTelBridge:
                 logger.debug("SSL verification disabled for kubectl commands")
 
             test_cmd.extend(["get", "nodes", "--request-timeout=10s"])
-            test_result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=15)
-            if test_result.returncode != 0:
-                logger.error(f"Invalid kubeconfig or cluster unreachable: {test_result.stderr}")
+            test_proc = await asyncio.create_subprocess_exec(
+                *test_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                _, test_stderr_bytes = await asyncio.wait_for(test_proc.communicate(), timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.error("Kubeconfig validation timed out")
                 return None
+
+            if test_proc.returncode != 0:
+                test_stderr = test_stderr_bytes.decode().strip() if test_stderr_bytes else ""
+                logger.error(f"Invalid kubeconfig or cluster unreachable: {test_stderr}")
+                return None
+
+            # Validate namespace exists first
+            logger.debug(f"Validating namespace {namespace} exists")
+            ns_cmd = [
+                "kubectl",
+                "--kubeconfig",
+                kubeconfig_path,
+            ]
+            if not app_settings.validate_certs:
+                ns_cmd.append("--insecure-skip-tls-verify")
+            ns_cmd.extend(["get", "namespace", namespace, "--request-timeout=10s"])
+            ns_proc = await asyncio.create_subprocess_exec(
+                *ns_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                _, ns_stderr_bytes = await asyncio.wait_for(ns_proc.communicate(), timeout=15.0)
+            except asyncio.TimeoutError as e:
+                error_msg = f"Namespace validation timed out for cluster {cluster_id}"
+                logger.error(error_msg)
+                raise NamespaceNotFoundError(error_msg) from e
+
+            if ns_proc.returncode != 0:
+                error_msg = f"Namespace '{namespace}' not found in cluster {cluster_id}"
+                ns_stderr = ns_stderr_bytes.decode().strip() if ns_stderr_bytes else ""
+                logger.error(f"{error_msg}: {ns_stderr}")
+                raise NamespaceNotFoundError(error_msg)
 
             # Check if the Prometheus service exists
             logger.debug(f"Checking for Prometheus service {service} in namespace {namespace}")
@@ -221,17 +265,33 @@ class OTelBridge:
                 svc_cmd.append("--insecure-skip-tls-verify")
 
             svc_cmd.extend(["-n", namespace, "get", "service", service, "--request-timeout=10s"])
-            svc_result = subprocess.run(svc_cmd, capture_output=True, text=True, timeout=15)
-            if svc_result.returncode != 0:
-                logger.error(f"Prometheus service {service} not found in namespace {namespace}: {svc_result.stderr}")
+            svc_proc = await asyncio.create_subprocess_exec(
+                *svc_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                _, svc_stderr_bytes = await asyncio.wait_for(svc_proc.communicate(), timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.error(f"Service check timed out for {service} in namespace {namespace}")
+                return None
+
+            if svc_proc.returncode != 0:
+                svc_stderr = svc_stderr_bytes.decode().strip() if svc_stderr_bytes else ""
+                logger.error(f"Prometheus service {service} not found in namespace {namespace}: {svc_stderr}")
                 # Try to list available services for debugging
                 list_cmd = ["kubectl", "--kubeconfig", kubeconfig_path]
                 if not app_settings.validate_certs:
                     list_cmd.append("--insecure-skip-tls-verify")
                 list_cmd.extend(["-n", namespace, "get", "services"])
-                list_result = subprocess.run(list_cmd, capture_output=True, text=True, timeout=10)
-                if list_result.returncode == 0:
-                    logger.info(f"Available services in {namespace}:\n{list_result.stdout}")
+                list_proc = await asyncio.create_subprocess_exec(
+                    *list_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                )
+                try:
+                    list_stdout_bytes, _ = await asyncio.wait_for(list_proc.communicate(), timeout=10.0)
+                    if list_proc.returncode == 0:
+                        list_stdout = list_stdout_bytes.decode().strip() if list_stdout_bytes else ""
+                        logger.info(f"Available services in {namespace}:\n{list_stdout}")
+                except asyncio.TimeoutError:
+                    logger.warning("List services command timed out")
                 return None
 
             # Find an available port
@@ -302,7 +362,10 @@ class OTelBridge:
             logger.info(f"Successfully established port-forward for cluster {cluster_id} on port {local_port}")
             return local_port
 
-        except subprocess.TimeoutExpired as e:
+        except NamespaceNotFoundError:
+            # Re-raise namespace errors so they can be handled specifically
+            raise
+        except asyncio.TimeoutError as e:
             logger.error(f"Command timed out: {e}")
             if process:
                 process.kill()

@@ -13,8 +13,14 @@
   resources:
     requests:
       nvidia.com/gpu: {{ .device.tp_size }}
+      {{- if and .device.hardware_mode (eq .device.hardware_mode "shared") }}
+      nvidia.com/gpumem: {{ .device.gpu_memory_mb }}
+      {{- end }}
     limits:
       nvidia.com/gpu: {{ .device.tp_size }}
+      {{- if and .device.hardware_mode (eq .device.hardware_mode "shared") }}
+      nvidia.com/gpumem: {{ .device.gpu_memory_mb }}
+      {{- end }}
   {{- if .device.envs }}
   env:
   {{- range $key, $value := .device.envs }}

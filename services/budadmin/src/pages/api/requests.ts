@@ -235,6 +235,9 @@ const handleErrorResponse = (err) => {
     } else if (err.config?.url?.includes('/prompts/oauth/status')) {
       // OAuth status not found is expected behavior when OAuth is not set up yet
       return Promise.reject(err);
+    } else if (err.config?.url?.includes('/prompts/prompt-config/')) {
+      // Prompt config not found is expected for new prompts - silent fail
+      return Promise.reject(err);
     } else {
       // Show toast for other 404 errors
       if (err && localStorage.getItem("access_token")) {
@@ -243,8 +246,9 @@ const handleErrorResponse = (err) => {
     }
     return false;
   } else {
-    // Don't show error toast for OAuth status endpoint
-    if (err.config?.url?.includes('/prompts/oauth/status')) {
+    // Don't show error toast for silent endpoints
+    if (err.config?.url?.includes('/prompts/oauth/status') ||
+        err.config?.url?.includes('/prompts/prompt-config/')) {
       return Promise.reject(err);
     }
 

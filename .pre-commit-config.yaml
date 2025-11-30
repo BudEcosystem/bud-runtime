@@ -38,12 +38,21 @@ repos:
               services/budgateway/CLAUDE\.md|
               services/budgateway/ci/dummy-gcp-credentials\.json|
               infra/helm/bud/charts/novu/values\.yaml|
-              infra/helm/bud/example.secrets.yaml|
+              infra/helm/bud/example\.secrets\.yaml|
+              infra/helm/bud/charts/mcp-stack/README\.md|
               services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs|
               \.env\.sample
           )$
       - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+              infra/helm/bud/charts/mcp-stack/templates/.*\.yaml
+          )$
       - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+              infra/helm/bud/charts/mcp-stack/templates/.*\.yaml
+          )$
 
   # Python linting and formatting (for all Python services)
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -170,7 +179,7 @@ repos:
     rev: 1.7.10
     hooks:
       - id: bandit
-        args: [-r, -ll, --skip, "B608,B113,B104,B310,B103"] # Temporarily skip SQL injection, timeout, bind, and file permission checks
+        args: [-r, -ll, --skip, "B113,B310,B103,B608,B104"] # Temporarily skip SQL injection, timeout, and file permission checks
         files: ^services/(budapp|budcluster|budsim|budmodel|budmetrics|budnotify|ask-bud|buddoc)/.*\.py$
 
 default_stages: [pre-commit]

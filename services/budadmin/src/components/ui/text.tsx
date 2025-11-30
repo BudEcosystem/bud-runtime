@@ -547,6 +547,16 @@ const Text_12_300_FFFFFF = ({ children, className = "", ...props }) => (
 const Text_18_600_EEEEEE = ({ children, className = "", ...props }) => (
   <Text
     as="div"
+    className={`block text-[1.125rem] font-[600] text-[#EEEEEE] ${className}`}
+    {...props}
+  >
+    {children}
+  </Text>
+);
+
+const Text_18_600_FFFFFF = ({ children, className = "", ...props }) => (
+  <Text
+    as="div"
     className={`block text-[1.125rem] font-[600] text-[#FFFFFF] ${className}`}
     {...props}
   >
@@ -891,6 +901,7 @@ export {
   Text_32_700_FFFFFF,
   Text_12_300_FFFFFF,
   Text_18_600_EEEEEE,
+  Text_18_600_FFFFFF,
   Text_26_600_FFFFFF,
   Text_26_600_EEEEEE,
   Text_26_400_EEEEEE,

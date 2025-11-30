@@ -11,6 +11,7 @@ import DeployModelSpecification from "src/flows/DeployModelSpecification";
 import DeployModelTemplate from "src/flows/DeployModelTemplate";
 import DeployModelConfiguration from "src/flows/DeployModelConfiguration";
 import DeployModelCredentialSelect from "src/flows/DeployModel/DeployModelCredentialSelect";
+import DeployModelHardwareMode from "src/flows/DeployModel/DeployModelHardwareMode";
 import InviteMembers from "src/flows/InviteMembers";
 import NewProject from "src/flows/NewProject";
 import ModelSource from "src/flows/AddModel/ModelSource";
@@ -40,6 +41,7 @@ import EditProject from "src/flows/Project/EditProject";
 import AddMembers from "src/flows/Project/AddMembers";
 import WorkerDetails from "src/flows/Worker/WorkerDetails";
 import UseModel from "src/flows/Project/UseModel";
+import UseAgent from "src/flows/Project/UseAgent";
 import DeleteCluster from "src/flows/Cluster/DeleteCluster";
 import DeployModelSuccess from "src/flows/DeployModel/DeployModelSuccess";
 import ClusterDeleteStatus from "./Cluster/ClusterDeleteStatus";
@@ -146,6 +148,7 @@ import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
 import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
 import AddAgentSuccess from "./AddAgent/AgentSuccess";
 import AddAgentSelectType from "./AddAgent/SelectAgentType";
+import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -154,6 +157,7 @@ export const StepComponents = {
   "invite-success": CreateProjectSuccess,
   "deploy-model": DeployModel,
   "deploy-model-credential-select": DeployModelCredentialSelect,
+  "deploy-model-hardware-mode": DeployModelHardwareMode,
   "deploy-model-template": DeployModelTemplate,
   "deploy-model-configuration": DeployModelConfiguration,
   "deploy-model-specification": DeployModelSpecification,
@@ -201,6 +205,7 @@ export const StepComponents = {
   "add-members": AddMembers,
   "worker-details": WorkerDetails,
   "use-model": UseModel,
+  "use-agent": UseAgent,
   "publish": Publish,
   "publish-endpoint": PublishEndpoint,
   "delete-cluster": DeleteCluster,
@@ -311,7 +316,7 @@ export const StepComponents = {
   "add-agent-configuration": AddAgentConfiguration,
   "add-agent-deployment-warning": AddAgentDeploymentWarning,
   "add-agent-success": AddAgentSuccess,
-
+  "edit-agent-drawer": AgentEditDrawer,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;

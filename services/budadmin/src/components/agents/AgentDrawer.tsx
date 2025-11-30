@@ -11,6 +11,7 @@ import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
+import { removePromptFromUrl } from "@/utils/urlUtils";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
@@ -23,9 +24,16 @@ const AgentDrawer: React.FC = () => {
     activeSessionIds,
     createSession,
     workflowContext,
+    isEditMode,
+    editingPromptId,
+    clearEditMode,
+    isAddVersionMode,
+    addVersionPromptId,
+    isEditVersionMode,
+    editVersionData,
   } = useAgentStore();
 
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, step, currentFlow } = useDrawer();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [drawerWidth, setDrawerWidth] = useState<string>('100%');
@@ -41,6 +49,9 @@ const AgentDrawer: React.FC = () => {
 
   // Handle close button click
   const handleCloseDrawer = () => {
+    // Remove prompt parameter from URL
+    removePromptFromUrl();
+
     // Check if we're in a workflow
     if (workflowContext.isInWorkflow) {
       // Close the agent drawer
@@ -56,6 +67,7 @@ const AgentDrawer: React.FC = () => {
     // Reset views when drawer closes
     setShowPlayground(false);
     setShowChatHistory(false);
+    // Clear edit mode is handled in closeAgentDrawer in the store
   };
 
   // Handle Play button click
@@ -92,10 +104,26 @@ const AgentDrawer: React.FC = () => {
 
   // Create initial session when drawer opens if none exist
   useEffect(() => {
-    if (isAgentDrawerOpen && activeSessions.length === 0) {
+    if (!isAgentDrawerOpen) return;
+
+    // Check if this is an OAuth callback - don't create new session
+    const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+
+    if (isOAuthCallback) {
+      // OAuth callback - session should already exist, don't create new one
+      return;
+    }
+
+    // Don't create a new session if in edit mode, add version mode, or edit version mode (session already loaded)
+    if (isEditMode || isAddVersionMode || isEditVersionMode) {
+      return;
+    }
+
+    // Only create session if none exist AND not OAuth callback AND not in any special mode
+    if (activeSessions.length === 0) {
       createSession();
     }
-  }, [isAgentDrawerOpen, activeSessions.length, createSession]);
+  }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode, isAddVersionMode, isEditVersionMode]);
 
   // Set first session as active by default
   useEffect(() => {
@@ -125,6 +153,12 @@ const AgentDrawer: React.FC = () => {
   useEffect(() => {
     if (!isAgentDrawerOpen) return;
 
+    // Don't update URL if we're on the add-agent success step
+    // This allows AgentSuccess component to clear the URL parameters
+    if (currentFlow === 'add-agent' && step?.id === 'add-agent-success') {
+      return;
+    }
+
     // Get all prompt IDs from active sessions
     const promptIds = activeSessions
       .map(session => session.promptId)
@@ -136,6 +170,12 @@ const AgentDrawer: React.FC = () => {
 
     // Only update if the URL param is different from what we want to set
     if (currentPromptParam !== newPromptParam) {
+      console.log('🔄 AgentDrawer updating URL:', {
+        currentPrompt: currentPromptParam,
+        newPrompt: newPromptParam,
+        willAddPrompt: !!newPromptParam
+      });
+
       // Build URL manually to avoid encoding commas
       // Use window.location to get the actual browser URL
       const currentPath = window.location.pathname;
@@ -144,6 +184,9 @@ const AgentDrawer: React.FC = () => {
       // Parse existing query params from actual browser URL (not router.query)
       // This ensures we capture params added via window.history.replaceState
       const urlSearchParams = new URLSearchParams(window.location.search);
+
+      // CRITICAL: Explicitly capture agent parameter FIRST before any operations
+      const agentParam = urlSearchParams.get('agent');
 
       // Add all existing query params except 'prompt'
       urlSearchParams.forEach((value, key) => {
@@ -157,15 +200,25 @@ const AgentDrawer: React.FC = () => {
         }
       });
 
+      // TRIPLE-CHECK: If agent parameter was in URL but somehow not added, force add it
+      if (agentParam && !queryParts.some(part => part.startsWith('agent='))) {
+        queryParts.unshift(`agent=${agentParam}`);
+      }
+
       // Add new prompt param if exists (without encoding commas)
       if (newPromptParam) {
         queryParts.push(`prompt=${newPromptParam}`);
+        console.log('✓ Adding prompt parameter:', newPromptParam);
       }
+
+      console.log('🔧 Final query parts:', queryParts);
 
       // Build the final URL
       const newUrl = queryParts.length > 0
         ? `${currentPath}?${queryParts.join('&')}`
         : currentPath;
+
+      console.log('✓ New URL:', newUrl);
 
       // Use window.history.replaceState to update URL
       window.history.replaceState(
@@ -173,11 +226,8 @@ const AgentDrawer: React.FC = () => {
         '',
         newUrl
       );
-
-      console.log('Updated URL with prompt IDs:', promptIds);
-      console.log('Preserved agent param:', urlSearchParams.get('agent'));
     }
-  }, [activeSessions, isAgentDrawerOpen, router]);
+  }, [activeSessions, isAgentDrawerOpen, router, currentFlow, step]);
 
 
 
@@ -194,6 +244,7 @@ const AgentDrawer: React.FC = () => {
           wrapper: {
             backgroundColor: "transparent",
             boxShadow: "none",
+            zIndex: 1050, // Higher than AddAgent drawer to ensure proper stacking
           },
           mask: {
             backgroundColor: "#101010",
@@ -320,6 +371,9 @@ const AgentDrawer: React.FC = () => {
                               totalSessions={numBoxes}
                               isActive={activeBoxId === session.id}
                               onActivate={() => setActiveBoxId(session.id)}
+                              isAddVersionMode={isAddVersionMode}
+                              isEditVersionMode={isEditVersionMode}
+                              editVersionData={editVersionData}
                             />
                           </div>
                         );

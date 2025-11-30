@@ -181,7 +181,8 @@ export default function AgentConfiguration() {
         const activeSessions = sessions.filter(s => activeSessionIds.includes(s.id));
         const discardedPromptIds = activeSessions
           .map(s => s.promptId)
-          .filter((id): id is string => id !== undefined && id !== null);
+          .filter((id): id is string => id !== undefined && id !== null)
+          .map(id => ({ prompt_id: id }));
 
         if (discardedPromptIds.length > 0) {
           payload.discarded_prompt_ids = discardedPromptIds;

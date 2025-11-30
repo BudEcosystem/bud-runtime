@@ -56,7 +56,7 @@ const saveOAuthState = (state: OAuthState) => {
   try {
     localStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(state));
   } catch (error) {
-    console.error('Failed to save OAuth state:', error);
+    // Silently fail - localStorage might not be available
   }
 };
 
@@ -74,7 +74,6 @@ const getOAuthState = (): OAuthState | null => {
 
     return state;
   } catch (error) {
-    console.error('Failed to get OAuth state:', error);
     return null;
   }
 };
@@ -83,7 +82,7 @@ const clearOAuthState = () => {
   try {
     localStorage.removeItem(OAUTH_STATE_KEY);
   } catch (error) {
-    console.error('Failed to clear OAuth state:', error);
+    // Silently fail - localStorage might not be available
   }
 };
 
@@ -118,61 +117,100 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setIsLoadingTools(true);
     try {
       const authType = selectedConnectorDetails?.auth_type;
-      let response: any;
 
-      // Use different endpoint based on auth type
-      if (authType?.toLowerCase() === 'oauth') {
-        response = await ConnectorService.fetchOAuthTools({
-          prompt_id: promptId,
-          connector_id: connector.id,
-          version: 1,
-        });
+      let allTools: Tool[] = [];
+
+      // If auth_type is "Open" or empty/undefined, only call fetchTools
+      // If auth_type is "OAuth" or any other value, call fetchOAuthTools
+      if (authType && authType.toLowerCase() !== 'open') {
+        try {
+          const oauthResponse = await ConnectorService.fetchOAuthTools({
+            prompt_id: promptId,
+            connector_id: connector.id,
+            version: 1,
+          });
+
+          if (oauthResponse.data && oauthResponse.data.tools) {
+            allTools = oauthResponse.data.tools;
+          }
+
+          // On success, also call GET /prompts/tools
+          const regularResponse = await ConnectorService.fetchTools({
+            prompt_id: promptId,
+            connector_id: connector.id,
+            page: 1,
+            limit: 100,
+          });
+
+          if (regularResponse.data && regularResponse.data.tools) {
+            // Merge tools from both responses (avoiding duplicates by ID)
+            const regularTools = regularResponse.data.tools;
+            const existingIds = new Set(allTools.map(t => t.id));
+
+            regularTools.forEach((tool: Tool) => {
+              if (!existingIds.has(tool.id)) {
+                allTools.push(tool);
+              }
+            });
+          }
+        } catch (error) {
+          throw error;
+        }
       } else {
-        response = await ConnectorService.fetchTools({
+        // auth_type is "Open" or not set, only call GET /prompts/tools
+        const response = await ConnectorService.fetchTools({
           prompt_id: promptId,
           connector_id: connector.id,
           page: 1,
           limit: 100,
         });
+
+        if (response.data && response.data.tools) {
+          allTools = response.data.tools;
+        }
       }
 
-      if (response.data && response.data.tools) {
-        const tools: Tool[] = response.data.tools;
-        setAvailableTools(tools);
+      // Set all collected tools
+      setAvailableTools(allTools);
 
-        // Auto-select tools that have is_added: true
-        const addedToolIds = tools
-          .filter((tool) => tool.is_added === true)
-          .map((tool) => tool.id)
-          .filter(Boolean);
+      // Auto-select tools that have is_added: true
+      const addedToolIds = allTools
+        .filter((tool) => tool.is_added === true)
+        .map((tool) => tool.id)
+        .filter(Boolean);
 
-        if (addedToolIds.length > 0) {
-          setSelectedTools(addedToolIds);
-          // Check if all tools are added
-          if (addedToolIds.length === tools.length) {
-            setSelectAll(true);
-          }
+      if (addedToolIds.length > 0) {
+        setSelectedTools(addedToolIds);
+        // Check if all tools are added
+        if (addedToolIds.length === allTools.length) {
+          setSelectAll(true);
         }
       }
     } catch (error) {
-      console.error('Error fetching tools:', error);
       errorToast('Failed to fetch tools');
     } finally {
       setIsLoadingTools(false);
     }
   }, [promptId, connector.id, selectedConnectorDetails?.auth_type]);
 
-  // Fetch connector details on mount
+  // Fetch connector details on mount (only if not already loaded)
   useEffect(() => {
+    // Don't fetch if we already have the details for this connector
+    if (selectedConnectorDetails && selectedConnectorDetails.id === connector.id) {
+      return;
+    }
+    // Don't fetch if already loading
+    if (isLoadingDetails) {
+      return;
+    }
     fetchConnectorDetails(connector.id);
-  }, [connector.id]);
+  }, [connector.id, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
 
   // Handle OAuth callback on mount
   useEffect(() => {
     const handleOAuthCallback = async () => {
       // Prevent multiple executions
       if (oauthCallbackProcessed.current) {
-        console.log('OAuth callback already processed, skipping');
         return;
       }
 
@@ -183,47 +221,45 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       if (!code || !state) return;
 
-      console.log('OAuth callback detected with code and state');
-
       // Get saved state
       const savedState = getOAuthState();
 
       if (!savedState) {
-        console.log('No saved OAuth state found');
         return;
       }
 
-      console.log('Saved OAuth state:', savedState);
-
       // Verify this callback is for the current connector
       if (savedState.connectorId !== connector.id) {
-        console.log('OAuth callback is for different connector, ignoring');
         return;
       }
 
       // Mark as processed
       oauthCallbackProcessed.current = true;
 
+      // Helper function to clean up OAuth-specific URL params (preserves agent and prompt params)
+      const cleanupOAuthParams = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.delete('code');
+        urlParams.delete('state');
+        urlParams.delete('connector');
+
+        const cleanUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname;
+
+        window.history.replaceState({}, document.title, cleanUrl);
+      };
+
       // Complete the OAuth flow
       try {
         setIsRegistering(true);
 
-        console.log('Completing OAuth callback...');
-        const response = await ConnectorService.completeOAuthCallback(
+        await ConnectorService.completeOAuthCallback(
           savedState.promptId,
           savedState.connectorId,
           code,
           state
         );
-
-        console.log('OAuth callback response:', response.data);
-
-        // Clean up URL params
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-
-        // Clear saved state
-        clearOAuthState();
 
         // Move to step 2 to show tools
         setStep(2);
@@ -233,15 +269,14 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
         successToast('OAuth authorization successful');
       } catch (error: any) {
-        console.error('Error completing OAuth callback:', error);
         errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
-
-        // Clean up URL params even on error
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-
-        clearOAuthState();
       } finally {
+        // Clean up OAuth-specific URL params (always runs whether success or error)
+        cleanupOAuthParams();
+
+        // Clear saved state
+        clearOAuthState();
+
         setIsRegistering(false);
       }
     };
@@ -264,31 +299,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
 
-  // Check OAuth status when component loads and OAuth is detected
-  useEffect(() => {
-    const checkOAuthStatus = async () => {
-      if (!promptId || !selectedConnectorDetails) return;
-
-      const authType = selectedConnectorDetails?.auth_type;
-
-      if (authType?.toLowerCase() === 'oauth') {
-        console.log('OAuth connector detected on load, checking OAuth status...');
-
-        try {
-          const statusResponse = await ConnectorService.checkOAuthStatus(promptId, connector.id);
-          console.log('OAuth status response:', statusResponse.data);
-
-          // TODO: Handle OAuth status response
-          // Possible statuses: pending, authorized, failed, etc.
-        } catch (error: any) {
-          console.error('Error checking OAuth status:', error);
-          // Don't show error toast on load, just log it
-        }
-      }
-    };
-
-    checkOAuthStatus();
-  }, [promptId, connector.id, selectedConnectorDetails]);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -332,11 +342,39 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setViewMode('connector');
   };
 
+  // Helper function to filter visible fields based on grant_type selection
+  const getVisibleFields = (fields: CredentialSchemaField[], grantTypeOverride?: string): CredentialSchemaField[] => {
+    const grantTypeValue = grantTypeOverride !== undefined ? grantTypeOverride : formData['grant_type'];
+
+    return fields.filter(field => {
+      // If no visible_when, field is always visible
+      if (!field.visible_when || field.visible_when.length === 0) {
+        return true;
+      }
+      // If visible_when exists, check if current grant_type is in the array
+      return grantTypeValue && field.visible_when.includes(grantTypeValue);
+    });
+  };
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => {
+      const newFormData = { ...prev, [field]: value };
+
+      // If grant_type changed, clear values of fields that are no longer visible
+      if (field === 'grant_type' && selectedConnectorDetails?.credential_schema) {
+        const visibleFields = getVisibleFields(selectedConnectorDetails.credential_schema, value);
+        const visibleFieldNames = new Set(visibleFields.map(f => f.field));
+
+        // Clear hidden fields (except grant_type itself)
+        Object.keys(newFormData).forEach(key => {
+          if (!visibleFieldNames.has(key) && key !== 'grant_type') {
+            delete newFormData[key];
+          }
+        });
+      }
+
+      return newFormData;
+    });
   };
 
   const handleContinue = async () => {
@@ -378,27 +416,14 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         version: 1
       };
 
-      console.log('Registering connector with payload:', payload);
-
       // Step 1: Register the connector first
       const response = await ConnectorService.registerConnector(promptId, connector.id, payload);
 
-      console.log('Registration response status:', response.status);
-      console.log('Registration response:', response.data);
-
       if (response.status === 200 || response.status === 201) {
-        console.log('Registration successful');
-
         // Step 2: Check if OAuth authentication is required
         const authType = selectedConnectorDetails?.auth_type;
-        console.log('Auth Type from connector details:', authType);
-        console.log('Is OAuth?:', authType?.toLowerCase() === 'oauth');
 
         if (authType?.toLowerCase() === 'oauth') {
-          console.log('OAuth connector detected, initiating OAuth flow...');
-          console.log('Current promptId:', promptId);
-          console.log('Current workflowId:', workflowId);
-
           try {
             const oauthPayload = {
               prompt_id: promptId,
@@ -407,18 +432,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               version: 1
             };
 
-            console.log('Calling OAuth initiate API with payload:', oauthPayload);
-
             const oauthResponse = await ConnectorService.initiateOAuth(oauthPayload);
-
-            console.log('OAuth initiate response:', oauthResponse.data);
 
             // Redirect to the authorization URL from the response
             const authorizationUrl = oauthResponse.data?.authorization_url;
 
             if (authorizationUrl) {
-              console.log('Redirecting to authorization URL:', authorizationUrl);
-
               // Save state before redirecting
               saveOAuthState({
                 promptId: promptId,
@@ -432,19 +451,15 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               // Redirect to OAuth provider
               window.location.href = authorizationUrl;
             } else {
-              console.error('No authorization_url in OAuth response');
               errorToast('OAuth authorization URL not found');
             }
 
             return;
           } catch (oauthError: any) {
-            console.error('Error initiating OAuth:', oauthError);
             errorToast(oauthError?.response?.data?.message || 'Failed to initiate OAuth');
             return;
           }
         } else {
-          console.log('Non-OAuth connector, proceeding to step 2');
-
           // For non-OAuth connectors, proceed normally to step 2
           setStep(2);
 
@@ -453,7 +468,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         }
       }
     } catch (error: any) {
-      console.error('Error registering connector:', error);
       errorToast(error?.response?.data?.message || 'Failed to register connector');
     } finally {
       setIsRegistering(false);
@@ -500,7 +514,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         await fetchTools();
       }
     } catch (error: any) {
-      console.error('Error connecting tools:', error);
       errorToast(error?.response?.data?.message || 'Failed to connect tools');
     } finally {
       setIsConnecting(false);
@@ -524,7 +537,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         onBack();
       }
     } catch (error: any) {
-      console.error('Error disconnecting connector:', error);
       errorToast(error?.response?.data?.message || 'Failed to disconnect connector');
     } finally {
       setIsDisconnecting(false);
@@ -546,45 +558,60 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       color: 'white',
     };
 
+    const renderLabel = () => (
+      <Text_12_400_EEEEEE className="mb-1 block">
+        {field.label}
+        {field.required && <span className="text-[#E82E2E] ml-0.5">*</span>}
+      </Text_12_400_EEEEEE>
+    );
+
     switch (field.type) {
       case 'dropdown':
         return (
-          <CustomSelect
-            key={field.field}
-            name={field.field}
-            placeholder={field.label}
-            value={formData[field.field]}
-            onChange={(value) => handleInputChange(field.field, value)}
-            selectOptions={field.options?.map(opt => ({ label: opt, value: opt }))}
-            InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <CustomSelect
+              name={field.field}
+              placeholder={field.label}
+              value={formData[field.field]}
+              onChange={(value) => handleInputChange(field.field, value)}
+              selectOptions={field.options?.map(opt => ({ label: opt.replace(/_/g, ' '), value: opt }))}
+              InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
+            />
+          </div>
         );
 
       case 'password':
         return (
-          <Input
-            key={field.field}
-            type="password"
-            placeholder={field.label}
-            value={formData[field.field] || ''}
-            onChange={(e) => handleInputChange(field.field, e.target.value)}
-            className={inputClassName}
-            style={inputStyle}
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              type="password"
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={inputStyle}
+              autoComplete="new-password"
+            />
+          </div>
         );
 
       case 'url':
       case 'text':
       default:
         return (
-          <Input
-            key={field.field}
-            placeholder={field.label}
-            value={formData[field.field] || ''}
-            onChange={(e) => handleInputChange(field.field, e.target.value)}
-            className={inputClassName}
-            style={inputStyle}
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={inputStyle}
+              autoComplete="off"
+            />
+          </div>
         );
     }
   };
@@ -592,7 +619,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const isStepOneValid = () => {
     if (!selectedConnectorDetails?.credential_schema) return false;
 
-    return selectedConnectorDetails.credential_schema
+    // Only validate visible required fields
+    const visibleFields = getVisibleFields(selectedConnectorDetails.credential_schema);
+
+    return visibleFields
       .filter(field => field.required)
       .every(field => formData[field.field]);
   };
@@ -676,8 +706,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           <div className='flex flex-col h-full justify-between'>
             {/* Dynamic Input Fields based on credential_schema */}
             <div className="space-y-3 mb-6 px-[1.125rem]">
-              {selectedConnectorDetails?.credential_schema
-                ?.sort((a, b) => a.order - b.order)
+              {getVisibleFields(selectedConnectorDetails?.credential_schema || [])
+                .sort((a, b) => a.order - b.order)
                 .map(field => renderFormField(field))}
             </div>
             <div style={{

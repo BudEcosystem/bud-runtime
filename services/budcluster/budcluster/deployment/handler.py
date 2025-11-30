@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import math
 import re
 import uuid
 from typing import Any, List, Optional
@@ -34,6 +35,11 @@ from .schemas import GetDeploymentConfigRequest, WorkerInfo
 
 
 logger = get_logger(__name__)
+
+# CPU deployment memory and resource constants
+CPU_MEMORY_MULTIPLIER = 1.7  # Accounts for runtime overhead, activation memory, safety margin
+CPU_MIN_MEMORY_GB = 10  # Minimum memory allocation for CPU nodes
+SHARED_MODE_CORE_RATIO = 0.1  # CPU request ratio for shared mode (10% of limit)
 
 
 class DeploymentHandler:
@@ -95,36 +101,52 @@ class DeploymentHandler:
         return urlparse(url).netloc
 
     def _get_memory_size(self, node_list: List[dict]) -> int:
-        """Get memory size from node list, supporting both legacy and new formats.
+        """Get maximum memory size from node list for PVC sizing fallback.
+
+        This method calculates the maximum memory across all nodes as a fallback
+        for PVC sizing when actual storage size is not available. For shared
+        deployments, all replicas share the same PVC, so we use the maximum
+        memory requirement.
 
         Args:
             node_list: List of node configurations
 
         Returns:
-            Memory size in GB
+            Maximum memory size in GB across all nodes
         """
-        memory_size = 0
+        max_memory_bytes = 0
+        nodes_with_memory = 0
+
         for node in node_list:
+            node_memory = 0
             if "memory" in node:
                 # New node group format: memory directly on node
-                memory_size = node["memory"]
-                logger.info(f"Using memory from node group format: {memory_size} bytes")
-                break
+                node_memory = node["memory"]
+                logger.debug(f"Node {node.get('name', 'unknown')}: {node_memory} bytes")
             elif "devices" in node and node["devices"]:
                 # Legacy format: memory in devices array
                 for device in node["devices"]:
-                    memory_size = device["memory"]
-                    logger.warning("Using memory from legacy devices format - consider migrating to node groups")
-                    break
-                break
-            else:
-                logger.warning(f"Node {node.get('name', 'unknown')} has no memory information")
+                    if "memory" in device:
+                        node_memory = device["memory"]
+                        logger.warning(
+                            f"Node {node.get('name', 'unknown')} using legacy devices format - "
+                            "consider migrating to node groups"
+                        )
+                        break
 
-        if memory_size == 0:
-            logger.warning("No memory size found in node list, using default")
-            memory_size = 1024**3  # 1GB default
+            if node_memory > 0:
+                nodes_with_memory += 1
+                max_memory_bytes = max(max_memory_bytes, node_memory)
 
-        return memory_size / (1024**3)
+        if max_memory_bytes == 0:
+            logger.warning(f"No memory size found in node list, using default of {CPU_MIN_MEMORY_GB}GB")
+            max_memory_bytes = CPU_MIN_MEMORY_GB * (1024**3)  # Default for models
+        else:
+            logger.info(
+                f"Calculated maximum memory from {nodes_with_memory} nodes: {max_memory_bytes / (1024**3):.2f} GB"
+            )
+
+        return max_memory_bytes / (1024**3)
 
     def deploy(
         self,
@@ -259,7 +281,78 @@ class DeploymentHandler:
         for _idx, node in enumerate(node_list):
             node["args"]["served-model-name"] = namespace
 
+            # Extract concurrency from labels (where budsim actually stores it)
+            node_concurrency = node.get("labels", {}).get("concurrency", "1")
+            node_concurrency = int(node_concurrency)  # Convert from string to int
+            node["concurrency"] = node_concurrency  # Also preserve at top level for Helm template
+
+            # Memory is already in GB from BudSim, no conversion needed
+            # Use tiered buffer: 1GB for ≤10GB, 2GB for >10GB
+            buffer_gb = 1 if node["memory"] <= 10 else 2
+            allocation_memory_gb = max(node["memory"] + buffer_gb, 1)  # Ensure non-zero for division safety
+
+            # Check for CPU device type and apply specific memory formula
+            device_type = node.get("type", "cpu")
+            if device_type == "cpu_high":
+                weight_memory_gb = node.get("weight_memory_gb", 0)
+                kv_cache_memory_gb = node.get("kv_cache_memory_gb", 0) if node.get("kv_cache_memory_gb", 0) > 4 else 4
+
+                # If we have the detailed memory components, use the new formula
+                if weight_memory_gb > 0 and kv_cache_memory_gb > 0:
+                    # Formula: memory_allocation = total_memory * multiplier + kv_cache_memory
+                    # Here "total_memory" is interpreted as model weights
+                    raw_memory_gb = (weight_memory_gb * CPU_MEMORY_MULTIPLIER) + kv_cache_memory_gb
+                    allocation_memory_gb = raw_memory_gb + buffer_gb
+                    # Ensure a minimum allocation for CPU nodes
+                    allocation_memory_gb = max(allocation_memory_gb, CPU_MIN_MEMORY_GB)
+                    logger.info(
+                        f"CPU Node {node.get('name')}: Calculated memory using formula "
+                        f"({weight_memory_gb:.2f} * {CPU_MEMORY_MULTIPLIER} + {kv_cache_memory_gb:.2f}) + {buffer_gb} = {allocation_memory_gb:.2f} GB"
+                    )
+
+                    # Update node memory for consistency
+                    node["memory"] = allocation_memory_gb
+
+                    # Set VLLM_CPU_KVCACHE_SPACE env var
+                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb)
+                    logger.info(f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb} GB")
+                else:
+                    logger.warning(
+                        f"CPU Node {node.get('name')}: Missing detailed memory components (weight: {weight_memory_gb}, kv: {kv_cache_memory_gb}). "
+                        "Using default memory allocation."
+                    )
+
+                # Set core_count for CPU resource limits in Helm template
+                # Priority: cores from budsim > physical_cores > default 14
+                core_count = node.get("cores") or node.get("physical_cores") or 14
+                node["core_count"] = core_count - 2
+
+                # For shared mode, set CPU request to configured ratio of limit (minimum 1 core)
+                # For dedicated mode, request equals limit
+                hardware_mode = node.get("hardware_mode", "dedicated")
+                if hardware_mode == "shared":
+                    node["core_request"] = max(1, int(node["core_count"] * SHARED_MODE_CORE_RATIO))
+                    logger.info(
+                        f"CPU Node {node.get('name')}: Shared mode - core_request={node['core_request']}, core_limit={node['core_count']}"
+                    )
+                else:
+                    node["core_request"] = node["core_count"]
+                    logger.info(f"CPU Node {node.get('name')}: Dedicated mode - core_count={node['core_count']}")
+
             node["args"]["gpu-memory-utilization"] = 0.95
+            node["args"]["max-num-seqs"] = node_concurrency
+
+            # For shared hardware mode, calculate GPU memory limit in MB
+            hardware_mode = node.get("hardware_mode", "dedicated")
+            if hardware_mode == "shared":
+                # Convert GB to MB for nvidia.com/gpumem resource limit
+                gpu_memory_mb = int(allocation_memory_gb * 1024)
+                node["gpu_memory_mb"] = gpu_memory_mb
+                logger.debug(
+                    f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
+                )
+
+                node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
 
             # Enable LoRA configuration if engine supports it
             supports_lora = node.get("supports_lora", False)
@@ -309,8 +402,6 @@ class DeploymentHandler:
                 node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
                 logger.info("Enabled runtime LoRA updating")
 
-            # node["core_count"] = core_count if device["type"] == "cpu" else 1
-            node["memory"] = node["memory"] / (1024**3)
             node["name"] = self._to_k8s_label(node["name"])
 
             # Add device mapping for node selector
@@ -622,6 +713,7 @@ api_key_location = "env::API_KEY"
         namespace: str = None,
         default_storage_class: Optional[str] = None,
         default_access_mode: Optional[str] = None,
+        storage_size_gb: Optional[float] = None,
     ):
         """Transfer model to the pod.
 
@@ -632,6 +724,8 @@ api_key_location = "env::API_KEY"
             platform: Optional cluster platform
             namespace: Optional Kubernetes namespace
             default_storage_class: Optional storage class for PVC creation
+            default_access_mode: Optional access mode for PVC
+            storage_size_gb: Actual model storage size in GB from MinIO
         """
         model_uri = [part for part in model_uri.split("/") if part]
         model_uri = model_uri[-1]
@@ -639,6 +733,42 @@ api_key_location = "env::API_KEY"
         access_mode = default_access_mode or "ReadWriteOnce"
         if default_access_mode:
             logger.info(f"Model transfer using provided access mode: {default_access_mode}")
+
+        # Calculate PVC size with validation
+        if storage_size_gb and storage_size_gb > 0:
+            # Use actual storage size from MinIO with 20% buffer for safety
+            pvc_size_gb = math.ceil(storage_size_gb * 1.2)
+            logger.info(
+                f"Using actual model storage size: {storage_size_gb:.2f} GB, "
+                f"PVC size with 20% buffer: {pvc_size_gb} GB"
+            )
+        else:
+            # Fallback to memory-based calculation
+            raw_size = self._get_memory_size(node_list) * 1.1
+            pvc_size_gb = math.ceil(raw_size)
+            logger.warning(f"Model storage size not available, using fallback calculation: {pvc_size_gb} GB")
+
+        # Additional warning if below recommended minimum
+        if pvc_size_gb < 1:
+            pvc_size_gb = 1
+            logger.warning(
+                f"PVC size ({pvc_size_gb} GB) is below recommended minimum of 1 GB. Setting the value to 1 GB"
+            )
+
+        # Determine device type and hardware mode from node_list for model transfer affinity
+        # CPU deployments need nodeAffinity to avoid master nodes
+        # Shared mode needs podAffinity for bin-packing
+        device_type = ""
+        hardware_mode = "dedicated"
+        if node_list:
+            for node in node_list:
+                if isinstance(node, dict):
+                    if node.get("type"):
+                        device_type = node.get("type")
+                    if node.get("hardware_mode"):
+                        hardware_mode = node.get("hardware_mode")
+                    break
+
         values = {
             "source_model_path": model_uri,
             "namespace": namespace,
@@ -647,9 +777,11 @@ api_key_location = "env::API_KEY"
             "minio_access_key": secrets_settings.minio_access_key,
             "minio_secret_key": secrets_settings.minio_secret_key,
             "minio_bucket": app_settings.minio_bucket,
-            "model_size": self._get_memory_size(node_list),
+            "model_size": pvc_size_gb,
             "nodes": node_list,
             "volume_type": app_settings.volume_type,
+            "deviceType": device_type,
+            "hardwareMode": hardware_mode,
         }
 
         # Add storage class configuration if provided
@@ -743,6 +875,20 @@ api_key_location = "env::API_KEY"
             get_deployment_status(
                 self.config, ingress_url, {"namespace": namespace}, cloud_model, platform, ingress_health
             )
+        )
+
+    async def get_deployment_status_async(
+        self,
+        namespace: str,
+        ingress_url: str,
+        cloud_model: bool = False,
+        platform: Optional[ClusterPlatformEnum] = None,
+        ingress_health: bool = True,
+        check_pods: bool = True,
+    ):
+        """Get the status of a deployment by namespace asynchronously."""
+        return await get_deployment_status(
+            self.config, ingress_url, {"namespace": namespace}, cloud_model, platform, ingress_health, check_pods
         )
 
     async def get_pod_status(self, namespace: str, pod_name: str, platform: Optional[ClusterPlatformEnum] = None):

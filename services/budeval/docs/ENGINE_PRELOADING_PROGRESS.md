@@ -69,7 +69,7 @@ ConfigMap: preloaded-engines (state tracking)
 - **Manual Control**: API endpoints for on-demand operations
 
 #### Current Engine Support
-- **OpenCompass**: `ghcr.io/rahulvramesh/opencompass:latest`
+- **OpenCompass**: `docker.io/budstudio/opencompass:latest`
 - **Extensible**: Automatically supports any newly registered engines
 
 ### Testing Checklist

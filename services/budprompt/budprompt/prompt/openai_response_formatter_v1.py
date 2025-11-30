@@ -16,11 +16,11 @@
 
 """OpenAI Response Formatter for converting pydantic-ai responses to OpenAI format."""
 
-import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
+from budmicroframe.commons import logging
 from openai.types.responses import (
     ResponseTextConfig,
     ResponseUsage,
@@ -68,12 +68,12 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.run import AgentRunResult
 
-from ..commons.constants import STRUCTURED_OUTPUT_TOOL_NAME, STRUCTURED_PUTOUT_TOOL_DESCRIPTION
+from ..commons.constants import STRUCTURED_OUTPUT_TOOL_DESCRIPTION, STRUCTURED_OUTPUT_TOOL_NAME
 from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
 
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 __all__ = [
     "OpenAIResponseFormatter_V1",
@@ -364,7 +364,7 @@ class OpenAIResponseFormatter_V1:
                 if (
                     isinstance(part, ToolReturnPart)
                     and part.tool_name == STRUCTURED_OUTPUT_TOOL_NAME
-                    and part.content == STRUCTURED_PUTOUT_TOOL_DESCRIPTION
+                    and part.content == STRUCTURED_OUTPUT_TOOL_DESCRIPTION
                 ):
                     return True
 

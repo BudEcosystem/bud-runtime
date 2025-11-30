@@ -78,6 +78,9 @@ export default function SelectEvaluation() {
       ),
   );
 
+  useEffect(()=> {
+    setSelectedDatasets(Array.isArray(currentWorkflow?.workflow_steps?.dataset_ids) ? currentWorkflow?.workflow_steps?.dataset_ids : [])
+  }, [currentWorkflow])
   return (
     <BudForm
       data={{}}

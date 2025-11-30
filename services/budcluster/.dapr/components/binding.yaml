@@ -8,7 +8,7 @@ spec:
   version: v1
   metadata:
   - name: schedule
-    value: "@every 3m" # Every 3 minutes
+    value: "@every 10m" # Every 10 minutes - reduced to prevent OOM
   - name: direction
     value: "input"
   - name: route
@@ -28,3 +28,18 @@ spec:
     value: "input"
   - name: route
     value: "/metrics/collect-all-cluster-metrics"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: periodic-deployment-status-update
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 3m" # Every 3 minutes
+  - name: direction
+    value: "input"
+  - name: route
+    value: "/deployment/periodic-deployment-status-update"

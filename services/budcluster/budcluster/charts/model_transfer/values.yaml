@@ -1,10 +1,12 @@
 namespace: default
 pvcName: models-pvc
-image: budstudio/minio-downloader:0.2.0
+image: budstudio/minio-downloader:0.3.0
 podName: model-transfer
 pvcSize: 10
 storageClass: default
 accessMode: ReadWriteOnce
+deviceType: ""  # cpu_high, cuda, hpu - used for node affinity
+hardwareMode: "dedicated"  # dedicated or shared - used for pod affinity
 
 imagePullSecrets:
   name: bud-registry-secret

@@ -158,6 +158,7 @@ class WorkflowService(SessionMixin):
             max_input_tokens = required_data.get("max_input_tokens")
             max_output_tokens = required_data.get("max_output_tokens")
             datasets = required_data.get("datasets")
+            dataset_ids = required_data.get("dataset_ids")
             nodes = required_data.get("nodes")
             credential_id = required_data.get("credential_id")
             user_confirmation = required_data.get("user_confirmation")
@@ -223,6 +224,9 @@ class WorkflowService(SessionMixin):
             chat_template = required_data.get("chat_template")
             enable_tool_calling = required_data.get("enable_tool_calling")
             enable_reasoning = required_data.get("enable_reasoning")
+
+            # Extract hardware mode
+            hardware_mode = required_data.get("hardware_mode")
 
             # Handle experiment_id extraction with UUID conversion
             experiment_id_str = required_data.get("experiment_id")
@@ -423,6 +427,8 @@ class WorkflowService(SessionMixin):
                 chat_template=chat_template if chat_template else None,
                 enable_tool_calling=enable_tool_calling if enable_tool_calling else None,
                 enable_reasoning=enable_reasoning if enable_reasoning else None,
+                hardware_mode=hardware_mode if hardware_mode else None,
+                dataset_ids=dataset_ids,
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -536,9 +542,7 @@ class WorkflowService(SessionMixin):
                 "user_confirmation",
                 "run_as_simulation",
             ],
-            "evaluation": [
-                BudServeWorkflowStepEventName.EVALUATION_EVENTS.value,
-            ],
+            "evaluation": [BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, "dataset_ids"],
             "add_adapter": [
                 "adapter_model_id",
                 "adapter_name",
@@ -551,6 +555,7 @@ class WorkflowService(SessionMixin):
                 "project_id",
                 "cluster_id",
                 "endpoint_name",
+                "hardware_mode",
                 "budserve_cluster_events",
                 "bud_simulator_events",
                 "deploy_config",

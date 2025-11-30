@@ -1,10 +1,11 @@
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from budmicroframe.commons.logging import get_logger
 from fastapi import status
 from fastapi.exceptions import HTTPException
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 
 from ..commons.base_crud import BaseDataManager
 from .models import Cluster as ClusterModel
@@ -103,6 +104,27 @@ class ClusterDataManager(BaseDataManager):
             List of clusters matching the given statuses
         """
         stmt = select(ClusterModel).filter(ClusterModel.status.in_(statuses))
+        return await self.get_all(stmt)
+
+    async def get_error_clusters_due_for_retry(self, status: str, cutoff_time: datetime) -> List[ClusterModel]:
+        """Get ERROR clusters that haven't been retried since cutoff time.
+
+        Args:
+            status: Cluster status to filter by (ERROR)
+            cutoff_time: Only return clusters with last_retry_time before this or None
+
+        Returns:
+            List of clusters due for retry
+        """
+        stmt = select(ClusterModel).filter(
+            and_(
+                ClusterModel.status == status,
+                or_(
+                    ClusterModel.last_retry_time.is_(None),
+                    ClusterModel.last_retry_time < cutoff_time,
+                ),
+            )
+        )
         return await self.get_all(stmt)
 
 

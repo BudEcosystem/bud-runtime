@@ -352,9 +352,19 @@ class LicenseExtractor:
 
         if license_id:
             license_details["license_id"] = license_id
+            # Use license_id as fallback if name is still None or empty
+            if not license_details.get("name"):
+                license_details["name"] = license_id
 
         if license_name:
             license_details["name"] = license_name
+
+        # Final safety check: ensure name is never None
+        if not license_details.get("name"):
+            logger.warning(
+                f"License name is missing, using license_id as fallback: {license_details.get('license_id')}"
+            )
+            license_details["name"] = license_details.get("license_id") or "unknown"
 
         return LicenseCreate(
             license_id=license_details["license_id"],
@@ -472,8 +482,11 @@ class HuggingFaceLicenseExtractor(LicenseExtractor):
 
             if hf_license_id:
                 license_details["license_id"] = hf_license_id
+                # Use license_id as fallback if name is still None or empty
+                if not license_details.get("name"):
+                    license_details["name"] = hf_license_id
 
-            if hf_license_name != "Unknown":
+            if hf_license_name and hf_license_name != "Unknown":
                 license_details["name"] = hf_license_name
 
             # Upload license details to minio by downloading to a temporary file
@@ -496,6 +509,13 @@ class HuggingFaceLicenseExtractor(LicenseExtractor):
                     return None
 
                 logger.debug(f"License info uploaded to minio: {minio_object_name}")
+
+                # Ensure name is never None before creating LicenseCreate (safety check)
+                if not license_details.get("name"):
+                    logger.warning(
+                        f"License name is missing for {uri}, using license_id as fallback: {license_details.get('license_id')}"
+                    )
+                    license_details["name"] = license_details.get("license_id") or "unknown"
 
                 # Create license data
                 license_data = LicenseCreate(

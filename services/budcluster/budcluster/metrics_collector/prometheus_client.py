@@ -1,7 +1,5 @@
 """Prometheus client for querying metrics from cluster Prometheus instances."""
 
-import asyncio
-import tempfile
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import AsyncGenerator, List, Optional
@@ -9,11 +7,13 @@ from typing import AsyncGenerator, List, Optional
 import aiohttp
 import yaml
 from budmicroframe.commons.logging import get_logger
-from kubernetes import client, config
+from kubernetes import client
 from kubernetes.client.exceptions import ApiException
 
+from ..cluster_ops.kubernetes import KubernetesHandler
 from ..commons.config import app_settings
 from ..commons.exceptions import KubernetesException
+from ..commons.metrics_config import get_hami_scheduler_port, is_hami_metrics_enabled
 from .schemas import Metric, MetricSample, PrometheusQueryResult
 
 
@@ -23,17 +23,25 @@ logger = get_logger(__name__)
 class PrometheusClient:
     """Client for querying Prometheus instances in Kubernetes clusters."""
 
-    def __init__(self, kubeconfig: str, timeout: int = 30):
+    def __init__(self, kubeconfig: str, timeout: int = 30, kubernetes_handler: KubernetesHandler = None):
         """Initialize Prometheus client.
 
         Args:
-            kubeconfig: Kubernetes configuration as a string
+            kubeconfig: Kubernetes configuration as a string or dict
             timeout: Query timeout in seconds
+            kubernetes_handler: Optional KubernetesHandler instance for port-forwarding.
+                              If not provided, one will be created from kubeconfig.
         """
         self.kubeconfig = kubeconfig
         self.timeout = timeout
-        self._port_forward_process = None
-        self._local_port = None
+
+        # Use provided handler or create a new one
+        if kubernetes_handler:
+            self.k8s_handler = kubernetes_handler
+        else:
+            # Create handler from kubeconfig
+            config_dict = kubeconfig if isinstance(kubeconfig, dict) else yaml.safe_load(kubeconfig)
+            self.k8s_handler = KubernetesHandler(config=config_dict)
 
     @asynccontextmanager
     async def _create_port_forward(self) -> AsyncGenerator[int, None]:
@@ -45,104 +53,80 @@ class PrometheusClient:
         Raises:
             KubernetesException: If port-forward fails
         """
-        # Write kubeconfig to temporary file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            if isinstance(self.kubeconfig, dict):
-                yaml.dump(self.kubeconfig, f)
-            else:
-                f.write(self.kubeconfig)
-            kubeconfig_path = f.name
-
+        # Verify Prometheus service exists before attempting port-forward
         try:
-            # Load Kubernetes configuration
-            config.load_kube_config(config_file=kubeconfig_path)
-
-            # Get the default configuration
-            configuration = client.Configuration.get_default_copy()
-            # Disable SSL cert validation based on app settings
-            configuration.verify_ssl = app_settings.validate_certs
-            # Set this configuration as the default
-            client.Configuration.set_default(configuration)
-
-            v1 = client.CoreV1Api()
-
-            # Get Prometheus service
-            try:
-                v1.read_namespaced_service(
-                    name=app_settings.prometheus_service_name, namespace=app_settings.prometheus_namespace
-                )
-            except ApiException as e:
-                if e.status == 404:
-                    raise KubernetesException(
-                        f"Prometheus service {app_settings.prometheus_service_name} not found in namespace {app_settings.prometheus_namespace}"
-                    ) from e
-                raise KubernetesException(f"Failed to get Prometheus service: {e}") from e
-
-            # Find an available local port
-            import socket
-
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("", 0))
-                local_port = s.getsockname()[1]
-
-            # Create port-forward using kubectl command (more reliable than Python API)
-            import subprocess
-
-            cmd = [
-                "kubectl",
-                f"--kubeconfig={kubeconfig_path}",
-            ]
-
-            # Add insecure flag if SSL verification is disabled
-            if not app_settings.validate_certs:
-                cmd.append("--insecure-skip-tls-verify")
-
-            cmd.extend(
-                [
-                    "port-forward",
-                    f"service/{app_settings.prometheus_service_name}",
-                    f"{local_port}:{app_settings.prometheus_port}",
-                    "-n",
-                    app_settings.prometheus_namespace,
-                ]
+            v1 = client.CoreV1Api(api_client=self.k8s_handler.api_client)
+            v1.read_namespaced_service(
+                name=app_settings.prometheus_service_name, namespace=app_settings.prometheus_namespace
             )
+        except ApiException as e:
+            if e.status == 404:
+                raise KubernetesException(
+                    f"Prometheus service {app_settings.prometheus_service_name} not found in namespace {app_settings.prometheus_namespace}"
+                ) from e
+            raise KubernetesException(f"Failed to get Prometheus service: {e}") from e
 
-            logger.info(
-                f"Creating port-forward from localhost:{local_port} to {app_settings.prometheus_service_name}:{app_settings.prometheus_port}"
-            )
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            # Wait for port-forward to be ready
-            await asyncio.sleep(2)
-
-            # Check if process is still running
-            if process.poll() is not None:
-                stderr = process.stderr.read().decode() if process.stderr else ""
-                raise KubernetesException(f"Port-forward failed to start: {stderr}")
-
-            self._port_forward_process = process
-            self._local_port = local_port
-
+        # Delegate port-forwarding to KubernetesHandler
+        async with self.k8s_handler.create_port_forward(
+            service_name=app_settings.prometheus_service_name,
+            namespace=app_settings.prometheus_namespace,
+            target_port=app_settings.prometheus_port,
+            label="Prometheus",
+        ) as local_port:
             yield local_port
 
-        finally:
-            # Clean up port-forward
-            if self._port_forward_process:
-                logger.info("Cleaning up port-forward")
-                self._port_forward_process.terminate()
-                try:
-                    self._port_forward_process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    self._port_forward_process.kill()
-                self._port_forward_process = None
-                self._local_port = None
+    @asynccontextmanager
+    async def _create_hami_port_forward(self) -> AsyncGenerator[int, None]:
+        """Create a port-forward to the HAMI scheduler service for metrics scraping.
 
-            # Clean up temporary kubeconfig file
-            import os
-            from contextlib import suppress
+        This establishes a kubectl port-forward tunnel from localhost to the HAMI scheduler
+        service running in the target cluster's kube-system namespace.
 
-            with suppress(Exception):
-                os.unlink(kubeconfig_path)
+        Yields:
+            Local port number where HAMI metrics are accessible
+
+        Raises:
+            KubernetesException: If HAMI service not found or port-forward fails
+        """
+        hami_service_name = "hami-scheduler"
+        hami_namespace = "kube-system"
+
+        # Get HAMI scheduler service and find the correct port
+        try:
+            v1 = client.CoreV1Api(api_client=self.k8s_handler.api_client)
+            service = v1.read_namespaced_service(name=hami_service_name, namespace=hami_namespace)
+        except ApiException as e:
+            if e.status == 404:
+                raise KubernetesException(
+                    f"HAMI scheduler service {hami_service_name} not found in namespace {hami_namespace}. "
+                    "HAMI may not be installed on this cluster."
+                ) from e
+            raise KubernetesException(f"Failed to get HAMI scheduler service: {e}") from e
+
+        # Find the service port that corresponds to the configured NodePort
+        hami_metrics_nodeport = get_hami_scheduler_port()  # Default: 31993
+        service_port = None
+
+        for port in service.spec.ports:
+            if port.node_port == hami_metrics_nodeport:
+                service_port = port.port
+                break
+
+        if not service_port:
+            available_ports = [(p.port, p.node_port) for p in service.spec.ports]
+            raise KubernetesException(
+                f"HAMI scheduler service does not expose NodePort {hami_metrics_nodeport}. "
+                f"Available ports: {available_ports}"
+            )
+
+        # Delegate port-forwarding to KubernetesHandler
+        async with self.k8s_handler.create_port_forward(
+            service_name=hami_service_name,
+            namespace=hami_namespace,
+            target_port=service_port,
+            label="HAMI",
+        ) as local_port:
+            yield local_port
 
     async def query(self, query: str, time: Optional[datetime] = None) -> PrometheusQueryResult:
         """Execute an instant query against Prometheus.
@@ -293,3 +277,46 @@ class PrometheusClient:
         except Exception as e:
             logger.error(f"Prometheus connection test failed: {e}")
             return False
+
+    async def get_hami_metrics(self) -> Optional[str]:
+        """Get HAMI GPU time-slicing metrics from the HAMI scheduler service.
+
+        This method uses kubectl port-forward to establish a secure tunnel to the HAMI
+        scheduler service in the target cluster, then scrapes Prometheus-formatted metrics
+        about GPU allocation and sharing.
+
+        Returns:
+            Raw Prometheus metrics text from HAMI scheduler, or None if HAMI is not enabled/available
+
+        Raises:
+            KubernetesException: If HAMI service not found or port-forward fails
+            aiohttp.ClientError: If HTTP request to metrics endpoint fails
+        """
+        if not is_hami_metrics_enabled():
+            logger.debug("HAMI metrics collection is disabled")
+            return None
+
+        try:
+            async with self._create_hami_port_forward() as local_port:
+                metrics_url = f"http://localhost:{local_port}/metrics"
+                logger.info(f"Scraping HAMI metrics from {metrics_url}")
+
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.get(
+                            metrics_url, timeout=aiohttp.ClientTimeout(total=self.timeout)
+                        ) as response:
+                            response.raise_for_status()
+                            metrics_text = await response.text()
+                            logger.info(f"Successfully scraped {len(metrics_text)} bytes of HAMI metrics")
+                            return metrics_text
+                    except aiohttp.ClientError as e:
+                        logger.error(f"Failed to scrape HAMI metrics from {metrics_url}: {e}")
+                        raise
+
+        except KubernetesException as e:
+            # Handle missing HAMI service gracefully
+            if "not found" in str(e):
+                logger.warning(f"HAMI scheduler service not available: {e}")
+                return None
+            raise

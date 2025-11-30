@@ -1,39 +1,29 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import {
-  Card,
-  Descriptions,
   Tag,
   Spin,
   Button,
-  Divider,
   Typography,
-  Row,
-  Col,
-  Statistic,
   message,
   Tooltip,
   Flex,
   Alert,
 } from "antd";
 import {
-  ArrowLeftOutlined,
   CopyOutlined,
   DownloadOutlined,
 } from "@ant-design/icons";
-import { format } from "date-fns";
 import { formatTimestampWithTZ } from "@/utils/formatDate";
 import { copyToClipboard as copyText } from "@/utils/clipboard";
 import { AppRequest } from "src/pages/api/requests";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import {
-  Text_11_400_808080,
   Text_12_400_B3B3B3,
   Text_12_400_EEEEEE,
   Text_12_600_EEEEEE,
   Text_14_600_EEEEEE,
   Text_16_600_FFFFFF,
-  Text_20_400_FFFFFF,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
 import DashBoardLayout from "../../../../layout";
@@ -42,7 +32,7 @@ import BackButton from "@/components/ui/bud/drawer/BackButton";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
 
-const { Title, Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 interface InferenceDetail {
   inference_id: string;
@@ -171,7 +161,7 @@ const InferenceDetailPage: React.FC = () => {
           <Flex align="center" justify="start">
             <BackButton onClick={goBack} />
             <CustomBreadcrumb
-              data={["Projects", `${slug}`, "Observability", "Details"]}
+              data={["Projects", `${inferenceData?.project_name || slug || ""}`, "Observability", "Details"]}
               urls={["/projects", `/projects/${slug}`, "", ""]}
             />
           </Flex>
