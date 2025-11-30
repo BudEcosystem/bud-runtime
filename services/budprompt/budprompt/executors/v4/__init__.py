@@ -14,7 +14,7 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""Simple Prompt Executor Module - Version 3 (Active)."""
+"""Simple Prompt Executor Module - Version 4 (Active)."""
 
 from .executor import SimplePromptExecutor_V4
 
