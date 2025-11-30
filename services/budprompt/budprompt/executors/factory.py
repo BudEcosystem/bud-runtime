@@ -43,7 +43,8 @@ class PromptExecutorFactory:
     Supported Versions:
         - Version 1: SimplePromptExecutorDeprecated (basic functionality)
         - Version 2: SimplePromptExecutor (improved with better formatters)
-        - Version 3: SimplePromptExecutor_V1 (active version with MCP tools support)
+        - Version 3: SimplePromptExecutor_V1 (MCP tools support)
+        - Version 4: SimplePromptExecutor_V4 (active version with chat history support)
 
     Example:
         >>> executor = PromptExecutorFactory.get_executor(version=3)
@@ -54,17 +55,17 @@ class PromptExecutorFactory:
     @staticmethod
     def get_executor(
         version: int = 4,
-    ) -> Union[SimplePromptExecutorDeprecated, SimplePromptExecutor, SimplePromptExecutor_V1]:
+    ) -> Union[SimplePromptExecutorDeprecated, SimplePromptExecutor, SimplePromptExecutor_V1, SimplePromptExecutor_V4]:
         """Get executor instance for the specified version.
 
         Args:
-            version: Executor version (1, 2, or 3). Default: 4
+            version: Executor version (1, 2, 3, or 4). Default: 4
 
         Returns:
             Executor instance of the requested version.
 
         Raises:
-            ValueError: If version is not 1, 2, or 3.
+            ValueError: If version is not 1, 2, 3, or 4.
         """
         if version == 1:
             logger.debug("Creating SimplePromptExecutorDeprecated (version 1)")
