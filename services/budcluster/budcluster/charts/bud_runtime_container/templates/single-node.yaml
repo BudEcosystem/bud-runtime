@@ -51,6 +51,7 @@ spec:
       - name: {{ $.Values.imagePullSecrets.name }}
       {{- if eq .node.type "cuda" }}
       runtimeClassName: nvidia
+      schedulerName: hami-scheduler
       {{- end }}
       containers:
       {{- if eq .node.type "cpu_high" }}
