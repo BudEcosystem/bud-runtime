@@ -18,6 +18,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
     deploymentSpecifcation,
     setDeploymentSpecification,
     currentWorkflow,
+    hardwareMode,
   } = useDeployModel();
 
   const isCloudModelFlow =
@@ -331,7 +332,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
             </Form.Item>
           </div>
         </div>
-        {!isCloudModelFlow && (
+        {!isCloudModelFlow && hardwareMode === "dedicated" && (
           <>
             <div className="flex gap-[1rem] w-full flex-row">
               <div className="w-full">
