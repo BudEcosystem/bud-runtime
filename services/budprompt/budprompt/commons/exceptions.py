@@ -69,7 +69,7 @@ class PromptExecutionException(Exception):
         Args:
             message: Human-readable error message
             status_code: HTTP status code (default: 500 for server errors)
-            type: Optional OpenAI error type
+            err_type: Optional OpenAI error type
             param: Optional parameter path that caused the error
             code: Optional specific error code (e.g., "invalid_schema", "execution_failed")
         """
