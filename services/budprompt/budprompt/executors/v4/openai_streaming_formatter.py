@@ -81,6 +81,7 @@ from pydantic_ai.messages import (
     ToolCallPart,
     ToolCallPartDelta,
 )
+from pydantic_ai.run import AgentRunResult
 
 from ...commons.constants import STRUCTURED_OUTPUT_TOOL_NAME
 from ...prompt.schemas import MCPToolConfig, Message, ModelSettings
@@ -1322,7 +1323,7 @@ class OpenAIStreamingFormatter_V4:
 
     async def build_final_output_items_from_result(
         self,
-        final_result,  # AgentRunResult type
+        final_result: AgentRunResult,  # AgentRunResult type
         tools: Optional[List[MCPToolConfig]] = None,
     ) -> List[Any]:
         """Build complete output items from AgentRunResult.
@@ -1342,7 +1343,8 @@ class OpenAIStreamingFormatter_V4:
 
         # Use the non-streaming formatter to build complete output items (includes structured output)
         formatter = OpenAIResponseFormatter_V4()
-        all_messages = final_result.all_messages()
+        # all_messages = final_result.all_messages()
+        all_messages = final_result.new_messages()
         output_items = await formatter.build_complete_output_items(all_messages, final_result, tools)
 
         return output_items
