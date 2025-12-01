@@ -635,6 +635,7 @@ class SimulationService:
                     supports_pipeline_parallelism=supports_pipeline_parallelism,
                     hardware_mode=hardware_mode,
                     is_quantization=bool(quantization_type),
+                    supports_lora=supports_lora,
                 )
                 top_k_configs = optimizer.search()
                 # Convert SearchResult dataclasses to dicts for JSON serialization in workflow mode
@@ -1668,6 +1669,58 @@ class SimulationService:
             for item in result.items:
                 recommendations.append(item.model_dump(mode="json") if serialize else item)
 
+            # Check if any recommendations failed to meet target concurrency
+            target_concurrency = request.concurrency
+            concurrency_warnings = []
+
+            for item in result.items:
+                actual_concurrency = item.metrics.concurrency
+                if actual_concurrency < target_concurrency:
+                    concurrency_warnings.append(
+                        {
+                            "cluster_id": str(item.cluster_id),
+                            "cluster_name": str(item.cluster_id),
+                            "target": target_concurrency,
+                            "actual": actual_concurrency,
+                        }
+                    )
+
+            # Fail workflow if concurrency target cannot be met
+            if concurrency_warnings:
+                # Build detailed error message
+                warning_details = [
+                    f"{w['cluster_name']}: achieved {w['actual']}/{w['target']} concurrency"
+                    for w in concurrency_warnings
+                ]
+
+                error_message = (
+                    f"Target concurrency {target_concurrency} cannot be achieved. "
+                    f"Details: {'; '.join(warning_details)}. "
+                    f"This may be due to limited available devices, memory constraints, or TP/PP requirements. "
+                    f"Recommended actions: (1) Add more devices to the cluster(s), "
+                    f"(2) Reduce concurrent_requests parameter, "
+                    f"or (3) Relax performance targets (ttft, throughput, e2e_latency)."
+                )
+
+                # Send ERROR notification
+                notification_req.payload.content = NotificationContent(
+                    title="Concurrency Target Cannot Be Met",
+                    message=error_message,
+                    status=WorkflowStatus.FAILED,
+                    primary_action="retry",
+                )
+                dapr_workflow.publish_notification(
+                    workflow_id=workflow_id,
+                    notification=notification_req,
+                    target_topic_name=request.source_topic,
+                    target_name=request.source,
+                )
+
+                logger.error(f"Failing workflow {workflow_id}: {error_message}")
+
+                # Fail the workflow by raising exception
+                raise ValueError(error_message)
+
             notification_req.payload.content = NotificationContent(
                 title="Ranked the clusters based on performance"
                 if cluster_id is None
@@ -2012,6 +2065,7 @@ class SimulationService:
                 if template_result.device_type in ("cpu", "cpu_high") and getattr(template_result, "cores", None)
                 else None
             ),
+            max_loras=top_k_configs.get("max_loras"),
         )
 
     @staticmethod
@@ -2095,6 +2149,15 @@ class SimulationService:
                 target_concurrency_per_result = top_k_configs.get("concurrency", 1)
                 needed_replicas = math.ceil(target_concurrency / target_concurrency_per_result)
                 replica_count = min(max_replicas, needed_replicas)
+
+                # Validate if target concurrency can be achieved
+                if replica_count < needed_replicas:
+                    logger.warning(
+                        f"Cannot fully meet target concurrency {target_concurrency} on {device_type}. "
+                        f"Need {needed_replicas} replicas but only {max_replicas} available. "
+                        f"Actual concurrency will be {replica_count * target_concurrency_per_result}"
+                    )
+
                 logger.info(f"Replica count for {device_type}: {replica_count}")
 
                 # Create node group configuration
@@ -2106,8 +2169,19 @@ class SimulationService:
                     logger.info(f"Successfully created node group for {device_type}")
                     config.node_groups.append(node_group)
                     total_cost += node_group.cost_per_million_tokens
-                    total_concurrency += top_k_configs.get("concurrency", 0) * replica_count
+                    device_concurrency = top_k_configs.get("concurrency", 0) * replica_count
+                    total_concurrency += device_concurrency
                     config.replica += replica_count
+
+                    # Detailed logging for concurrency scaling
+                    logger.info(
+                        f"Concurrency scaling for {device_type}: "
+                        f"optimized_concurrency_per_replica={top_k_configs.get('concurrency', 0)}, "
+                        f"replicas={replica_count}, "
+                        f"device_total_concurrency={device_concurrency}, "
+                        f"cumulative_total_concurrency={total_concurrency}, "
+                        f"target_concurrency={target_concurrency}"
+                    )
                     config.ttft += node_group.ttft
                     config.throughput_per_user += node_group.throughput_per_user
                     config.e2e_latency = max(config.e2e_latency, node_group.e2e_latency)
@@ -2120,6 +2194,16 @@ class SimulationService:
 
         config.concurrency = total_concurrency
         config.cost_per_million_tokens = total_cost
+
+        # Validate if target concurrency was achieved across all device types
+        if total_concurrency < target_concurrency:
+            logger.error(
+                f"Target concurrency {target_concurrency} cannot be met. "
+                f"Maximum achievable: {total_concurrency}. "
+                f"Consider relaxing performance targets or using more devices."
+            )
+        else:
+            logger.info(f"Successfully met target concurrency: {total_concurrency} >= {target_concurrency}")
 
         if not config.node_groups:
             logger.error("No node groups created, returning None")
