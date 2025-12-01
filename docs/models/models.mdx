@@ -5,53 +5,38 @@ description: "Cloud and Local Models capabilities and configuration"
 
 1. Description
 
-The Model module in Bud Admin centralizes how teams register, evaluate, route, and govern foundation models across cloud and on-prem environments. It was designed to bring “GPU-optional” GenAI to enterprises by mixing elastic cloud endpoints with highly optimized local runtimes—so teams can ship production-grade AI without waiting for scarce accelerator capacity. The module spans LLM, multi-model LLM, embeddings, speech to text, text to speech, action transformers, and document workloads.
+The Model module in Bud Admin centralizes how teams register, evaluate, route, and govern foundation models across cloud and on-prem environments. It brings GPU-optional GenAI to enterprises by mixing elastic cloud endpoints with highly optimized local runtimes, so teams can ship production-grade AI without waiting for scarce accelerator capacity. The module spans LLM, multi-model LLM, embeddings, speech to text, text to speech, action transformers, and document workloads.
 
 As enterprises scale GenAI, common pain points emerge:
 
 - How do we blend cloud APIs with local checkpoints without rewriting every app?
-
 - How do we avoid GPU queues while still meeting latency and quality targets?
-
 - How do we govern on-prem artifacts with the same rigor as managed cloud endpoints?
-
 - How do we give developers and auditors one source of truth for versions, routes, and policies?
 
 Bud AI Foundry addresses these challenges with:
 
 - A unified catalog that treats cloud and local models as first-class citizens with consistent metadata and approval gates,
-
 - Routing and scaling policies that favor CPU-first placements while bursting to cloud GPUs when SLOs demand it,
-
 - Safety, signing, and audit controls that travel with the model regardless of where it runs,
-
 - Built-in analytics so platform and app teams can pick the right backend for cost, latency, and compliance.
 
-⸻
-
 2. USPs (Unique Selling Propositions)
-
    1. GPU-optional architecture
 
       Run models on cost-efficient CPU-first stacks while still bursting to cloud GPUs when needed. Smart routing chooses the lowest-cost, policy-compliant backend per request.
-
    2. Unified catalog for every model type
 
       Keep cloud APIs, Hugging Face downloads, URL-based checkpoints, and disk-mounted models in one governed inventory with consistent metadata and policies across LLM, multi-model LLM, embeddings, speech, action transformers, and document tasks.
-
    3. Built-in safety and compliance controls
 
       Enforce guardrails, content filters, PII detection, and signing/attestation for on-prem artifacts before they are exposed to apps or external clients.
-
    4. Production-ready reliability
 
       Health checks, auto-failover between replicas/backends, and traffic shifting let teams roll out new model versions without downtime.
-
    5. Cost and performance visibility
 
       Per-route analytics show latency, throughput, token usage, and cost so you can pick the right model or backend for each workload.
-
-⸻
 
 3. Features
 
@@ -59,35 +44,33 @@ Bud AI Foundry addresses these challenges with:
 
 a. Cloud models
 
-                • Register managed endpoints from major clouds with keys, quotas, regional policies, and failover rules.
+               • Register managed endpoints from major clouds with keys, quotas, regional policies, and failover rules.
 
-                • Map SKUs and capabilities (LLM, multi-model LLM, embeddings, speech, action transformers, document) for fast discovery.
+               • Map SKUs and capabilities (LLM, multi-model LLM, embeddings, speech, action transformers, document) for fast discovery.
 
 b. Hugging Face models (download from Hugging Face)
 
-                • Pull repositories directly with checksum validation, optional offline mirrors, and support for LLM, embeddings, speech, action transformers, and document pipelines.
+               • Pull repositories directly with checksum validation, optional offline mirrors, and support for LLM, embeddings, speech, action transformers, and document pipelines.
 
-                • Capture hardware preferences (CPU/GPU), memory constraints, quantization settings, and tokenizer configs.
+               • Capture hardware preferences (CPU/GPU), memory constraints, quantization settings, and tokenizer configs.
 
 c. URL-based models (provide a URL to download model)
 
-                • Import checkpoints from signed or pre-approved URLs with expiry controls for air-gapped or controlled transfers.
+               • Import checkpoints from signed or pre-approved URLs with expiry controls for air-gapped or controlled transfers.
 
-                • Capture hardware preferences (CPU/GPU), memory constraints, quantization settings, and tokenizer configs.
+               • Capture hardware preferences (CPU/GPU), memory constraints, quantization settings, and tokenizer configs.
 
 d. Disk-based models (add from disk or server folder path)
 
-                • Register checkpoints from mounted disks or server paths with checksum/signature verification and lineage notes.
+               • Register checkpoints from mounted disks or server paths with checksum/signature verification and lineage notes.
 
-                • Capture hardware preferences (CPU/GPU), memory constraints, quantization settings, and tokenizer configs.
+               • Capture hardware preferences (CPU/GPU), memory constraints, quantization settings, and tokenizer configs.
 
 e. Metadata and governance
 
                • Standard fields for owner, project, PII exposure level, safety tags, license, and rollout status.
 
                • Attach evaluation baselines and approval workflows before promotion to production.
-
-⸻
 
 3.2 Routing, scaling, and reliability
 
@@ -99,8 +82,6 @@ e. Metadata and governance
 
                • Request-level controls: max tokens, temperature, stop sequences, retry budgets, and timeout guards.
 
-⸻
-
 3.3 Safety, compliance, and auditability
 
                • Content filters, jailbreak protection, and PII/PHI detection pipelines.
@@ -108,8 +89,6 @@ e. Metadata and governance
                • Mandatory signing/attestation for local artifacts and SBOM capture for supply-chain visibility.
 
                • Audit trails for model imports, policy changes, deployments, and route edits, exportable for compliance reviews.
-
-⸻
 
 3.4 Observability and optimization
 
@@ -119,8 +98,6 @@ e. Metadata and governance
 
                • Prompt-level analytics to spot regressions after model upgrades.
 
-⸻
-
 3.5 Quantized models and adapters
 
                • Track quantized variants (GGUF, GPTQ, AWQ, bits-and-bytes) alongside full-precision checkpoints with shared metadata and approvals.
@@ -128,8 +105,6 @@ e. Metadata and governance
                • Capture adapter lineage (LoRA/QLoRA/PEFT) including base model, training data tags, and compatible deployment targets.
 
                • Validate tokenizer and quantization configs to ensure deterministic rollouts between staging and production.
-
-⸻
 
 3.6 Security scan and supply chain integrity
 
@@ -139,8 +114,6 @@ e. Metadata and governance
 
                • Continuous drift detection to flag checksum or config changes on disk-backed and URL-hosted assets.
 
-⸻
-
 3.7 Evaluations
 
                • First-class evaluation runs with scenario tags (safety, hallucination, latency) that attach to each model version and route.
@@ -149,8 +122,6 @@ e. Metadata and governance
 
                • Store prompts, seeds, and datasets for repeatable runs; surface pass/fail gates that block promotion when thresholds are missed.
 
-⸻
-
 3.8 Performance benchmarks
 
                • Benchmark suites for throughput (tokens/s), latency percentiles, and memory footprint across CPU and GPU targets.
@@ -158,8 +129,6 @@ e. Metadata and governance
                • Compare cloud vs local vs quantized backends side-by-side to inform routing weights and autoscaling settings.
 
                • Publish reports to projects so app teams can select the best-fit model for their workload profile.
-
-⸻
 
 4. How-to Guides
 
@@ -170,8 +139,6 @@ e. Metadata and governance
                2. Click on Models menu from the side menu.
 
                3. Click on +Model button.
-
-⸻
 
 4.2 Add a cloud model
 
@@ -185,19 +152,15 @@ e. Metadata and governance
 
                5. Model should be added to the catalog.
 
-⸻
-
 4.3 Onboard a local Hugging Face model
 
                1. Click +Model and choose Modality.
 
-               2. Choose Huggingface.
+               2. Choose Hugging Face.
 
                3. Submit model name, URL, author, and tags.
 
                4. Model should be added to the catalog.
-
-⸻
 
 4.4 Onboard a local URL-based model
 
@@ -209,8 +172,6 @@ e. Metadata and governance
 
                4. Model should be added to the catalog.
 
-⸻
-
 4.5 Onboard a local disk-based model
 
                1. Click +Model and choose Modality.
@@ -221,8 +182,6 @@ e. Metadata and governance
 
                4. Model should be added to the catalog.
 
-⸻
-
 4.6 Edit a model
 
                1. Open the model detail page from the catalog.
@@ -230,8 +189,6 @@ e. Metadata and governance
                2. Update metadata (name, tags, modality notes) or adjust runtime settings as permitted.
 
                3. Save changes to refresh the catalog entry and downstream routes.
-
-⸻
 
 4.7 Delete a model
 
@@ -241,8 +198,6 @@ e. Metadata and governance
 
                3. Ensure dependent routes or applications are redirected before finalizing deletion.
 
-⸻
-
 4.8 Run a security scan
 
                1. Open the model detail page and select Security.
@@ -250,8 +205,6 @@ e. Metadata and governance
                2. Trigger a scan to validate checksums, signatures, SBOM insights, and vulnerability results.
 
                3. Review findings and apply required remediations before approving the model for routing.
-
-⸻
 
 4.9 Run an evaluation
 
@@ -261,8 +214,6 @@ e. Metadata and governance
 
                3. Execute the run and review baseline deltas before promoting the model or updating routes.
 
-⸻
-
 4.10 Run a performance benchmark
 
                1. Open the model detail page and select Benchmarks.
@@ -271,35 +222,31 @@ e. Metadata and governance
 
                3. Execute the benchmark and use the results to tune autoscaling or routing weights.
 
-⸻
-
 4.11 Add a quantized model variant
 
-1. Open the local model detail page and select Adapters tab.
-1. Click See More for Quantised Models section.
-1. Click Add Quantizations to add Quantised Models.
-2. Provide the quantization name, type and target hardware profile.
-3. Choose Quantization method and provide quantization recipe (weight bits, weight granularity, activation bits, activation granularity and symmetric)
-3. Save the variant; it will appear alongside the base model for routing and evaluation.
+               1. Open the model detail page and select Quantization.
 
-⸻
+               2. Provide the quantization recipe (bits, group size) and target hardware profile.
+
+               3. Save the variant; it will appear alongside the base model for routing and evaluation.
 
 4.12 View adapters
 
-1. Open the model detail page and select Adapters.
-2. Review available adapters, their lineage (base model, dataset), and activation status.
-3. Enable or disable adapters for specific routes or projects as needed.
+               1. Open the model detail page and select Adapters.
 
-⸻
+               2. Review available adapters, their lineage (base model, dataset), and activation status.
 
-4.13 Modify permissions for models module
+               3. Enable or disable adapters for specific routes or projects as needed.
 
-1. Open the model detail page and select Permissions.
-2. Assign view access for users who should only browse model listings.
-3. Grant manage permissions to users who can add models and perform edits, deletions, or routing updates.
-4. Save updates to enforce access across catalog and routing actions.
+4.13 Modify permissions for models
 
-⸻
+               1. Open the model detail page and select Permissions.
+
+               2. Assign view access for users who should only browse model listings.
+
+               3. Grant manage permissions to users who can add models and perform edits, deletions, or routing updates.
+
+               4. Save updates to enforce access across catalog and routing actions.
 
 5. FAQ
 
@@ -307,37 +254,25 @@ Q1. Which model types are supported?
 
 A. Cloud APIs, Hugging Face imports, signed URL downloads, and disk-mounted checkpoints are all first-class citizens. The module supports LLM, multi-model LLM, embeddings, speech to text, text to speech, action transformers, and document workloads with the same onboarding flow.
 
-⸻
-
 Q2. How do we keep local models secure?
 
 A. Artifacts require checksum or signature verification, optional SBOM capture, and policy-based approvals before activation. Safety filters and audit logs remain enforced even when running entirely on-prem.
 
-⸻
-
 Q3. Can we prioritize CPU to avoid GPU queues?
 
-A. Yes. You can proceed with CPU-first preferences and set routing rules that favor CPU until SLOs require GPU burst capacity.
-
-⸻
+A. Yes. You can tag backends with CPU-first preferences and set routing rules that favor CPU until SLOs require GPU burst capacity. Autoscaling respects those policies.
 
 Q4. How do we roll out a new model version safely?
 
 A. Use canary or shadow routing with weighted splits, attach evaluation baselines, and monitor analytics. Promote once latency, quality, and safety signals meet thresholds.
 
-⸻
-
 Q5. Does the module support multi-team isolation?
 
 A. Yes. Models carry project ownership, and routes can be scoped to teams. API keys, quotas, and analytics remain segmented per project and client.
 
-⸻
-
 Q6. What happens if a backend fails?
 
 A. Health checks and circuit breakers trigger automatic failover to the next eligible backend. Retries and timeout guards ensure requests either succeed or fail fast without hanging clients.
-
-⸻
 
 Q7. Can we audit who changed a route or model config?
 
