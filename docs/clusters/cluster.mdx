@@ -40,47 +40,36 @@ Quotas, budget guards, health gates, and preflight checks reduce misconfiguratio
 ### 3.1 Cluster registration
 
 - Guided registration for CPU, GPU, or mixed clusters with configurable networking, logging, and storage.
-
 - Support for cloud-managed and self-managed Kubernetes distributions.
 
 ### 3.2 Node pools & GPU-aware scheduling
 
 - Define node pools by instance type, GPU SKU, and availability zone.
-
 - Enable bin-packing and topology hints to maximize GPU occupancy.
-
 - Reserve pools for model-serving, batch training, or control-plane services.
 
 ### 3.3 Autoscaling & quotas
 
 - Horizontal and vertical autoscaling presets per pool.
-
 - Budget and quota controls per project/team with soft and hard limits.
-
 - Scale-to-zero for bursty agents; warm pools for low-latency inference.
 
 ### 3.4 Networking, security, and compliance
 
 - CNI and ingress configuration with support for private endpoints.
-
 - Namespace/project isolation with network policies and pod security standards.
-
 - Secrets management and image-signature enforcement for registries.
 
 ### 3.5 Observability & diagnostics
 
 - Live health status (nodes, GPU readiness, control-plane components).
-
 - Metrics and logs tabs with time-window filters and saved views.
-
 - Event timeline for deployments, reschedules, failures, and admin actions.
 
 ### 3.6 Integrations & runtime controls
 
 - Connect to model registries and OCI registries for runtime images.
-
 - Attach storage classes for datasets, checkpoints, and artifacts.
-
 - Webhooks for incident management, cost alerts, and guardrail violations.
 
 ⸻
@@ -153,11 +142,11 @@ Bud decommissions workloads, drains nodes, and revokes credentials before final 
 
 Open the cluster detail page from the listing.
 
-Review summary data including health, version, owners, tags, and environment.
+Review the summary cards for nodes, deployments, device types, disk space, RAM, and VRAM availability. 
 
-Check recent events for configuration or deployment changes.
+Switch the time filter (Today, 7 Days, This Month) to refresh utilization charts. Inspect CPU/GPU/HPU, memory, storage, and network bandwidth gauges to spot capacity or performance issues.
 
-Copy identifiers such as cluster ID or kubeconfig context for support requests.
+Inspect CPU/GPU/HPU, memory, storage, and network bandwidth gauges to spot capacity or performance issues.
 
 ⸻
 
