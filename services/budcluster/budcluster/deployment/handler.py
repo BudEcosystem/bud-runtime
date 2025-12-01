@@ -357,12 +357,13 @@ class DeploymentHandler:
             # Enable LoRA configuration if engine supports it
             supports_lora = node.get("supports_lora", False)
             if supports_lora:
-                # max_loras = 1 if not adapters else max(1, len(adapters))
-                max_loras = 5
+                # Use optimized max_loras from budsim if available, otherwise default to 5
+                max_loras = node.get("max_loras", 5)
                 node["args"]["max-loras"] = max_loras
                 node["args"]["max-lora-rank"] = 256
                 node["args"]["enable-lora"] = True
-                logger.info(f"LoRA enabled: max-loras={max_loras}, max-lora-rank=256")
+                source = "optimized by budsim" if "max_loras" in node else "default"
+                logger.info(f"LoRA enabled: max-loras={max_loras} ({source}), max-lora-rank=256")
 
             # Calculate max_model_len dynamically
             if input_tokens and output_tokens:

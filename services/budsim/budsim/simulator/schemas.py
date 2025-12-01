@@ -282,6 +282,8 @@ class NodeGroupConfiguration(BaseModel):
     kv_cache_memory_gb: Optional[float] = None
     # CPU cores for CPU/cpu_high deployments
     cores: Optional[int] = None
+    # Optimized LoRA configuration from simulation
+    max_loras: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_parallelism_config(self):
