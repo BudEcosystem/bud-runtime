@@ -212,6 +212,7 @@ class HeuristicCalculator:
             "seq_length": seq_length,
             "precision": self._get_precision_bits(model_params),
             "tensor_parallel": tp_size,  # Pass TP to get per-device memory
+            "respect_weight_tying": False,  # Count all physical tensors for accurate memory estimation
         }
 
         # Add LoRA parameters if provided

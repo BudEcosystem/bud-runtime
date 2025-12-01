@@ -282,14 +282,12 @@ class DirectSearchOptimizer:
                 self._heuristic_calc = HeuristicCalculator()
 
             # Get total GPU memory from device config
-            total_memory_gb = (
-                self.device_config.get("mem_per_gpu_in_gb")
-                or self.device_config.get("mem_per_GPU_in_GB")
-                or self.device_config.get("memory")
-                or self.device_config.get("memory_gb")
-                or self.device_config.get("gpu_memory_gb")
-                or 0
-            )
+            # Use explicit None check to handle 0 values correctly
+            total_memory_gb = 0
+            for key in ("mem_per_gpu_in_gb", "mem_per_GPU_in_GB", "memory", "memory_gb", "gpu_memory_gb"):
+                if (mem := self.device_config.get(key)) is not None:
+                    total_memory_gb = mem
+                    break
 
             # Calculate available memory based on hardware mode
             hardware_mode = self.device_config.get("hardware_mode", "dedicated")
