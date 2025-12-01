@@ -69,6 +69,9 @@ class NFDSchedulableResourceDetector:
         node_name = node.metadata.name
         labels = node.metadata.labels or {}
 
+        # Detect master/control-plane node
+        is_master = "node-role.kubernetes.io/master" in labels or "node-role.kubernetes.io/control-plane" in labels
+
         logger.debug(f"Processing node: {node_name}")
 
         # Check node schedulability
@@ -100,6 +103,7 @@ class NFDSchedulableResourceDetector:
             "schedulability": schedulability_info,
             "capacity": capacity,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "is_master": is_master,
         }
 
     def _get_node_schedulability(self, node) -> Dict[str, Any]:

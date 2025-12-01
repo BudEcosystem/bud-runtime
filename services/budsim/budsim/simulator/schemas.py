@@ -82,6 +82,7 @@ class Node(BaseModel):
     id: str
     devices: List[Device]
     status: bool
+    is_master: bool = False
 
 
 class Cluster(BaseModel):
