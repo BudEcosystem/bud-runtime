@@ -1,0 +1,290 @@
+---
+title: "Cluster Management"
+description: "Managing CPU and GPU clusters from the Bud Admin console"
+---
+
+## Description
+
+The Bud Admin cluster module gives platform, MLOps, and DevOps teams a single control plane to register, govern, and operate CPU and GPU clusters. It is designed for hybrid and multi-cloud footprints where GenAI workloads span inference APIs, training jobs, evaluations, and interactive playground traffic. The module pairs operational controls (quotas, autoscaling, scheduling) with governance (RBAC, audit trails) so that teams can move fast without risking runaway spend or compliance gaps.
+
+Bud’s cluster experience mirrors the rest of the admin console: declarative defaults, safe self-service, and deep observability. GPU-first organizations can maximize utilization with pool-aware scheduling, while CPU clusters can handle supporting services, control-plane workloads, and cost-efficient inference.
+
+⸻
+
+## USPs (Unique Selling Propositions)
+
+### 1. Unified control plane for CPU and GPU fleets
+
+Operate heterogenous clusters (CPU-only, GPU-only, mixed) from one console, with consistent policies for quotas, networking, security, and routing.
+
+### 2. Enterprise governance baked in
+
+Cluster actions respect Bud RBAC, project scoping, and audit logging. Every create, edit, and delete is tracked; permissions align with infra-admin roles and project boundaries.
+
+### 3. Purpose-built for GenAI traffic
+
+GPU-aware scheduling, pool-based allocations, and model/route affinity keep interactive agents and batch training predictable. Autoscaling and queueing policies are tuned for latency-sensitive inference and bursty workloads.
+
+### 4. Multi-cloud and on-prem friendly
+
+Register Kubernetes clusters from public clouds or on-prem; attach custom runtimes, registries, and CNI settings without rewriting your topology.
+
+### 5. Safety rails for cost and reliability
+
+Quotas, budget guards, health gates, and preflight checks reduce misconfiguration. Templates accelerate secure-by-default setups for production, staging, and sandbox environments.
+
+⸻
+
+## Features
+
+### 3.1 Cluster registration
+
+- Guided registration for CPU, GPU, or mixed clusters with configurable networking, logging, and storage.
+
+- Support for cloud-managed and self-managed Kubernetes distributions.
+
+### 3.2 Node pools & GPU-aware scheduling
+
+- Define node pools by instance type, GPU SKU, and availability zone.
+
+- Enable bin-packing and topology hints to maximize GPU occupancy.
+
+- Reserve pools for model-serving, batch training, or control-plane services.
+
+### 3.3 Autoscaling & quotas
+
+- Horizontal and vertical autoscaling presets per pool.
+
+- Budget and quota controls per project/team with soft and hard limits.
+
+- Scale-to-zero for bursty agents; warm pools for low-latency inference.
+
+### 3.4 Networking, security, and compliance
+
+- CNI and ingress configuration with support for private endpoints.
+
+- Namespace/project isolation with network policies and pod security standards.
+
+- Secrets management and image-signature enforcement for registries.
+
+### 3.5 Observability & diagnostics
+
+- Live health status (nodes, GPU readiness, control-plane components).
+
+- Metrics and logs tabs with time-window filters and saved views.
+
+- Event timeline for deployments, reschedules, failures, and admin actions.
+
+### 3.6 Integrations & runtime controls
+
+- Connect to model registries and OCI registries for runtime images.
+
+- Attach storage classes for datasets, checkpoints, and artifacts.
+
+- Webhooks for incident management, cost alerts, and guardrail violations.
+
+⸻
+
+## How-to Guides
+
+### 4.1 Accessing the cluster module
+
+Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+
+Click on **Clusters** from the side menu.
+
+Click on **\+Cluster**.
+
+⸻
+
+### 4.2 Add a new cluster
+
+Click **\+Cluster**.
+
+Choose **Create New Cluster**.
+
+Choose cloud provider.
+
+Select cloud credentials and click **Next**.
+
+Cluster is added and displayed on the listing page.
+
+⸻
+
+### 4.3 Add an existing cluster
+
+Click **\+Cluster**.
+
+Choose **Connect to Existing Cluster**.
+
+Provide cluster name, ingress URL, and upload the configuration file.
+
+Click **Next**.
+
+Cluster is added and displayed on the listing page.
+
+⸻
+
+### 4.4 Edit a cluster
+
+Open the cluster detail page from the listing.
+
+Click the edit icon and update data (name, ingress URL).
+
+Save changes to refresh the entry and downstream.
+
+⸻
+
+### 4.5 Delete a cluster
+
+Open the cluster detail page.
+
+Choose **Delete** from the Actions menu.
+
+Confirm removal to detach the cluster.
+
+Ensure dependent models or applications are redirected before finalizing deletion.
+
+Bud decommissions workloads, drains nodes, and revokes credentials before final removal. Audit logs record the deletion.
+
+⸻
+
+### 4.6 General tab
+
+Open the cluster detail page from the listing.
+
+Review summary data including health, version, owners, tags, and environment.
+
+Check recent events for configuration or deployment changes.
+
+Copy identifiers such as cluster ID or kubeconfig context for support requests.
+
+⸻
+
+### 4.7 Deployments tab
+
+Open the cluster detail page from the listing.
+
+Go to **Deployments**.
+
+View active workloads with status, routing, and rollout versions.
+
+Click a deployment to see pods, rollout progress, and failure reasons.
+
+Trigger a restart, pause, or rollback if a deployment is unhealthy.
+
+⸻
+
+### 4.8 Nodes tab
+
+Open the cluster detail page from the listing.
+
+Navigate to **Nodes** to see pools, capacity, and GPU SKUs.
+
+Select a node pool to view desired, minimum, and maximum nodes.
+
+Adjust autoscaling parameters or cordon/uncordon nodes before maintenance.
+
+Drill into a node for labels, taints, and recent health signals.
+
+⸻
+
+### 4.9 Analytics tab
+
+Open the cluster detail page from the listing.
+
+Go to **Analytics**.
+
+Choose a time window to review latency, throughput, and utilization metrics.
+
+Filter charts by project, pool, or workload type to isolate anomalies.
+
+Export dashboards or save views for recurring reviews.
+
+⸻
+
+### 4.10 Settings tab
+
+Open the cluster detail page from the listing.
+
+Navigate to **Settings**.
+
+Update networking (ingress, endpoints), security (registries, secrets), and compliance gates.
+
+Set quotas or budget alerts for projects mapped to the cluster.
+
+Save changes and verify that health checks pass after updates.
+
+⸻
+
+### 4.11 Modify permissions for clusters
+
+Open the user management page and navigate to the user’s detail view.
+
+Assign view access for users who should only view the cluster listing.
+
+Grant manage permissions to users who can add clusters and perform edits or deletions.
+
+Save updates to enforce access across the catalog and all cluster actions.
+
+⸻
+
+## FAQ
+
+### Q1. Which clusters are supported?
+
+CPU, GPU, and mixed Kubernetes clusters from public clouds or on-prem are supported. GPU scheduling honors pool labels and SKUs so latency-sensitive routes stay predictable.
+
+⸻
+
+### Q2. Who can create or edit clusters?
+
+Users with infra or platform admin permissions (per RBAC) can create/edit/delete clusters. Changes are scoped to their allowed projects and are fully audited.
+
+⸻
+
+### Q3. How does Bud prevent runaway GPU spend?
+
+Quotas and budgets cap CPU/GPU/memory and cost per project; autoscaling policies can enforce scale-to-zero, warm pools, and max nodes per pool. Alerts fire when thresholds are crossed.
+
+⸻
+
+### Q4. Can I pin certain models or routes to GPU pools?
+
+Yes. Label pools (e.g., `gpu=hopper`, `workload=model-serving`) and set affinity/taints in your model or route configuration. The scheduler honors these hints.
+
+⸻
+
+### Q5. What observability is available?
+
+The detail page surfaces health, metrics, logs, and events. You can stream to external sinks, export diagnostics bundles, and set alert destinations for incidents or budget breaches.
+
+⸻
+
+### Q6. How are deletes handled safely?
+
+Deletes require confirmation, drain workloads, revoke credentials, and capture an audit log entry. Dependent projects and routes are surfaced before final removal.
+
+⸻
+
+### Q7. Can we operate across multiple clouds?
+
+Yes. Register clusters from different clouds or on-prem. Policies, quotas, and security templates remain consistent, and pools can be tagged by region/zone for routing and failover.
+
+⸻
+
+### Q8. How do GPU-first orgs benefit?
+
+GPU-aware scheduling, pool-level bin-packing, and warm pools keep inference latency low while maximizing occupancy. Budget controls and alerts keep expensive SKUs in check.
+
+⸻
+
+### Q9. Does the module support compliance needs?
+
+Yes. Pod security standards, network policies, signed images, secrets management, and full audit trails help align with enterprise security and regulatory requirements.
+
+⸻
+
+### Q10. What if networking settings change after creation?
+
+Use the Networking tab to update ingress/TLS and IP policies. The module applies rolling updates when possible and surfaces disruptions (e.g., endpoint changes) before applying.
