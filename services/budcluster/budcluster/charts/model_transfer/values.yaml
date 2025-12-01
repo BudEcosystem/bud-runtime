@@ -5,6 +5,8 @@ podName: model-transfer
 pvcSize: 10
 storageClass: default
 accessMode: ReadWriteOnce
+deviceType: ""  # cpu_high, cuda, hpu - used for node affinity
+hardwareMode: "dedicated"  # dedicated or shared - used for pod affinity
 
 imagePullSecrets:
   name: bud-registry-secret

@@ -16,6 +16,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       workflows: ${{ steps.filter.outputs.workflows }}
       rust: ${{ steps.filter.outputs.rust }}
+      helmval: ${{ steps.filter.outputs.helmval }}
     steps:
       - uses: dorny/paths-filter@v3
         id: filter
@@ -45,6 +46,8 @@ jobs:
               - '**/*.rs'
               - '**/Cargo.toml'
               - '**/Cargo.lock'
+            helmval:
+              - 'infra/helm/bud/values.yaml'
 
   pre-commit:
     name: Pre-commit Hooks
@@ -64,7 +67,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -144,6 +147,23 @@ jobs:
           path: pre-commit.log
           if-no-files-found: ignore
 
+  helmval:
+    name: Limit Helm Global Envs
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.helmval == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Check Helm Chart
+        run: |
+          nix run .#no_new_global_env
+
   dependency-security:
     name: Python Dependency Security Check
     needs: detect-changes
@@ -173,7 +193,7 @@ jobs:
   lint-status:
     name: Code Quality Status
     runs-on: ubuntu-latest
-    needs: [detect-changes, pre-commit, dependency-security]
+    needs: [detect-changes, pre-commit, dependency-security, helmval]
     if: always()
 
     steps:
@@ -187,6 +207,12 @@ jobs:
         if: ${{ needs.detect-changes.outputs.python == 'true' && needs.dependency-security.result == 'failure' }}
         run: |
           echo "❌ Dependency security check failed"
+          exit 1
+
+      - name: Helm chart check failed
+        if: ${{ needs.detect-changes.outputs.helmval == 'true' && needs.helmval.result == 'failure' }}
+        run: |
+          echo "❌ Helm Chart check failed"
           exit 1
 
       - name: Dependency security check skipped unexpectedly

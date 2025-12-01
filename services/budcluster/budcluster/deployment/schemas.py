@@ -259,14 +259,6 @@ class DeleteDeploymentRequest(CloudEventBase):
     namespace: str
 
 
-class UpdateDeploymentStatusRequest(BaseModel):
-    """Request body for updating the deployment status."""
-
-    deployment_name: str
-    cluster_id: UUID
-    cloud_model: bool = False
-
-
 class WorkerData(BaseModel):
     """Worker data."""
 

@@ -67,6 +67,11 @@ class KubernetesHandler(BaseClusterHandler):
             # Disable SSL cert validation and hostname verification
             self.api_configuration.verify_ssl = app_settings.validate_certs
 
+            # Set connection and read timeout to prevent indefinite blocking
+            # This prevents hanging when clusters are unreachable
+            # Format: (connect_timeout, read_timeout) in seconds
+            self.api_configuration.timeout = (30, 30)  # 30 seconds for connect and read
+
             # Store an API client instance for this configuration
             self.api_client = client.ApiClient(self.api_configuration)
 
@@ -79,7 +84,6 @@ class KubernetesHandler(BaseClusterHandler):
             raise KubernetesException("Found error while loading Kubernetes config file") from err
 
     def _get_container_status(self, container_name: str, node: Dict[str, Any]) -> str:
-        print(node["status"])
         if "containerStatuses" in node["status"]:
             for container in node["status"]["containerStatuses"]:
                 if container_name in container["name"]:
@@ -901,8 +905,13 @@ class KubernetesHandler(BaseClusterHandler):
                                 created_datetime=start_time,
                                 last_restart_datetime=last_restart_datetime or start_time,
                                 node_ip=pod["status"]["hostIP"],
-                                cores=int(pod["spec"]["containers"][0]["resources"]["requests"].get("cpu", 0)),
-                                memory=pod["spec"]["containers"][0]["resources"]["requests"].get("memory", "0"),
+                                cores=int(
+                                    pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)
+                                ),
+                                memory=pod["spec"]["containers"][0]
+                                .get("resources", {})
+                                .get("requests", {})
+                                .get("memory", "0"),
                                 deployment_name=deploy_info["metadata"]["name"],
                                 concurrency=int(pod["metadata"]["labels"].get("concurrency") or 100),
                                 reason=reason,
@@ -962,14 +971,42 @@ class KubernetesHandler(BaseClusterHandler):
 
         return replicas
 
-    def get_deployment_status(self, values: dict, cloud_model: bool = False, ingress_health: bool = True) -> str:
+    def get_deployment_status(
+        self, values: dict, cloud_model: bool = False, ingress_health: bool = True, check_pods: bool = True
+    ) -> str:
         """Get the status of a deployment on the Kubernetes cluster."""
         logger.info(
             f"get_deployment_status called for {values.get('namespace', 'unknown')}: "
-            f"cloud_model={cloud_model}, ingress_health={ingress_health}"
+            f"cloud_model={cloud_model}, ingress_health={ingress_health}, check_pods={check_pods}"
         )
         if not self.ingress_url:
             raise KubernetesException("Ingress URL is not set")
+
+        # Optimization: Skip pod checks if check_pods is False
+        if not check_pods:
+            if not ingress_health:
+                # If both are False, we can't determine status
+                logger.warning("Both check_pods and ingress_health are False, returning unknown status")
+                return {
+                    "status": DeploymentStatusEnum.UNKNOWN,
+                    "replicas": {},
+                    "ingress_health": False,
+                    "worker_data_list": None,
+                }
+
+            # Only check ingress health
+            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            status = DeploymentStatusEnum.COMPLETED if ingress_healthy else DeploymentStatusEnum.FAILED
+            logger.info(
+                f"Optimized status check for {values['namespace']}: {status} (ingress_healthy={ingress_healthy})"
+            )
+
+            return {
+                "status": status,
+                "replicas": {},
+                "ingress_health": ingress_healthy,
+                "worker_data_list": None,  # Return None to indicate no worker data update
+            }
 
         while True:
             result = self.ansible_executor.run_playbook(
@@ -1220,8 +1257,8 @@ class KubernetesHandler(BaseClusterHandler):
             created_datetime=start_time,
             last_restart_datetime=last_restart_datetime or start_time,
             node_ip=pod["status"]["hostIP"],
-            cores=int(pod["spec"]["containers"][0]["resources"]["requests"].get("cpu", 0)),
-            memory=pod["spec"]["containers"][0]["resources"]["requests"].get("memory", 0),
+            cores=int(pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)),
+            memory=pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("memory", 0),
             deployment_name="litellm-container"
             if pod["metadata"]["name"].startswith("litellm-container")
             else "bud-runtime-container",

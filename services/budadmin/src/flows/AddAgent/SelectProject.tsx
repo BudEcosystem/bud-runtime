@@ -11,6 +11,7 @@ import { useProjects } from "src/hooks/useProjects";
 import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import { usePromptsAgents } from "@/stores/usePromptsAgents";
 import { useAddAgent } from "@/stores/useAddAgent";
+import { useAgentStore } from "@/stores/useAgentStore";
 import { updateQueryParams } from "@/utils/urlUtils";
 
 export default function SelectProject() {
@@ -31,6 +32,17 @@ export default function SelectProject() {
     setSelectedProject: setStoreSelectedProject,
     loading: workflowLoading
   } = useAddAgent();
+
+  // Clear any leftover agent sessions from previous add-agent flows
+  // This ensures a fresh start for every new add-agent flow
+  // Only clear if there's no currentWorkflow (i.e., starting a new flow, not navigating back)
+  // Note: Does not affect edit/version modes since they don't use SelectProject
+  useEffect(() => {
+    const { currentWorkflow } = useAddAgent.getState();
+    if (!currentWorkflow) {
+      useAgentStore.getState().resetSessionState();
+    }
+  }, []);
 
   // Fetch projects on component mount and when search changes
   useEffect(() => {

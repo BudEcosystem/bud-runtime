@@ -4,8 +4,10 @@ from datetime import timedelta
 from typing import Optional, TypedDict
 
 import dapr.ext.workflow as wf
+import requests
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
+from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
 from budeval.evals.schema import EvaluationRequest
 
@@ -277,6 +279,25 @@ def send_eta_notification(ctx: wf.WorkflowActivityContext, notification_data: st
         # )
 
         logger_local.info(f"Sent ETA notification: {progress_pct:.1f}%, {remaining_min}m remaining")
+
+        # Update ETA in budapp database via Dapr service invocation
+        eval_id = evaluate_model_request_dict.get("eval_id")
+        if eval_id and remaining_sec > 0:
+            try:
+                eta_url = (
+                    f"http://localhost:{app_settings.dapr_http_port}/v1.0/invoke/{app_settings.bud_app_id}"
+                    f"/method/experiments/internal/evaluations/eta"
+                )
+                requests.patch(
+                    eta_url,
+                    json={"evaluation_id": str(eval_id), "eta_seconds": remaining_sec},
+                    timeout=5,
+                )
+                logger_local.debug(f"Updated ETA in budapp: {remaining_sec}s for evaluation {eval_id}")
+            except Exception as eta_err:
+                # Non-critical - log warning and continue
+                logger_local.warning(f"Failed to update ETA in budapp: {eta_err}")
+
         return {"success": True}
 
     except Exception as e:

@@ -124,6 +124,7 @@ export interface Evaluation {
 // create zustand store
 export const useEvaluations = create<{
   loading: boolean;
+  experimentLoading: boolean;
   evaluationsList: Evaluation[];
   selectedEvals: Evaluation[];
   evaluationsListTotal: number;
@@ -161,6 +162,7 @@ export const useEvaluations = create<{
   getExperimentSummary: (id) => Promise<any>
 }>((set, get) => ({
   loading: false,
+  experimentLoading: false,
   selectedEvals: [],
   evaluationsList: [],
   traitsList: [],
@@ -329,7 +331,7 @@ export const useEvaluations = create<{
   },
 
   getExperimentDetails: async (id: string) => {
-    set({ loading: true });
+    set({ experimentLoading: true });
     try {
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/experiments/${id}`);
       set({ experimentDetails: response.data.experiment });
@@ -338,7 +340,7 @@ export const useEvaluations = create<{
       console.error("Error fetching experiment details:", error);
       throw error;
     } finally {
-      set({ loading: false });
+      set({ experimentLoading: false });
     }
   },
 

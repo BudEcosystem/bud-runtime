@@ -80,6 +80,10 @@ class AppConfig(BaseAppConfig):
         alias="OPENCOMPASS_DOCKER_IMAGE",
     )
 
+    # Budapp Service Configuration for Dapr Invocation
+    bud_app_id: str = Field(default="budapp", alias="BUD_APP_ID")
+    dapr_http_port: int = Field(default=3500, alias="DAPR_HTTP_PORT")
+
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]

@@ -2953,6 +2953,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 2,
             "required": True,
             "description": "Your OAuth client ID",
+            "visible_when": ["client_credentials", "authorization_code"],
         },
         {
             "type": "password",
@@ -2961,6 +2962,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 3,
             "required": True,
             "description": "Your OAuth client secret",
+            "visible_when": ["client_credentials", "authorization_code"],
         },
         {
             "type": "url",
@@ -2969,6 +2971,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 4,
             "required": True,
             "description": "OAuth token endpoint URL",
+            "visible_when": ["client_credentials", "authorization_code"],
         },
         {
             "type": "url",
@@ -2977,6 +2980,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 5,
             "required": True,
             "description": "OAuth authorization endpoint URL",
+            "visible_when": ["authorization_code"],
         },
         {
             "type": "url",
@@ -2985,6 +2989,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 6,
             "required": True,
             "description": "OAuth callback/redirect URI",
+            "visible_when": ["authorization_code"],
         },
         {
             "type": "text",
@@ -2993,6 +2998,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 7,
             "required": False,
             "description": "Space-separated list of OAuth scopes",
+            "visible_when": ["client_credentials", "authorization_code"],
         },
         {
             "type": "text",
@@ -3001,6 +3007,7 @@ CONNECTOR_AUTH_CREDENTIALS_MAP = {
             "order": 8,
             "required": False,
             "description": "Comma-separated list of headers to pass through from client requests (e.g., 'Authorization, X-Tenant-Id, X-Trace-Id')",
+            "visible_when": ["client_credentials", "authorization_code"],
         },
     ],
     ConnectorAuthTypeEnum.HEADERS: [

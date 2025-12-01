@@ -36,6 +36,7 @@ class SimulationResultsSchema(PSQLBase):
     device_model = Column(String(255), nullable=True)
     raw_name = Column(String(255), nullable=True)
     available_count = Column(Integer, nullable=False)
+    cores = Column(Integer, nullable=True)  # CPU cores for cpu/cpu_high devices
     mem_per_gpu_in_gb = Column(Float, nullable=False)
     hbm_bandwidth_in_gb_per_sec = Column(Float, nullable=False)
     intra_node_bandwidth_in_gb_per_sec = Column(Float, nullable=False)

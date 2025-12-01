@@ -165,10 +165,11 @@ async def get_deployment_status(
     cloud_model: bool = False,
     platform: Optional[ClusterPlatformEnum] = None,
     ingress_health: bool = True,
+    check_pods: bool = True,
 ) -> str:
     """Get the status of a deployment on the Kubernetes cluster."""
     cluster_handler = await get_cluster_handler(config, ingress_url, platform=platform)
-    return cluster_handler.get_deployment_status(values, cloud_model, ingress_health)
+    return cluster_handler.get_deployment_status(values, cloud_model, ingress_health, check_pods)
 
 
 async def delete_namespace(config: Dict, namespace: str, platform: Optional[ClusterPlatformEnum] = None) -> None:

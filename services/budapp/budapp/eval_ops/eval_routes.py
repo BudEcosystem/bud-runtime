@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -1330,4 +1331,72 @@ async def sync_evaluation_datasets(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to trigger evaluation dataset sync: {str(e)}",
+        ) from e
+
+
+# ------------------------ Internal Service-to-Service Routes ------------------------
+
+
+class UpdateEvaluationETARequest(BaseModel):
+    """Request schema for updating evaluation ETA from budeval service."""
+
+    evaluation_id: uuid.UUID = Field(..., description="ID of the evaluation to update")
+    eta_seconds: int = Field(..., ge=0, description="Remaining time in seconds")
+
+
+@router.patch(
+    "/internal/evaluations/eta",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+    tags=["Internal"],
+)
+def update_evaluation_eta(
+    request: UpdateEvaluationETARequest,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Update evaluation ETA (internal service-to-service endpoint).
+
+    Called by budeval service via Dapr service invocation to update the
+    ETA remaining seconds for an ongoing evaluation.
+
+    No authentication required - internal Dapr service invocation handles security.
+
+    - **request**: Payload with evaluation_id and eta_seconds.
+    - **session**: Database session dependency.
+
+    Returns a `SuccessResponse` confirming the update.
+    """
+    from budapp.eval_ops.models import Evaluation
+
+    try:
+        evaluation = session.query(Evaluation).filter(Evaluation.id == request.evaluation_id).first()
+
+        if not evaluation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Evaluation {request.evaluation_id} not found",
+            )
+
+        evaluation.eta_seconds = request.eta_seconds
+        session.commit()
+
+        logger.debug(f"Updated ETA for evaluation {request.evaluation_id}: {request.eta_seconds}s")
+
+        return SuccessResponse(
+            code=status.HTTP_200_OK,
+            message="ETA updated successfully",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to update evaluation ETA: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update evaluation ETA",
         ) from e

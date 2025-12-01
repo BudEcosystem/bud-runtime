@@ -42,6 +42,41 @@ export interface PaginationState {
   has_more: boolean;
 }
 
+// Probe interfaces
+export interface ProbeRule {
+  id: string;
+  name: string;
+  description?: string;
+  status: "enabled" | "disabled" | "deleted";
+  guard_types?: string[];
+  created_at?: string;
+  modified_at?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface Probe {
+  id: string;
+  name: string;
+  description?: string;
+  status: "active" | "disabled" | "deleted";
+  provider_id?: string;
+  provider_name?: string;
+  provider_type?: string;
+  tags?: Array<{ name: string; color: string }>;
+  is_custom?: boolean;
+  created_at: string;
+  modified_at?: string;
+  rules?: ProbeRule[]; // Rules will be loaded on demand
+}
+
+export interface ProbeFilters {
+  search?: boolean;
+  name?: string;
+  status?: string;
+  provider_id?: string;
+  order_by?: string;
+}
+
 interface GuardrailStore {
   // State
   guardrails: GuardrailProfile[];
@@ -50,10 +85,20 @@ interface GuardrailStore {
   isLoading: boolean;
   error: string | null;
 
+  // Probe state
+  probes: Probe[];
+  probeFilters: ProbeFilters;
+  probePagination: PaginationState;
+  isLoadingProbes: boolean;
+
   // Actions
   setFilters: (filters: Partial<GuardrailFilters>) => void;
   setPagination: (pagination: Partial<PaginationState>) => void;
   resetFilters: () => void;
+  setProbeFilters: (filters: Partial<ProbeFilters>) => void;
+  setProbePagination: (pagination: Partial<PaginationState>) => void;
+  resetProbeFilters: () => void;
+
   // API calls
   fetchGuardrails: (
     projectId?: string,
@@ -61,11 +106,25 @@ interface GuardrailStore {
   ) => Promise<void>;
   deleteGuardrail: (id: string, projectId: string) => Promise<any>;
   fetchGuardrailDetail: (id: string) => Promise<void>;
+  fetchProbes: (profileId: string, overrideFilters?: Partial<ProbeFilters>) => Promise<void>;
+  fetchProbeRules: (
+    profileId: string,
+    probeId: string,
+    page?: number,
+    limit?: number
+  ) => Promise<{ rules: ProbeRule[]; pagination: PaginationState }>;
   selectedGuardrail: GuardrailProfile | null;
 }
 
 // Default filters
 const defaultFilters: GuardrailFilters = {
+  search: false,
+  status: "",
+  order_by: "created_at:desc",
+};
+
+// Default probe filters
+const defaultProbeFilters: ProbeFilters = {
   search: false,
   status: "",
   order_by: "created_at:desc",
@@ -80,6 +139,72 @@ const defaultPagination: PaginationState = {
   has_more: false,
 };
 
+// Utility function to parse paginated API responses
+interface ParsedResponse<T> {
+  items: T[];
+  pagination: PaginationState;
+}
+
+function parseApiResponse<T>(
+  responseData: any,
+  primaryKey: string,
+  fallbackPagination: PaginationState
+): ParsedResponse<T> {
+  // Check for primary key array (e.g., 'profiles', 'probes', 'rules')
+  if (responseData[primaryKey] && Array.isArray(responseData[primaryKey])) {
+    const totalCount = responseData.total_record ?? responseData.total_count ?? 0;
+    const page = responseData.page ?? fallbackPagination.page;
+    const limit = responseData.limit ?? fallbackPagination.limit;
+    return {
+      items: responseData[primaryKey],
+      pagination: {
+        page,
+        limit,
+        total_count: totalCount,
+        total_pages: responseData.total_pages ?? Math.ceil(totalCount / limit),
+        has_more: responseData.has_more ?? (page * limit < totalCount),
+      },
+    };
+  }
+
+  // Check for 'items' array (alternative structure)
+  if (responseData.items && Array.isArray(responseData.items)) {
+    const totalCount = responseData.total_count ?? responseData.total_record ?? 0;
+    const page = responseData.page ?? fallbackPagination.page;
+    const limit = responseData.limit ?? fallbackPagination.limit;
+    return {
+      items: responseData.items,
+      pagination: {
+        page,
+        limit,
+        total_count: totalCount,
+        total_pages: responseData.total_pages ?? Math.ceil(totalCount / limit),
+        has_more: responseData.has_more ?? (page * limit < totalCount),
+      },
+    };
+  }
+
+  // Check if response data itself is an array
+  if (Array.isArray(responseData)) {
+    return {
+      items: responseData,
+      pagination: {
+        ...fallbackPagination,
+        total_count: responseData.length,
+        total_pages: Math.ceil(responseData.length / fallbackPagination.limit),
+        has_more: false,
+      },
+    };
+  }
+
+  // Unexpected structure
+  console.warn(`Unexpected response structure for ${primaryKey}:`, responseData);
+  return {
+    items: [],
+    pagination: fallbackPagination,
+  };
+}
+
 export const useGuardrails = create<GuardrailStore>((set, get) => ({
   // Initial state
   guardrails: [],
@@ -88,6 +213,12 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
   pagination: defaultPagination,
   isLoading: false,
   error: null,
+
+  // Probe initial state
+  probes: [],
+  probeFilters: defaultProbeFilters,
+  probePagination: defaultPagination,
+  isLoadingProbes: false,
 
   // Filter management
   setFilters: (filters) => {
@@ -107,6 +238,27 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
     set({
       filters: defaultFilters,
       pagination: defaultPagination,
+    });
+  },
+
+  // Probe filter management
+  setProbeFilters: (filters) => {
+    set((state) => ({
+      probeFilters: { ...state.probeFilters, ...filters },
+      probePagination: { ...state.probePagination, page: 1 }, // Reset to first page when filters change
+    }));
+  },
+
+  setProbePagination: (pagination) => {
+    set((state) => ({
+      probePagination: { ...state.probePagination, ...pagination },
+    }));
+  },
+
+  resetProbeFilters: () => {
+    set({
+      probeFilters: defaultProbeFilters,
+      probePagination: defaultPagination,
     });
   },
 
@@ -157,58 +309,12 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       const response = await AppRequest.Get("/guardrails/profiles", { params });
 
       if (response.data) {
-        // Check if response has profiles array (actual API response structure)
-        if (response.data.profiles && Array.isArray(response.data.profiles)) {
-          const data = response.data;
-          console.log("Fetched guardrails data:", data);
-          set({
-            guardrails: data.profiles,
-            pagination: {
-              page: data.page || pagination.page,
-              limit: data.limit || pagination.limit,
-              total_count: data.total_record || 0,
-              total_pages: data.total_pages || Math.ceil((data.total_record || 0) / pagination.limit),
-              has_more: (data.page * data.limit < data.total_record) || false,
-            },
-            isLoading: false,
-          });
-        }
-        // Check if response has items array (alternative structure)
-        else if (response.data.items && Array.isArray(response.data.items)) {
-          const data = response.data;
-          set({
-            guardrails: data.items,
-            pagination: {
-              page: data.page || pagination.page,
-              limit: data.limit || pagination.limit,
-              total_count: data.total_count || 0,
-              total_pages: data.total_pages || Math.ceil((data.total_count || 0) / pagination.limit),
-              has_more: data.has_more || (data.page * data.limit < data.total_count),
-            },
-            isLoading: false,
-          });
-        }
-        // Check if response data itself is an array
-        else if (Array.isArray(response.data)) {
-          set({
-            guardrails: response.data,
-            pagination: {
-              ...pagination,
-              total_count: response.data.length,
-              total_pages: Math.ceil(response.data.length / pagination.limit),
-              has_more: false,
-            },
-            isLoading: false,
-          });
-        }
-        // Handle unexpected response structure
-        else {
-          console.warn("Unexpected response structure for guardrails:", response.data);
-          set({
-            guardrails: [],
-            isLoading: false,
-          });
-        }
+        const parsed = parseApiResponse<GuardrailProfile>(response.data, "profiles", pagination);
+        set({
+          guardrails: parsed.items,
+          pagination: parsed.pagination,
+          isLoading: false,
+        });
       } else {
         throw new Error("Invalid response structure");
       }
@@ -257,6 +363,105 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         "Failed to fetch guardrail details";
       message.error(errorMsg);
       set({ error: errorMsg, isLoading: false });
+    }
+  },
+
+  // Fetch probes for a guardrail profile
+  fetchProbes: async (
+    profileId: string,
+    overrideFilters?: Partial<ProbeFilters>
+  ) => {
+    const { probeFilters, probePagination } = get();
+    set({ isLoadingProbes: true });
+
+    try {
+      // Build query parameters
+      const finalFilters = overrideFilters
+        ? { ...probeFilters, ...overrideFilters }
+        : probeFilters;
+
+      const params: any = {
+        page: probePagination.page,
+        limit: probePagination.limit,
+      };
+
+      // Add optional filters
+      if (finalFilters.search !== undefined) {
+        params.search = finalFilters.search;
+      }
+
+      if (finalFilters.name) {
+        params.name = finalFilters.name;
+      }
+
+      if (finalFilters.status) {
+        params.status = finalFilters.status;
+      }
+
+      if (finalFilters.provider_id) {
+        params.provider_id = finalFilters.provider_id;
+      }
+
+      if (finalFilters.order_by) {
+        params.order_by = finalFilters.order_by;
+      }
+
+      const response = await AppRequest.Get(`/guardrails/profile/${profileId}/probes`, { params });
+
+      if (response.data) {
+        const parsed = parseApiResponse<Probe>(response.data, "probes", probePagination);
+        set({
+          probes: parsed.items,
+          probePagination: parsed.pagination,
+          isLoadingProbes: false,
+        });
+      } else {
+        throw new Error("Invalid response structure");
+      }
+    } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch probes";
+      message.error(errorMsg);
+      set({ isLoadingProbes: false, probes: [] });
+    }
+  },
+
+  // Fetch rules for a specific probe with pagination
+  fetchProbeRules: async (
+    profileId: string,
+    probeId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{ rules: ProbeRule[]; pagination: PaginationState }> => {
+    const fallbackPagination: PaginationState = { page, limit, total_count: 0, total_pages: 0, has_more: false };
+
+    try {
+      const response = await AppRequest.Get(
+        `/guardrails/profile/${profileId}/probe/${probeId}/rules`,
+        {
+          params: {
+            page,
+            limit,
+          }
+        }
+      );
+
+      if (response.data) {
+        const parsed = parseApiResponse<ProbeRule>(response.data, "rules", fallbackPagination);
+        return { rules: parsed.items, pagination: parsed.pagination };
+      }
+
+      return { rules: [], pagination: fallbackPagination };
+    } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch probe rules";
+      console.error(errorMsg, error);
+      // Don't show error toast for rules fetch to avoid cluttering UI
+      return { rules: [], pagination: fallbackPagination };
     }
   },
 }));

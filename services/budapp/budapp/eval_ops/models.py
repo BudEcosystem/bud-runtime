@@ -100,6 +100,7 @@ class Evaluation(Base, TimestampMixin):
     )
     trait_ids: Mapped[Optional[list[str]]] = mapped_column(JSONB, nullable=True)
     duration_in_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    eta_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # Traits Score
     trait_scores: Mapped[Optional[dict[str, str]]] = mapped_column(JSONB, nullable=True)

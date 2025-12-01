@@ -38,6 +38,7 @@ const Evaluations = () => {
   const { openDrawer } = useDrawer();
   const [searchValue, setSearchValue] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All Categories");
+  const [isMounted, setIsMounted] = useState(false);
 
   // Mock data for evaluations
   const evaluations: EvaluationCard[] = [
@@ -120,6 +121,10 @@ const Evaluations = () => {
     setActiveTab(router.query?.tab?.toString() || '2');
   }, [router])
 
+    useEffect(() => {
+      setIsMounted(true);
+    }, []);
+
   const operations = (
     <PrimaryButton
       onClick={() => openDrawer("new-experiment" as any)}
@@ -147,7 +152,7 @@ const Evaluations = () => {
 
   return (
     <DashBoardLayout>
-      <div className="temp-bg h-full w-full">
+      {isMounted ? (<div className="temp-bg h-full w-full">
         <div className="evalTab h-full">
           <Tabs
             defaultActiveKey="1"
@@ -251,7 +256,7 @@ const Evaluations = () => {
             ]}
           />
         </div>
-      </div>
+      </div>) : null}
     </DashBoardLayout>
   );
 };

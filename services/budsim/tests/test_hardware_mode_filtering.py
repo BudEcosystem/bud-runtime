@@ -455,3 +455,329 @@ class TestHardwareModeFiltering:
         # This 5GB will later cause validation to fail for large models (15GB+)
         # in DirectSearchOptimizer._validate_config() -> validate_memory_requirements()
         # which will set meets_targets=False in direct_search.py:362
+
+
+class TestCpuHighDedicatedModeFiltering:
+    """Test cpu_high dedicated mode filtering using utilized_cores threshold."""
+
+    @pytest.fixture
+    def cluster_topology(self):
+        """Basic cluster topology fixture."""
+        return {
+            "total_nodes": 1,
+            "total_cluster_devices": 1,
+            "device_types": ["cpu_high"],
+        }
+
+    def test_cpu_high_low_utilization_passes_dedicated_mode(self, cluster_topology):
+        """Test that cpu_high with < 5% core utilization passes dedicated mode."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 48,
+                                "memory_gb": 251.2,
+                                "utilized_cores": 0.2,  # ~0.4% utilization - should pass
+                                "utilized_memory_gb": 0.13,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Should include cpu_high with low utilization
+        assert "cpu_high" in device_groups
+        assert len(device_groups["cpu_high"]["devices"]) == 1
+        assert device_groups["cpu_high"]["devices"][0]["name"] == "CPU-0"
+        # Verify available_memory_gb is set
+        assert "available_memory_gb" in device_groups["cpu_high"]["devices"][0]
+        assert device_groups["cpu_high"]["devices"][0]["available_memory_gb"] == pytest.approx(251.07, rel=0.01)
+
+    def test_cpu_high_high_utilization_filtered_dedicated_mode(self, cluster_topology):
+        """Test that cpu_high with >= 5% core utilization is filtered in dedicated mode."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 96,
+                                "memory_gb": 501.5,
+                                "utilized_cores": 9.9,  # ~10.3% utilization - should be filtered
+                                "utilized_memory_gb": 24.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Should not include cpu_high with high utilization
+        assert "cpu_high" not in device_groups
+
+    def test_cpu_high_exactly_5_percent_filtered(self, cluster_topology):
+        """Test that cpu_high with exactly 5% utilization is filtered (threshold is < 5%)."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 100,
+                                "memory_gb": 256.0,
+                                "utilized_cores": 5.0,  # Exactly 5% - should be filtered
+                                "utilized_memory_gb": 10.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Should not include cpu_high with exactly 5% utilization
+        assert "cpu_high" not in device_groups
+
+    def test_cpu_high_just_below_5_percent_passes(self, cluster_topology):
+        """Test that cpu_high with just below 5% utilization passes dedicated mode."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 100,
+                                "memory_gb": 256.0,
+                                "utilized_cores": 4.9,  # 4.9% - should pass
+                                "utilized_memory_gb": 10.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Should include cpu_high just below threshold
+        assert "cpu_high" in device_groups
+        assert len(device_groups["cpu_high"]["devices"]) == 1
+
+    def test_regular_cpu_uses_available_count_not_utilization(self, cluster_topology):
+        """Test that regular cpu type doesn't use utilization filtering."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu",  # Regular cpu, not cpu_high
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 48,
+                                "memory_gb": 128.0,
+                                "utilized_cores": 20.0,  # High utilization but should pass
+                                "utilized_memory_gb": 50.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Regular cpu should pass using available_count, not utilization
+        assert "cpu" in device_groups
+        assert len(device_groups["cpu"]["devices"]) == 1
+        assert device_groups["cpu"]["devices"][0]["name"] == "CPU-0"
+
+    def test_regular_cpu_filtered_by_zero_available_count(self, cluster_topology):
+        """Test that regular cpu with available_count=0 is filtered."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu",
+                                "name": "CPU-0",
+                                "available_count": 0,  # Should filter this
+                                "cores": 48,
+                                "memory_gb": 128.0,
+                                "utilized_cores": 0.0,  # Even with no utilization
+                                "utilized_memory_gb": 0.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Regular cpu should be filtered due to available_count=0
+        assert "cpu" not in device_groups
+
+    def test_cpu_high_missing_utilization_fields_fallback(self, cluster_topology):
+        """Test cpu_high behavior when utilization fields are missing."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 48,
+                                "memory_gb": 256.0,
+                                # Missing utilized_cores and utilized_memory_gb
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # With missing utilization fields, defaults to 0.0 which is < 5%, so should pass
+        assert "cpu_high" in device_groups
+        assert len(device_groups["cpu_high"]["devices"]) == 1
+
+    def test_cpu_high_zero_cores_filtered(self, cluster_topology):
+        """Test cpu_high with zero cores is filtered (edge case)."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 0,  # Edge case: zero cores
+                                "memory_gb": 256.0,
+                                "utilized_cores": 0.0,
+                                "utilized_memory_gb": 0.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Zero cores results in 100% utilization calculation, should be filtered
+        assert "cpu_high" not in device_groups
+
+    def test_mixed_cpu_high_utilization_levels(self, cluster_topology):
+        """Test filtering with mix of cpu_high devices at different utilization levels."""
+        cluster_info = [
+            {
+                "id": "cluster1",
+                "nodes": [
+                    {
+                        "id": "node1",
+                        "name": "node1",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-0",
+                                "available_count": 1,
+                                "cores": 48,
+                                "memory_gb": 251.2,
+                                "utilized_cores": 0.2,  # 0.4% - should pass
+                                "utilized_memory_gb": 0.13,
+                            },
+                        ],
+                    },
+                    {
+                        "id": "node2",
+                        "name": "node2",
+                        "devices": [
+                            {
+                                "type": "cpu_high",
+                                "name": "CPU-1",
+                                "available_count": 1,
+                                "cores": 96,
+                                "memory_gb": 501.5,
+                                "utilized_cores": 9.9,  # 10.3% - should be filtered
+                                "utilized_memory_gb": 24.0,
+                            },
+                        ],
+                    },
+                ],
+            }
+        ]
+
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            cluster_info, cluster_topology, "dedicated"
+        )
+
+        # Should only include CPU-0 with low utilization
+        assert "cpu_high" in device_groups
+        assert len(device_groups["cpu_high"]["devices"]) == 1
+        assert device_groups["cpu_high"]["devices"][0]["name"] == "CPU-0"
