@@ -14,7 +14,7 @@ interface PromptFormProps {
   onClose?: () => void;
 }
 
-export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: _onClose }: PromptFormProps) {
+export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }: PromptFormProps) {
   const { apiKey, accessKey } = useAuth();
   const getChat = useChatStore((state) => state.getChat);
   const setDeployment = useChatStore((state) => state.setDeployment);
@@ -305,6 +305,31 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose: 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-50 flex items-end justify-center p-[0.9375rem] pb-[.5rem]">
       <div className="chat-message-form p-[2.5rem] pb-[1.5rem]  w-full  flex items-center justify-center  border-t-2 hover:border-[#333333] rounded-[0.625rem] bg-[#101010] relative z-10 overflow-hidden max-w-5xl">
+        {/* Close Button */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-[#666666] hover:text-white hover:bg-[#1F1F1F] rounded-full transition-colors"
+            aria-label="Close form"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 4L4 12M4 4L12 12"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6 w-full">
           {/* Title */}
           <h2 className="text-white text-[1.25rem] font-[400] mb-6">

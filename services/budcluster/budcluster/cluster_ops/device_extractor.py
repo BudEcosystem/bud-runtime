@@ -60,6 +60,7 @@ class CPUDevice:
     frequency_ghz: Optional[float] = None  # Base frequency
     cache_mb: Optional[int] = None  # L3 cache size
     socket_count: int = 1  # Number of CPU sockets
+    memory_gb: Optional[int] = None  # System memory in GB
     instruction_sets: Optional[List[str]] = None  # AVX512, VNNI, etc.
 
     def to_dict(self) -> Dict[str, Any]:
@@ -664,6 +665,8 @@ class DeviceExtractor:
             # Enhance CPU info with node capacity if available
             if "capacity" in node_info and cpus:
                 cpu_capacity = node_info["capacity"].get("cpu", 0)
+                memory_capacity = node_info["capacity"].get("memory", "")
+
                 if cpu_capacity:
                     # Distribute cores across CPUs (usually 1 CPU per node)
                     cores_per_cpu = int(cpu_capacity) // len(cpus) if len(cpus) > 0 else int(cpu_capacity)
@@ -674,6 +677,14 @@ class DeviceExtractor:
                             cpu.threads = cores_per_cpu * 2
                         else:
                             cpu.threads = cores_per_cpu
+
+                # Parse system memory from Kubernetes capacity
+                if memory_capacity:
+                    memory_gb = self.parse_memory_size(memory_capacity)
+                    if memory_gb:
+                        # Assign memory to all CPU devices (usually 1 per node)
+                        for cpu in cpus:
+                            cpu.memory_gb = memory_gb
 
             result["cpus"] = [cpu.to_dict() for cpu in cpus]
 

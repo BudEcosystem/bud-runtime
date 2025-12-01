@@ -88,6 +88,14 @@ class AppConfig(BaseAppConfig):
     # Bud Services
     bud_app_id: str = Field("budapp", alias="BUD_APP_ID")
 
+    # Deployment Status Sync Configuration
+    deployment_sync_batch_size: int = Field(2, alias="DEPLOYMENT_SYNC_BATCH_SIZE")
+    deployment_sync_stale_threshold_minutes: int = Field(20, alias="DEPLOYMENT_SYNC_STALE_THRESHOLD_MINUTES")
+    deployment_sync_state_store_key: str = Field(
+        "deployment_status_sync_state", alias="DEPLOYMENT_SYNC_STATE_STORE_KEY"
+    )
+    deployment_sync_error_retry_hours: int = Field(24, alias="DEPLOYMENT_SYNC_ERROR_RETRY_HOURS")
+
 
 class SecretsConfig(BaseSecretsConfig):
     # App Info

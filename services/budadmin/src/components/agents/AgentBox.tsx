@@ -104,6 +104,7 @@ function AgentBoxInner({
     createSession,
     closeAgentDrawer,
     addDeletedPromptId,
+    isEditMode,
   } = useAgentStore();
 
   // Get prompts store for loading config
@@ -132,6 +133,89 @@ function AgentBoxInner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, session?.promptId, updateSession]);
 
+  // Helper function to refresh prompt config from backend using agent name (used after saving in edit mode)
+  const refreshPromptConfig = React.useCallback(async () => {
+    if (!session?.promptId || !session?.id || !session?.name) {
+      return;
+    }
+
+    try {
+      // Reset the cache to force a fresh fetch
+      hasLoadedConfigRef.current = null;
+
+      const response = await getPromptConfig(session.name);
+
+      if (response?.data) {
+        const configData = response.data;
+        const updates: Partial<typeof session> = {};
+
+        // Map deployment_name to selectedDeployment
+        if (configData.deployment_name) {
+          updates.selectedDeployment = {
+            id: configData.deployment_id || undefined,
+            name: configData.deployment_name,
+            model: session.selectedDeployment?.model || {}
+          };
+        }
+
+        // Map stream setting
+        if (configData.stream != null) {
+          updates.settings = {
+            ...session.settings,
+            stream: configData.stream
+          };
+        }
+
+        // Map system_prompt
+        if (configData.system_prompt) {
+          updates.systemPrompt = configData.system_prompt;
+        }
+
+        // Map messages to promptMessages
+        if (configData.messages && Array.isArray(configData.messages) && configData.messages.length > 0) {
+          updates.promptMessages = JSON.stringify(configData.messages);
+        }
+
+        // Map llm_retry_limit
+        if (configData.llm_retry_limit != null) {
+          updates.llm_retry_limit = configData.llm_retry_limit;
+        }
+
+        // Map input_schema to inputVariables
+        if (configData.input_schema) {
+          const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
+          if (inputVars.length > 0) {
+            updates.inputVariables = inputVars;
+            setStructuredInputEnabled(true);
+          }
+        }
+
+        // Map output_schema to outputVariables
+        if (configData.output_schema) {
+          const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
+          if (outputVars.length > 0) {
+            updates.outputVariables = outputVars;
+            setStructuredOutputEnabled(true);
+          }
+        }
+
+        // Only update if we have data to update
+        if (Object.keys(updates).length > 0) {
+          updateSession(session.id, updates);
+        }
+
+        // Update the cache
+        hasLoadedConfigRef.current = session.name;
+      }
+    } catch (error) {
+      console.error("Error refreshing prompt config:", error);
+    }
+  // Note: session?.settings and session?.selectedDeployment?.model are intentionally omitted
+  // to avoid unnecessary callback recreations. They're only used to preserve existing values
+  // when updating the session, not to determine when the callback should change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.promptId, session?.name, updateSession, getPromptConfig]);
+
   // Ensure session has a promptId (migration for old sessions)
   React.useEffect(() => {
     if (session && !session.promptId) {
@@ -143,15 +227,15 @@ function AgentBoxInner({
   // Load prompt config from backend on mount and when drawer re-opens
   React.useEffect(() => {
     const loadPromptConfig = async () => {
-      // Skip if no promptId
-      if (!session?.promptId || !session?.id) return;
+      // Skip if no promptId or name
+      if (!session?.promptId || !session?.id || !session?.name) return;
 
-      // Skip only if we've already loaded for this exact promptId in this component instance
+      // Skip only if we've already loaded for this exact prompt name in this component instance
       // This allows reloading when returning from playground (component remounts)
-      if (hasLoadedConfigRef.current === session.promptId) return;
+      if (hasLoadedConfigRef.current === session.name) return;
 
       try {
-        const response = await getPromptConfig(session.promptId);
+        const response = await getPromptConfig(session.name);
 
         if (response?.data) {
           const configData = response.data;
@@ -161,8 +245,8 @@ function AgentBoxInner({
           if (configData.deployment_name) {
             updates.selectedDeployment = {
               id: configData.deployment_id || undefined,
-              name: configData.deployment_name,
-              model: { name: configData.deployment_name }
+              name: configData.deployment_name, // deployment name (e.g., 'gpt-4-mini')
+              model: {} // model details will be populated when user selects from LoadModel
             };
           }
 
@@ -213,12 +297,12 @@ function AgentBoxInner({
           }
         }
 
-        // Mark as loaded for this promptId
-        hasLoadedConfigRef.current = session.promptId;
+        // Mark as loaded for this prompt name
+        hasLoadedConfigRef.current = session.name;
       } catch (error) {
         // Silently fail - config may not exist yet for new prompts
         console.debug("Could not load prompt config:", error);
-        hasLoadedConfigRef.current = session.promptId;
+        hasLoadedConfigRef.current = session.name;
       }
     };
 
@@ -329,6 +413,34 @@ function AgentBoxInner({
   const { status: outputWorkflowStatus, startWorkflow: startOutputWorkflow } = outputWorkflow;
   const { status: systemPromptWorkflowStatus, startWorkflow: startSystemPromptWorkflow, setSuccess: setSystemPromptSuccess, setFailed: setSystemPromptFailed } = systemPromptWorkflow;
   const { status: promptMessagesWorkflowStatus, startWorkflow: startPromptMessagesWorkflow, setSuccess: setPromptMessagesSuccess, setFailed: setPromptMessagesFailed } = promptMessagesWorkflow;
+
+  // Track previous workflow statuses to detect changes to 'success'
+  const prevWorkflowStatusRef = React.useRef<string | null>(null);
+  const prevOutputWorkflowStatusRef = React.useRef<string | null>(null);
+  const prevSystemPromptWorkflowStatusRef = React.useRef<string | null>(null);
+  const prevPromptMessagesWorkflowStatusRef = React.useRef<string | null>(null);
+
+  // Refresh prompt config when any workflow status changes to 'success'
+  React.useEffect(() => {
+    const checkAndRefresh = async (
+      currentStatus: string,
+      prevStatusRef: React.MutableRefObject<string | null>,
+      workflowName: string
+    ) => {
+      // Only trigger refresh when status changes TO 'success' (not when it was already 'success')
+      if (currentStatus === 'success' && prevStatusRef.current !== 'success') {
+        console.debug(`[AgentBox] ${workflowName} workflow succeeded, refreshing prompt config`);
+        await refreshPromptConfig();
+      }
+      prevStatusRef.current = currentStatus;
+    };
+
+    // Check each workflow status
+    checkAndRefresh(workflowStatus, prevWorkflowStatusRef, 'Input schema');
+    checkAndRefresh(outputWorkflowStatus, prevOutputWorkflowStatusRef, 'Output schema');
+    checkAndRefresh(systemPromptWorkflowStatus, prevSystemPromptWorkflowStatusRef, 'System prompt');
+    checkAndRefresh(promptMessagesWorkflowStatus, prevPromptMessagesWorkflowStatusRef, 'Prompt messages');
+  }, [workflowStatus, outputWorkflowStatus, systemPromptWorkflowStatus, promptMessagesWorkflowStatus, refreshPromptConfig]);
 
   // Use the settings context (schema settings)
   const { isOpen: isSettingsOpen, activeSettings, openSettings, closeSettings, toggleSettings: toggleSettingsOriginal } = useSettings();
@@ -608,7 +720,6 @@ function AgentBoxInner({
       workflow_total_steps: 0,
       trigger_workflow: triggerWorkflow
     };
-
     // Add version and permanent parameters if in edit version mode
     if (isEditVersionMode && editVersionData) {
       payload.version = editVersionData.versionNumber;
@@ -659,6 +770,11 @@ function AgentBoxInner({
         }
       }
 
+      // In edit mode, use the prompt name instead of ID for the prompt_id field
+      if (isEditMode && session.name) {
+        payload.prompt_id = session.name;
+      }
+
       // Start workflow status tracking
       startWorkflow();
 
@@ -677,13 +793,11 @@ function AgentBoxInner({
           updateSession(session.id, { inputWorkflowId: workflowId });
         }
 
-        // Refresh session data from backend to ensure we have the latest saved variables
-        await refreshSessionData();
-
         // Verify promptId exists
         if (!session.promptId) {
           console.error("WARNING: Session does not have a promptId!");
         }
+        // Note: refreshPromptConfig will be called when workflow status becomes 'success'
       }
     } catch (error: any) {
       console.error("Error saving prompt schema:", error);
@@ -737,6 +851,11 @@ function AgentBoxInner({
         }
       }
 
+      // In edit mode, use the prompt name instead of ID for the prompt_id field
+      if (isEditMode && session.name) {
+        payload.prompt_id = session.name;
+      }
+
       // Start workflow status tracking for output
       startOutputWorkflow();
 
@@ -755,13 +874,11 @@ function AgentBoxInner({
           updateSession(session.id, { outputWorkflowId: workflowId });
         }
 
-        // Refresh session data from backend to ensure we have the latest saved variables
-        await refreshSessionData();
-
         // Verify promptId exists
         if (!session.promptId) {
           console.error("WARNING: Session does not have a promptId!");
         }
+        // Note: refreshPromptConfig will be called when workflow status becomes 'success'
       }
     } catch (error: any) {
       console.error("Error saving output schema:", error);
@@ -833,7 +950,7 @@ function AgentBoxInner({
         prompt_id: session.promptId,
         version: 1,
         set_default: isEditVersionMode ? setAsDefault : false,
-        deployment_name: session.selectedDeployment.model.name,
+        deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: [
@@ -873,6 +990,7 @@ function AgentBoxInner({
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
+        // Note: refreshPromptConfig will be called when workflow status becomes 'success'
         setSystemPromptSuccess();
 
         // Close the settings sidebar on successful save
@@ -940,7 +1058,7 @@ function AgentBoxInner({
         prompt_id: session.promptId,
         version: 1,
         set_default: isEditVersionMode ? setAsDefault : false,
-        deployment_name: session.selectedDeployment.model.name,
+        deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
         messages: messages.map((msg: any) => ({
@@ -978,6 +1096,7 @@ function AgentBoxInner({
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
+        // Note: refreshPromptConfig will be called when workflow status becomes 'success'
         setPromptMessagesSuccess();
 
         // Close the settings sidebar on successful save

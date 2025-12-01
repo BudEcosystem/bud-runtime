@@ -32,7 +32,7 @@ class ModelStore:
     def __init__(self):
         """Initialize the ModelStore class."""
         self.client = Minio(
-            app_settings.minio_endpoint,
+            endpoint=app_settings.minio_endpoint,
             access_key=secrets_settings.minio_access_key,
             secret_key=secrets_settings.minio_secret_key,
             secure=app_settings.minio_secure,
