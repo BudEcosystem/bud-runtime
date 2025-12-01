@@ -30,7 +30,7 @@ from budprompt.shared.redis_service import RedisService
 from ..prompt.openai_response_formatter import extract_validation_error_details
 from ..prompt.schemas import PromptExecuteData
 from ..prompt.services import PromptExecutorService
-from .schemas import BudResponsePromptParam
+from .schemas import BudResponsePrompt
 
 
 logger = logging.get_logger(__name__)
@@ -49,7 +49,7 @@ class ResponsesService:
 
     async def execute_prompt(
         self,
-        prompt_params: BudResponsePromptParam,
+        prompt_params: BudResponsePrompt,
         input: Optional[Union[str, List[ResponseInputItem]]] = None,
         api_key: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -68,8 +68,8 @@ class ResponsesService:
         """
         try:
             # Extract parameters
-            prompt_id = prompt_params["id"]
-            version = prompt_params.get("version")
+            prompt_id = prompt_params.id
+            version = prompt_params.version
 
             # Determine Redis key based on version
             if version:
@@ -114,7 +114,7 @@ class ResponsesService:
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
             logger.debug("Config data for prompt: %s: %s", prompt_id, prompt_execute_data)
 
-            variables = prompt_params.get("variables")
+            variables = prompt_params.variables
 
             result = await PromptExecutorService().execute_prompt(
                 prompt_execute_data,
@@ -142,9 +142,9 @@ class ResponsesService:
                 logger.debug("Non Streaming response requested")
                 result = result.model_copy(
                     update={
-                        "prompt": BudResponsePromptParam(
+                        "prompt": BudResponsePrompt(
                             id=prompt_id,
-                            variables=prompt_params.get("variables"),
+                            variables=prompt_params.variables,
                             version=version,
                         )
                     }
