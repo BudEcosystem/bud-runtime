@@ -44,6 +44,10 @@ class EvalDataset(BaseModel):
 
     dataset_id: str = Field(..., description="ID of the dataset to be evaluated")
     run_id: str = Field(..., description="ID of the run to be evaluated")
+    task_type: Optional[str] = Field(
+        default=None,
+        description="Explicit evaluation task type for this dataset (e.g., gen, ppl, judge)",
+    )
 
 
 class EvalConfig(BaseModel):

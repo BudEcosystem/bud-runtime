@@ -1041,13 +1041,11 @@ class ExperimentService:
             HTTPException(status_code=500): If database query fails.
         """
         try:
-            # Only return traits that have at least one associated dataset with eval_type 'gen'
+            # Only return traits that have at least one associated dataset
             q = (
                 self.session.query(TraitModel)
                 .join(PivotModel, TraitModel.id == PivotModel.trait_id)
                 .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
-                .filter(DatasetModel.eval_types.op("?")("gen"))  # Filter datasets with 'gen' key in eval_types
-                .distinct()
             )
 
             # Apply filters
@@ -1846,8 +1844,10 @@ class ExperimentService:
                     # Filter by trait UUIDs through the many-to-many relationship
                     q = q.join(DatasetModel.traits).filter(TraitModel.id.in_(filters.trait_ids))
 
+                if getattr(filters, "eval_type", None):
+                    q = q.filter(DatasetModel.eval_types.has_key(filters.eval_type))
                 # Always apply has_gen_eval_type filter (defaults to True in route)
-                if hasattr(filters, "has_gen_eval_type") and filters.has_gen_eval_type is not None:
+                elif hasattr(filters, "has_gen_eval_type") and filters.has_gen_eval_type is not None:
                     # Filter by datasets that have 'gen' key in eval_types JSONB field
                     if filters.has_gen_eval_type:
                         q = q.filter(DatasetModel.eval_types.has_key("gen"))
@@ -4385,31 +4385,75 @@ class EvaluationWorkflowService:
             logger.info("*" * 10)
 
             # Collect all datasets from runs by extracting eval_type configurations from database
-            all_datasets = []
+            all_datasets: list[dict] = []
+            unique_task_types: set[str] = set()
+
+            def _resolve_requested_task_type(config: dict | None) -> str:
+                if not config:
+                    return "gen"
+
+                for key in ["task_type", "eval_type", "evaluation_type"]:
+                    value = config.get(key)
+                    if isinstance(value, dict) and value.get("mode"):
+                        return str(value.get("mode")).lower()
+                    if isinstance(value, str):
+                        return value.lower()
+                return "gen"
+
+            def _pick_dataset_eval(dataset, requested_type: str) -> tuple[str | None, str | None]:
+                eval_types = dataset.eval_types if isinstance(dataset.eval_types, dict) else {}
+                if requested_type and requested_type in eval_types:
+                    return requested_type, eval_types[requested_type]
+
+                if "gen" in eval_types:
+                    logger.debug(
+                        "Defaulting to 'gen' eval_type for dataset %s because requested type '%s' is unavailable",
+                        dataset.name,
+                        requested_type,
+                    )
+                    return "gen", eval_types["gen"]
+
+                if eval_types:
+                    fallback_type, fallback_config = next(iter(eval_types.items()))
+                    logger.warning(
+                        "Dataset %s does not support requested eval_type '%s'; falling back to '%s'",
+                        dataset.name,
+                        requested_type,
+                        fallback_type,
+                    )
+                    return str(fallback_type), fallback_config
+
+                return None, None
 
             # Add datasets from each run (avoiding duplicates)
             for run in runs:
                 try:
                     if run.dataset_version and run.dataset_version.dataset:
                         dataset = run.dataset_version.dataset
-                        eval_types = dataset.eval_types
+                        requested_task_type = _resolve_requested_task_type(run.config)
+                        resolved_task_type, dataset_config = _pick_dataset_eval(dataset, requested_task_type)
 
-                        if eval_types and isinstance(eval_types, dict):
-                            # Extract the "gen" evaluation type configuration
-                            # You can make this configurable based on run.config if needed
-                            if "gen" in eval_types:
-                                dataset_config = eval_types["gen"]
-                                if dataset_config and dataset_config not in all_datasets:
-                                    dataset_item = {
-                                        "dataset_id": dataset_config,
-                                        "run_id": str(run.id),
-                                    }
-                                    all_datasets.append(dataset_item)
-                                    logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
-                            else:
-                                logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no 'gen' eval_type")
+                        if dataset_config:
+                            dataset_item = {
+                                "dataset_id": dataset_config,
+                                "run_id": str(run.id),
+                                "task_type": resolved_task_type,
+                            }
+                            all_datasets.append(dataset_item)
+                            unique_task_types.add(resolved_task_type or "gen")
+                            logger.info(
+                                "Added dataset config '%s' for run %s with task_type '%s'",
+                                dataset_config,
+                                run.id,
+                                resolved_task_type,
+                            )
                         else:
-                            logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no eval_types configured")
+                            logger.warning(
+                                "Run %s: Dataset '%s' has no eval_types configured for task '%s'",
+                                run.id,
+                                dataset.name if hasattr(dataset, "name") else "unknown",
+                                requested_task_type,
+                            )
                 except Exception as e:
                     logger.error(
                         f"Could not retrieve dataset configuration for run {run.id}: {e}",
@@ -4422,6 +4466,16 @@ class EvaluationWorkflowService:
                 raise ClientException("No datasets with valid eval_type configurations found")
 
             logger.info(f"Collected {len(all_datasets)} dataset configurations: {all_datasets}")
+
+            eval_configs: list[dict] = []
+            if len(unique_task_types) == 1:
+                task_type = next(iter(unique_task_types))
+                eval_configs.append({"config_name": "task_type", "config_value": {"mode": task_type}})
+            elif len(unique_task_types) > 1:
+                logger.warning(
+                    "Multiple task types detected across runs (%s); relying on per-dataset task_type values",
+                    unique_task_types,
+                )
 
             # Get first run to determine model and endpoint
             first_run = runs[0]
@@ -4458,6 +4512,7 @@ class EvaluationWorkflowService:
                 "api_key": _api_key,  # Generated temporary credential
                 "extra_args": {},
                 "datasets": all_datasets,
+                "eval_configs": eval_configs,
                 "kubeconfig": "",  # TODO: Get actual kubeconfig
                 # Use service name as source for CloudEvent metadata (not the topic)
                 "source": app_settings.name,

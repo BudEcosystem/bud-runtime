@@ -289,6 +289,10 @@ def list_datasets(
         Optional[str],
         Query(description="Filter by trait UUIDs (comma-separated)"),
     ] = None,
+    eval_type: Annotated[
+        Optional[str],
+        Query(description="Eval type key to filter datasets (e.g., gen, ppl, judge)")
+    ] = None,
     has_gen_eval_type: Annotated[
         bool,
         Query(description="Filter datasets with 'gen' key in eval_types. Set to false to show all datasets."),
@@ -296,7 +300,8 @@ def list_datasets(
 ):
     """List datasets with optional filtering and pagination.
 
-    By default, only datasets with 'gen' evaluation type are returned. Set `has_gen_eval_type=false` to see all datasets.
+    By default, only datasets with 'gen' evaluation type are returned. Override `eval_type` to target a specific eval
+    capability (e.g., ppl or judge) or set `has_gen_eval_type=false` to see datasets without generation configs.
     """
     try:
         offset = (page - 1) * limit
@@ -321,7 +326,8 @@ def list_datasets(
             language=language.split(",") if language else None,
             domains=domains.split(",") if domains else None,
             trait_ids=trait_id_list,
-            has_gen_eval_type=has_gen_eval_type,
+            eval_type=eval_type,
+            has_gen_eval_type=has_gen_eval_type if eval_type is None else None,
         )
 
         datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)
