@@ -21,7 +21,7 @@ import json
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Dict, Optional, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
 from budmicroframe.commons.constants import WorkflowStatus
@@ -31,6 +31,7 @@ from budmicroframe.commons.schemas import (
     SuccessResponse,
 )
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
+from openai.types.responses import ResponseInputItem
 from pydantic import ValidationError
 
 from ..commons.config import app_settings
@@ -82,7 +83,7 @@ class PromptExecutorService:
 
     def __init__(self):
         """Initialize the PromptExecutorService."""
-        self.executor = PromptExecutorFactory.get_executor(version=3)
+        self.executor = PromptExecutorFactory.get_executor()
 
     async def execute_prompt_deprecated(
         self, request: PromptExecuteRequest
@@ -182,7 +183,8 @@ class PromptExecutorService:
     async def execute_prompt(
         self,
         request: PromptExecuteData,
-        input_data: Optional[Union[Dict[str, Any], str]],
+        input_data: Optional[Union[str, List[ResponseInputItem]]] = None,
+        variables: Optional[Dict[str, Any]] = None,
         api_key: Optional[str] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
@@ -217,6 +219,7 @@ class PromptExecutorService:
                 api_key=api_key,
                 tools=request.tools,
                 system_prompt=request.system_prompt,
+                variables=variables,
             )
 
             return result
@@ -248,8 +251,9 @@ class PromptExecutorService:
             # Prompt execution errors -> 500 Internal Server Error
             logger.error(f"Prompt execution failed: {str(e)}")
             raise ClientException(
-                status_code=500,
-                message=e.message,  # Use the custom exception's message
+                status_code=e.status_code,
+                message=e.message,
+                params={"param": e.param},
             ) from e
 
         except Exception as e:
@@ -675,18 +679,26 @@ class PromptConfigurationService:
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             run_async(redis_service.set(redis_key, config_json, ex=ttl))
 
-            # Only set default version pointer if set_default is True
+            # Handle default version pointer
             set_default = request_dict.get("set_default", False)
+            default_version_key = f"prompt:{prompt_id}:default_version"
             if set_default:
-                default_version_key = f"prompt:{prompt_id}:default_version"
                 run_async(redis_service.set(default_version_key, redis_key, ex=ttl))
                 logger.debug(
                     f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, updated default to v{version}"
                 )
             else:
-                logger.debug(
-                    f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
-                )
+                # Create default only if it doesn't exist (first version becomes default automatically)
+                existing_default = run_async(redis_service.get(default_version_key))
+                if not existing_default:
+                    run_async(redis_service.set(default_version_key, redis_key, ex=ttl))
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} set as initial default"
+                    )
+                else:
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
+                    )
 
             # Add to cleanup registry for all temporary prompts
             if not permanent:
@@ -1143,18 +1155,28 @@ class PromptService:
             # Store in Redis
             await self.redis_service.set(redis_key, config_json, ex=ttl)
 
+            # Handle default version pointer
+            default_version_key = f"prompt:{request.prompt_id}:default_version"
             if request.set_default:
-                default_version_key = f"prompt:{request.prompt_id}:default_version"
                 await self.redis_service.set(default_version_key, redis_key, ex=ttl)
                 logger.debug(
                     f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} "
                     f"and updated default to v{version}"
                 )
             else:
-                logger.debug(
-                    f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
-                    f"without updating default"
-                )
+                # Create default only if it doesn't exist (first version becomes default automatically)
+                existing_default = await self.redis_service.get(default_version_key)
+                if not existing_default:
+                    await self.redis_service.set(default_version_key, redis_key, ex=ttl)
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
+                        f"set as initial default"
+                    )
+                else:
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
+                        f"without updating default"
+                    )
 
             # Add to cleanup registry for all temporary prompts
             if not request.permanent:

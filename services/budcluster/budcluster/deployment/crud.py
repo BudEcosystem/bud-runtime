@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -8,6 +9,7 @@ from sqlalchemy import and_, func, select
 
 from ..commons.base_crud import BaseDataManager
 from .models import WorkerInfo as WorkerInfoModel
+from .schemas import DeploymentStatusEnum
 
 
 logger = get_logger(__name__)
@@ -105,3 +107,52 @@ class WorkerInfoDataManager(BaseDataManager):
     async def update_worker_info(self, worker_info: WorkerInfoModel) -> None:
         """Update a worker info in the database."""
         return await self.update_one(worker_info)
+
+    async def get_active_deployments(self) -> List[Tuple[UUID, str]]:
+        """Get distinct active deployments from worker_info table.
+
+        Returns deployments where deployment_status is not FAILED.
+
+        Returns:
+            List of (cluster_id, deployment_name) tuples for active deployments.
+        """
+        stmt = (
+            select(
+                WorkerInfoModel.cluster_id,
+                WorkerInfoModel.deployment_name,
+            )
+            .where(WorkerInfoModel.deployment_status != DeploymentStatusEnum.FAILED.value)
+            .distinct()
+        )
+
+        result = await self.get_all(stmt, scalar=False)
+        return [(row.cluster_id, row.deployment_name) for row in result]
+
+    async def get_failed_deployments_due_for_retry(self, cutoff_time: datetime) -> List[Tuple[UUID, str]]:
+        """Get FAILED deployments not updated since cutoff_time.
+
+        Returns deployments that have been in FAILED status for longer than
+        the retry threshold, allowing them to be retried.
+
+        Args:
+            cutoff_time: Only return deployments not updated since this time.
+
+        Returns:
+            List of (cluster_id, deployment_name) tuples for failed deployments due for retry.
+        """
+        stmt = (
+            select(
+                WorkerInfoModel.cluster_id,
+                WorkerInfoModel.deployment_name,
+            )
+            .where(
+                and_(
+                    WorkerInfoModel.deployment_status == DeploymentStatusEnum.FAILED.value,
+                    WorkerInfoModel.last_updated_datetime < cutoff_time,
+                )
+            )
+            .distinct()
+        )
+
+        result = await self.get_all(stmt, scalar=False)
+        return [(row.cluster_id, row.deployment_name) for row in result]

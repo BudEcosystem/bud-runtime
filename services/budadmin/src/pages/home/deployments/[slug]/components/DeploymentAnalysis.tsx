@@ -612,73 +612,6 @@ export function CircleProgress({
   );
 }
 
-function WorkersCard({
-  switchTab,
-  clusterdata,
-}: {
-  switchTab: (key: string) => void;
-  clusterdata?: any;
-}) {
-  const [data, setData] = React.useState([
-    {
-      color: "#4077E6",
-      title: "Running workers",
-      value: clusterdata?.running_worker_count || "-",
-    },
-    {
-      color: "#E36E4F",
-      title: "Crashed workers",
-      value: clusterdata?.crashed_worker_count || "-",
-    },
-  ]);
-
-  return (
-    <div className="group relative bg-[#101010] p-[1.45rem] pb-[1.2rem] rounded-[6.403px] border-[1.067px] border-[#1F1F1F] min-w-[13.75rem] w-full min-h-[7.8125rem] flex flex-col items-start justify-between flex-auto">
-      <div
-        className="absolute w-[.825rem] h-[.825rem] top-[.5rem] right-[1rem] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        onClick={() => switchTab("2")}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width=".825rem"
-          height=".825rem"
-          viewBox="0 0 13 13"
-          fill="none"
-        >
-          <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M4.60039 1.21875C4.32425 1.21875 4.10039 1.44261 4.10039 1.71875C4.10039 1.99489 4.32425 2.21875 4.60039 2.21875H10.5004V10.8188H4.60039C4.32425 10.8188 4.10039 11.0426 4.10039 11.3188C4.10039 11.5949 4.32425 11.8188 4.60039 11.8188H10.6004C11.0974 11.8188 11.5004 11.4158 11.5004 10.9187V2.11875C11.5004 1.62169 11.0974 1.21875 10.6004 1.21875H4.60039ZM6.35394 4.3652C6.15868 4.16993 5.8421 4.16993 5.64684 4.3652C5.45158 4.56046 5.45158 4.87704 5.64684 5.0723L6.59328 6.01875H1.40039C1.12425 6.01875 0.900391 6.24261 0.900391 6.51875C0.900391 6.79489 1.12425 7.01875 1.40039 7.01875H6.59328L5.64684 7.9652C5.45158 8.16046 5.45158 8.47704 5.64684 8.6723C5.8421 8.86757 6.15868 8.86757 6.35394 8.6723L8.15394 6.8723C8.34921 6.67704 8.34921 6.36046 8.15394 6.1652L6.35394 4.3652Z"
-            fill="#B3B3B3"
-          />
-        </svg>
-      </div>
-      <Text_12_500_FFFFFF>Workers</Text_12_500_FFFFFF>
-      <div className="flex flex-col justify-between gap-[.55rem] w-full">
-        {data.map((item, index) => (
-          <div key={index} className="flex items-center justify-between w-full">
-            <div className="flex items-center justify-center">
-              <div
-                className="w-[.5rem] h-[.5rem] rounded-full mr-[0.45rem]"
-                style={{
-                  background: item.color,
-                }}
-              />
-              <Text_14_400_EEEEEE
-                className="text-[#EEEEEE] text-md m-0"
-                level={5}
-              >
-                {item.title}
-              </Text_14_400_EEEEEE>
-            </div>
-            <Text_22_700_EEEEEE level={3}>{item.value}</Text_22_700_EEEEEE>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function TokenUsageCard(deployment) {
   const [tokenUsageRequestData, setTokenUsageRequestData] = useState<any>();
   const [tokenUsageRequestInterval, setTokenUsageRequestInterval] =
@@ -2445,9 +2378,6 @@ export default function DeploymentAnalysis({
           ))}
         </> */}
         {/* )} */}
-        {/* {clusterDetails && (
-          <WorkersCard switchTab={switchTab} clusterdata={clusterDetails} />
-        )} */}
       </div>
       <div className="flex  gap-[.8rem]">
         {deploymentId && <APICallsCard deploymentId={deploymentId} />}

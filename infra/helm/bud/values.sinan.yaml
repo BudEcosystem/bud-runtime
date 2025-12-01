@@ -1,3 +1,11 @@
+imagePullPolicy: Always
+
 ingress:
-    hosts:
-        root: sinan.bud.studio
+  hosts:
+    root: sinan.bud.studio
+
+microservices:
+  budprompt:
+    image: budstudio/budprompt:sinan
+  budapp:
+    image: budstudio/budapp:sinan

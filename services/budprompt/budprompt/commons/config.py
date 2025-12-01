@@ -24,7 +24,7 @@ from budmicroframe.commons.config import (
     BaseSecretsConfig,
     register_settings,
 )
-from pydantic import DirectoryPath, Field
+from pydantic import AnyHttpUrl, DirectoryPath, Field
 
 from ..__about__ import __version__
 
@@ -42,7 +42,9 @@ class AppConfig(BaseAppConfig):
     bud_gateway_base_url: str = Field(..., alias="BUD_GATEWAY_BASE_URL")
 
     # MCP Foundry Configuration
-    mcp_foundry_base_url: str = Field(..., alias="MCP_FOUNDRY_BASE_URL", description="Base URL for MCP Foundry API")
+    mcp_foundry_base_url: AnyHttpUrl = Field(
+        ..., alias="MCP_FOUNDRY_BASE_URL", description="Base URL for MCP Foundry API"
+    )
     mcp_foundry_api_key: str = Field(..., alias="MCP_FOUNDRY_API_KEY")
 
     # Redis Configuration

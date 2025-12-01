@@ -27,6 +27,7 @@ class CostCalculator:
         _device_cost_per_hour = {
             "cuda": _device_cost["a100"] / 5 / 365 / 24,
             "cpu": _device_cost["xeon5"] / 5 / 365 / 24,
+            "cpu_high": _device_cost["xeon5"] / 5 / 365 / 24,  # Same cost as CPU
             "hpu": _device_cost["gaudi2"] / 5 / 365 / 24,
         }
 

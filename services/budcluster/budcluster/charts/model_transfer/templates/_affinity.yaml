@@ -1,0 +1,27 @@
+{{/*
+CPU Node Affinity for Model Transfer - Excludes control-plane and master nodes
+*/}}
+{{- define "model-transfer.cpu-node-affinity" }}
+nodeAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: DoesNotExist
+      - key: node-role.kubernetes.io/master
+        operator: DoesNotExist
+{{- end }}
+
+{{/*
+Shared CPU Pod Affinity for Model Transfer - Bin-packing for shared CPU deployments
+*/}}
+{{- define "model-transfer.shared-cpu-pod-affinity" }}
+podAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+  - weight: 100
+    podAffinityTerm:
+      labelSelector:
+        matchLabels:
+          bud.studio/shared-cpu: "true"
+      topologyKey: kubernetes.io/hostname
+{{- end }}

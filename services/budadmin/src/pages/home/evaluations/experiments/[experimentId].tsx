@@ -217,7 +217,7 @@ const ExperimentDetailsPage = () => {
                     {/* Metrics Cards */}
                     <div className="w-full pt-[1.8rem]">
                         <div className="w-full flex justify-between items-center">
-                            <Text_28_600_FFFFFF>
+                            <Text_28_600_FFFFFF className="capitalize">
                                 {experimentDetails?.name || "Loading..."}
                             </Text_28_600_FFFFFF>
                             <PrimaryButton

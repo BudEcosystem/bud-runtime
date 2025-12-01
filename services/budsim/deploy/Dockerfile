@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir --prefer-binary -r ./requirements.txt
 
 COPY . .
 
-RUN pip install --no-cache-dir .
+RUN pip install .

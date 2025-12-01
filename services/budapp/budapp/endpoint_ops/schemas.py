@@ -180,8 +180,6 @@ class ModelClusterDetail(BaseModel):
     model: ModelDetailResponse
     cluster: Optional[ClusterResponse] = None
     deployment_config: Optional[dict] = None
-    running_worker_count: int | None = None
-    crashed_worker_count: int | None = None
 
 
 class ModelClusterDetailResponse(SuccessResponse):

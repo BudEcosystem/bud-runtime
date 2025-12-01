@@ -8,6 +8,7 @@ from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.schemas import NotificationContent, NotificationRequest, WorkflowStep
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
+from ..commons.device_utils import normalize_device_type
 from .schemas import ClusterMetrics, ClusterRecommendationRequest, ClusterRecommendationResponse
 from .services import SimulationService, calculate_available_gpu_memory
 
@@ -179,7 +180,8 @@ class SimulationWorkflows:
                         continue
 
                     for engine_device_combo in compatible_engines:
-                        if engine_device_combo["device"].lower() == device_type.lower():
+                        # Normalize both device types for comparison (e.g., cpu_high -> cpu, CPU -> cpu)
+                        if normalize_device_type(engine_device_combo["device"]) == normalize_device_type(device_type):
                             task_count += 1
 
                             # Get representative device for specs (use first device)

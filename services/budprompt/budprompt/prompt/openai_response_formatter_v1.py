@@ -68,7 +68,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.run import AgentRunResult
 
-from ..commons.constants import STRUCTURED_OUTPUT_TOOL_NAME, STRUCTURED_PUTOUT_TOOL_DESCRIPTION
+from ..commons.constants import STRUCTURED_OUTPUT_TOOL_DESCRIPTION, STRUCTURED_OUTPUT_TOOL_NAME
 from ..responses.schemas import OpenAIResponse
 from .schemas import MCPToolConfig, Message, ModelSettings
 
@@ -364,7 +364,7 @@ class OpenAIResponseFormatter_V1:
                 if (
                     isinstance(part, ToolReturnPart)
                     and part.tool_name == STRUCTURED_OUTPUT_TOOL_NAME
-                    and part.content == STRUCTURED_PUTOUT_TOOL_DESCRIPTION
+                    and part.content == STRUCTURED_OUTPUT_TOOL_DESCRIPTION
                 ):
                     return True
 

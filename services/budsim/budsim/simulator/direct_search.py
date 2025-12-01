@@ -26,16 +26,18 @@ class SearchResult:
     """Result from direct search optimization."""
 
     config: Dict[str, Any]
-    kv_cache_memory: float
+    total_memory: float
     ttft: float
     e2e_latency: float
     throughput_per_user: float
     concurrency: int
+    error_rate: float
     cost_per_million_tokens: float
     performance_penalty: float
     meets_targets: bool
     search_step: int
-    error_rate: float = 0.0  # Add error_rate for compatibility with Evolution results
+    weight_memory: float = 0.0
+    kv_cache_memory: float = 0.0
 
 
 class DirectSearchOptimizer:
@@ -69,6 +71,7 @@ class DirectSearchOptimizer:
         max_evaluations: int = 200,  # Safety limit
         supports_pipeline_parallelism: bool = False,
         hardware_mode: str = "dedicated",  # Hardware utilization mode
+        is_quantization: bool = False,
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
@@ -88,6 +91,7 @@ class DirectSearchOptimizer:
         self.max_evaluations = max_evaluations
         self.supports_pipeline_parallelism = supports_pipeline_parallelism
         self.hardware_mode = hardware_mode
+        self.is_quantization = is_quantization
         self._last_validation_result = None  # Initialize validation result cache
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
@@ -141,6 +145,12 @@ class DirectSearchOptimizer:
         # Override max_pp to 1 if engine doesn't support pipeline parallelism
         if not self.supports_pipeline_parallelism:
             logger.info("Engine does not support pipeline parallelism - constraining PP to 1")
+            self.max_pp = 1
+
+        # CPU devices don't support multi-node pipeline parallelism
+        device_type = self.device_config.get("device_type", self.device_config.get("type", "")).lower()
+        if device_type in ("cpu", "cpu_high"):
+            logger.info("CPU device detected - constraining PP to 1 (single-node only)")
             self.max_pp = 1
 
         # Find minimum TP required to run the model (even with concurrency=1)
@@ -334,12 +344,17 @@ class DirectSearchOptimizer:
                 )
 
                 # Get calculated memory from validation result
-                kv_cache_memory = 0
+                weight_memory = 0.0
+                total_memory = 0
+                kv_cache_memory = 0.0
                 if hasattr(self, "_last_validation_result") and self._last_validation_result:
-                    kv_cache_memory = self._last_validation_result.get("total_memory_gb", 0)
+                    total_memory_gb = self._last_validation_result.get("total_memory_gb", 0)
+                    total_memory = total_memory_gb * (1024**3)  # Convert GB to Bytes
                     breakdown = self._last_validation_result.get("breakdown", {})
+                    weight_memory = breakdown.get("weights", 0) * (1024**3)  # Convert GB to Bytes
+                    kv_cache_memory = breakdown.get("kv_cache", 0) * (1024**3)  # Convert GB to Bytes
                     logger.debug(
-                        f"Shared mode: total_memory_gb from validation={kv_cache_memory:.4f}GB, breakdown={breakdown}"
+                        f"Shared mode: total_memory_gb from validation={total_memory_gb:.4f}GB, breakdown={breakdown}"
                     )
 
                 # Use the actual validation result to determine if config meets targets
@@ -361,7 +376,7 @@ class DirectSearchOptimizer:
                 # Return minimal result - memory validation result from _validate_config
                 result = SearchResult(
                     config=config,
-                    kv_cache_memory=kv_cache_memory,
+                    total_memory=total_memory,
                     ttft=0,  # Not predicted in shared mode
                     e2e_latency=0,  # Not predicted in shared mode
                     throughput_per_user=0,  # Not predicted in shared mode
@@ -371,8 +386,9 @@ class DirectSearchOptimizer:
                     meets_targets=validation_passed,  # Use actual memory validation result
                     search_step=len(self.evaluated_configs),
                     error_rate=0,
+                    weight_memory=weight_memory,
+                    kv_cache_memory=kv_cache_memory,
                 )
-
                 # Cache and store result
                 self._evaluation_cache[cache_key] = result
                 self.evaluated_configs.append(result)
@@ -409,12 +425,33 @@ class DirectSearchOptimizer:
             performance_penalty = np.mean([ttft_penalty, e2e_penalty, throughput_penalty])
             meets_targets = performance_penalty <= self.error_threshold
 
-            # Calculate KV cache memory for result
-            kv_cache_memory = data.get("kv_cache_memory_per_gpu", 0) * tp_size * pp_size
+            # Calculate Total Memory (Weights + KV + Overhead) for result
+            # We use the value from validation which includes everything
+            weight_memory = 0.0
+            kv_cache_memory = 0.0
+            if hasattr(self, "_last_validation_result") and self._last_validation_result:
+                total_memory_gb = self._last_validation_result.get("total_memory_gb", 0)
+                total_memory = total_memory_gb * (1024**3)  # Convert GB to Bytes
+                # Extract weight and kv_cache memory from breakdown
+                breakdown = self._last_validation_result.get("breakdown", {})
+                weight_memory = breakdown.get("weights", 0) * (1024**3)
+                kv_cache_memory = breakdown.get("kv_cache", 0) * (1024**3)
+            else:
+                # Fallback if validation result missing (shouldn't happen if validated)
+                total_memory = data.get("kv_cache_memory_per_gpu", 0) * tp_size * pp_size
+                weight_memory = data.get("weight_memory_per_gpu", 0) * (1024**3)
+                kv_cache_memory = data.get("kv_cache_memory_per_gpu", 0)
 
+            # Apply quantization performance scaling if needed
+            if self.is_quantization:
+                # Scale throughput up and memory down
+                throughput_per_user = throughput_per_user * 1.3
+                total_memory = total_memory * 0.5  # Approximate 50% reduction for 8-bit
+                weight_memory = weight_memory * 0.5
+                kv_cache_memory = kv_cache_memory * 0.5
             result = SearchResult(
                 config=config,
-                kv_cache_memory=kv_cache_memory,
+                total_memory=total_memory,
                 ttft=ttft,
                 e2e_latency=e2e_latency,
                 throughput_per_user=throughput_per_user,
@@ -424,6 +461,8 @@ class DirectSearchOptimizer:
                 meets_targets=meets_targets,
                 search_step=len(self.evaluated_configs),
                 error_rate=performance_penalty,  # Use performance_penalty as error_rate for compatibility
+                weight_memory=weight_memory,
+                kv_cache_memory=kv_cache_memory,
             )
 
             # Cache and store result

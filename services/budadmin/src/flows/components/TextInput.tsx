@@ -72,6 +72,12 @@ function TextInput(props: BudInputProps) {
               suffix={props.suffix}
               type={props.type}
               className={inputClassName}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
             />
           </Form.Item>
         </FloatLabel>
@@ -101,6 +107,12 @@ function TextInput(props: BudInputProps) {
             suffix={props.suffix}
             type={props.type}
             className={inputClassName}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
           />
         </Form.Item>
       )}
