@@ -168,6 +168,9 @@ class ClusterOpsService:
                     {"status": ClusterStatusEnum.AVAILABLE if cluster_status else ClusterStatusEnum.NOT_AVAILABLE},
                 )
 
+            # Capture is_master for each node before DB operations (not stored in DB, passed to state store)
+            node_is_master_map = {node["node_name"]: node.get("is_master", False) for node in node_info}
+
             node_objects = []
             for node in node_info:
                 devices_data = json.loads(node.get("devices", "{}"))
@@ -375,6 +378,11 @@ class ClusterOpsService:
             logger.info("Added node info to db")
             nodes = await cls.transform_db_nodes(db_nodes)
             logger.info("Transformed db nodes")
+
+            # Add is_master to state store output (not persisted in DB)
+            for node in nodes:
+                node["is_master"] = node_is_master_map.get(node["name"], False)
+
             result = {
                 "id": str(cluster_id),
                 "name": cluster_name,
@@ -834,6 +842,12 @@ class ClusterOpsService:
 
                         # Store in state store for budapp consumption
                         nodes = await cls.transform_db_nodes_enhanced(db_cluster.nodes)
+
+                        # Add is_master from schedulable_nodes to output
+                        schedulable_nodes_map = {n["name"]: n.get("is_master", False) for n in schedulable_nodes}
+                        for node in nodes:
+                            node["is_master"] = schedulable_nodes_map.get(node["name"], False)
+
                         result = {"id": str(cluster_id), "nodes": nodes, "enhanced": True, "detection_method": "nfd"}
                         await cls.update_node_info_in_statestore(json.dumps(result))
 
@@ -927,6 +941,9 @@ class ClusterOpsService:
 
             # Get node info
             node_info = await get_node_info(config_dict, db_cluster.platform)
+
+            # Capture is_master for each node before DB operations (not stored in DB)
+            node_is_master_map = {node["node_name"]: node.get("is_master", False) for node in node_info}
 
             # Create node objects
             node_objects = []
@@ -1211,6 +1228,11 @@ class ClusterOpsService:
 
             # Prepare and store results in statestore
             nodes = await cls.transform_db_nodes(db_nodes)
+
+            # Add is_master to state store output (not persisted in DB)
+            for node in nodes:
+                node["is_master"] = node_is_master_map.get(node["name"], False)
+
             result = {
                 "id": str(cluster_id),
                 "nodes": nodes,

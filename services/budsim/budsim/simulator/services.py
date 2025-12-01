@@ -182,7 +182,7 @@ class SimulationService:
                     if device_type_lower in ("cpu", "cpu_high"):
                         is_master = node.get("is_master", False)
                         if is_master:
-                            logger.debug(f"Skipping master node {node_name} for CPU deployment")
+                            logger.info(f"Skipping master node {node_name} for CPU deployment")
                             continue
 
                     # Filter devices based on user's hardware mode preference
