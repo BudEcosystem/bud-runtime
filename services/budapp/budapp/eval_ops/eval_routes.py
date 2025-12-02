@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, Field
@@ -243,12 +243,16 @@ def list_traits(
     limit: Annotated[int, Query(ge=1, description="Results per page")] = 10,
     name: Annotated[Optional[str], Query(description="Filter by trait name")] = None,
     unique_id: Annotated[Optional[str], Query(description="Filter by trait UUID")] = None,
+    eval_type: Annotated[
+        Literal["gen", "ppl", "all"],
+        Query(description="Filter traits by datasets supporting a specific eval type (gen, ppl, all)."),
+    ] = "gen",
 ):
     """List experiment traits with optional filtering and pagination."""
     try:
         offset = (page - 1) * limit
         traits, total_count = ExperimentService(session).list_traits(
-            offset=offset, limit=limit, name=name, unique_id=unique_id
+            offset=offset, limit=limit, name=name, unique_id=unique_id, eval_type=eval_type
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list traits") from e
@@ -289,14 +293,15 @@ def list_datasets(
         Optional[str],
         Query(description="Filter by trait UUIDs (comma-separated)"),
     ] = None,
-    has_gen_eval_type: Annotated[
-        bool,
-        Query(description="Filter datasets with 'gen' key in eval_types. Set to false to show all datasets."),
-    ] = True,
+    eval_type: Annotated[
+        Literal["gen", "ppl", "all"],
+        Query(description="Filter datasets by eval type. Use 'all' to show every dataset."),
+    ] = "gen",
 ):
     """List datasets with optional filtering and pagination.
 
-    By default, only datasets with 'gen' evaluation type are returned. Set `has_gen_eval_type=false` to see all datasets.
+    By default, only datasets with 'gen' evaluation type are returned. Use `eval_type=ppl` to show perplexity datasets
+    or `eval_type=all` to see every dataset.
     """
     try:
         offset = (page - 1) * limit
@@ -321,7 +326,7 @@ def list_datasets(
             language=language.split(",") if language else None,
             domains=domains.split(",") if domains else None,
             trait_ids=trait_id_list,
-            has_gen_eval_type=has_gen_eval_type,
+            eval_type=eval_type,
         )
 
         datasets, total_count = ExperimentService(session).list_datasets(offset=offset, limit=limit, filters=filters)

@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import UUID4, BaseModel, Field, field_validator
 
@@ -662,9 +662,9 @@ class DatasetFilter(BaseModel):
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
     trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
-    has_gen_eval_type: Optional[bool] = Field(
-        None,
-        description="Filter datasets that have 'gen' key in eval_types. True to include only datasets with 'gen' key.",
+    eval_type: Literal["gen", "ppl", "all"] = Field(
+        "gen",
+        description="Filter datasets by eval type. Use 'all' to include every dataset regardless of eval_types.",
     )
 
 
