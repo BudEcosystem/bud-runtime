@@ -316,8 +316,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     const redirectField = visibleFields.find(f => isRedirectUriField(f.field));
 
     if (redirectField) {
-      // Use full URL including query params (e.g., http://localhost:3001/agents?agent=...&prompt=...&connector=...)
-      const currentUrl = window.location.href;
+      // Use full URL, but clean OAuth-specific params to avoid issues on re-authentication
+      const url = new URL(window.location.href);
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+      const currentUrl = url.toString();
       setFormData(prev => {
         // Only set if not already populated
         if (!prev[redirectField.field]) {
