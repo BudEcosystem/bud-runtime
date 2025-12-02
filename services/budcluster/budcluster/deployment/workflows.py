@@ -435,11 +435,11 @@ class CreateDeploymentWorkflow:
                 )
             else:
                 # Handle different failure types
-                # if not add_worker:
-                #     deployment_handler.delete(
-                #         namespace=verify_deployment_health_request_json.namespace,
-                #         platform=verify_deployment_health_request_json.platform,
-                #     )
+                if not add_worker:
+                    deployment_handler.delete(
+                        namespace=verify_deployment_health_request_json.namespace,
+                        platform=verify_deployment_health_request_json.platform,
+                    )
 
                 if deployment_status["status"] == DeploymentStatusEnum.FAILED:
                     message = f"Engine deployment failed: {deployment_status['replicas']['reason']}"
