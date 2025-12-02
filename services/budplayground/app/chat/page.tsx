@@ -116,16 +116,16 @@ export default function ChatPage() {
     else {
       console.log('[Session] Default mode');
 
-      // Clear any prompt sessions to isolate modes
+      // If there are prompt sessions, clear them and wait for the effect to re-run with a clean state.
       if (hasPromptSessions()) {
         console.log('[Session] Clearing prompt sessions for default mode');
         clearPromptSessions();
+        return; // Exit early, let the re-render handle the next step.
       }
 
-      // Check if we have any default sessions left
-      const defaultSessions = activeChatList.filter(chat => !chat.id.startsWith('prompt_'));
-
-      if (defaultSessions.length === 0) {
+      // At this point, we know there are no prompt sessions.
+      // Create a new default session if none exist.
+      if (activeChatList.length === 0) {
         console.log('[Session] Creating new default session');
         createNewChat();
       }
