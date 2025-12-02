@@ -62,6 +62,7 @@
             "group": "Clusters",
             "icon": "server",
             "pages": [
+              "clusters/cluster",
               "clusters/cluster-overview",
               "clusters/cluster-types",
               "clusters/registering-clusters",
