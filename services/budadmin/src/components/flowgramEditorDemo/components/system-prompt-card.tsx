@@ -101,6 +101,7 @@ export const SystemPromptCard = () => {
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             background: 'transparent',
+            textAlign: 'center'
           }}>
             {systemPrompt || 'Enter system prompt'}
           </div>

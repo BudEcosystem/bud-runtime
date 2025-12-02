@@ -143,7 +143,6 @@ export const MultiInputCard = () => {
             <div style={{
               fontSize: '12px',
               color: '#808080',
-              fontStyle: 'italic',
             }}>
               Click to add a variable
             </div>
