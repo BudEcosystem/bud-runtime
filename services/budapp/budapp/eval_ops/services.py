@@ -4385,7 +4385,16 @@ class EvaluationWorkflowService:
             logger.info("*" * 10)
 
             # Collect all datasets from runs by extracting eval_type configurations from database
+            workflow_data = await self._get_accumulated_step_data(workflow_id)
+            step_five_data = workflow_data.get("step_5", {}) if isinstance(workflow_data, dict) else {}
+
+            requested_eval_type_raw = step_five_data.get("eval_type") if isinstance(step_five_data, dict) else None
+            requested_eval_type = str(requested_eval_type_raw).lower() if requested_eval_type_raw else "gen"
+
+            logger.info(f"Requested eval type: '{requested_eval_type}'")
+
             all_datasets = []
+            seen_dataset_configs = set()
 
             # Add datasets from each run (avoiding duplicates)
             for run in runs:
@@ -4395,26 +4404,34 @@ class EvaluationWorkflowService:
                         eval_types = dataset.eval_types
 
                         if eval_types and isinstance(eval_types, dict):
-                            # Extract the "gen" evaluation type configuration
-                            # You can make this configurable based on run.config if needed
-                            if "gen" in eval_types:
-                                dataset_config = eval_types["gen"]
-                                if dataset_config and dataset_config not in all_datasets:
-                                    dataset_item = {
-                                        "dataset_id": dataset_config,
-                                        "run_id": str(run.id),
-                                    }
-                                    all_datasets.append(dataset_item)
-                                    logger.info(f"Added dataset config '{dataset_config}' from run {run.id}")
-                            else:
-                                logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no 'gen' eval_type")
+                            dataset_config = eval_types.get(requested_eval_type)
+                            if not dataset_config:
+                                available_types = ", ".join(eval_types.keys()) if eval_types else "none"
+                                raise ClientException(
+                                    f"Dataset '{dataset.name}' does not support eval type '{requested_eval_type}'. "
+                                    f"Available types: {available_types}"
+                                )
+
+                            dataset_key = (str(dataset_config), requested_eval_type)
+                            if dataset_key not in seen_dataset_configs:
+                                dataset_item = {
+                                    "dataset_id": dataset_config,
+                                    "run_id": str(run.id),
+                                    "eval_type": requested_eval_type,
+                                }
+                                all_datasets.append(dataset_item)
+                                seen_dataset_configs.add(dataset_key)
+                                logger.info(
+                                    f"Added dataset config '{dataset_config}' with eval type '{requested_eval_type}' from run {run.id}"
+                                )
                         else:
-                            logger.warning(f"Run {run.id}: Dataset '{dataset.name}' has no eval_types configured")
+                            raise ClientException(f"Dataset '{dataset.name}' has no eval_types configured")
                 except Exception as e:
                     logger.error(
                         f"Could not retrieve dataset configuration for run {run.id}: {e}",
                         exc_info=True,
                     )
+                    raise
 
             # Prepare single evaluation request with all datasets
             if not all_datasets:
