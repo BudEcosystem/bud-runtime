@@ -16,7 +16,6 @@ import { useChatStore } from '@/app/store/chat';
 import SettingsList from './Settings';
 import PromptForm from './PromptForm';
 import UnstructuredPromptInput from './UnstructuredPromptInput';
-import { resolveChatBaseUrl } from '@/app/lib/gateway';
 import { getPromptConfig } from '@/app/lib/api';
 import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
 
@@ -63,12 +62,11 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
     const params = new URLSearchParams(window.location.search);
     const baseUrl = params.get('base_url');
-    const resolvedBaseUrl = resolveChatBaseUrl(baseUrl);
     const baseBody = {
       model: chat?.selectedDeployment?.name,
       metadata: {
         project_id: chat?.selectedDeployment?.project?.id,
-        base_url: baseUrl, //reverting as it's causing issue with chat
+        base_url: baseUrl,
       },
       settings: currentSettingPreset,
     };
@@ -331,7 +329,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     const msgHistory = getMessages(chat.id);
     const updatedChat = {
       ...chat,
-      "total_tokens": usage.totalTokens,
+      "total_tokens": usage?.totalTokens || 0,
     }
     if (msgHistory.length == 0) {
       updatedChat.name = input;
@@ -345,9 +343,29 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       role: 'user',
       feedback: "",
     }
+
+    // Extract outputItems from the message's data or annotations
+    // The Vercel AI SDK may place custom metadata in different locations
+    const messageAny = message as any;
+    let outputItems: any[] | undefined;
+
+    // Try to get outputItems from various possible locations
+    if (messageAny.data?.outputItems) {
+      outputItems = messageAny.data.outputItems;
+    } else if (messageAny.experimental_providerMetadata?.outputItems) {
+      outputItems = messageAny.experimental_providerMetadata.outputItems;
+    } else if (messageAny.annotations) {
+      // Check if outputItems is in annotations array
+      const annotation = messageAny.annotations.find((a: any) => a?.outputItems);
+      if (annotation) {
+        outputItems = annotation.outputItems;
+      }
+    }
+
     const responseMessage: SavedMessage = {
       ...message,
       feedback: "",
+      responseItems: outputItems,  // Store output items for conversation history
     }
     addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
