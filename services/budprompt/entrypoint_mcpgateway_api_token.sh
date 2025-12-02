@@ -17,7 +17,7 @@ curl_wrapped() {
 access_token_get() {
 	resp="$(
 		curl_wrapped \
-			--location "$ENTRYPOINT_MCPGATEWAY_SERVICE/auth/login" \
+			--location "$MCP_FOUNDRY_BASE_URL/auth/login" \
 			--data-binary @- <<-EOF
 				{
 					  "email": "$ENTRYPOINT_MCPGATEWAY_EMAIL",
@@ -34,7 +34,7 @@ api_token_get() {
 
 	resp="$(
 		curl_wrapped \
-			--location "$ENTRYPOINT_MCPGATEWAY_SERVICE/tokens" \
+			--location "$MCP_FOUNDRY_BASE_URL/tokens" \
 			--header "Authorization: Bearer $access_token" \
 			--data-binary @- <<-EOF
 				{
@@ -56,10 +56,10 @@ api_token_get() {
 }
 
 while [ -z "$MCP_FOUNDRY_API_KEY" ] &&
-	[ -n "$ENTRYPOINT_MCPGATEWAY_SERVICE" ] &&
+	[ -n "$MCP_FOUNDRY_BASE_URL" ] &&
 	[ -n "$ENTRYPOINT_MCPGATEWAY_PASSWORD" ] &&
 	[ -n "$ENTRYPOINT_MCPGATEWAY_EMAIL" ]; do
-	note fetching mcp gateway api token from "$ENTRYPOINT_MCPGATEWAY_SERVICE"
+	note fetching mcp gateway api token from "$MCP_FOUNDRY_BASE_URL"
 
 	access_token="$(access_token_get)"
 	note access_token="$access_token"
