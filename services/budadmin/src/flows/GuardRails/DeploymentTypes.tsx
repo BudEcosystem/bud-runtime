@@ -26,7 +26,26 @@ export default function DeploymentTypes() {
   } = useGuardrails();
 
   const handleBack = () => {
-    openDrawerWithStep("pii-detection-config");
+    // Get the selected probes
+    const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
+
+    // Check if any selected probe is a PII probe (same logic as BudSentinelProbes)
+    const hasPIIProbe = probesArray.some(probe =>
+      probe.name?.toLowerCase().includes("personal identifier") ||
+      probe.name?.toLowerCase().includes("pii") ||
+      probe.tags?.some(
+        (tag: any) =>
+          tag.name.toLowerCase().includes("dlp") ||
+          tag.name.toLowerCase().includes("personal"),
+      )
+    );
+
+    // Navigate back based on whether PII probes were selected
+    if (hasPIIProbe) {
+      openDrawerWithStep("pii-detection-config");
+    } else {
+      openDrawerWithStep("bud-sentinel-probes");
+    }
   };
 
   const handleNext = async () => {
