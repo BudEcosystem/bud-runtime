@@ -313,9 +313,10 @@ class DeploymentHandler:
                     # Update node memory for consistency
                     node["memory"] = allocation_memory_gb
 
-                    # Set VLLM_CPU_KVCACHE_SPACE env var
-                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb)
-                    logger.info(f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb} GB")
+                    # Set VLLM_CPU_KVCACHE_SPACE env var (ceil to ensure integer)
+                    kv_cache_memory_gb_int = math.ceil(kv_cache_memory_gb)
+                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb_int)
+                    logger.info(f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb_int} GB (ceiled from {kv_cache_memory_gb:.2f})")
                 else:
                     logger.warning(
                         f"CPU Node {node.get('name')}: Missing detailed memory components (weight: {weight_memory_gb}, kv: {kv_cache_memory_gb}). "
