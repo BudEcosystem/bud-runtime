@@ -160,6 +160,50 @@ Check status tags, active versus total workers, and ROI to monitor health and ef
 
 Click a deployment row to open its detail page for rollout state, pods, and troubleshooting.
 
+#### 4.7.1 General tab (deployment detail)
+
+Review the model card for name, creation date, tags, and description.
+
+Check the linked cluster card for available versus total nodes and cluster tags (for non-cloud models).
+
+Open the deployment analysis charts to view request volume, latency, and token usage across selectable time ranges.
+
+Use the **Use this model** action when enabled to send traffic to the current endpoint.
+
+#### 4.7.2 Workers tab (deployment detail)
+
+Open **Workers** to see per-worker status, node placement, and utilization.
+
+Sort by worker name, status, node, or utilization to spot unhealthy pods.
+
+Use the filters to focus on specific pools or workers before rolling updates or maintenance.
+
+#### 4.7.3 Settings tab (deployment detail)
+
+Open **Settings** to manage rate limits, retries, and fallback behavior.
+
+Toggle rate limiting, choose the algorithm (token bucket, fixed window, or sliding window), and set per-second, per-minute, or per-hour caps with burst size.
+
+Configure retry counts and backoff delays for transient failures.
+
+Select fallback deployments for automatic failover and save to apply the changes.
+
+#### 4.7.4 Benchmarks tab (deployment detail)
+
+Navigate to **Benchmarks** to compare throughput and latency runs for the deployment.
+
+Review benchmark rows for scenarios, hardware targets, and result timestamps.
+
+Use the table to identify the best-performing configuration before routing production traffic.
+
+#### 4.7.5 Model Evaluations tab (deployment detail)
+
+Open **Model Evaluations** to view evaluation runs tied to the deployment.
+
+Inspect evaluation names, scenario tags, scores, and run dates to understand quality and safety coverage.
+
+Filter or sort to confirm the deployment meets target thresholds before promotion.
+
 ⸻
 
 ### 4.8 Nodes
