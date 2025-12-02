@@ -24,6 +24,12 @@ interface ChatStore {
   syncWithServer: () => Promise<void>;
   switchUser: () => void;
 
+  // Session isolation functions
+  clearPromptSessions: () => void;
+  clearDefaultSessions: () => void;
+  hasPromptSessions: () => boolean;
+  hasDefaultSessions: () => boolean;
+
   messages: Record<string, SavedMessage[]>;
   addMessage: (chatId: string, message: SavedMessage) => void;
   getMessages: (chatId: string) => SavedMessage[];
@@ -309,6 +315,67 @@ export const useChatStore = create<ChatStore>()(
         if (newUserData) {
           set(newUserData);
         }
+      },
+
+      // Clear prompt sessions (IDs starting with 'prompt_') - used when switching to default mode
+      clearPromptSessions: () => {
+        set((state) => {
+          // Filter out prompt sessions (keep default sessions)
+          const defaultSessions = state.activeChatList.filter(
+            (chat) => !chat.id.startsWith('prompt_')
+          );
+
+          // Get IDs of prompt sessions to clean up their messages
+          const promptSessionIds = state.activeChatList
+            .filter((chat) => chat.id.startsWith('prompt_'))
+            .map((chat) => chat.id);
+
+          // Clean up messages for removed sessions
+          const cleanedMessages = { ...state.messages };
+          promptSessionIds.forEach((id) => delete cleanedMessages[id]);
+
+          return {
+            activeChatList: defaultSessions,
+            messages: cleanedMessages,
+            promptIds: [], // Also clear promptIds
+          };
+        });
+        saveToStorage(get());
+      },
+
+      // Clear default sessions (UUIDs) - used when switching to prompt mode
+      clearDefaultSessions: () => {
+        set((state) => {
+          // Filter out default sessions (keep prompt sessions)
+          const promptSessions = state.activeChatList.filter(
+            (chat) => chat.id.startsWith('prompt_')
+          );
+
+          // Get IDs of default sessions to clean up their messages
+          const defaultSessionIds = state.activeChatList
+            .filter((chat) => !chat.id.startsWith('prompt_'))
+            .map((chat) => chat.id);
+
+          // Clean up messages for removed sessions
+          const cleanedMessages = { ...state.messages };
+          defaultSessionIds.forEach((id) => delete cleanedMessages[id]);
+
+          return {
+            activeChatList: promptSessions,
+            messages: cleanedMessages,
+          };
+        });
+        saveToStorage(get());
+      },
+
+      // Check if there are any prompt sessions
+      hasPromptSessions: () => {
+        return get().activeChatList.some((chat) => chat.id.startsWith('prompt_'));
+      },
+
+      // Check if there are any default sessions
+      hasDefaultSessions: () => {
+        return get().activeChatList.some((chat) => !chat.id.startsWith('prompt_'));
       },
 
       messages: {},  // Start empty, will be loaded by initializeStore
