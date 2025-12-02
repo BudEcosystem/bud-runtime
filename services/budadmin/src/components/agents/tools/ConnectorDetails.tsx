@@ -364,13 +364,14 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       if (field === 'grant_type' && selectedConnectorDetails?.credential_schema) {
         const visibleFields = getVisibleFields(selectedConnectorDetails.credential_schema, value);
         const visibleFieldNames = new Set(visibleFields.map(f => f.field));
+        visibleFieldNames.add('grant_type'); // Ensure grant_type is always preserved
 
-        // Clear hidden fields (except grant_type itself)
-        Object.keys(newFormData).forEach(key => {
-          if (!visibleFieldNames.has(key) && key !== 'grant_type') {
-            delete newFormData[key];
-          }
-        });
+        return Object.keys(newFormData)
+          .filter(key => visibleFieldNames.has(key))
+          .reduce((obj, key) => {
+            obj[key] = newFormData[key];
+            return obj;
+          }, {} as Record<string, string>);
       }
 
       return newFormData;
