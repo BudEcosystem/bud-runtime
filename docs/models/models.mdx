@@ -72,11 +72,10 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 - Standard fields for owner, project, safety tags, license, and rollout status.
 - Attach evaluation baselines and approval workflows before promotion to production.
 
-### 3.2 Routing, scaling, and reliability
+### 3.2 Workflow orchestration and readiness
 
-- Traffic policies for shadowing, canary, or weighted splits across cloud and local backends.
-- Autoscaling profiles per backend with CPU/GPU thresholds and cooldowns.
-- Health probes, circuit breakers, and automatic fallback when an endpoint degrades.
+- Cloud and local onboarding workflows coordinate validation, downloads, and extraction through orchestration
+- Workflow steps emit progress updates so teams can resume or audit long-running imports.
 - Request-level controls: max tokens, temperature, stop sequences, retry budgets, and timeout guards.
 
 ### 3.3 Safety, compliance, and auditability
