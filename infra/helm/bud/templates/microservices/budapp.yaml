@@ -99,8 +99,6 @@ spec:
             value: "false"
           - name: MCP_FOUNDRY_BASE_URL
             value: http://{{ .Release.Name }}-mcpgateway:4444
-          - name: ENTRYPOINT_MCPGATEWAY_SERVICE
-            value: http://{{ .Release.Name }}-mcpgateway:4444
           - name: ENTRYPOINT_MCPGATEWAY_EMAIL
             value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_EMAIL }}
           - name: ENTRYPOINT_MCPGATEWAY_PASSWORD
