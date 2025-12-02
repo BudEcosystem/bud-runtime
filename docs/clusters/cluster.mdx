@@ -3,340 +3,236 @@ title: "Cluster Management"
 description: "Managing CPU and GPU clusters from the Bud Admin console"
 ---
 
-## Description
+## 1. Description
 
 The Bud Admin cluster module gives platform, MLOps, and DevOps teams a single control plane to register, govern, and operate CPU and GPU clusters. It is designed for hybrid and multi-cloud footprints where GenAI workloads span inference APIs, training jobs, evaluations, and interactive playground traffic. The module pairs operational controls (quotas, autoscaling, scheduling) with governance (RBAC, audit trails) so that teams can move fast without risking runaway spend or compliance gaps.
 
 Bud’s cluster experience mirrors the rest of the admin console: declarative defaults, safe self-service, and deep observability. GPU-first organizations can maximize utilization with pool-aware scheduling, while CPU clusters can handle supporting services, control-plane workloads, and cost-efficient inference.
 
-⸻
+## 2. USPs (Unique Selling Propositions)
 
-## USPs (Unique Selling Propositions)
-
-### 1. Unified control plane for CPU and GPU fleets
+### 1. Unified Control Plane for CPU and GPU Fleets
 
 Operate heterogenous clusters (CPU-only, GPU-only, mixed) from one console, with consistent policies for quotas, networking, security, and routing.
 
-### 2. Enterprise governance baked in
+### 2. Enterprise Governance Baked In
 
 Cluster actions respect Bud RBAC, project scoping, and audit logging. Every create, edit, and delete is tracked; permissions align with infra-admin roles and project boundaries.
 
-### 3. Purpose-built for GenAI traffic
+### 3. Purpose-Built for GenAI Traffic
 
 GPU-aware scheduling, pool-based allocations, and model/route affinity keep interactive agents and batch training predictable. Autoscaling and queueing policies are tuned for latency-sensitive inference and bursty workloads.
 
-### 4. Multi-cloud and on-prem friendly
+### 4. Multi-Cloud and On-Prem Friendly
 
 Register Kubernetes clusters from public clouds or on-prem; attach custom runtimes, registries, and CNI settings without rewriting your topology.
 
-### 5. Safety rails for cost and reliability
+### 5. Safety Rails for Cost and Reliability
 
 Quotas, budget guards, health gates, and preflight checks reduce misconfiguration. Templates accelerate secure-by-default setups for production, staging, and sandbox environments.
 
-⸻
+## 3. Features
 
-## Features
-
-### 3.1 Cluster registration
+### 3.1 Cluster Registration
 
 - Registration for CPU, GPU, or mixed clusters with configurable networking, logging, and storage.
 - Support for cloud-managed and self-managed Kubernetes distributions.
 
-### 3.2 Node pools & GPU-aware scheduling
+### 3.2 Node Pools & GPU-Aware Scheduling
 
 - Define node pools by instance type, GPU SKU, and availability zone.
 - Enable bin-packing and topology hints to maximize GPU occupancy.
 - Reserve pools for model-serving, batch training, or control-plane services.
 
-### 3.3 Autoscaling & quotas
+### 3.3 Autoscaling & Quotas
 
 - Horizontal and vertical autoscaling presets per pool.
 - Budget and quota controls per project/team with soft and hard limits.
 - Scale-to-zero for bursty agents; warm pools for low-latency inference.
 
-### 3.4 Networking, security, and compliance
+### 3.4 Networking, Security, and Compliance
 
 - CNI and ingress configuration with support for private endpoints.
 - Namespace/project isolation with network policies and pod security standards.
 - Secrets management and image-signature enforcement for registries.
 
-### 3.5 Observability & diagnostics
+### 3.5 Observability & Diagnostics
 
 - Live health status (nodes, GPU readiness, control-plane components).
 - Metrics and logs tabs with time-window filters and saved views.
 - Event timeline for deployments, reschedules, failures, and admin actions.
 
-### 3.6 Integrations & runtime controls
+### 3.6 Integrations & Runtime Controls
 
 - Connect to model registries and OCI registries for runtime images.
 - Attach storage classes for datasets, checkpoints, and artifacts.
 - Webhooks for incident management, cost alerts, and guardrail violations.
 
-⸻
+## 4. How-to Guides
 
-## How-to Guides
+### 4.1 Accessing the Cluster Module
 
-### 4.1 Accessing the cluster module
+1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+2. Click on Clusters from the side menu.
+3. Click on +Cluster.
 
-Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+### 4.2 Add a New Cluster
 
-Click on Clusters from the side menu.
+1. Click +Cluster.
+2. Choose Create New Cluster.
+3. Choose cloud provider.
+4. Select cloud credentials and click Next.
+5. Cluster is added and displayed on the listing page.
 
-Click on +Cluster.
+### 4.3 Add an Existing Cluster
 
-⸻
+1. Click +Cluster.
+2. Choose Connect to Existing Cluster.
+3. Provide cluster name, ingress URL, and upload the configuration file.
+4. Click Next.
+5. Cluster is added and displayed on the listing page.
 
-### 4.2 Add a new cluster
+### 4.4 Edit a Cluster
 
-Click +Cluster.
+1. Open the cluster detail page from the listing.
+2. Click the edit icon and update data (name, ingress URL).
+3. Save changes to refresh the entry and downstream.
 
-Choose Create New Cluster.
+### 4.5 Delete a Cluster
 
-Choose cloud provider.
-
-Select cloud credentials and click Next.
-
-Cluster is added and displayed on the listing page.
-
-⸻
-
-### 4.3 Add an existing cluster
-
-Click +Cluster.
-
-Choose Connect to Existing Cluster.
-
-Provide cluster name, ingress URL, and upload the configuration file.
-
-Click Next.
-
-Cluster is added and displayed on the listing page.
-
-⸻
-
-### 4.4 Edit a cluster
-
-Open the cluster detail page from the listing.
-
-Click the edit icon and update data (name, ingress URL).
-
-Save changes to refresh the entry and downstream.
-
-⸻
-
-### 4.5 Delete a cluster
-
-Open the cluster detail page.
-
-Click the delete icon.
-
-Confirm removal to detach the cluster.
-
-Ensure dependent models or applications are redirected before finalizing deletion.
-
-Bud decommissions workloads, drains nodes, and revokes credentials before final removal. Audit logs record the deletion.
-
-⸻
+1. Open the cluster detail page.
+2. Click the delete icon.
+3. Confirm removal to detach the cluster.
+4. Ensure dependent models or applications are redirected before finalizing deletion.
+5. Bud decommissions workloads, drains nodes, and revokes credentials before final removal. Audit logs record the deletion.
 
 ### 4.6 General
 
-Open the cluster detail page and select General Tab.
-
-Review the summary cards for nodes, deployments, device types, disk space, RAM, and VRAM availability.
-
-Switch the time filter (Today, 7 Days, This Month) to refresh utilization charts.
-
-Inspect CPU/GPU/HPU, memory, storage, and network bandwidth gauges to spot capacity or performance issues.
-
-⸻
+1. Open the cluster detail page and select General Tab.
+2. Review the summary cards for nodes, deployments, device types, disk space, RAM, and VRAM availability.
+3. Switch the time filter (Today, 7 Days, This Month) to refresh utilization charts.
+4. Inspect CPU/GPU/HPU, memory, storage, and network bandwidth gauges to spot capacity or performance issues.
 
 ### 4.7 Deployments
 
-Open the cluster detail page and select Deployments tab.
-
-View details (deployment name, model name, project name etc) of all deployments on the selected cluster
-
-Check status tags, active versus total workers, and ROI to monitor health and efficiency.
-
-Click a deployment row to open its detail page for rollout state, pods, and troubleshooting.
+1. Open the cluster detail page and select Deployments tab.
+2. View details (deployment name, model name, project name etc) of all deployments on the selected cluster.
+3. Check status tags, active versus total workers, and ROI to monitor health and efficiency.
+4. Click a deployment row to open its detail page for rollout state, pods, and troubleshooting.
 
 #### 4.7.1 General
 
-Open deployment detail page
-
-Review the model card for name, creation date, tags, and description.
-
-Check the linked cluster card for available versus total nodes and cluster tags (for non-cloud models).
-
-Open the deployment analysis charts to view request volume, latency, and token usage across selectable time ranges.
-
-Use the Use this model action when enabled to send traffic to the current endpoint.
+1. Open the deployment detail page.
+2. Review the model card for name, creation date, tags, and description.
+3. Check the linked cluster card for available versus total nodes and cluster tags (for non-cloud models).
+4. Open the deployment analysis charts to view request volume, latency, and token usage across selectable time ranges.
+5. Use the Use this model action when enabled to send traffic to the current endpoint.
 
 #### 4.7.2 Workers
 
-Open deployment detail page and select Workers tab
-
-View per-worker status, node placement, and utilization.
-
-Use the filters (status, hardware type) to focus on specific pools or workers before rolling updates or maintenance.
-
-Click Add Worker to add a new worker with additional concurrency
+1. Open the deployment detail page and select Workers tab.
+2. View per-worker status, node placement, and utilization.
+3. Use the filters (status, hardware type) to focus on specific pools or workers before rolling updates or maintenance.
+4. Click Add Worker to add a new worker with additional concurrency.
 
 #### 4.7.3 Settings
 
-Open deployment detail page and select Settings tab
-
-View settings to manage rate limits, retries, and fallback behavior.
-
-Toggle rate limiting, choose the algorithm (token bucket, fixed window, or sliding window), and set per-second, per-minute, or per-hour caps with burst size.
-
-Configure retry counts and backoff delays for transient failures.
-
-Select fallback deployments for automatic failover and save to apply the changes.
+1. Open the deployment detail page and select Settings tab.
+2. View settings to manage rate limits, retries, and fallback behavior.
+3. Toggle rate limiting, choose the algorithm (token bucket, fixed window, or sliding window), and set per-second, per-minute, or per-hour caps with burst size.
+4. Configure retry counts and backoff delays for transient failures.
+5. Select fallback deployments for automatic failover and save to apply the changes.
 
 #### 4.7.4 Benchmarks
 
-Open deployment detail page and select Benchmarks tab
-
-Compare throughput and latency runs for the deployment.
-
-Review benchmark rows for scenarios, hardware targets, and result timestamps.
-
-Use the table to identify the best-performing configuration before routing production traffic.
-
-Search and filters (status, model name, cluster name, TPOT, TTFT) are available to focus on specific benchmark results.
-
-Click Run Another Benchmark to initiate a new benchmark run.
+1. Open the deployment detail page and select Benchmarks tab.
+2. Compare throughput and latency runs for the deployment.
+3. Review benchmark rows for scenarios, hardware targets, and result timestamps.
+4. Use the table to identify the best-performing configuration before routing production traffic.
+5. Use search and filters (status, model name, cluster name, TPOT, TTFT) to focus on specific benchmark results.
+6. Click Run Another Benchmark to initiate a new benchmark run.
 
 #### 4.7.5 Model Evaluations
 
-Open deployment detail page and select Model Evaluations tab
-
-View evaluation runs tied to the deployment.
-
-Inspect evaluation names, datasets, scores, and run dates to understand quality and safety coverage.
-
-Filter or sort to confirm the deployment meets target thresholds before promotion.
-
-Click Run Another Evaluation to initiate a new Evaluation run.
-
-⸻
+1. Open the deployment detail page and select Model Evaluations tab.
+2. View evaluation runs tied to the deployment.
+3. Inspect evaluation names, datasets, scores, and run dates to understand quality and safety coverage.
+4. Filter or sort to confirm the deployment meets target thresholds before promotion.
+5. Click Run Another Evaluation to initiate a new Evaluation run.
 
 ### 4.8 Nodes
 
-Open the cluster detail page and select Nodes tab.
+1. Open the cluster detail page and select Nodes tab.
+2. View details such as see pool membership, operating system, and GPU/CPU type badges.
+3. Review per-node gauges for Node Ready Status, Requests vs Allocatable (CPU, memory, GPU), Memory Req. vs Allocatable, and Network I/O.
+4. Check Events to identify nodes with recent warnings or failures before scheduling workloads.
+5. Click See More on a node row to open the event panel for deeper diagnostics.
 
-View details such as see pool membership, operating system, and GPU/CPU type badges.
+#### 4.8.1 Node Events Panel
 
-Review per-node gauges for Node Ready Status, Requests vs Allocatable (CPU, memory, GPU), Memory Req. vs Allocatable, and Network I/O.
-
-Check Events to identify nodes with recent warnings or failures before scheduling workloads.
-
-Click See More on a node row to open the event panel for deeper diagnostics.
-
-#### 4.8.1 Node events panel
-
-Click See More on the target node in the Nodes tab.
-
-View the event drawer for timestamped entries with severity, status, and pod/node references.
-
-Read the event description to confirm root cause (e.g., failed pod scheduling, cluster endpoint issues, taint mismatches).
-
-Close the drawer after triaging or proceed to remediation (cordon, drain, or reschedule) based on the event details.
-
-⸻
+1. Click See More on the target node in the Nodes tab.
+2. View the event drawer for timestamped entries with severity, status, and pod/node references.
+3. Read the event description to confirm root cause (e.g., failed pod scheduling, cluster endpoint issues, taint mismatches).
+4. Close the drawer after triaging or proceed to remediation (cordon, drain, or reschedule) based on the event details.
 
 ### 4.9 Analytics
 
-Open the cluster detail page and select Analytics tab.
-
-Monitor summary KPIs for node counts, pods, CPU, memory, disk usage, and health.
-
-Review sortable node and pod tables to identify hot spots or repeated restarts.
-
-Use the table to compare CPU, memory, and disk utilization across nodes over time.
-
-⸻
+1. Open the cluster detail page and select Analytics tab.
+2. Monitor summary KPIs for node counts, pods, CPU, memory, disk usage, and health.
+3. Review sortable node and pod tables to identify hot spots or repeated restarts.
+4. Use the table to compare CPU, memory, and disk utilization across nodes over time.
 
 ### 4.10 Settings
 
-Open the cluster detail page and Select settings tab.
+1. Open the cluster detail page and select settings tab.
+2. Load available storage classes from the cluster and pick the default class for deployments.
+3. Select the preferred access mode (e.g., ReadWriteOnce or ReadWriteMany), using the recommended value from the storage class when available.
+4. Save settings to apply the defaults and reuse them across future deployments.
 
-Load available storage classes from the cluster and pick the default class for deployments.
+### 4.11 Modify Permissions for Clusters
 
-Select the preferred access mode (e.g., ReadWriteOnce or ReadWriteMany), using the recommended value from the storage class when available.
+1. Open the user management page and select user.
+2. Assign view access for users who should only view the cluster listing.
+3. Grant manage permissions to users who can add clusters and perform edits or deletions.
+4. Save updates to enforce access across the cluster module and all cluster actions.
 
-Save settings to apply the defaults and reuse them across future deployments.
-
-⸻
-
-### 4.11 Modify permissions for clusters
-
-Open the user management page and select user.
-
-Assign view access for users who should only view the cluster listing.
-
-Grant manage permissions to users who can add clusters and perform edits or deletions.
-
-Save updates to enforce access across the cluster module and all cluster actions.
-
-⸻
-
-## FAQ
+## 5. FAQ
 
 ### Q1. Which clusters are supported?
 
 CPU, GPU, and mixed Kubernetes clusters from public clouds or on-prem are supported. GPU scheduling honors pool labels and SKUs so latency-sensitive routes stay predictable.
 
-⸻
-
 ### Q2. Who can create or edit clusters?
 
 Users with infra or platform admin permissions (per RBAC) can create/edit/delete clusters. Changes are scoped to their allowed projects and are fully audited.
-
-⸻
 
 ### Q3. How does Bud prevent runaway GPU spend?
 
 Quotas and budgets cap CPU/GPU/memory and cost per project; autoscaling policies can enforce scale-to-zero, warm pools, and max nodes per pool. Alerts fire when thresholds are crossed.
 
-⸻
-
 ### Q4. Can I pin certain models or routes to GPU pools?
 
 Yes. Label pools (e.g., `gpu=hopper`, `workload=model-serving`) and set affinity/taints in your model or route configuration. The scheduler honors these hints.
-
-⸻
 
 ### Q5. What observability is available?
 
 The detail page surfaces health, metrics, logs, and events. You can stream to external sinks, export diagnostics bundles, and set alert destinations for incidents or budget breaches.
 
-⸻
-
 ### Q6. How are deletes handled safely?
 
 Deletes require confirmation, drain workloads, revoke credentials, and capture an audit log entry. Dependent projects and routes are surfaced before final removal.
-
-⸻
 
 ### Q7. Can we operate across multiple clouds?
 
 Yes. Register clusters from different clouds or on-prem. Policies, quotas, and security templates remain consistent, and pools can be tagged by region/zone for routing and failover.
 
-⸻
-
 ### Q8. How do GPU-first orgs benefit?
 
 GPU-aware scheduling, pool-level bin-packing, and warm pools keep inference latency low while maximizing occupancy. Budget controls and alerts keep expensive SKUs in check.
 
-⸻
-
 ### Q9. Does the module support compliance needs?
 
 Yes. Pod security standards, network policies, signed images, secrets management, and full audit trails help align with enterprise security and regulatory requirements.
-
-⸻
 
 ### Q10. What if networking settings change after creation?
 
