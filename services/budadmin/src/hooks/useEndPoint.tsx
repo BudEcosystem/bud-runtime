@@ -122,6 +122,7 @@ export const useEndPoints = create<{
     limit?: any;
     name?: string;
     order_by?: string;
+    status?: string;
   }) => void;
 createEndPoint: (data: any) => Promise<any>;
   setPageSource: (data: any) => Promise<any>;
@@ -184,7 +185,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
     }
   },
 
-  getEndPoints: async ({ id, page, limit, name, order_by = "-created_at" } = {}) => {
+  getEndPoints: async ({ id, page, limit, name, order_by = "-created_at", status } = {}) => {
     const url = `${tempApiBaseUrl}/endpoints/`;
     set({ loading: true });
     try {
@@ -194,6 +195,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
         search: name ? true : false,
         name: name ? name : undefined,
         order_by: order_by,
+        status: status,
       };
 
       // Only add project_id if it's provided (not null)

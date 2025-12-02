@@ -16,9 +16,10 @@
 
 """Schemas for responses module - OpenAI-compatible API."""
 
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from openai.types.responses import Response
+from openai.types.responses import Response, ResponseInputItem
+from openai.types.responses.response_prompt import ResponsePrompt, Variables
 from pydantic import BaseModel, Field, field_serializer
 
 
@@ -43,36 +44,38 @@ class OpenAIResponse(Response):
         return int(value)
 
 
-class ResponseInputTextParam(BaseModel):
-    """Input text parameter matching OpenAI's responses API."""
+class BudResponsePrompt(ResponsePrompt):
+    """Extended ResponsePrompt that supports Variables + any value types.
 
-    type: Literal["input_text"] = "input_text"
-    text: str
-
-
-class ResponsePromptParam(BaseModel):
-    """Parameters for prompt template execution.
-
-    Compatible with OpenAI's responses API format.
+    Inherits from OpenAI's ResponsePrompt (Pydantic BaseModel) but overrides
+    the variables field to accept both the standard Variables types AND any
+    additional Python types.
     """
 
-    id: str = Field(..., description="The unique identifier of the prompt template to use")
-    variables: Optional[Dict[str, Union[str, ResponseInputTextParam, Any]]] = Field(
-        None,
-        description="Optional map of values to substitute in for variables in your prompt. "
-        "The substitution values can either be strings or ResponseInputTextParam.",
-    )
-    version: Optional[str] = Field(None, description="Optional version of the prompt template")
+    variables: Optional[Dict[str, Union[Variables, Any]]] = None
+    """Optional map of values to substitute in for variables in your prompt.
+
+    Values can be:
+    - OpenAI Variables types: str, ResponseInputText, ResponseInputImage, ResponseInputFile
+    - Any other type: int, float, bool, None, dict, list, etc.
+    """
 
 
 class ResponseCreateRequest(BaseModel):
     """Request model for creating responses via OpenAI-compatible API.
 
-    This model follows OpenAI's responses API structure for compatibility.
+    This model follows OpenAI's responses API structure for 100% compatibility.
     """
 
-    prompt: ResponsePromptParam = Field(..., description="Prompt parameters including id, variables, and version")
-    input: Optional[str] = Field(None, description="Optional input text for the prompt")
+    prompt: BudResponsePrompt = Field(
+        ..., description="Prompt template reference with id, optional variables, and version"
+    )
+    input: Optional[Union[str, List[ResponseInputItem]]] = Field(
+        None,
+        description="Text input to the model. Can be a simple string or array of message objects. "
+        "String format: 'What is 2+2?' | "
+        "Array format: [{'role': 'user', 'content': 'Hello'}, ...]",
+    )
 
 
 class OpenAIError(BaseModel):

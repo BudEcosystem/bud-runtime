@@ -168,6 +168,9 @@ class ClusterOpsService:
                     {"status": ClusterStatusEnum.AVAILABLE if cluster_status else ClusterStatusEnum.NOT_AVAILABLE},
                 )
 
+            # Capture is_master for each node before DB operations (not stored in DB, passed to state store)
+            node_is_master_map = {node["node_name"]: node.get("is_master", False) for node in node_info}
+
             node_objects = []
             for node in node_info:
                 devices_data = json.loads(node.get("devices", "{}"))
@@ -259,6 +262,7 @@ class ClusterOpsService:
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
                                     "generation": cpu.get("generation", ""),
+                                    "physical_cores": cpu.get("physical_cores", cpu.get("cores", 0)),
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
@@ -267,10 +271,12 @@ class ClusterOpsService:
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
                                     "instruction_sets": cpu.get("instruction_sets", []),
-                                    "memory_gb": 0,  # CPU doesn't have dedicated memory like GPU
-                                    "mem_per_GPU_in_GB": 0,
+                                    "memory_gb": cpu.get("memory_gb", 0),  # System memory from DeviceExtractor
+                                    "mem_per_GPU_in_GB": cpu.get("memory_gb", 0),  # System memory
                                     "inter_node_bandwidth_in_GB_per_sec": 100,
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
+                                    "utilized_cores": cpu.get("utilized_cores", 0.0),
+                                    "utilized_memory_gb": cpu.get("utilized_memory_gb", 0.0),
                                 },
                                 "available_count": 1,  # CPUs are counted differently
                                 "type": "cpu",
@@ -310,13 +316,15 @@ class ClusterOpsService:
                 else:
                     # Fallback to CPU if no devices detected
                     cpu_info = node.get("cpu_info", {})
+                    cpu_cores = int(cpu_info.get("cpu_cores", 0) or 0)
                     hardware_info = [
                         {
                             "device_config": {
                                 "type": "cpu",
                                 "name": cpu_info.get("cpu_name", "CPU"),
                                 "vendor": cpu_info.get("cpu_vendor", "Unknown"),
-                                "cores": int(cpu_info.get("cpu_cores", 0) or 0),
+                                "physical_cores": cpu_cores,
+                                "cores": cpu_cores,
                                 "architecture": cpu_info.get("architecture", "x86_64"),
                                 "raw_name": cpu_info.get("cpu_name", "CPU"),
                                 "mem_per_GPU_in_GB": 0,
@@ -370,6 +378,11 @@ class ClusterOpsService:
             logger.info("Added node info to db")
             nodes = await cls.transform_db_nodes(db_nodes)
             logger.info("Transformed db nodes")
+
+            # Add is_master to state store output (not persisted in DB)
+            for node in nodes:
+                node["is_master"] = node_is_master_map.get(node["name"], False)
+
             result = {
                 "id": str(cluster_id),
                 "name": cluster_name,
@@ -672,7 +685,10 @@ class ClusterOpsService:
                         "name": device.get("name", "unknown"),
                         "type": device.get("type", "cpu"),
                         "mem_per_gpu_in_gb": device.get("mem_per_gpu_in_gb", 0),
+                        "physical_cores": device.get("physical_cores", device.get("cores", 0)),
                         "cores": device.get("cores", 0),
+                        "utilized_cores": device.get("utilized_cores", 0.0),
+                        "utilized_memory_gb": device.get("utilized_memory_gb", 0.0),
                     },
                     "available_count": device.get("available_count", 0),
                     "total_count": device.get("total_count", 0),
@@ -826,6 +842,12 @@ class ClusterOpsService:
 
                         # Store in state store for budapp consumption
                         nodes = await cls.transform_db_nodes_enhanced(db_cluster.nodes)
+
+                        # Add is_master from schedulable_nodes to output
+                        schedulable_nodes_map = {n["name"]: n.get("is_master", False) for n in schedulable_nodes}
+                        for node in nodes:
+                            node["is_master"] = schedulable_nodes_map.get(node["name"], False)
+
                         result = {"id": str(cluster_id), "nodes": nodes, "enhanced": True, "detection_method": "nfd"}
                         await cls.update_node_info_in_statestore(json.dumps(result))
 
@@ -919,6 +941,9 @@ class ClusterOpsService:
 
             # Get node info
             node_info = await get_node_info(config_dict, db_cluster.platform)
+
+            # Capture is_master for each node before DB operations (not stored in DB)
+            node_is_master_map = {node["node_name"]: node.get("is_master", False) for node in node_info}
 
             # Create node objects
             node_objects = []
@@ -1014,6 +1039,7 @@ class ClusterOpsService:
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
                                     "generation": cpu.get("generation", ""),
+                                    "physical_cores": cpu.get("physical_cores", cpu.get("cores", 0)),
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
@@ -1022,10 +1048,12 @@ class ClusterOpsService:
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
                                     "instruction_sets": cpu.get("instruction_sets", []),
-                                    "memory_gb": 0,  # CPU doesn't have dedicated memory like GPU
-                                    "mem_per_GPU_in_GB": 0,
+                                    "memory_gb": cpu.get("memory_gb", 0),  # System memory from DeviceExtractor
+                                    "mem_per_GPU_in_GB": cpu.get("memory_gb", 0),  # System memory
                                     "inter_node_bandwidth_in_GB_per_sec": 100,
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
+                                    "utilized_cores": cpu.get("utilized_cores", 0.0),
+                                    "utilized_memory_gb": cpu.get("utilized_memory_gb", 0.0),
                                 },
                                 "available_count": 1,  # CPUs are counted differently
                                 "type": cpu_type,
@@ -1065,13 +1093,15 @@ class ClusterOpsService:
                 else:
                     # Fallback to CPU if no devices detected
                     cpu_info = node.get("cpu_info", {})
+                    cpu_cores = int(cpu_info.get("cpu_cores", 0) or 0)
                     hardware_info = [
                         {
                             "device_config": {
                                 "type": "cpu",
                                 "name": cpu_info.get("cpu_name", "CPU"),
                                 "vendor": cpu_info.get("cpu_vendor", "Unknown"),
-                                "cores": int(cpu_info.get("cpu_cores", 0) or 0),
+                                "physical_cores": cpu_cores,
+                                "cores": cpu_cores,
                                 "architecture": cpu_info.get("architecture", "x86_64"),
                                 "raw_name": cpu_info.get("cpu_name", "CPU"),
                                 "mem_per_GPU_in_GB": 0,
@@ -1198,6 +1228,11 @@ class ClusterOpsService:
 
             # Prepare and store results in statestore
             nodes = await cls.transform_db_nodes(db_nodes)
+
+            # Add is_master to state store output (not persisted in DB)
+            for node in nodes:
+                node["is_master"] = node_is_master_map.get(node["name"], False)
+
             result = {
                 "id": str(cluster_id),
                 "nodes": nodes,

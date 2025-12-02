@@ -55,7 +55,7 @@ spec:
           - name: PSQL_DB_NAME
             value: {{ .Values.externalServices.postgresql.databases.budprompt.name }}
           - name: MCP_FOUNDRY_BASE_URL
-            value: {{ include "bud.ingress.url.mcpgateway" $ }}
+            value: http://{{ .Release.Name }}-mcpgateway:4444
           - name: ENTRYPOINT_MCPGATEWAY_SERVICE
             value: http://{{ .Release.Name }}-mcpgateway:4444
           - name: ENTRYPOINT_MCPGATEWAY_EMAIL

@@ -102,7 +102,7 @@ class DeviceMappingRegistry:
             else:
                 logger.warning(f"No HPU product mapping found for device: {device_name}")
 
-        elif device_type == "cpu":
+        elif device_type in ("cpu", "cpu_high"):
             cpu_selector = cls._get_cpu_selector(device_name, device_model)
             node_selector.update(cpu_selector)
 
@@ -148,7 +148,7 @@ class DeviceMappingRegistry:
             return list(cls.NVIDIA_GPU_MAPPINGS.keys())
         elif device_type == "hpu":
             return list(cls.INTEL_HPU_MAPPINGS.keys())
-        elif device_type == "cpu":
+        elif device_type in ("cpu", "cpu_high"):
             return list(cls.CPU_ARCH_MAPPINGS.keys())
         else:
             return []

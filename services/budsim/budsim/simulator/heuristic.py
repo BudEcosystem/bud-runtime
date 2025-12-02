@@ -169,11 +169,18 @@ class HeuristicCalculator:
         # Default to bf16 for most models
         return "bf16"
 
-    def validate_memory_requirements(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_memory_requirements(
+        self,
+        model_params: Dict[str, Any],
+        max_loras: Optional[int] = None,
+        max_lora_rank: int = 256,
+    ) -> Dict[str, Any]:
         """Validate if the configuration fits in available memory.
 
         Args:
             model_params: Dictionary containing model and system parameters
+            max_loras: Maximum number of LoRA adapters to support (if LoRA enabled)
+            max_lora_rank: Maximum rank for LoRA adapters (default: 256)
 
         Returns:
             Dict containing validation results:
@@ -198,16 +205,24 @@ class HeuristicCalculator:
         tp_size = model_params.get("tensor_parallel_size", 1)
         pp_size = model_params.get("pipeline_parallel_size", 1)
 
+        # Prepare kwargs for calculate_memory
+        calc_kwargs = {
+            "model_id_or_config": model_uri,
+            "batch_size": batch_size,
+            "seq_length": seq_length,
+            "precision": self._get_precision_bits(model_params),
+            "tensor_parallel": tp_size,  # Pass TP to get per-device memory
+            "respect_weight_tying": False,  # Count all physical tensors for accurate memory estimation
+        }
+
+        # Add LoRA parameters if provided
+        if max_loras is not None and max_loras > 0:
+            calc_kwargs["max_loras"] = max_loras
+            calc_kwargs["max_lora_rank"] = max_lora_rank
+
         # Calculate memory requirements with tensor parallelism
         # calculate_memory with tensor_parallel gives per-device memory
-        memory_report = calculate_memory(
-            model_id_or_config=model_uri,
-            batch_size=batch_size,
-            seq_length=seq_length,
-            precision=self._get_precision_bits(model_params),
-            tensor_parallel=tp_size,  # Pass TP to get per-device memory
-            respect_weight_tying=False,
-        )
+        memory_report = calculate_memory(**calc_kwargs)
 
         # Memory per device - already calculated correctly by calculate_memory with TP
         total_memory_per_device_gb = memory_report.total_memory_gb / pp_size
@@ -252,6 +267,90 @@ class HeuristicCalculator:
                 else f"Insufficient memory: {total_memory_per_device_gb:.2f}GB > {available_memory_gb}GB"
             ),
         }
+
+    def find_optimal_max_loras(
+        self,
+        model_params: Dict[str, Any],
+        max_lora_rank: int = 256,
+        initial_max_loras: int = 5,
+        min_max_loras: int = 1,
+    ) -> Optional[int]:
+        """Find the optimal max_loras value that fits in available memory using binary search.
+
+        Args:
+            model_params: Dictionary containing model and system parameters
+            max_lora_rank: Maximum rank for LoRA adapters (default: 256)
+            initial_max_loras: Starting value for max_loras (default: 5)
+            min_max_loras: Minimum acceptable value for max_loras (default: 1)
+
+        Returns:
+            Optional[int]: The maximum number of LoRAs that fits in memory, or None if even min_max_loras doesn't fit
+        """
+        if not self.use_llm_calc:
+            logger.warning("llm-memory-calculator not available - cannot optimize max_loras")
+            return None
+
+        # First check if initial value fits
+        validation_result = self.validate_memory_requirements(
+            model_params=model_params,
+            max_loras=initial_max_loras,
+            max_lora_rank=max_lora_rank,
+        )
+
+        if validation_result["valid"]:
+            logger.debug(f"Initial max_loras={initial_max_loras} fits in memory")
+            return initial_max_loras
+
+        # Check if minimum value fits
+        validation_result = self.validate_memory_requirements(
+            model_params=model_params,
+            max_loras=min_max_loras,
+            max_lora_rank=max_lora_rank,
+        )
+
+        if not validation_result["valid"]:
+            logger.warning(f"Even min_max_loras={min_max_loras} doesn't fit in memory: {validation_result['message']}")
+            return None
+
+        # Binary search between min_max_loras and initial_max_loras
+        left = min_max_loras
+        right = initial_max_loras
+        optimal = min_max_loras
+
+        logger.debug(f"Starting binary search for max_loras between {left} and {right}")
+
+        while left <= right:
+            mid = (left + right) // 2
+
+            validation_result = self.validate_memory_requirements(
+                model_params=model_params,
+                max_loras=mid,
+                max_lora_rank=max_lora_rank,
+            )
+
+            if validation_result["valid"]:
+                # This value fits, try higher
+                optimal = mid
+                left = mid + 1
+                logger.debug(
+                    f"max_loras={mid} fits (using {validation_result['total_memory_gb']:.2f}GB "
+                    f"of {validation_result['available_memory_gb']:.2f}GB) - trying higher"
+                )
+            else:
+                # This value doesn't fit, try lower
+                right = mid - 1
+                logger.debug(
+                    f"max_loras={mid} doesn't fit (needs {validation_result['total_memory_gb']:.2f}GB, "
+                    f"available {validation_result['available_memory_gb']:.2f}GB) - trying lower"
+                )
+
+        logger.info(
+            f"Found optimal max_loras={optimal} for configuration "
+            f"(TP={model_params.get('tensor_parallel_size', 1)}, "
+            f"PP={model_params.get('pipeline_parallel_size', 1)}, "
+            f"concurrency={model_params.get('concurrent_requests')})"
+        )
+        return optimal
 
     def get_kv_cache_memory(self, model_params: Dict[str, Any]) -> float:
         """Get KV cache memory per GPU using llm-memory-calculator.

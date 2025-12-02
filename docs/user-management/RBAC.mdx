@@ -3,7 +3,7 @@ title: "User Management & RBAC"
 description: "User management system configuration and management"
 ---
 
-## Description
+## 1. Description
 
 Bud AI Foundry’s User Management and Role-Based Access Control (RBAC) system is designed for enterprises rolling out GenAI across multiple teams, projects, and applications.
 
@@ -11,7 +11,7 @@ As GenAI moves from POCs into production, access control becomes a governance an
 
 - Who can deploy or change models?
 - Who can see sensitive data or logs?
-- How do we stop “experiment” endpoints from becoming shadow production?
+- How do we stop "experiment" endpoints from becoming shadow production?
 - How do we give Sales/HR/Support safe AI tools without exposing infra?
 
 Bud AI Foundry addresses these challenges with:
@@ -24,13 +24,11 @@ Bud AI Foundry addresses these challenges with:
 
 The result: fast GenAI adoption across the organization, with the level of control your security, risk, and compliance teams expect.
 
-⸻
-
-## USPs (Unique Selling Propositions)
+## 2. USPs (Unique Selling Propositions)
 
 ### 1. Enterprise-grade multi-level RBAC
 
-Model your real org hierarchy: Super Admins, specialized Admins (Infra, Models, Evaluations, Routes), project teams (HR, Sales, DevOps), and non-technical consumers—all with clearly scoped access.
+Model your real org hierarchy: Super Admins, specialized Admins (Infra, Models, Evaluations, Routes), project teams (HR, Sales, DevOps), and non-technical consumers - all with clearly scoped access.
 
 ### 2. Project and task-level granularity
 
@@ -38,7 +36,7 @@ Control access not just at the platform level, but per project (team) and task (
 
 ### 3. API-level security and governance
 
-Classify APIs as internal or public, manage API keys, rate limits, quotas, and costs per client, team, or app—so embedded GenAI features remain secure and auditable.
+Classify APIs as internal or public, manage API keys, rate limits, quotas, and costs per client, team, or app - so embedded GenAI features remain secure and auditable.
 
 ### 4. Unified experience for all personas
 
@@ -46,25 +44,19 @@ Classify APIs as internal or public, manage API keys, rate limits, quotas, and c
 - Developers: OpenAI-style dev dashboard with safe self-serve APIs
 - Business users: curated chat-based experiences and playgrounds.
 
-### 5. Centralized IAM & SSO with enterprise standards
+### 5. Centralized IAM, security, and analytics
 
 Supports SSO, user federation with LDAP / Active Directory, and identity brokering with third-party IdPs, using OpenID Connect, OAuth 2.0, and SAML 2.0.
 
-### 6. Built-in security & compliance posture
-
 MFA, strong password policies, brute-force detection, signed JWTs, and detailed audit logs support regulatory frameworks such as GDPR and HIPAA, as well as internal governance requirements.
 
-### 7. Usage analytics and cost visibility for “Client” users
+Fine-grained analytics per client/department/project: tokens consumed, costs incurred, quotas, and plans - so you can implement chargeback/showback models for GenAI usage.
 
-Fine-grained analytics per client/department/project: tokens consumed, costs incurred, quotas, and plans—so you can implement chargeback/showback models for GenAI usage.
-
-⸻
-
-## Features
+## 3. Features
 
 ### 3.1 Multi-level RBAC Hierarchy
 
-#### a. Super Admin
+#### 3.1.1 Super Admin
 
 - Highest-privilege role with organization-wide control.
 - Configures:
@@ -73,15 +65,15 @@ Fine-grained analytics per client/department/project: tokens consumed, costs inc
   - Creation and assignment of specialized Admin roles,
   - Default roles and access templates.
 
-#### b. Admin-level roles
+#### 3.1.2 Admin-level roles
 
 Controlled by Super Admin, Admins can be specialized per module or capability, for example:
 
-- Infra Admin – clusters, runtimes, scaling policies.
-- Model Admin – onboarding models, model catalogs, versioning.
-- Evaluation Admin – benchmarks, evaluation suites, quality checks.
-- Routes/Orchestration Admin – flows, routing, and agents.
-- User & Project Admin – manages users, roles, and project assignments.
+- Infra Admin - clusters, runtimes, scaling policies.
+- Model Admin - onboarding models, model catalogs, versioning.
+- Evaluation Admin - benchmarks, evaluation suites, quality checks.
+- Routes/Orchestration Admin - flows, routing, and agents.
+- User & Project Admin - manages users, roles, and project assignments.
 
 Admins can be scoped at:
 
@@ -90,8 +82,6 @@ Admins can be scoped at:
 - Project (Team) level (e.g., only HR project, only Sales project).
 
 This supports separation of duties and alignment with internal operating models.
-
-⸻
 
 ### 3.2 Project Teams & Task-level Access
 
@@ -112,11 +102,9 @@ Within a project, you can define task-level permissions, for example:
 - Sales reps: can only use chat assistants.
 - A technical owner: can configure prompts, routes, and model selections.
 
-⸻
-
 ### 3.3 End User Types & Dashboards
 
-#### a. Admin users
+#### 3.3.1 Admin users
 
 - Manage operational aspects like:
   - Cluster & infrastructure management,
@@ -126,7 +114,7 @@ Within a project, you can define task-level permissions, for example:
   - API and route configuration.
 - Permissions can be view-only or manage per module.
 
-#### b. Client / Consumer users
+#### 3.3.2 Client / Consumer users
 
 Ideal for:
 
@@ -151,8 +139,6 @@ Bud AI Foundry exposes detailed analytics per client:
 - Token and cost quotas (configurable),
 - Billing cycles.
 
-⸻
-
 ### 3.4 Developer / End-user Dev Dashboard
 
 - OpenAI-like developer dashboard for internal devs and application teams.
@@ -164,8 +150,6 @@ Bud AI Foundry exposes detailed analytics per client:
 
 This enables self-service for developers, within a governed environment defined by Super Admins and Admins.
 
-⸻
-
 ### 3.5 API-level Access & Governance
 
 For every deployed model, route, or agent:
@@ -174,8 +158,8 @@ For every deployed model, route, or agent:
 - Specify which teams, services, or apps can call the API.
 - Set rate limits, quotas, and cost ceilings per API key or client.
 - Classify APIs as:
-  - Internal APIs – restricted to internal services/teams.
-  - Public APIs – available to broader app developers or external customers (if configured).
+  - Internal APIs - restricted to internal services/teams.
+  - Public APIs - available to broader app developers or external customers (if configured).
 
 All API usage is attributed to:
 
@@ -184,8 +168,6 @@ All API usage is attributed to:
 - A user or API key,
 
 enabling full auditability and chargeback.
-
-⸻
 
 ### 3.6 Centralized IAM & SSO
 
@@ -204,8 +186,6 @@ Key IAM capabilities:
 - Centralized policy application and review.
 - Reduced operational overhead and fewer fragmented accounts.
 
-⸻
-
 ### 3.7 Security & Compliance Features
 
 - Multi-Factor Authentication (MFA).
@@ -221,8 +201,6 @@ Key IAM capabilities:
 
 These capabilities support compliance and audit requirements such as GDPR, HIPAA, and internal security policies.
 
-⸻
-
 ### 3.8 Standards Compliance & IdP Integrations
 
 - Supports OpenID Connect (OIDC), OAuth 2.0, and SAML 2.0.
@@ -232,22 +210,18 @@ These capabilities support compliance and audit requirements such as GDPR, HIPAA
 
 This ensures Bud AI Foundry fits seamlessly into your existing identity landscape.
 
-⸻
-
-## How-to Guides
+## 4. How-to Guides
 
 ### 4.1 Accessing the User Management Module
 
 1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
 2. Click on your profile/avatar in the top-right corner.
-3. Select “User Management” from the menu.
+3. Select "User Management" from the menu.
 4. If you are an Admin or Super Admin, you’ll see user lists, roles, and access settings.
-
-⸻
 
 ### 4.2 Adding a New Admin User with Scoped Access
 
-1. Go to User Management → click “Add User”.
+1. Go to User Management, click "Add User".
 2. Enter the user’s name and email address.
 3. Under Role, select the appropriate base role (e.g., Admin, Developer, DevOps).
 4. Under User Type, choose Admin.
@@ -258,14 +232,12 @@ This ensures Bud AI Foundry fits seamlessly into your existing identity landscap
 6. Optionally, scope the user to specific Projects (Teams):
    - Assign them to HR, Sales, DevOps, or other relevant projects.
    - Within each project, specify which components they can see/manage.
-7. Click “Save”.
+7. Click "Save".
 8. The user will receive an invitation email. Once accepted, they can sign in and operate within the permissions you defined.
-
-⸻
 
 ### 4.3 Adding a Client / Consumer User and Configuring Quotas
 
-1. In User Management, click “Add User.”
+1. In User Management, click "Add User."
 2. Enter the name and email.
 3. Assign an appropriate Role (e.g., Client, Business User), if configured.
 4. Set User Type = Client.
@@ -276,41 +248,36 @@ This ensures Bud AI Foundry fits seamlessly into your existing identity landscap
    - Define token quotas (e.g., monthly token limit).
    - Set cost limits and billing plans.
    - Configure billing cycle (e.g., monthly).
-7. Click “Save.”
+7. Click "Save."
 8. The client can now:
    - Log into their client dashboard,
    - View usage and costs,
    - Access their assigned assistants via chat or playground.
 
-⸻
-
 ### 4.4 Creating and Managing Project-level Teams
 
 1. Navigate to Projects / Teams in the admin console.
-2. Click “Create Project / Team”.
-3. Name the project, e.g., “HR Assistants”, “Sales Copilot”, or “DevOps Automations”.
+2. Click "Create Project / Team".
+3. Name the project, e.g., "HR Assistants", "Sales Copilot", or "DevOps Automations".
 4. Assign Project Owners (Admins or technical leads).
 5. Attach:
    - Relevant models and agents,
    - Specific datasets, evaluations, or routes.
 6. Add users to the project and define their project roles:
-
-   For example:
-   - HR Lead – View analytics + manage assistants,
-   - HR Partners – Use chat assistants only,
-   - Data Scientist – manage prompts and evaluations.
+   - For example:
+     - HR Lead - View analytics + manage assistants,
+     - HR Partners - Use chat assistants only,
+     - Data Scientist - manage prompts and evaluations.
 7. Save the configuration.
 8. Project-level isolation is now enforced: users only see what their project access allows.
-
-⸻
 
 ### 4.5 Managing API Access: Internal vs Public
 
 1. Go to the APIs / Routes section in the dashboard.
 2. Select a deployed model, route, or agent.
 3. Under Access Type, choose:
-   - Internal – restricts usage to internal services and teams.
-   - Public – exposes the API to broader developer audiences (internal or external) as configured.
+   - Internal - restricts usage to internal services and teams.
+   - Public - exposes the API to broader developer audiences (internal or external) as configured.
 4. Configure API keys:
    - Generate keys for specific teams, apps, or clients.
    - Label them clearly (e.g., sales-copilot-prod, hr-portal-staging).
@@ -320,8 +287,6 @@ This ensures Bud AI Foundry fits seamlessly into your existing identity landscap
    - Optional cost caps.
 6. Save changes.
 7. Distribute API keys through your secure internal process (never hard-code into public repos).
-
-⸻
 
 ### 4.6 Integrating Bud AI Foundry with Your Identity Provider
 
@@ -344,8 +309,6 @@ Note: Exact steps vary by IdP (Okta, Azure AD, etc.), but the flow is broadly si
    - Confirm that the expected role and project assignments are applied.
 7. Roll out to wider user groups once validated.
 
-⸻
-
 ### 4.7 Modifying Permissions or Offboarding Users
 
 1. Go to User Management.
@@ -360,21 +323,15 @@ Note: Exact steps vary by IdP (Okta, Azure AD, etc.), but the flow is broadly si
    - Revoke associated API keys if applicable.
 6. Confirm that their access is removed by viewing their current roles and projects.
 
-⸻
-
-## FAQ
+## 5. FAQ
 
 ### Q1. How does Bud AI Foundry differ from basic role-based access in typical ML platforms?
 
-A. Bud AI Foundry goes beyond simple “admin/user” roles. It supports a multi-level hierarchy (Super Admin → Admins → Teams → End users), with module, task, project, and API-level controls, plus IAM/SSO and enterprise integrations. It’s built for full-scale enterprise GenAI rollouts, not just single-team experimentation.
-
-⸻
+A. Bud AI Foundry goes beyond simple "admin/user" roles. It supports a multi-level hierarchy (Super Admin → Admins → Teams → End users), with module, task, project, and API-level controls, plus IAM/SSO and enterprise integrations. It’s built for full-scale enterprise GenAI rollouts, not just single-team experimentation.
 
 ### Q2. Can I mirror my existing organizational structure (HR, Sales, DevOps, etc.) in the platform?
 
 A. Yes. You can create Projects (Teams) like HR, Sales, DevOps, Customer Support, etc., and assign users, roles, models, and agents to each. Access is isolated at the project level, with additional task-level granularity inside each project.
-
-⸻
 
 ### Q3. How are non-technical users like Sales reps or HR partners expected to use the platform?
 
@@ -383,13 +340,9 @@ A. Non-technical users are typically assigned Client / Consumer roles and intera
 - Chat-based assistants integrated into their tools, or
 - The Bud Playground, where they can safely use curated AI experiences without dealing with prompts, models, or infra.
 
-⸻
-
 ### Q4. How does the platform help ensure least-privilege access?
 
 A. Roles come with predefined access profiles that align with common responsibilities, and you can further restrict permissions to specific modules, projects, and tasks. View/manage distinctions, project scoping, and API-level controls all support a least-privilege model.
-
-⸻
 
 ### Q5. Can I see who changed what and when?
 
@@ -402,8 +355,6 @@ A. Yes. Bud AI Foundry maintains comprehensive audit logs covering:
 
 These logs support internal audits and external compliance reviews.
 
-⸻
-
 ### Q6. How does Bud AI Foundry integrate with our existing SSO and directory?
 
 A. The platform supports:
@@ -414,8 +365,6 @@ A. The platform supports:
 
 Users sign in with their existing corporate identities and receive roles based on group/attribute mappings.
 
-⸻
-
 ### Q7. Can we limit API usage for specific clients or apps?
 
 A. Yes. You can:
@@ -424,8 +373,6 @@ A. Yes. You can:
 - Set rate limits, token quotas, and cost caps,
 - Classify APIs as internal or public,
 - Attribute usage and cost to specific keys, teams, or clients for chargeback.
-
-⸻
 
 ### Q8. How does the system support compliance frameworks like GDPR or HIPAA?
 
@@ -439,13 +386,9 @@ A. Key features that support compliance include:
 
 These capabilities help you implement and demonstrate appropriate controls to auditors and regulators.
 
-⸻
-
 ### Q9. What happens if we want to change a user’s role or move them between teams?
 
 A. You can update a user’s role, user type, and project assignments directly from User Management. Changes take effect immediately, and their access is updated without needing new accounts or separate logins.
-
-⸻
 
 ### Q10. Can external customers get their own dashboards?
 

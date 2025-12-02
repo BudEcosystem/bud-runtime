@@ -38,6 +38,7 @@
             "group": "Models",
             "icon": "brain",
             "pages": [
+              "models/models",
               "models/model-repository",
               "models/model-cards",
               "models/model-selection-guide",
