@@ -113,6 +113,9 @@ function AgentBoxInner({
   // Track if config has been loaded for this session to prevent duplicate calls
   const hasLoadedConfigRef = React.useRef<string | null>(null);
 
+  // Guard to prevent concurrent API calls during refresh/load operations
+  const isFetchingConfigRef = React.useRef<boolean>(false);
+
   // Helper function to refresh session data from backend (used after saving schemas)
   const refreshSessionData = React.useCallback(async () => {
     if (!session?.promptId || !session?.id) {
@@ -139,9 +142,18 @@ function AgentBoxInner({
       return;
     }
 
+    // Skip for new sessions that haven't been saved to backend yet
+    if (session.promptId.startsWith('prompt_')) {
+      return;
+    }
+
+    // Prevent concurrent API calls
+    if (isFetchingConfigRef.current) {
+      return;
+    }
+
     try {
-      // Reset the cache to force a fresh fetch
-      hasLoadedConfigRef.current = null;
+      isFetchingConfigRef.current = true;
 
       const response = await getPromptConfig(session.name);
 
@@ -204,11 +216,13 @@ function AgentBoxInner({
           updateSession(session.id, updates);
         }
 
-        // Update the cache
+        // Update the cache after successful fetch
         hasLoadedConfigRef.current = session.name;
       }
     } catch (error) {
       console.error("Error refreshing prompt config:", error);
+    } finally {
+      isFetchingConfigRef.current = false;
     }
   // Note: session?.settings and session?.selectedDeployment?.model are intentionally omitted
   // to avoid unnecessary callback recreations. They're only used to preserve existing values
@@ -230,11 +244,19 @@ function AgentBoxInner({
       // Skip if no promptId or name
       if (!session?.promptId || !session?.id || !session?.name) return;
 
+      // Skip for new sessions that haven't been saved to backend yet
+      // New sessions have locally generated promptIds starting with 'prompt_'
+      if (session.promptId.startsWith('prompt_')) return;
+
       // Skip only if we've already loaded for this exact prompt name in this component instance
       // This allows reloading when returning from playground (component remounts)
       if (hasLoadedConfigRef.current === session.name) return;
 
+      // Skip if another fetch is already in progress (prevents race conditions with refreshPromptConfig)
+      if (isFetchingConfigRef.current) return;
+
       try {
+        isFetchingConfigRef.current = true;
         const response = await getPromptConfig(session.name);
 
         if (response?.data) {
@@ -303,6 +325,8 @@ function AgentBoxInner({
         // Silently fail - config may not exist yet for new prompts
         console.debug("Could not load prompt config:", error);
         hasLoadedConfigRef.current = session.name;
+      } finally {
+        isFetchingConfigRef.current = false;
       }
     };
 
