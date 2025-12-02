@@ -86,6 +86,11 @@ const clearOAuthState = () => {
   }
 };
 
+// Helper to identify redirect URI fields
+const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
+const isRedirectUriField = (fieldName: string) =>
+  REDIRECT_URI_FIELDS.includes(fieldName.toLowerCase());
+
 export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   connector,
   onBack,
@@ -298,6 +303,31 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       setHeaderHeight(height);
     }
   }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
+
+  // Auto-populate redirect URI with current browser URL when it becomes visible
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedConnectorDetails?.credential_schema) return;
+
+    const grantTypeValue = formData.grant_type;
+    const visibleFields = selectedConnectorDetails.credential_schema.filter(field => {
+      if (!field.visible_when || field.visible_when.length === 0) return true;
+      return grantTypeValue && field.visible_when.includes(grantTypeValue);
+    });
+    const redirectField = visibleFields.find(f => isRedirectUriField(f.field));
+
+    if (redirectField) {
+      // Use full URL including query params (e.g., http://localhost:3001/agents?agent=...&prompt=...&connector=...)
+      const currentUrl = window.location.href;
+      setFormData(prev => {
+        // Only set if not already populated
+        if (!prev[redirectField.field]) {
+          return { ...prev, [redirectField.field]: currentUrl };
+        }
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConnectorDetails?.credential_schema, formData.grant_type]);
 
 
   const handleSelectAll = (checked: boolean) => {
@@ -600,7 +630,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       case 'url':
       case 'text':
-      default:
+      default: {
+        const isRedirectUri = isRedirectUriField(field.field);
         return (
           <div key={field.field}>
             {renderLabel()}
@@ -609,11 +640,19 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               value={formData[field.field] || ''}
               onChange={(e) => handleInputChange(field.field, e.target.value)}
               className={inputClassName}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                ...(isRedirectUri && {
+                  cursor: 'not-allowed',
+                  opacity: 0.7,
+                }),
+              }}
               autoComplete="off"
+              disabled={isRedirectUri}
             />
           </div>
         );
+      }
     }
   };
 
