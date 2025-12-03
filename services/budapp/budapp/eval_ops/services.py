@@ -2804,6 +2804,499 @@ class ExperimentService:
                 detail="Failed to retrieve dataset scores",
             ) from e
 
+    # ------------------------ Comparison Methods ------------------------
+
+    # Color palette for radar chart deployments
+    DEPLOYMENT_COLORS = [
+        "#10B981",  # Green
+        "#8B5CF6",  # Purple
+        "#3B82F6",  # Blue
+        "#F59E0B",  # Amber
+        "#EF4444",  # Red
+        "#EC4899",  # Pink
+        "#14B8A6",  # Teal
+        "#6366F1",  # Indigo
+    ]
+
+    def get_comparison_deployments(
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        page: int = 1,
+        limit: int = 50,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get all unique deployments with completed runs for comparison.
+
+        Queries across ALL experiments in a project to find unique endpoint/model
+        combinations that have completed evaluation runs.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the requesting user (for access control).
+            project_id (uuid.UUID): ID of the project to get deployments for.
+            page (int): Page number for pagination (default: 1).
+            limit (int): Items per page (default: 50, max: 100).
+
+        Returns:
+            Tuple containing:
+                - List[Dict]: List of deployments with counts
+                - int: Total count of deployments
+        """
+        try:
+            # Query to get unique deployments across all experiments in project
+            query = (
+                self.session.query(
+                    EndpointModel.id.label("deployment_id"),
+                    EndpointModel.name.label("endpoint_name"),
+                    ModelTable.id.label("model_id"),
+                    ModelTable.name.label("model_name"),
+                    ModelTable.display_name.label("model_display_name"),
+                    ModelTable.icon.label("model_icon"),
+                    func.count(func.distinct(ExperimentModel.id)).label("experiment_count"),
+                    func.count(RunModel.id).label("run_count"),
+                )
+                .join(RunModel, RunModel.endpoint_id == EndpointModel.id)
+                .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
+                .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .filter(
+                    ExperimentModel.project_id == project_id,
+                    ExperimentModel.created_by == user_id,
+                    ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+                    RunModel.status == RunStatusEnum.COMPLETED.value,
+                )
+                .group_by(
+                    EndpointModel.id,
+                    EndpointModel.name,
+                    ModelTable.id,
+                    ModelTable.name,
+                    ModelTable.display_name,
+                    ModelTable.icon,
+                )
+                .order_by(func.count(RunModel.id).desc())
+            )
+
+            # Get total count
+            total_count = query.count()
+
+            # Apply pagination
+            offset = (page - 1) * limit
+            results = query.offset(offset).limit(limit).all()
+
+            deployments = []
+            for row in results:
+                deployments.append(
+                    {
+                        "id": row.deployment_id,
+                        "endpoint_name": row.endpoint_name,
+                        "model_id": row.model_id,
+                        "model_name": row.model_name,
+                        "model_display_name": row.model_display_name,
+                        "model_icon": row.model_icon,
+                        "experiment_count": row.experiment_count,
+                        "run_count": row.run_count,
+                    }
+                )
+
+            return deployments, total_count
+
+        except Exception as e:
+            logger.error(f"Failed to get comparison deployments: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve comparison deployments",
+            ) from e
+
+    def get_comparison_traits(
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        deployment_ids: Optional[List[uuid.UUID]] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get all traits that have completed runs in the project.
+
+        Returns only traits that have at least one completed evaluation run,
+        optionally filtered by specific deployments.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the requesting user (for access control).
+            project_id (uuid.UUID): ID of the project to get traits for.
+            deployment_ids (Optional[List[uuid.UUID]]): Filter by specific deployments.
+
+        Returns:
+            Tuple containing:
+                - List[Dict]: List of traits with counts
+                - int: Total count of traits
+        """
+        try:
+            # Base query: Find traits via dataset -> pivot -> runs
+            query = (
+                self.session.query(
+                    TraitModel.id.label("trait_id"),
+                    TraitModel.name.label("trait_name"),
+                    TraitModel.icon.label("trait_icon"),
+                    TraitModel.description.label("trait_description"),
+                    func.count(func.distinct(DatasetModel.id)).label("dataset_count"),
+                    func.count(func.distinct(RunModel.id)).label("run_count"),
+                )
+                .join(PivotModel, PivotModel.trait_id == TraitModel.id)
+                .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
+                .join(ExpDatasetVersion, ExpDatasetVersion.dataset_id == DatasetModel.id)
+                .join(RunModel, RunModel.dataset_version_id == ExpDatasetVersion.id)
+                .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
+                .filter(
+                    ExperimentModel.project_id == project_id,
+                    ExperimentModel.created_by == user_id,
+                    ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+                    RunModel.status == RunStatusEnum.COMPLETED.value,
+                )
+            )
+
+            # Apply deployment filter if provided
+            if deployment_ids:
+                query = query.filter(RunModel.endpoint_id.in_(deployment_ids))
+
+            query = query.group_by(
+                TraitModel.id,
+                TraitModel.name,
+                TraitModel.icon,
+                TraitModel.description,
+            ).order_by(func.count(RunModel.id).desc())
+
+            results = query.all()
+
+            traits = []
+            for row in results:
+                traits.append(
+                    {
+                        "id": row.trait_id,
+                        "name": row.trait_name,
+                        "icon": row.trait_icon,
+                        "description": row.trait_description,
+                        "dataset_count": row.dataset_count,
+                        "run_count": row.run_count,
+                    }
+                )
+
+            return traits, len(traits)
+
+        except Exception as e:
+            logger.error(f"Failed to get comparison traits: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve comparison traits",
+            ) from e
+
+    def get_radar_chart_data(
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        deployment_ids: List[uuid.UUID],
+        trait_ids: Optional[List[uuid.UUID]] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Get radar chart data showing best trait scores per deployment.
+
+        For each deployment, calculates the BEST (MAX) score across all runs
+        for each trait. Traits are determined via dataset-trait relationships.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the requesting user (for access control).
+            project_id (uuid.UUID): ID of the project.
+            deployment_ids (List[uuid.UUID]): List of deployment/endpoint IDs to include.
+            trait_ids (Optional[List[uuid.UUID]]): Filter by specific traits (max 6).
+            start_date (Optional[datetime]): Filter runs after this date.
+            end_date (Optional[datetime]): Filter runs before this date.
+
+        Returns:
+            Dict containing:
+                - traits: List of trait info for axis labels
+                - deployments: List of deployment data with trait scores
+        """
+        try:
+            # Build base query for runs with trait information
+            # Join: Run -> DatasetVersion -> Dataset -> Pivot -> Trait
+            # Also join: Run -> ExpMetric for scores
+            base_query = (
+                self.session.query(
+                    RunModel.endpoint_id,
+                    EndpointModel.name.label("endpoint_name"),
+                    ModelTable.name.label("model_name"),
+                    TraitModel.id.label("trait_id"),
+                    TraitModel.name.label("trait_name"),
+                    TraitModel.icon.label("trait_icon"),
+                    MetricModel.metric_value,
+                    RunModel.id.label("run_id"),
+                )
+                .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
+                .join(ExpDatasetVersion, RunModel.dataset_version_id == ExpDatasetVersion.id)
+                .join(DatasetModel, ExpDatasetVersion.dataset_id == DatasetModel.id)
+                .join(PivotModel, PivotModel.dataset_id == DatasetModel.id)
+                .join(TraitModel, PivotModel.trait_id == TraitModel.id)
+                .join(MetricModel, MetricModel.run_id == RunModel.id)
+                .filter(
+                    ExperimentModel.project_id == project_id,
+                    ExperimentModel.created_by == user_id,
+                    ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+                    RunModel.status == RunStatusEnum.COMPLETED.value,
+                    RunModel.endpoint_id.in_(deployment_ids),
+                    MetricModel.metric_name == "accuracy",  # Use accuracy metric
+                )
+            )
+
+            # Apply trait filter
+            if trait_ids:
+                base_query = base_query.filter(TraitModel.id.in_(trait_ids))
+
+            # Apply date filters
+            if start_date:
+                base_query = base_query.filter(RunModel.created_at >= start_date)
+            if end_date:
+                base_query = base_query.filter(RunModel.created_at <= end_date)
+
+            results = base_query.all()
+
+            # Aggregate: For each deployment, for each trait, find MAX score
+            deployments_data: Dict[uuid.UUID, Dict[str, Any]] = {}
+            traits_data: Dict[uuid.UUID, Dict[str, Any]] = {}
+
+            for row in results:
+                endpoint_id = row.endpoint_id
+                trait_id = row.trait_id
+
+                # Track trait info
+                if trait_id not in traits_data:
+                    traits_data[trait_id] = {
+                        "id": trait_id,
+                        "name": row.trait_name,
+                        "icon": row.trait_icon,
+                    }
+
+                # Initialize deployment if not exists
+                if endpoint_id not in deployments_data:
+                    deployments_data[endpoint_id] = {
+                        "deployment_id": endpoint_id,
+                        "deployment_name": row.endpoint_name,
+                        "model_name": row.model_name,
+                        "trait_scores": {},  # {trait_id: {"max_score": float, "run_count": int}}
+                    }
+
+                # Track best score per trait
+                if trait_id not in deployments_data[endpoint_id]["trait_scores"]:
+                    deployments_data[endpoint_id]["trait_scores"][trait_id] = {
+                        "max_score": float(row.metric_value) if row.metric_value else 0,
+                        "run_count": 1,
+                        "trait_name": row.trait_name,
+                    }
+                else:
+                    current = deployments_data[endpoint_id]["trait_scores"][trait_id]
+                    if row.metric_value and float(row.metric_value) > current["max_score"]:
+                        current["max_score"] = float(row.metric_value)
+                    current["run_count"] += 1
+
+            # Build response
+            traits_list = list(traits_data.values())
+
+            deployments_list = []
+            for idx, (_endpoint_id, data) in enumerate(deployments_data.items()):
+                trait_scores = []
+                for trait_id, score_data in data["trait_scores"].items():
+                    trait_scores.append(
+                        {
+                            "trait_id": trait_id,
+                            "trait_name": score_data["trait_name"],
+                            "score": round(score_data["max_score"], 2),
+                            "run_count": score_data["run_count"],
+                        }
+                    )
+
+                deployments_list.append(
+                    {
+                        "deployment_id": data["deployment_id"],
+                        "deployment_name": data["deployment_name"],
+                        "model_name": data["model_name"],
+                        "color": self.DEPLOYMENT_COLORS[idx % len(self.DEPLOYMENT_COLORS)],
+                        "trait_scores": trait_scores,
+                    }
+                )
+
+            return {
+                "traits": traits_list,
+                "deployments": deployments_list,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get radar chart data: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve radar chart data",
+            ) from e
+
+    def get_heatmap_chart_data(
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        deployment_ids: List[uuid.UUID],
+        trait_ids: Optional[List[uuid.UUID]] = None,
+        dataset_ids: Optional[List[uuid.UUID]] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Get heatmap chart data showing dataset scores per deployment.
+
+        For each deployment, calculates average scores per dataset.
+        Returns a matrix of deployment x dataset with average accuracy scores.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the requesting user (for access control).
+            project_id (uuid.UUID): ID of the project.
+            deployment_ids (List[uuid.UUID]): List of deployment/endpoint IDs to include.
+            trait_ids (Optional[List[uuid.UUID]]): Filter datasets by traits.
+            dataset_ids (Optional[List[uuid.UUID]]): Filter by specific datasets.
+            start_date (Optional[datetime]): Filter runs after this date.
+            end_date (Optional[datetime]): Filter runs before this date.
+
+        Returns:
+            Dict containing:
+                - datasets: List of dataset info for column headers
+                - deployments: List of deployment data with dataset scores
+                - stats: Min, max, avg scores for color scaling
+        """
+        try:
+            # Build base query
+            base_query = (
+                self.session.query(
+                    RunModel.endpoint_id,
+                    EndpointModel.name.label("endpoint_name"),
+                    ModelTable.name.label("model_name"),
+                    DatasetModel.id.label("dataset_id"),
+                    DatasetModel.name.label("dataset_name"),
+                    MetricModel.metric_value,
+                )
+                .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
+                .join(ExpDatasetVersion, RunModel.dataset_version_id == ExpDatasetVersion.id)
+                .join(DatasetModel, ExpDatasetVersion.dataset_id == DatasetModel.id)
+                .join(MetricModel, MetricModel.run_id == RunModel.id)
+                .filter(
+                    ExperimentModel.project_id == project_id,
+                    ExperimentModel.created_by == user_id,
+                    ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+                    RunModel.status == RunStatusEnum.COMPLETED.value,
+                    RunModel.endpoint_id.in_(deployment_ids),
+                    MetricModel.metric_name == "accuracy",
+                )
+            )
+
+            # Apply trait filter (filter datasets by their traits)
+            if trait_ids:
+                dataset_with_traits = (
+                    self.session.query(PivotModel.dataset_id).filter(PivotModel.trait_id.in_(trait_ids)).subquery()
+                )
+                base_query = base_query.filter(DatasetModel.id.in_(dataset_with_traits))
+
+            # Apply dataset filter
+            if dataset_ids:
+                base_query = base_query.filter(DatasetModel.id.in_(dataset_ids))
+
+            # Apply date filters
+            if start_date:
+                base_query = base_query.filter(RunModel.created_at >= start_date)
+            if end_date:
+                base_query = base_query.filter(RunModel.created_at <= end_date)
+
+            results = base_query.all()
+
+            # Aggregate: For each deployment x dataset, calculate average score
+            deployments_data: Dict[uuid.UUID, Dict[str, Any]] = {}
+            datasets_data: Dict[uuid.UUID, Dict[str, Any]] = {}
+            all_scores: List[float] = []
+
+            for row in results:
+                endpoint_id = row.endpoint_id
+                dataset_id = row.dataset_id
+
+                # Track dataset info
+                if dataset_id not in datasets_data:
+                    datasets_data[dataset_id] = {
+                        "id": dataset_id,
+                        "name": row.dataset_name,
+                    }
+
+                # Initialize deployment if not exists
+                if endpoint_id not in deployments_data:
+                    deployments_data[endpoint_id] = {
+                        "deployment_id": endpoint_id,
+                        "deployment_name": row.endpoint_name,
+                        "model_name": row.model_name,
+                        "dataset_scores": {},  # {dataset_id: {"scores": [], "run_count": int}}
+                    }
+
+                # Track scores per dataset
+                if dataset_id not in deployments_data[endpoint_id]["dataset_scores"]:
+                    deployments_data[endpoint_id]["dataset_scores"][dataset_id] = {
+                        "scores": [],
+                        "dataset_name": row.dataset_name,
+                    }
+
+                if row.metric_value and row.metric_value > 0:
+                    deployments_data[endpoint_id]["dataset_scores"][dataset_id]["scores"].append(
+                        float(row.metric_value)
+                    )
+
+            # Calculate averages and build response
+            datasets_list = list(datasets_data.values())
+
+            deployments_list = []
+            for _endpoint_id, data in deployments_data.items():
+                dataset_scores = []
+                for dataset_id, score_data in data["dataset_scores"].items():
+                    scores = score_data["scores"]
+                    avg_score = sum(scores) / len(scores) if scores else None
+
+                    if avg_score is not None:
+                        all_scores.append(avg_score)
+
+                    dataset_scores.append(
+                        {
+                            "dataset_id": dataset_id,
+                            "dataset_name": score_data["dataset_name"],
+                            "score": round(avg_score, 2) if avg_score is not None else None,
+                            "run_count": len(scores),
+                        }
+                    )
+
+                deployments_list.append(
+                    {
+                        "deployment_id": data["deployment_id"],
+                        "deployment_name": data["deployment_name"],
+                        "model_name": data["model_name"],
+                        "dataset_scores": dataset_scores,
+                    }
+                )
+
+            # Calculate stats for color scaling
+            stats = {
+                "min_score": round(min(all_scores), 2) if all_scores else 0,
+                "max_score": round(max(all_scores), 2) if all_scores else 0,
+                "avg_score": round(sum(all_scores) / len(all_scores), 2) if all_scores else 0,
+            }
+
+            return {
+                "datasets": datasets_list,
+                "deployments": deployments_list,
+                "stats": stats,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get heatmap chart data: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve heatmap chart data",
+            ) from e
+
 
 class ExperimentWorkflowService:
     """Service layer for Experiment Workflow operations."""
