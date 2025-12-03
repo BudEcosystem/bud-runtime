@@ -2846,7 +2846,6 @@ class ExperimentService:
                     EndpointModel.name.label("endpoint_name"),
                     ModelTable.id.label("model_id"),
                     ModelTable.name.label("model_name"),
-                    ModelTable.display_name.label("model_display_name"),
                     ModelTable.icon.label("model_icon"),
                     func.count(func.distinct(ExperimentModel.id)).label("experiment_count"),
                     func.count(RunModel.id).label("run_count"),
@@ -2863,7 +2862,6 @@ class ExperimentService:
                     EndpointModel.name,
                     ModelTable.id,
                     ModelTable.name,
-                    ModelTable.display_name,
                     ModelTable.icon,
                 )
                 .order_by(func.count(RunModel.id).desc())
@@ -2884,7 +2882,6 @@ class ExperimentService:
                         "endpoint_name": row.endpoint_name,
                         "model_id": row.model_id,
                         "model_name": row.model_name,
-                        "model_display_name": row.model_display_name,
                         "model_icon": row.model_icon,
                         "experiment_count": row.experiment_count,
                         "run_count": row.run_count,
