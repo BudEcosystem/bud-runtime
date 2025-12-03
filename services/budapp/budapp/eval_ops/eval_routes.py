@@ -33,12 +33,18 @@ from budapp.eval_ops.schemas import (
     GetDatasetResponse,
     GetExperimentResponse,
     GetRunResponse,
+    HeatmapChartResponse,
+    HeatmapDatasetInfo,
+    HeatmapStats,
+    ListComparisonDeploymentsResponse,
+    ListComparisonTraitsResponse,
     ListDatasetsResponse,
     ListEvaluationsResponse,
     ListExperimentModelsResponse,
     ListExperimentsResponse,
     ListRunsResponse,
     ListTraitsResponse,
+    RadarChartResponse,
     RunHistoryResponse,
     UpdateExperimentRequest,
     UpdateExperimentResponse,
@@ -474,6 +480,342 @@ def create_tag(
         session.rollback()
         logger.debug(f"Failed to create tag: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create tag") from e
+
+
+# ------------------------ Comparison Routes ------------------------
+
+
+@router.get(
+    "/compare/deployments",
+    response_model=ListComparisonDeploymentsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def list_comparison_deployments(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[uuid.UUID, Query(description="Project ID to filter deployments")],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
+):
+    """List deployments available for comparison within a project.
+
+    Returns unique deployments (endpoints) that have been used in evaluation runs
+    within the specified project. Each deployment includes model information and
+    counts of experiments and runs.
+
+    Only deployments with completed evaluation runs are returned.
+
+    - **project_id**: UUID of the project to get deployments for (required).
+    - **page**: Page number (default: 1).
+    - **limit**: Items per page (default: 50, max: 100).
+
+    Returns a `ListComparisonDeploymentsResponse` with:
+    - List of deployments with model info, experiment_count, and run_count
+    - Pagination metadata
+    """
+    try:
+        deployments, total = ExperimentService(session).get_comparison_deployments(
+            user_id=current_user.id,
+            project_id=project_id,
+            page=page,
+            limit=limit,
+        )
+
+        return ListComparisonDeploymentsResponse(
+            code=status.HTTP_200_OK,
+            object="comparison.deployments",
+            message="Successfully retrieved comparison deployments",
+            deployments=deployments,
+            page=page,
+            limit=limit,
+            total_record=total,
+        )
+    except Exception as e:
+        logger.debug(f"Failed to list comparison deployments: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list comparison deployments") from e
+
+
+@router.get(
+    "/compare/traits",
+    response_model=ListComparisonTraitsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def list_comparison_traits(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[uuid.UUID, Query(description="Project ID to filter traits")],
+    deployment_ids: Annotated[
+        Optional[str],
+        Query(description="Comma-separated deployment UUIDs to filter traits"),
+    ] = None,
+):
+    """List traits available for comparison filtering within a project.
+
+    Returns traits that have been evaluated in runs within the specified project.
+    Only traits with completed evaluation runs are returned.
+
+    - **project_id**: UUID of the project to get traits for (required).
+    - **deployment_ids**: Optional comma-separated deployment UUIDs to filter traits.
+
+    Returns a `ListComparisonTraitsResponse` with:
+    - List of traits with dataset_count and run_count
+    - Total count of traits
+    """
+    try:
+        # Parse deployment_ids if provided
+        deployment_id_list = None
+        if deployment_ids:
+            deployment_id_list = []
+            for did in deployment_ids.split(","):
+                try:
+                    deployment_id_list.append(uuid.UUID(did.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for deployment_id: {did}",
+                    )
+
+        traits, total = ExperimentService(session).get_comparison_traits(
+            user_id=current_user.id,
+            project_id=project_id,
+            deployment_ids=deployment_id_list,
+        )
+
+        return ListComparisonTraitsResponse(
+            code=status.HTTP_200_OK,
+            object="comparison.traits",
+            message="Successfully retrieved comparison traits",
+            traits=traits,
+            total_count=total,
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to list comparison traits: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list comparison traits") from e
+
+
+@router.get(
+    "/compare/radar",
+    response_model=RadarChartResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_radar_chart_data(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[uuid.UUID, Query(description="Project ID")],
+    deployment_ids: Annotated[str, Query(description="Comma-separated deployment UUIDs (required)")],
+    trait_ids: Annotated[
+        Optional[str],
+        Query(description="Comma-separated trait UUIDs to filter"),
+    ] = None,
+    start_date: Annotated[
+        Optional[datetime],
+        Query(description="Filter runs after this date (ISO 8601)"),
+    ] = None,
+    end_date: Annotated[
+        Optional[datetime],
+        Query(description="Filter runs before this date (ISO 8601)"),
+    ] = None,
+):
+    """Get radar chart data for comparing deployments across traits.
+
+    Returns trait scores for each selected deployment. Scores represent the
+    BEST (maximum) score achieved across all completed evaluation runs for
+    each trait-deployment combination.
+
+    - **project_id**: UUID of the project (required).
+    - **deployment_ids**: Comma-separated deployment UUIDs to compare (required).
+    - **trait_ids**: Optional comma-separated trait UUIDs to filter.
+    - **start_date**: Optional filter for runs after this date.
+    - **end_date**: Optional filter for runs before this date.
+
+    Returns a `RadarChartResponse` with:
+    - List of traits (axes for the radar chart)
+    - List of deployments with trait_scores (data points for each deployment)
+    """
+    try:
+        # Parse deployment_ids (required)
+        deployment_id_list = []
+        for did in deployment_ids.split(","):
+            try:
+                deployment_id_list.append(uuid.UUID(did.strip()))
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid UUID format for deployment_id: {did}",
+                )
+
+        if not deployment_id_list:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one deployment_id is required",
+            )
+
+        # Parse trait_ids if provided
+        trait_id_list = None
+        if trait_ids:
+            trait_id_list = []
+            for tid in trait_ids.split(","):
+                try:
+                    trait_id_list.append(uuid.UUID(tid.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for trait_id: {tid}",
+                    )
+
+        result = ExperimentService(session).get_radar_chart_data(
+            user_id=current_user.id,
+            project_id=project_id,
+            deployment_ids=deployment_id_list,
+            trait_ids=trait_id_list,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return RadarChartResponse(
+            code=status.HTTP_200_OK,
+            object="comparison.radar",
+            message="Successfully retrieved radar chart data",
+            traits=result["traits"],
+            deployments=result["deployments"],
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to get radar chart data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get radar chart data") from e
+
+
+@router.get(
+    "/compare/heatmap",
+    response_model=HeatmapChartResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_heatmap_chart_data(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    project_id: Annotated[uuid.UUID, Query(description="Project ID")],
+    deployment_ids: Annotated[str, Query(description="Comma-separated deployment UUIDs (required)")],
+    trait_ids: Annotated[
+        Optional[str],
+        Query(description="Comma-separated trait UUIDs to filter datasets"),
+    ] = None,
+    dataset_ids: Annotated[
+        Optional[str],
+        Query(description="Comma-separated dataset UUIDs to filter"),
+    ] = None,
+    start_date: Annotated[
+        Optional[datetime],
+        Query(description="Filter runs after this date (ISO 8601)"),
+    ] = None,
+    end_date: Annotated[
+        Optional[datetime],
+        Query(description="Filter runs before this date (ISO 8601)"),
+    ] = None,
+):
+    """Get heatmap chart data for comparing deployments across datasets.
+
+    Returns dataset benchmark scores for each selected deployment. Scores
+    represent the average accuracy across all completed evaluation runs for
+    each dataset-deployment combination.
+
+    - **project_id**: UUID of the project (required).
+    - **deployment_ids**: Comma-separated deployment UUIDs to compare (required).
+    - **trait_ids**: Optional comma-separated trait UUIDs to filter datasets.
+    - **dataset_ids**: Optional comma-separated dataset UUIDs to filter.
+    - **start_date**: Optional filter for runs after this date.
+    - **end_date**: Optional filter for runs before this date.
+
+    Returns a `HeatmapChartResponse` with:
+    - List of datasets (columns for the heatmap)
+    - List of deployments with dataset_scores (rows with cell values)
+    - Stats with min, max, and average scores for color scaling
+    """
+    try:
+        # Parse deployment_ids (required)
+        deployment_id_list = []
+        for did in deployment_ids.split(","):
+            try:
+                deployment_id_list.append(uuid.UUID(did.strip()))
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid UUID format for deployment_id: {did}",
+                )
+
+        if not deployment_id_list:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one deployment_id is required",
+            )
+
+        # Parse trait_ids if provided
+        trait_id_list = None
+        if trait_ids:
+            trait_id_list = []
+            for tid in trait_ids.split(","):
+                try:
+                    trait_id_list.append(uuid.UUID(tid.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for trait_id: {tid}",
+                    )
+
+        # Parse dataset_ids if provided
+        dataset_id_list = None
+        if dataset_ids:
+            dataset_id_list = []
+            for did in dataset_ids.split(","):
+                try:
+                    dataset_id_list.append(uuid.UUID(did.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for dataset_id: {did}",
+                    )
+
+        result = ExperimentService(session).get_heatmap_chart_data(
+            user_id=current_user.id,
+            project_id=project_id,
+            deployment_ids=deployment_id_list,
+            trait_ids=trait_id_list,
+            dataset_ids=dataset_id_list,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return HeatmapChartResponse(
+            code=status.HTTP_200_OK,
+            object="comparison.heatmap",
+            message="Successfully retrieved heatmap chart data",
+            datasets=result["datasets"],
+            deployments=result["deployments"],
+            stats=HeatmapStats(**result["stats"]),
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to get heatmap chart data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get heatmap chart data") from e
 
 
 @router.get(
