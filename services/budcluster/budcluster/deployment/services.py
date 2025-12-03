@@ -50,7 +50,7 @@ from ..commons.utils import (
     get_workflow_data_from_statestore,
     save_workflow_status_in_statestore,
 )
-from .crud import WorkerInfoDataManager
+from .crud import DeploymentDataManager, WorkerInfoDataManager
 from .handler import DeploymentHandler
 from .models import WorkerInfo as WorkerInfoModel
 from .schemas import (
@@ -58,6 +58,8 @@ from .schemas import (
     DeleteDeploymentRequest,
     DeleteWorkerRequest,
     DeploymentCreateRequest,
+    DeploymentRecordUpdate,
+    DeploymentStatusEnum,
     DeployQuantizationRequest,
     WorkerData,
     WorkerInfo,
@@ -183,24 +185,32 @@ class DeploymentOpsService:
                         logger.warning(f"Removing stale sync for deployment {deployment_key}")
                         del sync_state["active_syncs"][deployment_key]
 
-            # Get all active deployments from database
+            # Get all deployments to monitor (excludes only terminal ERROR state)
             with DBSession() as session:
-                active_deployments = await WorkerInfoDataManager(session).get_active_deployments()
+                active_deployments = await DeploymentDataManager(session).get_active_deployments()
 
-            # Get FAILED deployments that are due for retry
+            # Mark deployments that have been FAILED for > ERROR_RETRY_HOURS as ERROR (terminal)
             cutoff_time = datetime.now(timezone.utc) - timedelta(hours=ERROR_RETRY_HOURS)
             with DBSession() as session:
-                failed_deployments = await WorkerInfoDataManager(session).get_failed_deployments_due_for_retry(
-                    cutoff_time
-                )
+                deployments_to_error = await DeploymentDataManager(session).get_deployments_to_mark_error(cutoff_time)
+                for _cluster_id, namespace in deployments_to_error:
+                    try:
+                        deployment = await DeploymentDataManager(session).get_deployment_by_namespace(
+                            namespace, missing_ok=True
+                        )
+                        if deployment:
+                            await DeploymentDataManager(session).update_deployment(
+                                deployment, DeploymentRecordUpdate(status=DeploymentStatusEnum.ERROR)
+                            )
+                            logger.info(
+                                f"Marked deployment {namespace} as ERROR after {ERROR_RETRY_HOURS}hrs of failure"
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to mark deployment {namespace} as ERROR: {e}")
 
-            # Combine active and failed deployments
-            all_deployments = active_deployments + failed_deployments
+            all_deployments = active_deployments
 
-            logger.info(
-                f"Found {len(active_deployments)} active deployments + {len(failed_deployments)} FAILED deployments "
-                f"for status update (total: {len(all_deployments)})"
-            )
+            logger.info(f"Found {len(active_deployments)} deployments for status update")
 
             # Filter out deployments that are already being synced
             deployments_to_sync = []
@@ -411,6 +421,30 @@ class DeploymentOpsService:
                         worker.last_updated_datetime = datetime.now(timezone.utc)
                         await WorkerInfoDataManager(session).update_worker_info(worker)
                     db_workers_info = workers_info
+
+                # Update deployment record status in database
+                try:
+                    deployment_record = await DeploymentDataManager(session).get_deployment_by_namespace(
+                        deployment_name, missing_ok=True
+                    )
+                    if deployment_record:
+                        # Map status string to enum
+                        try:
+                            status_enum = DeploymentStatusEnum(deployment_status["status"])
+                        except ValueError:
+                            status_enum = DeploymentStatusEnum.FAILED
+
+                        update_data = DeploymentRecordUpdate(
+                            status=status_enum,
+                            last_status_check=datetime.now(timezone.utc),
+                        )
+                        # Only update replicas if we have valid data (check_pods was True)
+                        if current_replica > 0:
+                            update_data.number_of_replicas = current_replica
+                        await DeploymentDataManager(session).update_deployment(deployment_record, update_data)
+                        logger.debug(f"Updated deployment record status for {deployment_name}")
+                except Exception as e:
+                    logger.error(f"Failed to update deployment record for {deployment_name}: {e}")
 
                 # Send notification if status changed
                 if (

@@ -996,7 +996,7 @@ class KubernetesHandler(BaseClusterHandler):
 
             # Only check ingress health
             ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
-            status = DeploymentStatusEnum.COMPLETED if ingress_healthy else DeploymentStatusEnum.FAILED
+            status = DeploymentStatusEnum.READY if ingress_healthy else DeploymentStatusEnum.FAILED
             logger.info(
                 f"Optimized status check for {values['namespace']}: {status} (ingress_healthy={ingress_healthy})"
             )
