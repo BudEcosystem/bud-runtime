@@ -60,7 +60,7 @@ export default function GeneralTags(props: GeneralTagsProps) {
                 (() => {
                   try {
                     if (tag.url) {
-                      window.open(tag.url, "_blank");
+                      window.open(tag.url, "_blank", "noopener,noreferrer");
                     }
                   } catch (error) {
                     console.error(error);
