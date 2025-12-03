@@ -1047,7 +1047,6 @@ class ComparisonDeployment(BaseModel):
     endpoint_name: str = Field(..., description="Deployment name")
     model_id: UUID4 = Field(..., description="Model ID")
     model_name: str = Field(..., description="Model name")
-    model_display_name: Optional[str] = Field(None, description="Model display name")
     model_icon: Optional[str] = Field(None, description="Model icon URL")
     experiment_count: int = Field(..., description="Number of experiments using this deployment")
     run_count: int = Field(..., description="Total completed runs for this deployment")
