@@ -5,7 +5,7 @@ from uuid import UUID
 from budmicroframe.commons.logging import get_logger
 from fastapi import status
 from fastapi.exceptions import HTTPException
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 
 from ..commons.base_crud import BaseDataManager
 from .models import Deployment as DeploymentModel
@@ -284,9 +284,8 @@ class DeploymentDataManager(BaseDataManager):
 
     async def link_workers_to_deployment(self, deployment_id: UUID, worker_ids: List[UUID]) -> None:
         """Link existing workers to a deployment by updating their deployment_id."""
-        for worker_id in worker_ids:
-            stmt = select(WorkerInfoModel).filter_by(id=worker_id)
-            worker = await self.get_one_or_none(stmt)
-            if worker:
-                worker.deployment_id = deployment_id
-                await self.update_one(worker)
+        if not worker_ids:
+            return
+
+        stmt = update(WorkerInfoModel).where(WorkerInfoModel.id.in_(worker_ids)).values(deployment_id=deployment_id)
+        await self.execute_commit(stmt)

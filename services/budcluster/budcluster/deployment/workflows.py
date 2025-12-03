@@ -43,6 +43,8 @@ from .handler import DeploymentHandler, SimulatorHandler
 from .models import WorkerInfo as WorkerInfoModel
 from .performance import DeploymentPerformance
 from .schemas import (
+    CreateDeploymentRecordActivityRequest,
+    DeleteDeploymentRecordActivityRequest,
     DeleteDeploymentRequest,
     DeleteNamespaceRequest,
     DeleteWorkerActivityRequest,
@@ -96,6 +98,96 @@ def delete_namespace(ctx: wf.WorkflowActivityContext, delete_namespace_request: 
         response = ErrorResponse(
             message="Namespace deletion failed", code=HTTPStatus.BAD_REQUEST.value, param={"namespace": namespace}
         )
+    return response.model_dump(mode="json")
+
+
+@dapr_workflows.register_activity
+def create_deployment_record_activity(ctx: wf.WorkflowActivityContext, create_deployment_record_request: str) -> dict:
+    """Create a deployment record in the database."""
+    logger = logging.get_logger("CreateDeploymentRecord")
+    workflow_id = ctx.workflow_id
+    task_id = ctx.task_id
+    logger.info(f"Creating deployment record for workflow_id: {workflow_id} and task_id: {task_id}")
+
+    request = CreateDeploymentRecordActivityRequest.model_validate_json(create_deployment_record_request)
+    response: Union[SuccessResponse, ErrorResponse]
+
+    try:
+        deployment_create = DeploymentRecordCreate(
+            cluster_id=request.cluster_id,
+            namespace=request.namespace,
+            deployment_name=request.deployment_name,
+            endpoint_name=request.endpoint_name,
+            model=request.model,
+            deployment_url=request.deployment_url,
+            supported_endpoints=request.supported_endpoints,
+            concurrency=request.concurrency,
+            number_of_replicas=request.number_of_replicas,
+            deploy_config=request.deploy_config,
+            status=request.status,
+            workflow_id=request.workflow_id,
+            simulator_id=request.simulator_id,
+            credential_id=request.credential_id,
+        )
+
+        with DBSession() as session:
+            asyncio.run(DeploymentDataManager(session).create_deployment(deployment_create))
+            logger.info(f"Created deployment record for namespace: {request.namespace}")
+
+        response = SuccessResponse(
+            message=f"Deployment record created for namespace {request.namespace}",
+            param={"namespace": request.namespace},
+        )
+    except Exception as e:
+        error_msg = f"Error creating deployment record for workflow_id: {workflow_id}, error: {e}"
+        logger.error(error_msg)
+        response = ErrorResponse(
+            message="Failed to create deployment record",
+            code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+            param={"namespace": request.namespace, "error": str(e)},
+        )
+
+    return response.model_dump(mode="json")
+
+
+@dapr_workflows.register_activity
+def delete_deployment_record_activity(ctx: wf.WorkflowActivityContext, delete_deployment_record_request: str) -> dict:
+    """Delete a deployment record from the database."""
+    logger = logging.get_logger("DeleteDeploymentRecord")
+    workflow_id = ctx.workflow_id
+    task_id = ctx.task_id
+    logger.info(f"Deleting deployment record for workflow_id: {workflow_id} and task_id: {task_id}")
+
+    request = DeleteDeploymentRecordActivityRequest.model_validate_json(delete_deployment_record_request)
+    response: Union[SuccessResponse, ErrorResponse]
+
+    try:
+        with DBSession() as session:
+            deployment = asyncio.run(
+                DeploymentDataManager(session).get_deployment_by_namespace(request.namespace, missing_ok=True)
+            )
+            if deployment:
+                asyncio.run(DeploymentDataManager(session).delete_deployment(deployment))
+                logger.info(f"Deleted deployment record for namespace: {request.namespace}")
+                response = SuccessResponse(
+                    message=f"Deployment record deleted for namespace {request.namespace}",
+                    param={"namespace": request.namespace},
+                )
+            else:
+                logger.info(f"No deployment record found for namespace: {request.namespace}")
+                response = SuccessResponse(
+                    message=f"No deployment record found for namespace {request.namespace}",
+                    param={"namespace": request.namespace},
+                )
+    except Exception as e:
+        error_msg = f"Error deleting deployment record for workflow_id: {workflow_id}, error: {e}"
+        logger.error(error_msg)
+        response = ErrorResponse(
+            message="Failed to delete deployment record",
+            code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+            param={"namespace": request.namespace, "error": str(e)},
+        )
+
     return response.model_dump(mode="json")
 
 
@@ -1089,31 +1181,27 @@ class CreateDeploymentWorkflow:
 
         # Create deployment record in database after successful benchmark
         if not deployment_request_json.is_performance_benchmark:
-            try:
-                deployment_create = DeploymentRecordCreate(
-                    cluster_id=deployment_request_json.cluster_id,
-                    namespace=deploy_engine_result["param"]["namespace"],
-                    deployment_name=deploy_engine_result["param"]["namespace"],
-                    endpoint_name=deployment_request_json.endpoint_name,
-                    model=deployment_request_json.model,
-                    deployment_url=deploy_engine_result["param"].get("deployment_url"),
-                    supported_endpoints=deploy_model_result.supported_endpoints,
-                    concurrency=deployment_request_json.concurrency,
-                    number_of_replicas=deploy_engine_result["param"]["number_of_nodes"],
-                    deploy_config=deploy_engine_result["param"]["deploy_config"],
-                    status=DeploymentStatusEnum.READY,
-                    workflow_id=uuid.UUID(instance_id),
-                    simulator_id=deployment_request_json.simulator_id,
-                    credential_id=deployment_request_json.credential_id,
-                )
-
-                with DBSession() as session:
-                    asyncio.run(DeploymentDataManager(session).create_deployment(deployment_create))
-                    logger.info(
-                        f"Created deployment record for namespace: {deploy_engine_result['param']['namespace']}"
-                    )
-            except Exception as e:
-                logger.error(f"Failed to create deployment record: {e}")
+            create_deployment_record_request = CreateDeploymentRecordActivityRequest(
+                cluster_id=deployment_request_json.cluster_id,
+                namespace=deploy_engine_result["param"]["namespace"],
+                deployment_name=deploy_engine_result["param"]["namespace"],
+                endpoint_name=deployment_request_json.endpoint_name,
+                model=deployment_request_json.model,
+                deployment_url=deploy_engine_result["param"].get("deployment_url"),
+                supported_endpoints=deploy_model_result.supported_endpoints,
+                concurrency=deployment_request_json.concurrency,
+                number_of_replicas=deploy_engine_result["param"]["number_of_nodes"],
+                deploy_config=deploy_engine_result["param"]["deploy_config"],
+                status=DeploymentStatusEnum.READY,
+                workflow_id=uuid.UUID(instance_id),
+                simulator_id=deployment_request_json.simulator_id,
+                credential_id=deployment_request_json.credential_id,
+            )
+            create_deployment_record_result = yield ctx.call_activity(
+                create_deployment_record_activity, input=create_deployment_record_request.model_dump_json()
+            )
+            if create_deployment_record_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+                logger.error(f"Failed to create deployment record: {create_deployment_record_result}")
 
         # notify activity that performance benchmark is successful
         notification_req.payload.event = "deployment_status"
@@ -1858,16 +1946,12 @@ class DeleteDeploymentWorkflow:
                 )
 
         # Delete deployment record from database
-        with DBSession() as session:
-            try:
-                deployment = asyncio.run(
-                    DeploymentDataManager(session).get_deployment_by_namespace(namespace, missing_ok=True)
-                )
-                if deployment:
-                    asyncio.run(DeploymentDataManager(session).delete_deployment(deployment))
-                    logger.info(f"Deleted deployment record for namespace: {namespace}")
-            except Exception as e:
-                logger.error(f"Failed to delete deployment record for namespace {namespace}: {e}")
+        delete_deployment_record_request = DeleteDeploymentRecordActivityRequest(namespace=namespace)
+        delete_deployment_record_result = yield ctx.call_activity(
+            delete_deployment_record_activity, input=delete_deployment_record_request.model_dump_json()
+        )
+        if delete_deployment_record_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
+            logger.error(f"Failed to delete deployment record: {delete_deployment_record_result}")
 
         delete_namespace_request = DeleteNamespaceRequest(
             cluster_config=config_file_dict, namespace=namespace, platform=platform
