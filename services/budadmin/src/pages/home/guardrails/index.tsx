@@ -612,7 +612,7 @@ export default function GuardRails() {
       const hasStatusFilter = !!filter.status;
       load(filter, hasStatusFilter, 1, false);
     }
-  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, pageSize, isMounted, loadingUser]);
+  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, pageSize, isMounted, loadingUser, hasPermission, load]);
 
   // Initial data fetch - depend on loadingUser to re-run when user permissions load
   useEffect(() => {
