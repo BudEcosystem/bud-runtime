@@ -42,7 +42,7 @@ export default function GeneralTags(props: GeneralTagsProps) {
 
   const renderTag = (tag: GeneralTagItem, index: number) => (
     <Tags
-      key={index}
+      key={`${tag.name}-${index}`}
       name={tag.name}
       color={tag.color || defaultColor}
       classNames={classNames}
