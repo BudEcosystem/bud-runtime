@@ -136,6 +136,9 @@ class ProgressOverview(BaseModel):
     processing_rate_per_min: int = Field(..., description="Processing rate per minute")
     average_score_pct: float = Field(..., description="Average score percentage")
     eta_minutes: int = Field(..., description="Estimated time to completion in minutes")
+    duration_in_seconds: Optional[float] = Field(
+        None, description="Total duration in seconds (for completed evaluations)"
+    )
     status: str = Field(..., description="Status of the run")
     actions: ProgressActions | None = Field(..., description="Available actions")
 

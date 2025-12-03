@@ -606,7 +606,10 @@ def list_comparison_traits(
 def get_radar_chart_data(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
-    deployment_ids: Annotated[str, Query(description="Comma-separated deployment UUIDs (required)")],
+    deployment_ids: Annotated[
+        Optional[str],
+        Query(description="Comma-separated deployment UUIDs (optional, returns all if not provided)"),
+    ] = None,
     trait_ids: Annotated[
         Optional[str],
         Query(description="Comma-separated trait UUIDs to filter"),
@@ -626,7 +629,7 @@ def get_radar_chart_data(
     BEST (maximum) score achieved across all completed evaluation runs for
     each trait-deployment combination.
 
-    - **deployment_ids**: Comma-separated deployment UUIDs to compare (required).
+    - **deployment_ids**: Optional comma-separated deployment UUIDs to compare. Returns all if not provided.
     - **trait_ids**: Optional comma-separated trait UUIDs to filter.
     - **start_date**: Optional filter for runs after this date.
     - **end_date**: Optional filter for runs before this date.
@@ -636,22 +639,18 @@ def get_radar_chart_data(
     - List of deployments with trait_scores (data points for each deployment)
     """
     try:
-        # Parse deployment_ids (required)
-        deployment_id_list = []
-        for did in deployment_ids.split(","):
-            try:
-                deployment_id_list.append(uuid.UUID(did.strip()))
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid UUID format for deployment_id: {did}",
-                )
-
-        if not deployment_id_list:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one deployment_id is required",
-            )
+        # Parse deployment_ids if provided
+        deployment_id_list = None
+        if deployment_ids:
+            deployment_id_list = []
+            for did in deployment_ids.split(","):
+                try:
+                    deployment_id_list.append(uuid.UUID(did.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for deployment_id: {did}",
+                    )
 
         # Parse trait_ids if provided
         trait_id_list = None
@@ -699,7 +698,10 @@ def get_radar_chart_data(
 def get_heatmap_chart_data(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
-    deployment_ids: Annotated[str, Query(description="Comma-separated deployment UUIDs (required)")],
+    deployment_ids: Annotated[
+        Optional[str],
+        Query(description="Comma-separated deployment UUIDs (optional, returns all if not provided)"),
+    ] = None,
     trait_ids: Annotated[
         Optional[str],
         Query(description="Comma-separated trait UUIDs to filter datasets"),
@@ -723,7 +725,7 @@ def get_heatmap_chart_data(
     represent the average accuracy across all completed evaluation runs for
     each dataset-deployment combination.
 
-    - **deployment_ids**: Comma-separated deployment UUIDs to compare (required).
+    - **deployment_ids**: Optional comma-separated deployment UUIDs to compare. Returns all if not provided.
     - **trait_ids**: Optional comma-separated trait UUIDs to filter datasets.
     - **dataset_ids**: Optional comma-separated dataset UUIDs to filter.
     - **start_date**: Optional filter for runs after this date.
@@ -735,22 +737,18 @@ def get_heatmap_chart_data(
     - Stats with min, max, and average scores for color scaling
     """
     try:
-        # Parse deployment_ids (required)
-        deployment_id_list = []
-        for did in deployment_ids.split(","):
-            try:
-                deployment_id_list.append(uuid.UUID(did.strip()))
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid UUID format for deployment_id: {did}",
-                )
-
-        if not deployment_id_list:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one deployment_id is required",
-            )
+        # Parse deployment_ids if provided
+        deployment_id_list = None
+        if deployment_ids:
+            deployment_id_list = []
+            for did in deployment_ids.split(","):
+                try:
+                    deployment_id_list.append(uuid.UUID(did.strip()))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid UUID format for deployment_id: {did}",
+                    )
 
         # Parse trait_ids if provided
         trait_id_list = None

@@ -930,6 +930,7 @@ class ExperimentService:
                     processing_rate_per_min=0,
                     average_score_pct=evaluation_avg_score,
                     eta_minutes=25,
+                    duration_in_seconds=evaluation.duration_in_seconds,
                     status=evaluation.status,
                     actions=None,
                 )
@@ -2975,7 +2976,7 @@ class ExperimentService:
 
     def get_radar_chart_data(
         self,
-        deployment_ids: List[uuid.UUID],
+        deployment_ids: Optional[List[uuid.UUID]] = None,
         trait_ids: Optional[List[uuid.UUID]] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -2986,7 +2987,7 @@ class ExperimentService:
         for each trait. Traits are determined via dataset-trait relationships.
 
         Parameters:
-            deployment_ids (List[uuid.UUID]): List of deployment/endpoint IDs to include.
+            deployment_ids (Optional[List[uuid.UUID]]): List of deployment/endpoint IDs. If None, returns all.
             trait_ids (Optional[List[uuid.UUID]]): Filter by specific traits (max 6).
             start_date (Optional[datetime]): Filter runs after this date.
             end_date (Optional[datetime]): Filter runs before this date.
@@ -3022,10 +3023,13 @@ class ExperimentService:
                 .filter(
                     ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
                     RunModel.status == RunStatusEnum.COMPLETED.value,
-                    RunModel.endpoint_id.in_(deployment_ids),
                     MetricModel.metric_name == "accuracy",  # Use accuracy metric
                 )
             )
+
+            # Apply deployment filter if provided
+            if deployment_ids:
+                base_query = base_query.filter(RunModel.endpoint_id.in_(deployment_ids))
 
             # Apply trait filter
             if trait_ids:
@@ -3117,7 +3121,7 @@ class ExperimentService:
 
     def get_heatmap_chart_data(
         self,
-        deployment_ids: List[uuid.UUID],
+        deployment_ids: Optional[List[uuid.UUID]] = None,
         trait_ids: Optional[List[uuid.UUID]] = None,
         dataset_ids: Optional[List[uuid.UUID]] = None,
         start_date: Optional[datetime] = None,
@@ -3129,7 +3133,7 @@ class ExperimentService:
         Returns a matrix of deployment x dataset with average accuracy scores.
 
         Parameters:
-            deployment_ids (List[uuid.UUID]): List of deployment/endpoint IDs to include.
+            deployment_ids (Optional[List[uuid.UUID]]): List of deployment/endpoint IDs. If None, returns all.
             trait_ids (Optional[List[uuid.UUID]]): Filter datasets by traits.
             dataset_ids (Optional[List[uuid.UUID]]): Filter by specific datasets.
             start_date (Optional[datetime]): Filter runs after this date.
@@ -3161,10 +3165,13 @@ class ExperimentService:
                 .filter(
                     ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
                     RunModel.status == RunStatusEnum.COMPLETED.value,
-                    RunModel.endpoint_id.in_(deployment_ids),
                     MetricModel.metric_name == "accuracy",
                 )
             )
+
+            # Apply deployment filter if provided
+            if deployment_ids:
+                base_query = base_query.filter(RunModel.endpoint_id.in_(deployment_ids))
 
             # Apply trait filter (filter datasets by their traits)
             if trait_ids:
