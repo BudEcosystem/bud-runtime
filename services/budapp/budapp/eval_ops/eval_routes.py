@@ -496,19 +496,17 @@ def create_tag(
 def list_comparison_deployments(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
-    project_id: Annotated[uuid.UUID, Query(description="Project ID to filter deployments")],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
     limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
 ):
-    """List deployments available for comparison within a project.
+    """List deployments available for comparison globally.
 
     Returns unique deployments (endpoints) that have been used in evaluation runs
-    within the specified project. Each deployment includes model information and
+    across all experiments. Each deployment includes model information and
     counts of experiments and runs.
 
     Only deployments with completed evaluation runs are returned.
 
-    - **project_id**: UUID of the project to get deployments for (required).
     - **page**: Page number (default: 1).
     - **limit**: Items per page (default: 50, max: 100).
 
@@ -518,8 +516,6 @@ def list_comparison_deployments(
     """
     try:
         deployments, total = ExperimentService(session).get_comparison_deployments(
-            user_id=current_user.id,
-            project_id=project_id,
             page=page,
             limit=limit,
         )
@@ -550,18 +546,16 @@ def list_comparison_deployments(
 def list_comparison_traits(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
-    project_id: Annotated[uuid.UUID, Query(description="Project ID to filter traits")],
     deployment_ids: Annotated[
         Optional[str],
         Query(description="Comma-separated deployment UUIDs to filter traits"),
     ] = None,
 ):
-    """List traits available for comparison filtering within a project.
+    """List traits available for comparison filtering globally.
 
-    Returns traits that have been evaluated in runs within the specified project.
+    Returns traits that have been evaluated in runs across all experiments.
     Only traits with completed evaluation runs are returned.
 
-    - **project_id**: UUID of the project to get traits for (required).
     - **deployment_ids**: Optional comma-separated deployment UUIDs to filter traits.
 
     Returns a `ListComparisonTraitsResponse` with:
@@ -583,8 +577,6 @@ def list_comparison_traits(
                     )
 
         traits, total = ExperimentService(session).get_comparison_traits(
-            user_id=current_user.id,
-            project_id=project_id,
             deployment_ids=deployment_id_list,
         )
 
@@ -614,7 +606,6 @@ def list_comparison_traits(
 def get_radar_chart_data(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
-    project_id: Annotated[uuid.UUID, Query(description="Project ID")],
     deployment_ids: Annotated[str, Query(description="Comma-separated deployment UUIDs (required)")],
     trait_ids: Annotated[
         Optional[str],
@@ -635,7 +626,6 @@ def get_radar_chart_data(
     BEST (maximum) score achieved across all completed evaluation runs for
     each trait-deployment combination.
 
-    - **project_id**: UUID of the project (required).
     - **deployment_ids**: Comma-separated deployment UUIDs to compare (required).
     - **trait_ids**: Optional comma-separated trait UUIDs to filter.
     - **start_date**: Optional filter for runs after this date.
@@ -677,8 +667,6 @@ def get_radar_chart_data(
                     )
 
         result = ExperimentService(session).get_radar_chart_data(
-            user_id=current_user.id,
-            project_id=project_id,
             deployment_ids=deployment_id_list,
             trait_ids=trait_id_list,
             start_date=start_date,
@@ -711,7 +699,6 @@ def get_radar_chart_data(
 def get_heatmap_chart_data(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
-    project_id: Annotated[uuid.UUID, Query(description="Project ID")],
     deployment_ids: Annotated[str, Query(description="Comma-separated deployment UUIDs (required)")],
     trait_ids: Annotated[
         Optional[str],
@@ -736,7 +723,6 @@ def get_heatmap_chart_data(
     represent the average accuracy across all completed evaluation runs for
     each dataset-deployment combination.
 
-    - **project_id**: UUID of the project (required).
     - **deployment_ids**: Comma-separated deployment UUIDs to compare (required).
     - **trait_ids**: Optional comma-separated trait UUIDs to filter datasets.
     - **dataset_ids**: Optional comma-separated dataset UUIDs to filter.
@@ -793,8 +779,6 @@ def get_heatmap_chart_data(
                     )
 
         result = ExperimentService(session).get_heatmap_chart_data(
-            user_id=current_user.id,
-            project_id=project_id,
             deployment_ids=deployment_id_list,
             trait_ids=trait_id_list,
             dataset_ids=dataset_id_list,
