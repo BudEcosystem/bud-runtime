@@ -171,7 +171,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
       </div>
       <div className="w-[36.5%] relative flex justify-end items-start">
         <div className="w-[88%] border rounded-[.875rem] border-[#1F1F1F] py-[1.7rem] px-[1.4rem] backdrop-blur-sm bg-white/5">
-          <div>
+          {chartData.data.length ? <><div>
             <Text_14_400_EEEEEE>Evaluation Values</Text_14_400_EEEEEE>
             <Text_12_400_757575 className="leading-[140%] pt-[.3rem]">
               Following are some of the evaluator scores
@@ -208,7 +208,7 @@ function LeaderboardDetails({ datasets, leaderBoards }: LeaderboardDetailsProps)
               <EvalBarChart data={chartData} />
             </div>
             <div className="hR mt-[0.7rem]"></div>
-          </div>
+          </div></>: null}
           <div className="py-[1.35rem]">
             <div className="mb-[1rem]">
               <div className={`flex justify-start items-center  "min-w-[32%]"`}>

@@ -679,18 +679,26 @@ class PromptConfigurationService:
             config_json = config_data.model_dump_json(exclude_none=True, exclude_unset=True)
             run_async(redis_service.set(redis_key, config_json, ex=ttl))
 
-            # Only set default version pointer if set_default is True
+            # Handle default version pointer
             set_default = request_dict.get("set_default", False)
+            default_version_key = f"prompt:{prompt_id}:default_version"
             if set_default:
-                default_version_key = f"prompt:{prompt_id}:default_version"
                 run_async(redis_service.set(default_version_key, redis_key, ex=ttl))
                 logger.debug(
                     f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, updated default to v{version}"
                 )
             else:
-                logger.debug(
-                    f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
-                )
+                # Create default only if it doesn't exist (first version becomes default automatically)
+                existing_default = run_async(redis_service.get(default_version_key))
+                if not existing_default:
+                    run_async(redis_service.set(default_version_key, redis_key, ex=ttl))
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} set as initial default"
+                    )
+                else:
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {prompt_id}, type: {request.type}, v{version} without updating default"
+                    )
 
             # Add to cleanup registry for all temporary prompts
             if not permanent:
@@ -1147,18 +1155,28 @@ class PromptService:
             # Store in Redis
             await self.redis_service.set(redis_key, config_json, ex=ttl)
 
+            # Handle default version pointer
+            default_version_key = f"prompt:{request.prompt_id}:default_version"
             if request.set_default:
-                default_version_key = f"prompt:{request.prompt_id}:default_version"
                 await self.redis_service.set(default_version_key, redis_key, ex=ttl)
                 logger.debug(
                     f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} "
                     f"and updated default to v{version}"
                 )
             else:
-                logger.debug(
-                    f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
-                    f"without updating default"
-                )
+                # Create default only if it doesn't exist (first version becomes default automatically)
+                existing_default = await self.redis_service.get(default_version_key)
+                if not existing_default:
+                    await self.redis_service.set(default_version_key, redis_key, ex=ttl)
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
+                        f"set as initial default"
+                    )
+                else:
+                    logger.debug(
+                        f"Stored {storage_type} prompt configuration for prompt_id: {request.prompt_id} v{version} "
+                        f"without updating default"
+                    )
 
             # Add to cleanup registry for all temporary prompts
             if not request.permanent:

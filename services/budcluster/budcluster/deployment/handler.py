@@ -313,9 +313,12 @@ class DeploymentHandler:
                     # Update node memory for consistency
                     node["memory"] = allocation_memory_gb
 
-                    # Set VLLM_CPU_KVCACHE_SPACE env var
-                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb)
-                    logger.info(f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb} GB")
+                    # Set VLLM_CPU_KVCACHE_SPACE env var (ceil to ensure integer)
+                    kv_cache_memory_gb_int = math.ceil(kv_cache_memory_gb)
+                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb_int)
+                    logger.info(
+                        f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb_int} GB (ceiled from {kv_cache_memory_gb:.2f})"
+                    )
                 else:
                     logger.warning(
                         f"CPU Node {node.get('name')}: Missing detailed memory components (weight: {weight_memory_gb}, kv: {kv_cache_memory_gb}). "
@@ -357,12 +360,13 @@ class DeploymentHandler:
             # Enable LoRA configuration if engine supports it
             supports_lora = node.get("supports_lora", False)
             if supports_lora:
-                # max_loras = 1 if not adapters else max(1, len(adapters))
-                max_loras = 5
+                # Use optimized max_loras from budsim if available, otherwise default to 5
+                max_loras = node.get("max_loras", 5)
                 node["args"]["max-loras"] = max_loras
                 node["args"]["max-lora-rank"] = 256
                 node["args"]["enable-lora"] = True
-                logger.info(f"LoRA enabled: max-loras={max_loras}, max-lora-rank=256")
+                source = "optimized by budsim" if "max_loras" in node else "default"
+                logger.info(f"LoRA enabled: max-loras={max_loras} ({source}), max-lora-rank=256")
 
             # Calculate max_model_len dynamically
             if input_tokens and output_tokens:

@@ -86,6 +86,11 @@ const clearOAuthState = () => {
   }
 };
 
+// Helper to identify redirect URI fields
+const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
+const isRedirectUriField = (fieldName: string) =>
+  REDIRECT_URI_FIELDS.includes(fieldName.toLowerCase());
+
 export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   connector,
   onBack,
@@ -299,6 +304,34 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
 
+  // Auto-populate redirect URI with current browser URL when it becomes visible
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedConnectorDetails?.credential_schema) return;
+
+    const grantTypeValue = formData.grant_type;
+    const visibleFields = selectedConnectorDetails.credential_schema.filter(field => {
+      if (!field.visible_when || field.visible_when.length === 0) return true;
+      return grantTypeValue && field.visible_when.includes(grantTypeValue);
+    });
+    const redirectField = visibleFields.find(f => isRedirectUriField(f.field));
+
+    if (redirectField) {
+      // Use full URL, but clean OAuth-specific params to avoid issues on re-authentication
+      const url = new URL(window.location.href);
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+      const currentUrl = url.toString();
+      setFormData(prev => {
+        // Only set if not already populated
+        if (!prev[redirectField.field]) {
+          return { ...prev, [redirectField.field]: currentUrl };
+        }
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConnectorDetails?.credential_schema, formData.grant_type]);
+
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -364,13 +397,14 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       if (field === 'grant_type' && selectedConnectorDetails?.credential_schema) {
         const visibleFields = getVisibleFields(selectedConnectorDetails.credential_schema, value);
         const visibleFieldNames = new Set(visibleFields.map(f => f.field));
+        visibleFieldNames.add('grant_type'); // Ensure grant_type is always preserved
 
-        // Clear hidden fields (except grant_type itself)
-        Object.keys(newFormData).forEach(key => {
-          if (!visibleFieldNames.has(key) && key !== 'grant_type') {
-            delete newFormData[key];
-          }
-        });
+        return Object.keys(newFormData)
+          .filter(key => visibleFieldNames.has(key))
+          .reduce((obj, key) => {
+            obj[key] = newFormData[key];
+            return obj;
+          }, {} as Record<string, string>);
       }
 
       return newFormData;
@@ -599,7 +633,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       case 'url':
       case 'text':
-      default:
+      default: {
+        const isRedirectUri = isRedirectUriField(field.field);
         return (
           <div key={field.field}>
             {renderLabel()}
@@ -608,11 +643,19 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               value={formData[field.field] || ''}
               onChange={(e) => handleInputChange(field.field, e.target.value)}
               className={inputClassName}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                ...(isRedirectUri && {
+                  cursor: 'not-allowed',
+                  opacity: 0.7,
+                }),
+              }}
               autoComplete="off"
+              disabled={isRedirectUri}
             />
           </div>
         );
+      }
     }
   };
 

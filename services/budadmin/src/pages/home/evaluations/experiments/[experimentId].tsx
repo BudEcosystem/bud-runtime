@@ -85,7 +85,7 @@ const ExperimentDetailsPage = () => {
 
     // Use the actual API data from useEvaluations hook
     const {
-        loading,
+        experimentLoading,
         experimentDetails,
         experimentRuns,
         getExperimentDetails,
@@ -135,7 +135,7 @@ const ExperimentDetailsPage = () => {
         }
     }
 
-    if (loading) {
+    if (experimentLoading) {
         return (
             <DashBoardLayout>
                 <div className="flex items-center justify-center h-64">

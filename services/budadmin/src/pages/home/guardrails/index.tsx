@@ -270,7 +270,7 @@ const defaultFilter = {
   provider: [],
   guardRailType: [],
   modality: [],
-  status: [],
+  status: "",
 };
 
 interface GuardRailFilters {
@@ -278,7 +278,7 @@ interface GuardRailFilters {
   provider?: string[];
   guardRailType?: string[];
   modality?: string[];
-  status?: string[];
+  status?: string;
 }
 
 // Component for displaying selected filters
@@ -321,16 +321,14 @@ const SelectedFilters = ({
             onClose={() => removeTag("modality", item)}
           />
         ))}
-      {filters?.status?.length > 0 &&
-        filters.status.map((item, index) => (
-          <Tags
-            name={`Status: ${item}`}
-            color="#965CDE"
-            key={index}
-            closable
-            onClose={() => removeTag("status", item)}
-          />
-        ))}
+      {filters?.status && (
+        <Tags
+          name={`Status: ${filters.status}`}
+          color="#965CDE"
+          closable
+          onClose={() => removeTag("status", filters.status)}
+        />
+      )}
     </div>
   );
 };
@@ -406,7 +404,8 @@ export default function GuardRails() {
           setTotalProbePages(response.data.total_pages || 0);
         }
       } catch (error: any) {
-        errorToast(error?.message || "Failed to fetch probes");
+        // Silently handle error - don't show toast for listing API
+        console.error("Failed to fetch probes:", error?.message);
         setProbes([]);
       } finally {
         setProbesLoading(false);
@@ -420,7 +419,7 @@ export default function GuardRails() {
       if (hasPermission(PermissionEnum.ModelView)) {
         // Determine if we should set search to true
         // Set search: true if we have name search or status filter
-        const shouldSearch = isSearching || !!filter.name || (filter.status?.length > 0);
+        const shouldSearch = isSearching || !!filter.name || !!filter.status;
 
         // Use local fetch function instead of the hook's fetchProbes
         const params: any = {
@@ -444,9 +443,9 @@ export default function GuardRails() {
           params.tags = filter.guardRailType.join(',');
         }
 
-        if (filter.status?.length > 0) {
+        if (filter.status) {
           // Pass status filter to API
-          params.status = filter.status.join(',');
+          params.status = filter.status;
         }
 
         await fetchMainPageProbes(params);
@@ -465,7 +464,7 @@ export default function GuardRails() {
     setFilter(tempFilter);
     setCurrentPage(1);
     // Check if status filter is applied to determine if it's a search operation
-    const hasStatusFilter = tempFilter.status && tempFilter.status.length > 0;
+    const hasStatusFilter = !!tempFilter.status;
     load(tempFilter, hasStatusFilter);
     setFilterReset(false);
   };
@@ -480,7 +479,10 @@ export default function GuardRails() {
   };
 
   const removeSelectedTag = (key: string, item: string) => {
-    if (key === "provider" || key === "guardRailType" || key === "modality" || key === "status") {
+    if (key === "status") {
+      // Status is a single value, clear it
+      setTempFilter({ ...tempFilter, status: "" });
+    } else if (key === "provider" || key === "guardRailType" || key === "modality") {
       const filteredItems = tempFilter[key]?.filter(
         (element) => element !== item
       ) || [];
@@ -497,7 +499,7 @@ export default function GuardRails() {
 
   // Handle search with debounce
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || loadingUser) return;
 
     const timer = setTimeout(() => {
       if (hasPermission(PermissionEnum.ModelView)) {
@@ -506,29 +508,30 @@ export default function GuardRails() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [filter.name, isMounted, hasPermission]);
+  }, [filter.name, isMounted, loadingUser]);
 
   // Handle other filter changes (non-search)
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || loadingUser) return;
 
     if (hasPermission(PermissionEnum.ModelView)) {
       // Pass true for isSearching when status filter is applied, false for others
-      const hasStatusFilter = filter.status && filter.status.length > 0;
+      const hasStatusFilter = !!filter.status;
       load(filter, hasStatusFilter);
     }
-  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, currentPage, pageSize, isMounted, hasPermission]);
+  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, currentPage, pageSize, isMounted, loadingUser]);
 
-  // Initial data fetch
+  // Initial data fetch - depend on loadingUser to re-run when user permissions load
   useEffect(() => {
     getTasks();
     getAuthors();
     setIsMounted(true);
 
-    if (hasPermission(PermissionEnum.ModelView)) {
+    // Only fetch when user is loaded and has permission
+    if (!loadingUser && hasPermission(PermissionEnum.ModelView)) {
       fetchMainPageProbes({ page: 1, page_size: 20, isSearching: false });
     }
-  }, [hasPermission]);
+  }, [loadingUser]);
   return (
     <DashBoardLayout>
       <div className="boardPageView" id="model-container">
@@ -611,9 +614,9 @@ export default function GuardRails() {
                                       border: "0.5px solid #757575",
                                       width: "100%",
                                     }}
-                                    value={tempFilter.status}
+                                    value={tempFilter.status || undefined}
                                     size="large"
-                                    mode="multiple"
+                                    allowClear
                                     className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
                                     options={[
                                       { label: "Active", value: "active" },
@@ -623,14 +626,8 @@ export default function GuardRails() {
                                     onChange={(value) => {
                                       setTempFilter({
                                         ...tempFilter,
-                                        status: value,
+                                        status: value || "",
                                       });
-                                    }}
-                                    tagRender={(props) => {
-                                      const { label } = props;
-                                      return (
-                                        <Tags name={label} color="#965CDE"></Tags>
-                                      );
                                     }}
                                   />
                                 </ConfigProvider>

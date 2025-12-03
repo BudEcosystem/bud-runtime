@@ -106,8 +106,9 @@ class OpenAIResponseFormatter_V4:
             # Generate unique response ID
             response_id = f"resp_{uuid.uuid4().hex}"
 
-            # Get messages from pydantic-ai result
-            all_messages = pydantic_result.all_messages()
+            # Get NEW messages from pydantic-ai result (excludes input history)
+            # all_messages = pydantic_result.all_messages()
+            all_messages = pydantic_result.new_messages()
 
             # Extract output items and add structured output if present
             output_items = await self.build_complete_output_items(all_messages, pydantic_result, tools)

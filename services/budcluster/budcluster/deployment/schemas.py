@@ -35,6 +35,7 @@ class DeploymentStatusEnum(str, Enum):
     INGRESS_FAILED = "ingress_failed"
     ENDPOINTS_FAILED = "endpoints_failed"
     FAILED = "failed"
+    ERROR = "error"  # Terminal state after 24hrs of failure
 
 
 class WorkerStatusEnum(str, Enum):
@@ -446,3 +447,88 @@ class DeployAdapterActivityRequest(BaseModel):
 
 class UpdateAdapterStatusRequest(AdapterRequest):
     main_workflow_id: UUID
+
+
+# Deployment table schemas (for deployment tracking)
+class DeploymentRecordCreate(BaseModel):
+    """Schema for creating a deployment record in the database."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    cluster_id: UUID
+    namespace: str
+    deployment_name: str
+    endpoint_name: str
+    model: str
+    deployment_url: Optional[str] = None
+    supported_endpoints: Optional[List[str]] = None
+    concurrency: int
+    number_of_replicas: int = 1
+    deploy_config: Optional[List[Dict[str, Any]]] = None
+    status: DeploymentStatusEnum
+    workflow_id: Optional[UUID] = None
+    simulator_id: Optional[UUID] = None
+    credential_id: Optional[UUID] = None
+
+
+class DeploymentRecordUpdate(BaseModel):
+    """Schema for updating a deployment record in the database."""
+
+    status: Optional[DeploymentStatusEnum] = None
+    last_status_check: Optional[datetime] = None
+    number_of_replicas: Optional[int] = None
+    deployment_url: Optional[str] = None
+    supported_endpoints: Optional[List[str]] = None
+
+
+class DeploymentRecordResponse(BaseModel):
+    """Schema for deployment record response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    cluster_id: UUID
+    namespace: str
+    deployment_name: str
+    endpoint_name: str
+    model: str
+    deployment_url: Optional[str]
+    supported_endpoints: Optional[List[str]]
+    concurrency: int
+    number_of_replicas: int
+    deploy_config: Optional[List[Dict[str, Any]]]
+    status: DeploymentStatusEnum
+    workflow_id: Optional[UUID]
+    simulator_id: Optional[UUID]
+    credential_id: Optional[UUID]
+    last_status_check: Optional[datetime]
+    created_at: datetime
+    modified_at: datetime
+
+
+# Activity request schemas for deployment record operations
+class CreateDeploymentRecordActivityRequest(BaseModel):
+    """Schema for create deployment record activity request."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    cluster_id: UUID
+    namespace: str
+    deployment_name: str
+    endpoint_name: str
+    model: str
+    deployment_url: Optional[str] = None
+    supported_endpoints: Optional[List[str]] = None
+    concurrency: int
+    number_of_replicas: int = 1
+    deploy_config: Optional[List[Dict[str, Any]]] = None
+    status: DeploymentStatusEnum
+    workflow_id: Optional[UUID] = None
+    simulator_id: Optional[UUID] = None
+    credential_id: Optional[UUID] = None
+
+
+class DeleteDeploymentRecordActivityRequest(BaseModel):
+    """Schema for delete deployment record activity request."""
+
+    namespace: str

@@ -58,4 +58,7 @@ export type Note = {
 
 export type SavedMessage = Message & {
     feedback: string;
+    // Store full gateway output items for proper conversation history replay
+    // This includes reasoning, mcp_call, mcp_list_tools, and message items
+    responseItems?: any[];
 }
