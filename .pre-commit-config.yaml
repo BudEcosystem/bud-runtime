@@ -38,12 +38,21 @@ repos:
               services/budgateway/CLAUDE\.md|
               services/budgateway/ci/dummy-gcp-credentials\.json|
               infra/helm/bud/charts/novu/values\.yaml|
-              infra/helm/bud/example.secrets.yaml|
+              infra/helm/bud/example\.secrets\.yaml|
+              infra/helm/bud/charts/mcp-stack/README\.md|
               services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs|
               \.env\.sample
           )$
       - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+              infra/helm/bud/charts/mcp-stack/templates/.*\.yaml
+          )$
       - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+              infra/helm/bud/charts/mcp-stack/templates/.*\.yaml
+          )$
 
   # Python linting and formatting (for all Python services)
   - repo: https://github.com/astral-sh/ruff-pre-commit

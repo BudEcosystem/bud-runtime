@@ -170,7 +170,7 @@ export type WorkflowType = {
         traits_details?: any;
         experiment_id?: string;
         bud_prompt_id?: string;    }
-    template_id?: string;
+        template_id?: string;
 }
 
 export const useWorkflow = create<{

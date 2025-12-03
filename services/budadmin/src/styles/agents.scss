@@ -384,4 +384,17 @@ $text-placeholder: #606060;
   background-size: cover;
   background-repeat: no-repeat;
   background-position: top;
+
+  // Text selection highlighting for input fields
+  input::selection,
+  textarea::selection {
+    background-color: $primary-color;
+    color: #FFFFFF;
+  }
+
+  input::-moz-selection,
+  textarea::-moz-selection {
+    background-color: $primary-color;
+    color: #FFFFFF;
+  }
 }

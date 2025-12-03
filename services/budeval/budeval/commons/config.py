@@ -74,6 +74,16 @@ class AppConfig(BaseAppConfig):
     # Storage Backend Selection
     storage_backend: str = Field(default="clickhouse", alias="STORAGE_BACKEND")
 
+    # OpenCompass Docker Image Configuration
+    opencompass_docker_image: str = Field(
+        default="docker.io/budstudio/opencompass:latest",
+        alias="OPENCOMPASS_DOCKER_IMAGE",
+    )
+
+    # Budapp Service Configuration for Dapr Invocation
+    bud_app_id: str = Field(default="budapp", alias="BUD_APP_ID")
+    dapr_http_port: int = Field(default=3500, alias="DAPR_HTTP_PORT")
+
 
 class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]

@@ -80,6 +80,8 @@
           nodes: "{{ nodes }}"
           storageClass: "{{ storageClass | default('default') }}"
           accessMode: "{{ accessMode | default('ReadWriteOnce') }}"
+          deviceType: "{{ deviceType | default('') }}"
+          hardwareMode: "{{ hardwareMode | default('dedicated') }}"
           minio:
             endpoint: "{{ minio_endpoint }}"
             accessKey: "{{ minio_access_key }}"

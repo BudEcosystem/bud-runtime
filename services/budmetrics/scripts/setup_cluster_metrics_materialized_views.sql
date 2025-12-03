@@ -42,7 +42,7 @@ cpu_core_rates AS (
     SELECT
         toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
         ResourceAttributes['cluster_id'] AS cluster_id,
-        splitByChar(':', Attributes['instance'])[1] AS node_name,
+        coalesce(Attributes['node'], splitByChar(':', Attributes['instance'])[1]) AS node_name,
         Attributes['cpu'] AS cpu_core,
         Attributes['mode'] AS mode,
         toUnixTimestamp(max(TimeUnix)) - toUnixTimestamp(min(TimeUnix)) AS time_delta_seconds,
@@ -90,7 +90,7 @@ disk_deduplicated AS (
     SELECT
         toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
         ResourceAttributes['cluster_id'] AS cluster_id,
-        splitByChar(':', Attributes['instance'])[1] AS node_name,
+        coalesce(Attributes['node'], splitByChar(':', Attributes['instance'])[1]) AS node_name,
         Attributes['mountpoint'] AS mountpoint,
         -- Use max() to handle duplicates - all duplicates have same value
         max(if(MetricName = 'node_filesystem_size_bytes', Value, 0)) AS fs_size,
@@ -114,7 +114,7 @@ network_per_container AS (
     SELECT
         toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
         ResourceAttributes['cluster_id'] AS cluster_id,
-        splitByChar(':', Attributes['instance'])[1] AS node_name,
+        coalesce(Attributes['node'], splitByChar(':', Attributes['instance'])[1]) AS node_name,
         Attributes['id'] AS container_id,
         MetricName,
         toUnixTimestamp(max(TimeUnix)) - toUnixTimestamp(min(TimeUnix)) AS time_delta_seconds,
@@ -141,7 +141,7 @@ other_metrics AS (
         toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
         ResourceAttributes['cluster_id'] AS cluster_id,
         anyLast(ResourceAttributes['cluster_name']) AS cluster_name,
-        splitByChar(':', Attributes['instance'])[1] AS node_name,
+        coalesce(Attributes['node'], splitByChar(':', Attributes['instance'])[1]) AS node_name,
 
         -- Memory metrics (gauges) - maxIf handles duplicates correctly
         maxIf(Value, MetricName = 'node_memory_MemTotal_bytes') AS memory_total_bytes,

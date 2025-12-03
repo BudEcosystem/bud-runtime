@@ -25,6 +25,7 @@ import { FormProgressStatus } from "../ui/bud/progress/FormProgress";
 import { calculateEta } from "src/flows/utils/calculateETA";
 import IconRender from "src/flows/components/BudIconRender";
 import { useEvaluations } from "@/hooks/useEvaluations";
+import { useAddAgent } from "@/stores/useAddAgent";
 
 export function getFailedStep(data: WorkflowListItem) {
   return data?.progress?.steps?.find(
@@ -90,9 +91,8 @@ export function BudWidget({
     setSelectedCredentials,
   } = useDeployModel();
 
-  const {
-    getWorkflow: getEvaluationWorkflow,
-  } = useEvaluations();
+  const { getWorkflow: getEvaluationWorkflow } = useEvaluations();
+  const { getWorkflow: getAgentWorkflow } = useAddAgent();
   const { openDrawerWithStep } = useDrawer();
   const { close } = useIsland();
   const [loading, setLoading] = useState(false);
@@ -166,6 +166,10 @@ export function BudWidget({
     if (data.workflow_type === "evaluate_model") {
       workflow = await getEvaluationWorkflow(data.id);
     }
+
+    if (data.workflow_type === "prompt_creation") {
+      workflow = await getAgentWorkflow(data.id);
+    }
     setLoading(false);
     if (workflow.workflow_steps) {
       setProviderType(workflow.workflow_steps.provider_type);
@@ -223,7 +227,7 @@ export function BudWidget({
               {data?.title || flow?.title}
             </Text_12_400_A4A4A9>
             {/* <Text_14_600_EEEEEE className="tracking-[-.01rem]">{currentStep?.description || `${flow?.title} In Progress`}</Text_14_600_EEEEEE> */}
-            <Text_14_600_EEEEEE className="tracking-[-.01rem]">{`${flow?.title} ${faiedStep ? "Failed" : "In Progress"}`}</Text_14_600_EEEEEE>
+            <Text_14_600_EEEEEE className="tracking-[-.01rem]">{`${data?.title || flow?.title} ${faiedStep ? "Failed" : "In Progress"}`}</Text_14_600_EEEEEE>
           </div>
         </div>
         <div className="flex flex-col items-end justify-start">

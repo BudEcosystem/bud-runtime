@@ -26,16 +26,19 @@ class SearchResult:
     """Result from direct search optimization."""
 
     config: Dict[str, Any]
-    kv_cache_memory: float
+    total_memory: float
     ttft: float
     e2e_latency: float
     throughput_per_user: float
     concurrency: int
+    error_rate: float
     cost_per_million_tokens: float
     performance_penalty: float
     meets_targets: bool
     search_step: int
-    error_rate: float = 0.0  # Add error_rate for compatibility with Evolution results
+    weight_memory: float = 0.0
+    kv_cache_memory: float = 0.0
+    max_loras: Optional[int] = None  # Optimal max_loras if LoRA supported
 
 
 class DirectSearchOptimizer:
@@ -69,6 +72,8 @@ class DirectSearchOptimizer:
         max_evaluations: int = 200,  # Safety limit
         supports_pipeline_parallelism: bool = False,
         hardware_mode: str = "dedicated",  # Hardware utilization mode
+        is_quantization: bool = False,
+        supports_lora: bool = False,
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
@@ -88,6 +93,8 @@ class DirectSearchOptimizer:
         self.max_evaluations = max_evaluations
         self.supports_pipeline_parallelism = supports_pipeline_parallelism
         self.hardware_mode = hardware_mode
+        self.is_quantization = is_quantization
+        self.supports_lora = supports_lora
         self._last_validation_result = None  # Initialize validation result cache
 
         self.engine_config = get_engine_properties(self.engine_name, {"model": self.model})
@@ -109,6 +116,8 @@ class DirectSearchOptimizer:
         # Cache for avoiding redundant evaluations
         self._evaluation_cache = {}
         self.evaluated_configs = []
+        # Cache for storing optimal max_loras per configuration
+        self._max_loras_cache = {}
 
         # Get valid TP/PP ranges from device constraints
         self._init_search_space()
@@ -141,6 +150,12 @@ class DirectSearchOptimizer:
         # Override max_pp to 1 if engine doesn't support pipeline parallelism
         if not self.supports_pipeline_parallelism:
             logger.info("Engine does not support pipeline parallelism - constraining PP to 1")
+            self.max_pp = 1
+
+        # CPU devices don't support multi-node pipeline parallelism
+        device_type = self.device_config.get("device_type", self.device_config.get("type", "")).lower()
+        if device_type in ("cpu", "cpu_high"):
+            logger.info("CPU device detected - constraining PP to 1 (single-node only)")
             self.max_pp = 1
 
         # Find minimum TP required to run the model (even with concurrency=1)
@@ -245,15 +260,73 @@ class DirectSearchOptimizer:
             logger.debug(f"TP={tp_size} exceeds max devices per node ({self.device_config['max_devices_per_node']})")
             return False
 
-        # Check memory requirements
-        return self._check_memory_requirements(tp_size, pp_size, concurrency)
+        # Check memory requirements and cache optimal max_loras
+        fits, optimal_max_loras = self._check_memory_requirements(tp_size, pp_size, concurrency)
+        if fits and optimal_max_loras is not None:
+            # Cache the optimal max_loras for this configuration
+            cache_key = (tp_size, pp_size, concurrency)
+            self._max_loras_cache[cache_key] = optimal_max_loras
+        return fits
 
-    def _check_memory_requirements(self, tp_size: int, pp_size: int, concurrency: int) -> bool:
-        """Check if configuration fits in memory using HeuristicCalculator."""
+    def _check_memory_requirements(self, tp_size: int, pp_size: int, concurrency: int) -> Tuple[bool, Optional[int]]:
+        """Check if configuration fits in memory and find optimal max_loras if LoRA supported.
+
+        Returns:
+            Tuple[bool, Optional[int]]: (fits_in_memory, optimal_max_loras)
+                - fits_in_memory: True if configuration fits
+                - optimal_max_loras: Optimal max_loras value if LoRA supported, None otherwise
+        """
         try:
             # Initialize HeuristicCalculator if not already done
             if not hasattr(self, "_heuristic_calc"):
                 self._heuristic_calc = HeuristicCalculator()
+
+            # Get total GPU memory from device config
+            # Use explicit None check to handle 0 values correctly
+            total_memory_gb = 0
+            for key in ("mem_per_gpu_in_gb", "mem_per_GPU_in_GB", "memory", "memory_gb", "gpu_memory_gb"):
+                if (mem := self.device_config.get(key)) is not None:
+                    total_memory_gb = mem
+                    break
+
+            # Calculate available memory based on hardware mode
+            hardware_mode = self.device_config.get("hardware_mode", "dedicated")
+            memory_utilization_percent = self.device_config.get("memory_utilization_percent", 0)
+
+            # Check if memory was already reduced upstream (workflows.py sets this marker)
+            # When total_memory_gb_original is set, mem_per_GPU_in_GB already contains available memory
+            memory_already_reduced = self.device_config.get("total_memory_gb_original") is not None
+
+            if hardware_mode in ["shared", "time-slicing"]:
+                if memory_already_reduced:
+                    # Memory was already reduced in workflows.py, use as-is to avoid double reduction
+                    available_memory_gb = total_memory_gb
+                    original_total = self.device_config.get("total_memory_gb_original", total_memory_gb)
+                    logger.info(
+                        f"Shared GPU mode: Memory already reduced upstream "
+                        f"(original={original_total:.2f}GB), using available_memory={available_memory_gb:.2f}GB"
+                    )
+                elif memory_utilization_percent > 0:
+                    # Legacy path: reduce memory based on utilization percentage
+                    available_memory_gb = total_memory_gb * (1 - memory_utilization_percent / 100.0)
+                    logger.info(
+                        f"Shared GPU mode detected: hardware_mode={hardware_mode}, "
+                        f"total_memory={total_memory_gb:.2f}GB, "
+                        f"utilization={memory_utilization_percent:.2f}%, "
+                        f"available_memory={available_memory_gb:.2f}GB"
+                    )
+                else:
+                    # Shared mode but no utilization data, use total memory
+                    available_memory_gb = total_memory_gb
+                    logger.debug(f"Shared GPU mode: No utilization data, using total_memory={total_memory_gb:.2f}GB")
+            else:
+                # For dedicated mode (or when hardware_mode not specified), use total memory
+                available_memory_gb = total_memory_gb
+                if hardware_mode not in ["shared", "time-slicing"]:
+                    logger.debug(
+                        f"Dedicated GPU mode: hardware_mode={hardware_mode}, "
+                        f"using total_memory={total_memory_gb:.2f}GB"
+                    )
 
             # Prepare model_params for validate_memory_requirements
             # Extract memory with fallback chain and log which key matched
@@ -278,28 +351,62 @@ class DirectSearchOptimizer:
                 "concurrent_requests": concurrency,
                 "tensor_parallel_size": tp_size,
                 "pipeline_parallel_size": pp_size,
-                "memory_in_GB": memory_in_gb,
+                "memory_in_GB": available_memory_gb,
                 "quantization_bits": 16,  # Default to 16-bit
             }
 
-            # Validate memory requirements
-            validation_result = self._heuristic_calc.validate_memory_requirements(model_params)
+            # Check if LoRA is supported and optimize max_loras
+            optimal_max_loras = None
+            if self.supports_lora:
+                optimal_max_loras = self._heuristic_calc.find_optimal_max_loras(
+                    model_params=model_params,
+                    max_lora_rank=256,
+                    initial_max_loras=5,
+                    min_max_loras=1,
+                )
 
-            # Store validation result for later use (e.g., in shared mode to get memory value)
-            self._last_validation_result = validation_result
+                if optimal_max_loras is None:
+                    # Even min_max_loras=1 doesn't fit, configuration is invalid
+                    logger.debug(
+                        f"Memory check TP={tp_size}, PP={pp_size}, concurrency={concurrency}: "
+                        f"Configuration doesn't fit even with min LoRA support"
+                    )
+                    return (False, None)
 
-            fits = validation_result["valid"]
-            logger.debug(
-                f"Memory check TP={tp_size}, PP={pp_size}, concurrency={concurrency}: "
-                f"required={validation_result['total_memory_gb']:.2f}GB, "
-                f"available={validation_result['available_memory_gb']:.2f}GB, "
-                f"fits={fits}, message={validation_result['message']}"
-            )
-            return fits
+                logger.debug(
+                    f"Memory check TP={tp_size}, PP={pp_size}, concurrency={concurrency}: "
+                    f"Optimized max_loras={optimal_max_loras}"
+                )
+
+                # Store the validation result so memory values are available for shared mode evaluation
+                # This mirrors the pattern used in the non-LoRA path (line 371)
+                validation_result = self._heuristic_calc.validate_memory_requirements(
+                    model_params={**model_params, "max_loras": optimal_max_loras},
+                    max_loras=optimal_max_loras,
+                    max_lora_rank=256,
+                )
+                self._last_validation_result = validation_result
+
+                return (True, optimal_max_loras)
+            else:
+                # LoRA not supported, just check if base configuration fits
+                validation_result = self._heuristic_calc.validate_memory_requirements(model_params)
+
+                # Store validation result for later use (e.g., in shared mode to get memory value)
+                self._last_validation_result = validation_result
+
+                fits = validation_result["valid"]
+                logger.debug(
+                    f"Memory check TP={tp_size}, PP={pp_size}, concurrency={concurrency}: "
+                    f"required={validation_result['total_memory_gb']:.2f}GB, "
+                    f"available={validation_result['available_memory_gb']:.2f}GB, "
+                    f"fits={fits}, message={validation_result['message']}"
+                )
+                return (fits, None)
 
         except Exception as e:
             logger.debug(f"Memory check failed for TP={tp_size}, PP={pp_size}, concurrency={concurrency}: {e}")
-            return False
+            return (False, None)
 
     def _evaluate_config(self, tp_size: int, pp_size: int, concurrency: int) -> Optional[SearchResult]:
         """Evaluate a single configuration."""
@@ -334,12 +441,17 @@ class DirectSearchOptimizer:
                 )
 
                 # Get calculated memory from validation result
-                kv_cache_memory = 0
+                weight_memory = 0.0
+                total_memory = 0
+                kv_cache_memory = 0.0
                 if hasattr(self, "_last_validation_result") and self._last_validation_result:
-                    kv_cache_memory = self._last_validation_result.get("total_memory_gb", 0)
+                    total_memory_gb = self._last_validation_result.get("total_memory_gb", 0)
+                    total_memory = total_memory_gb * (1024**3)  # Convert GB to Bytes
                     breakdown = self._last_validation_result.get("breakdown", {})
+                    weight_memory = breakdown.get("weights", 0) * (1024**3)  # Convert GB to Bytes
+                    kv_cache_memory = breakdown.get("kv_cache", 0) * (1024**3)  # Convert GB to Bytes
                     logger.debug(
-                        f"Shared mode: total_memory_gb from validation={kv_cache_memory:.4f}GB, breakdown={breakdown}"
+                        f"Shared mode: total_memory_gb from validation={total_memory_gb:.4f}GB, breakdown={breakdown}"
                     )
 
                 # Use the actual validation result to determine if config meets targets
@@ -361,7 +473,7 @@ class DirectSearchOptimizer:
                 # Return minimal result - memory validation result from _validate_config
                 result = SearchResult(
                     config=config,
-                    kv_cache_memory=kv_cache_memory,
+                    total_memory=total_memory,
                     ttft=0,  # Not predicted in shared mode
                     e2e_latency=0,  # Not predicted in shared mode
                     throughput_per_user=0,  # Not predicted in shared mode
@@ -371,8 +483,9 @@ class DirectSearchOptimizer:
                     meets_targets=validation_passed,  # Use actual memory validation result
                     search_step=len(self.evaluated_configs),
                     error_rate=0,
+                    weight_memory=weight_memory,
+                    kv_cache_memory=kv_cache_memory,
                 )
-
                 # Cache and store result
                 self._evaluation_cache[cache_key] = result
                 self.evaluated_configs.append(result)
@@ -409,12 +522,37 @@ class DirectSearchOptimizer:
             performance_penalty = np.mean([ttft_penalty, e2e_penalty, throughput_penalty])
             meets_targets = performance_penalty <= self.error_threshold
 
-            # Calculate KV cache memory for result
-            kv_cache_memory = data.get("kv_cache_memory_per_gpu", 0) * tp_size * pp_size
+            # Calculate Total Memory (Weights + KV + Overhead) for result
+            # We use the value from validation which includes everything
+            weight_memory = 0.0
+            kv_cache_memory = 0.0
+            if hasattr(self, "_last_validation_result") and self._last_validation_result:
+                total_memory_gb = self._last_validation_result.get("total_memory_gb", 0)
+                total_memory = total_memory_gb * (1024**3)  # Convert GB to Bytes
+                # Extract weight and kv_cache memory from breakdown
+                breakdown = self._last_validation_result.get("breakdown", {})
+                weight_memory = breakdown.get("weights", 0) * (1024**3)
+                kv_cache_memory = breakdown.get("kv_cache", 0) * (1024**3)
+            else:
+                # Fallback if validation result missing (shouldn't happen if validated)
+                total_memory = data.get("kv_cache_memory_per_gpu", 0) * tp_size * pp_size
+                weight_memory = data.get("weight_memory_per_gpu", 0) * (1024**3)
+                kv_cache_memory = data.get("kv_cache_memory_per_gpu", 0)
+
+            # Apply quantization performance scaling if needed
+            if self.is_quantization:
+                # Scale throughput up and memory down
+                throughput_per_user = throughput_per_user * 1.3
+                total_memory = total_memory * 0.5  # Approximate 50% reduction for 8-bit
+                weight_memory = weight_memory * 0.5
+                kv_cache_memory = kv_cache_memory * 0.5
+
+            # Retrieve cached optimal max_loras for this configuration
+            optimal_max_loras = self._max_loras_cache.get(cache_key)
 
             result = SearchResult(
                 config=config,
-                kv_cache_memory=kv_cache_memory,
+                total_memory=total_memory,
                 ttft=ttft,
                 e2e_latency=e2e_latency,
                 throughput_per_user=throughput_per_user,
@@ -424,6 +562,9 @@ class DirectSearchOptimizer:
                 meets_targets=meets_targets,
                 search_step=len(self.evaluated_configs),
                 error_rate=performance_penalty,  # Use performance_penalty as error_rate for compatibility
+                weight_memory=weight_memory,
+                kv_cache_memory=kv_cache_memory,
+                max_loras=optimal_max_loras,  # Include optimized max_loras
             )
 
             # Cache and store result

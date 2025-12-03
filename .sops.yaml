@@ -1,8 +1,8 @@
 keys:
   # people
-  - &admin_sinan  age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
-  - &admin_ditto  age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9
-  - &admin_adarsh age1h32pss4dc5qjzl8rqutmt647mfsy5t2szawkp8y473lnjwpm7uqs9q042c
+  - &admin_sinan age1q5sfy74d53n6jxlgsc2zrsz4wcl9d830nxuagc3wfmdkrrp55ckq9ev6nv
+  - &admin_ditto age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9
+  - &admin_adarsh age1ueu6gg5sgnvlnyk0u8zfyvpgrgja3g0xxdp9whegwk5rqlu42gjsveqrjj
   - &admin_varun age1evyhf8qvcvftzhrznv65a6shag2r05wnzmfkfaad5l66ztztv4qsh7f23k
   # machines
   - &server_github_runner age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
@@ -15,38 +15,47 @@ creation_rules:
   - path_regex: (infra/nixos/primary|infra/helm|infra/tofu)/.*
     key_groups:
       - age:
-        - *admin_sinan
-        - *admin_ditto
-        - *admin_adarsh
-        - *admin_varun
-        - *server_budk8s_primary
+          - *admin_sinan
+          - *admin_ditto
+          - *admin_adarsh
+          - *admin_varun
+          - *server_budk8s_primary
+
+  # server_budk8s_*
+  - path_regex: infra/nixos/budk8s/modules/headscale/secrets.yaml
+    key_groups:
+      - age:
+          - *admin_sinan
+          - *server_budk8s_primary
+          - *server_budk8s_ingress
+          - *server_budk8s_worker
 
   # server_budk8s_*
   - path_regex: infra/nixos/budk8s/.*
     key_groups:
       - age:
-        - *admin_sinan
-        - *admin_ditto
-        - *admin_adarsh
-        - *admin_varun
-        - *server_budk8s_primary
-        - *server_budk8s_ingress
-        - *server_budk8s_worker
+          - *admin_sinan
+          - *admin_ditto
+          - *admin_adarsh
+          - *admin_varun
+          - *server_budk8s_primary
+          - *server_budk8s_ingress
+          - *server_budk8s_worker
 
   # server_github_runner
   - path_regex: nix/workflows/dockerhub_budcustomer/secrets.yaml
     key_groups:
       - age:
-        - *admin_sinan
-        - *admin_ditto
-        - *admin_adarsh
-        - *admin_varun
-        - *server_github_runner
+          - *admin_sinan
+          - *admin_ditto
+          - *admin_adarsh
+          - *admin_varun
+          - *server_github_runner
 
   # default
   - key_groups:
       - age:
-        - *admin_sinan
-        - *admin_ditto
-        - *admin_adarsh
-        - *admin_varun
+          - *admin_sinan
+          - *admin_ditto
+          - *admin_adarsh
+          - *admin_varun

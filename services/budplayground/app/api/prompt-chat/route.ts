@@ -18,10 +18,7 @@ interface PromptBody {
   settings?: {
     temperature?: number;
   } | null;
-  messages?: Array<{
-    role: string;
-    content: string;
-  }>;
+  messages?: Array<any>;
 }
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
@@ -93,6 +90,42 @@ const buildPromptInput = (body: PromptBody) => {
   return '';
 };
 
+const convertMessagesToInput = (messages: any[]): any[] => {
+  const result: any[] = [];
+
+  for (const msg of messages) {
+    // If it's already in the gateway format (has 'type'), pass through as-is
+    if (msg.type && ['reasoning', 'message', 'mcp_list_tools', 'mcp_call'].includes(msg.type)) {
+      result.push(msg);
+      continue;
+    }
+
+    // Check if this message has stored responseItems from a previous gateway response
+    // These should be expanded into the input array
+    if (msg.responseItems && Array.isArray(msg.responseItems)) {
+      for (const item of msg.responseItems) {
+        result.push(item);
+      }
+      continue;
+    }
+
+    // Handle standard Vercel AI SDK messages - use simple { role, content } format
+    // This is the basic format that works with both Chat Completions and Responses API
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      result.push({
+        role: msg.role,
+        content: msg.content
+      });
+      continue;
+    }
+
+    // Fallback for other roles or unknown types
+    result.push(msg);
+  }
+
+  return result;
+};
+
 export async function POST(req: Request) {
   const logger = new Logger({ endpoint: 'Prompt Chat', method: 'POST' });
 
@@ -124,19 +157,22 @@ export async function POST(req: Request) {
 
   const promptInput = buildPromptInput(body);
 
-  // Check if this is a prompt form submission (has variables or input)
+  // Check if this is a structured prompt submission (has variables)
   const hasPromptVariables = body.prompt?.variables && Object.keys(body.prompt.variables).length > 0;
-  const hasPromptInput = body.input && body.input.trim().length > 0;
-  const isPromptFormSubmission = hasPromptVariables || hasPromptInput;
 
-  // Check if this is a follow-up message in a conversation
-  // Only treat as follow-up if we have messages AND it's NOT a prompt form submission
-  const isFollowUpMessage = !isPromptFormSubmission && body.messages && body.messages.length > 1;
+  // Check if there's an existing conversation (at least one user-assistant exchange)
+  // messages.length > 1 means we have more than just the current user message
+  const hasExistingConversation = body.messages && body.messages.length > 1;
+
+  // Determine if this is a follow-up message:
+  // - If we have an existing conversation, treat as follow-up (even if stale 'input' is present)
+  // - Exception: if new structured variables are provided, treat as new submission
+  const isFollowUpMessage = hasExistingConversation && !hasPromptVariables;
 
   // For initial prompt submission, we need prompt input
   // For follow-up messages, we rely on the messages array
   if (!promptInput && !isFollowUpMessage) {
-    logger.warn('Missing prompt input or messages', { promptInput, isFollowUpMessage });
+    logger.warn('Missing prompt input or messages', { promptInput, isFollowUpMessage, messageCount: body.messages?.length });
     return Response.json(
       { error: 'Missing prompt input or messages' },
       { status: 400 },
@@ -161,7 +197,7 @@ export async function POST(req: Request) {
 
     if (isFollowUpMessage) {
       // For follow-up messages, include the conversation history
-      requestBody.messages = body.messages;
+      requestBody.input = convertMessagesToInput(body.messages || []);
 
       // Still include prompt context (id and version) but NOT variables
       if (body.prompt?.id) {
@@ -261,6 +297,7 @@ export async function POST(req: Request) {
     let text = '';
     let usage: any = null;
     let finishReason = 'completed';
+    let outputItems: any[] = [];  // Store full output items for conversation history
 
     // Check if it's SSE format (starts with "event:")
     if (responseText.startsWith('event:')) {
@@ -290,6 +327,13 @@ export async function POST(req: Request) {
               }
             }
 
+            // Capture full output items from response.completed or response_end event
+            if (currentEvent === 'response.completed' || currentEvent === 'response_completed') {
+              if (parsed.response?.output && Array.isArray(parsed.response.output)) {
+                outputItems = parsed.response.output;
+              }
+            }
+
             // Extract usage and finish reason from response_end
             if (currentEvent === 'response_end' || currentEvent === 'done') {
               if (parsed.usage) {
@@ -297,6 +341,10 @@ export async function POST(req: Request) {
               }
               if (parsed.status) {
                 finishReason = parsed.status;
+              }
+              // Also try to capture output from done event
+              if (parsed.output && Array.isArray(parsed.output)) {
+                outputItems = parsed.output;
               }
             }
           } catch (e) {
@@ -309,10 +357,22 @@ export async function POST(req: Request) {
       try {
         const result = JSON.parse(responseText);
 
-        // Extract text from gateway's response format
+        // Capture full output items for conversation history
         if (result.output && Array.isArray(result.output)) {
+          outputItems = result.output;
+
+          // Extract text from gateway's response format
           for (const item of result.output) {
-            if (item.content && Array.isArray(item.content)) {
+            // Extract text from message type items
+            if (item.type === 'message' && item.content && Array.isArray(item.content)) {
+              for (const content of item.content) {
+                if (content.text) {
+                  text += content.text;
+                }
+              }
+            }
+            // Also handle items without type but with content array
+            else if (!item.type && item.content && Array.isArray(item.content)) {
               for (const content of item.content) {
                 if (content.text) {
                   text += content.text;
@@ -337,13 +397,22 @@ export async function POST(req: Request) {
         // Send the text as a stream chunk
         controller.enqueue(encoder.encode(`0:${JSON.stringify(text)}\n`));
 
-        // Send usage metadata if available
-        if (usage) {
-          controller.enqueue(encoder.encode(`d:${JSON.stringify({
-            finishReason: finishReason,
-            usage: usage
-          })}\n`));
+        // Send outputItems as message annotations (prefix 8:)
+        // This attaches them to the message so frontend can access via message.annotations
+        if (outputItems.length > 0) {
+          controller.enqueue(encoder.encode(`8:${JSON.stringify([{ outputItems }])}\n`));
         }
+
+        // Send usage metadata (prefix d: for finish data)
+        const metadata: any = {
+          finishReason: finishReason,
+        };
+
+        if (usage) {
+          metadata.usage = usage;
+        }
+
+        controller.enqueue(encoder.encode(`d:${JSON.stringify(metadata)}\n`));
 
         controller.close();
       },

@@ -89,7 +89,7 @@ input {
 /* Alternative: target the background layer itself */
 .demo-fixed-container [class*="background"],
 .gedit-playground [class*="background"] {
-  opacity: 0.3;
+  opacity: 0.15;
 }
 
 /* Hide incoming connection line above the first input node */

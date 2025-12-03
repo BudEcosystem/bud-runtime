@@ -30,6 +30,7 @@ export interface CredentialSchemaField {
   required: boolean;
   description: string;
   options?: string[];
+  visible_when?: string[];
 }
 
 export interface ConnectorsListParams {

@@ -86,6 +86,11 @@ const clearOAuthState = () => {
   }
 };
 
+// Helper to identify redirect URI fields
+const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
+const isRedirectUriField = (fieldName: string) =>
+  REDIRECT_URI_FIELDS.includes(fieldName.toLowerCase());
+
 export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   connector,
   onBack,
@@ -299,6 +304,34 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
 
+  // Auto-populate redirect URI with current browser URL when it becomes visible
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedConnectorDetails?.credential_schema) return;
+
+    const grantTypeValue = formData.grant_type;
+    const visibleFields = selectedConnectorDetails.credential_schema.filter(field => {
+      if (!field.visible_when || field.visible_when.length === 0) return true;
+      return grantTypeValue && field.visible_when.includes(grantTypeValue);
+    });
+    const redirectField = visibleFields.find(f => isRedirectUriField(f.field));
+
+    if (redirectField) {
+      // Use full URL, but clean OAuth-specific params to avoid issues on re-authentication
+      const url = new URL(window.location.href);
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+      const currentUrl = url.toString();
+      setFormData(prev => {
+        // Only set if not already populated
+        if (!prev[redirectField.field]) {
+          return { ...prev, [redirectField.field]: currentUrl };
+        }
+        return prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConnectorDetails?.credential_schema, formData.grant_type]);
+
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
@@ -342,11 +375,40 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setViewMode('connector');
   };
 
+  // Helper function to filter visible fields based on grant_type selection
+  const getVisibleFields = (fields: CredentialSchemaField[], grantTypeOverride?: string): CredentialSchemaField[] => {
+    const grantTypeValue = grantTypeOverride !== undefined ? grantTypeOverride : formData['grant_type'];
+
+    return fields.filter(field => {
+      // If no visible_when, field is always visible
+      if (!field.visible_when || field.visible_when.length === 0) {
+        return true;
+      }
+      // If visible_when exists, check if current grant_type is in the array
+      return grantTypeValue && field.visible_when.includes(grantTypeValue);
+    });
+  };
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => {
+      const newFormData = { ...prev, [field]: value };
+
+      // If grant_type changed, clear values of fields that are no longer visible
+      if (field === 'grant_type' && selectedConnectorDetails?.credential_schema) {
+        const visibleFields = getVisibleFields(selectedConnectorDetails.credential_schema, value);
+        const visibleFieldNames = new Set(visibleFields.map(f => f.field));
+        visibleFieldNames.add('grant_type'); // Ensure grant_type is always preserved
+
+        return Object.keys(newFormData)
+          .filter(key => visibleFieldNames.has(key))
+          .reduce((obj, key) => {
+            obj[key] = newFormData[key];
+            return obj;
+          }, {} as Record<string, string>);
+      }
+
+      return newFormData;
+    });
   };
 
   const handleContinue = async () => {
@@ -530,53 +592,80 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       color: 'white',
     };
 
+    const renderLabel = () => (
+      <Text_12_400_EEEEEE className="mb-1 block">
+        {field.label}
+        {field.required && <span className="text-[#E82E2E] ml-0.5">*</span>}
+      </Text_12_400_EEEEEE>
+    );
+
     switch (field.type) {
       case 'dropdown':
         return (
-          <CustomSelect
-            key={field.field}
-            name={field.field}
-            placeholder={field.label}
-            value={formData[field.field]}
-            onChange={(value) => handleInputChange(field.field, value)}
-            selectOptions={field.options?.map(opt => ({ label: opt, value: opt }))}
-            InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <CustomSelect
+              name={field.field}
+              placeholder={field.label}
+              value={formData[field.field]}
+              onChange={(value) => handleInputChange(field.field, value)}
+              selectOptions={field.options?.map(opt => ({ label: opt.replace(/_/g, ' '), value: opt }))}
+              InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
+            />
+          </div>
         );
 
       case 'password':
         return (
-          <Input
-            key={field.field}
-            type="password"
-            placeholder={field.label}
-            value={formData[field.field] || ''}
-            onChange={(e) => handleInputChange(field.field, e.target.value)}
-            className={inputClassName}
-            style={inputStyle}
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              type="password"
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={inputStyle}
+              autoComplete="new-password"
+            />
+          </div>
         );
 
       case 'url':
       case 'text':
-      default:
+      default: {
+        const isRedirectUri = isRedirectUriField(field.field);
         return (
-          <Input
-            key={field.field}
-            placeholder={field.label}
-            value={formData[field.field] || ''}
-            onChange={(e) => handleInputChange(field.field, e.target.value)}
-            className={inputClassName}
-            style={inputStyle}
-          />
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={{
+                ...inputStyle,
+                ...(isRedirectUri && {
+                  cursor: 'not-allowed',
+                  opacity: 0.7,
+                }),
+              }}
+              autoComplete="off"
+              disabled={isRedirectUri}
+            />
+          </div>
         );
+      }
     }
   };
 
   const isStepOneValid = () => {
     if (!selectedConnectorDetails?.credential_schema) return false;
 
-    return selectedConnectorDetails.credential_schema
+    // Only validate visible required fields
+    const visibleFields = getVisibleFields(selectedConnectorDetails.credential_schema);
+
+    return visibleFields
       .filter(field => field.required)
       .every(field => formData[field.field]);
   };
@@ -660,8 +749,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           <div className='flex flex-col h-full justify-between'>
             {/* Dynamic Input Fields based on credential_schema */}
             <div className="space-y-3 mb-6 px-[1.125rem]">
-              {selectedConnectorDetails?.credential_schema
-                ?.sort((a, b) => a.order - b.order)
+              {getVisibleFields(selectedConnectorDetails?.credential_schema || [])
+                .sort((a, b) => a.order - b.order)
                 .map(field => renderFormField(field))}
             </div>
             <div style={{

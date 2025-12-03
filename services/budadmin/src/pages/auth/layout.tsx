@@ -25,7 +25,7 @@ const AuthLayout: React.FC<LayoutProps> = ({ children }) => {
                 alt=""
                 src={branding.logoAuthUrl}
                 preview={false}
-                className="w-[6.6em] h-auto"
+                className="w-[100px] h-auto"
               />
               <div className="logo-text text-[2.25em] 2xl:text-[2.5rem] 1680px:text-[2.4rem] text-white open-sans tracking-[.0rem] leading-[3.1rem] w-[400px] 1680px:w-[500px] 2560px:w-[700px]">
                 Useful. Private. Real time. Offline. Safe Intelligence in your

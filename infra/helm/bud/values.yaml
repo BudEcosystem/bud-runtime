@@ -90,6 +90,10 @@ externalServices:
         name: "budprompt"
         username: "budprompt"
         password: "budprompt"
+      mcpgateway:
+        name: "mcpgateway"
+        username: "mcpgateway"
+        password: "mcpgateway"
         # TODO: map all external service through here
         # monogodb:
         #   endpoint: ""
@@ -121,11 +125,12 @@ ingress:
     novuapi: ""
     novuws: ""
     s3: ""
+    mcpgateway: ""
 microservices:
   # frontend services
   budadmin:
     enabled: true
-    image: budstudio/budadmin:0.4.4
+    image: budstudio/budadmin:0.4.5
     # Branding configuration - customize logos per customer deployment
     # Leave empty to use default Bud logos
     env:
@@ -140,20 +145,20 @@ microservices:
     affinity: {}
   budcustomer:
     enabled: true
-    image: budstudio/budcustomer:0.4.4
+    image: budstudio/budcustomer:0.4.5
     env: {}
     nodeSelector: {}
     affinity: {}
   budplayground:
     enabled: true
-    image: budstudio/budplayground:0.4.4
+    image: budstudio/budplayground:0.4.5
     env: {}
     nodeSelector: {}
     affinity: {}
   # backend exposed services
   budgateway:
     enabled: true
-    image: budstudio/budgateway:0.4.4
+    image: budstudio/budgateway:0.4.5
     env: {}
     nodeSelector: {}
     affinity: {}
@@ -163,9 +168,15 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
+  mcpgateway:
+    enabled: true
+    image: budstudio/mcpgateway:latest
+    env: {}
+    nodeSelector: {}
+    affinity: {}
   askbud:
     enabled: true
-    image: budstudio/askbud:0.4.4
+    image: budstudio/askbud:0.4.5
     daprid: askbud
     model: bud-gpt-oss-20b-ada28b58
     env:
@@ -175,7 +186,7 @@ microservices:
     affinity: {}
   budapp:
     enabled: true
-    image: budstudio/budapp:0.4.4
+    image: budstudio/budapp:0.4.5
     daprid: budapp
     corsOrigins:
       - "http://localhost:3000"
@@ -198,7 +209,7 @@ microservices:
   # backend internal services
   budcluster:
     enabled: true
-    image: budstudio/budcluster:0.4.4
+    image: budstudio/budcluster:0.4.5
     daprid: budcluster
     env:
       LOG_LEVEL: INFO
@@ -231,7 +242,7 @@ microservices:
   budmetrics:
     enabled: true
     daprid: budmetrics
-    image: budstudio/budmetrics:0.4.4
+    image: budstudio/budmetrics:0.4.5
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
@@ -246,7 +257,7 @@ microservices:
     affinity: {}
   budmodel:
     enabled: true
-    image: budstudio/budmodel:0.4.4
+    image: budstudio/budmodel:0.4.5
     daprid: budmodel
     storageClassName: nfs-csi
     storageSize: "32Gi"
@@ -256,7 +267,7 @@ microservices:
     affinity: {}
   budeval:
     enabled: true
-    image: budstudio/budeval:0.4.4
+    image: budstudio/budeval:0.4.5
     daprid: budeval
     storageClassName: nfs-csi
     env: {}
@@ -264,7 +275,7 @@ microservices:
     affinity: {}
   budsim:
     enabled: true
-    image: budstudio/budsim:0.4.4
+    image: budstudio/budsim:0.4.5
     daprid: budsim
     env:
       LOG_LEVEL: INFO
@@ -272,7 +283,7 @@ microservices:
     affinity: {}
   buddoc:
     enabled: true
-    image: budstudio/buddoc:0.4.4
+    image: budstudio/buddoc:0.4.5
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
@@ -284,7 +295,7 @@ microservices:
     affinity: {}
   budnotify:
     enabled: true
-    image: budstudio/budnotify:0.4.4
+    image: budstudio/budnotify:0.4.5
     daprid: budnotify
     pubsubTopic: notificationMessages
     nodeSelector: {}
@@ -292,7 +303,7 @@ microservices:
   budprompt:
     enabled: true
     daprid: budprompt
-    image: budstudio/budprompt:0.4.4
+    image: budstudio/budprompt:0.4.5
     env:
       LOG_LEVEL: INFO
       BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
@@ -348,7 +359,6 @@ microservices:
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
       LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
-      MCP_FOUNDRY_BASE_URL: https://mcp-foundry.bud.studio/
       MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
       MINIO_BUCKET: models-registry
       MINIO_ENDPOINT: '{{ include "bud.ingress.hosts.s3" $ }}'
@@ -457,7 +467,7 @@ clickhouse:
     password: bud
   resources:
     requests:
-      memory: 2Gi
+      memory: 1Gi
       cpu: 500m
     limits:
       memory: 4Gi
@@ -469,11 +479,6 @@ clickhouse:
   # Optional node scheduling for ClickHouse
   nodeSelector: {}
   affinity: {}
-  resources:
-    requests:
-      memory: 1Gi
-    limits:
-      memory: 4Gi
 clickhouseExtra:
   autoCreateDB:
     - budproxy
@@ -509,6 +514,7 @@ postgresqlExtra:
     - budeval
     - buddoc
     - budprompt
+    - mcpgateway
 keycloak:
   image:
     repository: bitnamilegacy/keycloak

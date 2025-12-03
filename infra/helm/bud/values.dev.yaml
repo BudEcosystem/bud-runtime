@@ -59,3 +59,13 @@ deploymentAnnotations:
     keel.sh/trigger: poll
     keel.sh/match-tag: true
     keel.sh/pollSchedule: "@every 1m"
+
+mcpStackEnabled: true
+mcp-stack:
+    mcpContextForge:
+        ingress:
+            host: mcpgateway.dev.bud.studio
+            tls:
+                enabled: true
+        config:
+            APP_DOMAIN: https://mcpgateway.dev.bud.studio

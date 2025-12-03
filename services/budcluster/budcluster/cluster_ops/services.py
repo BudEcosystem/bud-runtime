@@ -25,7 +25,16 @@ from uuid import UUID
 
 from budmicroframe.commons.constants import WorkflowStatus
 from budmicroframe.commons.logging import get_logger
-from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse, WorkflowMetadataResponse
+from budmicroframe.commons.schemas import (
+    ErrorResponse,
+    NotificationCategory,
+    NotificationContent,
+    NotificationPayload,
+    NotificationRequest,
+    NotificationType,
+    SuccessResponse,
+    WorkflowMetadataResponse,
+)
 from budmicroframe.shared.dapr_service import DaprService, DaprServiceCrypto
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 
@@ -159,6 +168,9 @@ class ClusterOpsService:
                     {"status": ClusterStatusEnum.AVAILABLE if cluster_status else ClusterStatusEnum.NOT_AVAILABLE},
                 )
 
+            # Capture is_master for each node before DB operations (not stored in DB, passed to state store)
+            node_is_master_map = {node["node_name"]: node.get("is_master", False) for node in node_info}
+
             node_objects = []
             for node in node_info:
                 devices_data = json.loads(node.get("devices", "{}"))
@@ -250,6 +262,7 @@ class ClusterOpsService:
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
                                     "generation": cpu.get("generation", ""),
+                                    "physical_cores": cpu.get("physical_cores", cpu.get("cores", 0)),
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
@@ -258,10 +271,12 @@ class ClusterOpsService:
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
                                     "instruction_sets": cpu.get("instruction_sets", []),
-                                    "memory_gb": 0,  # CPU doesn't have dedicated memory like GPU
-                                    "mem_per_GPU_in_GB": 0,
+                                    "memory_gb": cpu.get("memory_gb", 0),  # System memory from DeviceExtractor
+                                    "mem_per_GPU_in_GB": cpu.get("memory_gb", 0),  # System memory
                                     "inter_node_bandwidth_in_GB_per_sec": 100,
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
+                                    "utilized_cores": cpu.get("utilized_cores", 0.0),
+                                    "utilized_memory_gb": cpu.get("utilized_memory_gb", 0.0),
                                 },
                                 "available_count": 1,  # CPUs are counted differently
                                 "type": "cpu",
@@ -301,13 +316,15 @@ class ClusterOpsService:
                 else:
                     # Fallback to CPU if no devices detected
                     cpu_info = node.get("cpu_info", {})
+                    cpu_cores = int(cpu_info.get("cpu_cores", 0) or 0)
                     hardware_info = [
                         {
                             "device_config": {
                                 "type": "cpu",
                                 "name": cpu_info.get("cpu_name", "CPU"),
                                 "vendor": cpu_info.get("cpu_vendor", "Unknown"),
-                                "cores": int(cpu_info.get("cpu_cores", 0) or 0),
+                                "physical_cores": cpu_cores,
+                                "cores": cpu_cores,
                                 "architecture": cpu_info.get("architecture", "x86_64"),
                                 "raw_name": cpu_info.get("cpu_name", "CPU"),
                                 "mem_per_GPU_in_GB": 0,
@@ -361,6 +378,11 @@ class ClusterOpsService:
             logger.info("Added node info to db")
             nodes = await cls.transform_db_nodes(db_nodes)
             logger.info("Transformed db nodes")
+
+            # Add is_master to state store output (not persisted in DB)
+            for node in nodes:
+                node["is_master"] = node_is_master_map.get(node["name"], False)
+
             result = {
                 "id": str(cluster_id),
                 "name": cluster_name,
@@ -663,7 +685,10 @@ class ClusterOpsService:
                         "name": device.get("name", "unknown"),
                         "type": device.get("type", "cpu"),
                         "mem_per_gpu_in_gb": device.get("mem_per_gpu_in_gb", 0),
+                        "physical_cores": device.get("physical_cores", device.get("cores", 0)),
                         "cores": device.get("cores", 0),
+                        "utilized_cores": device.get("utilized_cores", 0.0),
+                        "utilized_memory_gb": device.get("utilized_memory_gb", 0.0),
                     },
                     "available_count": device.get("available_count", 0),
                     "total_count": device.get("total_count", 0),
@@ -817,6 +842,12 @@ class ClusterOpsService:
 
                         # Store in state store for budapp consumption
                         nodes = await cls.transform_db_nodes_enhanced(db_cluster.nodes)
+
+                        # Add is_master from schedulable_nodes to output
+                        schedulable_nodes_map = {n["name"]: n.get("is_master", False) for n in schedulable_nodes}
+                        for node in nodes:
+                            node["is_master"] = schedulable_nodes_map.get(node["name"], False)
+
                         result = {"id": str(cluster_id), "nodes": nodes, "enhanced": True, "detection_method": "nfd"}
                         await cls.update_node_info_in_statestore(json.dumps(result))
 
@@ -910,6 +941,9 @@ class ClusterOpsService:
 
             # Get node info
             node_info = await get_node_info(config_dict, db_cluster.platform)
+
+            # Capture is_master for each node before DB operations (not stored in DB)
+            node_is_master_map = {node["node_name"]: node.get("is_master", False) for node in node_info}
 
             # Create node objects
             node_objects = []
@@ -1005,6 +1039,7 @@ class ClusterOpsService:
                                     "model": cpu.get("model", ""),
                                     "family": cpu.get("family", ""),
                                     "generation": cpu.get("generation", ""),
+                                    "physical_cores": cpu.get("physical_cores", cpu.get("cores", 0)),
                                     "cores": cpu.get("cores", 0),
                                     "threads": cpu.get("threads", 0),
                                     "architecture": cpu.get("architecture", "x86_64"),
@@ -1013,10 +1048,12 @@ class ClusterOpsService:
                                     "cache_mb": cpu.get("cache_mb"),
                                     "socket_count": cpu.get("socket_count", 1),
                                     "instruction_sets": cpu.get("instruction_sets", []),
-                                    "memory_gb": 0,  # CPU doesn't have dedicated memory like GPU
-                                    "mem_per_GPU_in_GB": 0,
+                                    "memory_gb": cpu.get("memory_gb", 0),  # System memory from DeviceExtractor
+                                    "mem_per_GPU_in_GB": cpu.get("memory_gb", 0),  # System memory
                                     "inter_node_bandwidth_in_GB_per_sec": 100,
                                     "intra_node_bandwidth_in_GB_per_sec": 200,
+                                    "utilized_cores": cpu.get("utilized_cores", 0.0),
+                                    "utilized_memory_gb": cpu.get("utilized_memory_gb", 0.0),
                                 },
                                 "available_count": 1,  # CPUs are counted differently
                                 "type": cpu_type,
@@ -1056,13 +1093,15 @@ class ClusterOpsService:
                 else:
                     # Fallback to CPU if no devices detected
                     cpu_info = node.get("cpu_info", {})
+                    cpu_cores = int(cpu_info.get("cpu_cores", 0) or 0)
                     hardware_info = [
                         {
                             "device_config": {
                                 "type": "cpu",
                                 "name": cpu_info.get("cpu_name", "CPU"),
                                 "vendor": cpu_info.get("cpu_vendor", "Unknown"),
-                                "cores": int(cpu_info.get("cpu_cores", 0) or 0),
+                                "physical_cores": cpu_cores,
+                                "cores": cpu_cores,
                                 "architecture": cpu_info.get("architecture", "x86_64"),
                                 "raw_name": cpu_info.get("cpu_name", "CPU"),
                                 "mem_per_GPU_in_GB": 0,
@@ -1189,6 +1228,11 @@ class ClusterOpsService:
 
             # Prepare and store results in statestore
             nodes = await cls.transform_db_nodes(db_nodes)
+
+            # Add is_master to state store output (not persisted in DB)
+            for node in nodes:
+                node["is_master"] = node_is_master_map.get(node["name"], False)
+
             result = {
                 "id": str(cluster_id),
                 "nodes": nodes,
@@ -1269,39 +1313,32 @@ class ClusterOpsService:
         return response
 
     @classmethod
-    async def _send_cluster_state_notification(
-        cls, cluster_id: UUID, cluster_name: str, old_status: str, new_status: str, message: str
-    ):
-        """Send notification when cluster state changes.
+    def _send_cluster_status_update_notification(
+        cls,
+        cluster_id: str,
+        new_status: ClusterStatusEnum,
+        message: str,
+    ) -> None:
+        """Send cluster-status-update notification to budapp.
+
+        This method is designed to be called OUTSIDE of database transactions
+        to ensure DB changes are committed before attempting to send notifications.
 
         Args:
-            cluster_id: ID of the cluster
-            cluster_name: Name of the cluster
-            old_status: Previous cluster status
-            new_status: New cluster status
-            message: Notification message
+            cluster_id: The cluster UUID as string
+            new_status: The new cluster status enum value
+            message: Human-readable message describing the change
         """
-        from budmicroframe.commons.schemas import (
-            NotificationCategory,
-            NotificationContent,
-            NotificationPayload,
-            NotificationRequest,
-            NotificationType,
-            WorkflowStatus,
-        )
-        from budmicroframe.shared.dapr_service import DaprService
-
         try:
-            event_name = "cluster-state-change"
+            event_name = "cluster-status-update"
             content = NotificationContent(
-                title=f"Cluster {cluster_name} state changed",
+                title="Cluster status updated",
                 message=message,
                 status=WorkflowStatus.COMPLETED,
                 result={
-                    "cluster_id": str(cluster_id),
-                    "cluster_name": cluster_name,
-                    "old_status": old_status,
-                    "new_status": new_status,
+                    "cluster_id": cluster_id,
+                    "status": new_status.value,
+                    "node_info": {"id": cluster_id, "nodes": []},
                 },
             )
             notification_request = NotificationRequest(
@@ -1310,9 +1347,9 @@ class ClusterOpsService:
                 payload=NotificationPayload(
                     category=NotificationCategory.INTERNAL,
                     type=event_name,
-                    event="cluster_state_change",
+                    event="results",
                     content=content,
-                    workflow_id="",  # No workflow for state change notifications
+                    workflow_id="",
                 ),
                 topic_keys=["budAppMessages"],
             )
@@ -1323,9 +1360,10 @@ class ClusterOpsService:
                     target_name=None,
                     event_type=notification_request.payload.type,
                 )
-            logger.info(f"Sent notification for cluster {cluster_id} state change: {old_status} -> {new_status}")
+            logger.info(f"Sent {new_status.value} notification for cluster {cluster_id}")
         except Exception as e:
-            logger.error(f"Failed to send cluster state notification for {cluster_id}: {e}")
+            # Log error but don't raise - notification failure shouldn't affect callers
+            logger.error(f"Failed to send cluster status notification for {cluster_id}: {e}")
 
     @classmethod
     async def _check_and_move_to_error(cls, threshold_hours: int = 24):
@@ -1337,6 +1375,9 @@ class ClusterOpsService:
         from datetime import timedelta
 
         cutoff_time = datetime.utcnow() - timedelta(hours=threshold_hours)
+
+        # Collect notifications to send after transaction commits
+        notifications_to_send = []
 
         try:
             with DBSession() as session:
@@ -1361,17 +1402,21 @@ class ClusterOpsService:
                             f"Cluster {cluster.id} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE"
                         )
 
-                        # Send notification about the state change
-                        await cls._send_cluster_state_notification(
-                            cluster_id=cluster.id,
-                            cluster_name=cluster.host,
-                            old_status=ClusterStatusEnum.NOT_AVAILABLE.value,
-                            new_status=ClusterStatusEnum.ERROR.value,
-                            message=f"Cluster {cluster.host} moved to ERROR state after {threshold_hours} hours in NOT_AVAILABLE",
+                        # Collect notification info to send after transaction commits
+                        notifications_to_send.append(
+                            {
+                                "cluster_id": str(cluster.id),
+                                "new_status": ClusterStatusEnum.ERROR,
+                                "message": f"Cluster {cluster.host} moved to ERROR state after {threshold_hours}h in NOT_AVAILABLE",
+                            }
                         )
 
                 if moved_count > 0:
                     logger.info(f"Moved {moved_count} clusters from NOT_AVAILABLE to ERROR")
+
+            # Send notifications AFTER transaction commits successfully
+            for notification in notifications_to_send:
+                cls._send_cluster_status_update_notification(**notification)
 
         except Exception as e:
             logger.error(f"Failed to check and move clusters to ERROR: {e}")
@@ -1413,6 +1458,8 @@ class ClusterOpsService:
         Args:
             cluster_id: ID of the cluster that failed
         """
+        notification_data = None  # Track what to notify after transaction
+
         try:
             with DBSession() as session:
                 cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
@@ -1420,6 +1467,8 @@ class ClusterOpsService:
                 if not cluster:
                     logger.error(f"Cluster {cluster_id} not found for failure handling")
                     return
+
+                cluster_id_str = str(cluster_id)
 
                 # If currently AVAILABLE, move to NOT_AVAILABLE and record timestamp
                 if cluster.status == ClusterStatusEnum.AVAILABLE:
@@ -1430,9 +1479,14 @@ class ClusterOpsService:
                             "not_available_since": datetime.utcnow(),
                         },
                     )
+                    notification_data = {
+                        "cluster_id": cluster_id_str,
+                        "new_status": ClusterStatusEnum.NOT_AVAILABLE,
+                        "message": f"Cluster {cluster_id_str} status: NOT_AVAILABLE",
+                    }
                     logger.info(f"Cluster {cluster_id} moved to NOT_AVAILABLE")
 
-                # If ERROR, just update retry time
+                # If ERROR, update retry time and keep status as ERROR
                 elif cluster.status == ClusterStatusEnum.ERROR:
                     await ClusterDataManager(session).update_cluster_by_fields(
                         cluster,
@@ -1440,7 +1494,16 @@ class ClusterOpsService:
                             "last_retry_time": datetime.utcnow(),
                         },
                     )
+                    notification_data = {
+                        "cluster_id": cluster_id_str,
+                        "new_status": ClusterStatusEnum.ERROR,
+                        "message": f"Cluster {cluster_id_str} status: ERROR",
+                    }
                     logger.debug(f"Updated retry time for ERROR cluster {cluster_id}")
+
+            # Send notification AFTER transaction commits successfully
+            if notification_data:
+                cls._send_cluster_status_update_notification(**notification_data)
 
         except Exception as e:
             logger.error(f"Failed to handle cluster failure for {cluster_id}: {e}")
@@ -1452,6 +1515,8 @@ class ClusterOpsService:
         Args:
             cluster_id: ID of the cluster that succeeded
         """
+        notification_data = None  # Track what to notify after transaction
+
         try:
             with DBSession() as session:
                 cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
@@ -1462,6 +1527,8 @@ class ClusterOpsService:
 
                 # Reset to AVAILABLE and clear timestamps
                 previous_status = cluster.status
+                cluster_id_str = str(cluster_id)
+
                 await ClusterDataManager(session).update_cluster_by_fields(
                     cluster,
                     {
@@ -1473,15 +1540,15 @@ class ClusterOpsService:
 
                 if previous_status in [ClusterStatusEnum.NOT_AVAILABLE, ClusterStatusEnum.ERROR]:
                     logger.info(f"Cluster {cluster_id} recovered from {previous_status} to AVAILABLE")
+                    notification_data = {
+                        "cluster_id": cluster_id_str,
+                        "new_status": ClusterStatusEnum.AVAILABLE,
+                        "message": f"Cluster {cluster_id_str} recovered to AVAILABLE",
+                    }
 
-                    # Send notification about the recovery
-                    await cls._send_cluster_state_notification(
-                        cluster_id=cluster.id,
-                        cluster_name=cluster.host,
-                        old_status=previous_status.value,
-                        new_status=ClusterStatusEnum.AVAILABLE.value,
-                        message=f"Cluster {cluster.host} recovered from {previous_status.value} to AVAILABLE",
-                    )
+            # Send notification AFTER transaction commits successfully
+            if notification_data:
+                cls._send_cluster_status_update_notification(**notification_data)
 
         except Exception as e:
             logger.error(f"Failed to handle cluster success for {cluster_id}: {e}")

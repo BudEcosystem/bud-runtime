@@ -21,8 +21,10 @@ locals {
     "gateway",
     "app",
     "ask",
+    "mcpgateway",
     "api.novu",
     "ws.novu",
+    "chat",
   ]
 
   # place holder domains for new pde services

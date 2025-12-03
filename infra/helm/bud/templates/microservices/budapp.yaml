@@ -39,7 +39,6 @@ spec:
       - name: {{ .Release.Name}}-budapp
         image: {{ .Values.microservices.budapp.image }}
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        command: ["sh", "-c", "alembic -c ./budapp/alembic.ini upgrade head && uvicorn budapp.main:app --host 0.0.0.0 --port 9082"]
         ports:
         - containerPort: 9082
         env:
@@ -98,8 +97,12 @@ spec:
             value: {{ .Values.externalServices.minio.buckets.modelInfo }}
           - name: MINIO_SECURE
             value: "false"
-          - name: MCP_FOUNDRY_API_KEY
-            value: {{ .Values.microservices.keys.mcpFoundryApi }}
+          - name: MCP_FOUNDRY_BASE_URL
+            value: http://{{ .Release.Name }}-mcpgateway:4444
+          - name: ENTRYPOINT_MCPGATEWAY_EMAIL
+            value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_EMAIL }}
+          - name: ENTRYPOINT_MCPGATEWAY_PASSWORD
+            value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_PASSWORD }}
 {{- if (default .Values.microservices.budsentinel.enabled false) }}
           - name: BUD_SENTINEL_BASE_URL
             value: {{ .Release.Name }}-budsentinel:50051

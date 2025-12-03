@@ -13,7 +13,7 @@ import { Endpoint } from "../types/deployment";
 import { tempApiBaseUrl } from "../lib/environment";
 
 export default function ChatPage() {
-  const { activeChatList, createChat, setPromptIds, getPromptIds, setActiveChatList } = useChatStore();
+  const { activeChatList, createChat, setPromptIds, getPromptIds, setActiveChatList, clearPromptSessions, clearDefaultSessions, hasPromptSessions } = useChatStore();
   const { hideLoader } = useLoader();
   const { apiKey, isLoading, isSessionValid } = useAuth();
   const router = useRouter();
@@ -61,12 +61,12 @@ export default function ChatPage() {
   // Create chat sessions based on promptIds or default
   useEffect(() => {
     if (!hasHydrated) return;
-    if (promptIdsFromUrl.length === 0 && activeChatList.length > 0) return; // Don't interfere if no promptIds and chats exist
 
     hideLoader();
-    // If promptIds exist, create chat sessions for them
+
+    // PROMPT MODE: Has promptIds in URL
     if (promptIdsFromUrl.length > 0) {
-      console.log('Creating chat sessions for promptIds:', promptIdsFromUrl);
+      console.log('[Session] Prompt mode - promptIds:', promptIdsFromUrl);
 
       // Check if existing chats match the promptIds (same IDs in same order)
       const existingChatIds = activeChatList.map(chat => chat.id);
@@ -74,7 +74,10 @@ export default function ChatPage() {
         promptIdsFromUrl.every((id, index) => existingChatIds[index] === id);
 
       if (!promptIdsMatch) {
-        console.log('Clearing existing chats and creating new ones from promptIds');
+        console.log('[Session] Creating new prompt sessions');
+
+        // Clear any default sessions first (isolate modes)
+        clearDefaultSessions();
 
         // Create new chats from promptIds
         const newChats: Session[] = promptIdsFromUrl.map((promptId, index) => {
@@ -85,7 +88,7 @@ export default function ChatPage() {
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
             total_tokens: 0,
-            active: true, // All chats from promptIds are active
+            active: true,
           };
 
           if (selectedModel) {
@@ -103,17 +106,31 @@ export default function ChatPage() {
           return newChatPayload;
         });
 
-        // Set all chats at once (this will replace existing chats)
+        // Set all chats at once
         setActiveChatList(newChats);
       } else {
-        console.log('Chats already match promptIds from URL');
+        console.log('[Session] Prompt sessions already match URL');
       }
-    } else if (activeChatList.length === 0) {
-      // No promptIds in URL and no existing chats, create a default chat
-      console.log('No promptIds, creating default chat');
-      createNewChat();
     }
-  }, [hasHydrated, promptIdsFromUrl, selectedModel, activeChatList, createNewChat, hideLoader, setActiveChatList]);
+    // DEFAULT MODE: No promptIds in URL
+    else {
+      console.log('[Session] Default mode');
+
+      // If there are prompt sessions, clear them and wait for the effect to re-run with a clean state.
+      if (hasPromptSessions()) {
+        console.log('[Session] Clearing prompt sessions for default mode');
+        clearPromptSessions();
+        return; // Exit early, let the re-render handle the next step.
+      }
+
+      // At this point, we know there are no prompt sessions.
+      // Create a new default session if none exist.
+      if (activeChatList.length === 0) {
+        console.log('[Session] Creating new default session');
+        createNewChat();
+      }
+    }
+  }, [hasHydrated, promptIdsFromUrl, selectedModel, activeChatList, createNewChat, hideLoader, setActiveChatList, clearPromptSessions, clearDefaultSessions, hasPromptSessions]);
 
   // Handle URL parameters for page configuration (not authentication)
   useEffect(() => {
