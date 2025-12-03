@@ -233,6 +233,8 @@ class GuardrailProfilePaginatedResponse(PaginatedSuccessResponse):
 class GuardrailProfileDetailResponse(SuccessResponse):
     profile: GuardrailProfileResponse
     probe_count: int
+    deployment_count: int
+    is_standalone: bool
     object: str = "guardrail.profile.get"
 
 
