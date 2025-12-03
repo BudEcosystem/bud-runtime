@@ -2,7 +2,6 @@
 
 # Bud AI Foundry
 
-![Model Deployment Flow](docs/images/model-deployment-flow.gif)
 
 [![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
@@ -12,6 +11,9 @@
 Bud AI Foundry is a control panel for your GenAI deployments, designed to maximize infrastructure performance and give you full control over every aspect, from deployment administration to compliance and security management—All in one place
 
 **[Quick Start](#-quick-start)** • **[Documentation](#-documentation)** • **[Contributing](#-contributing)**
+
+
+![Model Deployment Flow](docs/images/model-deployment-flow.gif)
 
 ## 🚀 Features
 
