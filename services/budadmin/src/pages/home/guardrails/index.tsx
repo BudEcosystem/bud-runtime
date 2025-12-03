@@ -166,7 +166,7 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
               style={{
                 display: "-webkit-box",
                 WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2
+                WebkitLineClamp: 1
               }}
             >
               <Text_13_400_B3B3B3 className="pt-[.5em] pr-[.45em] text-[0.75em] tracking-[.01em] leading-[150%]">
