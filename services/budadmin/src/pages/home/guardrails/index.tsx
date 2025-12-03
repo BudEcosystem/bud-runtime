@@ -262,11 +262,11 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
           <div className="flex items-center gap-[0.25rem] flex-wrap">
             {item.guard_types && item.guard_types.length > 0 ? (
               <>
-                {item.guard_types.slice(0, 2).map((type: string, idx: number) => (
+                {item.guard_types.slice(0, 2).map((type: string) => (
                   <Tags
                     name={type}
                     color="#EEEEEE"
-                    key={idx}
+                    key={type}
                   />
                 ))}
                 {item.guard_types.length > 2 && (
