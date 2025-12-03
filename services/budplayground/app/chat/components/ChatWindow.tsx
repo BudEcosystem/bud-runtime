@@ -87,7 +87,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     return promptIds.length > 0 ? '/api/prompt-chat' : '/api/chat';
   }, [promptIds]);
 
-  const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, reload, error, stop, status, setMessages, append, setInput } = useChat({
     id: chat.id,
     api: apiEndpoint,
     headers: {
@@ -457,6 +457,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       role: 'user',
       content: userMessage,
     });
+
+    // Clear the input field after sending
+    setInput('');
 
     // Scroll to bottom
     setTimeout(() => {
