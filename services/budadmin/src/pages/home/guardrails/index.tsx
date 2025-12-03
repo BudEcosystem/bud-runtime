@@ -60,7 +60,6 @@ interface GuardRail {
 
 function GuardRailCard({ item, index }: { item: any; index: number }) {
   const { openDrawer, openDrawerWithStep } = useDrawer();
-  const [descriptionPopoverOpen, setDescriptionPopoverOpen] = useState(false);
 
   // Check if description is long enough to need "See more" (approximately 3 lines worth)
   const needsSeeMore = item.description && item.description.length > 150;
@@ -170,9 +169,7 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
                     </Text_13_400_B3B3B3>
                   </div>
                 }
-                trigger="click"
-                open={descriptionPopoverOpen}
-                onOpenChange={setDescriptionPopoverOpen}
+                trigger="hover"
                 placement="top"
                 rootClassName="guardrail-description-popover"
                 getPopupContainer={(trigger) =>
