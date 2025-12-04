@@ -49,22 +49,6 @@ in
             "infra/nixos/primary"
           ];
         }
-        {
-          name = "OpenTofu";
-          slack_color = "#fbdb1c";
-          exec_line = [
-            "nix"
-            "run"
-            ".#workflow_tofu_apply"
-            "-L"
-          ];
-          watch_paths = [
-            "flake.nix"
-            "flake.lock"
-            "infra/tofu"
-            "nix/workflows/tofu_apply"
-          ];
-        }
       ];
     };
   };
