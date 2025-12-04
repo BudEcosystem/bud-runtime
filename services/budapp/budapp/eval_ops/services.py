@@ -2426,14 +2426,19 @@ class ExperimentService:
         self,
         project_id: uuid.UUID,
         experiment_id: uuid.UUID,
+        evaluation_id: uuid.UUID,
     ) -> str:
         """Generate temporary API key for evaluation (no DB storage).
 
         The key is only cached in Redis with 24-hour TTL for automatic cleanup.
+        The evaluation_id is stored in the API key metadata so that all inference
+        requests made using this key are tagged with the evaluation_id for tracking
+        metrics like total tokens used, request count, etc.
 
         Args:
             project_id: Project ID to associate the credential with
             experiment_id: Experiment ID for logging purposes
+            evaluation_id: Evaluation ID to tag all inference requests made with this key
 
         Returns:
             The generated API key string
@@ -2451,14 +2456,17 @@ class ExperimentService:
         expiry = datetime.now() + timedelta(hours=24)
 
         # Update Redis cache directly (no DB storage)
+        # Include evaluation_id in metadata for tracking inference requests
         await CredentialService(self.session).update_proxy_cache(
             project_id=project_id,
             api_key=api_key,
             expiry=expiry,
+            evaluation_id=evaluation_id,
         )
 
         logger.info(
-            f"Generated temporary evaluation key for experiment {experiment_id}, valid until {expiry.isoformat()}"
+            f"Generated temporary evaluation key for experiment {experiment_id}, "
+            f"evaluation {evaluation_id}, valid until {expiry.isoformat()}"
         )
 
         return api_key
@@ -4939,9 +4947,11 @@ class EvaluationWorkflowService:
             experiment_service = ExperimentService(self.session)
             project_id = await experiment_service.get_first_active_project()
 
-            # Generate temporary evaluation credential
+            # Generate temporary evaluation credential with evaluation_id for tracking
             _api_key = await experiment_service._generate_temporary_evaluation_key(
-                project_id=project_id, experiment_id=experiment_id
+                project_id=project_id,
+                experiment_id=experiment_id,
+                evaluation_id=evaluation_id,
             )
 
             # Build evaluation request with dynamic values

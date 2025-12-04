@@ -127,6 +127,8 @@ pub struct ObservabilityMetadata {
     pub api_key_id: Option<String>,
     pub user_id: Option<String>,
     pub api_key_project_id: Option<String>,
+    // Evaluation tracking metadata
+    pub evaluation_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -198,6 +200,11 @@ pub async fn inference_handler(
             .get("x-tensorzero-api-key-project-id")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
+        // Extract evaluation tracking metadata from headers
+        let evaluation_id = headers
+            .get("x-tensorzero-evaluation-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
 
         Some(ObservabilityMetadata {
             project_id: project_id.to_string(),
@@ -206,6 +213,7 @@ pub async fn inference_handler(
             api_key_id,
             user_id,
             api_key_project_id,
+            evaluation_id,
         })
     } else {
         None
@@ -320,14 +328,22 @@ pub async fn inference_handler(
                 model_latency_ms.to_string().parse().unwrap(),
             );
 
+            // Add auth metadata headers to response for analytics middleware
+            super::add_auth_metadata_to_response(&mut http_response, &headers);
+
             Ok(http_response)
         }
         Ok(InferenceOutput::Streaming(stream)) => {
             let event_stream = prepare_serialized_events(stream);
 
-            Ok(Sse::new(event_stream)
+            let mut response = Sse::new(event_stream)
                 .keep_alive(axum::response::sse::KeepAlive::new())
-                .into_response())
+                .into_response();
+
+            // Add auth metadata headers to response for analytics middleware
+            super::add_auth_metadata_to_response(&mut response, &headers);
+
+            Ok(response)
         }
         Err(error) => {
             // The inference function already sends failure events internally for AllVariantsFailed
@@ -345,6 +361,9 @@ pub async fn inference_handler(
                     }
                 }
             }
+
+            // Add auth metadata headers to response for analytics middleware
+            super::add_auth_metadata_to_response(&mut error_response, &headers);
 
             Ok(error_response)
         }
@@ -1367,7 +1386,7 @@ pub async fn write_inference(
         };
 
         // Use observability metadata if available, otherwise fall back to function/variant names
-        let (project_id, endpoint_id, obs_model_id, api_key_id, user_id, api_key_project_id) =
+        let (project_id, endpoint_id, obs_model_id, api_key_id, user_id, api_key_project_id, evaluation_id) =
             if let Some(obs_metadata) = observability_metadata {
                 (
                     obs_metadata.project_id.clone(),
@@ -1376,12 +1395,14 @@ pub async fn write_inference(
                     obs_metadata.api_key_id.clone(),
                     obs_metadata.user_id.clone(),
                     obs_metadata.api_key_project_id.clone(),
+                    obs_metadata.evaluation_id.clone(),
                 )
             } else {
                 (
                     metadata_clone.function_name.clone(),
                     metadata_clone.variant_name.clone(),
                     model_id.to_string(),
+                    None,
                     None,
                     None,
                     None,
@@ -1402,6 +1423,7 @@ pub async fn write_inference(
             api_key_id,
             user_id,
             api_key_project_id,
+            evaluation_id,
             error_code: None, // No error for successful inferences
             error_message: None,
             error_type: None,
@@ -1493,7 +1515,7 @@ async fn send_failure_event(
     };
 
     // Use observability metadata if available, otherwise use function/model names
-    let (project_id, endpoint_id, model_id, api_key_id, user_id, api_key_project_id) =
+    let (project_id, endpoint_id, model_id, api_key_id, user_id, api_key_project_id, evaluation_id) =
         if let Some(obs_metadata) = &observability_metadata {
             (
                 obs_metadata.project_id.clone(),
@@ -1502,6 +1524,7 @@ async fn send_failure_event(
                 obs_metadata.api_key_id.clone(),
                 obs_metadata.user_id.clone(),
                 obs_metadata.api_key_project_id.clone(),
+                obs_metadata.evaluation_id.clone(),
             )
         } else {
             // Fallback to function/model names
@@ -1511,6 +1534,7 @@ async fn send_failure_event(
                 fn_name.to_string(),
                 "unknown".to_string(),
                 mdl_name.to_string(),
+                None,
                 None,
                 None,
                 None,
@@ -1531,6 +1555,7 @@ async fn send_failure_event(
         api_key_id: api_key_id.clone(),
         user_id: user_id.clone(),
         api_key_project_id: api_key_project_id.clone(),
+        evaluation_id: evaluation_id.clone(),
         error_code: Some(format!("{:?}", status_code)),
         error_message: Some(error_message.clone()),
         error_type: Some(error_type.to_string()),
@@ -1615,6 +1640,7 @@ async fn send_failure_event(
         api_key_id: api_key_id.and_then(|id| uuid::Uuid::parse_str(&id).ok()),
         user_id: user_id.and_then(|id| uuid::Uuid::parse_str(&id).ok()),
         api_key_project_id: parsed_api_key_project_id,
+        evaluation_id: evaluation_id.and_then(|id| uuid::Uuid::parse_str(&id).ok()),
         error_code: Some(format!("{:?}", status_code)),
         error_message: Some(error_message),
         error_type: Some(error_type.to_string()),

@@ -254,7 +254,11 @@ class CredentialService(SessionMixin):
         return db_credential
 
     async def update_proxy_cache(
-        self, project_id: UUID, api_key: Optional[str] = None, expiry: Optional[datetime] = None
+        self,
+        project_id: UUID,
+        api_key: Optional[str] = None,
+        expiry: Optional[datetime] = None,
+        evaluation_id: Optional[UUID] = None,
     ):
         """Update the proxy cache in Redis with the latest endpoints and adapters for a given project.
 
@@ -263,8 +267,12 @@ class CredentialService(SessionMixin):
         the Redis cache with this information. Now includes authentication metadata for API usage tracking.
 
         Args:
-            api_key (str): The API key to associate with the project and its models.
             project_id (UUID): The unique identifier of the project whose endpoints and adapters are to be cached.
+            api_key (str): The API key to associate with the project and its models.
+            expiry (datetime): Optional expiry time for the API key.
+            evaluation_id (UUID): Optional evaluation ID to associate with requests made using this API key.
+                When provided, all inference requests using this API key will be tagged with this evaluation_id
+                for tracking evaluation metrics (tokens used, request count, etc.).
 
         Returns:
             None
@@ -363,6 +371,7 @@ class CredentialService(SessionMixin):
                 "api_key_id": str(key_info["credential_id"]) if key_info.get("credential_id") else None,
                 "user_id": str(key_info["user_id"]) if key_info.get("user_id") else None,
                 "api_key_project_id": str(project_id),  # project_id is always available
+                "evaluation_id": str(evaluation_id) if evaluation_id else None,
             }
 
             ttl = None

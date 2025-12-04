@@ -58,6 +58,7 @@ pub struct GatewayAnalyticsDatabaseInsert {
     pub user_id: Option<String>,
     pub project_id: Option<Uuid>,
     pub endpoint_id: Option<Uuid>,
+    pub evaluation_id: Option<Uuid>, // Evaluation ID for tracking evaluation-related requests
 
     /// Performance metrics
     #[serde(serialize_with = "serialize_datetime")]
@@ -123,6 +124,7 @@ impl GatewayAnalyticsDatabaseInsert {
             user_id: None,
             project_id: None,
             endpoint_id: None,
+            evaluation_id: None,
             request_timestamp: now,
             response_timestamp: now,
             gateway_processing_ms: 0,
