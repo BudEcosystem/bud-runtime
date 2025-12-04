@@ -261,8 +261,6 @@ impl DocumentProcessingProvider for BudDocProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::documents::DocumentInput;
-    use std::sync::Arc;
 
     #[test]
     fn test_buddoc_request_serialization() {

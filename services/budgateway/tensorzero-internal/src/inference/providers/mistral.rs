@@ -1139,8 +1139,10 @@ impl ModerationProvider for MistralProvider {
                         harassment: result.categories.hate_and_discrimination,
                         harassment_threatening: result.categories.hate_and_discrimination
                             && result.categories.violence_and_threats,
-                        illicit: false,         // Mistral doesn't have this category
-                        illicit_violent: false, // Mistral doesn't have this category
+                        illicit: false,          // Mistral doesn't have this category
+                        illicit_violent: false,  // Mistral doesn't have this category
+                        illegal: false,          // Mistral doesn't have this category
+                        regulated_advice: false, // Mistral doesn't have this category
                         self_harm: result.categories.self_harm,
                         self_harm_intent: result.categories.self_harm,
                         self_harm_instructions: result.categories.self_harm,
@@ -1152,6 +1154,8 @@ impl ModerationProvider for MistralProvider {
                         insult: false,        // Mistral doesn't have this category
                         toxicity: false,      // Mistral doesn't have this category
                         malicious: false,     // Mistral doesn't have this category
+                        pii: false,           // Mistral doesn't have this category
+                        secrets: false,       // Mistral doesn't have this category
                         ip_violation: false,  // Mistral doesn't have this category
                         hallucination: false, // Mistral doesn't have this category
                     };
@@ -1174,11 +1178,16 @@ impl ModerationProvider for MistralProvider {
                         sexual_minors: result.category_scores.sexual,
                         violence: result.category_scores.violence_and_threats,
                         violence_graphic: result.category_scores.violence_and_threats,
-                        illicit: 0.0,         // Mistral doesn't have this category
-                        illicit_violent: 0.0, // Mistral doesn't have this category
-                        profanity: 0.0,       // Mistral doesn't have this category
-                        insult: 0.0,          // Mistral doesn't have this category
-                        toxicity: 0.0,        // Mistral doesn't have this category
+                        illicit: 0.0,          // Mistral doesn't have this category
+                        illicit_violent: 0.0,  // Mistral doesn't have this category
+                        illegal: 0.0,          // Mistral doesn't have this category
+                        regulated_advice: 0.0, // Mistral doesn't have this category
+                        profanity: 0.0,        // Mistral doesn't have this category
+                        insult: 0.0,           // Mistral doesn't have this category
+                        toxicity: 0.0,         // Mistral doesn't have this category
+                        malicious: 0.0,        // Mistral doesn't have this category
+                        pii: 0.0,
+                        secrets: 0.0,
                     };
 
                     // Determine if content is flagged (any category is true)
@@ -1188,6 +1197,8 @@ impl ModerationProvider for MistralProvider {
                         || categories.harassment_threatening
                         || categories.illicit
                         || categories.illicit_violent
+                        || categories.illegal
+                        || categories.regulated_advice
                         || categories.self_harm
                         || categories.self_harm_intent
                         || categories.self_harm_instructions
@@ -1199,6 +1210,8 @@ impl ModerationProvider for MistralProvider {
                         || categories.insult
                         || categories.toxicity
                         || categories.malicious
+                        || categories.pii
+                        || categories.secrets
                         || categories.ip_violation;
 
                     ModerationResult {

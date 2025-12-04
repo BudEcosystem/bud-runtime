@@ -26,6 +26,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     APP_ICONS,
     EndpointStatusEnum,
@@ -773,6 +774,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             providers["bud_sentinel"] = {
                 "type": "bud_sentinel",
                 "probe_config": {},
+                "endpoint": app_settings.bud_sentinel_base_url,
                 "api_key_location": "none",  # Bud sentinel doesn't require credentials
             }
 
@@ -1356,6 +1358,8 @@ class GuardrailProfileDeploymentService(SessionMixin):
         return GuardrailProfileDetailResponse(
             profile=GuardrailProfileResponse.model_validate(db_profile),
             probe_count=0,
+            deployment_count=0,
+            is_standalone=False,
             message="Profile created successfully",
             code=HTTPStatus.HTTP_201_CREATED,
         )
@@ -1546,14 +1550,15 @@ class GuardrailProfileDeploymentService(SessionMixin):
             # Update the cache after profile update
             await GuardrailDeploymentWorkflowService(self.session).update_guardrail_profile_cache(profile_id)
 
-            # Get probe count
-            db_probe_count = await GuardrailsDeploymentDataManager(self.session).get_count_by_fields(
-                GuardrailProfileProbe, fields={"profile_id": profile_id}
-            )
+            probe_count, deployment_count, is_standalone = await GuardrailsDeploymentDataManager(
+                self.session
+            ).get_profile_counts(profile_id)
 
             return GuardrailProfileDetailResponse(
                 profile=GuardrailProfileResponse.model_validate(updated_profile),
-                probe_count=db_probe_count,
+                probe_count=probe_count,
+                deployment_count=deployment_count,
+                is_standalone=is_standalone,
                 message="Profile updated successfully",
                 code=HTTPStatus.HTTP_200_OK,
             )
@@ -1641,17 +1646,17 @@ class GuardrailProfileDeploymentService(SessionMixin):
 
     async def retrieve_profile(self, profile_id: UUID) -> GuardrailProfileDetailResponse:
         """Retrieve a specific profile by ID."""
-        db_profile = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+        deployment_data_manager = GuardrailsDeploymentDataManager(self.session)
+        db_profile = await deployment_data_manager.retrieve_by_fields(
             GuardrailProfile, {"id": profile_id, "status": GuardrailStatusEnum.ACTIVE}
         )
-
-        db_probe_count = await GuardrailsDeploymentDataManager(self.session).get_count_by_fields(
-            GuardrailProfileProbe, fields={"profile_id": profile_id}
-        )
+        probe_count, deployment_count, is_standalone = await deployment_data_manager.get_profile_counts(profile_id)
 
         return GuardrailProfileDetailResponse(
-            profile=db_profile,
-            probe_count=db_probe_count,
+            profile=GuardrailProfileResponse.model_validate(db_profile),
+            probe_count=probe_count,
+            deployment_count=deployment_count,
+            is_standalone=is_standalone,
             message="Profile retrieved successfully",
             code=HTTPStatus.HTTP_200_OK,
         )

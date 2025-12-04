@@ -67,6 +67,9 @@ pub enum ModerationCategory {
     Illicit,
     #[serde(rename = "illicit/violent")]
     IllicitViolent,
+    Illegal,
+    #[serde(rename = "regulated-advice")]
+    RegulatedAdvice,
     SelfHarm,
     #[serde(rename = "self-harm/intent")]
     SelfHarmIntent,
@@ -84,6 +87,10 @@ pub enum ModerationCategory {
     Toxicity,
     // AWS Comprehend Prompt Safety, Azure Prompt Safety
     Malicious,
+    #[serde(rename = "pii")]
+    PII,
+    #[serde(rename = "secrets")]
+    Secrets,
     // Azure Protect Content
     IPViolation,
     // Groundedness/Hallucination detection
@@ -100,6 +107,8 @@ impl ModerationCategory {
             ModerationCategory::HarassmentThreatening,
             ModerationCategory::Illicit,
             ModerationCategory::IllicitViolent,
+            ModerationCategory::Illegal,
+            ModerationCategory::RegulatedAdvice,
             ModerationCategory::SelfHarm,
             ModerationCategory::SelfHarmIntent,
             ModerationCategory::SelfHarmInstructions,
@@ -111,6 +120,8 @@ impl ModerationCategory {
             ModerationCategory::Insult,
             ModerationCategory::Toxicity,
             ModerationCategory::Malicious,
+            ModerationCategory::PII,
+            ModerationCategory::Secrets,
             ModerationCategory::IPViolation,
             ModerationCategory::Hallucination,
         ]
@@ -125,6 +136,8 @@ impl ModerationCategory {
             ModerationCategory::HarassmentThreatening => "harassment/threatening",
             ModerationCategory::Illicit => "illicit",
             ModerationCategory::IllicitViolent => "illicit/violent",
+            ModerationCategory::Illegal => "illegal",
+            ModerationCategory::RegulatedAdvice => "regulated-advice",
             ModerationCategory::SelfHarm => "self-harm",
             ModerationCategory::SelfHarmIntent => "self-harm/intent",
             ModerationCategory::SelfHarmInstructions => "self-harm/instructions",
@@ -136,6 +149,8 @@ impl ModerationCategory {
             ModerationCategory::Insult => "insult",
             ModerationCategory::Toxicity => "toxicity",
             ModerationCategory::Malicious => "malicious",
+            ModerationCategory::PII => "pii",
+            ModerationCategory::Secrets => "secrets",
             ModerationCategory::IPViolation => "ip-violation",
             ModerationCategory::Hallucination => "hallucination",
         }
@@ -155,6 +170,10 @@ pub struct ModerationCategories {
     pub illicit: bool,
     #[serde(rename = "illicit/violent", default)]
     pub illicit_violent: bool,
+    #[serde(default)]
+    pub illegal: bool,
+    #[serde(rename = "regulated-advice", default)]
+    pub regulated_advice: bool,
     #[serde(rename = "self-harm")]
     pub self_harm: bool,
     #[serde(rename = "self-harm/intent")]
@@ -175,6 +194,10 @@ pub struct ModerationCategories {
     pub toxicity: bool,
     #[serde(default)]
     pub malicious: bool,
+    #[serde(default)]
+    pub pii: bool,
+    #[serde(default)]
+    pub secrets: bool,
     #[serde(rename = "ip-violation", default)]
     pub ip_violation: bool,
     #[serde(default)]
@@ -194,6 +217,10 @@ pub struct ModerationCategoryScores {
     pub illicit: f32,
     #[serde(rename = "illicit/violent", default)]
     pub illicit_violent: f32,
+    #[serde(default)]
+    pub illegal: f32,
+    #[serde(rename = "regulated-advice", default)]
+    pub regulated_advice: f32,
     #[serde(rename = "self-harm")]
     pub self_harm: f32,
     #[serde(rename = "self-harm/intent")]
@@ -212,6 +239,12 @@ pub struct ModerationCategoryScores {
     pub insult: f32,
     #[serde(default)]
     pub toxicity: f32,
+    #[serde(default)]
+    pub malicious: f32,
+    #[serde(default)]
+    pub pii: f32,
+    #[serde(default)]
+    pub secrets: f32,
 }
 
 impl ModerationCategoryScores {
@@ -223,6 +256,8 @@ impl ModerationCategoryScores {
             || self.harassment_threatening > 0.0
             || self.illicit > 0.0
             || self.illicit_violent > 0.0
+            || self.illegal > 0.0
+            || self.regulated_advice > 0.0
             || self.self_harm > 0.0
             || self.self_harm_intent > 0.0
             || self.self_harm_instructions > 0.0
@@ -233,6 +268,9 @@ impl ModerationCategoryScores {
             || self.profanity > 0.0
             || self.insult > 0.0
             || self.toxicity > 0.0
+            || self.malicious > 0.0
+            || self.pii > 0.0
+            || self.secrets > 0.0
     }
 }
 
@@ -255,6 +293,10 @@ pub struct CategoryAppliedInputTypes {
     pub illicit: Vec<String>,
     #[serde(rename = "illicit/violent", default)]
     pub illicit_violent: Vec<String>,
+    #[serde(default)]
+    pub illegal: Vec<String>,
+    #[serde(rename = "regulated-advice", default)]
+    pub regulated_advice: Vec<String>,
     #[serde(rename = "self-harm", default)]
     pub self_harm: Vec<String>,
     #[serde(rename = "self-harm/intent", default)]
@@ -267,6 +309,10 @@ pub struct CategoryAppliedInputTypes {
     pub violence_graphic: Vec<String>,
     #[serde(default)]
     pub malicious: Vec<String>,
+    #[serde(default)]
+    pub pii: Vec<String>,
+    #[serde(default)]
+    pub secrets: Vec<String>,
     #[serde(rename = "ip-violation", default)]
     pub ip_violation: Vec<String>,
     #[serde(default)]
@@ -427,6 +473,11 @@ mod tests {
             ModerationCategory::IllicitViolent.as_str(),
             "illicit/violent"
         );
+        assert_eq!(ModerationCategory::Illegal.as_str(), "illegal");
+        assert_eq!(
+            ModerationCategory::RegulatedAdvice.as_str(),
+            "regulated-advice"
+        );
         assert_eq!(ModerationCategory::SelfHarm.as_str(), "self-harm");
         assert_eq!(
             ModerationCategory::SelfHarmIntent.as_str(),
@@ -447,6 +498,8 @@ mod tests {
         assert_eq!(ModerationCategory::Insult.as_str(), "insult");
         assert_eq!(ModerationCategory::Toxicity.as_str(), "toxicity");
         assert_eq!(ModerationCategory::Malicious.as_str(), "malicious");
+        assert_eq!(ModerationCategory::PII.as_str(), "pii");
+        assert_eq!(ModerationCategory::Secrets.as_str(), "secrets");
         assert_eq!(ModerationCategory::IPViolation.as_str(), "ip-violation");
         assert_eq!(ModerationCategory::Hallucination.as_str(), "hallucination");
     }
@@ -454,13 +507,15 @@ mod tests {
     #[test]
     fn test_moderation_category_all() {
         let all_categories = ModerationCategory::all();
-        assert_eq!(all_categories.len(), 19);
+        assert_eq!(all_categories.len(), 23);
         assert!(all_categories.contains(&ModerationCategory::Hate));
         assert!(all_categories.contains(&ModerationCategory::HateThreatening));
         assert!(all_categories.contains(&ModerationCategory::Harassment));
         assert!(all_categories.contains(&ModerationCategory::HarassmentThreatening));
         assert!(all_categories.contains(&ModerationCategory::Illicit));
         assert!(all_categories.contains(&ModerationCategory::IllicitViolent));
+        assert!(all_categories.contains(&ModerationCategory::Illegal));
+        assert!(all_categories.contains(&ModerationCategory::RegulatedAdvice));
         assert!(all_categories.contains(&ModerationCategory::SelfHarm));
         assert!(all_categories.contains(&ModerationCategory::SelfHarmIntent));
         assert!(all_categories.contains(&ModerationCategory::SelfHarmInstructions));
@@ -472,6 +527,8 @@ mod tests {
         assert!(all_categories.contains(&ModerationCategory::Insult));
         assert!(all_categories.contains(&ModerationCategory::Toxicity));
         assert!(all_categories.contains(&ModerationCategory::Malicious));
+        assert!(all_categories.contains(&ModerationCategory::PII));
+        assert!(all_categories.contains(&ModerationCategory::Secrets));
         assert!(all_categories.contains(&ModerationCategory::IPViolation));
         assert!(all_categories.contains(&ModerationCategory::Hallucination));
     }
@@ -496,6 +553,8 @@ mod tests {
         assert!(!categories.insult);
         assert!(!categories.toxicity);
         assert!(!categories.malicious);
+        assert!(!categories.pii);
+        assert!(!categories.secrets);
         assert!(!categories.ip_violation);
         assert!(!categories.hallucination);
     }
@@ -519,6 +578,9 @@ mod tests {
         assert_eq!(scores.profanity, 0.0);
         assert_eq!(scores.insult, 0.0);
         assert_eq!(scores.toxicity, 0.0);
+        assert_eq!(scores.malicious, 0.0);
+        assert_eq!(scores.pii, 0.0);
+        assert_eq!(scores.secrets, 0.0);
     }
 
     // Tests for ModerationModelConfig have been removed as moderation

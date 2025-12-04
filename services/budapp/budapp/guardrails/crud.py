@@ -440,6 +440,31 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
 
         return tags_result, total_count
 
+    async def get_profile_counts(self, profile_id: UUID) -> Tuple[int, int, bool]:
+        """Return probe count, deployment count, and standalone flag for a profile."""
+        deployment_counts_subquery = (
+            select(
+                func.count(GuardrailDeployment.id).label("deployment_count"),
+                func.count().filter(GuardrailDeployment.endpoint_id.is_(None)).label("standalone_count"),
+            )
+            .where(GuardrailDeployment.profile_id == profile_id)
+            .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+        ).subquery()
+
+        probe_count_subquery = (
+            select(func.count(GuardrailProfileProbe.id)).where(GuardrailProfileProbe.profile_id == profile_id)
+        ).scalar_subquery()
+
+        counts = self.session.execute(
+            select(
+                func.coalesce(probe_count_subquery, 0).label("probe_count"),
+                func.coalesce(deployment_counts_subquery.c.deployment_count, 0).label("deployment_count"),
+                func.coalesce(deployment_counts_subquery.c.standalone_count, 0).label("standalone_count"),
+            ).select_from(deployment_counts_subquery)
+        ).one()
+
+        return counts.probe_count, counts.deployment_count, counts.standalone_count > 0
+
     async def add_profile_with_selections(
         self,
         name: str,
@@ -613,21 +638,34 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         Returns:
             None
         """
-        # Check for active deployments using this profile
-        active_deployment_stmt = (
+        # Check for active (non-deleted) deployments that are linked to endpoints
+        active_endpoint_deployment_stmt = (
             select(func.count(GuardrailDeployment.id))
             .where(GuardrailDeployment.profile_id == profile_id)
+            .where(GuardrailDeployment.endpoint_id.is_not(None))
             .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
         )
-        active_deployment_count = self.session.execute(active_deployment_stmt).scalar()
+        active_endpoint_deployment_count = self.session.execute(active_endpoint_deployment_stmt).scalar()
 
-        if active_deployment_count > 0:
-            logger.error(f"Cannot delete profile {profile_id}: {active_deployment_count} active deployment(s) found")
+        if active_endpoint_deployment_count > 0:
+            logger.error(
+                f"Cannot delete profile {profile_id}: {active_endpoint_deployment_count} active deployment(s) with endpoints found"
+            )
             raise ValueError(
-                f"Cannot delete guardrail profile because it has {active_deployment_count} active deployment(s). Please delete or update the deployments first."
+                f"Cannot delete guardrail profile because it has {active_endpoint_deployment_count} active deployment(s) with endpoints. Please delete or update the deployments first."
             )
 
         try:
+            # Soft delete standalone deployments (no endpoint) before deleting the profile
+            standalone_delete_stmt = (
+                update(GuardrailDeployment)
+                .where(GuardrailDeployment.profile_id == profile_id)
+                .where(GuardrailDeployment.endpoint_id.is_(None))
+                .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+                .values(status=GuardrailDeploymentStatusEnum.DELETED)
+            )
+            self.session.execute(standalone_delete_stmt)
+
             # Soft delete the profile (keep associations for audit trail)
             stmt = (
                 update(GuardrailProfile)
