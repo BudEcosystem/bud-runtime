@@ -136,6 +136,9 @@ class ProgressOverview(BaseModel):
     processing_rate_per_min: int = Field(..., description="Processing rate per minute")
     average_score_pct: float = Field(..., description="Average score percentage")
     eta_minutes: int = Field(..., description="Estimated time to completion in minutes")
+    duration_in_seconds: Optional[float] = Field(
+        None, description="Total duration in seconds (for completed evaluations)"
+    )
     status: str = Field(..., description="Status of the run")
     actions: ProgressActions | None = Field(..., description="Available actions")
 
@@ -1032,3 +1035,127 @@ class ExperimentSummaryResponse(SuccessResponse):
     """Response for experiment summary endpoint."""
 
     summary: ExperimentSummary = Field(..., description="Experiment summary data")
+
+
+# ------------------------ Comparison Schemas ------------------------
+
+
+class ComparisonDeployment(BaseModel):
+    """Deployment available for comparison."""
+
+    id: UUID4 = Field(..., description="Endpoint/deployment ID")
+    endpoint_name: str = Field(..., description="Deployment name")
+    model_id: UUID4 = Field(..., description="Model ID")
+    model_name: str = Field(..., description="Model name")
+    model_icon: Optional[str] = Field(None, description="Model icon URL")
+    experiment_count: int = Field(..., description="Number of experiments using this deployment")
+    run_count: int = Field(..., description="Total completed runs for this deployment")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class ListComparisonDeploymentsResponse(PaginatedSuccessResponse):
+    """Response for listing deployments available for comparison."""
+
+    deployments: List[ComparisonDeployment] = Field(..., description="List of deployments available for comparison")
+
+
+class ComparisonTrait(BaseModel):
+    """Trait available for comparison filtering."""
+
+    id: UUID4 = Field(..., description="Trait ID")
+    name: str = Field(..., description="Trait name")
+    icon: Optional[str] = Field(None, description="Trait icon")
+    description: Optional[str] = Field(None, description="Trait description")
+    dataset_count: int = Field(..., description="Number of datasets with this trait")
+    run_count: int = Field(..., description="Number of completed runs with this trait")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class ListComparisonTraitsResponse(SuccessResponse):
+    """Response for listing traits for comparison filtering."""
+
+    traits: List[ComparisonTrait] = Field(..., description="List of traits")
+    total_count: int = Field(..., description="Total number of traits")
+
+
+class TraitScoreItem(BaseModel):
+    """Score for a single trait."""
+
+    trait_id: UUID4 = Field(..., description="Trait ID")
+    trait_name: str = Field(..., description="Trait name")
+    score: float = Field(..., description="Best score for this trait (0-100)")
+    run_count: int = Field(..., description="Number of runs contributing to this score")
+
+
+class DeploymentRadarData(BaseModel):
+    """Radar data for a single deployment."""
+
+    deployment_id: UUID4 = Field(..., description="Endpoint/deployment ID")
+    deployment_name: str = Field(..., description="Deployment name")
+    model_name: str = Field(..., description="Model name")
+    color: str = Field(..., description="Hex color for visualization")
+    trait_scores: List[TraitScoreItem] = Field(..., description="Scores per trait")
+
+
+class RadarTraitInfo(BaseModel):
+    """Trait info for radar chart axis labels."""
+
+    id: UUID4 = Field(..., description="Trait ID")
+    name: str = Field(..., description="Trait name")
+    icon: Optional[str] = Field(None, description="Trait icon")
+
+
+class RadarChartResponse(SuccessResponse):
+    """Response for radar chart data."""
+
+    traits: List[RadarTraitInfo] = Field(..., description="List of traits for axis labels")
+    deployments: List[DeploymentRadarData] = Field(..., description="Radar data per deployment")
+
+
+class DatasetScoreCell(BaseModel):
+    """Score for a single dataset cell in heatmap."""
+
+    dataset_id: UUID4 = Field(..., description="Dataset ID")
+    dataset_name: str = Field(..., description="Dataset name")
+    score: Optional[float] = Field(None, description="Score (null if no data)")
+    run_count: int = Field(0, description="Number of runs averaged")
+
+
+class DeploymentHeatmapData(BaseModel):
+    """Heatmap data for a single deployment."""
+
+    deployment_id: UUID4 = Field(..., description="Endpoint/deployment ID")
+    deployment_name: str = Field(..., description="Deployment name")
+    model_name: str = Field(..., description="Model name")
+    dataset_scores: List[DatasetScoreCell] = Field(..., description="Scores per dataset")
+
+
+class HeatmapDatasetInfo(BaseModel):
+    """Dataset info for heatmap column headers."""
+
+    id: UUID4 = Field(..., description="Dataset ID")
+    name: str = Field(..., description="Dataset name")
+
+
+class HeatmapStats(BaseModel):
+    """Statistics for heatmap color scaling."""
+
+    min_score: float = Field(..., description="Minimum score across all cells")
+    max_score: float = Field(..., description="Maximum score across all cells")
+    avg_score: float = Field(..., description="Average score across all cells")
+
+
+class HeatmapChartResponse(SuccessResponse):
+    """Response for heatmap chart data."""
+
+    datasets: List[HeatmapDatasetInfo] = Field(..., description="List of datasets for column headers")
+    deployments: List[DeploymentHeatmapData] = Field(..., description="Heatmap data per deployment")
+    stats: HeatmapStats = Field(..., description="Statistics for color scaling")

@@ -16,7 +16,7 @@ from ..commons.constants import ClusterNodeTypeEnum, ClusterPlatformEnum, Cluste
 
 if TYPE_CHECKING:
     from ..benchmark_ops.models import BenchmarkSchema
-    from ..deployment.models import WorkerInfo
+    from ..deployment.models import Deployment, WorkerInfo
 
 
 class Cluster(PSQLBase, TimestampMixin):
@@ -57,6 +57,7 @@ class Cluster(PSQLBase, TimestampMixin):
 
     nodes: Mapped[list["ClusterNodeInfo"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
     workers: Mapped[list["WorkerInfo"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
+    deployments: Mapped[list["Deployment"]] = relationship(back_populates="cluster", cascade="all, delete-orphan")
     benchmarks: Mapped[list["BenchmarkSchema"]] = relationship(back_populates="cluster")
 
     @hybrid_property
