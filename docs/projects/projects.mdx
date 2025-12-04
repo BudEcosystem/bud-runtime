@@ -92,27 +92,29 @@ Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and 
 
 ### 4.2 Create a project
 
-1. Click + Project on the Projects grid (or the header button on the detail list).
+1. Click + Project button on the Projects listing.
 2. Enter Project Name, Description, optional Icon, and Tags.
-3. Submit to add the project to the catalog; it appears in the grid with deployment and member counts.
+3. Proceed to the Invite members step and add collaborators with Project view or manage scopes.
+3. Submit to add the project to the catalog; it appears in the listing with deployment and member counts.
 
 ### 4.3 Edit project metadata
 
 1. Open a project detail page.
-2. Click **Edit** in the header actions.
+2. Click Edit in the header actions.
 3. Update name, description, icon, or tags, then save to refresh the header and grid card.
 
 ### 4.4 Share a project and manage members
 
-1. From a project card or detail header, click the **Share** icon.
-2. Add users by email or ID and assign scopes (Project View/Manage, Endpoint View/Manage).
-3. Save invitations; remove members or adjust scopes anytime from the same drawer.
+1. From a project detail page, click the Share icon.
+2. Add users by email or name and assign project scopes (View/Manage).
+3. Send invitations.
+4. Remove members or adjust scopes anytime from the same drawer.
 
 ### 4.5 Delete a project
 
 1. Open the project detail page.
-2. Click **Delete** in header actions.
-3. If deployments are active, pause or delete them as prompted; otherwise confirm deletion to remove the project.
+2. Click \*\*Delete \*\*in header actions.
+3. Confirmation popup is displayed to proceed with deletion. If deployments are active, delete them as prompted to remove the project.
 
 ### 4.6 Review deployments
 
@@ -120,43 +122,50 @@ Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and 
 2. Inspect deployment rows, statuses, and endpoint counts.
 3. Click a deployment row to open its detail page and use the in-page tabs below.
 
-#### 4.6.1 General tab
+#### 4.6.1 Deploy Model
+
+1. In the Deployments tab, click Deploy Model (visible when you have project or endpoint manage permission).
+2. Pick a source for the model (Cloud, Hugging Face, URL, or Disk) and choose the modality/endpoints needed (LLM, embedding, speech, document, or action transformers where supported).
+3. Provide model details, placement, and concurrency/rate-limit preferences, then review validation messages and submit to create the deployment entry in the table.
+3. Use the table search and sort controls to confirm the new deployment appears with the expected status.
+
+#### 4.6.2 General tab
 
 1. Review the model card (click to open model details) and cluster card with tags and resource availability.
 2. Scroll to **Deployment Analysis** for usage, latency, and routing signals.
 3. Use the **Use this model** action (when permitted) to attach the deployment to downstream workflows.
 
-#### 4.6.2 Adapters tab (LoRA-capable engines)
+#### 4.6.3 Adapters tab (LoRA-capable engines)
 
 1. Open **Adapters** (visible when the engine supports LoRA/PEFT).
 2. Click **Add Adapter** to register a new adapter against the deployment; saved adapters appear in the table with status and timestamps.
 3. Use row actions to remove unused adapters; deletion is blocked while an adapter is already deleting.
 
-#### 4.6.3 Workers tab (local deployments)
+#### 4.6.4 Workers tab (local deployments)
 
 1. Open **Workers** (shown for local deployments only).
 2. Filter workers by status or hardware, then click a row to open worker details in a drawer.
 3. Use the worker detail drawer to inspect logs, lifecycle state, and hardware allocation before scaling or troubleshooting.
 
-#### 4.6.4 Settings tab
+#### 4.6.5 Settings tab
 
 1. Open **Settings** to configure rate limits, retries, and fallback chains per deployment.
 2. Toggle **Rate Limit** and choose the algorithm (fixed, sliding, or token bucket), then set per-second/minute/hour quotas and burst size.
 3. Add **Fallback deployment** and **Retry** limits to harden reliability, then **Save** to persist the policy.
 
-#### 4.6.5 Benchmarks tab
+#### 4.6.6 Benchmarks tab
 
 1. Enable dev mode to surface **Benchmarks**.
 2. Review benchmark runs comparing throughput and latency across hardware or adapters for the deployment.
 3. Use results to inform routing weights and autoscaling policies.
 
-#### 4.6.6 Model Evaluations tab
+#### 4.6.7 Model Evaluations tab
 
 1. Enable dev mode to surface **Model Evaluations**.
 2. Inspect evaluation runs, scenario tags, and scores tied to the deployment.
 3. Use the data to validate safety, quality, or regression performance before scaling traffic.
 
-#### 4.6.7 Publish model
+#### 4.6.8 Publish model
 
 1. In the Deployments tab, click Publish on an active row (disabled for deprecated endpoints).
 2. Enter Input cost, Output cost, and Price per token (USD) to publish the endpoint to the Bud customer dashboard so org users can consume it with governed pricing.
