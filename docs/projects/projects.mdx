@@ -147,16 +147,17 @@ Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and 
 3. Filter workers by status or hardware, then click a row to open worker details in a drawer.
 3. Click Add Worker to add a new worker with additional concurrency.
 
-#### 4.6.5 Settings
+#### 4.6.4 Settings
 
 1. Open the deployment detail page and select Settings tab.
 1. View Settings to configure rate limits, retries, and fallback chains per deployment.
 2. Toggle Rate Limit and choose the algorithm (fixed, sliding, or token bucket), then set per-second/minute/hour quotas and burst size.
 3. Add Fallback deployment and Retry limits to harden reliability, then Save to persist the policy.
 
-#### 4.6.6 Benchmarks tab
+#### 4.6.5 Benchmarks
 
-1. Enable dev mode to surface **Benchmarks**.
+1. Open the deployment detail page and select Benchmarks tab.
+1. Enable dev mode to surface Benchmarks.
 2. Review benchmark runs comparing throughput and latency across hardware or adapters for the deployment.
 3. Use results to inform routing weights and autoscaling policies.
 
