@@ -238,3 +238,15 @@ Use the Analytics tab for aggregated metrics and the Observability tab for infer
 **Q5. Are guardrails mandatory?**
 
 Guardrails are optional per project and surfaced in a dedicated tab. Teams can enable them in dev mode to pilot safety policies before enforcing them in production routes.
+
+**Q6. How do I inspect deployment specifics?**
+
+Open a deployment from the **Deployments** tab to reach its detail page, then use **General**, **Adapters** (for LoRA engines), **Workers** (local deployments), **Settings**, **Benchmarks** (dev mode), and **Model Evaluations** (dev mode) to review configuration and performance.
+
+**Q7. How are agents reused across the project?**
+
+The **Agents** tab centralizes prompts/agents so you can edit once and reuse them across routes and apps without duplicating configurations.
+
+**Q8. How do routes get configured for a project?**
+
+Enable dev mode if needed, open the **Routes** tab, and define traffic targets to balance requests between cloud and local deployments within the project.
