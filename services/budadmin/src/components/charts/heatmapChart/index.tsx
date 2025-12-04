@@ -197,6 +197,10 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
           `,
           confine: true, // Keep tooltip within chart container
           formatter: (params: any) => {
+            // Guard against undefined data
+            if (!params.data) {
+              return '';
+            }
             // Handle both wrapped ({value: [x, y, score]}) and unwrapped ([x, y, score]) data formats
             const dataArray = params.data.value || params.data;
             const value = dataArray[2];
@@ -318,6 +322,9 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
               fontSize: cellWidth > 60 ? 11 : 9,
               fontWeight: 500,
               formatter: (params: any) => {
+                if (!params.data) {
+                  return '';
+                }
                 const value = params.data.value ? params.data.value[2] : params.data[2];
                 if (value === null || value === undefined) {
                   return 'N/A';
