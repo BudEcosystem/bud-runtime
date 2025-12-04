@@ -1,10 +1,14 @@
-{ lib, ... }:
+{
+  lib,
+  primaryIp ? "10.177.2.69",
+  ...
+}:
 {
   options.global.budk8s = {
     primaryIp = lib.mkOption {
       type = lib.types.str;
-      example = "10.177.2.69";
-      default = "10.177.2.69";
+      example = "192.168.29.69";
+      default = primaryIp;
     };
   };
 }
