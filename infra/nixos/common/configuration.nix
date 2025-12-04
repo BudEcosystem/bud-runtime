@@ -4,7 +4,6 @@ let
 in
 {
   imports = [
-    ./modules/users.nix
     ./disko.nix
   ];
 
