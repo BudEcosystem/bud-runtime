@@ -1,0 +1,292 @@
+---
+title: "Projects Management"
+description: "Projects module for organizing deployments, teams, analytics, and governance in Bud Admin"
+---
+
+## 1. Description
+
+The Projects module in Bud Admin groups every artifact—models, deployments, routes, analytics, and guardrails—into collaborative workspaces. Each project anchors cloud and local model deployments (Hugging Face, URL-based, and disk-based) so teams can ship GPU-optional GenAI experiences with shared governance, observability, and access control. Projects expose structured tabs for Deployments, Agents, Routes, Analytics, Clusters, Observability, and Guardrails, mirroring the Bud platform’s focus on running production workloads without costly GPU dependence.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. GPU-optional delivery for cloud and local models
+
+Organize cloud endpoints and local checkpoints (Hugging Face, URL, disk) under one project so teams can mix CPU-first inference with burst-to-cloud flexibility inspired by Bud’s GPU-free GenAI approach.
+
+### 2. One workspace for every workflow
+
+Deployments, agents/prompts, routing tables, analytics, clusters, and guardrails live in a single project page—no context switching across tools.
+
+### 3. Granular collaboration and permissions
+
+Project-level view/manage scopes, invitations, and member removal give admins control over who can create, edit, or delete projects, deployments, and routes.
+
+### 4. Governed lifecycle with safety controls
+
+Guardrail tab centralizes safety policies, while project-level delete/edit actions respect active deployment checks to prevent accidental outages.
+
+### 5. Built-in observability and benchmarking
+
+Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and inference timelines so teams can benchmark backends and route traffic confidently.
+
+## 3. Features
+
+### 3.1 Project creation and metadata
+
+- Create projects with names, icons, and descriptions from the global Projects list.
+
+- Tag projects for discovery and filtering. Tags also appear on the project detail header.
+
+- Edit project metadata from the detail page without impacting existing deployments or members.
+
+### 3.2 Member and permission management
+
+- Invite users with scoped permissions (project:view/manage, endpoint:view/manage) and remove them when access changes.
+
+- Share projects from cards or the detail header. Member pills show profile colors and counts for quick visibility.
+
+### 3.3 Deployments tab
+
+- View deployment table scoped to the project, including endpoint counts and status.
+
+- Launch, pause, or delete deployments with permission-aware controls; delete project guarded when deployments are active.
+
+### 3.4 Agents tab
+
+- List agents and prompts tied to the project for reuse across routes and applications.
+
+- Centralize prompt assets beside deployments to keep routing decisions contextual.
+
+### 3.5 Routes tab
+
+- Define and inspect traffic routes (enable via dev mode) to steer workloads across cloud/local backends.
+
+- Keep routing logic close to deployment metadata to simplify rollback or traffic shifting.
+
+### 3.6 Analytics tab
+
+- Pull project metrics (latency, throughput, TTFT, concurrency, queuing) via unified observability adapters.
+
+- Compare average and percentile performance across deployments to guide cost/quality choices.
+
+### 3.7 Clusters tab
+
+- List clusters associated with the project for placement awareness.
+
+- Jump into cluster detail tabs (General, Deployments, Nodes, Analytics in dev mode, Settings) from the project context.
+
+### 3.8 Observability tab
+
+- Review inference events and logs per project to debug behavior without leaving the workspace.
+
+- Surface real-time signals for CPU-first or burst-to-GPU deployments.
+
+### 3.9 Guardrails tab
+
+- Attach and monitor guardrail policies alongside deployments (visible in dev mode).
+
+- Enable or disable guardrails per project to align with compliance needs before enforcing them in routes.
+
+### 3.10 Project deletion safeguards
+
+- Delete action prompts warnings when deployments exist, blocking removal until endpoints are paused or removed.
+
+- Overlay confirmation keeps observability overlays and notifications synchronized with the action result.
+
+## 4. How-to Guides
+
+### 4.1 Accessing the Projects module
+
+1. Log in to Bud Admin.
+
+2. Click **Projects** from the side menu or the home layout shortcut.
+
+3. View the project grid with counts of deployments and member avatars.
+
+### 4.2 Create a project
+
+1. Click **\+ Project** on the Projects grid (or the header button on the detail list).
+
+2. Enter **Project Name**, **Description**, optional **Icon**, and **Tags**.
+
+3. Submit to add the project to the catalog; it appears in the grid with deployment and member counts.
+
+### 4.3 Edit project metadata
+
+1. Open a project detail page.
+
+2. Click **Edit** in the header actions.
+
+3. Update name, description, icon, or tags, then save to refresh the header and grid card.
+
+### 4.4 Share a project and manage members
+
+1. From a project card or detail header, click the **Share** icon.
+
+2. Add users by email or ID and assign scopes (Project View/Manage, Endpoint View/Manage).
+
+3. Save invitations; remove members or adjust scopes anytime from the same drawer.
+
+### 4.5 Delete a project
+
+1. Open the project detail page.
+
+2. Click **Delete** in header actions.
+
+3. If deployments are active, pause or delete them as prompted; otherwise confirm deletion to remove the project.
+
+### 4.6 Review deployments
+
+1. In the project detail page, select the **Deployments** tab.
+
+2. Inspect deployment rows, statuses, and endpoint counts.
+
+3. Click a deployment row to open its detail page and use the in-page tabs below.
+
+#### 4.6.1 General tab
+
+1. Review the model card (click to open model details) and cluster card with tags and resource availability.
+
+2. Scroll to **Deployment Analysis** for usage, latency, and routing signals.
+
+3. Use the **Use this model** action (when permitted) to attach the deployment to downstream workflows.
+
+#### 4.6.2 Adapters tab (LoRA-capable engines)
+
+1. Open **Adapters** (visible when the engine supports LoRA/PEFT).
+
+2. Click **Add Adapter** to register a new adapter against the deployment; saved adapters appear in the table with status and timestamps.
+
+3. Use row actions to remove unused adapters; deletion is blocked while an adapter is already deleting.
+
+#### 4.6.3 Workers tab (local deployments)
+
+1. Open **Workers** (shown for local deployments only).
+
+2. Filter workers by status or hardware, then click a row to open worker details in a drawer.
+
+3. Use the worker detail drawer to inspect logs, lifecycle state, and hardware allocation before scaling or troubleshooting.
+
+#### 4.6.4 Settings tab
+
+1. Open **Settings** to configure rate limits, retries, and fallback chains per deployment.
+
+2. Toggle **Rate Limit** and choose the algorithm (fixed, sliding, or token bucket), then set per-second/minute/hour quotas and burst size.
+
+3. Add **Fallback deployment** and **Retry** limits to harden reliability, then **Save** to persist the policy.
+
+#### 4.6.5 Benchmarks tab (dev mode)
+
+1. Enable dev mode to surface **Benchmarks**.
+
+2. Review benchmark runs comparing throughput and latency across hardware or adapters for the deployment.
+
+3. Use results to inform routing weights and autoscaling policies.
+
+#### 4.6.6 Model Evaluations tab (dev mode)
+
+1. Enable dev mode to surface **Model Evaluations**.
+
+2. Inspect evaluation runs, scenario tags, and scores tied to the deployment.
+
+3. Use the data to validate safety, quality, or regression performance before scaling traffic.
+
+### 4.7 Manage agents and prompts
+
+1. Open the **Agents** tab.
+
+2. Review agent/prompt entries linked to the project.
+
+3. Add or edit prompts to standardize responses across routes and applications.
+
+### 4.8 Configure routes (dev mode)
+
+1. Enable dev mode if required.
+
+2. Open the **Routes** tab.
+
+3. Define or adjust routing targets to balance traffic between cloud and local (Hugging Face, URL, disk) deployments.
+
+### 4.9 Analyze performance
+
+1. Open the **Analytics** tab.
+
+2. Select metrics and filters to view latency, throughput, TTFT, concurrency, or queueing trends.
+
+3. Compare results across deployments to tune autoscaling and cost controls.
+
+### 4.10 Review clusters
+
+1. Open the **Clusters** tab.
+
+2. View clusters associated with the project to understand placement targets.
+
+3. Click a cluster row to open cluster details and navigate the tabs below.
+
+#### 4.10.1 Cluster General tab
+
+1. Review cluster metadata (icon, name, creation date) and aggregated tags.
+
+2. Confirm available vs. total nodes to assess capacity before scheduling deployments.
+
+#### 4.10.2 Cluster Deployments tab
+
+1. Open **Deployments** inside the cluster to see endpoints running on the selected cluster.
+
+2. Use the list to jump back into deployment details or to validate that placement policies are met.
+
+#### 4.10.3 Nodes tab
+
+1. Review the **Nodes** tab for per-node capacity and health visibility.
+
+2. Use node details when debugging placement issues or when planning hardware upgrades.
+
+#### 4.10.4 Cluster Analytics tab (dev mode)
+
+1. Enable dev mode to reveal **Analytics** for the cluster.
+
+2. Inspect time-series performance metrics to catch regressions or saturation before they affect deployments.
+
+#### 4.10.5 Cluster Settings tab
+
+1. Open **Settings** (requires cluster-manage permissions) to configure default storage classes and access modes.
+
+2. Pick the default storage class recommended by the cluster and save access mode preferences to standardize deployments.
+
+### 4.11 Observe inferences
+
+1. Open the **Observability** tab.
+
+2. Browse inference entries and logs scoped to the project.
+
+3. Use signals to debug prompts, guardrails, and routing behavior.
+
+### 4.12 Apply guardrails (dev mode)
+
+1. Open the **Guardrails** tab.
+
+2. Attach or edit guardrail configurations for the project.
+
+3. Enable policies to filter unsafe content before routing traffic to deployments.
+
+## 5. FAQs
+
+**Q1. Can a project mix cloud and local models?**  
+
+Yes. Projects group deployments from cloud APIs and local checkpoints (Hugging Face, URL-based, disk-based) so routing and governance stay consistent across backends.
+
+**Q2. What happens if I try to delete a project with active deployments?**  
+
+Deletion is blocked with a warning until you pause or delete running deployments, preventing accidental outages.
+
+**Q3. How do permissions work for collaborators?**  
+
+Admins can invite members with view or manage scopes for projects and endpoints. Permissions drive which buttons (create, edit, delete, share) appear on list and detail pages.
+
+**Q4. Where can I see performance metrics?**  
+
+Use the Analytics tab for aggregated metrics and the Observability tab for inference-level logs to diagnose latency, TTFT, and throughput issues.
+
+**Q5. Are guardrails mandatory?**  
+
+Guardrails are optional per project and surfaced in a dedicated tab. Teams can enable them in dev mode to pilot safety policies before enforcing them in production routes.
