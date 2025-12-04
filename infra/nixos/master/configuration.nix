@@ -1,5 +1,9 @@
 {
-  imports = [ ../budk8s/configuration.nix ];
+  imports = [
+    ../azure/configuration.nix
+    ../budk8s/configuration.nix
+    ../common/configuration.nix
+  ];
 
   services.k3s = {
     role = "server";

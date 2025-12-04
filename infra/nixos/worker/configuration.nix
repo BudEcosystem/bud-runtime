@@ -4,9 +4,10 @@ let
 in
 {
   imports = [
-    ../budk8s/configuration.nix
     ../azure/configuration.nix
+    ../budk8s/configuration.nix
     ../common/configuration.nix
+    ../dev/configuration.nix
   ];
 
   boot.supportedFilesystems = [ "nfs" ];
