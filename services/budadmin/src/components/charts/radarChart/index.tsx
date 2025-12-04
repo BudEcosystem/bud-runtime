@@ -6,17 +6,9 @@ import React, { useEffect, useRef, useState } from "react";
  * Converts a color string (hex, rgb, rgba) to rgba format with specified opacity
  */
 const colorToRgba = (color: string, opacity: number): string => {
-  // Handle rgba - replace the alpha value
-  if (color.startsWith("rgba")) {
-    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (match) {
-      return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${opacity})`;
-    }
-  }
-
-  // Handle rgb - add alpha
+  // Handle rgb and rgba
   if (color.startsWith("rgb")) {
-    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
     if (match) {
       return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${opacity})`;
     }
@@ -32,13 +24,17 @@ const colorToRgba = (color: string, opacity: number): string => {
         .map((c) => c + c)
         .join("");
     }
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
   }
 
-  // Fallback: return original color with opacity applied via gradient
+  // Fallback for unsupported formats. Log a warning as opacity will not be applied.
+  console.warn(`colorToRgba: Unsupported color format "${color}".`);
   return color;
 };
 
