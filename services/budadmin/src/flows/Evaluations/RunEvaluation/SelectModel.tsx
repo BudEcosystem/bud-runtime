@@ -87,7 +87,7 @@ export default function SelectModelForNewEvaluation() {
   // Handle search - debounced
   useEffect(() => {
     // Don't trigger on initial render (when search is empty)
-    if (search === "" && page === 1 && allEndpoints.length === 0) {
+    if (page === 1 && allEndpoints.length === 0) {
       return;
     }
 

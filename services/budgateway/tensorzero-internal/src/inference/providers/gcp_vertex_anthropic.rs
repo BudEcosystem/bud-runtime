@@ -38,7 +38,7 @@ use super::anthropic::{
 use super::gcp_vertex_gemini::{
     default_api_key_location, parse_shorthand_url, GCPVertexCredentials, ShorthandUrl,
 };
-use super::helpers::{inject_extra_request_data, peek_first_chunk};
+use super::helpers::{handle_reqwest_error, inject_extra_request_data, peek_first_chunk};
 use super::openai::convert_stream_error;
 
 /// Implements a subset of the GCP Vertex Gemini API as documented [here](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/projects.locations.publishers.models/generateContent) for non-streaming
@@ -221,13 +221,11 @@ impl InferenceProvider for GCPVertexAnthropicProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!("Error sending request: {}", DisplayOrDebugGateway::new(e)),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                )
             })?;
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),

@@ -2,7 +2,7 @@
 "use client";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 import { ConfigProvider, Image, Popover, Select, Spin } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 
@@ -35,6 +35,8 @@ import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
+import GeneralTags from "src/flows/components/GeneralTags";
+import { formatDate } from "@/utils/formatDate";
 
 // Interface for GuardRail/Probe data structure
 interface GuardRail {
@@ -59,11 +61,23 @@ interface GuardRail {
 }
 
 function GuardRailCard({ item, index }: { item: any; index: number }) {
-  const { openDrawer, openDrawerWithStep } = useDrawer();
-  const [descriptionPopoverOpen, setDescriptionPopoverOpen] = useState(false);
+  const { openDrawer } = useDrawer();
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const descriptionRef = useRef<HTMLDivElement>(null);
 
-  // Check if description is long enough to need "See more" (approximately 3 lines worth)
-  const needsSeeMore = item.description && item.description.length > 150;
+  // Check if description is actually overflowing using ref
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (descriptionRef.current) {
+        const { scrollHeight, clientHeight } = descriptionRef.current;
+        setIsOverflowing(scrollHeight > clientHeight);
+      }
+    };
+    checkOverflow();
+    // Re-check on window resize
+    window.addEventListener("resize", checkOverflow);
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [item.description]);
 
   const getTypeIcon = (item: any) => {
     // Use uri or type to determine icon
@@ -109,93 +123,101 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
 
   return (
     <div
-      className="flex flex-col bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.5rem] min-h-[280px] group cursor-pointer hover:shadow-[1px_1px_6px_-1px_#2e3036] hover:border-[#757575] transition-all"
+      className="flex flex-col projectCards min-h-[325px] 1680px:min-h-[400px] 2048px:min-h-[475px] border border-[#1F1F1F] rounded-lg cursor-pointer text-[1rem] 1680px:text-[1.1rem]  hover:shadow-[1px_1px_6px_-1px_#2e3036] bg-[#101010] overflow-hidden"
       key={index}
       onClick={() => {
         openDrawer("view-guardrail-details", { guardrail: item });
       }}
     >
-      <div className="flex items-start justify-between mb-[1.25rem]">
-        <div className="flex items-center gap-[1rem]">
-          <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.75rem]">
-            {getTypeIcon(item)}
+      <div className="flex flex-col justify-start pr-[1.5em] pl-[1.5em] pt-[1.6em] h-full">
+        <div className="flex items-start justify-between mb-[1.25rem]">
+          <div className="flex flex-col justify-start gap-[1rem]">
+            <div className="w-[2.4rem] h-[2.4rem] bg-[#1F1F1F] rounded flex items-center justify-center text-[1.75rem]">
+              {getTypeIcon(item)}
+            </div>
+            <div className="flex-1">
+              <Text_11_400_808080>
+                {formatDate(item.created_at)}
+              </Text_11_400_808080>
+              <Text_17_600_FFFFFF className="pt-[.35em] text-wrap	pr-1 truncate-text max-w-[100%]">
+                {item.name}
+              </Text_17_600_FFFFFF>
+              {item.provider && (
+                <Text_12_400_B3B3B3 className="pt-[.35em]">
+                  by {typeof item.provider === 'object' ? item.provider.name : item.provider}
+                </Text_12_400_B3B3B3>
+              )}
+            </div>
           </div>
-          <div className="flex-1">
-            <Text_17_600_FFFFFF className="mb-[0.25rem] line-clamp-1">
-              {item.name}
-            </Text_17_600_FFFFFF>
-            {item.provider && (
-              <Text_12_400_B3B3B3>
-                by {typeof item.provider === 'object' ? item.provider.name : item.provider}
-              </Text_12_400_B3B3B3>
-            )}
-          </div>
-        </div>
-        {item.status && (
-          <div
-            className="w-[10px] h-[10px] rounded-full shrink-0"
-            style={{ backgroundColor: getStatusColor(item.status) }}
-            title={item.status}
-          />
-        )}
-      </div>
-
-      {item.description && (
-        <div className="mb-[1.25rem] relative">
-          <div
-            className="line-clamp-3 overflow-hidden"
-            style={{
-              display: "-webkit-box",
-              WebkitBoxOrient: "vertical",
-              WebkitLineClamp: 3
-            }}
-          >
-            <Text_13_400_B3B3B3 className="leading-[1.4]">
-              {item.description}
-            </Text_13_400_B3B3B3>
-          </div>
-          {needsSeeMore && (
-            <ConfigProvider
-              theme={{
-                token: {
-                  sizePopupArrow: 0,
-                },
-              }}
-            >
-              <Popover
-                content={
-                  <div className="max-w-[400px] p-[1rem] bg-[#111113] border border-[#1F1F1F] rounded-[6px]">
-                    <Text_13_400_B3B3B3 className="leading-[1.4] whitespace-pre-wrap">
-                      {item.description}
-                    </Text_13_400_B3B3B3>
-                  </div>
-                }
-                trigger="click"
-                open={descriptionPopoverOpen}
-                onOpenChange={setDescriptionPopoverOpen}
-                placement="top"
-                rootClassName="guardrail-description-popover"
-                getPopupContainer={(trigger) =>
-                  (trigger.parentNode as HTMLElement) || document.body
-                }
-              >
-                <Text_12_600_EEEEEE
-                  className="cursor-pointer mt-[0.5rem] inline-block hover:text-[#965CDE] transition-colors"
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                  }}
-                >
-                  See more
-                </Text_12_600_EEEEEE>
-              </Popover>
-            </ConfigProvider>
+          {item.status && (
+            <div
+              className="w-[10px] h-[10px] rounded-full shrink-0"
+              style={{ backgroundColor: getStatusColor(item.status) }}
+              title={item.status}
+            />
           )}
         </div>
-      )}
 
-      <div className="flex items-center justify-between mt-auto pt-[1rem] border-t border-[#1F1F1F]">
-        <div className="flex items-center gap-[0.5rem] flex-wrap">
-          {item.tags ? (
+        {item.description && (
+          <div className="relative">
+            <div
+              ref={descriptionRef}
+              className="overflow-hidden"
+              style={{
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: 1
+              }}
+            >
+              <Text_13_400_B3B3B3 className="pt-[.5em] pr-[.45em] text-[0.75em] tracking-[.01em] leading-[150%]">
+                {item.description}
+              </Text_13_400_B3B3B3>
+            </div>
+            {isOverflowing && (
+              <ConfigProvider
+                theme={{
+                  token: {
+                    sizePopupArrow: 0,
+                  },
+                }}
+              >
+                <Popover
+                  content={
+                    <div className="max-w-[300px] p-[1rem] bg-[#111113] border border-[#1F1F1F] rounded-[6px]">
+                      <Text_13_400_B3B3B3 className="leading-[1.4] whitespace-pre-wrap">
+                        {item.description}
+                      </Text_13_400_B3B3B3>
+                    </div>
+                  }
+                  trigger="hover"
+                  placement="top"
+                  rootClassName="guardrail-description-popover"
+                  getPopupContainer={(trigger) =>
+                    (trigger.parentNode as HTMLElement) || document.body
+                  }
+                >
+                  <Text_12_600_EEEEEE
+                    className="cursor-pointer mt-[0.5rem] inline-block hover:text-[#965CDE] transition-colors"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    See more
+                  </Text_12_600_EEEEEE>
+                </Popover>
+              </ConfigProvider>
+            )}
+          </div>
+        )}
+        <div className="flex items-center gap-[0.5rem] flex-wrap py-[1.1rem]">
+          <GeneralTags
+            data={item.tags?.map((tag: { name: string; color?: string }) => ({
+              name: tag.name,
+              color: tag.color || "#EEEEEE",
+            })) || []}
+            limit={2}
+          />
+          {/* {item.tags ? (
             // Use tags from API if available
             <>
               {item.tags.slice(0, 3).map((tag: any, idx: number) => (
@@ -229,13 +251,36 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
                 />
               )}
             </>
-          ) : null}
+          ) : null} */}
         </div>
-        {item.deployments !== undefined && (
-          <Text_12_400_B3B3B3 className="shrink-0">
-            {item.deployments} {item.deployments === 1 ? 'deploy' : 'deploys'}
-          </Text_12_400_B3B3B3>
-        )}
+      </div>
+      <div className="flex items-center justify-between mt-auto pt-[1.1rem] pr-[1.5em] pl-[1.5em] pb-[1.45em] bg-[#161616]">
+        <div className="flex justify-start items-center gap-[0.5rem]">
+          <Text_13_400_B3B3B3 className="">
+            Guard Types:
+          </Text_13_400_B3B3B3>
+          <div className="flex items-center gap-[0.25rem] flex-wrap">
+            {item.guard_types && item.guard_types.length > 0 ? (
+              <>
+                {item.guard_types.slice(0, 2).map((type: string) => (
+                  <Tags
+                    name={type}
+                    color="#EEEEEE"
+                    key={type}
+                  />
+                ))}
+                {item.guard_types.length > 2 && (
+                  <Tags
+                    name={`+${item.guard_types.length - 2}`}
+                    color="#EEEEEE"
+                  />
+                )}
+              </>
+            ) : (
+              <Text_12_400_B3B3B3>-</Text_12_400_B3B3B3>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -354,8 +399,13 @@ export default function GuardRails() {
   // Local state for main listing page probes
   const [probes, setProbes] = useState<any[]>([]);
   const [probesLoading, setProbesLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [totalProbes, setTotalProbes] = useState(0);
   const [totalProbePages, setTotalProbePages] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Ref for infinite scroll sentinel
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // State for guardrails (fallback for when API is not available)
   const [guardRails] = useState<any[]>([]);
@@ -372,11 +422,18 @@ export default function GuardRails() {
   // Local fetch function for main listing page
   const fetchMainPageProbes = useCallback(
     async (params?: any) => {
-      setProbesLoading(true);
+      const isLoadingMore = params?.append === true;
+
+      if (isLoadingMore) {
+        setLoadingMore(true);
+      } else {
+        setProbesLoading(true);
+      }
+
       try {
         const queryParams: any = {
           page: params?.page || 1,
-          page_size: params?.page_size || 20,
+          page_size: params?.page_size || pageSize,
           search: params?.isSearching === true ? true : false, // Add search parameter
         };
 
@@ -399,23 +456,41 @@ export default function GuardRails() {
         });
 
         if (response.data) {
-          setProbes(response.data.probes || []);
+          const newProbes = response.data.probes || [];
+          const totalPages = response.data.total_pages || 0;
+          const currentPageNum = params?.page || 1;
+
+          if (isLoadingMore) {
+            // Append new data to existing probes
+            setProbes((prev) => [...prev, ...newProbes]);
+          } else {
+            // Replace data for initial load or filter changes
+            setProbes(newProbes);
+          }
+
           setTotalProbes(response.data.total_record || 0);
-          setTotalProbePages(response.data.total_pages || 0);
+          setTotalProbePages(totalPages);
+          setHasMore(currentPageNum < totalPages);
         }
       } catch (error: any) {
         // Silently handle error - don't show toast for listing API
         console.error("Failed to fetch probes:", error?.message);
-        setProbes([]);
+        if (!isLoadingMore) {
+          setProbes([]);
+        }
       } finally {
-        setProbesLoading(false);
+        if (isLoadingMore) {
+          setLoadingMore(false);
+        } else {
+          setProbesLoading(false);
+        }
       }
     },
-    []
+    [pageSize]
   );
 
   const load = useCallback(
-    async (filter: GuardRailFilters, isSearching: boolean = false) => {
+    async (filter: GuardRailFilters, isSearching: boolean = false, page: number = 1, append: boolean = false) => {
       if (hasPermission(PermissionEnum.ModelView)) {
         // Determine if we should set search to true
         // Set search: true if we have name search or status filter
@@ -423,9 +498,10 @@ export default function GuardRails() {
 
         // Use local fetch function instead of the hook's fetchProbes
         const params: any = {
-          page: currentPage,
+          page: page,
           page_size: pageSize,
           isSearching: shouldSearch, // Pass the search flag
+          append: append, // For infinite scroll
         };
 
         if (filter.name) {
@@ -451,8 +527,18 @@ export default function GuardRails() {
         await fetchMainPageProbes(params);
       }
     },
-    [hasPermission, currentPage, pageSize, fetchMainPageProbes]
+    [hasPermission, pageSize, fetchMainPageProbes]
   );
+
+  // Load more function for infinite scroll
+  const loadMore = useCallback(() => {
+    if (!loadingMore && !probesLoading && hasMore) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      const hasStatusFilter = !!filter.status;
+      load(filter, hasStatusFilter, nextPage, true);
+    }
+  }, [loadingMore, probesLoading, hasMore, currentPage, filter, load]);
 
   const handleOpenChange = (open: boolean) => {
     setFilterOpen(open);
@@ -463,9 +549,10 @@ export default function GuardRails() {
     setFilterOpen(false);
     setFilter(tempFilter);
     setCurrentPage(1);
+    setHasMore(true); // Reset hasMore when filters change
     // Check if status filter is applied to determine if it's a search operation
     const hasStatusFilter = !!tempFilter.status;
-    load(tempFilter, hasStatusFilter);
+    load(tempFilter, hasStatusFilter, 1, false);
     setFilterReset(false);
   };
 
@@ -503,23 +590,29 @@ export default function GuardRails() {
 
     const timer = setTimeout(() => {
       if (hasPermission(PermissionEnum.ModelView)) {
+        // Reset pagination when search changes
+        setCurrentPage(1);
+        setHasMore(true);
         // Pass true for isSearching when searching by name
-        load(filter, !!filter.name);
+        load(filter, !!filter.name, 1, false);
       }
     }, 500);
     return () => clearTimeout(timer);
   }, [filter.name, isMounted, loadingUser]);
 
-  // Handle other filter changes (non-search)
+  // Handle other filter changes (non-search) - exclude currentPage to avoid infinite loop
   useEffect(() => {
     if (!isMounted || loadingUser) return;
 
     if (hasPermission(PermissionEnum.ModelView)) {
+      // Reset pagination when filters change
+      setCurrentPage(1);
+      setHasMore(true);
       // Pass true for isSearching when status filter is applied, false for others
       const hasStatusFilter = !!filter.status;
-      load(filter, hasStatusFilter);
+      load(filter, hasStatusFilter, 1, false);
     }
-  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, currentPage, pageSize, isMounted, loadingUser]);
+  }, [filter.provider, filter.guardRailType, filter.modality, filter.status, pageSize, isMounted, loadingUser, hasPermission, load]);
 
   // Initial data fetch - depend on loadingUser to re-run when user permissions load
   useEffect(() => {
@@ -529,9 +622,37 @@ export default function GuardRails() {
 
     // Only fetch when user is loaded and has permission
     if (!loadingUser && hasPermission(PermissionEnum.ModelView)) {
-      fetchMainPageProbes({ page: 1, page_size: 20, isSearching: false });
+      fetchMainPageProbes({ page: 1, page_size: pageSize, isSearching: false });
     }
   }, [loadingUser]);
+
+  // Infinite scroll with IntersectionObserver
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !loadingMore && !probesLoading) {
+          loadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "100px", // Trigger 100px before reaching the sentinel
+        threshold: 0.1,
+      }
+    );
+
+    const sentinel = loadMoreRef.current;
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+
+    return () => {
+      if (sentinel) {
+        observer.unobserve(sentinel);
+      }
+    };
+  }, [hasMore, loadingMore, probesLoading, loadMore]);
   return (
     <DashBoardLayout>
       <div className="boardPageView" id="model-container">
@@ -683,7 +804,7 @@ export default function GuardRails() {
                 <SelectedFilters filters={filter} removeTag={removeSelectedTag} />
               )} */}
               {/* Category Filter Tags */}
-              <div className="flex items-center gap-[0.75rem] mb-[2rem] px-[1.5rem] flex-wrap">
+              <div className="flex items-center gap-[0.75rem] mb-[2rem] flex-wrap">
                 {(() => {
                   // Extract unique tag names from probes
                   const uniqueTags = new Set<string>();
@@ -752,11 +873,23 @@ export default function GuardRails() {
                   });
 
                 return filteredGuardRails.length > 0 ? (
-                  <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem] px-[1.5rem]">
-                    {filteredGuardRails.map((item: any, index: number) => (
-                      <GuardRailCard key={item.id} item={item} index={index} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem]">
+                      {filteredGuardRails.map((item: any, index: number) => (
+                        <GuardRailCard key={item.id} item={item} index={index} />
+                      ))}
+                    </div>
+                    {/* Infinite scroll sentinel */}
+                    <div
+                      ref={loadMoreRef}
+                      className="flex justify-center items-center py-4"
+                    >
+                      {loadingMore && <Spin size="default" />}
+                      {!hasMore && probes.length > 0 && (
+                        <Text_12_400_B3B3B3>No more guardrails to load</Text_12_400_B3B3B3>
+                      )}
+                    </div>
+                  </>
                 ) : (
                   <NoDataFount
                     classNames="h-[50vh]"

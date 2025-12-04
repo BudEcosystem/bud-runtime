@@ -174,7 +174,20 @@ export function randomColor() {
 }
 
 export function checkColor(color: string) {
-  return colourOptions.find((option) => option.value === color);
+  // Return undefined for missing/empty colors (will fallback to default #D1B854)
+  if (!color || color.trim() === "") return undefined;
+
+  // First check if it's a predefined color
+  const predefinedColor = colourOptions.find((option) => option.value === color);
+  if (predefinedColor) return predefinedColor;
+
+  // If not predefined, validate if it's a valid color using chroma.js
+  try {
+    chroma(color);
+    return { value: color, label: "Custom" };
+  } catch {
+    return undefined;
+  }
 }
 
 export function getChromeColor(color: string) {

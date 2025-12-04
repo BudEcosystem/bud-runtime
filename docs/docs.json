@@ -28,8 +28,8 @@
             "group": "Projects",
             "icon": "folder-tree",
             "pages": [
+              "projects/projects",
               "projects/creating-projects",
-              "projects/project-management",
               "projects/project-dashboard",
               "projects/project-settings"
             ]
