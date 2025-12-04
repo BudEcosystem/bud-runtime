@@ -1,7 +1,10 @@
 {
   imports = [
+    ../common/configuration.nix
+    ../dev/configuration.nix
+    ../azure/configuration.nix
+    ../budk8s/configuration.nix
     ../master/configuration.nix
-    ./disko.nix
 
     ./modules/scid.nix
     ./modules/nfs.nix
