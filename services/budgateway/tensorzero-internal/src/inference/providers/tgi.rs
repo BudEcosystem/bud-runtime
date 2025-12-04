@@ -22,7 +22,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 use url::Url;
 
-use super::helpers::inject_extra_request_data;
+use super::helpers::{handle_reqwest_error, inject_extra_request_data};
 use super::openai::{
     convert_stream_error, get_chat_url, prepare_openai_messages, prepare_openai_tools,
     OpenAIRequestMessage, OpenAITool, OpenAIToolChoice, OpenAIToolType, StreamOptions,
@@ -221,16 +221,7 @@ impl InferenceProvider for TGIProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to TGI: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: serde_json::to_string(&request_body).ok(),
-                    raw_response: None,
-                })
+                handle_reqwest_error(e, PROVIDER_TYPE, serde_json::to_string(&request_body).ok())
             })?;
 
         if res.status().is_success() {

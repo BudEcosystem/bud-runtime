@@ -63,7 +63,7 @@ use crate::tool::{ToolCall, ToolCallChunk, ToolChoice, ToolConfig};
 
 use crate::inference::providers::helpers::inject_extra_request_data;
 
-use super::helpers::{parse_jsonl_batch_file, JsonlBatchFileInfo};
+use super::helpers::{handle_reqwest_error, parse_jsonl_batch_file, JsonlBatchFileInfo};
 use super::provider_trait::{TensorZeroEventError, WrappedProvider};
 
 lazy_static! {
@@ -491,18 +491,11 @@ impl InferenceProvider for OpenAIProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         }
         // Actually upload the file to OpenAI
-        let res = request_builder.multipart(form).send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending request to OpenAI: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: None,
-                raw_response: None,
-            })
-        })?;
+        let res = request_builder
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, None))?;
         let text = res.text().await.map_err(|e| {
             Error::new(ErrorDetails::InferenceServer {
                 message: format!(
@@ -634,16 +627,11 @@ impl InferenceProvider for OpenAIProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         }
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending request to OpenAI: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: Some(serde_json::to_string(&batch_request).unwrap_or_default()),
-                raw_response: None,
-            })
+            handle_reqwest_error(
+                e,
+                PROVIDER_TYPE,
+                Some(serde_json::to_string(&batch_request).unwrap_or_default()),
+            )
         })?;
         let text = res.text().await.map_err(|e| {
             Error::new(ErrorDetails::InferenceServer {
@@ -955,18 +943,17 @@ impl AudioTranscriptionProvider for OpenAIProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         }
 
-        let res = request_builder.multipart(form).send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending audio transcription request to OpenAI: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: Some(format!("Audio file: {}", request.filename)),
-                raw_response: None,
-            })
-        })?;
+        let res = request_builder
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| {
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(format!("Audio file: {}", request.filename)),
+                )
+            })?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {

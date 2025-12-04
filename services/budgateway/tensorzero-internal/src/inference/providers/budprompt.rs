@@ -13,6 +13,8 @@ use secrecy::{ExposeSecret, SecretString};
 use std::time::Instant;
 use url::Url;
 
+use super::helpers::handle_reqwest_error;
+
 const PROVIDER_NAME: &str = "BudPrompt";
 const PROVIDER_TYPE: &str = "budprompt";
 
@@ -145,17 +147,11 @@ impl ResponseProvider for BudPromptProvider {
         }
 
         let res = request_builder.json(&request).send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending request to {} Responses API: {}",
-                    PROVIDER_NAME,
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
-                raw_response: None,
-            })
+            handle_reqwest_error(
+                e,
+                PROVIDER_TYPE,
+                Some(serde_json::to_string(&request).unwrap_or_default()),
+            )
         })?;
 
         if res.status().is_success() {
@@ -333,16 +329,7 @@ impl ResponseProvider for BudPromptProvider {
         }
 
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error retrieving response: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: None,
-                raw_response: None,
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, None)
         })?;
 
         if res.status().is_success() {
@@ -406,13 +393,7 @@ impl ResponseProvider for BudPromptProvider {
         }
 
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!("Error deleting response: {}", DisplayOrDebugGateway::new(e)),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: None,
-                raw_response: None,
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, None)
         })?;
 
         if res.status().is_success() {
@@ -476,16 +457,7 @@ impl ResponseProvider for BudPromptProvider {
         }
 
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error cancelling response: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: None,
-                raw_response: None,
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, None)
         })?;
 
         if res.status().is_success() {
@@ -549,16 +521,7 @@ impl ResponseProvider for BudPromptProvider {
         }
 
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error listing response input items: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: None,
-                raw_response: None,
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, None)
         })?;
 
         if res.status().is_success() {
@@ -624,17 +587,11 @@ impl ResponseProvider for BudPromptProvider {
         // Send request WITHOUT modifying the stream parameter
         // BudPrompt will determine response format based on internal prompt config
         let res = request_builder.json(&request).send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending request to {} Responses API: {}",
-                    PROVIDER_NAME,
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
-                raw_response: None,
-            })
+            handle_reqwest_error(
+                e,
+                PROVIDER_TYPE,
+                Some(serde_json::to_string(&request).unwrap_or_default()),
+            )
         })?;
 
         // Check if response is successful
