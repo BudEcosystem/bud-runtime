@@ -118,7 +118,7 @@ const Evaluations = () => {
   }, [searchValue, selectedFilter]);
 
   useEffect(()=> {
-    setActiveTab(router.query?.tab?.toString() || '2');
+    setActiveTab(router.query?.tab?.toString() || '1');
   }, [router])
 
     useEffect(() => {
