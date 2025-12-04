@@ -1382,10 +1382,6 @@ mod tests {
             error_string.contains("300 seconds"),
             "Error should include timeout duration: {error_string}"
         );
-        assert!(
-            error_string.contains("vLLM"),
-            "Error should include provider: {error_string}"
-        );
     }
 
     #[test]
@@ -1411,10 +1407,8 @@ mod tests {
             error_obj.get("timeout_seconds").and_then(|v| v.as_u64()),
             Some(300)
         );
-        assert_eq!(
-            error_obj.get("provider").and_then(|v| v.as_str()),
-            Some("openai")
-        );
+        // Provider name is intentionally not included in user-facing response
+        assert!(error_obj.get("provider").is_none());
         assert!(error_obj
             .get("message")
             .and_then(|v| v.as_str())
