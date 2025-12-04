@@ -29,6 +29,7 @@ interface BenchmarkProgressProps {
     progressTotal?: number;
     canPause?: boolean;
     pauseUrl?: string;
+    duration?: string;
   };
   refreshETA: () => void;
 }
@@ -130,10 +131,16 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refres
                   alt="Logo"
                 />
               </div>
-              <Text_12_400_B3B3B3>ETA</Text_12_400_B3B3B3>
+              <Text_12_400_B3B3B3>{benchmark.status === 'completed' ? 'Duration' : 'ETA'}</Text_12_400_B3B3B3>
             </div>
-            <Text_12_400_EEEEEE>{benchmark.eta}</Text_12_400_EEEEEE>
-            <div className="ml-2 cursor-pointer" onClick={refreshETA}>
+            <Text_12_400_EEEEEE>
+              {benchmark.status === "failed"
+                ? "-"
+                : benchmark.status === "completed"
+                ? benchmark.duration
+                : benchmark.eta}
+            </Text_12_400_EEEEEE>
+            {(!['completed', 'failed'].includes(benchmark.status)) && <div className="ml-2 cursor-pointer" onClick={refreshETA}>
               <div className="w-4 h-4">
               <svg
                 width="100%"
@@ -151,7 +158,7 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refres
                 <path d="M20.49 15a9 9 0 01-14.85 3.36L1 14"></path>
               </svg>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
 
