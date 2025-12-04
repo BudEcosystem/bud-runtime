@@ -2,6 +2,46 @@ import { Box } from "@radix-ui/themes";
 import * as echarts from "echarts";
 import React, { useEffect, useRef, useState } from "react";
 
+/**
+ * Converts a color string (hex, rgb, rgba) to rgba format with specified opacity
+ */
+const colorToRgba = (color: string, opacity: number): string => {
+  // Handle rgba - replace the alpha value
+  if (color.startsWith("rgba")) {
+    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+      return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${opacity})`;
+    }
+  }
+
+  // Handle rgb - add alpha
+  if (color.startsWith("rgb")) {
+    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+      return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${opacity})`;
+    }
+  }
+
+  // Handle hex colors
+  if (color.startsWith("#")) {
+    let hex = color.slice(1);
+    // Expand shorthand (e.g., #fff -> #ffffff)
+    if (hex.length === 3) {
+      hex = hex
+        .split("")
+        .map((c) => c + c)
+        .join("");
+    }
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+
+  // Fallback: return original color with opacity applied via gradient
+  return color;
+};
+
 interface RadarChartProps {
   data: {
     indicators: { name: string; max: number }[];
@@ -115,33 +155,27 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
               </div>`;
           },
         },
-        series: radarChartData.series.map((item: any) => ({
-          name: item.name,
-          type: "radar",
-          symbol: "none",
-          lineStyle: {
-            width: 2,
-            color: item.color || "#7E57C2",
-          },
-          areaStyle: item.areaStyle || {
-            color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-              {
-                color: item.color || "rgba(126, 87, 194, 0.4)",
-                offset: 0,
-              },
-              {
-                color: item.color || "rgba(126, 87, 194, 0.1)",
-                offset: 1,
-              },
-            ]),
-          },
-          data: [
-            {
-              value: item.value,
-              name: item.name,
+        series: radarChartData.series.map((item: any) => {
+          const baseColor = item.color || "#7E57C2";
+          return {
+            name: item.name,
+            type: "radar",
+            symbol: "none",
+            lineStyle: {
+              width: 1,
+              color: baseColor,
             },
-          ],
-        })),
+            areaStyle: item.areaStyle || {
+              color: colorToRgba(baseColor, 0.3),
+            },
+            data: [
+              {
+                value: item.value,
+                name: item.name,
+              },
+            ],
+          };
+        }),
       };
 
       myChart.setOption(option);
