@@ -11,7 +11,7 @@ export const formatTimeToHMS = (seconds: number, format: 'short' | 'default' = '
     if (secs > 0 || (hours === 0 && minutes === 0)) {
       parts.push(`${secs}s`);
     }
-    return parts.length > 0 ? parts.join(' ') : '0s';
+    return parts.join(' ');
   }
   // Format the result as 6h:8m:9s
   return `${hours}h:${minutes}m:${secs}s`;
