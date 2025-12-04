@@ -6,7 +6,7 @@ interface HeatmapChartProps {
   data: {
     xAxis: string[];
     yAxis: string[];
-    data: [number, number, number][]; // [x, y, value]
+    data: [number, number, number | null][]; // [x, y, value] - null indicates missing data
     min?: number;
     max?: number;
     colorRange?: string[];
@@ -15,8 +15,8 @@ interface HeatmapChartProps {
   minCellHeight?: number; // Minimum height for each cell in pixels
 }
 
-// Chevron Right Icon
-const ChevronRight = () => (
+// Chevron Icon with direction prop
+const ChevronIcon = ({ direction }: { direction: "left" | "right" }) => (
   <svg
     width="20"
     height="20"
@@ -25,26 +25,7 @@ const ChevronRight = () => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M9 18L15 12L9 6"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-// Chevron Left Icon
-const ChevronLeft = () => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M15 18L9 12L15 6"
+      d={direction === "right" ? "M9 18L15 12L9 6" : "M15 18L9 12L15 6"}
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
@@ -103,14 +84,23 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - scrollThreshold);
   }, [needsHorizontalScroll]);
 
-  // Initialize scroll indicators after chart renders
+  // Initialize scroll indicators using ResizeObserver for reliable dimension detection
   useEffect(() => {
-    // Small delay to ensure container has proper dimensions
-    const timer = setTimeout(() => {
-      updateScrollIndicators();
-    }, 100);
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-    return () => clearTimeout(timer);
+    const resizeObserver = new ResizeObserver(() => {
+      updateScrollIndicators();
+    });
+
+    resizeObserver.observe(container);
+
+    // Also update when data changes
+    updateScrollIndicators();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [heatmapData, chartDimensions, updateScrollIndicators]);
 
   // Scroll handlers
@@ -207,14 +197,19 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
           `,
           confine: true, // Keep tooltip within chart container
           formatter: (params: any) => {
-            const value = params.data[2];
+            // Handle both wrapped ({value: [x, y, score]}) and unwrapped ([x, y, score]) data formats
+            const dataArray = params.data.value || params.data;
+            const value = dataArray[2];
+            const xIndex = dataArray[0];
+            const yIndex = dataArray[1];
             const displayValue = value !== null && value !== undefined
               ? (typeof value === 'number' ? value.toFixed(2) : value)
               : 'N/A';
+            const valueColor = value === null ? '#666666' : '#8C73C2';
             return `
               <div style="text-align: left;">
-                <strong>${heatmapData.yAxis[params.data[1]]}</strong><br/>
-                ${heatmapData.xAxis[params.data[0]]}: <span style="color: #8C73C2; font-weight: 600;">${displayValue}</span>
+                <strong>${heatmapData.yAxis[yIndex]}</strong><br/>
+                ${heatmapData.xAxis[xIndex]}: <span style="color: ${valueColor}; font-weight: 600;">${displayValue}</span>
               </div>`;
           },
         },
@@ -307,16 +302,28 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
           {
             name: "Heatmap",
             type: "heatmap",
-            data: heatmapData.data,
+            data: heatmapData.data.map((item) => ({
+              value: item,
+              // Use gray color for null/missing data to distinguish from score of 0
+              itemStyle: item[2] === null ? {
+                color: "#2a2a2a",
+                borderRadius: 4,
+                borderWidth: 2,
+                borderColor: "#0A0A0A",
+              } : undefined,
+            })),
             label: {
               show: showLabelsInCells,
               color: "#FFFFFF",
               fontSize: cellWidth > 60 ? 11 : 9,
               fontWeight: 500,
               formatter: (params: any) => {
-                const value = params.data[2];
-                if (value === null || value === undefined || value === 0) {
-                  return '';
+                const value = params.data.value ? params.data.value[2] : params.data[2];
+                if (value === null || value === undefined) {
+                  return 'N/A';
+                }
+                if (value === 0) {
+                  return '0';
                 }
                 return typeof value === 'number' ? value.toFixed(1) : value;
               },
@@ -387,7 +394,7 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
           }}
         >
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1F1F1F] hover:bg-[#2a2a2a] text-[#B3B3B3] hover:text-white transition-colors border border-[#333]">
-            <ChevronLeft />
+            <ChevronIcon direction="left" />
           </div>
         </div>
       )}
@@ -404,7 +411,7 @@ const HeatmapChart: React.FC<HeatmapChartProps> = ({
           }}
         >
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1F1F1F] hover:bg-[#2a2a2a] text-[#B3B3B3] hover:text-white transition-colors border border-[#333]">
-            <ChevronRight />
+            <ChevronIcon direction="right" />
           </div>
         </div>
       )}

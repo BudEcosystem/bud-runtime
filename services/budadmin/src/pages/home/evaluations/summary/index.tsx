@@ -25,6 +25,7 @@ const EvaluationSummary = () => {
     isLoadingRadar,
     isLoadingHeatmap,
     isInitialized,
+    radarData,
     initializeData,
     toggleDeploymentSelection,
     toggleTraitSelection,
@@ -140,11 +141,9 @@ const EvaluationSummary = () => {
                     filteredDeployments.map((deployment) => {
                       const isSelected = selectedDeploymentIds.includes(deployment.id);
                       // Find the color from radar data if available
-                      const deploymentRadarData = useComparisonStore
-                        .getState()
-                        .radarData?.deployments.find(
-                          (d) => d.deployment_id === deployment.id
-                        );
+                      const deploymentRadarData = radarData?.deployments.find(
+                        (d) => d.deployment_id === deployment.id
+                      );
                       const deploymentColor = deploymentRadarData?.color || "#22C55E";
 
                       return (
