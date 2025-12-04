@@ -11,6 +11,10 @@ import HeatmapChart from "@/components/charts/heatmapChart";
 import { useComparisonStore } from "@/stores/useComparisonStore";
 import { assetBaseUrl } from "@/components/environment";
 
+// Gradient styles for sidebar container
+const SIDEBAR_BORDER_GRADIENT = "linear-gradient(180deg, #1F1F1F 0%, #030303 100%)";
+const SIDEBAR_BACKGROUND_GRADIENT = "linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, #0A0A0A 75.77%, #0A0A0A 85%, #121212 100%)";
+
 const EvaluationSummary = () => {
   const [searchValue, setSearchValue] = useState("");
 
@@ -88,9 +92,18 @@ const EvaluationSummary = () => {
         <div className="flex gap-6">
           {/* Left Section - Following Figma specs */}
           <div className="w-[254px] flex-shrink-0">
-            <div className="bg-[#101010] border border-[#1F1F1F] rounded-[8px] p-4 flex flex-col gap-6">
+            {/* Outer wrapper for gradient border */}
+            <div
+              className="rounded-[8px] p-[1px]"
+              style={{ background: SIDEBAR_BORDER_GRADIENT }}
+            >
+              {/* Inner container with background */}
+              <div
+                className="rounded-[7px] p-4 flex flex-col gap-6"
+                style={{ background: SIDEBAR_BACKGROUND_GRADIENT }}
+              >
               {/* Search Section */}
-              <div className="bg-[rgba(255,255,255,0.03)] rounded-[8px] h-[2.125rem] flex items-center px-[10px]">
+              <div className="bg-[rgba(255,255,255,0.03)] rounded-[12px] h-[2.125rem] flex items-center px-[10px]">
                 <div className="flex items-center gap-3 w-full">
                   <div className="w-[14px] h-[14px] opacity-50">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -267,6 +280,7 @@ const EvaluationSummary = () => {
                     })
                   )}
                 </div>
+              </div>
               </div>
             </div>
           </div>
