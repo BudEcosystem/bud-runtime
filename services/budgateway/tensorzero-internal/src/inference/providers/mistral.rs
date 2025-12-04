@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::{
-    helpers::inject_extra_request_data,
+    helpers::{handle_reqwest_error, inject_extra_request_data},
     openai::{
         convert_stream_error, get_chat_url, tensorzero_to_openai_messages, OpenAIFunction,
         OpenAIRequestMessage, OpenAISystemRequestMessage, OpenAITool, OpenAIToolType,
@@ -164,16 +164,11 @@ impl InferenceProvider for MistralProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to Mistral: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                )
             })?;
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
@@ -893,16 +888,11 @@ impl EmbeddingProvider for MistralProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to Mistral: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(raw_request.clone()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(raw_request.clone()),
+                )
             })?;
 
         let latency = Latency::NonStreaming {
@@ -1099,16 +1089,11 @@ impl ModerationProvider for MistralProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to Mistral: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(raw_request.clone()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(raw_request.clone()),
+                )
             })?;
 
         let latency = Latency::NonStreaming {

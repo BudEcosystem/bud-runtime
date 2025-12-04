@@ -27,7 +27,7 @@ use crate::inference::types::{
 use crate::model::{Credential, CredentialLocation, ModelProvider};
 use crate::tool::ToolCallChunk;
 
-use super::helpers::inject_extra_request_data;
+use super::helpers::{handle_reqwest_error, inject_extra_request_data};
 use super::openai::{
     convert_stream_error, get_chat_url, handle_openai_error, prepare_openai_tools,
     tensorzero_to_openai_messages, tensorzero_to_openai_system_message,
@@ -166,16 +166,11 @@ impl InferenceProvider for DeepSeekProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to DeepSeek: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
-                    raw_response: None,
-                    provider_type: PROVIDER_TYPE.to_string(),
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                )
             })?;
 
         if res.status().is_success() {

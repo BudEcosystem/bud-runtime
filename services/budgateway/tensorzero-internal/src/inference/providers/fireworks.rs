@@ -35,7 +35,7 @@ use crate::{
 };
 
 use super::{
-    helpers::inject_extra_request_data,
+    helpers::{handle_reqwest_error, inject_extra_request_data},
     helpers_thinking_block::{process_think_blocks, ThinkingState},
     openai::{
         get_chat_url, handle_openai_error, prepare_openai_tools, tensorzero_to_openai_messages,
@@ -216,16 +216,11 @@ impl InferenceProvider for FireworksProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to Fireworks: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                )
             })?;
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
@@ -434,16 +429,11 @@ impl EmbeddingProvider for FireworksProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to Fireworks: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(raw_request.clone()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(raw_request.clone()),
+                )
             })?;
 
         let status = res.status();
@@ -627,16 +617,11 @@ impl AudioTranscriptionProvider for FireworksProvider {
         let request_builder = client.post(url).bearer_auth(api_key.expose_secret());
 
         let res = request_builder.multipart(form).send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending audio transcription request to Fireworks: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: Some(format!("Audio file: {}", request.filename)),
-                raw_response: None,
-            })
+            handle_reqwest_error(
+                e,
+                PROVIDER_TYPE,
+                Some(format!("Audio file: {}", request.filename)),
+            )
         })?;
 
         let status = res.status();
@@ -771,16 +756,11 @@ impl AudioTranslationProvider for FireworksProvider {
         let request_builder = client.post(url).bearer_auth(api_key.expose_secret());
 
         let res = request_builder.multipart(form).send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                status_code: e.status(),
-                message: format!(
-                    "Error sending audio translation request to Fireworks: {}",
-                    DisplayOrDebugGateway::new(e)
-                ),
-                provider_type: PROVIDER_TYPE.to_string(),
-                raw_request: Some(format!("Audio file: {}", request.filename)),
-                raw_response: None,
-            })
+            handle_reqwest_error(
+                e,
+                PROVIDER_TYPE,
+                Some(format!("Audio file: {}", request.filename)),
+            )
         })?;
 
         let status = res.status();

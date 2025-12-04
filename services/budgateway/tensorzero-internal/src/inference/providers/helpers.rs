@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     error::{DisplayOrDebugGateway, Error, ErrorDetails},
+    gateway_util::DEFAULT_HTTP_CLIENT_TIMEOUT,
     inference::types::{
         batch::{ProviderBatchInferenceOutput, ProviderBatchInferenceResponse},
         extra_body::{FullExtraBodyConfig, InferenceExtraBody},
@@ -17,6 +18,36 @@ use crate::{
     },
     model::{fully_qualified_name, ModelProviderRequestInfo},
 };
+
+/// Converts a reqwest error to the appropriate Error type, detecting timeouts.
+///
+/// This function checks if the error is a timeout using `is_timeout()` and returns
+/// a `ProviderTimeout` error with appropriate details. For other errors, it returns
+/// an `InferenceClient` error.
+pub fn handle_reqwest_error(
+    e: reqwest::Error,
+    provider_type: &str,
+    raw_request: Option<String>,
+) -> Error {
+    if e.is_timeout() {
+        Error::new(ErrorDetails::ProviderTimeout {
+            provider_type: provider_type.to_string(),
+            timeout_secs: DEFAULT_HTTP_CLIENT_TIMEOUT.as_secs(),
+            raw_request,
+        })
+    } else {
+        Error::new(ErrorDetails::InferenceClient {
+            status_code: e.status(),
+            message: format!(
+                "Error sending request: {}",
+                DisplayOrDebugGateway::new(e)
+            ),
+            provider_type: provider_type.to_string(),
+            raw_request,
+            raw_response: None,
+        })
+    }
+}
 
 pub struct JsonlBatchFileInfo {
     pub provider_type: String,

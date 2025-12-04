@@ -32,7 +32,7 @@ use crate::model::{build_creds_caching_default, Credential, CredentialLocation, 
 use crate::tool::{ToolCall, ToolCallChunk, ToolChoice, ToolConfig};
 
 use super::gcp_vertex_gemini::process_output_schema;
-use super::helpers::inject_extra_request_data;
+use super::helpers::{handle_reqwest_error, inject_extra_request_data};
 use super::openai::convert_stream_error;
 
 const PROVIDER_NAME: &str = "Google AI Studio Gemini";
@@ -179,13 +179,11 @@ impl InferenceProvider for GoogleAIStudioGeminiProvider {
             .send()
             .await
             .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!("Error sending request: {}", DisplayOrDebugGateway::new(e)),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&request_body).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&request_body).unwrap_or_default()),
+                )
             })?;
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),

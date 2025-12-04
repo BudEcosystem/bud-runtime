@@ -34,7 +34,7 @@ use crate::inference::types::{
 use crate::model::{build_creds_caching_default, Credential, CredentialLocation, ModelProvider};
 use crate::tool::{ToolCall, ToolCallChunk, ToolChoice, ToolConfig};
 
-use crate::inference::providers::helpers::inject_extra_request_data;
+use crate::inference::providers::helpers::{handle_reqwest_error, inject_extra_request_data};
 
 use super::provider_trait::TensorZeroEventError;
 
@@ -185,18 +185,7 @@ impl InferenceProvider for OpenRouterProvider {
             .headers(headers)
             .send()
             .await
-            .map_err(|e| {
-                Error::new(ErrorDetails::InferenceClient {
-                    status_code: e.status(),
-                    message: format!(
-                        "Error sending request to OpenRouter: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(raw_request.clone()),
-                    raw_response: None,
-                })
-            })?;
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
