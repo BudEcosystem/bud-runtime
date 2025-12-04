@@ -87,9 +87,9 @@ export default function SelectModelForNewEvaluation() {
   // Handle search - debounced
   useEffect(() => {
     // Don't trigger on initial render (when search is empty)
-    if (search === "" && page === 1 && allEndpoints.length === 0) {
-      return;
-    }
+    // if (page === 1 && allEndpoints.length === 0) {
+    //   return;
+    // }
 
     const delayDebounce = setTimeout(() => {
       setPage(1);

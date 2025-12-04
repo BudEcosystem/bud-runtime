@@ -83,6 +83,12 @@ export default function SearchHeaderInput({
       onChange={handleChange}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
       style={{
         width: isExpanded ? (expanded ? "100%" : fullWidth? '' : "19.8125rem") : "1.7rem",
         borderColor: isExpanded ? "#757575" : "transparent",
