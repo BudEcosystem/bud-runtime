@@ -216,7 +216,7 @@ class AppConfig(BaseAppConfig):
     )
 
     # Bud Sentinel
-    bud_sentinel_base_url: Optional[AnyHttpUrl] = Field(default=None, alias="BUD_SENTINEL_BASE_URL")
+    bud_sentinel_base_url: Optional[str] = Field(default=None, alias="BUD_SENTINEL_BASE_URL")
     # MCP Foundry
     mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
     mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
