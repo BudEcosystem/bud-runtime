@@ -10,7 +10,7 @@ in
 
   global.userdata = {
     email = "sinan@bud.studio";
-    domain = "dev.bud.studio";
+    domain = "bud.studio";
   };
 
   sops.defaultSopsFile = lib.mkForce ../${host}/secrets.yaml;
