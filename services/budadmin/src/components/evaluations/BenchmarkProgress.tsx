@@ -134,16 +134,11 @@ const BenchmarkProgress: React.FC<BenchmarkProgressProps> = ({ benchmark, refres
               <Text_12_400_B3B3B3>{benchmark.status === 'completed' ? 'Duration' : 'ETA'}</Text_12_400_B3B3B3>
             </div>
             <Text_12_400_EEEEEE>
-              {(() => {
-                switch (benchmark.status) {
-                  case "failed":
-                    return "-";
-                  case "completed":
-                    return benchmark.duration;
-                  default:
-                    return benchmark.eta;
-                }
-              })()}
+              {benchmark.status === "failed"
+                ? "-"
+                : benchmark.status === "completed"
+                ? benchmark.duration
+                : benchmark.eta}
             </Text_12_400_EEEEEE>
             {(!['completed', 'failed'].includes(benchmark.status)) && <div className="ml-2 cursor-pointer" onClick={refreshETA}>
               <div className="w-4 h-4">
