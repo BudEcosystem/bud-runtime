@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.config.envConfigMapName }}
+  labels:
+    {{- include "onyx.labels" . | nindent 4 }}
+data:
+  INTERNAL_URL: "http://{{ include "onyx.fullname" . }}-api-service:{{ .Values.api.service.port | default 8080 }}"
+  # PostgreSQL host - uses release name pattern (works with parent chart's PostgreSQL)
+  POSTGRES_HOST: {{ .Release.Name }}-postgresql
+  {{- if .Values.vespa.enabled }}
+  VESPA_HOST: {{ .Values.vespa.name }}.{{ .Values.vespa.service.name }}.{{ .Release.Namespace }}.svc.cluster.local
+  {{- end }}
+  # Redis/Valkey host - uses release name pattern (works with parent chart's Valkey)
+  REDIS_HOST: {{ .Release.Name }}-valkey-primary
+  MODEL_SERVER_HOST: "{{ include "onyx.fullname" . }}-inference-model-service"
+  INDEXING_MODEL_SERVER_HOST: "{{ include "onyx.fullname" . }}-indexing-model-service"
+  {{- range $key, $value := .Values.configMap }}
+  {{- if not (empty $value) }}
+  {{ $key }}: {{ tpl $value $ | quote }}
+  {{- end }}
+  {{- end }}
+  # S3/MinIO endpoint - uses release name pattern (works with parent chart's MinIO)
+  S3_ENDPOINT_URL: "http://{{ .Release.Name }}-minio:9000"
