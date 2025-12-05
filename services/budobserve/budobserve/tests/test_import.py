@@ -35,10 +35,11 @@ def test_import_types() -> None:
 
 def test_import_internal_main() -> None:
     """Test that internal main module can be imported."""
-    from budobserve._internal.main import BudObserve, get_budobserve
+    from budobserve._internal.main import BudObserve, configure, get_default_instance
 
     assert BudObserve is not None
-    assert get_budobserve is not None
+    assert configure is not None
+    assert get_default_instance is not None
 
 
 def test_import_internal_config() -> None:
@@ -76,12 +77,12 @@ def test_import_internal_constants() -> None:
     assert constants.GEN_AI_SYSTEM == "gen_ai.system"
 
 
-def test_budobserve_singleton() -> None:
-    """Test that BudObserve follows singleton pattern."""
-    from budobserve._internal.main import BudObserve
+def test_budobserve_default_instance() -> None:
+    """Test that get_default_instance returns same instance."""
+    from budobserve._internal.main import get_default_instance
 
-    instance1 = BudObserve()
-    instance2 = BudObserve()
+    instance1 = get_default_instance()
+    instance2 = get_default_instance()
 
     assert instance1 is instance2
 
@@ -93,9 +94,9 @@ def test_budobserve_config_default() -> None:
     config = BudObserveConfig()
 
     assert config.service_name == "unknown-service"
-    assert config.service_version == "0.0.0"
-    assert config.environment == "development"
+    assert config.service_version is None
+    assert config.environment is None
     assert config.otlp_endpoint is None
     assert config.budmetrics_endpoint is None
-    assert config.enable_console_exporter is False
+    assert config.console_enabled is False
     assert config.scrub_patterns == []
