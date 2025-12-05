@@ -2356,6 +2356,191 @@ class ExperimentService:
             "evaluations": evaluation_results,
         }
 
+    async def get_all_evaluations(
+        self,
+        user_id: uuid.UUID,
+        model_id: Optional[uuid.UUID] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        """Get all evaluations for a user with optional model_id and endpoint_id filters.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the user.
+            model_id (Optional[uuid.UUID]): Optional model ID to filter evaluations.
+            endpoint_id (Optional[uuid.UUID]): Optional endpoint ID to filter evaluations.
+            page (int): Page number for pagination (1-indexed).
+            page_size (int): Number of items per page.
+
+        Returns:
+            dict: Paginated evaluations with their details.
+
+        Raises:
+            HTTPException: If access denied or error occurs.
+        """
+        from budapp.eval_ops.schemas import (
+            AllEvaluationsItem,
+            AllEvaluationsRunItem,
+            EvaluationScore,
+            ModelDetail,
+        )
+
+        # Build base query for evaluations
+        query = (
+            self.session.query(EvaluationModel)
+            .join(ExperimentModel, EvaluationModel.experiment_id == ExperimentModel.id)
+            .filter(
+                ExperimentModel.created_by == user_id,
+                EvaluationModel.status != EvaluationStatusEnum.PENDING.value,
+            )
+        )
+
+        # Apply endpoint_id filter if provided (takes precedence over model_id)
+        if endpoint_id:
+            # Get evaluation IDs that have runs with this endpoint
+            evaluation_ids_with_endpoint = (
+                self.session.query(RunModel.evaluation_id)
+                .filter(
+                    RunModel.endpoint_id == endpoint_id,
+                    RunModel.evaluation_id.isnot(None),
+                )
+                .distinct()
+                .subquery()
+            )
+
+            query = query.filter(EvaluationModel.id.in_(evaluation_ids_with_endpoint))
+
+        # Apply model_id filter if provided (only if endpoint_id is not provided)
+        elif model_id:
+            # Get all endpoint_ids that use this model
+            endpoint_ids_with_model = (
+                self.session.query(EndpointModel.id).filter(EndpointModel.model_id == model_id).subquery()
+            )
+
+            # Get evaluation IDs that have runs with these endpoints
+            evaluation_ids_with_model = (
+                self.session.query(RunModel.evaluation_id)
+                .filter(
+                    RunModel.endpoint_id.in_(endpoint_ids_with_model),
+                    RunModel.evaluation_id.isnot(None),
+                )
+                .distinct()
+                .subquery()
+            )
+
+            query = query.filter(EvaluationModel.id.in_(evaluation_ids_with_model))
+
+        # Get total count
+        total = query.count()
+
+        # Apply pagination
+        offset = (page - 1) * page_size
+        evaluations_db = query.order_by(EvaluationModel.created_at.desc()).offset(offset).limit(page_size).all()
+
+        # Collect evaluation job IDs for batch score fetching
+        evaluation_job_ids = []
+        for eval_db in evaluations_db:
+            # Get runs for this evaluation
+            runs = (
+                self.session.query(RunModel)
+                .filter(
+                    RunModel.evaluation_id == eval_db.id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .all()
+            )
+            for run in runs:
+                eval_job_id = run.config.get("evaluation_job_id") if run.config else None
+                if eval_job_id:
+                    evaluation_job_ids.append((eval_db.id, run.id, eval_job_id))
+
+        # Fetch scores from BudEval in parallel
+        scores_map = {}
+        if evaluation_job_ids:
+            from budapp.eval_ops.budeval_client import BudEvalClient
+
+            client = BudEvalClient()
+            eval_ids = list({job_id for _, _, job_id in evaluation_job_ids})
+            scores_map = await client.fetch_scores_batch(eval_ids)
+
+        # Build response
+        evaluation_results = []
+        for eval_db in evaluations_db:
+            # Get experiment
+            experiment = self.session.get(ExperimentModel, eval_db.experiment_id)
+
+            # Get runs for this evaluation
+            runs = (
+                self.session.query(RunModel)
+                .filter(
+                    RunModel.evaluation_id == eval_db.id,
+                    RunModel.status != RunStatusEnum.DELETED.value,
+                )
+                .order_by(RunModel.run_index)
+                .all()
+            )
+
+            # Get model details from the first run
+            model_detail = ModelDetail(id=uuid.uuid4(), name="Unknown Model", deployment_name=None)
+            traits_list = []
+
+            if runs:
+                first_run = runs[0]
+                model_detail = self.get_endpoint_model_details(first_run.endpoint_id)
+                traits_list = self.get_traits_with_datasets_for_run(first_run.dataset_version_id)
+
+            # Build run items
+            run_items = []
+            scores = None
+            for run in runs:
+                eval_job_id = run.config.get("evaluation_job_id") if run.config else None
+
+                run_items.append(
+                    AllEvaluationsRunItem(
+                        run_id=run.id,
+                        run_index=run.run_index,
+                        status=run.status,
+                        evaluation_job_id=eval_job_id,
+                        created_at=run.created_at,
+                    )
+                )
+
+                # Get scores from first run with scores
+                if not scores and eval_job_id and eval_job_id in scores_map:
+                    score_data = scores_map[eval_job_id]
+                    if score_data:
+                        scores = EvaluationScore(
+                            status="completed" if score_data.get("overall_accuracy") is not None else "running",
+                            overall_accuracy=score_data.get("overall_accuracy"),
+                            datasets=score_data.get("datasets", []),
+                        )
+
+            evaluation_results.append(
+                AllEvaluationsItem(
+                    evaluation_id=eval_db.id,
+                    evaluation_name=eval_db.name,
+                    experiment_id=eval_db.experiment_id,
+                    experiment_name=experiment.name if experiment else "Unknown Experiment",
+                    model=model_detail,
+                    traits=traits_list,
+                    status=eval_db.status,
+                    scores=scores,
+                    runs=run_items,
+                    created_at=eval_db.created_at,
+                    updated_at=eval_db.updated_at,
+                    duration_in_seconds=eval_db.duration_in_seconds,
+                )
+            )
+
+        return {
+            "evaluations": evaluation_results,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size if total > 0 else 0,
+        }
+
     def get_endpoint_model_details(self, endpoint_id: uuid.UUID) -> "ModelDetail":
         """Get detailed model information from endpoint.
 

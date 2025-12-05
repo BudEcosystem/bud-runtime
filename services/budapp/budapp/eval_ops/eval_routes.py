@@ -11,6 +11,7 @@ from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.eval_ops.schemas import (
+    AllEvaluationsResponse,
     ConfigureRunsRequest,
     ConfigureRunsResponse,
     CreateEvalTagResponse,
@@ -1586,6 +1587,78 @@ async def get_experiment_evaluations(
     except Exception as e:
         logger.debug(f"Failed to get experiment evaluations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get experiment evaluations") from e
+
+
+@router.get(
+    "/evaluations/all",
+    response_model=AllEvaluationsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def get_all_evaluations(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    model_id: Annotated[
+        Optional[uuid.UUID],
+        Query(description="Filter evaluations by model ID"),
+    ] = None,
+    endpoint_id: Annotated[
+        Optional[uuid.UUID],
+        Query(description="Filter evaluations by endpoint ID (takes precedence over model_id)"),
+    ] = None,
+    page: Annotated[
+        int,
+        Query(ge=1, description="Page number (1-indexed)"),
+    ] = 1,
+    page_size: Annotated[
+        int,
+        Query(ge=1, le=100, description="Number of items per page"),
+    ] = 20,
+):
+    """Get all evaluations for the current user with optional filtering.
+
+    This endpoint retrieves all evaluations across all experiments for the current user including:
+    - Evaluation details with model, traits, and datasets
+    - Real-time evaluation scores from BudEval service
+    - Runs associated with each evaluation
+
+    The scores are fetched asynchronously from the BudEval service.
+
+    - **model_id**: Optional UUID to filter evaluations by model
+    - **endpoint_id**: Optional UUID to filter evaluations by endpoint (takes precedence over model_id)
+    - **page**: Page number for pagination (1-indexed, default: 1)
+    - **page_size**: Number of items per page (default: 20, max: 100)
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user requesting the evaluations
+
+    Returns an `AllEvaluationsResponse` with paginated evaluations.
+    """
+    try:
+        result = await ExperimentService(session).get_all_evaluations(
+            user_id=current_user.id,
+            model_id=model_id,
+            endpoint_id=endpoint_id,
+            page=page,
+            page_size=page_size,
+        )
+
+        return AllEvaluationsResponse(
+            code=status.HTTP_200_OK,
+            object="evaluations.list",
+            message="Successfully retrieved all evaluations",
+            evaluations=result["evaluations"],
+            total=result["total"],
+            page=result["page"],
+            page_size=result["page_size"],
+            total_pages=result["total_pages"],
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.debug(f"Failed to get all evaluations: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get all evaluations") from e
 
 
 @router.post(

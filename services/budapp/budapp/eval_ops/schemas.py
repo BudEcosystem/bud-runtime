@@ -1159,3 +1159,39 @@ class HeatmapChartResponse(SuccessResponse):
     datasets: List[HeatmapDatasetInfo] = Field(..., description="List of datasets for column headers")
     deployments: List[DeploymentHeatmapData] = Field(..., description="Heatmap data per deployment")
     stats: HeatmapStats = Field(..., description="Statistics for color scaling")
+
+
+# ------------------------ All Evaluations Listing Schemas ------------------------
+
+
+class AllEvaluationsRunItem(BaseModel):
+    """Run information withipass down eval id to be added to model inference Detailsn an evaluation for the all-evaluations listing."""
+
+    run_id: UUID4 = Field(..., description="Run UUID")
+    run_index: int = Field(..., description="Run index within experiment")
+    status: str = Field(..., description="Run status")
+    evaluation_job_id: Optional[str] = Field(None, description="BudEval job ID if evaluation was triggered")
+    created_at: Optional[datetime] = Field(None, description="Run creation timestamp")
+
+
+class AllEvaluationsItem(BaseModel):
+    """A single evaluation item for the all-evaluations listing."""
+
+    evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    evaluation_name: str = Field(..., description="Name of the evaluation")
+    experiment_id: UUID4 = Field(..., description="UUID of the parent experiment")
+    experiment_name: str = Field(..., description="Name of the parent experiment")
+    model: ModelDetail = Field(..., description="Model details for this evaluation")
+    traits: List[TraitWithDatasets] = Field(..., description="Traits with their associated datasets")
+    status: str = Field(..., description="Evaluation status (pending/running/completed/failed)")
+    scores: Optional[EvaluationScore] = Field(None, description="Evaluation scores from BudEval")
+    runs: List[AllEvaluationsRunItem] = Field(default_factory=list, description="Runs in this evaluation")
+    created_at: Optional[datetime] = Field(None, description="Evaluation creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Evaluation update timestamp")
+    duration_in_seconds: Optional[int] = Field(None, description="Evaluation duration in seconds")
+
+
+class AllEvaluationsResponse(PaginatedSuccessResponse):
+    """Response schema for listing all evaluations."""
+
+    evaluations: List[AllEvaluationsItem] = Field(..., description="List of evaluations")
