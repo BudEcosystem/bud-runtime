@@ -333,38 +333,45 @@ export const useComparisonStore = create<ComparisonStore>((set, get) => ({
   initializeData: async () => {
     const { fetchHeatmapData } = get();
 
-    set({ isLoadingRadar: true, radarError: null });
+    set({ isLoadingRadar: true, isLoadingHeatmap: true, radarError: null, heatmapError: null });
 
-    try {
-      // Fetch initial radar data (unfiltered) for sidebar
+    // Fetch radar and heatmap data in parallel for better performance
+    const radarPromise = (async () => {
       const url = `${tempApiBaseUrl}/experiments/compare/radar`;
       const response = await AppRequest.Get(url) as ApiResponse<RadarApiData>;
+      return response;
+    })();
 
-      if (response?.data) {
-        const { traits, deployments } = response.data;
-        const initialData = {
-          traits: traits || [],
-          deployments: deployments || [],
-        };
-        // Store as both sidebarData (permanent) and radarData (for charts)
-        set({
-          sidebarData: initialData,
-          radarData: initialData,
-          isLoadingRadar: false,
-        });
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch radar chart data";
-      console.error("Error fetching initial radar data:", error);
+    const heatmapPromise = fetchHeatmapData();
+
+    const results = await Promise.allSettled([radarPromise, heatmapPromise]);
+
+    // Handle radar result
+    const radarResult = results[0];
+    if (radarResult.status === "fulfilled" && radarResult.value?.data) {
+      const { traits, deployments } = radarResult.value.data;
+      const initialData = {
+        traits: traits || [],
+        deployments: deployments || [],
+      };
+      // Store as both sidebarData (permanent) and radarData (for charts)
+      set({
+        sidebarData: initialData,
+        radarData: initialData,
+        isLoadingRadar: false,
+      });
+    } else if (radarResult.status === "rejected") {
+      const errorMessage = radarResult.reason instanceof Error
+        ? radarResult.reason.message
+        : "Failed to fetch radar chart data";
+      console.error("Error fetching initial radar data:", radarResult.reason);
       message.error("Failed to fetch radar chart data");
       set({ isLoadingRadar: false, radarError: errorMessage });
     }
 
-    // Fetch heatmap data in parallel
-    try {
-      await fetchHeatmapData();
-    } catch (error) {
-      console.error("Failed to initialize heatmap:", error);
+    // Handle heatmap result (fetchHeatmapData already handles its own state)
+    if (results[1].status === "rejected") {
+      console.error("Failed to initialize heatmap:", results[1].reason);
     }
 
     set({ isInitialized: true });
