@@ -142,17 +142,17 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
       const queryParams: PromptsListParams = {
         page: params?.page || state.currentPage,
         limit: params?.limit || state.pageSize,
-        search: hasSearchQuery ? true : false,
+        search: hasSearchQuery ? true : undefined,
         name: hasSearchQuery ? searchQuery : undefined,
         prompt_type: params?.prompt_type || state.selectedType,
         project_id: params?.project_id || state.projectId,
         order_by: params?.order_by || state.orderBy,
       };
 
-      // Remove undefined values and false search when not searching
+      // Remove undefined values
       Object.keys(queryParams).forEach(key => {
         const value = queryParams[key as keyof PromptsListParams];
-        if (value === undefined || value === "" || (key === "search" && value === false)) {
+        if (value === undefined || value === "") {
           delete queryParams[key as keyof PromptsListParams];
         }
       });
