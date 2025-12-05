@@ -13,6 +13,7 @@ import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 import { usePromptsAgents } from "@/stores/usePromptsAgents";
 import { usePrompts } from "src/hooks/usePrompts";
+import { useAddAgent } from "@/stores/useAddAgent";
 
 // Type for agent tags - can be either a string or an object
 type AgentTag = string | { name: string; color?: string };
@@ -22,14 +23,37 @@ export default function AgentEditDrawer() {
   const [form] = Form.useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { fetchPrompts } = usePromptsAgents();
-  const { getPromptVersions, versions, versionsLoading } = usePrompts();
+  const { getPromptVersions, versions } = usePrompts();
+  const { getPromptTags, promptTags } = useAddAgent();
 
-  // State for tag dropdown options only (not form data)
+  // State for tags - both the current value and dropdown options
+  const [tags, setTags] = useState<Tag[]>([]);
   const [tagOptions, setTagOptions] = useState<Tag[]>([]);
+  // Track if tags have been initialized from agent data
+  const [tagsInitialized, setTagsInitialized] = useState(false);
+
+  // Fetch prompt tags on component mount
+  useEffect(() => {
+    getPromptTags();
+  }, [getPromptTags]);
+
+  // Transform promptTags to tagOptions format
+  useEffect(() => {
+    if (promptTags && promptTags.length > 0) {
+      const formattedTags = promptTags.map((tag) => ({
+        name: tag.name,
+        color: tag.color,
+      }));
+      setTagOptions(formattedTags);
+    }
+  }, [promptTags]);
 
   // Initialize form with agent data
   useEffect(() => {
+    // Reset initialization state when agent changes
+    setTagsInitialized(false);
     form.resetFields();
+
     if (drawerProps?.agent) {
       const agent = drawerProps.agent;
 
@@ -42,6 +66,11 @@ export default function AgentEditDrawer() {
             return { name: tag.name, color: tag.color || "#CaCF40" };
           })
         : [];
+
+      // Set local tags state for TagsInput
+      setTags(formattedTags);
+      // Mark tags as initialized so TagsInput renders with correct initial value
+      setTagsInitialized(true);
 
       form.setFieldsValue({
         name: agent.name || "",
@@ -81,7 +110,7 @@ export default function AgentEditDrawer() {
         const payload = {
           name: values.name,
           description: values.description || "",
-          tags: (values.tags || []).map((tag: Tag) => ({
+          tags: tags.map((tag: Tag) => ({
             name: tag.name,
             color: tag.color || "#CaCF40"
           })),
@@ -165,15 +194,20 @@ export default function AgentEditDrawer() {
 
             {/* Tags */}
             <div className="mb-[1.5rem]">
-              <TagsInput
-                label="Tags"
-                options={tagOptions}
-                info="Add keywords to help organize and find your agent later"
-                name="tags"
-                required={false}
-                placeholder=""
-                rules={[]}
-              />
+              {tagsInitialized && (
+                <TagsInput
+                  key={`tags-${drawerProps?.agent?.id}`}
+                  label="Tags"
+                  options={tagOptions}
+                  defaultValue={tags}
+                  onChange={setTags}
+                  info="Add keywords to help organize and find your agent later"
+                  name="tags"
+                  required={false}
+                  placeholder=""
+                  rules={[]}
+                />
+              )}
             </div>
 
             {/* Description */}
