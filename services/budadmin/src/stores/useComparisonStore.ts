@@ -6,28 +6,6 @@ import * as echarts from "echarts";
 
 // ============ Interfaces ============
 
-// Deployment for sidebar
-export interface ComparisonDeployment {
-  id: string;
-  endpoint_name: string;
-  model_id: string;
-  model_name: string;
-  model_display_name: string;
-  model_icon: string | null;
-  experiment_count: number;
-  run_count: number;
-}
-
-// Trait for sidebar checkboxes
-export interface ComparisonTrait {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  dataset_count: number;
-  run_count: number;
-}
-
 // Radar chart data from API
 export interface RadarTraitScore {
   trait_id: string;
@@ -100,17 +78,6 @@ interface ApiResponse<T> {
   data: T;
 }
 
-interface DeploymentsApiData {
-  deployments: ComparisonDeployment[];
-  page: number;
-  limit: number;
-  total_record: number;
-}
-
-interface TraitsApiData {
-  traits: ComparisonTrait[];
-}
-
 interface RadarApiData {
   traits: { id: string; name: string; icon: string }[];
   deployments: RadarDeploymentData[];
@@ -126,12 +93,29 @@ interface HeatmapApiData {
   };
 }
 
+// Sidebar deployment derived from radar data
+export interface SidebarDeployment {
+  id: string;
+  endpoint_name: string;
+  model_name: string;
+  model_display_name: string;
+  model_icon: string | null;
+  color: string;
+}
+
+// Sidebar trait derived from radar data
+export interface SidebarTrait {
+  id: string;
+  name: string;
+  icon: string;
+}
+
 // ============ Store Interface ============
 
 interface ComparisonStore {
-  // Data
-  deployments: ComparisonDeployment[];
-  traits: ComparisonTrait[];
+  // Sidebar data (full list, never filtered)
+  sidebarData: RadarChartResponse | null;
+  // Chart data (filtered based on selections)
   radarData: RadarChartResponse | null;
   heatmapData: HeatmapChartResponse | null;
 
@@ -140,26 +124,15 @@ interface ComparisonStore {
   selectedTraitIds: string[];
 
   // Loading states
-  isLoadingDeployments: boolean;
-  isLoadingTraits: boolean;
   isLoadingRadar: boolean;
   isLoadingHeatmap: boolean;
   isInitialized: boolean;
 
   // Error states
-  deploymentsError: string | null;
-  traitsError: string | null;
   radarError: string | null;
   heatmapError: string | null;
 
-  // Pagination for deployments
-  deploymentsPage: number;
-  deploymentsLimit: number;
-  deploymentsTotal: number;
-
   // Fetch methods
-  fetchDeployments: (page?: number, limit?: number) => Promise<void>;
-  fetchTraits: (deploymentIds?: string[]) => Promise<void>;
   fetchRadarData: (
     deploymentIds?: string[],
     traitIds?: string[],
@@ -185,6 +158,10 @@ interface ComparisonStore {
 
   // Refresh charts based on selections
   refreshCharts: () => Promise<void>;
+
+  // Derived data getters (from radar data)
+  getDeployments: () => SidebarDeployment[];
+  getTraits: () => SidebarTrait[];
 
   // Transformed data getters
   getRadarChartData: () => RadarChartData;
@@ -214,87 +191,19 @@ const defaultHeatmapChartData: HeatmapChartData = {
 
 export const useComparisonStore = create<ComparisonStore>((set, get) => ({
   // Initial state
-  deployments: [],
-  traits: [],
+  sidebarData: null,
   radarData: null,
   heatmapData: null,
 
   selectedDeploymentIds: [],
   selectedTraitIds: [],
 
-  isLoadingDeployments: false,
-  isLoadingTraits: false,
   isLoadingRadar: false,
   isLoadingHeatmap: false,
   isInitialized: false,
 
-  deploymentsError: null,
-  traitsError: null,
   radarError: null,
   heatmapError: null,
-
-  deploymentsPage: 1,
-  deploymentsLimit: 50,
-  deploymentsTotal: 0,
-
-  // Fetch deployments for sidebar
-  fetchDeployments: async (page = 1, limit = 50) => {
-    set({ isLoadingDeployments: true, deploymentsError: null });
-    try {
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      params.append("limit", limit.toString());
-
-      const url = `${tempApiBaseUrl}/experiments/compare/deployments?${params.toString()}`;
-      const response = await AppRequest.Get(url) as ApiResponse<DeploymentsApiData>;
-
-      if (response?.data) {
-        const { deployments, page, limit, total_record } = response.data;
-        set({
-          deployments: deployments || [],
-          deploymentsPage: page || 1,
-          deploymentsLimit: limit || 50,
-          deploymentsTotal: total_record || 0,
-          isLoadingDeployments: false,
-        });
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch deployments";
-      console.error("Error fetching comparison deployments:", error);
-      message.error("Failed to fetch deployments");
-      set({ isLoadingDeployments: false, deploymentsError: errorMessage });
-      throw error;
-    }
-  },
-
-  // Fetch traits for sidebar filters
-  fetchTraits: async (deploymentIds?: string[]) => {
-    set({ isLoadingTraits: true, traitsError: null });
-    try {
-      const params = new URLSearchParams();
-      if (deploymentIds && deploymentIds.length > 0) {
-        params.append("deployment_ids", deploymentIds.join(","));
-      }
-
-      const queryString = params.toString();
-      const url = `${tempApiBaseUrl}/experiments/compare/traits${queryString ? `?${queryString}` : ""}`;
-      const response = await AppRequest.Get(url) as ApiResponse<TraitsApiData>;
-
-      if (response?.data) {
-        const { traits } = response.data;
-        set({
-          traits: traits || [],
-          isLoadingTraits: false,
-        });
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch traits";
-      console.error("Error fetching comparison traits:", error);
-      message.error("Failed to fetch traits");
-      set({ isLoadingTraits: false, traitsError: errorMessage });
-      throw error;
-    }
-  },
 
   // Fetch radar chart data
   fetchRadarData: async (
@@ -423,23 +332,41 @@ export const useComparisonStore = create<ComparisonStore>((set, get) => ({
 
   // Initialize all data on page load
   initializeData: async () => {
-    const { fetchDeployments, fetchTraits, fetchRadarData, fetchHeatmapData } = get();
+    const { fetchHeatmapData } = get();
 
-    // Fetch all data in parallel, allowing partial failures
-    const results = await Promise.allSettled([
-      fetchDeployments(),
-      fetchTraits(),
-      fetchRadarData(),
-      fetchHeatmapData(),
-    ]);
+    set({ isLoadingRadar: true, radarError: null });
 
-    // Log any failures but still mark as initialized
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        const operations = ["deployments", "traits", "radar", "heatmap"];
-        console.error(`Failed to initialize ${operations[index]}:`, result.reason);
+    try {
+      // Fetch initial radar data (unfiltered) for sidebar
+      const url = `${tempApiBaseUrl}/experiments/compare/radar`;
+      const response = await AppRequest.Get(url) as ApiResponse<RadarApiData>;
+
+      if (response?.data) {
+        const { traits, deployments } = response.data;
+        const initialData = {
+          traits: traits || [],
+          deployments: deployments || [],
+        };
+        // Store as both sidebarData (permanent) and radarData (for charts)
+        set({
+          sidebarData: initialData,
+          radarData: initialData,
+          isLoadingRadar: false,
+        });
       }
-    });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch radar chart data";
+      console.error("Error fetching initial radar data:", error);
+      message.error("Failed to fetch radar chart data");
+      set({ isLoadingRadar: false, radarError: errorMessage });
+    }
+
+    // Fetch heatmap data in parallel
+    try {
+      await fetchHeatmapData();
+    } catch (error) {
+      console.error("Failed to initialize heatmap:", error);
+    }
 
     set({ isInitialized: true });
   },
@@ -467,9 +394,42 @@ export const useComparisonStore = create<ComparisonStore>((set, get) => ({
     });
   },
 
+  // Derive deployments from sidebar data (always shows full list)
+  getDeployments: (): SidebarDeployment[] => {
+    const { sidebarData } = get();
+
+    if (!sidebarData || !sidebarData.deployments) {
+      return [];
+    }
+
+    return sidebarData.deployments.map((deployment) => ({
+      id: deployment.deployment_id,
+      endpoint_name: deployment.deployment_name,
+      model_name: deployment.model_name,
+      model_display_name: deployment.deployment_name,
+      model_icon: null, // Not available in radar API
+      color: deployment.color,
+    }));
+  },
+
+  // Derive traits from sidebar data (always shows full list)
+  getTraits: (): SidebarTrait[] => {
+    const { sidebarData } = get();
+
+    if (!sidebarData || !sidebarData.traits) {
+      return [];
+    }
+
+    return sidebarData.traits.map((trait) => ({
+      id: trait.id,
+      name: trait.name,
+      icon: trait.icon,
+    }));
+  },
+
   // Transform radar API response to chart format
   getRadarChartData: (): RadarChartData => {
-    const { radarData } = get();
+    const { radarData, sidebarData } = get();
 
     if (!radarData || !radarData.traits || radarData.traits.length === 0) {
       return defaultRadarChartData;
@@ -482,26 +442,35 @@ export const useComparisonStore = create<ComparisonStore>((set, get) => ({
         name: trait.name,
         max: maxScore,
       })),
-      series: radarData.deployments.map((deployment) => ({
-        name: deployment.deployment_name,
-        value: radarData.traits.map((trait) => {
-          const score = deployment.trait_scores.find((ts) => ts.trait_id === trait.id);
-          return score?.score ?? 0;
-        }),
-        color: deployment.color,
-        areaStyle: {
-          color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-            {
-              color: deployment.color + "66", // 40% opacity
-              offset: 0,
-            },
-            {
-              color: deployment.color + "1A", // 10% opacity
-              offset: 1,
-            },
-          ]),
-        },
-      })),
+      series: radarData.deployments.map((deployment) => {
+        // Use color from sidebarData (original colors) to maintain consistency
+        // The filtered radarData may return different colors based on position
+        const originalDeployment = sidebarData?.deployments.find(
+          (d) => d.deployment_id === deployment.deployment_id
+        );
+        const color = originalDeployment?.color || deployment.color;
+
+        return {
+          name: deployment.deployment_name,
+          value: radarData.traits.map((trait) => {
+            const score = deployment.trait_scores.find((ts) => ts.trait_id === trait.id);
+            return score?.score ?? 0;
+          }),
+          color,
+          areaStyle: {
+            color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
+              {
+                color: color + "66", // 40% opacity
+                offset: 0,
+              },
+              {
+                color: color + "1A", // 10% opacity
+                offset: 1,
+              },
+            ]),
+          },
+        };
+      }),
       showLegend: false,
     };
   },
@@ -539,24 +508,16 @@ export const useComparisonStore = create<ComparisonStore>((set, get) => ({
   // Reset store
   reset: () => {
     set({
-      deployments: [],
-      traits: [],
+      sidebarData: null,
       radarData: null,
       heatmapData: null,
       selectedDeploymentIds: [],
       selectedTraitIds: [],
-      isLoadingDeployments: false,
-      isLoadingTraits: false,
       isLoadingRadar: false,
       isLoadingHeatmap: false,
       isInitialized: false,
-      deploymentsError: null,
-      traitsError: null,
       radarError: null,
       heatmapError: null,
-      deploymentsPage: 1,
-      deploymentsLimit: 50,
-      deploymentsTotal: 0,
     });
   },
 }));
