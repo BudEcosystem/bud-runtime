@@ -1840,16 +1840,12 @@ class GuardrailProfileDeploymentService(SessionMixin):
             ).all()
             endpoint_names = {row.id: row.name for row in endpoint_rows}
 
-        db_deployments_response = []
-        for db_deployment in db_deployments:
-            endpoint_name = None
-            if db_deployment[0].endpoint_id:
-                endpoint_name = endpoint_names.get(db_deployment[0].endpoint_id)
-
-            deployment_response = GuardrailDeploymentResponse.model_validate(db_deployment[0]).model_copy(
-                update={"endpoint_name": endpoint_name}
+        db_deployments_response = [
+            GuardrailDeploymentResponse.model_validate(db_deployment[0]).model_copy(
+                update={"endpoint_name": endpoint_names.get(db_deployment[0].endpoint_id)}
             )
-            db_deployments_response.append(deployment_response)
+            for db_deployment in db_deployments
+        ]
 
         return db_deployments_response, count
 
@@ -1865,11 +1861,9 @@ class GuardrailProfileDeploymentService(SessionMixin):
 
         endpoint_name = None
         if db_deployment.endpoint_id:
-            endpoint_row = self.session.execute(
+            endpoint_name = self.session.execute(
                 select(Endpoint.name).where(Endpoint.id == db_deployment.endpoint_id)
-            ).first()
-            if endpoint_row:
-                endpoint_name = endpoint_row.name
+            ).scalar_one_or_none()
 
         deployment_response = GuardrailDeploymentResponse.model_validate(db_deployment).model_copy(
             update={"endpoint_name": endpoint_name}
