@@ -505,10 +505,10 @@ export default function PromptsAgents() {
             }}
             ButtonIcon={PlusOutlined}
             rightComponent={
-              <div className="flex gap-x-[.2rem] hidden">
+              <div className="flex gap-x-[.2rem]">
                 <SearchHeaderInput
-                  classNames="mr-[.2rem]"
-                  placeholder="Search prompts and agents..."
+                  classNames="mr-[.6rem]"
+                  placeholder="Search agents..."
                   searchValue={filter.name || ""}
                   setSearchValue={(value: string) => {
                     setFilter({ ...filter, name: value });
