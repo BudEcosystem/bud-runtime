@@ -152,7 +152,7 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
           },
         },
         series: radarChartData.series.map((item: any) => {
-          const baseColor = item.color;
+          const baseColor = item.color || "#7E57C2";
           return {
             name: item.name,
             type: "radar",
