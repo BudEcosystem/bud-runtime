@@ -1026,6 +1026,7 @@ class ExperimentService:
         limit: int = 10,
         name: Optional[str] = None,
         unique_id: Optional[str] = None,
+        eval_type: str = "gen",
     ) -> Tuple[List[TraitBasic], int]:
         """List Trait entries with optional filters and pagination.
 
@@ -1034,6 +1035,7 @@ class ExperimentService:
             limit (int): Maximum number of records to return.
             name (Optional[str]): Optional case-insensitive substring filter on trait name.
             unique_id (Optional[str]): Optional exact UUID filter on trait ID.
+            eval_type (str): Eval type filter. 'all' returns traits across every dataset.
 
         Returns:
             Tuple[List[TraitSchema], int]: A tuple of (list of TraitSchema, total count).
@@ -1042,14 +1044,18 @@ class ExperimentService:
             HTTPException(status_code=500): If database query fails.
         """
         try:
-            # Only return traits that have at least one associated dataset with eval_type 'gen'
+            # Only return traits that have at least one associated dataset with the requested eval_type
             q = (
                 self.session.query(TraitModel)
                 .join(PivotModel, TraitModel.id == PivotModel.trait_id)
                 .join(DatasetModel, PivotModel.dataset_id == DatasetModel.id)
-                .filter(DatasetModel.eval_types.op("?")("gen"))  # Filter datasets with 'gen' key in eval_types
-                .distinct()
             )
+
+            selected_eval_type = (eval_type or "gen").lower()
+            if selected_eval_type != "all":
+                q = q.filter(DatasetModel.eval_types.has_key(selected_eval_type))
+
+            q = q.distinct()
 
             # Apply filters
             if name:
@@ -1847,14 +1853,12 @@ class ExperimentService:
                     # Filter by trait UUIDs through the many-to-many relationship
                     q = q.join(DatasetModel.traits).filter(TraitModel.id.in_(filters.trait_ids))
 
-                # Always apply has_gen_eval_type filter (defaults to True in route)
-                if hasattr(filters, "has_gen_eval_type") and filters.has_gen_eval_type is not None:
-                    # Filter by datasets that have 'gen' key in eval_types JSONB field
-                    if filters.has_gen_eval_type:
-                        q = q.filter(DatasetModel.eval_types.has_key("gen"))
-                    else:
-                        # Filter for datasets WITHOUT 'gen' key
-                        q = q.filter(~DatasetModel.eval_types.has_key("gen"))
+                selected_eval_type = getattr(filters, "eval_type", None)
+                if selected_eval_type:
+                    selected_eval_type = selected_eval_type.lower()
+                if selected_eval_type and selected_eval_type != "all":
+                    # Filter by datasets that have the selected eval type key in eval_types JSONB field
+                    q = q.filter(DatasetModel.eval_types.has_key(selected_eval_type))
 
             # Get total count before applying pagination
             total_count = q.count()
