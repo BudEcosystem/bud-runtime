@@ -665,6 +665,10 @@ class DatasetFilter(BaseModel):
     language: Optional[List[str]] = Field(None, description="Filter by languages.")
     domains: Optional[List[str]] = Field(None, description="Filter by domains.")
     trait_ids: Optional[List[UUID4]] = Field(None, description="Filter by trait UUIDs.")
+    eval_type: Optional[str] = Field(
+        None,
+        description="Filter datasets that expose a specific eval type key in eval_types (e.g., gen, ppl, judge).",
+    )
     has_gen_eval_type: Optional[bool] = Field(
         None,
         description="Filter datasets that have 'gen' key in eval_types. True to include only datasets with 'gen' key.",
