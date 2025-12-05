@@ -9,6 +9,11 @@ Configuration follows a priority order:
 1. Explicit programmatic configuration (highest)
 2. Environment variables
 3. Default values (lowest)
+
+Following Logfire's architecture, this module owns:
+- BudObserveConfig class with settings AND provider management
+- configure() module-level function as the main SDK entry point
+- _initialize() method for OTEL provider setup
 """
 
 from __future__ import annotations
@@ -19,12 +24,19 @@ from threading import RLock
 from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
+from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace.sampling import ParentBasedTraceIdRatio
 
+from budobserve._internal.logger import ProxyLoggerProvider
+from budobserve._internal.meter import ProxyMeterProvider
+from budobserve._internal.tracer import ProxyTracerProvider
 from budobserve._internal.version import __version__
 
 if TYPE_CHECKING:
-    pass
+    from budobserve._internal.main import BudObserve
 
 
 def _get_env(
@@ -127,6 +139,11 @@ class BudObserveConfig:
     _initialized: bool = field(default=False, repr=False, compare=False)
     _lock: RLock = field(default_factory=RLock, repr=False, compare=False)
     _instance_id: str = field(default_factory=lambda: uuid4().hex, repr=False)
+
+    # Provider references (owned by config, following Logfire pattern)
+    _tracer_provider: ProxyTracerProvider | None = field(default=None, repr=False, compare=False)
+    _meter_provider: ProxyMeterProvider | None = field(default=None, repr=False, compare=False)
+    _logger_provider: ProxyLoggerProvider | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def from_environment(cls) -> BudObserveConfig:
@@ -248,10 +265,145 @@ class BudObserveConfig:
         """Check if configuration has been initialized."""
         return self._initialized
 
-    def mark_initialized(self) -> None:
-        """Mark the configuration as initialized."""
+    @property
+    def tracer_provider(self) -> ProxyTracerProvider:
+        """Get the proxy tracer provider.
+
+        Creates the provider lazily on first access.
+        """
+        if self._tracer_provider is None:
+            self._tracer_provider = ProxyTracerProvider()
+        return self._tracer_provider
+
+    @property
+    def meter_provider(self) -> ProxyMeterProvider:
+        """Get the proxy meter provider.
+
+        Creates the provider lazily on first access.
+        """
+        if self._meter_provider is None:
+            self._meter_provider = ProxyMeterProvider()
+        return self._meter_provider
+
+    @property
+    def logger_provider(self) -> ProxyLoggerProvider:
+        """Get the proxy logger provider.
+
+        Creates the provider lazily on first access.
+        """
+        if self._logger_provider is None:
+            self._logger_provider = ProxyLoggerProvider()
+        return self._logger_provider
+
+    def configure(
+        self,
+        *,
+        service_name: str | None = None,
+        service_version: str | None = None,
+        environment: str | None = None,
+        otlp_endpoint: str | None = None,
+        budmetrics_endpoint: str | None = None,
+        console_enabled: bool | None = None,
+        console_colors: Literal["auto", "always", "never"] | None = None,
+        sample_rate: float | None = None,
+    ) -> None:
+        """Configure the SDK with the given settings.
+
+        This method updates configuration and initializes OTEL providers.
+        Thread-safe via internal lock.
+
+        Args:
+            service_name: Name of the service for telemetry.
+            service_version: Version of the service.
+            environment: Deployment environment (dev, staging, prod).
+            otlp_endpoint: OTLP exporter endpoint URL.
+            budmetrics_endpoint: BudMetrics endpoint URL.
+            console_enabled: Enable console exporter for debugging.
+            console_colors: Console color mode.
+            sample_rate: Trace sampling rate (0.0 to 1.0).
+        """
         with self._lock:
-            self._initialized = True
+            # Update settings in place (following Logfire pattern)
+            if service_name is not None:
+                self.service_name = service_name
+            if service_version is not None:
+                self.service_version = service_version
+            if environment is not None:
+                self.environment = environment
+            if otlp_endpoint is not None:
+                self.otlp_endpoint = otlp_endpoint
+            if budmetrics_endpoint is not None:
+                self.budmetrics_endpoint = budmetrics_endpoint
+            if console_enabled is not None:
+                self.console_enabled = console_enabled
+            if console_colors is not None:
+                self.console_colors = console_colors
+            if sample_rate is not None:
+                self.sample_rate = sample_rate
+
+            # Initialize providers
+            self._initialize()
+
+    def _initialize(self) -> None:
+        """Initialize the OTEL providers with current configuration.
+
+        Creates SDK providers and sets them on the proxy providers.
+        """
+        # Create resource from config
+        resource = self.create_resource()
+
+        # Create sampler based on sample rate
+        sampler = ParentBasedTraceIdRatio(self.sample_rate)
+
+        # Create the real SDK TracerProvider
+        sdk_tracer_provider = SDKTracerProvider(
+            sampler=sampler,
+            resource=resource,
+        )
+
+        # Add console exporter if enabled
+        if self.console_enabled:
+            console_exporter = ConsoleSpanExporter()
+            sdk_tracer_provider.add_span_processor(BatchSpanProcessor(console_exporter))
+
+        # Set the real provider on our proxy
+        self.tracer_provider.set_provider(sdk_tracer_provider)
+
+        # Set as global OTEL provider
+        otel_trace.set_tracer_provider(self.tracer_provider)
+
+        # Mark as initialized
+        self._initialized = True
+
+    def shutdown(self) -> None:
+        """Shutdown the SDK and flush all pending telemetry.
+
+        Should be called when the application exits.
+        """
+        if self._tracer_provider:
+            self._tracer_provider.shutdown()
+        if self._meter_provider:
+            self._meter_provider.shutdown()
+        if self._logger_provider:
+            self._logger_provider.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Force flush all pending telemetry.
+
+        Args:
+            timeout_millis: Maximum time to wait for flush.
+
+        Returns:
+            True if flush succeeded, False otherwise.
+        """
+        success = True
+        if self._tracer_provider:
+            success = success and self._tracer_provider.force_flush(timeout_millis)
+        if self._meter_provider:
+            success = success and self._meter_provider.force_flush(timeout_millis)
+        if self._logger_provider:
+            success = success and self._logger_provider.force_flush(timeout_millis)
+        return success
 
 
 # Global configuration singleton
@@ -266,3 +418,58 @@ def get_default_config() -> BudObserveConfig:
         The global BudObserveConfig instance.
     """
     return GLOBAL_CONFIG
+
+
+def configure(
+    *,
+    service_name: str | None = None,
+    service_version: str | None = None,
+    environment: str | None = None,
+    otlp_endpoint: str | None = None,
+    budmetrics_endpoint: str | None = None,
+    console: bool | None = None,
+    console_colors: Literal["auto", "always", "never"] | None = None,
+    sample_rate: float | None = None,
+) -> BudObserve:
+    """Configure the global BudObserve SDK instance.
+
+    This is the primary way to initialize BudObserve.
+
+    Args:
+        service_name: Name of the service for telemetry.
+        service_version: Version of the service.
+        environment: Deployment environment (dev, staging, prod).
+        otlp_endpoint: OTLP exporter endpoint URL.
+        budmetrics_endpoint: BudMetrics endpoint URL.
+        console: Enable console exporter for debugging.
+        console_colors: Console color mode.
+        sample_rate: Trace sampling rate (0.0 to 1.0).
+
+    Returns:
+        The configured BudObserve instance.
+
+    Example:
+        >>> import budobserve
+        >>> budobserve.configure(
+        ...     service_name="my-service",
+        ...     environment="production",
+        ...     console=True,
+        ... )
+    """
+    # Import here to avoid circular dependency
+    from budobserve._internal.main import get_default_instance
+
+    # Configure the global config
+    GLOBAL_CONFIG.configure(
+        service_name=service_name,
+        service_version=service_version,
+        environment=environment,
+        otlp_endpoint=otlp_endpoint,
+        budmetrics_endpoint=budmetrics_endpoint,
+        console_enabled=console,
+        console_colors=console_colors,
+        sample_rate=sample_rate,
+    )
+
+    # Return the default BudObserve instance
+    return get_default_instance()

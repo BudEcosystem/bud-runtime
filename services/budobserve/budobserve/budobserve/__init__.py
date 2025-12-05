@@ -26,8 +26,8 @@ Configuration:
         BUDOBSERVE_SAMPLE_RATE / OTEL_TRACES_SAMPLER_ARG: Sample rate
 """
 
-from budobserve._internal.config import GLOBAL_CONFIG, BudObserveConfig
-from budobserve._internal.main import BudObserve, configure, get_default_instance
+from budobserve._internal.config import GLOBAL_CONFIG, BudObserveConfig, configure
+from budobserve._internal.main import BudObserve, get_default_instance
 from budobserve._internal.version import __version__
 
 # Global singleton instance - lazily created on first access

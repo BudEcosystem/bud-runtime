@@ -384,12 +384,12 @@ class TestBudObserveConfig:
         assert attrs["telemetry.sdk.name"] == "budobserve"
         assert "process.pid" in attrs
 
-    def test_mark_initialized(self) -> None:
-        """Test marking config as initialized."""
+    def test_configure_marks_initialized(self) -> None:
+        """Test that configure marks config as initialized."""
         config = BudObserveConfig()
         assert config.is_initialized is False
 
-        config.mark_initialized()
+        config.configure(service_name="test-service")
         assert config.is_initialized is True
 
 
@@ -460,50 +460,66 @@ class TestBudObserve:
         assert instance.config.service_name == "custom-service"
 
     def test_tracer_provider_lazy_init(self) -> None:
-        """Test that tracer_provider is lazily initialized."""
-        instance = BudObserve()
-        assert instance._tracer_provider is None
+        """Test that tracer_provider is lazily initialized via config."""
+        config = BudObserveConfig()
+        assert config._tracer_provider is None
 
         # Access triggers creation
-        provider = instance.tracer_provider
+        provider = config.tracer_provider
         assert isinstance(provider, ProxyTracerProvider)
 
+        # BudObserve delegates to config
+        instance = BudObserve(config=config)
+        assert instance.tracer_provider is provider
+
     def test_meter_provider_lazy_init(self) -> None:
-        """Test that meter_provider is lazily initialized."""
-        instance = BudObserve()
-        assert instance._meter_provider is None
+        """Test that meter_provider is lazily initialized via config."""
+        config = BudObserveConfig()
+        assert config._meter_provider is None
 
         # Access triggers creation
-        provider = instance.meter_provider
+        provider = config.meter_provider
         assert isinstance(provider, ProxyMeterProvider)
 
+        # BudObserve delegates to config
+        instance = BudObserve(config=config)
+        assert instance.meter_provider is provider
+
     def test_logger_provider_lazy_init(self) -> None:
-        """Test that logger_provider is lazily initialized."""
-        instance = BudObserve()
-        assert instance._logger_provider is None
+        """Test that logger_provider is lazily initialized via config."""
+        config = BudObserveConfig()
+        assert config._logger_provider is None
 
         # Access triggers creation
-        provider = instance.logger_provider
+        provider = config.logger_provider
         assert isinstance(provider, ProxyLoggerProvider)
 
-    def test_configure_returns_instance(self) -> None:
-        """Test that configure returns the instance for chaining."""
-        instance = BudObserve()
-        result = instance.configure(service_name="test-service")
-        assert result is instance
+        # BudObserve delegates to config
+        instance = BudObserve(config=config)
+        assert instance.logger_provider is provider
 
-    def test_configure_updates_config(self) -> None:
-        """Test that configure updates configuration."""
-        instance = BudObserve()
-        instance.configure(
+    def test_config_configure_updates_settings(self) -> None:
+        """Test that config.configure updates configuration settings."""
+        config = BudObserveConfig()
+        config.configure(
             service_name="configured-service",
             environment="production",
-            console=True,
+            console_enabled=True,
         )
 
-        assert instance.config.service_name == "configured-service"
-        assert instance.config.environment == "production"
-        assert instance.config.console_enabled is True
+        assert config.service_name == "configured-service"
+        assert config.environment == "production"
+        assert config.console_enabled is True
+        assert config.is_initialized is True
+
+    def test_budobserve_reflects_config_state(self) -> None:
+        """Test that BudObserve reflects config's initialized state."""
+        config = BudObserveConfig()
+        instance = BudObserve(config=config)
+
+        assert instance.is_configured is False
+
+        config.configure(service_name="test-service")
         assert instance.is_configured is True
 
     def test_shutdown(self) -> None:

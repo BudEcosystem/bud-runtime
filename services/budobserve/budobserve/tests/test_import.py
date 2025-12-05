@@ -35,11 +35,17 @@ def test_import_types() -> None:
 
 def test_import_internal_main() -> None:
     """Test that internal main module can be imported."""
-    from budobserve._internal.main import BudObserve, configure, get_default_instance
+    from budobserve._internal.main import BudObserve, get_default_instance
 
     assert BudObserve is not None
-    assert configure is not None
     assert get_default_instance is not None
+
+
+def test_import_internal_config_configure() -> None:
+    """Test that configure is importable from config module."""
+    from budobserve._internal.config import configure
+
+    assert configure is not None
 
 
 def test_import_internal_config() -> None:
