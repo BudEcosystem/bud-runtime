@@ -1350,8 +1350,7 @@ class GuardrailProfileDeploymentService(SessionMixin):
         )
         deployment_counts_result = self.session.execute(deployment_counts_q)
         deployment_counts = {
-            row.profile_id: (row.deployment_count, bool(row.is_standalone))
-            for row in deployment_counts_result.all()
+            row.profile_id: (row.deployment_count, bool(row.is_standalone)) for row in deployment_counts_result.all()
         }
 
         db_profiles_response = []
