@@ -1323,7 +1323,24 @@ class GuardrailProfileDeploymentService(SessionMixin):
             offset, limit, filters, order_by, search
         )
 
-        db_profiles_response = [GuardrailProfileResponse.model_validate(db_profile[0]) for db_profile in db_profiles]
+        deployment_data_manager = GuardrailsDeploymentDataManager(self.session)
+        db_profiles_response = []
+
+        for db_profile in db_profiles:
+            probe_count, deployment_count, is_standalone = await deployment_data_manager.get_profile_counts(
+                db_profile[0].id
+            )
+            db_profiles_response.append(
+                GuardrailProfileResponse.model_validate(
+                    db_profile[0],
+                    update={
+                        "probe_count": probe_count,
+                        "deployment_count": deployment_count,
+                        "is_standalone": is_standalone,
+                    },
+                )
+            )
+
         return db_profiles_response, count
 
     async def create_profile(
@@ -1355,11 +1372,12 @@ class GuardrailProfileDeploymentService(SessionMixin):
             )
         )
 
+        profile_response = GuardrailProfileResponse.model_validate(
+            db_profile, update={"probe_count": 0, "deployment_count": 0, "is_standalone": False}
+        )
+
         return GuardrailProfileDetailResponse(
-            profile=GuardrailProfileResponse.model_validate(db_profile),
-            probe_count=0,
-            deployment_count=0,
-            is_standalone=False,
+            profile=profile_response,
             message="Profile created successfully",
             code=HTTPStatus.HTTP_201_CREATED,
         )
@@ -1554,11 +1572,17 @@ class GuardrailProfileDeploymentService(SessionMixin):
                 self.session
             ).get_profile_counts(profile_id)
 
+            profile_response = GuardrailProfileResponse.model_validate(
+                updated_profile,
+                update={
+                    "probe_count": probe_count,
+                    "deployment_count": deployment_count,
+                    "is_standalone": is_standalone,
+                },
+            )
+
             return GuardrailProfileDetailResponse(
-                profile=GuardrailProfileResponse.model_validate(updated_profile),
-                probe_count=probe_count,
-                deployment_count=deployment_count,
-                is_standalone=is_standalone,
+                profile=profile_response,
                 message="Profile updated successfully",
                 code=HTTPStatus.HTTP_200_OK,
             )
@@ -1652,11 +1676,17 @@ class GuardrailProfileDeploymentService(SessionMixin):
         )
         probe_count, deployment_count, is_standalone = await deployment_data_manager.get_profile_counts(profile_id)
 
+        profile_response = GuardrailProfileResponse.model_validate(
+            db_profile,
+            update={
+                "probe_count": probe_count,
+                "deployment_count": deployment_count,
+                "is_standalone": is_standalone,
+            },
+        )
+
         return GuardrailProfileDetailResponse(
-            profile=GuardrailProfileResponse.model_validate(db_profile),
-            probe_count=probe_count,
-            deployment_count=deployment_count,
-            is_standalone=is_standalone,
+            profile=profile_response,
             message="Profile retrieved successfully",
             code=HTTPStatus.HTTP_200_OK,
         )
