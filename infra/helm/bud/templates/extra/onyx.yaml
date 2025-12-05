@@ -1,0 +1,57 @@
+{{- if .Values.onyx.enabled }}
+# PostgreSQL credentials for Onyx (shared from bud's PostgreSQL)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onyx-postgresql
+  labels:
+    app.kubernetes.io/component: onyx
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+type: Opaque
+data:
+  username: {{ "postgres" | b64enc }}
+  password: {{ .Values.postgresql.auth.postgresPassword | b64enc }}
+---
+# Redis/Valkey credentials for Onyx (shared from bud's Valkey)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onyx-redis
+  labels:
+    app.kubernetes.io/component: onyx
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+type: Opaque
+data:
+  redis_password: {{ .Values.valkey.auth.password | b64enc }}
+---
+# MinIO/S3 credentials for Onyx (shared from bud's MinIO)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onyx-objectstorage
+  labels:
+    app.kubernetes.io/component: onyx
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+type: Opaque
+data:
+  s3_aws_access_key_id: {{ .Values.minio.auth.rootUser | b64enc }}
+  s3_aws_secret_access_key: {{ .Values.minio.auth.rootPassword | b64enc }}
+  rootUser: {{ .Values.minio.auth.rootUser | b64enc }}
+  rootPassword: {{ .Values.minio.auth.rootPassword | b64enc }}
+---
+# OAuth/Keycloak credentials for Onyx
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onyx-oauth
+  labels:
+    app.kubernetes.io/component: onyx
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+type: Opaque
+data:
+  keycloak_admin_password: {{ .Values.keycloak.auth.adminPassword | b64enc }}
+{{- end }}

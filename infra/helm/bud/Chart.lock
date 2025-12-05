@@ -29,5 +29,8 @@ dependencies:
 - name: prometheus-adapter
   repository: https://prometheus-community.github.io/helm-charts
   version: 4.11.0
-digest: sha256:e8d5a5ac53a4615d7f25debcf8fef4f5539945fe596c43367c390602e59569ab
-generated: "2025-12-07T08:15:18.728344572Z"
+- name: onyx
+  repository: file://charts/onyx
+  version: 0.4.4
+digest: sha256:fbcb1d34aac2189c4689495287f249f378750e53fa4ec5960598733b19e23519
+generated: "2026-01-13T06:02:26.345103712Z"

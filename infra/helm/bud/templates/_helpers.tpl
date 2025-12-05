@@ -68,6 +68,13 @@
 {{- printf "mcpgateway.%s" .Values.ingress.hosts.root }}
 {{- end }}
 {{- end }}
+{{- define "bud.ingress.hosts.onyx" -}}
+{{- if .Values.ingress.hosts.onyx }}
+{{- .Values.ingress.hosts.onyx }}
+{{- else }}
+{{- printf "chat.%s" .Values.ingress.hosts.root }}
+{{- end }}
+{{- end }}
 
 {{- define "bud.ingress.url.mcpgateway" -}}
 {{- if ne .Values.ingress.https "disabled" }}
@@ -137,6 +144,13 @@
 {{- printf "https://%s" (include "bud.ingress.hosts.s3" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.s3" $) }}
+{{- end }}
+{{- end }}
+{{- define "bud.ingress.url.onyx" -}}
+{{- if ne .Values.ingress.https "disabled" }}
+{{- printf "https://%s" (include "bud.ingress.hosts.onyx" $) }}
+{{- else }}
+{{- printf "http://%s" (include "bud.ingress.hosts.onyx" $) }}
 {{- end }}
 {{- end }}
 
