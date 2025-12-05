@@ -156,7 +156,8 @@ const RadarChart: React.FC<RadarChartProps> = ({ data }) => {
           return {
             name: item.name,
             type: "radar",
-            symbol: "none",
+            symbol: "circle",
+            color: baseColor,
             lineStyle: {
               width: 1,
               color: baseColor,
