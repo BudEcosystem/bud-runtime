@@ -27,6 +27,7 @@ pub struct AuthMetadata {
     pub api_key_id: Option<String>,
     pub user_id: Option<String>,
     pub api_key_project_id: Option<String>,
+    pub evaluation_id: Option<String>,
 }
 
 pub type APIConfig = HashMap<String, ApiKeyMetadata>;
@@ -340,6 +341,13 @@ pub async fn require_api_key(
                     request
                         .headers_mut()
                         .insert("x-tensorzero-api-key-project-id", header_value);
+                }
+            }
+            if let Some(evaluation_id) = auth_meta.evaluation_id {
+                if let Ok(header_value) = evaluation_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-evaluation-id", header_value);
                 }
             }
         }

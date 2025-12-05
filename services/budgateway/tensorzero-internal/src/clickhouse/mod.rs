@@ -640,6 +640,7 @@ pub struct ModelInferenceDetailsInsert {
     pub api_key_id: Option<uuid::Uuid>,
     pub user_id: Option<uuid::Uuid>,
     pub api_key_project_id: Option<uuid::Uuid>,
+    pub evaluation_id: Option<uuid::Uuid>,
     pub error_code: Option<String>,
     pub error_message: Option<String>,
     pub error_type: Option<String>,
