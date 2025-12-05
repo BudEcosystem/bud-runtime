@@ -94,12 +94,11 @@ interface HeatmapApiData {
 }
 
 // Sidebar deployment derived from radar data
+// Note: model_icon is not available in radar API, UI uses fallback image
 export interface SidebarDeployment {
   id: string;
   endpoint_name: string;
   model_name: string;
-  model_display_name: string;
-  model_icon: string | null;
   color: string;
 }
 
@@ -406,8 +405,6 @@ export const useComparisonStore = create<ComparisonStore>((set, get) => ({
       id: deployment.deployment_id,
       endpoint_name: deployment.deployment_name,
       model_name: deployment.model_name,
-      model_display_name: deployment.deployment_name,
-      model_icon: null, // Not available in radar API
       color: deployment.color,
     }));
   },

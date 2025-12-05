@@ -57,10 +57,9 @@ const EvaluationSummary = () => {
   const radarChartData = getRadarChartData();
   const heatmapChartData = getHeatmapChartData();
 
-  // Filter deployments based on search
+  // Filter deployments based on search (endpoint name and model name)
   const filteredDeployments = deployments.filter((deployment) =>
     deployment.endpoint_name.toLowerCase().includes(searchValue.toLowerCase()) ||
-    deployment.model_display_name?.toLowerCase().includes(searchValue.toLowerCase()) ||
     deployment.model_name.toLowerCase().includes(searchValue.toLowerCase())
   );
 
@@ -169,9 +168,8 @@ const EvaluationSummary = () => {
                               <Image
                                 preview={false}
                                 style={{ width: "auto", height: "1.25rem" }}
-                                src={deployment.model_icon}
+                                src="/icons/huggingFace.png"
                                 alt={deployment.endpoint_name}
-                                fallback="/icons/huggingFace.png"
                               />
                             </div>
                             <div className="flex-1 min-w-0">
