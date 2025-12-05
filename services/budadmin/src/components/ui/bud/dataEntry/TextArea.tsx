@@ -41,9 +41,8 @@ function TextAreaInput(props: BudInputProps) {
           className={props.formItemClassnames}
           hasFeedback
           getValueFromEvent={(e) => {
-            const newValue = e.target.value;
-            props.onChange?.(newValue);
-            return newValue;
+            props.onChange?.(e.target.value);
+            return e.target.value;
           }}
         >
           <TextArea
