@@ -1649,10 +1649,9 @@ async def get_all_evaluations(
             object="evaluations.list",
             message="Successfully retrieved all evaluations",
             evaluations=result["evaluations"],
-            total=result["total"],
+            total_record=result["total"],
             page=result["page"],
-            page_size=result["page_size"],
-            total_pages=result["total_pages"],
+            limit=result["page_size"],
         )
     except HTTPException as e:
         raise e

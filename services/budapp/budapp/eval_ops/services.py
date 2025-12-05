@@ -2383,7 +2383,6 @@ class ExperimentService:
             AllEvaluationsItem,
             AllEvaluationsRunItem,
             EvaluationScore,
-            ModelDetail,
         )
 
         # Build base query for evaluations
@@ -2482,7 +2481,7 @@ class ExperimentService:
             )
 
             # Get model details from the first run
-            model_detail = ModelDetail(id=uuid.uuid4(), name="Unknown Model", deployment_name=None)
+            model_detail = None
             traits_list = []
 
             if runs:

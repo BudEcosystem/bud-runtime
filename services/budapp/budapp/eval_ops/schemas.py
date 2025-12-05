@@ -1165,7 +1165,7 @@ class HeatmapChartResponse(SuccessResponse):
 
 
 class AllEvaluationsRunItem(BaseModel):
-    """Run information withipass down eval id to be added to model inference Detailsn an evaluation for the all-evaluations listing."""
+    """Run information with pass down eval id to be added to model inference Details an evaluation for the all-evaluations listing."""
 
     run_id: UUID4 = Field(..., description="Run UUID")
     run_index: int = Field(..., description="Run index within experiment")
@@ -1181,7 +1181,7 @@ class AllEvaluationsItem(BaseModel):
     evaluation_name: str = Field(..., description="Name of the evaluation")
     experiment_id: UUID4 = Field(..., description="UUID of the parent experiment")
     experiment_name: str = Field(..., description="Name of the parent experiment")
-    model: ModelDetail = Field(..., description="Model details for this evaluation")
+    model: Optional[ModelDetail] = Field(None, description="Model details for this evaluation")
     traits: List[TraitWithDatasets] = Field(..., description="Traits with their associated datasets")
     status: str = Field(..., description="Evaluation status (pending/running/completed/failed)")
     scores: Optional[EvaluationScore] = Field(None, description="Evaluation scores from BudEval")
