@@ -1359,16 +1359,14 @@ class GuardrailProfileDeploymentService(SessionMixin):
             probe_count = probe_counts.get(profile_id, 0)
             deployment_count, is_standalone = deployment_counts.get(profile_id, (0, False))
 
-            db_profiles_response.append(
-                GuardrailProfileResponse.model_validate(
-                    db_profile[0],
-                    update={
-                        "probe_count": probe_count,
-                        "deployment_count": deployment_count,
-                        "is_standalone": is_standalone,
-                    },
-                )
+            profile_response = GuardrailProfileResponse.model_validate(db_profile[0]).model_copy(
+                update={
+                    "probe_count": probe_count,
+                    "deployment_count": deployment_count,
+                    "is_standalone": is_standalone,
+                }
             )
+            db_profiles_response.append(profile_response)
 
         return db_profiles_response, count
 
@@ -1401,8 +1399,8 @@ class GuardrailProfileDeploymentService(SessionMixin):
             )
         )
 
-        profile_response = GuardrailProfileResponse.model_validate(
-            db_profile, update={"probe_count": 0, "deployment_count": 0, "is_standalone": False}
+        profile_response = GuardrailProfileResponse.model_validate(db_profile).model_copy(
+            update={"probe_count": 0, "deployment_count": 0, "is_standalone": False}
         )
 
         return GuardrailProfileDetailResponse(
@@ -1601,13 +1599,12 @@ class GuardrailProfileDeploymentService(SessionMixin):
                 self.session
             ).get_profile_counts(profile_id)
 
-            profile_response = GuardrailProfileResponse.model_validate(
-                updated_profile,
+            profile_response = GuardrailProfileResponse.model_validate(updated_profile).model_copy(
                 update={
                     "probe_count": probe_count,
                     "deployment_count": deployment_count,
                     "is_standalone": is_standalone,
-                },
+                }
             )
 
             return GuardrailProfileDetailResponse(
@@ -1705,13 +1702,12 @@ class GuardrailProfileDeploymentService(SessionMixin):
         )
         probe_count, deployment_count, is_standalone = await deployment_data_manager.get_profile_counts(profile_id)
 
-        profile_response = GuardrailProfileResponse.model_validate(
-            db_profile,
+        profile_response = GuardrailProfileResponse.model_validate(db_profile).model_copy(
             update={
                 "probe_count": probe_count,
                 "deployment_count": deployment_count,
                 "is_standalone": is_standalone,
-            },
+            }
         )
 
         return GuardrailProfileDetailResponse(
@@ -1832,9 +1828,29 @@ class GuardrailProfileDeploymentService(SessionMixin):
             offset, limit, filters, order_by, search
         )
 
-        db_deployments_response = [
-            GuardrailDeploymentResponse.model_validate(db_deployment[0]) for db_deployment in db_deployments
-        ]
+        if not db_deployments:
+            return [], count
+
+        endpoint_ids = [deployment[0].endpoint_id for deployment in db_deployments if deployment[0].endpoint_id]
+        endpoint_names: dict[UUID, str] = {}
+
+        if endpoint_ids:
+            endpoint_rows = self.session.execute(
+                select(Endpoint.id, Endpoint.name).where(Endpoint.id.in_(endpoint_ids))
+            ).all()
+            endpoint_names = {row.id: row.name for row in endpoint_rows}
+
+        db_deployments_response = []
+        for db_deployment in db_deployments:
+            endpoint_name = None
+            if db_deployment[0].endpoint_id:
+                endpoint_name = endpoint_names.get(db_deployment[0].endpoint_id)
+
+            deployment_response = GuardrailDeploymentResponse.model_validate(db_deployment[0]).model_copy(
+                update={"endpoint_name": endpoint_name}
+            )
+            db_deployments_response.append(deployment_response)
+
         return db_deployments_response, count
 
     async def retrieve_deployment(self, deployment_id: UUID) -> GuardrailDeploymentDetailResponse:
@@ -1847,10 +1863,20 @@ class GuardrailProfileDeploymentService(SessionMixin):
         if not db_deployment:
             raise ClientException(message="Deployment not found", status_code=HTTPStatus.HTTP_404_NOT_FOUND)
 
+        endpoint_name = None
+        if db_deployment.endpoint_id:
+            endpoint_row = self.session.execute(
+                select(Endpoint.name).where(Endpoint.id == db_deployment.endpoint_id)
+            ).first()
+            if endpoint_row:
+                endpoint_name = endpoint_row.name
+
+        deployment_response = GuardrailDeploymentResponse.model_validate(db_deployment).model_copy(
+            update={"endpoint_name": endpoint_name}
+        )
+
         return GuardrailDeploymentDetailResponse(
-            deployment=db_deployment,
-            message="Deployment retrieved successfully",
-            code=HTTPStatus.HTTP_200_OK,
+            deployment=deployment_response, message="Deployment retrieved successfully", code=HTTPStatus.HTTP_200_OK
         )
 
     async def edit_deployment(

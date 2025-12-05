@@ -217,9 +217,9 @@ class GuardrailProfileResponse(BaseModel):
     tags: Optional[list[Tag]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
-    probe_count: int
-    deployment_count: int
-    is_standalone: bool
+    probe_count: int = 0
+    deployment_count: int = 0
+    is_standalone: bool = False
     created_by: Optional[UUID4] = None
     project_id: Optional[UUID4] = None
     created_at: datetime
@@ -324,6 +324,7 @@ class GuardrailDeploymentResponse(BaseModel):
     created_by: Optional[UUID4] = None
     project_id: UUID4
     endpoint_id: Optional[UUID4] = None
+    endpoint_name: Optional[str] = None
     credential_id: Optional[UUID4] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None

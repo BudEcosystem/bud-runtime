@@ -339,13 +339,12 @@ class WorkflowService(SessionMixin):
                 probe_count, deployment_count, is_standalone = await GuardrailsDeploymentDataManager(
                     self.session
                 ).get_profile_counts(db_guardrail_profile.id)
-                guardrail_profile = GuardrailProfileResponse.model_validate(
-                    db_guardrail_profile,
+                guardrail_profile = GuardrailProfileResponse.model_validate(db_guardrail_profile).model_copy(
                     update={
                         "probe_count": probe_count,
                         "deployment_count": deployment_count,
                         "is_standalone": is_standalone,
-                    },
+                    }
                 )
 
             db_endpoints = (
