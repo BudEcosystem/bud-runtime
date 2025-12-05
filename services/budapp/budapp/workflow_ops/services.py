@@ -334,6 +334,20 @@ class WorkflowService(SessionMixin):
                 else None
             )
 
+            guardrail_profile = None
+            if db_guardrail_profile:
+                probe_count, deployment_count, is_standalone = await GuardrailsDeploymentDataManager(
+                    self.session
+                ).get_profile_counts(db_guardrail_profile.id)
+                guardrail_profile = GuardrailProfileResponse.model_validate(
+                    db_guardrail_profile,
+                    update={
+                        "probe_count": probe_count,
+                        "deployment_count": deployment_count,
+                        "is_standalone": is_standalone,
+                    },
+                )
+
             db_endpoints = (
                 await EndpointDataManager(self.session).get_endpoints(
                     [UUID(endpoint_id) for endpoint_id in required_data["endpoint_ids"]]
@@ -404,7 +418,7 @@ class WorkflowService(SessionMixin):
                 template=db_template if db_template else None,
                 add_model_modality=add_model_modality if add_model_modality else None,
                 guardrail_profile_id=guardrail_profile_id if guardrail_profile_id else None,
-                guardrail_profile=db_guardrail_profile if db_guardrail_profile else None,
+                guardrail_profile=guardrail_profile if guardrail_profile else None,
                 endpoint_ids=endpoint_ids if endpoint_ids else None,
                 endpoints=db_endpoints if db_endpoints else None,
                 is_standalone=is_standalone,

@@ -5,4 +5,126 @@ description: "PII, toxicity, and bias detection"
 
 # Content Filtering
 
-*Content to be added*
+Content filtering in Bud Stack uses probes to detect various types of harmful, sensitive, or policy-violating content. This guide covers the available detection categories across supported providers and how to create profiles that combine probes for comprehensive protection.
+
+## Detection Categories by Provider
+
+Different providers offer different detection capabilities. Choose providers based on the categories you need.
+
+### Bud Sentinel Categories
+
+Bud Sentinel provides detection for:
+
+| Category | Description |
+|----------|-------------|
+| **Prompt Injection** | Attempts to manipulate model behavior through crafted inputs |
+| **Jailbreak Attempts** | Efforts to bypass model safety guidelines |
+| **PII Detection** | Names, addresses, phone numbers, SSNs, and other personal identifiers |
+| **Toxicity** | Harmful, offensive, or inappropriate language |
+| **Malicious Instructions** | Requests for harmful actions or dangerous information |
+
+<Note>
+Bud Sentinel probes sync automatically every 7 days. Available probes may expand as new detection capabilities are added.
+</Note>
+
+### OpenAI Moderation Categories
+
+OpenAI's moderation models (`text-moderation-latest`, `omni-moderation-latest`) detect:
+
+| Category | Description |
+|----------|-------------|
+| **Hate** | Content targeting groups based on protected characteristics |
+| **Harassment** | Threatening or bullying content |
+| **Self-Harm** | Content promoting or instructing self-injury |
+| **Sexual** | Explicit or suggestive sexual material |
+| **Violence** | Graphic violence or threats |
+| **Harassment/Threatening** | Harassment with violent or threatening intent |
+
+### Azure Content Safety Categories
+
+Azure Content Safety (`azure-content-safety-text`) provides:
+
+| Category | Description |
+|----------|-------------|
+| **Violence** | Violent content and threats |
+| **Self-Harm** | Self-injury related content |
+| **Sexual** | Adult and explicit content |
+| **Hate** | Hate speech and discrimination |
+
+## Understanding Probes
+
+Each probe contains:
+
+- **Name & Description**: What the probe detects
+- **Guard Types**: Whether it applies to `input`, `output`, or both
+- **Scanner Types**: The detection methodology used
+- **Modality Types**: Content types it can analyze (text, image, etc.)
+- **Rules**: Specific detection patterns within the probe
+- **Examples**: Sample content the probe would flag
+
+### Probe Status
+
+| Status | Description |
+|--------|-------------|
+| `active` | Probe is available for use |
+| `disabled` | Probe exists but is not available |
+| `deleted` | Probe has been removed |
+
+## Creating Profiles
+
+Profiles combine multiple probes into a reusable guardrail configuration.
+
+### Profile Structure
+
+A profile includes:
+
+- **Name**: Descriptive identifier for the profile
+- **Description**: Explanation of the profile's purpose
+- **Project** (optional): Associate with a specific project
+- **Severity Threshold** (optional): Default threshold for all probes (0.0 - 1.0)
+- **Guard Types**: Which stages to apply (`input`, `output`, or both)
+
+### Adding Probes to Profiles
+
+After creating a profile, add probes to define what content gets filtered:
+
+- **Select Probes**: Choose from available probes based on your filtering needs
+- **Set Thresholds**: Override the profile-level severity threshold for specific probes
+- **Configure Guard Types**: Override when specific probes run (input/output)
+
+### Configuring Rules
+
+Each probe contains multiple rules. Fine-tune your profile by:
+
+- **Enabling/Disabling Rules**: Turn off specific rules within a probe
+- **Rule Thresholds**: Set severity thresholds at the individual rule level
+- **Rule Guard Types**: Override guard types for specific rules
+
+### Profile APIs
+
+- **Create Profile** (`POST /guardrails/profiles`) - Create a new profile
+- **List Profiles** (`GET /guardrails/profiles`) - View your profiles
+- **Get Profile** (`GET /guardrails/profiles/{id}`) - Retrieve profile details
+- **Update Profile** (`PUT /guardrails/profiles/{id}`) - Modify profile settings
+- **Delete Profile** (`DELETE /guardrails/profiles/{id}`) - Remove a profile
+
+### Profile Probe APIs
+
+- **Add Probes** (`POST /guardrails/profiles/{id}/probes`) - Add probes to a profile
+- **Update Probe** (`PUT /guardrails/profiles/{id}/probes/{probe_id}`) - Modify probe settings in profile
+- **Get Probe Rules** (`GET /guardrails/profiles/{id}/probes/{probe_id}/rules`) - View rules with profile overrides
+
+## Combining Providers
+
+You can create profiles that use probes from multiple providers for layered protection. For example:
+
+- Use **Bud Sentinel** for prompt injection and jailbreak detection
+- Add **OpenAI Moderation** for comprehensive harmful content filtering
+- Include **Azure Content Safety** if you need Azure compliance integration
+
+The gateway executes probes according to your configured execution mode (parallel or sequential) and aggregates results from all providers.
+
+## Next Steps
+
+- [Setting Up Guardrails](/guardrails/setting-up-guardrails) - Deploy your profiles to endpoints
+- [Custom Rules](/guardrails/custom-rules) - Create custom probes for specific needs

@@ -5,4 +5,115 @@ description: "Safety and content filtering overview"
 
 # What are Guardrails
 
-*Content to be added*
+Guardrails are safety mechanisms that monitor, filter, and control content flowing through your AI model endpoints. They act as intelligent gatekeepers that analyze both user inputs and model outputs to detect and prevent harmful, inappropriate, or policy-violating content.
+
+## Why Use Guardrails
+
+AI models can generate unpredictable outputs, and users may submit malicious or inappropriate inputs. Guardrails help you:
+
+- **Protect users** from harmful content including hate speech, violence, and self-harm
+- **Ensure compliance** with organizational policies and regulatory requirements
+- **Prevent misuse** by blocking prompt injection attacks and jailbreak attempts
+- **Maintain brand safety** by filtering content that could damage reputation
+- **Detect sensitive data** like PII before it's processed or leaked
+
+## How Guardrails Work
+
+Guardrails operate at two critical points in the request/response flow:
+
+```
+User Request → [Input Guard] → Model → [Output Guard] → Response
+```
+
+**Input Guards** analyze user prompts before they reach the model:
+- Block malicious prompts and injection attacks
+- Filter toxic or inappropriate user content
+- Detect and redact sensitive information (PII)
+
+**Output Guards** analyze model responses before returning them:
+- Filter harmful or inappropriate generated content
+- Detect hallucinations and factual errors
+- Ensure responses align with safety policies
+
+## Supported Providers
+
+Bud Stack supports multiple guardrail providers, giving you flexibility to choose based on your requirements:
+
+### Bud Sentinel (Proprietary)
+
+Our in-house guardrail solution offering comprehensive protection with:
+- High-performance gRPC-based communication
+- Extensive probe library for various threat categories
+- Customizable severity thresholds and rule configurations
+- Profile-based management for consistent policies across endpoints
+
+<Note>
+Bud Sentinel is a proprietary service. While the deployment stack includes references to the Bud Sentinel container image, it requires a separate license. Contact sales for access to the gated container registry.
+</Note>
+
+Once licensed, configure the Bud Sentinel base URL in budapp. The system automatically syncs available probes and rules from Bud Sentinel on a scheduled basis (every 7 days), keeping your detection capabilities up to date.
+
+### Cloud Providers
+
+Third-party guardrail services from major cloud providers:
+
+| Provider | Models | Best For |
+|----------|--------|----------|
+| **OpenAI** | `text-moderation-latest`, `omni-moderation-latest` | General content moderation with broad category coverage |
+| **Azure Content Safety** | `azure-content-safety-text` | Enterprise environments with Azure integration |
+
+## Core Concepts
+
+### Probes
+
+Probes are detection mechanisms that identify specific types of vulnerabilities or threats. Each probe contains:
+- **Rules**: Specific patterns or behaviors the probe detects
+- **Guard Types**: Whether the probe applies to inputs, outputs, or both
+- **Modality**: The content type the probe analyzes (text, image, etc.)
+
+### Profiles
+
+Profiles are user-defined configurations that combine multiple probes into a coherent guardrail policy. Profiles allow you to:
+- Select which probes to enable
+- Set severity thresholds (profile-wide or per-probe)
+- Enable/disable specific rules within probes
+- Define guard type behavior
+
+### Deployments
+
+Deployments activate guardrail profiles on your inference endpoints. You can:
+- Deploy to specific endpoints for targeted protection
+- Create standalone deployments for batch processing
+- Manage multiple deployments per profile
+
+## Execution Modes
+
+When multiple providers or probes are configured, guardrails can execute in different modes:
+
+| Mode | Behavior |
+|------|----------|
+| **Parallel** | All probes run simultaneously for faster execution |
+| **Sequential** | Probes run in order, allowing early termination |
+
+Failure handling can also be configured:
+
+| Mode | Behavior |
+|------|----------|
+| **Fail Fast** | Stop immediately when content is flagged |
+| **Best Effort** | Continue execution and aggregate all results |
+
+## When to Use Guardrails
+
+Guardrails are essential for:
+
+- **Customer-facing applications** where users interact directly with AI
+- **Sensitive domains** like healthcare, finance, or legal
+- **Multi-tenant platforms** requiring consistent safety policies
+- **Regulated industries** with compliance requirements
+- **High-risk use cases** where model outputs have significant impact
+
+## Next Steps
+
+- [Setting Up Guardrails](/guardrails/setting-up-guardrails) - Configure your first guardrail profile
+- [Content Filtering](/guardrails/content-filtering) - Learn about available detection categories
+- [Custom Rules](/guardrails/custom-rules) - Create tailored guardrail configurations
