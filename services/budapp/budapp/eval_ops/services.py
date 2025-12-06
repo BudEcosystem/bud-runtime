@@ -3276,6 +3276,21 @@ class ExperimentService:
                     }
                 )
 
+            # Filter datasets to only those with at least one non-null score
+            datasets_with_scores = set()
+            for deployment in deployments_list:
+                for ds in deployment["dataset_scores"]:
+                    if ds["score"] is not None:
+                        datasets_with_scores.add(ds["dataset_id"])
+
+            datasets_list = [d for d in datasets_list if d["id"] in datasets_with_scores]
+
+            # Filter dataset_scores in each deployment to only include relevant datasets
+            for deployment in deployments_list:
+                deployment["dataset_scores"] = [
+                    ds for ds in deployment["dataset_scores"] if ds["dataset_id"] in datasets_with_scores
+                ]
+
             # Calculate stats for color scaling
             stats = {
                 "min_score": round(min(all_scores), 2) if all_scores else 0,
