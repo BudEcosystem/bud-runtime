@@ -3123,11 +3123,13 @@ class ExperimentService:
         dataset_ids: Optional[List[uuid.UUID]] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
+        limit: int = 5,
     ) -> Dict[str, Any]:
         """Get heatmap chart data showing dataset scores per deployment.
 
         For each deployment, calculates average scores per dataset.
         Returns a matrix of deployment x dataset with average accuracy scores.
+        By default, returns only the 5 most recent deployments with successful runs.
 
         Parameters:
             deployment_ids (Optional[List[uuid.UUID]]): List of deployment/endpoint IDs. If None, returns all.
@@ -3135,6 +3137,7 @@ class ExperimentService:
             dataset_ids (Optional[List[uuid.UUID]]): Filter by specific datasets.
             start_date (Optional[datetime]): Filter runs after this date.
             end_date (Optional[datetime]): Filter runs before this date.
+            limit (int): Maximum number of deployments to return (default: 5).
 
         Returns:
             Dict containing:
@@ -3152,6 +3155,7 @@ class ExperimentService:
                     DatasetModel.id.label("dataset_id"),
                     DatasetModel.name.label("dataset_name"),
                     MetricModel.metric_value,
+                    RunModel.created_at.label("run_created_at"),
                 )
                 .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
                 .join(ModelTable, EndpointModel.model_id == ModelTable.id)
@@ -3212,7 +3216,15 @@ class ExperimentService:
                         "deployment_name": row.endpoint_name,
                         "model_name": row.model_name,
                         "dataset_scores": {},  # {dataset_id: {"scores": [], "run_count": int}}
+                        "latest_run_at": row.run_created_at,
                     }
+                else:
+                    # Track the latest run timestamp for this deployment
+                    if row.run_created_at and (
+                        deployments_data[endpoint_id]["latest_run_at"] is None
+                        or row.run_created_at > deployments_data[endpoint_id]["latest_run_at"]
+                    ):
+                        deployments_data[endpoint_id]["latest_run_at"] = row.run_created_at
 
                 # Track scores per dataset
                 if dataset_id not in deployments_data[endpoint_id]["dataset_scores"]:
@@ -3229,8 +3241,15 @@ class ExperimentService:
             # Calculate averages and build response
             datasets_list = list(datasets_data.values())
 
+            # Sort deployments by latest run timestamp (descending) and apply limit
+            sorted_deployments = sorted(
+                deployments_data.items(),
+                key=lambda x: x[1]["latest_run_at"] or datetime.min,
+                reverse=True,
+            )[:limit]
+
             deployments_list = []
-            for _endpoint_id, data in deployments_data.items():
+            for _endpoint_id, data in sorted_deployments:
                 dataset_scores = []
                 for dataset_id, score_data in data["dataset_scores"].items():
                     scores = score_data["scores"]

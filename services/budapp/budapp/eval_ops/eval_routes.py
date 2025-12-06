@@ -719,18 +719,24 @@ def get_heatmap_chart_data(
         Optional[datetime],
         Query(description="Filter runs before this date (ISO 8601)"),
     ] = None,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=50, description="Maximum number of deployments to return (default: 5)"),
+    ] = 5,
 ):
     """Get heatmap chart data for comparing deployments across datasets.
 
     Returns dataset benchmark scores for each selected deployment. Scores
     represent the average accuracy across all completed evaluation runs for
-    each dataset-deployment combination.
+    each dataset-deployment combination. By default, returns only the 5 most
+    recent deployments with successful runs.
 
     - **deployment_ids**: Optional comma-separated deployment UUIDs to compare. Returns all if not provided.
     - **trait_ids**: Optional comma-separated trait UUIDs to filter datasets.
     - **dataset_ids**: Optional comma-separated dataset UUIDs to filter.
     - **start_date**: Optional filter for runs after this date.
     - **end_date**: Optional filter for runs before this date.
+    - **limit**: Maximum number of deployments to return (default: 5, max: 50).
 
     Returns a `HeatmapChartResponse` with:
     - List of datasets (columns for the heatmap)
@@ -783,6 +789,7 @@ def get_heatmap_chart_data(
             dataset_ids=dataset_id_list,
             start_date=start_date,
             end_date=end_date,
+            limit=limit,
         )
 
         return HeatmapChartResponse(
