@@ -15,9 +15,10 @@ use tokio::signal;
 use tower_http::trace::{DefaultOnFailure, TraceLayer};
 use tracing::Level;
 
+use tensorzero_internal::analytics_batcher::AnalyticsBatcher;
 use tensorzero_internal::analytics_middleware::{
-    analytics_middleware, attach_clickhouse_middleware, attach_geoip_middleware,
-    attach_ua_parser_middleware,
+    analytics_middleware, attach_analytics_batcher_middleware, attach_clickhouse_middleware,
+    attach_geoip_middleware, attach_ua_parser_middleware,
 };
 use tensorzero_internal::auth::require_api_key;
 use tensorzero_internal::blocking_middleware::{attach_blocking_manager, blocking_middleware};
@@ -474,6 +475,23 @@ async fn main() {
             router = router.layer(axum::middleware::from_fn_with_state(
                 geoip,
                 attach_geoip_middleware,
+            ));
+        }
+
+        // Initialize and attach analytics batcher for efficient batched ClickHouse writes
+        // This reduces individual writes from N to N/500, improving throughput under high load
+        if let ClickHouseConnectionInfo::Production { .. } =
+            &app_state.clickhouse_connection_info
+        {
+            let batcher = AnalyticsBatcher::new(Arc::new(
+                app_state.clickhouse_connection_info.clone(),
+            ));
+            tracing::info!(
+                "Analytics batcher initialized (batch_size=500, flush_interval=1000ms)"
+            );
+            router = router.layer(axum::middleware::from_fn_with_state(
+                batcher,
+                attach_analytics_batcher_middleware,
             ));
         }
 

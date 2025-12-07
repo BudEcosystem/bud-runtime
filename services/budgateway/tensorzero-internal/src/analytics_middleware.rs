@@ -5,6 +5,7 @@ use axum::{
     response::Response,
 };
 use chrono::Utc;
+use metrics::histogram;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
@@ -12,6 +13,7 @@ use uaparser::{Parser, UserAgentParser};
 use uuid::Uuid;
 
 use crate::analytics::{GatewayAnalyticsDatabaseInsert, RequestAnalytics};
+use crate::analytics_batcher::AnalyticsBatcher;
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::error::Error;
 use crate::geoip::GeoIpService;
@@ -72,6 +74,9 @@ pub async fn analytics_middleware(
         .extensions()
         .get::<Arc<ClickHouseConnectionInfo>>()
         .cloned();
+
+    // Get analytics batcher for batched writes (preferred over direct writes)
+    let batcher_opt = request.extensions().get::<AnalyticsBatcher>().cloned();
 
     tracing::debug!(
         "ClickHouse connection in analytics middleware: {}",
@@ -142,11 +147,45 @@ pub async fn analytics_middleware(
         }
     }
 
+    // Record Prometheus metrics for autoscaling
+    {
+        let analytics = analytics_arc.lock().await;
+        let method_str = method.to_string();
+        let status_str = analytics.record.status_code.to_string();
+
+        // Always record total request duration
+        histogram!(
+            "gateway_request_duration_seconds",
+            "method" => method_str.clone(),
+            "status" => status_str.clone()
+        )
+        .record(analytics.record.total_duration_ms as f64 / 1000.0);
+
+        // Record gateway processing overhead (only when model latency was available)
+        if analytics.record.gateway_processing_ms > 0 {
+            histogram!(
+                "gateway_processing_seconds",
+                "method" => method_str,
+                "status" => status_str
+            )
+            .record(analytics.record.gateway_processing_ms as f64 / 1000.0);
+        }
+    }
+
     // Get final analytics record
     let final_record = analytics_arc.lock().await.record.clone();
 
-    // Spawn task to write analytics (non-blocking)
-    if let Some(clickhouse) = clickhouse_opt {
+    // Write analytics - prefer batched writes for high throughput
+    if let Some(batcher) = batcher_opt {
+        // Use batcher for efficient batched writes (non-blocking, fire-and-forget)
+        tracing::debug!(
+            "Queueing analytics record for batched write: {} {}",
+            method,
+            uri.path()
+        );
+        batcher.try_send(final_record);
+    } else if let Some(clickhouse) = clickhouse_opt {
+        // Fallback to direct write if batcher is not available
         tracing::debug!(
             "Spawning task to write analytics to ClickHouse for {} {}",
             method,
@@ -161,7 +200,7 @@ pub async fn analytics_middleware(
             }
         });
     } else {
-        tracing::warn!("No ClickHouse connection available for analytics");
+        tracing::warn!("No ClickHouse connection or batcher available for analytics");
     }
 
     Ok(response)
@@ -484,5 +523,15 @@ pub async fn attach_ua_parser_middleware(
     next: Next,
 ) -> Result<Response, Error> {
     request.extensions_mut().insert(parser);
+    Ok(next.run(request).await)
+}
+
+/// Middleware to attach analytics batcher to request extensions
+pub async fn attach_analytics_batcher_middleware(
+    State(batcher): State<AnalyticsBatcher>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, Error> {
+    request.extensions_mut().insert(batcher);
     Ok(next.run(request).await)
 }
