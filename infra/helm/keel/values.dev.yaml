@@ -1,0 +1,6 @@
+keel:
+  slack:
+    enabled: true
+    botName: "infrabot"
+    channel: "infra"
+    approvalsChannel: "infra"
