@@ -1,4 +1,8 @@
-{ config, pkgs, ... }:
+{
+  config,
+  lib,
+  ...
+}:
 let
   sops_key_path = "/var/lib/sops-nix/key.txt";
 in
@@ -7,33 +11,16 @@ in
 
   services.scid = {
     enable = true;
-
-    environment = {
-      SOPS_AGE_KEY_FILE = sops_key_path;
-      KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
-      HOME = "/var/lib/scid";
-    };
-    path = with pkgs; [
-      kubernetes-helm
-      nixos-rebuild
-      nix
-    ];
-
+    environment.SOPS_AGE_KEY_FILE = sops_key_path;
     settings = {
-      repo_url = "https://github.com/BudEcosystem/bud-runtime.git";
-      branch = "master";
-      helm_charts_path = "infra/helm";
-
       slack = {
         channel = "infra";
         token = "%file%:${config.sops.secrets."misc/slack_token".path}";
       };
 
-      jobs = [
-        {
-          name = "NixOS";
-          slack_color = "#7bb8e2";
-          exec_line = [
+      jobs = {
+        NixOS = {
+          exec_line = lib.mkForce [
             "nixos-rebuild"
             "switch"
             "--flake"
@@ -41,15 +28,10 @@ in
             "-L"
           ];
           watch_paths = [
-            "flake.nix"
-            "flake.lock"
-            "infra/nixos/common"
-            "infra/nixos/azure"
-            "infra/nixos/budk8s"
-            "infra/nixos/primary"
+            "infra/nixos/primary-dev"
           ];
-        }
-        {
+        };
+        OpenTofu = {
           name = "OpenTofu";
           slack_color = "#fbdb1c";
           exec_line = [
@@ -64,8 +46,8 @@ in
             "infra/tofu"
             "nix/workflows/tofu_apply"
           ];
-        }
-      ];
+        };
+      };
     };
   };
 }
