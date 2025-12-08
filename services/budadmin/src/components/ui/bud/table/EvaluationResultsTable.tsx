@@ -14,8 +14,78 @@ import { formatDate } from "@/utils/formatDate";
 import { capitalize } from "@/lib/utils";
 import { endpointStatusMapping } from "@/lib/colorMapping";
 
+// Constants
+const TEXT_TRUNCATION_LENGTH = 25;
+
 interface EvaluationResultsTableProps {
   model?: Model;
+}
+
+// Helper component for rendering truncated text with popover
+function TruncatedTextCell({ text }: { text: string }) {
+  if (!text || text === "-") {
+    return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+  }
+
+  const needsTruncation = text.length > TEXT_TRUNCATION_LENGTH;
+  const truncatedText = needsTruncation
+    ? text.substring(0, TEXT_TRUNCATION_LENGTH) + "..."
+    : text;
+
+  if (needsTruncation) {
+    return (
+      <Popover
+        content={
+          <div className="max-w-[300px] break-words p-[.8rem]">
+            <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+          </div>
+        }
+        placement="top"
+      >
+        <div
+          className="cursor-pointer"
+          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
+        </div>
+      </Popover>
+    );
+  }
+
+  return (
+    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+    </div>
+  );
+}
+
+// Helper function to extract display text from models/traits data
+function getDisplayText(
+  data: unknown,
+  priorityKey: string = "name",
+  fallbackKey: string = "name"
+): string {
+  if (!data) return "-";
+
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (Array.isArray(data)) {
+    const texts = data.map((item) => {
+      if (typeof item === "string") return item;
+      return item[priorityKey] || item[fallbackKey] || String(item);
+    });
+    return texts.length > 0 ? texts.join(", ") : "-";
+  }
+
+  if (typeof data === "object") {
+    return (data as Record<string, unknown>)[priorityKey] as string
+      || (data as Record<string, unknown>)[fallbackKey] as string
+      || JSON.stringify(data);
+  }
+
+  return "-";
 }
 
 function SortIcon({ sortOrder }: { sortOrder: string }) {
@@ -144,47 +214,8 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
       width: 180,
       ellipsis: true,
       render: (models) => {
-        let displayText = "-";
-
-        if (typeof models === "string") {
-          displayText = models;
-        } else if (Array.isArray(models)) {
-          // Prioritize deployment_name over name
-          displayText = models.map((m) => m.deployment_name || m.name || m).join(", ");
-        } else if (models && typeof models === "object") {
-          // Prioritize deployment_name over name
-          displayText = models.deployment_name || models.name || JSON.stringify(models);
-        }
-
-        if (displayText === "-") {
-          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
-        }
-
-        const needsTruncation = displayText.length > 25;
-        const truncatedText = needsTruncation ? displayText.substring(0, 25) + "..." : displayText;
-
-        if (needsTruncation) {
-          return (
-            <Popover
-              content={
-                <div className="max-w-[300px] break-words p-[.8rem]">
-                  <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
-                </div>
-              }
-              placement="top"
-            >
-              <div className="cursor-pointer" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
-              </div>
-            </Popover>
-          );
-        }
-
-        return (
-          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
-          </div>
-        );
+        const displayText = getDisplayText(models, "deployment_name", "name");
+        return <TruncatedTextCell text={displayText} />;
       },
     },
     {
@@ -194,45 +225,8 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
       width: 160,
       ellipsis: true,
       render: (traits) => {
-        let displayText = "-";
-
-        if (typeof traits === "string") {
-          displayText = traits;
-        } else if (Array.isArray(traits)) {
-          displayText = traits.map((t) => t.name || t).join(", ");
-        } else if (traits && typeof traits === "object") {
-          displayText = traits.name || JSON.stringify(traits);
-        }
-
-        if (displayText === "-") {
-          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
-        }
-
-        const needsTruncation = displayText.length > 25;
-        const truncatedText = needsTruncation ? displayText.substring(0, 25) + "..." : displayText;
-
-        if (needsTruncation) {
-          return (
-            <Popover
-              content={
-                <div className="max-w-[300px] break-words p-[.8rem]">
-                  <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
-                </div>
-              }
-              placement="top"
-            >
-              <div className="cursor-pointer" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
-              </div>
-            </Popover>
-          );
-        }
-
-        return (
-          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
-          </div>
-        );
+        const displayText = getDisplayText(traits, "name", "name");
+        return <TruncatedTextCell text={displayText} />;
       },
     },
     {
