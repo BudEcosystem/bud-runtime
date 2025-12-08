@@ -42,21 +42,17 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
 }
 
 // Helper function to format decimal values to max 6 decimal places
-const formatDecimalValue = (value: any): string => {
+const formatDecimalValue = (value: unknown): string => {
   if (value === null || value === undefined) return "-";
-  if (typeof value === "number") {
-    // Check if it has decimal places
-    if (Number.isInteger(value)) return value.toString();
-    // Limit to 6 decimal places and remove trailing zeros
-    return parseFloat(value.toFixed(6)).toString();
+
+  const numValue = Number(value);
+  if (isNaN(numValue)) {
+    // Return the original string value if it's not a valid number
+    return String(value);
   }
-  // If it's a string that looks like a number, try to format it
-  const numValue = parseFloat(value);
-  if (!isNaN(numValue)) {
-    if (Number.isInteger(numValue)) return numValue.toString();
-    return parseFloat(numValue.toFixed(6)).toString();
-  }
-  return value;
+
+  // Use toFixed(6) and convert back to number to remove trailing zeros
+  return Number(numValue.toFixed(6)).toString();
 };
 
 function LeaderboardsTable({
