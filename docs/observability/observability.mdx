@@ -72,31 +72,30 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 2. Set a time range with presets or the date picker; changes apply across Metrics and Requests tabs.
 3. Use search and filters to scope the active tab before drilling into charts, tables, or rule lists.
 
-### 4.2 Metrics 
+### 4.2 Metrics
 
 - **Pivot the view**: Select Model, Deployment, Project, or User to regroup charts and lines by that dimension.
 - **Adjust time**: Apply presets or custom ranges; the tab reloads metrics using the selected window.
 - **Review key cards**: Scan request totals, success/failure ratios, latency percentiles, and token counts for the window.
 - **Explore charts**: Use request volume, latency distribution, geo map, tokens over time, RPS, and TTFT visualizations to spot regressions by the selected grouping.
 
-### 4.3 Requests 
+### 4.3 Requests
 
-- Select Requests tab
 - **Search & filter**: Combine InferenceFilters (project and request attributes) with the search bar for prompt/response text to trim the list before analysis.
 - **Sort & scan**: Sort by timestamp or latency and review prompt previews, token counts, and status badges in the table.
 - **Export**: Download filtered rows as CSV for offline review via the Export button in the header.
 
 #### 4.3.1 Request detail page
 
-- **Open request**: Click any request to load the detail page showing overview fields (latency, tokens, cache flag, status) and request metadata (IP, method, path, auth, client info, location).
+- **Open request**: Click any request to load the detail page showing overview fields (latency, tokens, cache flag, status) and request metadata (IP, method, path, client info, location).
 - **Inspect payloads**: Raw gateway request/response blocks include copy and download buttons for JSON exports, plus formatted message content for chat-style payloads.
 - **Trace IDs**: Copy inference and trace identifiers for use in external tracing or incident reports.
 
-### 4.4 Rules tab actions
+### 4.4 Rules 
 
 - **Review stats**: Check total, active, and recent block counts at the top of the Rules tab to gauge enforcement impact.
 - **Filter the list**: Use rule type (IP, country, user-agent, rate-based) and status (active/inactive) selectors to narrow results; counts update as filters change.
-- **Lifecycle actions**: Create new blocking rules via the drawer, open existing rules to view details, edit configurations, or delete with confirmation and loader feedback.
+- **Lifecycle actions**: Create new blocking rules via the Create Rule button, open existing rules to view details, edit configurations, or delete with confirmation and loader feedback.
 
 #### 4.4.1 Rule detail drawer
 
