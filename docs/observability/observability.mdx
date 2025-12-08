@@ -91,22 +91,41 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 - **Inspect payloads**: Raw gateway request/response blocks include copy and download buttons for JSON exports, plus formatted message content for chat-style payloads.
 - **Trace IDs**: Copy inference and trace identifiers for use in external tracing or incident reports.
 
-### 4.4 Rules 
+### 4.4 Rules
 
 - **Review stats**: Check total, active, and recent block counts at the top of the Rules tab to gauge enforcement impact.
 - **Filter the list**: Use rule type (IP, country, user-agent, rate-based) and status (active/inactive) selectors to narrow results; counts update as filters change.
-- **Lifecycle actions**: Create new blocking rules via the Create Rule button, open existing rules to view details, edit configurations, or delete with confirmation and loader feedback.
+- **Lifecycle actions**: Create new blocking rules via the Create Rule button, open existing rules to view details, edit configurations, or delete with confirmation.
 
 #### 4.4.1 Rule detail drawer
 
 - **Open rule**: Choose **View** on any row to load the drawer with rule properties, type, scope, and current status (active/inactive).
-- **Evaluate status**: Use the active/inactive state and recent block counts to decide whether to adjust thresholds or disable the rule.
+
+- **Evaluate status**: Use the active/inactive state, match criteria, and recent block counts to decide whether to adjust thresholds or disable the rule.
 
 #### 4.4.2 Create rule flow
 
 - **Start**: Select **Create Rule** to open the creation drawer.
-- **Configure**: Choose a rule type (IP, country, user-agent, rate-based), set scope, and define activation state before saving.
+
+- **Configure**: Choose a rule type (IP, country, user-agent, rate-based), set scope, add optional notes, and define activation state before saving.
+
 - **Save & review**: After creation, verify the new rule appears in the list with updated totals and matches the intended status.
+
+#### 4.4.3 Edit rule flow
+
+- **Open for edit**: From the Rules list, select **Edit** on a row to reopen the drawer with current values prefilled.
+
+- **Adjust settings**: Update match criteria, scope, status, or notifications. Use validation feedback for malformed IPs, CIDR ranges, or rate limits.
+
+- **Confirm changes**: Save to apply edits and confirm updated values in the list and stats cards.
+
+#### 4.4.4 Delete rule
+
+- **Start deletion**: Click **Delete** on a rule row to trigger the confirmation prompt.
+
+- **Confirm removal**: Accept the confirmation; the loader displays while the deletion completes and stats update to reflect the removal.
+
+- **Verify cleanup**: Ensure the rule no longer appears in filtered views and that block counters adjust accordingly.
 
 ### 4.5 Request and trace troubleshooting
 
