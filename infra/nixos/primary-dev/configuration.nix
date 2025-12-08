@@ -1,6 +1,7 @@
 {
   imports = [
     ../primary/configuration.nix
+    ../azure/configuration.nix
     ../dev/configuration.nix
     ./disko.nix
 
