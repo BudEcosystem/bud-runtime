@@ -150,11 +150,11 @@ Request volume, latency distribution, geographic origin, token usage over time, 
 
 **Q3: What details are shown when I open a request?**
 
-The detail page includes overview stats (latency, tokens, cache flag, status), gateway metadata (IP, method, path, auth, client, location), formatted messages, and raw request/response blocks with copy/download actions.
+The detail page includes overview stats (latency, tokens, cache flag, status), gateway metadata (IP, method, path, client, location), formatted messages, and raw request/response blocks with copy/download actions.
 
 **Q4: How do I export observability data?**
 
-Use the Export buttons on the Requests tab for CSV/JSON tables and the copy/download controls in request details for raw payload JSON; exports follow applied filters and sort order.
+Use the Export buttons on the Requests tab for CSV tables and the copy/download controls in request details for raw payload JSON; exports follow applied filters and sort order.
 
 **Q5: What rule types can I enforce, and how do I manage them?**
 
@@ -166,8 +166,4 @@ Open the Rules tab to review active counts and block statistics, then filter to 
 
 **Q7: Can I pause a rule without deleting it?**
 
-Yes. Open the rule detail drawer or the edit flow and toggle the rule to **Inactive**. The rule stays listed for auditing but no longer enforces blocks until reactivated.
-
-**Q8: How do exports respect my current filters?**
-
-Request and rule exports include only rows that match the active filters, time range, and search criteria, preserving the sort order applied in the table.
+Yes. Open the rule detail page and select Disable from three-dots menu. The rule stays listed for auditing but no longer enforces blocks until reactivated.
