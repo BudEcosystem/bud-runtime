@@ -162,7 +162,11 @@
           );
 
       nixosConfigurations = lib.genAttrs [
+        # generic budk8s iso
         "primary"
+
+        # dev.bud.studio specific, cause of ./infra/nixos/dev
+        "primary-dev"
         "ingress"
         "worker"
       ] (host: makeNixos host "x86_64-linux");
