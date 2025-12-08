@@ -6,6 +6,7 @@
 pub mod analytics; // gateway analytics data structures
 pub mod analytics_batcher; // analytics batching for high-throughput ClickHouse writes
 pub mod analytics_middleware; // gateway analytics middleware
+pub mod inference_batcher; // inference batching for high-throughput ClickHouse writes
 pub mod audio; // audio transcription, translation, and text-to-speech
 pub mod auth;
 pub mod blocking_middleware; // blocking rules enforcement middleware

@@ -11,7 +11,6 @@
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Instant;
 
 use axum::body::Body;
 use axum::debug_handler;
@@ -21,7 +20,6 @@ use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use futures::{Stream, StreamExt as FuturesStreamExt};
-use metrics::histogram;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use url::Url;
@@ -194,6 +192,7 @@ pub async fn inference_handler(
         model_credential_store,
         usage_limiter,
         guardrails,
+        inference_batcher,
         ..
     }): AppState,
     analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
@@ -476,6 +475,7 @@ pub async fn inference_handler(
                             let records = guardrail_context.scan_records.clone();
                             let async_writes = config.gateway.observability.async_writes;
                             let obs_metadata = observability_metadata.clone();
+                            let inference_batcher_clone = inference_batcher.clone();
 
                             // Get the resolved input and gateway request before moving params
                             let resolved_input = params
@@ -602,6 +602,7 @@ pub async fn inference_handler(
                                     Some(gateway_response_str), // Pass the actual gateway_response
                                     model_pricing,
                                     Some(records),
+                                    inference_batcher_clone.as_ref(),
                                 )
                                 .await;
                             });
@@ -633,11 +634,6 @@ pub async fn inference_handler(
         }
     }
 
-    // Profiling: record pre-inference handler time
-    histogram!("handler_pre_inference_seconds").record(handler_start.elapsed().as_secs_f64());
-
-    // Profiling: inference call
-    let inference_call_start = Instant::now();
     let response = inference(
         config.clone(),
         &http_client,
@@ -646,9 +642,9 @@ pub async fn inference_handler(
         model_credential_store.clone(),
         params,
         analytics.as_ref().map(|ext| ext.0.clone()),
+        inference_batcher.clone(),
     )
     .await?;
-    histogram!("handler_inference_call_seconds").record(inference_call_start.elapsed().as_secs_f64());
 
     match response {
         InferenceOutput::NonStreaming {
@@ -797,6 +793,7 @@ pub async fn inference_handler(
                                         let records = guardrail_context.scan_records.clone();
                                         let async_writes =
                                             config.gateway.observability.async_writes;
+                                        let inference_batcher_clone = inference_batcher.clone();
 
                                         // Create the gateway response that would be sent to the client
                                         let (_, gateway_response_json) =
@@ -820,6 +817,7 @@ pub async fn inference_handler(
                                                 Some(gateway_response_str), // Pass the actual error response
                                                 write_info.model_pricing,
                                                 Some(records),
+                                                inference_batcher_clone.as_ref(),
                                             )
                                             .await;
                                         });
@@ -961,6 +959,7 @@ pub async fn inference_handler(
                 let clickhouse_connection_info = clickhouse_connection_info.clone();
                 let kafka_connection_info = kafka_connection_info.clone();
                 let async_writes = config.gateway.observability.async_writes;
+                let inference_batcher_clone = inference_batcher.clone();
 
                 // Clone guardrail records for async write
                 let guardrail_records = guardrail_context.scan_records.clone();
@@ -997,6 +996,7 @@ pub async fn inference_handler(
                         gateway_response,
                         write_info.model_pricing,
                         Some(guardrail_records), // Pass guardrail records for batch write
+                        inference_batcher_clone.as_ref(),
                     )
                     .await;
                 });
@@ -3165,6 +3165,7 @@ pub async fn embedding_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        inference_batcher,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -3418,6 +3419,7 @@ pub async fn embedding_handler(
         let gateway_response_json = gateway_response.clone();
         let async_writes = config.gateway.observability.async_writes;
         let model_pricing = model.pricing.clone();
+        let inference_batcher_clone = inference_batcher.clone();
 
         let write_future = tokio::spawn(async move {
             write_inference(
@@ -3432,6 +3434,7 @@ pub async fn embedding_handler(
                 gateway_response_json,
                 model_pricing,
                 None, // No guardrail records for embeddings
+                inference_batcher_clone.as_ref(),
             )
             .await;
         });
@@ -3484,6 +3487,7 @@ pub async fn moderation_handler(
         authentication_info: _,
         model_credential_store,
         guardrails,
+        inference_batcher,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -4027,6 +4031,7 @@ pub async fn moderation_handler(
         let gateway_response_json_clone = gateway_response_json.clone();
         let async_writes = config.gateway.observability.async_writes;
         let model_pricing = model_config.pricing.clone();
+        let inference_batcher_clone = inference_batcher.clone();
 
         let write_future = tokio::spawn(async move {
             write_inference(
@@ -4041,6 +4046,7 @@ pub async fn moderation_handler(
                 gateway_response_json_clone,
                 model_pricing,
                 None, // No guardrail records for moderation
+                inference_batcher_clone.as_ref(),
             )
             .await;
         });
@@ -5043,6 +5049,7 @@ pub async fn image_generation_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        inference_batcher,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -5328,6 +5335,7 @@ pub async fn image_generation_handler(
         let gateway_response_json = gateway_response_json.clone();
         let async_writes = config.gateway.observability.async_writes;
         let model_pricing = model.pricing.clone();
+        let inference_batcher_clone = inference_batcher.clone();
 
         let write_future = tokio::spawn(async move {
             write_inference(
@@ -5341,7 +5349,8 @@ pub async fn image_generation_handler(
                 gateway_request_json,
                 gateway_response_json,
                 model_pricing,
-                None, // No guardrail records for embeddings
+                None, // No guardrail records for image generation
+                inference_batcher_clone.as_ref(),
             )
             .await;
         });
