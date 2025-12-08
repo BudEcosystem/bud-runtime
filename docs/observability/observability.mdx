@@ -49,7 +49,7 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 
 - Inference request table with timestamp, project, deployment, prompt preview, response time, tokens, and success/failure status columns plus sortable fields for timestamp and response time.
 - Filters for project and additional attributes through the shared InferenceFilters component, paired with search-by-text input and reload/export controls.
-- Row click opens the request detail page, preserving applied filters and time range for context.
+- Request click opens the request detail page, preserving applied filters and time range for context.
 
 ### 3.4 Rules tab
 
@@ -60,32 +60,35 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 ### 3.5 Governance and auditability
 
 - Rules and request exports reuse centralized loaders and confirmation prompts, ensuring user actions are surfaced and reversible where applicable.
-- Request details expose trace-friendly identifiers (inference ID, API key) and copy/download buttons for raw payloads to support audit workflows.
+- Request details expose trace-friendly identifiers (inference ID, endpoint) and copy/download buttons for raw payloads to support audit workflows.
 
 ## 4. How-to Guides
 
 ### 4.1 Accessing the module
 
-1. In Bud Admin, open **Observability** from the left navigation.
+1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+1. Click on Observability menu from the side menu.
+1. View Observability page, which includes Metrics, Requests, and Rules tabs.
 2. Set a time range with presets or the date picker; changes apply across Metrics and Requests tabs.
 3. Use search and filters to scope the active tab before drilling into charts, tables, or rule lists.
 
-### 4.2 Metrics tab actions
+### 4.2 Metrics 
 
-- **Pivot the view**: Select **Model**, **Deployment**, **Project**, or **User** to regroup charts and lines by that dimension.
+- **Pivot the view**: Select Model, Deployment, Project, or User to regroup charts and lines by that dimension.
 - **Adjust time**: Apply presets or custom ranges; the tab reloads metrics using the selected window.
 - **Review key cards**: Scan request totals, success/failure ratios, latency percentiles, and token counts for the window.
 - **Explore charts**: Use request volume, latency distribution, geo map, tokens over time, RPS, and TTFT visualizations to spot regressions by the selected grouping.
 
-### 4.3 Requests tab actions
+### 4.3 Requests 
 
-- **Search & filter**: Combine **InferenceFilters** (project and request attributes) with the search bar for prompt/response text to trim the list before analysis.
+- Select Requests tab
+- **Search & filter**: Combine InferenceFilters (project and request attributes) with the search bar for prompt/response text to trim the list before analysis.
 - **Sort & scan**: Sort by timestamp or latency and review prompt previews, token counts, and status badges in the table.
-- **Export**: Download filtered rows as CSV/JSON for offline review via the Export button in the header.
+- **Export**: Download filtered rows as CSV for offline review via the Export button in the header.
 
 #### 4.3.1 Request detail page
 
-- **Open request**: Click any row to load the detail page showing overview fields (latency, tokens, cache flag, status) and request metadata (IP, method, path, auth, client info, location).
+- **Open request**: Click any request to load the detail page showing overview fields (latency, tokens, cache flag, status) and request metadata (IP, method, path, auth, client info, location).
 - **Inspect payloads**: Raw gateway request/response blocks include copy and download buttons for JSON exports, plus formatted message content for chat-style payloads.
 - **Trace IDs**: Copy inference and trace identifiers for use in external tracing or incident reports.
 
