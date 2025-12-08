@@ -7,12 +7,7 @@ import { Text_12_400_EEEEEE, Text_16_600_FFFFFF } from "../../text";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "../../noDataFount";
 import useHandleRouteChange from "@/lib/useHandleRouteChange";
-import ProjectTags from "src/flows/components/ProjectTags";
-import Tags from "src/flows/components/DrawerTags";
 import { useEvaluations, ExperimentData, GetExperimentsPayload } from "src/hooks/useEvaluations";
-import { formatDate } from "@/utils/formatDate";
-import { capitalize } from "@/lib/utils";
-import { endpointStatusMapping } from "@/lib/colorMapping";
 
 // Constants
 const TEXT_TRUNCATION_LENGTH = 25;
@@ -97,42 +92,6 @@ function getDisplayText(
   return "-";
 }
 
-function SortIcon({ sortOrder }: { sortOrder: string }) {
-  return sortOrder ? (
-    sortOrder === "descend" ? (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="12"
-        height="13"
-        viewBox="0 0 12 13"
-        fill="none"
-      >
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M6.00078 2.10938C6.27692 2.10938 6.50078 2.33324 6.50078 2.60938L6.50078 9.40223L8.84723 7.05578C9.04249 6.86052 9.35907 6.86052 9.55433 7.05578C9.7496 7.25104 9.7496 7.56763 9.55433 7.76289L6.35433 10.9629C6.15907 11.1582 5.84249 11.1582 5.64723 10.9629L2.44723 7.76289C2.25197 7.56763 2.25197 7.25104 2.44723 7.05578C2.64249 6.86052 2.95907 6.86052 3.15433 7.05578L5.50078 9.40223L5.50078 2.60938C5.50078 2.33324 5.72464 2.10938 6.00078 2.10938Z"
-          fill="#B3B3B3"
-        />
-      </svg>
-    ) : (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="12"
-        height="13"
-        viewBox="0 0 12 13"
-        fill="none"
-      >
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M6.00078 10.8906C6.27692 10.8906 6.50078 10.6668 6.50078 10.3906L6.50078 3.59773L8.84723 5.94418C9.04249 6.13944 9.35907 6.13944 9.55433 5.94418C9.7496 5.74892 9.7496 5.43233 9.55433 5.23707L6.35433 2.03707C6.15907 1.84181 5.84249 1.84181 5.64723 2.03707L2.44723 5.23707C2.25197 5.43233 2.25197 5.74892 2.44723 5.94418C2.64249 6.13944 2.95907 6.13944 3.15433 5.94418L5.50078 3.59773L5.50078 10.3906C5.50078 10.6668 5.72464 10.8906 6.00078 10.8906Z"
-          fill="#B3B3B3"
-        />
-      </svg>
-    )
-  ) : null;
-}
-
 function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
   const router = useRouter();
 
@@ -178,6 +137,7 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
         order: order || undefined,
         orderBy: orderBy || undefined,
         model_id: model.id,
+        experiment_status: "completed",
       };
 
       await getExperiments(payload);
@@ -202,25 +162,10 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
   // Table columns
   const columns: ColumnsType<ExperimentData> = [
     {
-      title: "Experiment Name",
-      dataIndex: "name",
-      key: "name",
-      width: 180,
-      render: (text) => <Text_12_400_EEEEEE className="capitalize">{text || "-"}</Text_12_400_EEEEEE>,
-      sorter: true,
-      sortOrder:
-        orderBy === "name"
-          ? order === "-"
-            ? "descend"
-            : "ascend"
-          : undefined,
-      sortIcon: SortIcon,
-    },
-    {
       title: "Deployment Name",
       dataIndex: "models",
       key: "models",
-      width: 180,
+      // width: 180,
       ellipsis: true,
       render: (models) => {
         const displayText = getDisplayText(models, "deployment_name", "name");
@@ -231,7 +176,7 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
       title: "Traits",
       dataIndex: "traits",
       key: "traits",
-      width: 160,
+      // width: 160,
       ellipsis: true,
       render: (traits) => {
         const displayText = getDisplayText(traits, "name", "name");
@@ -239,68 +184,14 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
       },
     },
     {
-      title: "Tags",
-      dataIndex: "tags",
-      key: "tags",
-      width: 140,
-      render: (tags) => {
-        const tagsArray = Array.isArray(tags) ? tags : [];
-        if (tagsArray.length === 0) {
-          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
-        }
-        return (
-          <div className="flex gap-1 flex-wrap">
-            {tagsArray.slice(0, 2).map((tag, index) => (
-              <Tags
-                key={index}
-                name={typeof tag === "string" ? tag : tag.name || JSON.stringify(tag)}
-                color="#D1B854"
-                classNames="text-center justify-center items-center"
-              />
-            ))}
-            {tagsArray.length > 2 && (
-              <Text_12_400_EEEEEE>+{tagsArray.length - 2}</Text_12_400_EEEEEE>
-            )}
-          </div>
-        );
+      title: "Dataset",
+      dataIndex: "dataset_name",
+      key: "dataset_name",
+      // width: 160,
+      ellipsis: true,
+      render: (datasetName) => {
+        return <TruncatedTextCell text={datasetName || "-"} />;
       },
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      width: 100,
-      render: (status: string) => (
-        <ProjectTags
-          name={capitalize(status)}
-          color={endpointStatusMapping[capitalize(status) === "Running" ? capitalize(status) + "-yellow" : capitalize(status)]}
-          textClass="text-[.75rem] py-[.22rem]"
-          tagClass="py-[0rem]"
-        />
-      ),
-      sorter: true,
-      sortOrder:
-        orderBy === "status" ? (order === "-" ? "descend" : "ascend") : undefined,
-      sortIcon: SortIcon,
-    },
-    {
-      title: "Created Date",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 120,
-      render: (date) => (
-        <Text_12_400_EEEEEE>
-          {formatDate(date)}
-        </Text_12_400_EEEEEE>
-      ),
-      sorter: true,
-      sortOrder:
-        orderBy === "created_at"
-          ? order === "-"
-            ? "descend"
-            : "ascend"
-          : undefined,
-      sortIcon: SortIcon,
     },
   ];
 
@@ -315,55 +206,12 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
     <div className="pb-[30px] pt-[.4rem]">
       <div className="userTable evalTable relative CommonCustomPagination evaluation-results-table">
         <style jsx global>{`
-          .evaluation-results-table .ant-table-body {
-            overflow-x: auto !important;
-            scrollbar-width: thin;
-            scrollbar-color: #757575 #1f1f1f;
-          }
-          .evaluation-results-table .ant-table-body::-webkit-scrollbar {
-            height: 8px;
-          }
-          .evaluation-results-table .ant-table-body::-webkit-scrollbar-track {
-            background: #1f1f1f;
-            border-radius: 4px;
-          }
-          .evaluation-results-table .ant-table-body::-webkit-scrollbar-thumb {
-            background: #757575;
-            border-radius: 4px;
-          }
-          .evaluation-results-table .ant-table-body::-webkit-scrollbar-thumb:hover {
-            background: #999999;
-          }
-          .evaluation-results-table .ant-table-content {
-            position: relative;
-          }
-          .evaluation-results-table .ant-table-content::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 8px;
-            width: 30px;
-            background: linear-gradient(to right, transparent, rgba(16, 16, 16, 0.9));
-            pointer-events: none;
-            z-index: 1;
-          }
-          .evaluation-results-table:hover .ant-table-content::after {
-            opacity: 0.5;
-          }
-          .evaluation-results-table .ant-table-placeholder {
-            position: relative;
-            z-index: 2;
-          }
           .evaluation-results-table .ant-table-placeholder .ant-table-cell {
             text-align: center !important;
             padding: 16px !important;
           }
           .evaluation-results-table .ant-table-placeholder td {
             width: 100% !important;
-          }
-          .evaluation-results-table:has(.ant-table-placeholder) .ant-table-content::after {
-            display: none !important;
           }
           .evaluation-results-table .ant-table-tbody .ant-table-placeholder > td {
             text-align: center !important;
@@ -382,7 +230,6 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
         <Table<ExperimentData>
           columns={columns}
           dataSource={tableData}
-          scroll={{ x: 860 }}
           pagination={{
             className: "small-pagination",
             current: currentPage,
@@ -449,12 +296,10 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
           )}
           locale={{
             emptyText: (
-              <div className="w-full flex justify-start pl-[10%]">
-                <NoDataFount
+              <NoDataFount
                   classNames="h-[20vh]"
                   textMessage="No experiments found for this model"
                 />
-              </div>
             ),
           }}
         />
