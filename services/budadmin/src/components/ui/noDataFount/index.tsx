@@ -9,12 +9,7 @@ interface noAccessProps {
 }
 const NoDataFount: React.FC<noAccessProps> = ({ textMessage, classNames }) => {
   return (
-    <div className={`flex ${classNames}`}
-    style={{
-      justifyContent: "center",
-      alignItems: "center"
-    }}
-    >
+    <div className={`flex justify-center items-center ${classNames}`}>
       <div>
         <div className="mb-[1em] flex justify-center">
           <svg

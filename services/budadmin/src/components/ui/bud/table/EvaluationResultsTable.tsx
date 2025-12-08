@@ -449,9 +449,10 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
           )}
           locale={{
             emptyText: (
-              <div className="w-full flex justify-center">
-                <NoDataFount classNames="h-[20vh]" textMessage="No experiments found for this model" />
-              </div>
+              <NoDataFount
+                classNames="h-[20vh]"
+                textMessage="No experiments found for this model"
+              />
             ),
           }}
         />
