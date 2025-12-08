@@ -18,7 +18,7 @@
       repo_url = "https://github.com/BudEcosystem/bud-runtime.git";
       tag.model = "semver";
       helm = {
-        env = "";
+        env = "prod";
         charts_path = "infra/helm";
       };
 

@@ -4,10 +4,10 @@ let
 in
 {
   imports = [
-    ../common/configuration.nix
-    ../dev/configuration.nix
     ../azure/configuration.nix
     ../budk8s/configuration.nix
+    ../common/configuration.nix
+    ../dev/configuration.nix
     ../master/configuration.nix
   ];
 

@@ -53,7 +53,7 @@ let
   '';
 in
 {
-  sops.secrets."misc/wireguard" = { };
+  sops.secrets."misc/wireguard".sopsFile = ./secrets.yaml;
   services.k3s.extraFlags = [ "--tls-san 10.54.132.1" ];
 
   networking = {
