@@ -1,35 +1,21 @@
-import React, { useEffect, useState } from "react";
-import { notification, Table } from "antd";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { notification, Table, Popover } from "antd";
+import { ColumnsType } from "antd/es/table";
 import { Model } from "src/hooks/useModels";
-import { Cluster } from "src/hooks/useCluster";
-import { PrimaryButton } from "../form/Buttons";
-import { useRouter as useRouter } from "next/router";
-import { useDrawer } from "src/hooks/useDrawer";
-import { useDeployModel } from "src/stores/useDeployModel";
-import { useProjects } from "src/hooks/useProjects";
+import { useRouter } from "next/router";
 import { Text_12_400_EEEEEE, Text_16_600_FFFFFF } from "../../text";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
-import { useEndPoints } from "src/hooks/useEndPoint";
-import { openWarning } from "@/components/warningMessage";
-import { useOverlay } from "src/context/overlayContext";
 import NoDataFount from "../../noDataFount";
 import useHandleRouteChange from "@/lib/useHandleRouteChange";
-import Tags from "src/flows/components/DrawerTags";
 import ProjectTags from "src/flows/components/ProjectTags";
-import { PermissionEnum, useUser } from "src/stores/useUser";
+import Tags from "src/flows/components/DrawerTags";
+import { useEvaluations, ExperimentData, GetExperimentsPayload } from "src/hooks/useEvaluations";
+import { formatDate } from "@/utils/formatDate";
+import { capitalize } from "@/lib/utils";
+import { endpointStatusMapping } from "@/lib/colorMapping";
 
-const capitalize = (str) =>
-  str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
-
-interface DataType {
-  key?: string;
-  name?: string;
-  status?: string;
-  type?: string;
-  created_at?: string;
+interface EvaluationResultsTableProps {
   model?: Model;
-  cluster?: Cluster;
-  id?: string;
 }
 
 function SortIcon({ sortOrder }: { sortOrder: string }) {
@@ -68,182 +54,403 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
   ) : null;
 }
 
-const data = [
-  {
-    id: "1",
-    evaluationType: "IFEval",
-    dataSet: "Reasoning",
-    status: "completed",
-    result: "1.2",
-  },
-  {
-    id: "2",
-    evaluationType: "BBH",
-    dataSet: "MMLU",
-    status: "completed",
-    result: "1.2",
-  },
-  {
-    id: "3",
-    evaluationType: "Model",
-    dataSet: "Factuality",
-    status: "completed",
-    result: "1.2",
-  },
-];
-
-function EvaluationResultsTable() {
-  const { hasPermission } = useUser();
-
-  const { reset } = useDeployModel();
-  const { getProject } = useProjects();
-  const [searchValue, setSearchValue] = useState("");
+function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
   const router = useRouter();
-  const { projectId } = router.query; // Access the dynamic part of the route
+
+  // State
+  const [searchValue, setSearchValue] = useState("");
   const [order, setOrder] = useState<"-" | "">("");
   const [orderBy, setOrderBy] = useState<string>("created_at");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
-  const getData = () => {};
+  // Use Zustand store
+  const {
+    experimentsList,
+    experimentsListTotal,
+    loading,
+    getExperiments,
+  } = useEvaluations();
 
   useHandleRouteChange(() => {
     notification.destroy();
   });
 
-  useEffect(() => {
-    if (projectId) {
-      getData();
+  // Fetch experiments filtered by model_id
+  const fetchExperiments = useCallback(async () => {
+    if (!model?.id) return;
+
+    try {
+      const payload: GetExperimentsPayload = {
+        page: currentPage,
+        limit: pageSize,
+        search: searchValue || undefined,
+        order: order || undefined,
+        orderBy: orderBy || undefined,
+        model_id: model.id,
+      };
+
+      await getExperiments(payload);
+    } catch (error) {
+      console.error("Failed to fetch experiments for model:", error);
     }
-  }, [projectId]);
+  }, [currentPage, pageSize, searchValue, order, orderBy, model?.id, getExperiments]);
 
+  // Initial data fetch and refetch on dependencies change
   useEffect(() => {
-    // debounce
-    if (!projectId) return;
+    fetchExperiments();
+  }, [fetchExperiments]);
 
+  // Debounced search effect
+  useEffect(() => {
     const timer = setTimeout(() => {
-      // getEndPoints({
-      //     id: projectId,
-      //     page: page,
-      //     limit: limit,
-      //     name: searchValue,
-      //     order_by: `${order}${orderBy}`,
-      // });
-    }, 500);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 300);
+
     return () => clearTimeout(timer);
-  }, [searchValue, order, orderBy]);
+  }, [searchValue]);
+
+  // Table data
+  const tableData = useMemo(() => {
+    if (!experimentsList || !Array.isArray(experimentsList)) {
+      return [];
+    }
+    return experimentsList;
+  }, [experimentsList]);
+
+  // Table columns
+  const columns: ColumnsType<ExperimentData> = [
+    {
+      title: "Experiment Name",
+      dataIndex: "name",
+      key: "name",
+      width: 180,
+      render: (text) => <Text_12_400_EEEEEE className="capitalize">{text || "-"}</Text_12_400_EEEEEE>,
+      sorter: true,
+      sortOrder:
+        orderBy === "name"
+          ? order === "-"
+            ? "descend"
+            : "ascend"
+          : undefined,
+      sortIcon: SortIcon,
+    },
+    {
+      title: "Deployment Name",
+      dataIndex: "models",
+      key: "models",
+      width: 180,
+      ellipsis: true,
+      render: (models) => {
+        let displayText = "-";
+
+        if (typeof models === "string") {
+          displayText = models;
+        } else if (Array.isArray(models)) {
+          // Prioritize deployment_name over name
+          displayText = models.map((m) => m.deployment_name || m.name || m).join(", ");
+        } else if (models && typeof models === "object") {
+          // Prioritize deployment_name over name
+          displayText = models.deployment_name || models.name || JSON.stringify(models);
+        }
+
+        if (displayText === "-") {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+
+        const needsTruncation = displayText.length > 25;
+        const truncatedText = needsTruncation ? displayText.substring(0, 25) + "..." : displayText;
+
+        if (needsTruncation) {
+          return (
+            <Popover
+              content={
+                <div className="max-w-[300px] break-words p-[.8rem]">
+                  <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+                </div>
+              }
+              placement="top"
+            >
+              <div className="cursor-pointer" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
+              </div>
+            </Popover>
+          );
+        }
+
+        return (
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+          </div>
+        );
+      },
+    },
+    {
+      title: "Traits",
+      dataIndex: "traits",
+      key: "traits",
+      width: 160,
+      ellipsis: true,
+      render: (traits) => {
+        let displayText = "-";
+
+        if (typeof traits === "string") {
+          displayText = traits;
+        } else if (Array.isArray(traits)) {
+          displayText = traits.map((t) => t.name || t).join(", ");
+        } else if (traits && typeof traits === "object") {
+          displayText = traits.name || JSON.stringify(traits);
+        }
+
+        if (displayText === "-") {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+
+        const needsTruncation = displayText.length > 25;
+        const truncatedText = needsTruncation ? displayText.substring(0, 25) + "..." : displayText;
+
+        if (needsTruncation) {
+          return (
+            <Popover
+              content={
+                <div className="max-w-[300px] break-words p-[.8rem]">
+                  <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+                </div>
+              }
+              placement="top"
+            >
+              <div className="cursor-pointer" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
+              </div>
+            </Popover>
+          );
+        }
+
+        return (
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <Text_12_400_EEEEEE>{displayText}</Text_12_400_EEEEEE>
+          </div>
+        );
+      },
+    },
+    {
+      title: "Tags",
+      dataIndex: "tags",
+      key: "tags",
+      width: 140,
+      render: (tags) => {
+        const tagsArray = Array.isArray(tags) ? tags : [];
+        if (tagsArray.length === 0) {
+          return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+        }
+        return (
+          <div className="flex gap-1 flex-wrap">
+            {tagsArray.slice(0, 2).map((tag, index) => (
+              <Tags
+                key={index}
+                name={typeof tag === "string" ? tag : tag.name || JSON.stringify(tag)}
+                color="#D1B854"
+                classNames="text-center justify-center items-center"
+              />
+            ))}
+            {tagsArray.length > 2 && (
+              <Text_12_400_EEEEEE>+{tagsArray.length - 2}</Text_12_400_EEEEEE>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      width: 100,
+      render: (status: string) => (
+        <ProjectTags
+          name={capitalize(status)}
+          color={endpointStatusMapping[capitalize(status) === "Running" ? capitalize(status) + "-yellow" : capitalize(status)]}
+          textClass="text-[.75rem] py-[.22rem]"
+          tagClass="py-[0rem]"
+        />
+      ),
+      sorter: true,
+      sortOrder:
+        orderBy === "status" ? (order === "-" ? "descend" : "ascend") : undefined,
+      sortIcon: SortIcon,
+    },
+    {
+      title: "Created Date",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 120,
+      render: (date) => (
+        <Text_12_400_EEEEEE>
+          {formatDate(date)}
+        </Text_12_400_EEEEEE>
+      ),
+      sorter: true,
+      sortOrder:
+        orderBy === "created_at"
+          ? order === "-"
+            ? "descend"
+            : "ascend"
+          : undefined,
+      sortIcon: SortIcon,
+    },
+  ];
+
+  const handleTableChange = (_pagination: any, _filters: any, sorter: any) => {
+    if (sorter.field) {
+      setOrder(sorter.order === "ascend" ? "" : "-");
+      setOrderBy(sorter.field);
+    }
+  };
 
   return (
-    <div className="pb-[60px] pt-[.4rem]">
-      <Table<DataType>
-        columns={[
-          {
-            title: "Evaluation Type",
-            dataIndex: "evaluationType",
-            key: "evaluationType",
-            render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
-            sortOrder:
-              orderBy === "name"
-                ? order === "-"
-                  ? "descend"
-                  : "ascend"
-                : undefined,
-            sorter: true,
-            sortIcon: SortIcon,
-          },
-          {
-            title: "Dataset",
-            dataIndex: "dataSet",
-            key: "dataSet",
-            sortIcon: SortIcon,
-            render: (status) => (
-              <ProjectTags name={capitalize(status)} color={"#3EC564"} />
-            ),
-          },
-          {
-            title: "Result",
-            key: "result",
-            dataIndex: "result",
-            sortOrder:
-              orderBy === "status"
-                ? order === "-"
-                  ? "descend"
-                  : "ascend"
-                : undefined,
-            sorter: true,
-            render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
-            sortIcon: SortIcon,
-          },
-        ]}
-        pagination={false}
-        dataSource={[]}
-        bordered={false}
-        footer={null}
-        virtual
-        onRow={(record, rowIndex) => {
-          return {
-            onClick: async (event) => {},
-          };
-        }}
-        onChange={(
-          pagination,
-          filters,
-          sorter: {
-            order: "ascend" | "descend";
-            field: string;
-          },
-          extra,
-        ) => {
-          setOrder(sorter.order === "ascend" ? "" : "-");
-          setOrderBy(sorter.field);
-        }}
-        showSorterTooltip={true}
-        title={() => (
-          <div className="flex justify-between items-center px-[0.75rem] py-[1rem] gap-x-[.4rem]">
-            <Text_16_600_FFFFFF className="text-[#EEEEEE] whitespace-nowrap">
-              Evaluation Results
-            </Text_16_600_FFFFFF>
-            <div className="flex items-center justify-between gap-x-[.4rem]">
-              <SearchHeaderInput
-                placeholder={"Search by name"}
-                searchValue={searchValue}
-                classNames={'flex-1'}
-                fullWidth={true}
-                setSearchValue={setSearchValue}
-              />
-              {hasPermission(PermissionEnum.ModelManage) && (
-                <PrimaryButton
-                  onClick={() => {
-                    reset();
-                  }}
-                >
-                  <div className="flex items-center justify-center">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="13"
-                      viewBox="0 0 12 13"
-                      fill="none"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M5.48129 3.47747L6.12128 2.83745C6.63692 2.32183 7.54131 1.96401 8.44 1.83563C8.8829 1.77236 9.30173 1.76843 9.64357 1.81962C9.99743 1.87261 10.2143 1.9762 10.3156 2.07749C10.4169 2.17877 10.5205 2.39563 10.5735 2.74949C10.6247 3.09131 10.6207 3.51014 10.5575 3.95304C10.4291 4.85174 10.0712 5.75613 9.55559 6.27179L5.99843 9.82895L5.08127 8.91179C4.92506 8.75558 4.67179 8.75558 4.51558 8.91179C4.35937 9.068 4.35937 9.32127 4.51558 9.47748L5.71559 10.6775C5.8718 10.8337 6.12507 10.8337 6.28128 10.6775L6.71902 10.2397L7.65543 11.8004C7.7188 11.906 7.8273 11.9766 7.94956 11.9916C8.07181 12.0067 8.19417 11.9646 8.28127 11.8775L9.88127 10.2775C9.9703 10.1884 10.0122 10.0627 9.99441 9.93806L9.6227 7.33606L10.1213 6.83747C10.8056 6.15309 11.2078 5.05747 11.3494 4.06617C11.4211 3.56407 11.4297 3.06541 11.3647 2.631C11.3014 2.20861 11.16 1.79048 10.8813 1.51179C10.6026 1.2331 10.1844 1.09169 9.76205 1.02844C9.32764 0.963385 8.82897 0.971945 8.32687 1.04367C7.33558 1.18527 6.23995 1.58743 5.55559 2.27177L5.05701 2.77037L2.45501 2.39866C2.33037 2.38085 2.20462 2.42277 2.1156 2.51179L0.515598 4.11179C0.428501 4.19889 0.386388 4.32126 0.401438 4.44351C0.416488 4.56576 0.487022 4.67426 0.592643 4.73763L2.15335 5.67405L1.71561 6.11179C1.64059 6.18681 1.59845 6.28855 1.59845 6.39463C1.59845 6.50072 1.64059 6.60246 1.71561 6.67748L2.91561 7.87748C3.07182 8.03369 3.32509 8.03369 3.4813 7.87748C3.63751 7.72127 3.63751 7.468 3.4813 7.31179L2.56414 6.39464L3.0813 5.87748L5.48129 3.47747ZM8.07784 10.9495L7.30211 9.65664L8.91559 8.04317L9.17416 9.85321L8.07784 10.9495ZM2.73645 5.09096L4.34991 3.47748L2.53986 3.2189L1.44354 4.31522L2.73645 5.09096ZM1.88128 8.67747C2.03749 8.52126 2.03749 8.26799 1.88128 8.11178C1.72507 7.95557 1.47181 7.95557 1.3156 8.11178L0.515598 8.91178C0.359388 9.06799 0.359388 9.32126 0.515598 9.47747C0.671808 9.63368 0.925074 9.63368 1.08128 9.47747L1.88128 8.67747ZM3.0813 9.87749C3.23751 9.72128 3.23752 9.46801 3.08131 9.3118C2.9251 9.15559 2.67183 9.15559 2.51562 9.31179L0.915601 10.9118C0.75939 11.068 0.759387 11.3213 0.915595 11.4775C1.0718 11.6337 1.32507 11.6337 1.48128 11.4775L3.0813 9.87749ZM4.28128 11.0775C4.43749 10.9213 4.43749 10.668 4.28128 10.5118C4.12507 10.3556 3.87181 10.3556 3.7156 10.5118L2.9156 11.3118C2.75939 11.468 2.75939 11.7213 2.9156 11.8775C3.07181 12.0337 3.32507 12.0337 3.48128 11.8775L4.28128 11.0775ZM7.59671 5.79498C8.14847 5.79498 8.59576 5.34769 8.59576 4.79593C8.59576 4.24417 8.14847 3.79688 7.59671 3.79688C7.04495 3.79688 6.59766 4.24417 6.59766 4.79593C6.59766 5.34769 7.04495 5.79498 7.59671 5.79498Z"
-                        fill="#EEEEEE"
-                      />
-                    </svg>
-                    <div className="ml-2" />
-                    Run Evaluations
-                  </div>
-                </PrimaryButton>
-              )}
+    <div className="pb-[30px] pt-[.4rem]">
+      <div className="userTable evalTable relative CommonCustomPagination evaluation-results-table">
+        <style jsx global>{`
+          .evaluation-results-table .ant-table-body {
+            overflow-x: auto !important;
+            scrollbar-width: thin;
+            scrollbar-color: #757575 #1f1f1f;
+          }
+          .evaluation-results-table .ant-table-body::-webkit-scrollbar {
+            height: 8px;
+          }
+          .evaluation-results-table .ant-table-body::-webkit-scrollbar-track {
+            background: #1f1f1f;
+            border-radius: 4px;
+          }
+          .evaluation-results-table .ant-table-body::-webkit-scrollbar-thumb {
+            background: #757575;
+            border-radius: 4px;
+          }
+          .evaluation-results-table .ant-table-body::-webkit-scrollbar-thumb:hover {
+            background: #999999;
+          }
+          .evaluation-results-table .ant-table-content {
+            position: relative;
+          }
+          .evaluation-results-table .ant-table-content::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 8px;
+            width: 30px;
+            background: linear-gradient(to right, transparent, rgba(16, 16, 16, 0.9));
+            pointer-events: none;
+            z-index: 1;
+          }
+          .evaluation-results-table:hover .ant-table-content::after {
+            opacity: 0.5;
+          }
+          .evaluation-results-table .ant-table-placeholder {
+            position: relative;
+            z-index: 2;
+          }
+          .evaluation-results-table .ant-table-placeholder .ant-table-cell {
+            text-align: center !important;
+            padding: 16px !important;
+          }
+          .evaluation-results-table .ant-table-placeholder td {
+            width: 100% !important;
+          }
+          .evaluation-results-table:has(.ant-table-placeholder) .ant-table-content::after {
+            display: none !important;
+          }
+          .evaluation-results-table .ant-table-tbody .ant-table-placeholder > td {
+            text-align: center !important;
+          }
+          .evaluation-results-table .ant-empty,
+          .evaluation-results-table .ant-table-empty .ant-table-tbody > tr > td {
+            text-align: center !important;
+          }
+          .evaluation-results-table .ant-table-placeholder .ant-table-cell > div {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+          }
+        `}</style>
+        <Table<ExperimentData>
+          columns={columns}
+          dataSource={tableData}
+          scroll={{ x: 860 }}
+          pagination={{
+            className: "small-pagination",
+            current: currentPage,
+            pageSize: pageSize,
+            total: experimentsListTotal || 0,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showSizeChanger: true,
+            pageSizeOptions: ["5", "10", "20", "50"],
+          }}
+          loading={loading}
+          onChange={handleTableChange}
+          onRow={(record) => ({
+            onClick: () => router.push(`/home/evaluations/experiments/${record.id}`),
+            style: { cursor: "pointer" },
+            className: "group",
+          })}
+          showSorterTooltip={false}
+          rowKey="id"
+          bordered={false}
+          title={() => (
+            <div className="flex justify-between items-center px-[0.75rem] py-[1rem] gap-x-[.4rem]">
+              <Text_16_600_FFFFFF className="text-[#EEEEEE] whitespace-nowrap">
+                Evaluation Results
+              </Text_16_600_FFFFFF>
+              <div className="flex items-center justify-between gap-x-[.4rem]">
+                <SearchHeaderInput
+                  placeholder="Search by name"
+                  searchValue={searchValue}
+                  classNames="flex-1"
+                  fullWidth={true}
+                  setSearchValue={setSearchValue}
+                />
+                {/* {hasPermission(PermissionEnum.ModelManage) && (
+                  <PrimaryButton
+                    onClick={() => {
+                      router.push("/home/evaluations/experiments");
+                    }}
+                  >
+                    <div className="flex items-center justify-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="13"
+                        viewBox="0 0 12 13"
+                        fill="none"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          clipRule="evenodd"
+                          d="M5.48129 3.47747L6.12128 2.83745C6.63692 2.32183 7.54131 1.96401 8.44 1.83563C8.8829 1.77236 9.30173 1.76843 9.64357 1.81962C9.99743 1.87261 10.2143 1.9762 10.3156 2.07749C10.4169 2.17877 10.5205 2.39563 10.5735 2.74949C10.6247 3.09131 10.6207 3.51014 10.5575 3.95304C10.4291 4.85174 10.0712 5.75613 9.55559 6.27179L5.99843 9.82895L5.08127 8.91179C4.92506 8.75558 4.67179 8.75558 4.51558 8.91179C4.35937 9.068 4.35937 9.32127 4.51558 9.47748L5.71559 10.6775C5.8718 10.8337 6.12507 10.8337 6.28128 10.6775L6.71902 10.2397L7.65543 11.8004C7.7188 11.906 7.8273 11.9766 7.94956 11.9916C8.07181 12.0067 8.19417 11.9646 8.28127 11.8775L9.88127 10.2775C9.9703 10.1884 10.0122 10.0627 9.99441 9.93806L9.6227 7.33606L10.1213 6.83747C10.8056 6.15309 11.2078 5.05747 11.3494 4.06617C11.4211 3.56407 11.4297 3.06541 11.3647 2.631C11.3014 2.20861 11.16 1.79048 10.8813 1.51179C10.6026 1.2331 10.1844 1.09169 9.76205 1.02844C9.32764 0.963385 8.82897 0.971945 8.32687 1.04367C7.33558 1.18527 6.23995 1.58743 5.55559 2.27177L5.05701 2.77037L2.45501 2.39866C2.33037 2.38085 2.20462 2.42277 2.1156 2.51179L0.515598 4.11179C0.428501 4.19889 0.386388 4.32126 0.401438 4.44351C0.416488 4.56576 0.487022 4.67426 0.592643 4.73763L2.15335 5.67405L1.71561 6.11179C1.64059 6.18681 1.59845 6.28855 1.59845 6.39463C1.59845 6.50072 1.64059 6.60246 1.71561 6.67748L2.91561 7.87748C3.07182 8.03369 3.32509 8.03369 3.4813 7.87748C3.63751 7.72127 3.63751 7.468 3.4813 7.31179L2.56414 6.39464L3.0813 5.87748L5.48129 3.47747ZM8.07784 10.9495L7.30211 9.65664L8.91559 8.04317L9.17416 9.85321L8.07784 10.9495ZM2.73645 5.09096L4.34991 3.47748L2.53986 3.2189L1.44354 4.31522L2.73645 5.09096ZM1.88128 8.67747C2.03749 8.52126 2.03749 8.26799 1.88128 8.11178C1.72507 7.95557 1.47181 7.95557 1.3156 8.11178L0.515598 8.91178C0.359388 9.06799 0.359388 9.32126 0.515598 9.47747C0.671808 9.63368 0.925074 9.63368 1.08128 9.47747L1.88128 8.67747ZM3.0813 9.87749C3.23751 9.72128 3.23752 9.46801 3.08131 9.3118C2.9251 9.15559 2.67183 9.15559 2.51562 9.31179L0.915601 10.9118C0.75939 11.068 0.759387 11.3213 0.915595 11.4775C1.0718 11.6337 1.32507 11.6337 1.48128 11.4775L3.0813 9.87749ZM4.28128 11.0775C4.43749 10.9213 4.43749 10.668 4.28128 10.5118C4.12507 10.3556 3.87181 10.3556 3.7156 10.5118L2.9156 11.3118C2.75939 11.468 2.75939 11.7213 2.9156 11.8775C3.07181 12.0337 3.32507 12.0337 3.48128 11.8775L4.28128 11.0775ZM7.59671 5.79498C8.14847 5.79498 8.59576 5.34769 8.59576 4.79593C8.59576 4.24417 8.14847 3.79688 7.59671 3.79688C7.04495 3.79688 6.59766 4.24417 6.59766 4.79593C6.59766 5.34769 7.04495 5.79498 7.59671 5.79498Z"
+                          fill="#EEEEEE"
+                        />
+                      </svg>
+                      <div className="ml-2" />
+                      Run Evaluations
+                    </div>
+                  </PrimaryButton>
+                )} */}
+              </div>
             </div>
-          </div>
-        )}
-        locale={{
-          emptyText: (
-            <NoDataFount classNames="h-[20vh]" textMessage={`No data found`} />
-          ),
-        }}
-      />
+          )}
+          locale={{
+            emptyText: (
+              <div className="w-full flex justify-start pl-[10%]">
+                <NoDataFount classNames="h-[20vh]" textMessage="No experiments found
+  for this model" />
+              </div>),
+          }}
+        />
+      </div>
     </div>
   );
 }
