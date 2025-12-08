@@ -68,21 +68,30 @@ function getDisplayText(
   if (!data) return "-";
 
   if (typeof data === "string") {
-    return data;
+    return data || "-";
   }
 
   if (Array.isArray(data)) {
-    const texts = data.map((item) => {
-      if (typeof item === "string") return item;
-      return item[priorityKey] || item[fallbackKey] || String(item);
-    });
+    if (data.length === 0) return "-";
+    const texts = data
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          return item[priorityKey] || item[fallbackKey] || null;
+        }
+        return null;
+      })
+      .filter(Boolean);
     return texts.length > 0 ? texts.join(", ") : "-";
   }
 
   if (typeof data === "object") {
-    return (data as Record<string, unknown>)[priorityKey] as string
-      || (data as Record<string, unknown>)[fallbackKey] as string
-      || JSON.stringify(data);
+    const obj = data as Record<string, unknown>;
+    const value = obj[priorityKey] || obj[fallbackKey];
+    if (typeof value === "string" && value) {
+      return value;
+    }
+    return "-";
   }
 
   return "-";
