@@ -235,6 +235,10 @@ pub struct BlockingRulesManager {
     /// Global rules that apply to all requests
     global_rules: Arc<RwLock<Vec<Arc<CompiledRule>>>>,
 
+    /// Whether global rules have been loaded (even if empty)
+    /// This prevents repeated Redis lookups when no rules exist
+    global_rules_loaded: AtomicBool,
+
     /// Rate limit states using DashMap for concurrent access
     /// Key format: "global:{ip}"
     rate_limits: Arc<DashMap<String, RateLimitState>>,
@@ -258,6 +262,7 @@ impl BlockingRulesManager {
     pub fn new(redis_client: Option<Arc<RedisClient>>) -> Self {
         Self {
             global_rules: Arc::new(RwLock::new(Vec::new())),
+            global_rules_loaded: AtomicBool::new(false),
             rate_limits: Arc::new(DashMap::new()),
             redis_client,
             clickhouse_client: None,
@@ -274,6 +279,7 @@ impl BlockingRulesManager {
     ) -> Self {
         Self {
             global_rules: Arc::new(RwLock::new(Vec::new())),
+            global_rules_loaded: AtomicBool::new(false),
             rate_limits: Arc::new(DashMap::new()),
             redis_client,
             clickhouse_client,
@@ -560,12 +566,17 @@ impl BlockingRulesManager {
             info!("No global blocking rules found");
         }
 
+        // Mark as loaded to prevent repeated Redis lookups (even if empty)
+        self.global_rules_loaded.store(true, Ordering::Release);
+
         Ok(())
     }
 
     /// Clear global rules (when deleted from Redis)
     pub async fn clear_global_rules(&self) {
         *self.global_rules.write().await = Vec::new();
+        // Reset the loaded flag to allow reloading on next request
+        self.global_rules_loaded.store(false, Ordering::Release);
         gauge!("blocking_rules_cached").set(0.0);
         info!("Cleared global blocking rules");
     }
@@ -599,15 +610,12 @@ impl BlockingRulesManager {
 
         let mut rules_evaluated = 0;
 
-        // Ensure global rules are loaded (load on first access)
-        {
-            let global_rules = self.global_rules.read().await;
-            if global_rules.is_empty() {
-                drop(global_rules); // Release read lock before loading
-                debug!("No global rules cached, loading from Redis...");
-                if let Err(e) = self.load_rules("global").await {
-                    warn!("Failed to load global rules: {}", e);
-                }
+        // Ensure global rules are loaded (load on first access only)
+        // Uses atomic flag to prevent repeated Redis lookups when rules are legitimately empty
+        if !self.global_rules_loaded.load(Ordering::Acquire) {
+            debug!("Global rules not yet loaded, loading from Redis...");
+            if let Err(e) = self.load_rules("global").await {
+                warn!("Failed to load global rules: {}", e);
             }
         }
 
