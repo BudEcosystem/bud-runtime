@@ -23,141 +23,158 @@ End-to-end metrics include request volumes, latency distributions, token usage, 
 
 Searchable, filterable request tables link directly to detail pages with full payloads, metadata, copy/download actions, and trace-friendly IDs.
 
-### ### 4. Governed blocking rules
+### 4. Governed blocking rules
 
 Rules manage IP, country, user-agent, and rate-based blocking with stats, filters, creation drawers, and audited delete confirmations, keeping enforcement aligned with deployments.
 
-### 5. Actionable alerting and remediation
+### 5. Consistent search, filter, and export
 
-Alert policies that trigger on AI-specific thresholds (latency, token burn, error rate) with guided runbooks, webhook/Slack/Teams delivery, and one-click drills into traces and logs.
+Global search, time-range presets, tab-level filters, and CSV/JSON exports are available across metrics and requests for repeatable investigations.
 
 ## 3. Features
 
 ### 3.1 Unified observability workspace
 
-- Left-nav entry for **Observability** with tabs for **Metrics**, **Requests**, and **Rules**.
-- Time-range selector, global search, filters (project, accelerator type, model, route, status), and CSV/JSON export for charts and tables.
-- Dark/light theme alignment with Bud Admin UI and keyboard shortcuts for search and time range.
+- Left navigation entry for **Observability** with tabs for **Metrics**, **Requests**, and **Rules** plus shared time-range controls and refresh actions.
+
+- Search, filter, and export patterns mirror the broader Bud Admin UI, including saved range presets and CSV/JSON outputs for tables.
 
 ### 3.2 Metrics tab
 
-- Curated dashboards for system health: CPU/GPU/HPU/TPU utilization, memory, disk, network, queue depth, autoscaler signals, and service SLIs.
-- Breakdowns by project, accelerator type, and deployment route with comparison overlays.
-- Chart-level actions: change rollup, pin to saved view, export data, and open in full-screen mode.
+- **View by Model / Deployment / Project / User** segmented control to pivot charts and groupings without changing context.
+
+- Key cards for total requests, success/failure rates, latency (avg/p95/p99), and token totals per time range.
+
+- Charts for request volume over time, latency distribution, geographic origin, token usage, requests per second, and TTFT with series colored per selected view dimension.
+
+- Time-range presets (1h, 6h, 24h, 7d, 30d, 3mo) and calendar picker apply consistently to all metrics queries.
 
 ### 3.3 Requests tab
 
-- Request analytics by model, route, agent, and client API key (throughput, success/error breakdown, p50/p95/p99 latency, token burn, and per-request cost).
-- Drill-down cards for error fingerprints with prompt/response samples (redacted where required) and correlated infra signals.
-- Table and chart exports that respect applied filters and time range.
+- Inference request table with timestamp, project, deployment, prompt preview, latency, tokens, and success/failure status columns plus sortable fields for timestamp and latency.
+
+- Filters for project and additional attributes through the shared **InferenceFilters** component, paired with search-by-text input and reload/export controls.
+
+- Row click opens the request detail page at `/observability/[id]`, preserving applied filters and time range for context.
 
 ### 3.4 Rules tab
 
-- Alerting workspace for latency, error rate, saturation, queue depth, token burn, and cost signals.
-- Templates for common AI scenarios and custom rule builder with thresholds or anomalies.
-- Actions to create, edit, mute, clone, archive, test notifications, and export rule sets.
+- Statistics cards summarizing total rules, active rules, and recent blocks (today/this week).
+
+- Filters for rule type (IP, country, user-agent, rate-based) and status (active/inactive) plus counts of how many rules match the current view.
+
+- Actions to create a rule (opens drawer), view a rule, edit, and delete with confirmation and loader feedback for long-running operations.
 
 ### 3.5 Governance and auditability
 
-- RBAC-aligned access to observability tabs with read/manage scopes per role and project.
-- Audit log of every action (rule create/edit/delete/mute, exports, saved views) with actor, timestamp, and before/after state.
-- Data retention controls for metrics and request analytics per project or compliance regime.
+- Rules and request exports reuse centralized loaders and confirmation prompts, ensuring user actions are surfaced and reversible where applicable.
+
+- Request details expose trace-friendly identifiers (inference ID, API key) and copy/download buttons for raw payloads to support audit workflows.
 
 ## 4. How-to Guides
 
 ### 4.1 Accessing the module
 
 1. In Bud Admin, open **Observability** from the left navigation.
-2. Use the global search bar to find models, routes, or rules; apply filters (project, accelerator type, status, provider) to refine results.
-3. Set the time range (last 15m/1h/24h/custom) to scope all tabs.
+
+2. Set a time range with presets or the date picker; changes apply across Metrics and Requests tabs.
+
+3. Use search and filters to scope the active tab before drilling into charts, tables, or rule lists.
 
 ### 4.2 Metrics tab actions
 
-- **Switch dashboard**: Use the dashboard picker to toggle between system health, accelerator utilization, and service SLI views.
-- **Search & Filter**: Search by service/model/route; filter by project, accelerator type (CPU/GPU/HPU/TPU), status, and provider.
-- **View by Model / Deployment / Project / User**: Pivot charts and tables to group metrics by the selected dimension so you can compare models, deployments, projects, or users without changing tabs.
-- **Chart controls**: Change rollup (avg/p95/max), compare entities side-by-side, toggle legends, and expand to full screen.
-- **Saved views**: Save a filter/time-range combination for fast recall; update or delete saved views as needed.
-- **Export**: Export the current panel or full dashboard to CSV/JSON (data) or PNG (visual) respecting time range and filters.
+- **Pivot the view**: Select **Model**, **Deployment**, **Project**, or **User** to regroup charts and lines by that dimension.
+
+- **Adjust time**: Apply presets or custom ranges; the tab reloads metrics using the selected window.
+
+- **Review key cards**: Scan request totals, success/failure ratios, latency percentiles, and token counts for the window.
+
+- **Explore charts**: Use request volume, latency distribution, geo map, tokens over time, RPS, and TTFT visualizations to spot regressions by the selected grouping.
 
 ### 4.3 Requests tab actions
 
-- **Request explorer**: Table with throughput, latency, error rate, token burn, and cost grouped by model, route, agent, or client API key.
-- **Search & Filter**: Search by route or client key; filter by status code family, latency band, project, accelerator type, or geography.
-- **Drill-down**: Click a row to open request details with error fingerprints, prompt/response (redacted), correlated metrics, and trace links.
-- **Compare**: Pin multiple rows to compare performance across models or routes within the selected window.
-- **Export**: Export filtered tables and charts to CSV/JSON for incident reviews or offline analysis.
+- **Search & filter**: Combine **InferenceFilters** (project and request attributes) with the search bar for prompt/response text to trim the list before analysis.
+
+- **Sort & scan**: Sort by timestamp or latency and review prompt previews, token counts, and status badges in the table.
+
+- **Export**: Download filtered rows as CSV/JSON for offline review via the Export button in the header.
 
 #### 4.3.1 Request detail page
 
-- **Open request**: Click any request row to open its inner detail page with timeline, spans, and correlated metrics.
-- **Tabs within detail**: View **Summary**, **Error**, **Prompt/Response** (with redaction), and **Infra Correlation** sections.
-- **Actions**: Copy request ID/trace ID, rerun a similar request (where allowed), download trace JSON, and export the visible table slice to CSV/JSON.
+- **Open request**: Click any row to load the detail page showing overview fields (latency, tokens, cache flag, status) and request metadata (IP, method, path, auth, client info, location).
+
+- **Inspect payloads**: Raw gateway request/response blocks include copy and download buttons for JSON exports, plus formatted message content for chat-style payloads.
+
+- **Trace IDs**: Copy inference and trace identifiers for use in external tracing or incident reports.
 
 ### 4.4 Rules tab actions
 
-- **Create Rule**: Button at top right. Choose a template (latency, error rate, token burn, cost, saturation) or start from scratch.
-- **Configure**: Define scope (project/model/route/client key), conditions (threshold/anomaly), evaluation window, and notification channels (email, Slack, Teams, PagerDuty, webhook).
-- **Lifecycle actions**: Edit, clone, mute/unmute, archive, and test notification delivery; all actions are audited.
-- **Search & Filter**: Search by rule name or ID; filter by status (active/muted/archived), severity, project, and channel.
-- **Export**: Export rule lists or a single rule definition to JSON for backup or reuse.
+- **Review stats**: Check total, active, and recent block counts at the top of the Rules tab to gauge enforcement impact.
 
-#### 4.4.1 Rule detail page
+- **Filter the list**: Use rule type (IP, country, user-agent, rate-based) and status (active/inactive) selectors to narrow results; counts update as filters change.
 
-- **Open rule**: Click any rule to view its configuration, evaluation history, recent alerts, and notification targets.
-- **Controls**: Enable/disable the rule, mute/unmute notifications, clone, or archive directly from the detail page.
-- **History & audit**: Review evaluation logs, recent triggers, acknowledgments, and audit entries for edits or routing changes.
+- **Lifecycle actions**: Create new blocking rules via the drawer, open existing rules to view details, edit configurations, or delete with confirmation and loader feedback.
+
+#### 4.4.1 Rule detail drawer
+
+- **Open rule**: Choose **View** on any row to load the drawer with rule properties, type, scope, and current status (active/inactive).
+
+- **Evaluate status**: Use the active/inactive state and recent block counts to decide whether to adjust thresholds or disable the rule.
 
 #### 4.4.2 Create rule flow
 
-- **Start**: Select **Create Rule** to launch the builder (template or custom).
-- **Scope & conditions**: Choose dimension (project/model/route/user/client key), set thresholds or anomaly detection, and define evaluation windows.
-- **Notifications & actions**: Add delivery channels, escalation steps, auto-remediation webhooks, and test notifications before saving.
-- **Save & review**: Save the rule, verify it appears in the list with correct status, and export the definition if needed.
+- **Start**: Select **Create Rule** to open the creation drawer.
+
+- **Configure**: Choose a rule type (IP, country, user-agent, rate-based), set scope, and define activation state before saving.
+
+- **Save & review**: After creation, verify the new rule appears in the list with updated totals and matches the intended status.
 
 ### 4.5 Request and trace troubleshooting
 
-1. Open **Requests** and apply filters for model/route/client key or status code family.
-2. Select a request to view correlated spans, downstream dependencies, and infra metrics at the time of the request.
-3. Use **Search** to locate specific trace IDs; filter by status/duration; download trace JSON for deep debugging.
-4. Export tables or traces to support incident postmortems.
+1. In **Requests**, filter by project and time to isolate the affected window, then sort by latency to surface slow calls.
 
-### 4.6 Alert routing and escalation
+2. Open a request to inspect metadata (method, path, auth, client IP, user agent, location) and confirm whether blocks or failures align with rule coverage.
 
-1. In **Rules**, open a rule and review the notification section.
-2. Add or reorder channels (Slack/Teams/email/PagerDuty/webhook) and set escalation timers.
-3. Save changes and trigger a **Test Notification** to validate delivery.
-4. Use filters and exports to review routing coverage across projects.
+3. Copy and download raw gateway payloads for replay or deeper tracing, ensuring sensitive fields remain redacted as stored.
+
+### 4.6 Rule hygiene and enforcement checks
+
+1. Review Rules tab stats to ensure active blocking aligns with current traffic patterns.
+
+2. Filter by rule type/status to confirm coverage (e.g., active rate limits for high-traffic deployments).
+
+3. Use the create/edit flows to update thresholds or disable rules; deletions prompt confirmation to avoid accidental removals.
 
 ### 4.7 Search, filter, and export best practices
 
-- Use the global search to jump to models, routes, rules, or traces; keyboard shortcuts are supported.
-- Combine filters (project + accelerator type + status) to narrow noise during incidents.
-- Save frequent filter sets as **Saved Views** for quick access.
-- Exports respect the active filters and time range; prefer JSON for rule and trace exports and CSV for tabular reports.
+- Use time presets for quick pivots during incidents, then refine with the date picker for exact comparisons.
+
+- Combine table filters and text search before exporting to minimize post-processing; exports respect the active filters and sort order.
+
+- Prefer JSON exports for payload fidelity (requests, rules) and CSV for spreadsheet-friendly tabular analysis.
 
 ## 5. FAQ
 
-**Q1: How do I onboard a new accelerator type (e.g., HPU/TPU) into observability?**
+**Q1: How do I switch between model, deployment, project, and user perspectives in Metrics?**
 
-Ensure the data collectors for the accelerator are enabled, verify signals appear in the **Metrics** tab, and confirm request attribution by model/route in **Requests**. No cluster registration is required inside Observability.
+Use the **View by** segmented control at the top of the Metrics tab to pivot charts and stats without changing tabs.
 
-**Q2: What data retention defaults apply to metrics and request analytics?**
+**Q2: Which performance visuals are available for inference analytics?**
 
-Retention inherits the project’s policy set in **Settings**; you can request overrides from an admin and confirm the effective policy in the tab header.
+Request volume, latency distribution, geographic origin, token usage over time, requests per second, and TTFT charts render for the selected time range and grouping.
 
-**Q3: How are rules routed and escalated for incidents?**
+**Q3: What details are shown when I open a request?**
 
-Rules define primary channels (Slack/Teams/email/PagerDuty/webhook) and escalation timers; acknowledgments and resolves are tracked in the **Rules** tab and the audit log.
+The detail page includes overview stats (latency, tokens, cache flag, status), gateway metadata (IP, method, path, auth, client, location), formatted messages, and raw request/response blocks with copy/download actions.
 
-**Q4: Can I restrict who sees request analytics?**
+**Q4: How do I export observability data?**
 
-Yes. RBAC scopes let admins limit **Requests** tab visibility to specific roles or projects while keeping read-only access to health metrics for broader teams.
+Use the Export buttons on the Requests tab for CSV/JSON tables and the copy/download controls in request details for raw payload JSON; exports follow applied filters and sort order.
 
-**Q5: Are exports secured and auditable?**
+**Q5: What rule types can I enforce, and how do I manage them?**
 
-Exports respect RBAC, time range, and filters; each export action is logged with actor, scope, format (CSV/JSON/PNG), and a downloadable link that expires per policy.
+Rules support IP, country, user-agent, and rate-based blocking. Create or view them via drawers, filter by type/status, and update or delete with confirmation prompts to keep coverage accurate.
 
-**Q6: How do I troubleshoot missing traces or request records?**
+**Q6: How can I check whether blocking is effective during an incident?**
 
-Check sampling and redaction rules in **Rules** or project settings, confirm services emit OTLP/Prometheus signals, and use the **Requests** tab filters to ensure the time range and status filters include the expected traffic.
+Open the Rules tab to review active counts and block statistics, then filter to the relevant rule types to confirm the correct policies are live.
