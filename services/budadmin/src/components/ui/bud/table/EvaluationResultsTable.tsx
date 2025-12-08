@@ -59,6 +59,7 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
 
   // State
   const [searchValue, setSearchValue] = useState("");
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
   const [order, setOrder] = useState<"-" | "">("");
   const [orderBy, setOrderBy] = useState<string>("created_at");
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,6 +77,16 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
     notification.destroy();
   });
 
+  // Debounced search effect - updates debouncedSearchValue and resets page together
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValue(searchValue);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
   // Fetch experiments filtered by model_id
   const fetchExperiments = useCallback(async () => {
     if (!model?.id) return;
@@ -84,7 +95,7 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
       const payload: GetExperimentsPayload = {
         page: currentPage,
         limit: pageSize,
-        search: searchValue || undefined,
+        search: debouncedSearchValue || undefined,
         order: order || undefined,
         orderBy: orderBy || undefined,
         model_id: model.id,
@@ -94,21 +105,12 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
     } catch (error) {
       console.error("Failed to fetch experiments for model:", error);
     }
-  }, [currentPage, pageSize, searchValue, order, orderBy, model?.id, getExperiments]);
+  }, [currentPage, pageSize, debouncedSearchValue, order, orderBy, model?.id, getExperiments]);
 
-  // Initial data fetch and refetch on dependencies change
+  // Fetch data when dependencies change
   useEffect(() => {
     fetchExperiments();
   }, [fetchExperiments]);
-
-  // Debounced search effect
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page when search changes
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchValue]);
 
   // Table data
   const tableData = useMemo(() => {
