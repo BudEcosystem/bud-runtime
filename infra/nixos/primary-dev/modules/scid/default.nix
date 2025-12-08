@@ -13,7 +13,7 @@ in
     enable = true;
     environment.SOPS_AGE_KEY_FILE = sops_key_path;
     settings = {
-      tag = lib.mkForce { };
+      tag = lib.mkForce null;
 
       slack = {
         channel = "infra";
