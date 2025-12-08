@@ -43,7 +43,7 @@ let
 
     [Peer]
     # friendly_name = varun
-    PublicKey = pCbQgCvujD5lkzrWDHqiRlxk4SvwhxnXhvx1eJ2iVl4=
+    PublicKey = 0p3WlvhxK6HKq2tFapQvjCogeABgPcUjwW3veN3qGyw=
     AllowedIPs = 10.54.132.5/32
 
     [Peer]
