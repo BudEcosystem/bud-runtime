@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Table, Tooltip } from "antd";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { LeaderBoardItem } from "src/hooks/useModels";
@@ -62,9 +62,6 @@ function LeaderboardsTable({
   data: LeaderBoardItem[];
   leaderboardClasses?: string;
 }) {
-  const [, setOrderBy] = useState<string>("");
-  const [, setOrder] = useState<string>("");
-
   const rows = useMemo(() => {
     let horizontalRows = [];
 
@@ -224,19 +221,6 @@ function LeaderboardsTable({
         bordered={false}
         footer={null}
         scroll={{ x: 600 }}
-        onChange={(
-          pagination,
-          filters,
-          sorter: {
-            order: "ascend" | "descend";
-            field: string;
-          },
-          extra,
-        ) => {
-          setOrder(sorter.order === "ascend" ? "" : "-");
-          setOrderBy(sorter.field);
-        }}
-        showSorterTooltip={true}
         locale={{
           emptyText: (
             <NoDataFount
