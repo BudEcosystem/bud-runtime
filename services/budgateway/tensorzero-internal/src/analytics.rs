@@ -66,6 +66,8 @@ pub struct GatewayAnalyticsDatabaseInsert {
     pub response_timestamp: DateTime<Utc>,
     pub gateway_processing_ms: u32,
     pub total_duration_ms: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_latency_ms: Option<u32>,
 
     /// Model routing information
     pub model_name: Option<String>,
@@ -127,6 +129,7 @@ impl GatewayAnalyticsDatabaseInsert {
             response_timestamp: now,
             gateway_processing_ms: 0,
             total_duration_ms: 0,
+            model_latency_ms: None,
             model_name: None,
             model_provider: None,
             model_version: None,

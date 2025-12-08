@@ -218,6 +218,7 @@ mod tests {
             status_code: 200,
             total_duration_ms: 100,
             gateway_processing_ms: 10,
+            model_latency_ms: Some(90),
             inference_id: None,
             is_blocked: false,
             block_reason: None,

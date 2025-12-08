@@ -134,11 +134,24 @@ pub async fn analytics_middleware(
         {
             if let Ok(model_latency_str) = model_latency_header.to_str() {
                 if let Ok(model_latency_ms) = model_latency_str.parse::<u32>() {
+                    // Store model latency for metrics
+                    analytics.record.model_latency_ms = Some(model_latency_ms);
+
                     // Gateway processing time = Total duration - Model latency
-                    analytics.record.gateway_processing_ms = analytics
-                        .record
-                        .total_duration_ms
-                        .saturating_sub(model_latency_ms);
+                    if analytics.record.total_duration_ms >= model_latency_ms {
+                        analytics.record.gateway_processing_ms = analytics
+                            .record
+                            .total_duration_ms
+                            .saturating_sub(model_latency_ms);
+                    } else {
+                        // This shouldn't happen - log a warning for debugging
+                        tracing::warn!(
+                            "Unexpected: total_duration_ms ({}) < model_latency_ms ({}). Using 0 for gateway processing.",
+                            analytics.record.total_duration_ms,
+                            model_latency_ms
+                        );
+                        analytics.record.gateway_processing_ms = 0;
+                    }
                     tracing::debug!(
                         "Calculated gateway processing time: {} ms (total: {} ms, model: {} ms)",
                         analytics.record.gateway_processing_ms,
@@ -178,8 +191,9 @@ pub async fn analytics_middleware(
         )
         .record(analytics.record.total_duration_ms as f64 / 1000.0);
 
-        // Record gateway processing overhead (only when model latency was available)
-        if analytics.record.gateway_processing_ms > 0 {
+        // Record gateway processing overhead when model latency was available
+        // We record even when gateway_processing_ms is 0 to get accurate percentile calculations
+        if analytics.record.model_latency_ms.is_some() {
             histogram!(
                 "gateway_processing_seconds",
                 "method" => method_str,
