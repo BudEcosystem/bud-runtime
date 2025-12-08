@@ -13,7 +13,6 @@ in
   };
 
   sops.defaultSopsFile = lib.mkForce ../${host}/secrets.yaml;
-  facter.reportPath = ../${host}/facter.json;
   system.stateVersion = lib.mkForce "25.11";
   # let cloud-init do that
   environment.etc.hostname.enable = false;

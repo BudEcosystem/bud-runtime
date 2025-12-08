@@ -1,6 +1,7 @@
-{
-  disk ? "nvme0n1",
-}:
+{ ... }:
+let
+  disk = "nvme0n1";
+in
 {
   disko.devices = {
     disk = {
