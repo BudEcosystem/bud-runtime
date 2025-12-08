@@ -12,7 +12,7 @@ keys:
 
 creation_rules:
   # server_budk8s_primary
-  - path_regex: (infra/nixos/primary|infra/helm|infra/tofu)/.*
+  - path_regex: (infra/nixos/primary-dev|infra/helm|infra/tofu)/.*
     key_groups:
       - age:
           - *admin_sinan
@@ -21,23 +21,23 @@ creation_rules:
           - *admin_varun
           - *server_budk8s_primary
 
-  # server_budk8s_*
-  - path_regex: infra/nixos/budk8s/modules/headscale/secrets.yaml
+  # server_dev_k3s
+  - path_regex: infra/nixos/dev/modules/k3s/secrets.yaml
     key_groups:
       - age:
           - *admin_sinan
+          - *admin_ditto
+          - *admin_adarsh
+          - *admin_varun
           - *server_budk8s_primary
           - *server_budk8s_ingress
           - *server_budk8s_worker
 
-  # server_budk8s_*
-  - path_regex: infra/nixos/budk8s/.*
+  # server_dev_headscale
+  - path_regex: infra/nixos/dev/modules/headscale/secrets.yaml
     key_groups:
       - age:
           - *admin_sinan
-          - *admin_ditto
-          - *admin_adarsh
-          - *admin_varun
           - *server_budk8s_primary
           - *server_budk8s_ingress
           - *server_budk8s_worker
