@@ -50,6 +50,11 @@ let
     # friendly_name = adarsh
     PublicKey = H8awlBbJtoNKiEZruBVzqk0KzSc6u2VbCc8iPwwaQUc=
     AllowedIPs = 10.54.132.6/32
+
+    [Peer]
+    # friendly_name = karthik
+    PublicKey = MS4oL6uihxlozA61FYgBHl5fz7ck5d5gOdW1DXCkSSk=
+    AllowedIPs = 10.54.132.7/32
   '';
 in
 {
