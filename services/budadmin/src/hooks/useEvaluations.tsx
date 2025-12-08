@@ -301,9 +301,9 @@ export const useEvaluations = create<{
       const experimentsArray = Array.isArray(experiments) ? experiments : [];
 
       set({ experimentsList: experimentsArray });
-      set({ experimentsListTotal: response.data?.total || response.total || 0 });
+      set({ experimentsListTotal: response.data?.total_record || response.data?.total || response.total || 0 });
 
-      return { experiments: experimentsArray, total: response.data?.total || response.total || 0 };
+      return { experiments: experimentsArray, total: response.data?.total_record || response.data?.total || response.total || 0 };
     } catch (error) {
       console.error("Error fetching experiments:", error);
       // Return empty data on error

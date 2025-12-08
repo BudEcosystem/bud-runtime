@@ -184,7 +184,7 @@ export default function Evaluations({ model }: { model: Model }) {
           <div className="hR mt-[.1rem] mb-[1rem]"></div>
         </>
       )}
-      {enableDevMode && <EvaluationResultsTable />}
+      {enableDevMode && <EvaluationResultsTable model={model} />}
     </div>
   );
 }
