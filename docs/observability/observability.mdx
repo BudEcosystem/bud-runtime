@@ -85,7 +85,7 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 - **Sort & scan**: Sort by timestamp or latency and review prompt previews, token counts, and status badges in the table.
 - **Export**: Download filtered rows as CSV for offline review via the Export button in the header.
 
-#### 4.3.1 Request detail page
+#### 4.3.1 Request detail
 
 - **Open request**: Click any request to load the detail page showing overview fields (latency, tokens, cache flag, status) and request metadata (IP, method, path, client info, location).
 - **Inspect payloads**: Raw gateway request/response blocks include copy and download buttons for JSON exports, plus formatted message content for chat-style payloads.
@@ -108,7 +108,7 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 - Choose a rule type (IP, country, user-agent, rate-based), set scope, add optional reason, and priority before saving.
 - After creation, verify the new rule appears in the list with updated details and matches the intended status.
 
-#### 4.4.3 Edit Rule 
+#### 4.4.3 Edit Rule
 
 - Open rule detail page and select edit.
 - Update match criteria, scope, status etc. Use validation feedback for malformed IPs, CIDR ranges, or rate limits.
@@ -122,7 +122,7 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 
 ### 4.5 Request and trace troubleshooting
 
-1. In **Requests**, filter by project and time to isolate the affected window, then sort by latency to surface slow calls.
+1. In Requests, filter by deployment and time to isolate the affected window, then sort by latency to surface slow calls.
 2. Open a request to inspect metadata (method, path, auth, client IP, user agent, location) and confirm whether blocks or failures align with rule coverage.
 3. Copy and download raw gateway payloads for replay or deeper tracing, ensuring sensitive fields remain redacted as stored.
 
@@ -130,7 +130,7 @@ Global search, time-range presets, tab-level filters, and CSV/JSON exports are a
 
 1. Review Rules tab stats to ensure active blocking aligns with current traffic patterns.
 2. Filter by rule type/status to confirm coverage (e.g., active rate limits for high-traffic deployments).
-3. Use the create/edit flows to update thresholds or disable rules; deletions prompt confirmation to avoid accidental removals.
+3. Use the create/edit flows to update thresholds or disable rules.
 
 ### 4.7 Search, filter, and export best practices
 
@@ -163,3 +163,11 @@ Rules support IP, country, user-agent, and rate-based blocking. Create or view t
 **Q6: How can I check whether blocking is effective during an incident?**
 
 Open the Rules tab to review active counts and block statistics, then filter to the relevant rule types to confirm the correct policies are live.
+
+**Q7: Can I pause a rule without deleting it?**
+
+Yes. Open the rule detail drawer or the edit flow and toggle the rule to **Inactive**. The rule stays listed for auditing but no longer enforces blocks until reactivated.
+
+**Q8: How do exports respect my current filters?**
+
+Request and rule exports include only rows that match the active filters, time range, and search criteria, preserving the sort order applied in the table.
