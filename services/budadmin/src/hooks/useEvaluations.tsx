@@ -37,6 +37,7 @@ export interface ExperimentData {
   tags: string[] | any[];
   status: "Running" | "Completed" | "Failed" | string;
   created_at: string;
+  dataset_name?: string;
 }
 
 export interface Trait {
