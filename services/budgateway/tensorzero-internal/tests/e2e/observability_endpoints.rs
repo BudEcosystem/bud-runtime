@@ -8,13 +8,15 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::{common::get_gateway_endpoint, providers::common::make_embedded_gateway};
-use tensorzero_internal::clickhouse::test_helpers::get_clickhouse;
+use tensorzero_internal::clickhouse::test_helpers::{clickhouse_flush_async_insert, get_clickhouse};
 
 // Helper function to select data from new observability tables
 async fn select_embedding_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM EmbeddingInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -32,6 +34,8 @@ async fn select_audio_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM AudioInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -48,6 +52,8 @@ async fn select_image_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM ImageInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -64,6 +70,8 @@ async fn select_moderation_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM ModerationInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -80,6 +88,8 @@ async fn select_model_inference_by_endpoint_type(
     endpoint_type: &str,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM ModelInference WHERE endpoint_type = '{}' ORDER BY id DESC LIMIT 1 FORMAT JSONEachRow",
         endpoint_type
