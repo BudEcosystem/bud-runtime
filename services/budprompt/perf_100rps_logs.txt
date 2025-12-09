@@ -641,7 +641,7 @@
 2025-12-09 12:50:41.012 | {"asctime": "2025-12-09 07:20:41,012", "threadName": "MainThread", "levelname": "INFO", "name": "budprompt.executors.v4.executor", "filename": "executor.py", "funcName": "execute", "lineno": 246, "message": "[CP7] Creating Agent done | req_id=eac91d96 | elapsed=1.1ms"}
 2025-12-09 12:50:41.012 | {"asctime": "2025-12-09 07:20:41,012", "threadName": "MainThread", "levelname": "INFO", "name": "budprompt.executors.v4.executor", "filename": "executor.py", "funcName": "execute", "lineno": 287, "message": "[CP8] Agent.run start | req_id=eac91d96 | elapsed=1.1ms"}
 2025-12-09 12:50:41.016 | {"asctime": "2025-12-09 07:20:41,016", "threadName": "MainThread", "levelname": "INFO", "name": "httpx", "filename": "_client.py", "funcName": "_send_single_request", "lineno": 1740, "message": "HTTP Request: POST https://gateway.ditto.bud.studio/v1/chat/completions \"HTTP/1.1 200 OK\""}
-2025-12-09 12:50:41.029 | {"asctime": "2025-12-09 07:20:41,029", "threadName": "MainThread", "levelname": "INFO", "name": "budprompt.executors.v4.executor", "filename": "executor.py", "funcName": "execute", "lineno": 299, "message": "[CP8] Agent.run 
+2025-12-09 12:50:41.029 | {"asctime": "2025-12-09 07:20:41,029", "threadName": "MainThread", "levelname": "INFO", "name": "budprompt.executors.v4.executor", "filename": "executor.py", "funcName": "execute", "lineno": 299, "message": "[CP8] Agent.run
 
 done | req_id=e7c45a05 | elapsed=1151.6ms"}
 2025-12-09 12:50:41.054 | {"asctime": "2025-12-09 07:20:41,054", "threadName": "MainThread", "levelname": "INFO", "name": "budprompt.responses.services", "filename": "services.py", "funcName": "execute_prompt", "lineno": 164, "message": "[CP4] PromptExecutorService call done | req_id=e7c45a05 | elapsed=1176.9ms"}
