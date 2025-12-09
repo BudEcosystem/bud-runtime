@@ -64,8 +64,10 @@
         host: system:
         lib.nixosSystem {
           inherit system;
-          facter.reportPath = ./infra/nixos/${host}/facter.json;
           modules = [
+            {
+              facter.reportPath = ./infra/nixos/${host}/facter.json;
+            }
             self.nixosModules.common
             nixos-facter-modules.nixosModules.facter
             ./infra/nixos/${host}/configuration.nix
