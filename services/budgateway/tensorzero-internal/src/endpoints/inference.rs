@@ -275,7 +275,12 @@ pub async fn inference_handler(
                 let config = config.clone();
                 let clickhouse_connection_info = clickhouse_connection_info.clone();
                 let kafka_connection_info = kafka_connection_info.clone();
-                let inference_batcher = inference_batcher.clone();
+                // Only use batcher for async writes; sync writes need direct ClickHouse access
+                let inference_batcher_for_write = if async_writes {
+                    inference_batcher.clone()
+                } else {
+                    None
+                };
 
                 let write_future = tokio::spawn(async move {
                     write_inference(
@@ -290,7 +295,7 @@ pub async fn inference_handler(
                         gateway_response,
                         write_info.model_pricing,
                         None, // No guardrail records for standard inference endpoint
-                        inference_batcher.as_ref(),
+                        inference_batcher_for_write.as_ref(),
                     )
                     .await;
                 });
@@ -656,6 +661,14 @@ pub async fn inference(
                     .or(model_used_info.gateway_request),
             };
 
+            // Only use batcher for async writes; sync writes need direct ClickHouse access
+            let async_writes = config.gateway.observability.async_writes;
+            let inference_batcher_for_stream = if async_writes {
+                inference_batcher.clone()
+            } else {
+                None
+            };
+
             let stream = create_stream(
                 function,
                 config.clone(),
@@ -663,7 +676,7 @@ pub async fn inference(
                 stream,
                 clickhouse_connection_info,
                 kafka_connection_info,
-                inference_batcher.clone(),
+                inference_batcher_for_stream,
             );
 
             return Ok(InferenceOutput::Streaming(Box::pin(stream)));

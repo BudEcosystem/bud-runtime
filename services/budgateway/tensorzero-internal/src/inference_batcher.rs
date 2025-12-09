@@ -322,7 +322,8 @@ mod tests {
     use std::collections::HashMap;
     use uuid::Uuid;
 
-    use crate::inference::types::{InferenceParams, resolved_input::ResolvedInput};
+    use crate::endpoints::inference::InferenceParams;
+    use crate::inference::types::resolved_input::ResolvedInput;
 
     fn create_test_chat_inference() -> ChatInferenceDatabaseInsert {
         ChatInferenceDatabaseInsert {
