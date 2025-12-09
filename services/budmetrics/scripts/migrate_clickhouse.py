@@ -205,6 +205,7 @@ class ClickHouseMigration:
             api_key_id Nullable(UUID),
             user_id Nullable(UUID),
             api_key_project_id Nullable(UUID),
+            evaluation_id Nullable(UUID),
             error_code Nullable(String),
             error_message Nullable(String),
             error_type Nullable(String),
@@ -230,6 +231,7 @@ class ClickHouseMigration:
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_api_key_id (api_key_id) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_user_id (user_id) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_api_key_project_id (api_key_project_id) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_evaluation_id (evaluation_id) TYPE bloom_filter(0.01) GRANULARITY 4",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_error_type (error_type) TYPE minmax GRANULARITY 1",
                 "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_status_code (status_code) TYPE minmax GRANULARITY 1",
             ]
@@ -1036,6 +1038,64 @@ class ClickHouseMigration:
 
         logger.info("Error tracking columns migration completed successfully")
 
+    async def add_evaluation_id_column(self):
+        """Add evaluation_id column to ModelInferenceDetails table for evaluation tracking.
+
+        This migration adds evaluation_id column to track inferences associated with specific evaluations.
+        """
+        logger.info("Adding evaluation_id column to ModelInferenceDetails table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE ModelInferenceDetails")
+            if not table_exists or not table_exists[0][0]:
+                logger.warning("ModelInferenceDetails table does not exist. Skipping evaluation_id migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if ModelInferenceDetails table exists: {e}")
+            return
+
+        # Check if evaluation_id column already exists
+        try:
+            check_column_query = """
+            SELECT COUNT(*)
+            FROM system.columns
+            WHERE table = 'ModelInferenceDetails'
+              AND database = currentDatabase()
+              AND name = 'evaluation_id'
+            """
+            result = await self.client.execute_query(check_column_query)
+            column_exists = result[0][0] > 0 if result else False
+
+            if not column_exists:
+                # Add the column
+                alter_query = """
+                ALTER TABLE ModelInferenceDetails
+                ADD COLUMN IF NOT EXISTS evaluation_id Nullable(UUID)
+                """
+                await self.client.execute_query(alter_query)
+                logger.info("Added evaluation_id column to ModelInferenceDetails table")
+            else:
+                logger.info("evaluation_id column already exists in ModelInferenceDetails table")
+
+        except Exception as e:
+            if "already exists" in str(e).lower():
+                logger.info("evaluation_id column already exists")
+            else:
+                logger.error(f"Error adding evaluation_id column: {e}")
+                return
+
+        # Add index for evaluation_id
+        try:
+            index_query = "ALTER TABLE ModelInferenceDetails ADD INDEX IF NOT EXISTS idx_evaluation_id (evaluation_id) TYPE bloom_filter(0.01) GRANULARITY 4"
+            await self.client.execute_query(index_query)
+            logger.info("Index idx_evaluation_id created or already exists")
+        except Exception as e:
+            if "already exists" not in str(e).lower():
+                logger.warning(f"Index creation warning for idx_evaluation_id: {e}")
+
+        logger.info("Evaluation ID column migration completed successfully")
+
     async def setup_cluster_metrics_materialized_views(self):
         """Set up materialized views for cluster metrics.
 
@@ -1183,6 +1243,7 @@ class ClickHouseMigration:
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration
             await self.update_api_key_project_id()  # Update api_key_project_id where null
             await self.add_error_tracking_columns()  # Add error tracking columns for failed inferences
+            await self.add_evaluation_id_column()  # Add evaluation_id column for evaluation tracking
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 

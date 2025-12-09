@@ -284,6 +284,10 @@ pub async fn inference_handler(
             .get("x-tensorzero-api-key-project-id")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
+        let evaluation_id = headers
+            .get("x-tensorzero-evaluation-id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
 
         params.observability_metadata = Some(super::inference::ObservabilityMetadata {
             project_id: project_id.to_string(),
@@ -292,6 +296,7 @@ pub async fn inference_handler(
             api_key_id,
             user_id,
             api_key_project_id,
+            evaluation_id,
         });
     }
 
@@ -1019,6 +1024,9 @@ pub async fn inference_handler(
                 model_latency_ms.to_string().parse().unwrap(),
             );
 
+            // Add auth metadata headers to response for analytics middleware
+            super::add_auth_metadata_to_response(&mut http_response, &headers);
+
             Ok(http_response)
         }
         InferenceOutput::Streaming(mut stream) => {
@@ -1099,6 +1107,9 @@ pub async fn inference_handler(
                     inference_id.to_string().parse().unwrap(),
                 );
             }
+
+            // Add auth metadata headers to response for analytics middleware
+            super::add_auth_metadata_to_response(&mut response, &headers);
 
             Ok(response)
         }
@@ -3342,6 +3353,10 @@ pub async fn embedding_handler(
                 .get("x-tensorzero-api-key-project-id")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
+            let evaluation_id = headers
+                .get("x-tensorzero-evaluation-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
 
             Some(super::inference::ObservabilityMetadata {
                 project_id: project_id.to_string(),
@@ -3350,6 +3365,7 @@ pub async fn embedding_handler(
                 api_key_id,
                 user_id,
                 api_key_project_id,
+                evaluation_id,
             })
         } else {
             None
@@ -3956,6 +3972,10 @@ pub async fn moderation_handler(
                 .get("x-tensorzero-api-key-project-id")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
+            let evaluation_id = headers
+                .get("x-tensorzero-evaluation-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
 
             Some(super::inference::ObservabilityMetadata {
                 project_id: project_id.to_string(),
@@ -3964,6 +3984,7 @@ pub async fn moderation_handler(
                 api_key_id,
                 user_id,
                 api_key_project_id,
+                evaluation_id,
             })
         } else {
             None
@@ -5261,6 +5282,10 @@ pub async fn image_generation_handler(
                 .get("x-tensorzero-api-key-project-id")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string());
+            let evaluation_id = headers
+                .get("x-tensorzero-evaluation-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
 
             Some(super::inference::ObservabilityMetadata {
                 project_id: project_id.to_string(),
@@ -5269,6 +5294,7 @@ pub async fn image_generation_handler(
                 api_key_id,
                 user_id,
                 api_key_project_id,
+                evaluation_id,
             })
         } else {
             None

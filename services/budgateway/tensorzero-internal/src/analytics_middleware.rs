@@ -63,6 +63,9 @@ pub async fn analytics_middleware(
     // Extract selected request headers
     record.request_headers = extract_important_headers(&headers);
 
+    // Note: Auth metadata headers are extracted from response headers (after endpoint handlers copy them)
+    // because the auth middleware runs after this middleware on the request path
+
     // Store analytics in request extensions
     let analytics_arc = Arc::new(tokio::sync::Mutex::new(analytics));
     request.extensions_mut().insert(analytics_arc.clone());
@@ -129,6 +132,9 @@ pub async fn analytics_middleware(
 
         // Extract selected response headers
         analytics.record.response_headers = extract_important_headers(response.headers());
+
+        // Extract auth metadata from response headers (copied by endpoint handlers)
+        extract_auth_metadata(response.headers(), &mut analytics.record);
 
         // Check if request was blocked
         if response.status() == StatusCode::FORBIDDEN
@@ -441,6 +447,55 @@ fn extract_important_headers(headers: &HeaderMap) -> HashMap<String, String> {
     }
 
     result
+}
+
+/// Extract auth metadata from request headers (injected by auth middleware)
+fn extract_auth_metadata(headers: &HeaderMap, record: &mut GatewayAnalyticsDatabaseInsert) {
+    // Extract api_key_id
+    if let Some(api_key_id) = headers.get("x-tensorzero-api-key-id") {
+        if let Ok(id_str) = api_key_id.to_str() {
+            record.api_key_id = Some(id_str.to_string());
+            tracing::debug!("Captured api_key_id for analytics: {}", id_str);
+        }
+    }
+
+    // Extract user_id
+    if let Some(user_id) = headers.get("x-tensorzero-user-id") {
+        if let Ok(id_str) = user_id.to_str() {
+            record.user_id = Some(id_str.to_string());
+            tracing::debug!("Captured user_id for analytics: {}", id_str);
+        }
+    }
+
+    // Extract project_id
+    if let Some(project_id) = headers.get("x-tensorzero-project-id") {
+        if let Ok(id_str) = project_id.to_str() {
+            if let Ok(uuid) = Uuid::parse_str(id_str) {
+                record.project_id = Some(uuid);
+                tracing::debug!("Captured project_id for analytics: {}", id_str);
+            }
+        }
+    }
+
+    // Extract endpoint_id
+    if let Some(endpoint_id) = headers.get("x-tensorzero-endpoint-id") {
+        if let Ok(id_str) = endpoint_id.to_str() {
+            if let Ok(uuid) = Uuid::parse_str(id_str) {
+                record.endpoint_id = Some(uuid);
+                tracing::debug!("Captured endpoint_id for analytics: {}", id_str);
+            }
+        }
+    }
+
+    // Extract evaluation_id
+    if let Some(evaluation_id) = headers.get("x-tensorzero-evaluation-id") {
+        if let Ok(id_str) = evaluation_id.to_str() {
+            if let Ok(uuid) = Uuid::parse_str(id_str) {
+                record.evaluation_id = Some(uuid);
+                tracing::debug!("Captured evaluation_id for analytics: {}", id_str);
+            }
+        }
+    }
 }
 
 /// Write analytics record to ClickHouse
