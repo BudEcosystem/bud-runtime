@@ -32,7 +32,7 @@ export default function SelectModelForNewEvaluation() {
       limit,
       name: undefined,
       order_by: "created_at",
-      status: "running",
+      // status: "running",
     });
   }, []); // Empty dependency array = runs once on mount
 
@@ -47,7 +47,7 @@ export default function SelectModelForNewEvaluation() {
         limit,
         name: search || undefined,
         order_by: "created_at",
-        status: "running",
+        // status: "running",
       });
       setIsLoadingMore(false);
     };
@@ -99,7 +99,7 @@ export default function SelectModelForNewEvaluation() {
         limit,
         name: search || undefined,
         order_by: "created_at",
-        status: "running",
+        // status: "running",
       });
     }, 500);
 
