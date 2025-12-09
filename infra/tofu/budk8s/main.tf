@@ -29,11 +29,11 @@ module "azure" {
 
 module "primary_nixos" {
   source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
-  attribute = ".#nixosConfigurations.primary.config.system.build.toplevel"
+  attribute = ".#nixosConfigurations.primary-dev.config.system.build.toplevel"
 }
 module "primary_disko" {
   source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
-  attribute = ".#nixosConfigurations.primary.config.system.build.diskoScript"
+  attribute = ".#nixosConfigurations.primary-dev.config.system.build.diskoScript"
 }
 module "primary_install" {
   source            = "github.com/nix-community/nixos-anywhere//terraform/install"
