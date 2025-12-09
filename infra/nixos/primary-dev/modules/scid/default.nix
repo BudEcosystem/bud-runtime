@@ -14,6 +14,7 @@ in
     environment.SOPS_AGE_KEY_FILE = sops_key_path;
     settings = {
       tag = lib.mkForce null;
+      helm.env = "dev";
 
       slack = {
         channel = "infra";

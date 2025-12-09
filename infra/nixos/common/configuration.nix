@@ -17,6 +17,8 @@ in
   # change if needed in the future
   boot.loader = {
     systemd-boot.enable = true;
-    timeout = 0;
+    timeout = lib.mkForce 0;
   };
+
+  networking.useDHCP = lib.mkForce true;
 }

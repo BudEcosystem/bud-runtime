@@ -1,7 +1,6 @@
 {
   imports = [
     ../common/configuration.nix
-    ../dev/configuration.nix
     ../budk8s/configuration.nix
     ../master/configuration.nix
 

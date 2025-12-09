@@ -1,18 +1,13 @@
-{ ... }:
+{ lib, ... }:
 let
   userName = "bud";
 in
 {
   services.getty = {
     greetingLine = ''
-      ______ _   _______   ________  ___  ___  _____  _____ 
-      | ___ \ | | |  _  \ |_   _|  \/  | / _ \|  __ \|  ___|
-      | |_/ / | | | | | |   | | | .  . |/ /_\ \ |  \/| |__  
-      | ___ \ | | | | | |   | | | |\/| ||  _  | | __ |  __| 
-      | |_/ / |_| | |/ /   _| |_| |  | || | | | |_\ \| |___ 
-      \____/ \___/|___/    \___/\_|  |_/\_| |_/\____/\____/
+      BUD NIXOS IMAGE
     '';
-    helpLine = ''
+    helpLine = lib.MkForce ''
       Default Username: ${userName}
       Default Password: ${userName}
 
