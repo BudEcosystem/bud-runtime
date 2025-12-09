@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   services.scid = {
     enable = true;
@@ -18,7 +18,7 @@
       repo_url = "https://github.com/BudEcosystem/bud-runtime.git";
       tag.model = "semver";
       helm = {
-        env = "prod";
+        env = lib.mkDefault "prod";
         charts_path = "infra/helm";
       };
 
