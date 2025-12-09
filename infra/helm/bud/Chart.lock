@@ -23,5 +23,8 @@ dependencies:
 - name: novu
   repository: file://charts/novu
   version: 0.1.6
-digest: sha256:f7410145c2fdaabc5cfd8a43ad3c639677094f0bb2602393ce54de5ae49d6ae3
-generated: "2025-11-27T11:56:08.887492279+05:30"
+- name: onyx
+  repository: file://charts/onyx
+  version: 0.4.4
+digest: sha256:e2aea038469c224ac847dd3e58a9e762289de860e08f5fd2ae2e601595e21873
+generated: "2025-12-02T12:40:38.768776302Z"
