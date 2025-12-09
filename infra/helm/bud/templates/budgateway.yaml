@@ -38,23 +38,6 @@ data:
     [object_storage]
     type = "disabled"
 
-    # Test model using mock provider
-    [models."test-mock"]
-    routing = ["mock"]
-    endpoints = ["chat"]
-
-    [models."test-mock".providers.mock]
-    type = "openai"
-    model_name = "gpt-3.5-turbo"
-    api_base = "http://mock-inference-provider:3030/openai/"
-    api_key_location = "none"
-
-    [api_keys."f430caafcc2b1f15bbf406527e740d302a6987240e55e39e5a5b72a9e17c7546"]
-    [api_keys."f430caafcc2b1f15bbf406527e740d302a6987240e55e39e5a5b72a9e17c7546"."gpt-3.5-turbo"]
-    endpoint_id = "test-mock"
-    model_id = "019787c1-3de1-7b50-969b-e0a58514b6a2"
-    project_id = "019787c1-3de1-7b50-969b-e0a58514b6a1"
-
 
 ---
 apiVersion: apps/v1
