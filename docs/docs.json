@@ -110,6 +110,7 @@
             "group": "Observability",
             "icon": "chart-line",
             "pages": [
+              "observability/observability",
               "observability/dashboard-overview",
               "observability/request-analytics",
               "observability/performance-monitoring",
