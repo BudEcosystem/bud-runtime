@@ -6,13 +6,14 @@ ingress:
 
 microservices:
     budprompt:
-        image: dittops/budprompt:vsr
+        image: budstudio/budprompt:nightly
         env:
             REDIS_DB_INDEX: "2"
-            BUD_GATEWAY_BASE_URL: https://gateway.varun.bud.studio/v1
+            # BUD_GATEWAY_BASE_URL: https://gateway.varun.bud.studio/v1
+            BUD_GATEWAY_BASE_URL: https://gateway.ditto.bud.studio/v1
             LOG_LEVEL: DEBUG
     budapp:
-        image: dittops/budapp:vsr
+        image: budstudio/budapp:nightly
         env:
             LOG_LEVEL: DEBUG
     budcluster:

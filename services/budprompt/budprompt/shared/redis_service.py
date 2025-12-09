@@ -28,9 +28,13 @@ class RedisSingleton(metaclass=SingletonMeta):
         return self._redis_client
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        """Exit the context manager."""
-        if self._redis_client:
-            await self._redis_client.aclose()
+        """Exit the context manager.
+
+        Note: We intentionally do NOT close the Redis client here.
+        The connection pool should remain open for the lifetime of
+        the application to support concurrent requests.
+        """
+        pass
 
 
 class RedisService:
@@ -239,9 +243,13 @@ class TensorZeroRedisSingleton(metaclass=SingletonMeta):
         return self._redis_client
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        """Exit the context manager."""
-        if self._redis_client:
-            await self._redis_client.aclose()
+        """Exit the context manager.
+
+        Note: We intentionally do NOT close the Redis client here.
+        The connection pool should remain open for the lifetime of
+        the application to support concurrent requests.
+        """
+        pass
 
 
 class TensorZeroRedisService(RedisService):

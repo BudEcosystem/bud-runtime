@@ -1,0 +1,8 @@
+{
+    "prompt": {
+      "id": "test_greeting",
+      "variables": {},
+      "version": "1"
+    },
+    "input": "Good morning, I have a very complex math problem I need solved."
+}

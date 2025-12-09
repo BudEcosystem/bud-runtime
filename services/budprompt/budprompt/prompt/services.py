@@ -186,6 +186,8 @@ class PromptExecutorService:
         input_data: Optional[Union[str, List[ResponseInputItem]]] = None,
         variables: Optional[Dict[str, Any]] = None,
         api_key: Optional[str] = None,
+        req_id: Optional[str] = None,
+        start_time: Optional[float] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt based on the request.
 
@@ -193,6 +195,8 @@ class PromptExecutorService:
             request: Prompt execution request
             input_data: Input data for the prompt
             api_key: Optional API key for authorization
+            req_id: Request ID for performance tracking
+            start_time: Request start time for performance tracking
 
         Returns:
             The result of the prompt execution or a generator for streaming
@@ -200,6 +204,13 @@ class PromptExecutorService:
         Raises:
             ClientException: If validation or execution fails
         """
+        # [CP5] Performance checkpoint - PromptExecutorService entry
+        if req_id and start_time:
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(
+                f"[CP5] PromptExecutorService.execute_prompt start | req_id={req_id} | elapsed={elapsed:.1f}ms"
+            )
+
         try:
             # Execute the prompt with input_data from request and stream parameter
             result = await self.executor.execute(
@@ -220,6 +231,8 @@ class PromptExecutorService:
                 tools=request.tools,
                 system_prompt=request.system_prompt,
                 variables=variables,
+                req_id=req_id,
+                start_time=start_time,
             )
 
             return result

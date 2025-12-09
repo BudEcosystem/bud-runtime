@@ -16,6 +16,8 @@
 
 """API routes for responses module - OpenAI-compatible API."""
 
+import time
+import uuid
 from typing import Any, Dict, Union
 
 from budmicroframe.commons import logging
@@ -73,6 +75,11 @@ async def create_response(
         OpenAIResponse on success or JSONResponse with error status code and
         OpenAI-compatible error format on failure
     """
+    # [CP1] Performance checkpoint - request entry
+    req_id = str(uuid.uuid4())[:8]
+    start_time = time.time()
+    logger.info(f"[CP1] Request received | req_id={req_id}")
+
     logger.debug("Received response creation request: %s", request.model_dump(mode="json"))
 
     # Extract bearer token from credentials if present
@@ -87,7 +94,11 @@ async def create_response(
             prompt_params=request.prompt,
             input=request.input,
             api_key=api_key,
+            req_id=req_id,
+            start_time=start_time,
         )
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"[CP1] Request complete | req_id={req_id} | elapsed={elapsed:.1f}ms")
         return result
 
     except OpenAIResponseException as e:

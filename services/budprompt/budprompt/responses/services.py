@@ -17,6 +17,7 @@
 """Services for responses module - OpenAI-compatible API."""
 
 import json
+import time
 from typing import Any, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
@@ -52,6 +53,8 @@ class ResponsesService:
         prompt_params: BudResponsePrompt,
         input: Optional[Union[str, List[ResponseInputItem]]] = None,
         api_key: Optional[str] = None,
+        req_id: Optional[str] = None,
+        start_time: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Execute prompt using template from Redis.
 
@@ -59,6 +62,8 @@ class ResponsesService:
             prompt_params: Prompt parameters including id, version, and variables
             input: Optional input text for the prompt
             api_key: Optional API key for authorization
+            req_id: Request ID for performance tracking
+            start_time: Request start time for performance tracking
 
         Returns:
             Dictionary containing the execution result
@@ -66,6 +71,11 @@ class ResponsesService:
         Raises:
             OpenAIResponseException: OpenAI-compatible exception with status code and error details
         """
+        # [CP2] Performance checkpoint - service entry
+        if req_id and start_time:
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(f"[CP2] ResponsesService.execute_prompt start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
         try:
             # Extract parameters
             prompt_id = prompt_params.id
@@ -78,7 +88,17 @@ class ResponsesService:
             else:
                 # Get default version
                 default_key = f"prompt:{prompt_id}:default_version"
+
+                # [CP3] Performance checkpoint - Redis GET (default version)
+                if req_id and start_time:
+                    elapsed = (time.time() - start_time) * 1000
+                    logger.info(f"[CP3] Redis GET default_version start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
                 redis_key = await self.redis_service.get(default_key)
+
+                if req_id and start_time:
+                    elapsed = (time.time() - start_time) * 1000
+                    logger.info(f"[CP3] Redis GET default_version done | req_id={req_id} | elapsed={elapsed:.1f}ms")
 
                 if not redis_key:
                     logger.error("Default version not found for prompt_id: %s", prompt_id)
@@ -88,8 +108,17 @@ class ResponsesService:
                         code="not_found",
                     )
 
+            # [CP3] Performance checkpoint - Redis GET (config)
+            if req_id and start_time:
+                elapsed = (time.time() - start_time) * 1000
+                logger.info(f"[CP3] Redis GET config start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
             # Fetch prompt configuration from Redis
             config_json = await self.redis_service.get(redis_key)
+
+            if req_id and start_time:
+                elapsed = (time.time() - start_time) * 1000
+                logger.info(f"[CP3] Redis GET config done | req_id={req_id} | elapsed={elapsed:.1f}ms")
 
             if not config_json:
                 logger.error("Prompt configuration not found for key: %s", redis_key)
@@ -116,12 +145,23 @@ class ResponsesService:
 
             variables = prompt_params.variables
 
+            # [CP4] Performance checkpoint - PromptExecutorService call
+            if req_id and start_time:
+                elapsed = (time.time() - start_time) * 1000
+                logger.info(f"[CP4] PromptExecutorService call start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
             result = await PromptExecutorService().execute_prompt(
                 prompt_execute_data,
                 input,
                 variables=variables,
                 api_key=api_key,
+                req_id=req_id,
+                start_time=start_time,
             )
+
+            if req_id and start_time:
+                elapsed = (time.time() - start_time) * 1000
+                logger.info(f"[CP4] PromptExecutorService call done | req_id={req_id} | elapsed={elapsed:.1f}ms")
 
             # Log successful execution
             logger.debug("Successfully executed prompt: %s", prompt_id)

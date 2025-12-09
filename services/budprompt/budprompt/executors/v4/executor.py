@@ -17,6 +17,7 @@
 """Prompt executors for running AI prompts."""
 
 import json
+import time
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type, Union
 
@@ -127,6 +128,8 @@ class SimplePromptExecutor_V4:
         tools: Optional[List[MCPToolConfig]] = None,
         system_prompt: Optional[str] = None,
         variables: Optional[Dict[str, Any]] = None,
+        req_id: Optional[str] = None,
+        start_time: Optional[float] = None,
     ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
@@ -156,6 +159,11 @@ class SimplePromptExecutor_V4:
             ValidationError: If input validation fails
             PromptExecutionException: If prompt execution fails
         """
+        # [CP6] Performance checkpoint - Executor entry
+        if req_id and start_time:
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(f"[CP6] Executor.execute start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
         try:
             # Validate variables/schema relationship
             validate_input_data_type(input_schema, variables)
@@ -216,6 +224,11 @@ class SimplePromptExecutor_V4:
             # Load toolsets from tools configuration (only if tools are present)
             toolsets = await self._load_toolsets(tools)
 
+            # [CP7] Performance checkpoint - Creating Agent
+            if req_id and start_time:
+                elapsed = (time.time() - start_time) * 1000
+                logger.info(f"[CP7] Creating Agent start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
             # Create AI agent with appropriate output type and retry configuration
             agent, agent_kwargs = await self._create_agent(
                 deployment_name,
@@ -227,6 +240,10 @@ class SimplePromptExecutor_V4:
                 api_key=api_key,
                 toolsets=toolsets,
             )
+
+            if req_id and start_time:
+                elapsed = (time.time() - start_time) * 1000
+                logger.info(f"[CP7] Creating Agent done | req_id={req_id} | elapsed={elapsed:.1f}ms")
 
             # Check if streaming is requested
             if stream:
@@ -264,6 +281,11 @@ class SimplePromptExecutor_V4:
                         rendered_system_prompt,
                     )
             else:
+                # [CP8] Performance checkpoint - Agent.run
+                if req_id and start_time:
+                    elapsed = (time.time() - start_time) * 1000
+                    logger.info(f"[CP8] Agent.run start | req_id={req_id} | elapsed={elapsed:.1f}ms")
+
                 # Execute the agent with both history and current prompt
                 result = await self._run_agent(
                     agent,
@@ -271,6 +293,10 @@ class SimplePromptExecutor_V4:
                     message_history,
                     output_schema,
                 )
+
+                if req_id and start_time:
+                    elapsed = (time.time() - start_time) * 1000
+                    logger.info(f"[CP8] Agent.run done | req_id={req_id} | elapsed={elapsed:.1f}ms")
 
                 # Format to official OpenAI Response
                 openai_response = await self.response_formatter.format_response(
