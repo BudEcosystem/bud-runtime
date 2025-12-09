@@ -16,6 +16,7 @@ pub async fn usage_limit_middleware(
     next: Next,
 ) -> Result<Response, Response> {
     let (parts, body) = request.into_parts();
+
     let bytes = to_bytes(body, 1024 * 1024).await.unwrap_or_default();
 
     // Extract the API key from authorization header
@@ -28,12 +29,13 @@ pub async fn usage_limit_middleware(
         .map(|s| s.to_string());
 
     if let Some(key) = api_key {
-        // Get user_id from auth metadata
-        if let Some(metadata) = auth.get_auth_metadata(&key) {
+        let metadata_opt = auth.get_auth_metadata(&key);
+
+        if let Some(metadata) = metadata_opt {
             if let Some(user_id) = metadata.user_id {
-                // For now, just check without consuming (consumption happens after successful response)
-                // TODO: Extract estimated tokens/cost from request body for pre-check
-                match usage_limiter.check_usage(&user_id, None, None).await {
+                let decision = usage_limiter.check_usage(&user_id, None, None).await;
+
+                match decision {
                     UsageLimitDecision::Allow => {
                         debug!("Usage limit check passed for user {}", user_id);
                     }

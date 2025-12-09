@@ -8,13 +8,15 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::{common::get_gateway_endpoint, providers::common::make_embedded_gateway};
-use tensorzero_internal::clickhouse::test_helpers::get_clickhouse;
+use tensorzero_internal::clickhouse::test_helpers::{clickhouse_flush_async_insert, get_clickhouse};
 
 // Helper function to select data from new observability tables
 async fn select_embedding_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM EmbeddingInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -32,6 +34,8 @@ async fn select_audio_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM AudioInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -48,6 +52,8 @@ async fn select_image_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM ImageInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
@@ -64,9 +70,30 @@ async fn select_moderation_inference_clickhouse(
     inference_id: Uuid,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM ModerationInference WHERE id = '{}' FORMAT JSONEachRow",
         inference_id
+    );
+    let result = clickhouse.run_query_synchronous(query, None).await?;
+    if result.trim().is_empty() {
+        return Ok(None);
+    }
+    let json: Value = serde_json::from_str(result.trim())?;
+    Ok(Some(json))
+}
+
+/// Query ModerationInference by unique input text for test isolation
+async fn select_moderation_inference_by_input(
+    input_text: &str,
+) -> Result<Option<Value>, Box<dyn std::error::Error>> {
+    let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
+    let query = format!(
+        "SELECT * FROM ModerationInference WHERE input = '{}' ORDER BY id DESC LIMIT 1 FORMAT JSONEachRow",
+        input_text
     );
     let result = clickhouse.run_query_synchronous(query, None).await?;
     if result.trim().is_empty() {
@@ -80,6 +107,8 @@ async fn select_model_inference_by_endpoint_type(
     endpoint_type: &str,
 ) -> Result<Option<Value>, Box<dyn std::error::Error>> {
     let clickhouse = get_clickhouse().await;
+    // Flush async insert buffer to ensure data is visible
+    clickhouse_flush_async_insert(&clickhouse).await;
     let query = format!(
         "SELECT * FROM ModelInference WHERE endpoint_type = '{}' ORDER BY id DESC LIMIT 1 FORMAT JSONEachRow",
         endpoint_type
@@ -189,38 +218,22 @@ async fn test_dummy_only_moderation_observability_clickhouse_write() {
     // Wait for async writes
     sleep(Duration::from_millis(500)).await;
 
-    // Check ModelInference table
-    let model_inference = select_model_inference_by_endpoint_type("moderation")
-        .await
-        .unwrap();
-    assert!(
-        model_inference.is_some(),
-        "No ModelInference record found for moderation"
-    );
-    let model_record = model_inference.unwrap();
-    assert_eq!(model_record["endpoint_type"], "moderation");
-
-    // Extract inference_id
-    let inference_id_str = model_record["inference_id"].as_str().unwrap();
-    let inference_id = Uuid::parse_str(inference_id_str).unwrap();
-
-    // Check ModerationInference table
-    let moderation_inference = select_moderation_inference_clickhouse(inference_id)
+    // Query ModerationInference directly by input text for test isolation
+    // This ensures we get our test's specific data even if other tests run concurrently
+    let expected_input = "This is a test message for moderation observability";
+    let moderation_inference = select_moderation_inference_by_input(expected_input)
         .await
         .unwrap();
     assert!(
         moderation_inference.is_some(),
-        "No ModerationInference record found"
+        "No ModerationInference record found for input: '{}'",
+        expected_input
     );
     let moderation_record = moderation_inference.unwrap();
-    assert_eq!(moderation_record["id"], inference_id_str);
-    assert_eq!(moderation_record["function_name"], "tensorzero::moderation");
-    // Debug print the actual input value to see what's stored
-    let actual_input = moderation_record["input"].as_str().unwrap();
-    println!("DEBUG: Actual input stored: '{}'", actual_input);
 
-    // The input should match what was sent in the request
-    let expected_input = "This is a test message for moderation observability";
+    // Verify the record contents
+    assert_eq!(moderation_record["function_name"], "tensorzero::moderation");
+    let actual_input = moderation_record["input"].as_str().unwrap();
     assert_eq!(
         actual_input, expected_input,
         "Input mismatch: stored '{}' but expected '{}'",

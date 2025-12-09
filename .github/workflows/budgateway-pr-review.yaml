@@ -99,7 +99,15 @@ jobs:
       - run: df -h
       - name: "Free up disk space"
         run: |
+          # Remove large pre-installed software to free ~20GB for ClickHouse e2e tests
+          # See: https://github.com/actions/runner-images/discussions/9329
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/swift /usr/share/miniconda /usr/local/share/powershell
+          sudo rm -rf /opt/az /opt/microsoft /opt/pipx
+          # Docker images take significant space
+          docker system prune -af || true
+          # Show freed space
+          df -h
 
       - name: Cache cargo bin directory
         uses: actions/cache@v4

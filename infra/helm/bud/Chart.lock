@@ -23,5 +23,11 @@ dependencies:
 - name: novu
   repository: file://charts/novu
   version: 0.1.6
-digest: sha256:f7410145c2fdaabc5cfd8a43ad3c639677094f0bb2602393ce54de5ae49d6ae3
-generated: "2025-11-27T11:56:08.887492279+05:30"
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 25.27.0
+- name: prometheus-adapter
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 4.11.0
+digest: sha256:e8d5a5ac53a4615d7f25debcf8fef4f5539945fe596c43367c390602e59569ab
+generated: "2025-12-07T08:15:18.728344572Z"

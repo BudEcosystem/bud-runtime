@@ -23,6 +23,7 @@ use crate::endpoints;
 use crate::error::{Error, ErrorDetails};
 use crate::geoip::GeoIpService;
 use crate::guardrail_table::GuardrailTable;
+use crate::inference_batcher::InferenceBatcher;
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
@@ -51,6 +52,8 @@ pub struct AppStateData {
     pub ua_parser: Option<Arc<UserAgentParser>>,
     pub blocking_manager: Option<Arc<BlockingRulesManager>>,
     pub guardrails: Arc<tokio::sync::RwLock<GuardrailTable>>,
+    /// Inference batcher for batching ClickHouse writes (reduces connection overhead)
+    pub inference_batcher: Option<InferenceBatcher>,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -98,6 +101,16 @@ impl AppStateData {
             (None, None)
         };
 
+        // Initialize inference batcher for production ClickHouse connections
+        let inference_batcher =
+            if let ClickHouseConnectionInfo::Production { .. } = &clickhouse_connection_info {
+                Some(InferenceBatcher::new(Arc::new(
+                    clickhouse_connection_info.clone(),
+                )))
+            } else {
+                None
+            };
+
         Ok(Self {
             config,
             http_client,
@@ -111,6 +124,7 @@ impl AppStateData {
             ua_parser,
             blocking_manager: None, // Will be initialized later with Redis client
             guardrails: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            inference_batcher,
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {

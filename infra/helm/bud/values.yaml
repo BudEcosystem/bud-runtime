@@ -162,6 +162,27 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration for budgateway
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10
+      # CPU-based scaling (optional)
+      targetCPUUtilizationPercentage: 70
+      # Memory-based scaling (optional)
+      targetMemoryUtilizationPercentage: 80
+      # Prometheus custom metrics scaling (requires prometheus-adapter)
+      prometheusMetrics:
+        enabled: true
+        # Gateway processing overhead metric - p95 percentile (excludes model inference time)
+        # Exposed by prometheus-adapter from gateway_processing_seconds histogram
+        metricName: gateway_processing_seconds_p95
+        # Target average p95 processing time per pod (2ms = 2m)
+        targetValue: "2m"
+      # Scale down stabilization (avoid flapping)
+      scaleDownStabilizationSeconds: 300
+      # Scale up stabilization (react quickly to load)
+      scaleUpStabilizationSeconds: 0
   budsentinel:
     enabled: false # closed source, avoid enabling by default
     image: harbor.bud.studio/sentinel/sentinel:nightly
@@ -467,11 +488,11 @@ clickhouse:
     password: bud
   resources:
     requests:
-      memory: 1Gi
-      cpu: 500m
-    limits:
       memory: 4Gi
-      cpu: 2000m
+      cpu: 1000m
+    limits:
+      memory: 8Gi
+      cpu: 4000m
   keeper:
     replicaCount: 1
     image:
@@ -479,6 +500,22 @@ clickhouse:
   # Optional node scheduling for ClickHouse
   nodeSelector: {}
   affinity: {}
+  # Extra config files mounted to /etc/clickhouse-server/config.d/
+  configdFiles:
+    09-async-insert.xml: |
+      <clickhouse>
+        <profiles>
+          <default>
+            <async_insert>1</async_insert>
+            <wait_for_async_insert>0</wait_for_async_insert>
+            <async_insert_max_data_size>104857600</async_insert_max_data_size>
+            <async_insert_max_query_number>10000</async_insert_max_query_number>
+            <async_insert_busy_timeout_ms>1000</async_insert_busy_timeout_ms>
+          </default>
+        </profiles>
+        <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+        <max_concurrent_queries>2000</max_concurrent_queries>
+      </clickhouse>
 clickhouseExtra:
   autoCreateDB:
     - budproxy
@@ -650,6 +687,68 @@ otelCollector:
   # Optional node scheduling for OTel Collector
   nodeSelector: {}
   affinity: {}
+
+# Minimal Prometheus for HPA custom metrics (gateway processing time)
+prometheus:
+  enabled: true
+  # Disable unnecessary components for HPA-only use case
+  alertmanager:
+    enabled: false
+  kube-state-metrics:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
+  server:
+    retention: "2h"
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 4Gi
+    nodeSelector: {}
+    affinity: {}
+  # Scrape configuration for budgateway metrics
+  extraScrapeConfigs: |
+    - job_name: 'budgateway'
+      scrape_interval: 1s
+      kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app]
+          regex: .*-budgateway
+          action: keep
+        - source_labels: [__meta_kubernetes_pod_container_port_number]
+          regex: "3000"
+          action: keep
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+
+# Prometheus Adapter - exposes custom metrics to Kubernetes HPA API
+prometheus-adapter:
+  enabled: true
+  prometheus:
+    # URL will be: <release-name>-prometheus-server
+    url: "http://{{ $.Release.Name }}-prometheus-server"
+    port: 80
+  rules:
+    custom:
+      # Gateway processing overhead p95 metric (summary type with pre-computed quantiles)
+      # Selects only the quantile="0.95" series from the summary
+      - seriesQuery: 'gateway_processing_seconds{quantile="0.95"}'
+        resources:
+          overrides:
+            pod: {resource: "pod"}
+            namespace: {resource: "namespace"}
+        name:
+          as: "gateway_processing_seconds_p95"
+        metricsQuery: 'gateway_processing_seconds{quantile="0.95",<<.LabelMatchers>>}'
+
 # best to be installed cluster wide, not as part of this chart
 dapr:
   enabled: false

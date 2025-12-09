@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use ipnet::IpNet;
-use metrics::{counter, gauge, histogram};
+use metrics::{counter, gauge};
 use redis::AsyncCommands;
 use regex::Regex;
 use serde::Serializer;
@@ -235,6 +235,10 @@ pub struct BlockingRulesManager {
     /// Global rules that apply to all requests
     global_rules: Arc<RwLock<Vec<Arc<CompiledRule>>>>,
 
+    /// Whether global rules have been loaded (even if empty)
+    /// This prevents repeated Redis lookups when no rules exist
+    global_rules_loaded: AtomicBool,
+
     /// Rate limit states using DashMap for concurrent access
     /// Key format: "global:{ip}"
     rate_limits: Arc<DashMap<String, RateLimitState>>,
@@ -258,6 +262,7 @@ impl BlockingRulesManager {
     pub fn new(redis_client: Option<Arc<RedisClient>>) -> Self {
         Self {
             global_rules: Arc::new(RwLock::new(Vec::new())),
+            global_rules_loaded: AtomicBool::new(false),
             rate_limits: Arc::new(DashMap::new()),
             redis_client,
             clickhouse_client: None,
@@ -274,6 +279,7 @@ impl BlockingRulesManager {
     ) -> Self {
         Self {
             global_rules: Arc::new(RwLock::new(Vec::new())),
+            global_rules_loaded: AtomicBool::new(false),
             rate_limits: Arc::new(DashMap::new()),
             redis_client,
             clickhouse_client,
@@ -415,8 +421,6 @@ impl BlockingRulesManager {
 
     /// Load global rules from Redis (called by background task only, not in request path)
     pub async fn load_rules(&self, key_suffix: &str) -> Result<(), Error> {
-        let start = Instant::now();
-
         // Only handle global rules
         if key_suffix != "global" {
             debug!(
@@ -544,11 +548,7 @@ impl BlockingRulesManager {
 
             // Update global rules
             *self.global_rules.write().await = compiled_rules;
-            info!(
-                "Loaded {} active global blocking rules in {:?}",
-                active_count,
-                start.elapsed()
-            );
+            info!("Loaded {} active global blocking rules", active_count);
 
             // Update metrics
             gauge!("blocking_rules_cached").set(active_count as f64);
@@ -560,12 +560,17 @@ impl BlockingRulesManager {
             info!("No global blocking rules found");
         }
 
+        // Mark as loaded to prevent repeated Redis lookups (even if empty)
+        self.global_rules_loaded.store(true, Ordering::Release);
+
         Ok(())
     }
 
     /// Clear global rules (when deleted from Redis)
     pub async fn clear_global_rules(&self) {
         *self.global_rules.write().await = Vec::new();
+        // Reset the loaded flag to allow reloading on next request
+        self.global_rules_loaded.store(false, Ordering::Release);
         gauge!("blocking_rules_cached").set(0.0);
         info!("Cleared global blocking rules");
     }
@@ -577,8 +582,6 @@ impl BlockingRulesManager {
         country_code: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
-        let start = Instant::now();
-
         debug!(
             "should_block called with: ip={}, country={:?}, user_agent={:?}",
             client_ip, country_code, user_agent
@@ -588,7 +591,7 @@ impl BlockingRulesManager {
         let client_addr = match IpAddr::from_str(client_ip) {
             Ok(addr) => Some(addr),
             Err(_) => {
-                warn!(
+                debug!(
                     "Invalid client IP address: {} - IP-based rules will be skipped",
                     client_ip
                 );
@@ -599,15 +602,12 @@ impl BlockingRulesManager {
 
         let mut rules_evaluated = 0;
 
-        // Ensure global rules are loaded (load on first access)
-        {
-            let global_rules = self.global_rules.read().await;
-            if global_rules.is_empty() {
-                drop(global_rules); // Release read lock before loading
-                debug!("No global rules cached, loading from Redis...");
-                if let Err(e) = self.load_rules("global").await {
-                    warn!("Failed to load global rules: {}", e);
-                }
+        // Ensure global rules are loaded (load on first access only)
+        // Uses atomic flag to prevent repeated Redis lookups when rules are legitimately empty
+        if !self.global_rules_loaded.load(Ordering::Acquire) {
+            debug!("Global rules not yet loaded, loading from Redis...");
+            if let Err(e) = self.load_rules("global").await {
+                warn!("Failed to load global rules: {}", e);
             }
         }
 
@@ -702,7 +702,7 @@ impl BlockingRulesManager {
                     debug!("MATCH FOUND: Global rule '{}' matched!", rule.name);
                     // Record metrics and return blocked result
                     return self
-                        .handle_rule_match(rule, client_ip, country_code, start, "global")
+                        .handle_rule_match(rule, client_ip, country_code, "global")
                         .await;
                 } else {
                     debug!("No match for global rule '{}'", rule.name);
@@ -711,8 +711,6 @@ impl BlockingRulesManager {
         }
 
         // No rules matched - request allowed
-        let elapsed = start.elapsed();
-        histogram!("blocking_rule_evaluation_time").record(elapsed.as_secs_f64());
         counter!("blocking_rules_evaluated",
             "result" => "allowed",
             "rules_checked" => rules_evaluated.to_string()
@@ -728,11 +726,8 @@ impl BlockingRulesManager {
         rule: &BlockingRule,
         client_ip: &str,
         country_code: Option<&str>,
-        start: Instant,
         scope: &str,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
-        let elapsed = start.elapsed();
-        histogram!("blocking_rule_evaluation_time").record(elapsed.as_secs_f64());
         counter!("blocking_rules_matched",
             "rule_type" => format!("{:?}", rule.rule_type),
             "rule_name" => rule.name.clone(),
@@ -752,8 +747,8 @@ impl BlockingRulesManager {
         }
 
         debug!(
-            "Request blocked by {} rule '{}' (type: {:?}) in {:?}",
-            scope, rule.name, rule.rule_type, elapsed
+            "Request blocked by {} rule '{}' (type: {:?})",
+            scope, rule.name, rule.rule_type
         );
 
         // Try to get the custom reason from Redis, fall back to default reason

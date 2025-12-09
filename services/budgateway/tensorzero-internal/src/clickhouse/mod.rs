@@ -466,10 +466,11 @@ async fn write_production(
 
     let rows_json = rows_json?.join("\n");
 
-    // We can wait for the async insert since we're spawning a new tokio task to do the insert
+    // Use async_insert with wait_for_async_insert=0 for fire-and-forget batched writes
+    // This allows ClickHouse to buffer and batch inserts server-side for better throughput
     let query = format!(
         "INSERT INTO {table}\n\
-        SETTINGS async_insert=1, wait_for_async_insert=1\n\
+        SETTINGS async_insert=1, wait_for_async_insert=0\n\
         FORMAT JSONEachRow\n\
         {rows_json}"
     );
