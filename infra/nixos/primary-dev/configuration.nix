@@ -7,5 +7,6 @@
 
     ./modules/scid
     ./modules/wireguard
+    ./modules/nfs.nix
   ];
 }
