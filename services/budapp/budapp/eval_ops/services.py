@@ -2989,6 +2989,193 @@ class ExperimentService:
                 detail="Failed to retrieve dataset scores",
             ) from e
 
+    def get_cross_dataset_scores(
+        self,
+        user_id: uuid.UUID,
+        endpoint_id: Optional[uuid.UUID] = None,
+        model_id: Optional[uuid.UUID] = None,
+        dataset_id: Optional[uuid.UUID] = None,
+        page: int = 1,
+        limit: int = 50,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Get scores across multiple datasets with optional filters.
+
+        This method retrieves all completed evaluation runs, grouped by dataset + model/endpoint
+        combination, with optional filters for endpoint_id, model_id, and dataset_id.
+        At least one filter must be provided.
+
+        Parameters:
+            user_id (uuid.UUID): ID of the requesting user (for access control).
+            endpoint_id (Optional[uuid.UUID]): Filter by specific endpoint.
+            model_id (Optional[uuid.UUID]): Filter by specific model.
+            dataset_id (Optional[uuid.UUID]): Filter by specific dataset.
+            page (int): Page number for pagination (default: 1).
+            limit (int): Items per page (default: 50, max: 100).
+
+        Returns:
+            Tuple containing:
+                - List[Dict]: List of scores with rankings
+                - int: Total count of score entries
+
+        Raises:
+            HTTPException(status_code=400): If no filter is provided.
+            HTTPException(status_code=500): If database query fails.
+        """
+        try:
+            # Build base query with all necessary joins
+            runs_query = (
+                self.session.query(
+                    RunModel.id.label("run_id"),
+                    RunModel.created_at,
+                    RunModel.endpoint_id,
+                    RunModel.dataset_version_id,
+                    EndpointModel.name.label("endpoint_name"),
+                    ModelTable.id.label("model_id"),
+                    ModelTable.name.label("model_name"),
+                    ModelTable.icon.label("model_icon"),
+                    ExpDatasetVersion.dataset_id.label("dataset_id"),
+                    DatasetModel.name.label("dataset_name"),
+                    ExperimentModel.id.label("experiment_id"),
+                )
+                .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
+                .join(ExpDatasetVersion, RunModel.dataset_version_id == ExpDatasetVersion.id)
+                .join(DatasetModel, ExpDatasetVersion.dataset_id == DatasetModel.id)
+                .filter(
+                    RunModel.status == RunStatusEnum.COMPLETED.value,
+                    ExperimentModel.created_by == user_id,  # Access control
+                    ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
+                )
+            )
+
+            # Apply optional filters
+            if endpoint_id:
+                runs_query = runs_query.filter(RunModel.endpoint_id == endpoint_id)
+
+            if model_id:
+                runs_query = runs_query.filter(ModelTable.id == model_id)
+
+            if dataset_id:
+                runs_query = runs_query.filter(ExpDatasetVersion.dataset_id == dataset_id)
+
+            runs_result = runs_query.all()
+
+            if not runs_result:
+                return [], 0
+
+            # Group runs by (dataset_id, model_id, endpoint_id) combination
+            # This creates unique entries for each dataset + model + endpoint combination
+            scores_data: Dict[Tuple[uuid.UUID, uuid.UUID, uuid.UUID], Dict[str, Any]] = {}
+
+            for run_row in runs_result:
+                key = (run_row.dataset_id, run_row.model_id, run_row.endpoint_id)
+
+                if key not in scores_data:
+                    scores_data[key] = {
+                        "dataset_id": run_row.dataset_id,
+                        "dataset_name": run_row.dataset_name,
+                        "model_id": run_row.model_id,
+                        "model_name": run_row.model_name,
+                        "model_icon": run_row.model_icon,
+                        "endpoint_id": run_row.endpoint_id,
+                        "endpoint_name": run_row.endpoint_name,
+                        "run_ids": [],
+                        "latest_created_at": run_row.created_at,
+                        "metrics_by_name": {},
+                    }
+                else:
+                    # Track latest created_at
+                    if run_row.created_at > scores_data[key]["latest_created_at"]:
+                        scores_data[key]["latest_created_at"] = run_row.created_at
+
+                scores_data[key]["run_ids"].append(run_row.run_id)
+
+            # Fetch all metrics for all runs
+            all_run_ids = [run_row.run_id for run_row in runs_result]
+            metrics_query = self.session.query(MetricModel).filter(MetricModel.run_id.in_(all_run_ids)).all()
+
+            # Group metrics by run_id
+            metrics_by_run: Dict[uuid.UUID, List[MetricModel]] = {}
+            for metric in metrics_query:
+                if metric.run_id not in metrics_by_run:
+                    metrics_by_run[metric.run_id] = []
+                metrics_by_run[metric.run_id].append(metric)
+
+            # Aggregate metrics for each score entry
+            for _key, score_info in scores_data.items():
+                for run_id in score_info["run_ids"]:
+                    if run_id in metrics_by_run:
+                        for metric in metrics_by_run[run_id]:
+                            metric_name = metric.metric_name
+
+                            if metric_name not in score_info["metrics_by_name"]:
+                                score_info["metrics_by_name"][metric_name] = []
+
+                            # Only include non-zero values for averaging
+                            if metric.metric_value and metric.metric_value > 0:
+                                score_info["metrics_by_name"][metric_name].append(float(metric.metric_value))
+
+            # Calculate averaged metrics and extract accuracy
+            scores_list = []
+            for _key, score_info in scores_data.items():
+                averaged_metrics = []
+                accuracy_value = None
+
+                for metric_name, values in score_info["metrics_by_name"].items():
+                    if values:  # Only if we have non-zero values
+                        avg_value = sum(values) / len(values)
+                        averaged_metrics.append(
+                            {
+                                "metric_name": metric_name,
+                                "metric_value": round(avg_value, 2),
+                            }
+                        )
+
+                        # Extract accuracy for ranking
+                        if metric_name.lower() == "accuracy":
+                            accuracy_value = avg_value
+
+                scores_list.append(
+                    {
+                        "dataset_id": score_info["dataset_id"],
+                        "dataset_name": score_info["dataset_name"],
+                        "model_id": score_info["model_id"],
+                        "model_name": score_info["model_name"],
+                        "model_display_name": None,  # Can be enriched if needed
+                        "model_icon": score_info["model_icon"],
+                        "endpoint_id": score_info["endpoint_id"],
+                        "endpoint_name": score_info["endpoint_name"],
+                        "accuracy": accuracy_value,
+                        "metrics": averaged_metrics,
+                        "num_runs": len(score_info["run_ids"]),
+                        "created_at": score_info["latest_created_at"],
+                    }
+                )
+
+            # Sort by accuracy (nulls last)
+            scores_list.sort(key=lambda x: (x["accuracy"] is None, -x["accuracy"] if x["accuracy"] else 0))
+
+            # Assign ranks
+            for rank, score in enumerate(scores_list, start=1):
+                score["rank"] = rank
+
+            # Calculate pagination
+            total_count = len(scores_list)
+            offset = (page - 1) * limit
+            paginated_scores = scores_list[offset : offset + limit]
+
+            return paginated_scores, total_count
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get cross-dataset scores: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve cross-dataset scores",
+            ) from e
+
     # ------------------------ Comparison Methods ------------------------
 
     # Color palette for radar chart deployments

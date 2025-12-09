@@ -1020,6 +1020,38 @@ class DatasetScoresResponse(PaginatedSuccessResponse):
     scores: List[DatasetModelScore] = Field(default_factory=list, description="List of model scores")
 
 
+# ------------------------ Cross-Dataset Scores Schemas ------------------------
+
+
+class CrossDatasetScoreItem(BaseModel):
+    """Score entry for cross-dataset scores listing."""
+
+    rank: int = Field(..., description="Ranking by accuracy within the result set (1=best)")
+    dataset_id: UUID4 = Field(..., description="UUID of the dataset")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    model_id: UUID4 = Field(..., description="UUID of the model")
+    model_name: str = Field(..., description="Model name")
+    model_display_name: Optional[str] = Field(None, description="Model display name")
+    model_icon: Optional[str] = Field(None, description="Model icon URL")
+    endpoint_id: UUID4 = Field(..., description="UUID of the endpoint")
+    endpoint_name: str = Field(..., description="Endpoint/deployment name")
+    accuracy: Optional[float] = Field(None, description="Accuracy metric used for ranking")
+    metrics: List[MetricValue] = Field(default_factory=list, description="All averaged metrics")
+    num_runs: int = Field(..., description="Number of runs averaged")
+    created_at: datetime = Field(..., description="Creation timestamp from most recent run")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class CrossDatasetScoresResponse(PaginatedSuccessResponse):
+    """Response for cross-dataset scores endpoint."""
+
+    scores: List[CrossDatasetScoreItem] = Field(default_factory=list, description="List of scores across datasets")
+
+
 class ExperimentSummary(BaseModel):
     """Summary statistics for an experiment."""
 
