@@ -51,8 +51,13 @@
 
       makeModule = host: {
         nix.nixPath = [ "nixpkgs=${nixpkgs}" ];
-        networking.hostName = host;
         imports = [
+          (
+            { lib, ... }:
+            {
+              networking.hostName = lib.mkDefault host;
+            }
+          )
           disko.nixosModules.disko
           sinan.nixosModules.server
           scid.nixosModules.scid
@@ -67,6 +72,7 @@
           modules = [
             {
               facter.reportPath = ./infra/nixos/${host}/facter.json;
+              networking.hostName = lib.mkDefault host;
             }
             self.nixosModules.common
             nixos-facter-modules.nixosModules.facter
