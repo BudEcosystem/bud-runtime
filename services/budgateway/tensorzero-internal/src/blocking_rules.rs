@@ -591,7 +591,7 @@ impl BlockingRulesManager {
         let client_addr = match IpAddr::from_str(client_ip) {
             Ok(addr) => Some(addr),
             Err(_) => {
-                warn!(
+                debug!(
                     "Invalid client IP address: {} - IP-based rules will be skipped",
                     client_ip
                 );
