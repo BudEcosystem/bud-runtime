@@ -811,6 +811,124 @@ def get_heatmap_chart_data(
 
 
 @router.get(
+    "/scores",
+    response_model=CrossDatasetScoresResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_cross_dataset_scores(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    endpoint_id: Annotated[Optional[uuid.UUID], Query(description="Filter by endpoint ID")] = None,
+    model_id: Annotated[Optional[uuid.UUID], Query(description="Filter by model ID")] = None,
+    dataset_id: Annotated[Optional[uuid.UUID], Query(description="Filter by dataset ID")] = None,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
+):
+    """Get scores across multiple datasets with optional filters.
+
+    This endpoint retrieves scores for model/endpoint combinations across different datasets.
+    At least one filter (endpoint_id, model_id, or dataset_id) must be provided.
+
+    **Features:**
+    - Query scores across multiple datasets at once
+    - Filter by endpoint_id, model_id, and/or dataset_id (at least one required)
+    - One entry per unique dataset + model + endpoint combination
+    - Metrics averaged across all completed runs (non-zero values only)
+    - Ranked by accuracy metric (1 = best)
+    - Only shows completed evaluation runs
+    - Access control: only shows data from user's own experiments
+
+    **Query Parameters:**
+    - `endpoint_id`: Filter by specific endpoint (optional)
+    - `model_id`: Filter by specific model (optional)
+    - `dataset_id`: Filter by specific dataset (optional)
+    - `page`: Page number for pagination (default: 1)
+    - `limit`: Items per page (default: 50, max: 100)
+
+    **Returns:**
+    - `scores`: List of score entries with:
+        - `rank`: Ranking by accuracy (1=best)
+        - `dataset_id`, `dataset_name`: Dataset information
+        - `model_id`, `model_name`, `model_display_name`, `model_icon`: Model information
+        - `endpoint_id`, `endpoint_name`: Endpoint/deployment information
+        - `accuracy`: Accuracy metric value (used for ranking)
+        - `metrics`: List of all averaged metrics
+        - `num_runs`: Number of runs averaged
+        - `created_at`: Timestamp from most recent run
+    - `pagination`: Standard pagination metadata
+
+    **Example Response:**
+    ```json
+    {
+      "code": 200,
+      "object": "cross_dataset.scores",
+      "message": "Successfully retrieved scores",
+      "scores": [
+        {
+          "rank": 1,
+          "dataset_id": "uuid",
+          "dataset_name": "MMLU Benchmark",
+          "model_id": "uuid",
+          "model_name": "meta-llama/Llama-3.1-70B",
+          "endpoint_id": "uuid",
+          "endpoint_name": "llama-3-prod",
+          "accuracy": 87.4,
+          "metrics": [{"metric_name": "accuracy", "metric_value": 87.4}],
+          "num_runs": 3,
+          "created_at": "2025-01-15T10:30:00Z"
+        }
+      ],
+      "page": 1,
+      "limit": 50,
+      "total_record": 5,
+      "total_pages": 1
+    }
+    ```
+    """
+    # Validate that at least one filter is provided
+    if not endpoint_id and not model_id and not dataset_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one filter (endpoint_id, model_id, or dataset_id) must be provided",
+        )
+
+    try:
+        scores, total = ExperimentService(session).get_cross_dataset_scores(
+            user_id=current_user.id,
+            endpoint_id=endpoint_id,
+            model_id=model_id,
+            dataset_id=dataset_id,
+            page=page,
+            limit=limit,
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Failed to get cross-dataset scores: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve cross-dataset scores",
+        ) from e
+
+    # Convert to Pydantic models
+    score_models = [CrossDatasetScoreItem(**score) for score in scores]
+
+    return CrossDatasetScoresResponse(
+        code=status.HTTP_200_OK,
+        object="cross_dataset.scores",
+        message="Successfully retrieved scores",
+        scores=score_models,
+        page=page,
+        limit=limit,
+        total_record=total,
+    )
+
+
+@router.get(
     "/{experiment_id}",
     response_model=GetExperimentResponse,
     status_code=status.HTTP_200_OK,
@@ -1428,124 +1546,6 @@ def get_dataset_scores(
         page=page,
         limit=limit,
         total_record=total,  # Use total_record, not total (total_pages is computed automatically)
-    )
-
-
-@router.get(
-    "/scores",
-    response_model=CrossDatasetScoresResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
-    },
-)
-def get_cross_dataset_scores(
-    session: Annotated[Session, Depends(get_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    endpoint_id: Annotated[Optional[uuid.UUID], Query(description="Filter by endpoint ID")] = None,
-    model_id: Annotated[Optional[uuid.UUID], Query(description="Filter by model ID")] = None,
-    dataset_id: Annotated[Optional[uuid.UUID], Query(description="Filter by dataset ID")] = None,
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
-):
-    """Get scores across multiple datasets with optional filters.
-
-    This endpoint retrieves scores for model/endpoint combinations across different datasets.
-    At least one filter (endpoint_id, model_id, or dataset_id) must be provided.
-
-    **Features:**
-    - Query scores across multiple datasets at once
-    - Filter by endpoint_id, model_id, and/or dataset_id (at least one required)
-    - One entry per unique dataset + model + endpoint combination
-    - Metrics averaged across all completed runs (non-zero values only)
-    - Ranked by accuracy metric (1 = best)
-    - Only shows completed evaluation runs
-    - Access control: only shows data from user's own experiments
-
-    **Query Parameters:**
-    - `endpoint_id`: Filter by specific endpoint (optional)
-    - `model_id`: Filter by specific model (optional)
-    - `dataset_id`: Filter by specific dataset (optional)
-    - `page`: Page number for pagination (default: 1)
-    - `limit`: Items per page (default: 50, max: 100)
-
-    **Returns:**
-    - `scores`: List of score entries with:
-        - `rank`: Ranking by accuracy (1=best)
-        - `dataset_id`, `dataset_name`: Dataset information
-        - `model_id`, `model_name`, `model_display_name`, `model_icon`: Model information
-        - `endpoint_id`, `endpoint_name`: Endpoint/deployment information
-        - `accuracy`: Accuracy metric value (used for ranking)
-        - `metrics`: List of all averaged metrics
-        - `num_runs`: Number of runs averaged
-        - `created_at`: Timestamp from most recent run
-    - `pagination`: Standard pagination metadata
-
-    **Example Response:**
-    ```json
-    {
-      "code": 200,
-      "object": "cross_dataset.scores",
-      "message": "Successfully retrieved scores",
-      "scores": [
-        {
-          "rank": 1,
-          "dataset_id": "uuid",
-          "dataset_name": "MMLU Benchmark",
-          "model_id": "uuid",
-          "model_name": "meta-llama/Llama-3.1-70B",
-          "endpoint_id": "uuid",
-          "endpoint_name": "llama-3-prod",
-          "accuracy": 87.4,
-          "metrics": [{"metric_name": "accuracy", "metric_value": 87.4}],
-          "num_runs": 3,
-          "created_at": "2025-01-15T10:30:00Z"
-        }
-      ],
-      "page": 1,
-      "limit": 50,
-      "total_record": 5,
-      "total_pages": 1
-    }
-    ```
-    """
-    # Validate that at least one filter is provided
-    if not endpoint_id and not model_id and not dataset_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one filter (endpoint_id, model_id, or dataset_id) must be provided",
-        )
-
-    try:
-        scores, total = ExperimentService(session).get_cross_dataset_scores(
-            user_id=current_user.id,
-            endpoint_id=endpoint_id,
-            model_id=model_id,
-            dataset_id=dataset_id,
-            page=page,
-            limit=limit,
-        )
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        logger.error(f"Failed to get cross-dataset scores: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve cross-dataset scores",
-        ) from e
-
-    # Convert to Pydantic models
-    score_models = [CrossDatasetScoreItem(**score) for score in scores]
-
-    return CrossDatasetScoresResponse(
-        code=status.HTTP_200_OK,
-        object="cross_dataset.scores",
-        message="Successfully retrieved scores",
-        scores=score_models,
-        page=page,
-        limit=limit,
-        total_record=total,
     )
 
 
