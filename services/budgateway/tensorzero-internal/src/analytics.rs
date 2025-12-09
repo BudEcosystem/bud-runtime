@@ -28,6 +28,7 @@ pub struct GatewayAnalyticsDatabaseInsert {
 
     /// Geographical data (populated by GeoIP lookup)
     pub country_code: Option<String>,
+    pub country_name: Option<String>,
     pub region: Option<String>,
     pub city: Option<String>,
     pub latitude: Option<f32>,
@@ -101,6 +102,7 @@ impl GatewayAnalyticsDatabaseInsert {
             proxy_chain: None,
             protocol_version: "HTTP/1.1".to_string(),
             country_code: None,
+            country_name: None,
             region: None,
             city: None,
             latitude: None,

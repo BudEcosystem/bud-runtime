@@ -205,6 +205,7 @@ mod tests {
             device_type: None,
             is_bot: false,
             country_code: None,
+            country_name: None,
             region: None,
             city: None,
             latitude: None,
