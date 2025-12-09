@@ -199,9 +199,6 @@ pub async fn inference_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
-    // Profiling: start handler timing
-    let handler_start = Instant::now();
-
     if !openai_compatible_params.unknown_fields.is_empty() {
         tracing::warn!(
             "Ignoring unknown fields in OpenAI-compatible request: {:?}",
@@ -214,15 +211,12 @@ pub async fn inference_handler(
     let stream_options = openai_compatible_params.stream_options;
     let logprobs_requested = matches!(openai_compatible_params.logprobs, Some(true));
 
-    // Profiling: model resolution
-    let model_resolution_start = Instant::now();
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
         Some(&openai_compatible_params.model),
         &headers,
         false, // not for embedding
     )?;
-    histogram!("handler_model_resolution_seconds").record(model_resolution_start.elapsed().as_secs_f64());
 
     let original_model_name = model_resolution.original_model_name.to_string();
 
@@ -305,8 +299,6 @@ pub async fn inference_handler(
     // Set the gateway request on params
     params.gateway_request = gateway_request;
 
-    // Profiling: model config lookup
-    let model_config_start = Instant::now();
     // Get the guardrail profile if model has one configured
     let (guardrail_profile_id, model_pricing) = if let Some(model_name) = &resolved_model_name {
         let models = config.models.read().await;
@@ -325,7 +317,6 @@ pub async fn inference_handler(
     } else {
         (None, None)
     };
-    histogram!("handler_model_config_lookup_seconds").record(model_config_start.elapsed().as_secs_f64());
 
     // Create guardrail execution context to track all guardrail operations
     let mut guardrail_context = crate::guardrail::GuardrailExecutionContext::new();

@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use ipnet::IpNet;
-use metrics::{counter, gauge, histogram};
+use metrics::{counter, gauge};
 use redis::AsyncCommands;
 use regex::Regex;
 use serde::Serializer;
@@ -421,8 +421,6 @@ impl BlockingRulesManager {
 
     /// Load global rules from Redis (called by background task only, not in request path)
     pub async fn load_rules(&self, key_suffix: &str) -> Result<(), Error> {
-        let start = Instant::now();
-
         // Only handle global rules
         if key_suffix != "global" {
             debug!(
@@ -550,11 +548,7 @@ impl BlockingRulesManager {
 
             // Update global rules
             *self.global_rules.write().await = compiled_rules;
-            info!(
-                "Loaded {} active global blocking rules in {:?}",
-                active_count,
-                start.elapsed()
-            );
+            info!("Loaded {} active global blocking rules", active_count);
 
             // Update metrics
             gauge!("blocking_rules_cached").set(active_count as f64);
@@ -588,8 +582,6 @@ impl BlockingRulesManager {
         country_code: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
-        let start = Instant::now();
-
         debug!(
             "should_block called with: ip={}, country={:?}, user_agent={:?}",
             client_ip, country_code, user_agent
@@ -710,7 +702,7 @@ impl BlockingRulesManager {
                     debug!("MATCH FOUND: Global rule '{}' matched!", rule.name);
                     // Record metrics and return blocked result
                     return self
-                        .handle_rule_match(rule, client_ip, country_code, start, "global")
+                        .handle_rule_match(rule, client_ip, country_code, "global")
                         .await;
                 } else {
                     debug!("No match for global rule '{}'", rule.name);
@@ -719,8 +711,6 @@ impl BlockingRulesManager {
         }
 
         // No rules matched - request allowed
-        let elapsed = start.elapsed();
-        histogram!("blocking_rule_evaluation_time").record(elapsed.as_secs_f64());
         counter!("blocking_rules_evaluated",
             "result" => "allowed",
             "rules_checked" => rules_evaluated.to_string()
@@ -736,11 +726,8 @@ impl BlockingRulesManager {
         rule: &BlockingRule,
         client_ip: &str,
         country_code: Option<&str>,
-        start: Instant,
         scope: &str,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
-        let elapsed = start.elapsed();
-        histogram!("blocking_rule_evaluation_time").record(elapsed.as_secs_f64());
         counter!("blocking_rules_matched",
             "rule_type" => format!("{:?}", rule.rule_type),
             "rule_name" => rule.name.clone(),
@@ -760,8 +747,8 @@ impl BlockingRulesManager {
         }
 
         debug!(
-            "Request blocked by {} rule '{}' (type: {:?}) in {:?}",
-            scope, rule.name, rule.rule_type, elapsed
+            "Request blocked by {} rule '{}' (type: {:?})",
+            scope, rule.name, rule.rule_type
         );
 
         // Try to get the custom reason from Redis, fall back to default reason

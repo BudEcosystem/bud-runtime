@@ -3,13 +3,11 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use metrics::histogram;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiKeyMetadata {
@@ -140,15 +138,9 @@ pub async fn require_api_key(
     request: Request,
     next: Next,
 ) -> Result<Response, Response> {
-    let auth_start = Instant::now();
-
     let (parts, body) = request.into_parts();
 
-    // Measure body read time
-    let body_read_start = Instant::now();
     let bytes = to_bytes(body, 1024 * 1024).await.unwrap_or_default();
-    let body_read_duration = body_read_start.elapsed();
-    histogram!("auth_body_read_seconds").record(body_read_duration.as_secs_f64());
 
     // Extract the key as an owned String to avoid borrowing parts
     let key = parts
@@ -171,14 +163,9 @@ pub async fn require_api_key(
         }
     };
 
-    // Measure API key validation time
-    let validate_start = Instant::now();
     let mut api_config = auth.validate_api_key(&key);
-    let validate_duration = validate_start.elapsed();
-    histogram!("auth_validate_key_seconds").record(validate_duration.as_secs_f64());
 
     if api_config.is_err() {
-        histogram!("auth_total_seconds").record(auth_start.elapsed().as_secs_f64());
         return Err(auth_error_response(
             StatusCode::UNAUTHORIZED,
             "Invalid API key",
@@ -235,21 +222,15 @@ pub async fn require_api_key(
     }
 
     if !is_batch_or_file_endpoint {
-        // Measure JSON parsing time
-        let json_parse_start = Instant::now();
         let val: Value = match serde_json::from_slice(&bytes) {
             Ok(v) => v,
             Err(_) => {
-                histogram!("auth_json_parse_seconds").record(json_parse_start.elapsed().as_secs_f64());
-                histogram!("auth_total_seconds").record(auth_start.elapsed().as_secs_f64());
                 return Err(auth_error_response(
                     StatusCode::BAD_REQUEST,
                     "Invalid request body",
                 ))
             }
         };
-        let json_parse_duration = json_parse_start.elapsed();
-        histogram!("auth_json_parse_seconds").record(json_parse_duration.as_secs_f64());
 
         // Determine lookup key: either model OR prompt.id with prompt: prefix
         let (lookup_key, is_prompt_based, _original_prompt_id) =
@@ -364,9 +345,6 @@ pub async fn require_api_key(
             }
         }
     }
-
-    // Record total auth middleware time (before calling next handler)
-    histogram!("auth_total_seconds").record(auth_start.elapsed().as_secs_f64());
 
     Ok(next.run(request).await)
 }

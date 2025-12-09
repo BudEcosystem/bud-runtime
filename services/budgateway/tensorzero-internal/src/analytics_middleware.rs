@@ -8,7 +8,6 @@ use chrono::Utc;
 use metrics::histogram;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use tracing::error;
 use uaparser::{Parser, UserAgentParser};
 use uuid::Uuid;
@@ -28,7 +27,6 @@ pub async fn analytics_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, Error> {
-    let analytics_start = Instant::now();
     tracing::debug!("Analytics middleware called for {} {}", method, uri.path());
 
     // Get services from request extensions
@@ -40,10 +38,8 @@ pub async fn analytics_middleware(
     let record = &mut analytics.record;
 
     // Extract basic request information - use headers-only approach for client IP
-    let ip_extraction_start = Instant::now();
     record.client_ip = get_client_ip_fallback(&headers);
     record.proxy_chain = extract_proxy_chain(&headers);
-    histogram!("analytics_ip_extraction_seconds").record(ip_extraction_start.elapsed().as_secs_f64());
 
     record.protocol_version = format!("{version:?}");
     record.method = method.to_string();
@@ -57,19 +53,15 @@ pub async fn analytics_middleware(
         .map(|s| s.to_string());
 
     // Parse user agent for device/browser info
-    let ua_parse_start = Instant::now();
     if let (Some(ua), Some(parser)) = (record.user_agent.clone(), ua_parser.as_ref()) {
         parse_user_agent(&ua, record, parser);
     }
-    histogram!("analytics_ua_parse_seconds").record(ua_parse_start.elapsed().as_secs_f64());
 
     // Perform GeoIP lookup
-    let geoip_start = Instant::now();
     if let Some(geoip) = &geoip_service {
         let client_ip = record.client_ip.clone();
         geoip.enrich_analytics(&client_ip, record);
     }
-    histogram!("analytics_geoip_lookup_seconds").record(geoip_start.elapsed().as_secs_f64());
 
     // Extract selected request headers
     record.request_headers = extract_important_headers(&headers);
@@ -87,9 +79,6 @@ pub async fn analytics_middleware(
     // Get analytics batcher for batched writes (preferred over direct writes)
     let batcher_opt = request.extensions().get::<AnalyticsBatcher>().cloned();
 
-    // Record pre-handler analytics time
-    histogram!("analytics_pre_handler_seconds").record(analytics_start.elapsed().as_secs_f64());
-
     tracing::debug!(
         "ClickHouse connection in analytics middleware: {}",
         if clickhouse_opt.is_some() {
@@ -102,14 +91,9 @@ pub async fn analytics_middleware(
     // Process the request
     let response = next.run(request).await;
 
-    // Start post-handler timing
-    let post_handler_start = Instant::now();
-
     // Update analytics with response data
     {
-        let lock_start = Instant::now();
         let mut analytics = analytics_arc.lock().await;
-        histogram!("analytics_lock_acquire_seconds").record(lock_start.elapsed().as_secs_f64());
 
         // Calculate durations
         let elapsed = analytics.start_time.elapsed();
@@ -207,7 +191,6 @@ pub async fn analytics_middleware(
     let final_record = analytics_arc.lock().await.record.clone();
 
     // Write analytics - prefer batched writes for high throughput
-    let write_start = Instant::now();
     if let Some(batcher) = batcher_opt {
         // Use batcher for efficient batched writes (non-blocking, fire-and-forget)
         tracing::debug!(
@@ -234,10 +217,6 @@ pub async fn analytics_middleware(
     } else {
         tracing::warn!("No ClickHouse connection or batcher available for analytics");
     }
-    histogram!("analytics_write_queue_seconds").record(write_start.elapsed().as_secs_f64());
-
-    // Record total post-handler analytics time
-    histogram!("analytics_post_handler_seconds").record(post_handler_start.elapsed().as_secs_f64());
 
     Ok(response)
 }

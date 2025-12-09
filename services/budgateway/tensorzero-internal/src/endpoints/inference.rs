@@ -6,7 +6,7 @@ use axum::response::{IntoResponse, Response};
 use axum::{debug_handler, Json};
 use futures::stream::Stream;
 use http::StatusCode;
-use metrics::{counter, histogram};
+use metrics::counter;
 use object_store::{ObjectStore, PutMode, PutOptions};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
@@ -417,9 +417,6 @@ pub async fn inference(
     analytics: Option<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
     inference_batcher: Option<InferenceBatcher>,
 ) -> Result<InferenceOutput, Error> {
-    // Profiling: start overall inference timing
-    let inference_start = std::time::Instant::now();
-
     let span = tracing::Span::current();
     if let Some(function_name) = &params.function_name {
         span.record("function_name", function_name);
@@ -460,13 +457,10 @@ pub async fn inference(
     .await?;
     tracing::Span::current().record("episode_id", episode_id.to_string());
 
-    // Profiling: model lookup
-    let model_lookup_start = std::time::Instant::now();
     let models = config.models.read().await;
     let (function, function_name) = find_function(&params, &config, &models)?;
     // Release the read lock on the models table before potentially spawning
     drop(models);
-    histogram!("inference_model_lookup_seconds").record(model_lookup_start.elapsed().as_secs_f64());
 
     // Collect the function variant names as a Vec<&str>
     let mut candidate_variant_names: Vec<&str> =
@@ -558,8 +552,6 @@ pub async fn inference(
         extra_headers: Default::default(),
         gateway_request: params.gateway_request.clone(),
     };
-    // Profiling: credential merge
-    let credential_merge_start = std::time::Instant::now();
     // Merge credentials from the credential store with the provided credentials
     let mut merged_credentials = params.credentials.clone();
     {
@@ -572,7 +564,6 @@ pub async fn inference(
             }
         }
     }
-    histogram!("inference_credential_merge_seconds").record(credential_merge_start.elapsed().as_secs_f64());
 
     let inference_clients = InferenceClients {
         http_client,
@@ -584,8 +575,6 @@ pub async fn inference(
     let models = config.models.read().await;
     let inference_models = InferenceModels { models: &models };
 
-    // Profiling: input resolution
-    let input_resolve_start = std::time::Instant::now();
     let resolved_input = params
         .input
         .resolve(&FetchContext {
@@ -593,10 +582,7 @@ pub async fn inference(
             object_store_info: &config.object_store_info,
         })
         .await?;
-    histogram!("inference_input_resolve_seconds").record(input_resolve_start.elapsed().as_secs_f64());
 
-    // Profiling: record pre-inference setup time
-    histogram!("inference_pre_setup_seconds").record(inference_start.elapsed().as_secs_f64());
     // Keep sampling variants until one succeeds
     while !candidate_variant_names.is_empty() {
         let (variant_name, variant) = sample_variant(
@@ -682,8 +668,6 @@ pub async fn inference(
 
             return Ok(InferenceOutput::Streaming(Box::pin(stream)));
         } else {
-            // Profiling: variant inference call
-            let variant_infer_start = std::time::Instant::now();
             let result = variant
                 .infer(
                     &resolved_input,
@@ -694,7 +678,6 @@ pub async fn inference(
                     variant_inference_params,
                 )
                 .await;
-            histogram!("inference_variant_infer_seconds").record(variant_infer_start.elapsed().as_secs_f64());
 
             let mut result = match result {
                 Ok(result) => result,
