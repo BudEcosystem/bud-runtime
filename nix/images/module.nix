@@ -7,7 +7,7 @@ in
     greetingLine = ''
       BUD NIXOS IMAGE
     '';
-    helpLine = lib.MkForce ''
+    helpLine = lib.mkForce ''
       Default Username: ${userName}
       Default Password: ${userName}
 
