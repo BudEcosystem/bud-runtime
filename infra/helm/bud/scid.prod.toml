@@ -1,0 +1,3 @@
+release_name = "bud-dev"
+namespace = "bud-dev"
+value_paths = [ "values.standalone.yaml", "example.secrets.yaml" ]

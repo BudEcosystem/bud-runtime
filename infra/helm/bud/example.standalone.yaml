@@ -1,13 +1,11 @@
 ingress:
     https: disabled
     hosts:
-        root: bane.tsnet.sinanmohd.com
+        root: bane.tsnet.bud.studio
 
-imagePullPolicy: "Always"
 deploymentAnnotations:
-    keel.sh/policy: force
+    keel.sh/policy: all
     keel.sh/trigger: poll
-    keel.sh/match-tag: true
     keel.sh/pollSchedule: "@every 1m"
 
 storage:
@@ -16,36 +14,3 @@ storage:
 minio:
     persistence:
         size: "128Gi"
-
-microservices:
-    budadmin:
-        image: budstudio/budadmin:nightly
-    budcustomer:
-        image: budstudio/budcustomer:nightly
-    budplayground:
-        image: budstudio/budplayground:nightly
-    budgateway:
-        image: budstudio/budgateway:nightly
-    askbud:
-        image: budstudio/askbud:nightly
-    budapp:
-        image: budstudio/budapp:nightly
-    budcluster:
-        image: budstudio/budcluster:nightly
-    budmetrics:
-        image: budstudio/budmetrics:nightly
-    budmodel:
-        image: budstudio/budmodel:nightly
-    budsim:
-        image: budstudio/budsim:nightly
-    budnotify:
-        image: budstudio/budnotify:nightly
-    budprompt:
-        image: budstudio/budprompt:nightly
-    buddoc:
-        image: budstudio/buddoc:nightly
-    global:
-        env:
-            SUPER_USER_EMAIL: root@example.com
-            # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
-            SUPER_USER_PASSWORD: LCMSaOh2M2zMtMim0JOD5ctmyPFeVVNG

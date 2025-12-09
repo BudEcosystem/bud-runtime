@@ -3,7 +3,12 @@ let
   primaryIp = config.global.budk8s.primaryIp;
 in
 {
-  imports = [ ../budk8s/configuration.nix ];
+  imports = [
+    ../azure/configuration.nix
+    ../budk8s/configuration.nix
+    ../common/configuration.nix
+    ../dev/configuration.nix
+  ];
 
   boot.supportedFilesystems = [ "nfs" ];
   services.k3s = {
