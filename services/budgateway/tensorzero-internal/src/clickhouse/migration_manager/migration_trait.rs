@@ -7,10 +7,16 @@ pub trait Migration {
     // so that `&self` is the underlying type. This ensures that
     // calling `name()` on a `dyn Migration` will get the name of the erased type.
     fn name(&self) -> String {
-        std::any::type_name_of_val(&self)
+        let full_name = std::any::type_name_of_val(&self)
             .split("::")
             .last()
-            .unwrap_or("Unknown migration")
+            .unwrap_or("Unknown migration");
+        // Strip any lifetime annotations like <'_> from the type name
+        // e.g., "Migration0029<'_>" -> "Migration0029"
+        full_name
+            .split('<')
+            .next()
+            .unwrap_or(full_name)
             .to_string()
     }
     async fn can_apply(&self) -> Result<(), Error>;
