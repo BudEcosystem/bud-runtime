@@ -267,6 +267,7 @@ class BenchmarkService(SessionMixin):
                 # "use_cache",
                 "cluster_id",
                 "bud_cluster_id",
+                "hardware_mode",
                 "nodes",
                 "model_id",
                 "model",
@@ -298,6 +299,12 @@ class BenchmarkService(SessionMixin):
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:
                 raise ClientException(f"Missing required data for run benchmark workflow: {', '.join(missing_keys)}")
+
+            # Apply hardware_mode to each node for budcluster deployment
+            hardware_mode = required_data.get("hardware_mode", "dedicated")
+            if "nodes" in required_data and required_data["nodes"]:
+                for node in required_data["nodes"]:
+                    node["hardware_mode"] = hardware_mode
 
             try:
                 if "datasets" in required_data:

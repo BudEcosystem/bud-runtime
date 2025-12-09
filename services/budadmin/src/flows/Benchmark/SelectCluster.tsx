@@ -143,10 +143,9 @@ const SelectCluster: React.FC = (props: {}) => {
       onNext={() => {
         stepThree().then((result) => {
           if (result) {
-            openDrawerWithStep("Select-Nodes");
+            openDrawerWithStep("Select-Hardware-Mode");
           }
         });
-        // openDrawerWithStep("Select-Nodes");
       }}
     >
       <BudWraperBox>

@@ -5,7 +5,7 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { Text_14_400_EEEEEE, Text_10_400_B3B3B3 } from "@/components/ui/text";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { useDeployModel } from "src/stores/useDeployModel";
+import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
 import { Checkbox, Image } from "antd";
 
 // Badge color configurations for hardware mode cards
@@ -99,9 +99,9 @@ function HardwareModeCard({
   );
 }
 
-export default function DeployModelHardwareMode() {
-  const { hardwareMode, setHardwareMode, updateHardwareMode } = useDeployModel();
-  const { openDrawerWithStep, openDrawer } = useDrawer();
+const SelectHardwareMode: React.FC = () => {
+  const { hardwareMode, setHardwareMode, stepHardwareMode } = usePerfomanceBenchmark();
+  const { openDrawerWithStep } = useDrawer();
 
   // Local state to manage selection before saving to store
   const [selectedMode, setSelectedMode] = useState<"dedicated" | "shared">(
@@ -112,18 +112,18 @@ export default function DeployModelHardwareMode() {
     <BudForm
       data={{}}
       disableNext={!selectedMode}
-      onNext={async () => {
+      onNext={() => {
         // Save the selected mode to store
         setHardwareMode(selectedMode);
-
-        // Persist hardware mode to backend
-        await updateHardwareMode();
-
-        // Navigate to template selection
-        openDrawerWithStep("deploy-model-template");
+        // Call API to persist hardware mode and navigate on success
+        stepHardwareMode().then((result) => {
+          if (result) {
+            openDrawerWithStep("Select-Nodes");
+          }
+        });
       }}
       onBack={() => {
-        openDrawer("deploy-model");
+        openDrawerWithStep("Select-Cluster");
       }}
       backText="Back"
       nextText="Next"
@@ -132,22 +132,22 @@ export default function DeployModelHardwareMode() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Hardware Resource Mode"
-            description="Choose how your model will use compute resources. This affects performance, cost, and resource sharing."
+            description="Choose how your benchmark will use compute resources. This affects performance measurement and resource allocation."
           />
 
           <div className="pt-[.6rem]">
             <HardwareModeCard
               mode="dedicated"
               title="Dedicated Hardware"
-              description="Exclusive GPU/CPU allocation for your deployment only. Guarantees consistent performance with zero resource contention."
+              description="Exclusive GPU/CPU allocation for your benchmark only. Guarantees consistent performance with zero resource contention."
               icon="/images/deployRocket.png"
               badge="Recommended"
               badgeColor="blue"
               benefits={[
                 "Best performance and predictability",
                 "No resource sharing or context switching",
-                "Ideal for production workloads",
-                "Higher cost per deployment",
+                "Ideal for production benchmarks",
+                "Accurate performance measurements",
               ]}
               selected={selectedMode === "dedicated"}
               onClick={() => setSelectedMode("dedicated")}
@@ -156,14 +156,14 @@ export default function DeployModelHardwareMode() {
             <HardwareModeCard
               mode="shared"
               title="Shared Hardware"
-              description="Multiple deployments share the same hardware through efficient scheduling."
+              description="Multiple workloads share the same hardware through efficient scheduling."
               icon="/images/gift.png"
               badge="Cost Efficient"
               badgeColor="green"
               benefits={[
-                "Lower cost per deployment",
+                "Lower cost per benchmark",
                 "Better resource utilization",
-                "Ideal for development and testing",
+                "Ideal for development testing",
                 "Slight performance overhead from context switching",
               ]}
               selected={selectedMode === "shared"}
@@ -174,4 +174,6 @@ export default function DeployModelHardwareMode() {
       </BudWraperBox>
     </BudForm>
   );
-}
+};
+
+export default SelectHardwareMode;

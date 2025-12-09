@@ -163,7 +163,7 @@ const SelectNodes: React.FC = (props: {}) => {
       backText="Back"
       nextText="Next"
       onBack={() => {
-        openDrawerWithStep("Select-Cluster");
+        openDrawerWithStep("Select-Hardware-Mode");
       }}
       // onNext={() => {
       //   openDrawerWithStep("Select-Model");

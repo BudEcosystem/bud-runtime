@@ -2073,6 +2073,10 @@ class SimulationService:
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
         """Perform optimal search for deployment configuration using node groups."""
+        if not simulation_results:
+            logger.warning("optimal_search_node_group_config called with empty simulation_results")
+            return None
+
         try:
             logger.info(f"Starting optimal_search_node_group_config with {len(simulation_results)} results")
 

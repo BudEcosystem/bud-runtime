@@ -40,6 +40,9 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     cluster_id: Optional[UUID] = None
     bud_cluster_id: Optional[UUID] = None
 
+    # step 3.5 - hardware mode
+    hardware_mode: Optional[Literal["dedicated", "shared"]] = None
+
     # step 4
     nodes: Optional[list[dict[str, Any]]] = None
 

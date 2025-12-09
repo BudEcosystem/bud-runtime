@@ -102,6 +102,7 @@ export const usePerfomanceBenchmark = create<{
   selectedDataset: Dataset[];
   selectedModel: Model | null;
   runAsSimulation: boolean;
+  hardwareMode: "dedicated" | "shared" | null;
 
   benchmarks: Benchmark[];
   currentWorkflow: WorkflowType | null;
@@ -130,11 +131,13 @@ export const usePerfomanceBenchmark = create<{
   setSelecteUnselectAllDataset: (selectAll: boolean) => void;
   setSelectedDataset: (dataset: Dataset) => void;
   setSelectedModel: (model: Model) => void;
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => void;
 
   createBenchmark: (data: CreateForm) => any;
   stepTwo: (data: StepTwo) => any;
   stepTwoDataset: () => any;
   stepThree: () => any;
+  stepHardwareMode: () => Promise<any>;
   stepFour: () => any;
   stepFive: () => any;
   updateCredentials: (credentials: Credentials) => any;
@@ -164,12 +167,16 @@ export const usePerfomanceBenchmark = create<{
   selectedDataset: [],
   selectedModel: null,
   selectedCredentials: null,
+  hardwareMode: null,
   totalDataset: null,
   setSelectedCredentials: (credentials: Credentials | null) => {
     set({ selectedCredentials: credentials });
   },
   setSelectedModel: (model: any) => {
     set({ selectedModel: model });
+  },
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => {
+    set({ hardwareMode: mode });
   },
   setNodeMetrics: (nodeMetrics: any) => {
     set({ nodeMetrics: nodeMetrics });
@@ -209,6 +216,7 @@ export const usePerfomanceBenchmark = create<{
       selectedDataset: [],
       totalDataset: null,
       evalWith: "",
+      hardwareMode: null,
     });
   },
 
@@ -443,9 +451,37 @@ export const usePerfomanceBenchmark = create<{
       get().setLoading(false);
     }
   },
+  stepHardwareMode: async () => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const hardwareMode = get().hardwareMode;
+    if (!hardwareMode) {
+      errorToast("Please select a hardware mode");
+      return;
+    }
+    get().setLoading(true);
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/run-workflow`,
+        {
+          ...get().stepOneData,
+          workflow_id: workflowId,
+          step_number: 4,
+          trigger_workflow: false,
+          hardware_mode: hardwareMode,
+        },
+      );
+      get().getWorkflow();
+      return response;
+    } catch (error) {
+      console.error("Error saving hardware mode:", error);
+    } finally {
+      get().setLoading(false);
+    }
+  },
   stepFour: async () => {
     const workflowId = get().currentWorkflow?.workflow_id;
     const nodes = get().selectedNodes;
+    const hardwareMode = get().hardwareMode;
     console.log("cluster", nodes);
     if (!nodes) {
       errorToast("Please select nodes");
@@ -458,9 +494,10 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 4,
+          step_number: 5,
           trigger_workflow: false,
           nodes: nodes,
+          hardware_mode: hardwareMode,
         },
       );
       get().getWorkflow();

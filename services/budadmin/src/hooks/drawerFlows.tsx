@@ -2659,7 +2659,7 @@ const userUsage: DrawerFlowType = {
 const addBenchmark: DrawerFlowType = {
   title: "Add Benchmark",
   description: "Add Benchmark",
-  totalSteps: 9,
+  totalSteps: 10,
   steps: [
     {
       navigation: () => ["Benchmarks", "Create Benchmark"],
@@ -2795,9 +2795,46 @@ const addBenchmark: DrawerFlowType = {
     },
     {
       navigation: () => ["Benchmarks", "Create Benchmark"],
-      id: "Select-Nodes",
+      id: "Select-Hardware-Mode",
       confirmClose: true,
       step: 4,
+      component: StepComponents["Select-Hardware-Mode"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Create benchmark",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Eval with",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Nodes",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Benchmark Configuration",
+        },
+      ],
+    },
+    {
+      navigation: () => ["Benchmarks", "Create Benchmark"],
+      id: "Select-Nodes",
+      confirmClose: true,
+      step: 5,
       component: StepComponents["Select-Nodes"],
       progress: [
         {
@@ -2811,6 +2848,10 @@ const addBenchmark: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Hardware Mode",
         },
         {
           status: FormProgressStatus.inProgress,
@@ -2830,7 +2871,7 @@ const addBenchmark: DrawerFlowType = {
       navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "Select-Model",
       confirmClose: true,
-      step: 5,
+      step: 6,
       component: StepComponents["Select-Model"],
       progress: [
         {
@@ -2844,6 +2885,10 @@ const addBenchmark: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Hardware Mode",
         },
         {
           status: FormProgressStatus.completed,
@@ -2863,7 +2908,7 @@ const addBenchmark: DrawerFlowType = {
       navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "model_benchmark-credential-select",
       confirmClose: true,
-      step: 5,
+      step: 6,
       component: StepComponents["model_benchmark-credential-select"],
       progress: [
         {
@@ -2877,6 +2922,10 @@ const addBenchmark: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Hardware Mode",
         },
         {
           status: FormProgressStatus.completed,
@@ -2896,7 +2945,7 @@ const addBenchmark: DrawerFlowType = {
       navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "Benchmark-Configuration",
       confirmClose: true,
-      step: 6,
+      step: 7,
       component: StepComponents["Benchmark-Configuration"],
       progress: [
         {
@@ -2913,6 +2962,10 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.completed,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.completed,
           title: "Select Nodes",
         },
         {
@@ -2925,7 +2978,7 @@ const addBenchmark: DrawerFlowType = {
       navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "simulate-run",
       confirmClose: true,
-      step: 7,
+      step: 8,
       component: StepComponents["simulate-run"],
       progress: [],
     },
@@ -2933,7 +2986,7 @@ const addBenchmark: DrawerFlowType = {
       navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "Benchmarking-Progress",
       confirmClose: true,
-      step: 8,
+      step: 9,
       component: StepComponents["Benchmarking-Progress"],
       progress: [],
     },
@@ -2941,7 +2994,7 @@ const addBenchmark: DrawerFlowType = {
       navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "Benchmarking-Finished",
       confirmClose: false,
-      step: 9,
+      step: 10,
       component: StepComponents["Benchmarking-Finished"],
       progress: [],
     },
