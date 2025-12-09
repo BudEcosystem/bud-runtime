@@ -13,7 +13,7 @@ in
           partitions = {
             ESP = {
               name = "ESP";
-              label = "ESP";
+              # label = "ESP";
               size = "1G";
               type = "EF00";
               priority = 100;
@@ -35,7 +35,10 @@ in
             };
             root = {
               name = "root";
-              label = "root";
+              # it's currently disk-os-root -> ../../nvme0n1p2 in dev
+              # setting this to root causes Timed out waiting for
+              # device /dev/disk/by-partlabel/root on boot
+              # label = "root";
               size = "100%";
               priority = 200;
               content = {
