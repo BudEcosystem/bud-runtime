@@ -15,8 +15,6 @@ in
     authKeyFile = config.sops.secrets."pre_auth_key".path;
     extraUpFlags = [
       "--login-server=${headScaleUrl}"
-    ];
-    extraSetFlags = [
       "--operator=${user}"
     ];
   };
