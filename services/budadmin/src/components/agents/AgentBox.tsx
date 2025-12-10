@@ -995,6 +995,14 @@ function AgentBoxInner({
         payload.permanent = true;
       }
 
+      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      if (isEditMode) {
+        payload.permanent = true;
+        if (session.name) {
+          payload.prompt_id = session.name;
+        }
+      }
+
       // Start workflow status tracking
       startSystemPromptWorkflow();
 
@@ -1099,6 +1107,14 @@ function AgentBoxInner({
       if (isEditVersionMode && editVersionData) {
         payload.version = editVersionData.versionNumber;
         payload.permanent = true;
+      }
+
+      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      if (isEditMode) {
+        payload.permanent = true;
+        if (session.name) {
+          payload.prompt_id = session.name;
+        }
       }
 
       // Start workflow status tracking
