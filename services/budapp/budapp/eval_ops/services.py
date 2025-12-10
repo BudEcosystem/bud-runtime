@@ -2515,22 +2515,22 @@ class ExperimentService:
                             datasets=score_data.get("datasets", []),
                         )
 
-            evaluation_results.append(
-                AllEvaluationsItem(
-                    evaluation_id=eval_db.id,
-                    evaluation_name=eval_db.name,
-                    experiment_id=eval_db.experiment_id,
-                    experiment_name=experiment.name if experiment else "Unknown Experiment",
-                    model=model_detail,
-                    traits=traits_list,
-                    status=eval_db.status,
-                    scores=scores,
-                    runs=run_items,
-                    created_at=eval_db.created_at,
-                    updated_at=eval_db.updated_at,
-                    duration_in_seconds=eval_db.duration_in_seconds,
+                evaluation_results.append(
+                    AllEvaluationsItem(
+                        evaluation_id=eval_db.id,
+                        evaluation_name=eval_db.name,
+                        experiment_id=eval_db.experiment_id,
+                        experiment_name=experiment.name if experiment else "Unknown Experiment",
+                        model=model_detail,
+                        traits=traits_list,
+                        status=eval_db.status,
+                        scores=scores,
+                        runs=run_items,
+                        created_at=eval_db.created_at,
+                        updated_at=eval_db.modified_at,  # TimestampMixin uses modified_at, not updated_at
+                        duration_in_seconds=eval_db.duration_in_seconds,
+                    )
                 )
-            )
 
         return {
             "evaluations": evaluation_results,
@@ -2649,13 +2649,16 @@ class ExperimentService:
         return api_key
 
     def get_traits_with_datasets_for_run(self, dataset_version_id: uuid.UUID) -> List["TraitWithDatasets"]:
-        """Get traits with their datasets for a specific run.
+        """Get traits with the specific dataset used in a run.
+
+        This method returns only the dataset that was actually used in the run evaluation,
+        not all datasets associated with each trait.
 
         Parameters:
             dataset_version_id (uuid.UUID): ID of the dataset version used in the run.
 
         Returns:
-            List[TraitWithDatasets]: List of traits with their associated datasets.
+            List[TraitWithDatasets]: List of traits with the specific dataset used in the run.
         """
         from budapp.eval_ops.schemas import DatasetInfo, TraitWithDatasets
 
@@ -2677,38 +2680,23 @@ class ExperimentService:
             .all()
         )
 
-        # Build trait with datasets response
+        # Create DatasetInfo for the specific dataset used in this run
+        run_dataset_info = DatasetInfo(
+            id=dataset.id,
+            name=dataset.name,
+            version=dataset_version.version if dataset_version.version else "1.0",
+            description=dataset.description,
+        )
+
+        # Build trait with the specific dataset (not all datasets for each trait)
         traits_with_datasets = []
         for trait in traits_query:
-            # Get all datasets for this trait
-            datasets_for_trait = (
-                self.session.query(DatasetModel)
-                .join(PivotModel, DatasetModel.id == PivotModel.dataset_id)
-                .filter(PivotModel.trait_id == trait.id)
-                .all()
-            )
-
-            # Convert datasets to DatasetInfo
-            dataset_infos = []
-            for ds in datasets_for_trait:
-                # Get the version for this dataset
-                version = self.session.query(ExpDatasetVersion).filter(ExpDatasetVersion.dataset_id == ds.id).first()
-
-                dataset_infos.append(
-                    DatasetInfo(
-                        id=ds.id,
-                        name=ds.name,
-                        version=version.version if version else "1.0",
-                        description=ds.description,
-                    )
-                )
-
             traits_with_datasets.append(
                 TraitWithDatasets(
                     id=trait.id,
                     name=trait.name,
                     icon=trait.icon,
-                    datasets=dataset_infos,
+                    datasets=[run_dataset_info],  # Only include the dataset used in this run
                 )
             )
 

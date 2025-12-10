@@ -1783,8 +1783,18 @@ async def get_all_evaluations(
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.debug(f"Failed to get all evaluations: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get all evaluations") from e
+        logger.error(
+            f"Failed to get all evaluations: {e}",
+            exc_info=True,
+            extra={
+                "user_id": str(current_user.id),
+                "model_id": str(model_id) if model_id else None,
+                "endpoint_id": str(endpoint_id) if endpoint_id else None,
+                "page": page,
+                "page_size": page_size,
+            },
+        )
+        raise HTTPException(status_code=500, detail=f"Failed to get all evaluations: {str(e)}") from e
 
 
 @router.post(
