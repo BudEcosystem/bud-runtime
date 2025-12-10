@@ -143,6 +143,15 @@ class EndpointDataManager(DataManagerUtils):
             if status_filter:
                 stmt = stmt.filter(EndpointModel.status == status_filter)
                 count_stmt = count_stmt.filter(EndpointModel.status == status_filter)
+            # Apply project_id filter for search mode as well
+            if project_id:
+                # Handle both single UUID and list of UUIDs
+                if isinstance(project_id, list):
+                    stmt = stmt.filter(EndpointModel.project_id.in_(project_id))
+                    count_stmt = count_stmt.filter(EndpointModel.project_id.in_(project_id))
+                else:
+                    stmt = stmt.filter(EndpointModel.project_id == project_id)
+                    count_stmt = count_stmt.filter(EndpointModel.project_id == project_id)
         else:
             stmt = select(EndpointModel).join(Model).outerjoin(ClusterModel)
             count_stmt = select(func.count()).select_from(EndpointModel).join(Model).outerjoin(ClusterModel)
