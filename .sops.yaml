@@ -4,6 +4,7 @@ keys:
   - &admin_ditto age18xn7rqxu27kschgqs7u5x7af9evnpcp4sru34th6zhhwlwnwycpsajeeh9
   - &admin_adarsh age1ueu6gg5sgnvlnyk0u8zfyvpgrgja3g0xxdp9whegwk5rqlu42gjsveqrjj
   - &admin_varun age1evyhf8qvcvftzhrznv65a6shag2r05wnzmfkfaad5l66ztztv4qsh7f23k
+  - &admin_karthik age1g22rh8x48tanpl5pq6pjrpmslnvv0e3qcm6w7dghhe8cnl5y0evqu835qm
   # machines
   - &server_github_runner age1ueq3k22vcfet3y0uqu7wu385wd0pwx5nslqp2z30v4e3zf9stpesx7wjxr
   - &server_budk8s_primary age138ut93gvvwkaudl3wxtwn8z9e50ptuhe2yukg6vhwcgncxpplpsqtmhp7t
@@ -19,6 +20,7 @@ creation_rules:
           - *admin_ditto
           - *admin_adarsh
           - *admin_varun
+          - *admin_karthik
           - *server_budk8s_primary
 
   # server_dev_k3s
@@ -29,6 +31,7 @@ creation_rules:
           - *admin_ditto
           - *admin_adarsh
           - *admin_varun
+          - *admin_karthik
           - *server_budk8s_primary
           - *server_budk8s_ingress
           - *server_budk8s_worker
@@ -50,6 +53,7 @@ creation_rules:
           - *admin_ditto
           - *admin_adarsh
           - *admin_varun
+          - *admin_karthik
           - *server_github_runner
 
   # default
@@ -59,3 +63,4 @@ creation_rules:
           - *admin_ditto
           - *admin_adarsh
           - *admin_varun
+          - *admin_karthik
