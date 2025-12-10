@@ -367,7 +367,7 @@ class CredentialService(SessionMixin):
 
             ttl = None
             if key_info["expiry"]:
-                ttl = int((key_info["expiry"] - datetime.now(UTC)).total_seconds())
+                ttl = int((key_info["expiry"] - datetime.now()).total_seconds())
                 # Skip caching for expired credentials (negative or zero TTL)
                 if ttl <= 0:
                     logger.warning(f"Skipping cache for credential with invalid TTL: {ttl}s")
