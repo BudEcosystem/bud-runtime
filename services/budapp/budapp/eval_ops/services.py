@@ -327,12 +327,14 @@ class ExperimentService:
             HTTPException(status_code=400): If experiment with same name already exists for the user.
             HTTPException(status_code=500): If database insertion fails.
         """
-        # Check for duplicate experiment name for this user
+        # Check for duplicate experiment name for this user (case-insensitive)
         # Note: name has already been validated and trimmed by Pydantic
+        # Convert name to lowercase for storage and comparison
+        normalized_name = req.name.lower()
         existing_experiment = (
             self.session.query(ExperimentModel)
             .filter(
-                ExperimentModel.name == req.name,
+                func.lower(ExperimentModel.name) == normalized_name,
                 ExperimentModel.created_by == user_id,
                 ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
             )
@@ -358,8 +360,9 @@ class ExperimentService:
             tag_ids = [tag.id for tag in created_tags]
 
         # Create experiment without project_id initially
+        # Store name in lowercase for consistent storage
         ev = ExperimentModel(
-            name=req.name,
+            name=normalized_name,
             description=req.description,
             # project_id=req.project_id,  # Commented out - made optional
             created_by=user_id,
@@ -4660,7 +4663,8 @@ class EvaluationWorkflowService:
         trait_ids = all_data.get("step_3", {}).get("trait_ids", [])
 
         # Common details for evaluation
-        evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation")
+        # Convert evaluation name to lowercase for consistent storage
+        evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation").lower()
         evaluation_description = all_data.get("step_1", {}).get("description")
 
         if not endpoint_id:
@@ -4701,6 +4705,21 @@ class EvaluationWorkflowService:
                 trait_id_strings.append(str(validated_uuid))
             except (ValueError, TypeError):
                 logger.warning(f"Invalid trait ID format: {trait_id}, skipping")
+
+        # Check for duplicate evaluation name within the same experiment (case-insensitive)
+        existing_evaluation = (
+            self.session.query(Evaluation)
+            .filter(
+                func.lower(Evaluation.name) == evaluation_name,
+                Evaluation.experiment_id == experiment_id,
+            )
+            .first()
+        )
+        if existing_evaluation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"An evaluation with the name '{evaluation_name}' already exists in this experiment. Please choose a different name.",
+            )
 
         # Create Evaluation
         evaluation = Evaluation(
