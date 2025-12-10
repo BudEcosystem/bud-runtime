@@ -1,0 +1,120 @@
+---
+title: "Playground"
+description: "Interactive workspace to experiment with cloud and local models across Bud projects"
+---
+
+description: "Interactive workspace to experiment with Bud Playground’s chat, code, template, and comparison tools"
+
+## 1. Description
+
+The Playground in Bud Admin opens the BudPlayground experience (gated by `NEXT_PUBLIC_ENABLE_PLAYGROUND` and the configured `NEXT_PUBLIC_PLAYGROUND_URL`) so teams can exercise GenAI models without wiring client code. It provides real-time inference, model comparison, prompt templates, code-focused views, streaming output, and export options to keep experimentation fast and repeatable across supported providers.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. Interactive testing with streaming feedback
+
+Run live inference with streaming responses, adjustable decoding parameters (temperature, top-k, top-p), and a chat interface so users can iterate quickly on prompts and observe results in real time.
+
+### 2. Built-in comparison workflow
+
+Compare models side-by-side in dedicated panes to spot quality or latency differences using the same prompts and independent parameter settings.
+
+### 3. Prompt templates and code-oriented modes
+
+Start from pre-built templates for common tasks or switch to code generation views to tailor prompts for completion scenarios without manual setup.
+
+### 4. Export-ready results
+
+Export conversations and comparison outcomes so findings can be shared or reused in downstream workflows.
+
+## 3. Features
+
+### 3.1 Access and navigation
+
+- Enable the Playground feature flag in Bud Admin `NEXT_PUBLIC_ENABLE_PLAYGROUND=true`) and set `NEXT_PUBLIC_PLAYGROUND_URL` to the BudPlayground host so the **Playground** entry appears in the side menu.
+
+- Use the redirect at `/playground` to reach the BudPlayground interface from Bud Admin.
+
+### 3.2 Chat and single-model testing
+
+- Use the chat interface to send prompts to a selected model, with controls for temperature, top-k, top-p, and other generation parameters.
+
+- View streaming responses, inspect generated content, and refine prompts iteratively.
+
+### 3.3 Model comparison
+
+- Open the comparison workflow to place two or more models side-by-side.
+
+- Send the same prompt to each model and review outputs together to judge quality or latency differences.
+
+### 3.4 Prompt templates and code generation
+
+- Browse prompt templates for common tasks and load them into the editor for quick trials.
+
+- Switch to code-generation-oriented views to craft completions or code-specific prompts.
+
+### 3.5 Response analysis and export
+
+- Review response details and performance insights surfaced alongside model outputs.
+
+- Export conversations or comparison runs to share findings or keep reproducible records.
+
+## 4. How-to Guides
+
+### 4.1 Access the Playground
+
+1. In Bud Admin, ensure `NEXT_PUBLIC_ENABLE_PLAYGROUND` is set to `true` and `NEXT_PUBLIC_PLAYGROUND_URL` points to your BudPlayground deployment.
+
+2. Click **Playground** in the side navigation (or visit `/playground`) to open the interface.
+
+### 4.2 Run a chat against a single model
+
+1. Open the Playground and select a model from the model selector.
+
+2. Adjust decoding parameters (temperature, top-k, top-p) as needed.
+
+3. Enter your prompt in the chat and send to view streaming output.
+
+4. Refine prompts and resend until you achieve the desired response, then export if you want to share the result.
+
+### 4.3 Compare multiple models
+
+1. Switch to the comparison view.
+
+2. Add two or more models to the comparison panes.
+
+3. Enter a shared prompt and send to evaluate outputs together.
+
+4. Export or capture the comparison summary for later reference.
+
+### 4.4 Use prompt templates and code-focused modes
+
+1. Open the templates section and choose a template for your task.
+
+2. Load the template into the editor and adjust variables or parameters.
+
+3. For code use cases, switch to the code generation view to tailor completions before running.
+
+### 4.5 Export conversations or comparisons
+
+1. After finishing a chat or comparison, select the export option.
+
+2. Choose the format offered by the interface to save the conversation or comparison results.
+
+## 5. FAQs
+
+**Q1. How do I turn on the Playground in Bud Admin?**
+
+Set `NEXT_PUBLIC_ENABLE_PLAYGROUND=true` and provide a `NEXT_PUBLIC_PLAYGROUND_URL` so the Playground link is available in the Bud Admin navigation.
+
+**Q2. Which experiments does Playground support?**
+
+Playground includes interactive chat testing, side-by-side model comparisons, prompt templates, code generation views, and exportable results.
+
+**Q3. Can I tune model parameters while testing?**
+
+Yes. Temperature, top-k, and top-p controls are available so you can adjust generation settings between runs.
+
+**Q4. How do I capture results for stakeholders?**
+
+Use the export option in the Playground to save conversations or comparison outputs for sharing or downstream analysis.
