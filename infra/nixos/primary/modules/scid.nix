@@ -35,10 +35,11 @@
         watch_paths = [
           "flake.nix"
           "flake.lock"
-          "infra/nixos/common"
           "infra/nixos/azure"
           "infra/nixos/budk8s"
+          "infra/nixos/common"
           "infra/nixos/primary"
+          "infra/nixos/master"
         ];
       };
     };
