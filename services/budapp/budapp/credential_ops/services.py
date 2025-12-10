@@ -369,7 +369,7 @@ class CredentialService(SessionMixin):
             if key_info["expiry"]:
                 ttl = int((key_info["expiry"] - datetime.now()).total_seconds())
 
-            logger.info(f"Credential cache TTL: {ttl}")
+            logger.debug(f"Credential cache TTL: {ttl}")
 
             # Hash the API key before storing in Redis (consistent with database storage)
             hashed_key = CredentialModel.set_hashed_key(key_info["api_key"])
