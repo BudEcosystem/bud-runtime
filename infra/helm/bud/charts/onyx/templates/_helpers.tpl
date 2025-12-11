@@ -75,11 +75,13 @@ Create env vars from secrets
     {{- range $secretSuffix, $secretContent := .Values.auth }}
     {{- if and (ne $secretContent.enabled false) ($secretContent.secretKeys) }}
     {{- range $name, $key := $secretContent.secretKeys }}
+    {{- if $key }}
 - name: {{ $name | upper | replace "-" "_" | quote }}
   valueFrom:
     secretKeyRef:
       name: {{ include "onyx.secretName" $secretContent }}
       key: {{ default $name $key }}
+    {{- end }}
     {{- end }}
     {{- end }}
     {{- end }}
