@@ -963,6 +963,10 @@ onyx:
       existingSecret: "onyx-oauth"
       secretKeys:
         KEYCLOAK_ADMIN_PASSWORD: keycloak_admin_password
+        # Explicitly nullify subchart defaults - these keys don't exist in our secret
+        OAUTH_CLIENT_ID: null
+        OAUTH_CLIENT_SECRET: null
+        OAUTH_COOKIE_SECRET: null
     smtp:
       enabled: false
   # ConfigMap overrides (template expressions are evaluated via tpl function)
