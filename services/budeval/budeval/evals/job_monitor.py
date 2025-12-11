@@ -10,6 +10,7 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
 from budeval.evals.schema import EvaluationRequest
+from budeval.evals.workflows import EvaluationWorkflow
 
 
 logger = logging.getLogger(__name__)
@@ -382,7 +383,30 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
         elif status == "failed" and job_id not in failed_jobs:
             failed_jobs.append(job_id)
             if not ctx.is_replaying:
-                logger_local.error(f"Job {job_id} failed")
+                logger_local.error(f"Job {job_id} failed - extracting error details")
+
+            # Extract error information from failed job
+            error_extraction_result = yield ctx.call_activity(
+                EvaluationWorkflow.extract_job_error,
+                input=json.dumps({"job_id": job_id, "kubeconfig": data.get("kubeconfig")}),
+            )
+
+            # Store error info in job timing map
+            if error_extraction_result.get("success"):
+                error_info = error_extraction_result.get("error_info", {})
+                job_timing_map[job_id]["error_details"] = error_info
+
+                if not ctx.is_replaying:
+                    logger_local.error(
+                        f"Job {job_id} error category '{error_info.get('category')}': "
+                        f"{error_info.get('actionable_message', error_info.get('error_message'))}"
+                    )
+            else:
+                # Fallback: store basic error
+                job_timing_map[job_id]["error_details"] = {
+                    "category": "unknown",
+                    "error_message": "Failed to extract error details",
+                }
 
     # Check if all jobs are done
     remaining_jobs = [j for j in job_ids if j not in completed_jobs and j not in failed_jobs]
