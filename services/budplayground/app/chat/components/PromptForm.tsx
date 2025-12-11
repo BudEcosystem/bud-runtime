@@ -6,6 +6,7 @@ import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 import { useChatStore } from '@/app/store/chat';
 import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
+import { Text_12_400_B3B3B3 } from '@/lib/text';
 
 interface PromptFormProps {
   promptIds?: string[];
@@ -22,6 +23,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
   const { endpoints, getEndPoints, isReady } = useEndPoints();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
+  const [fieldOrder, setFieldOrder] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [promptVersion, setPromptVersion] = useState<string | undefined>();
@@ -91,14 +93,19 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
 
           // Handle JSON schema format - extract properties from $defs
           let schemaToUse: any = config.data.input_schema ?? null;
+          let requiredFields: string[] = [];
 
           // If it's a JSON schema with $defs, flatten it for the form
           // Check for both "Input" and "InputSchema" in $defs
           if (schemaToUse && schemaToUse.$defs) {
             if (schemaToUse.$defs.Input) {
-              schemaToUse = schemaToUse.$defs.Input.properties || {};
+              const inputDef = schemaToUse.$defs.Input;
+              schemaToUse = inputDef.properties || {};
+              requiredFields = inputDef.required || [];
             } else if (schemaToUse.$defs.InputSchema) {
-              schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+              const inputDef = schemaToUse.$defs.InputSchema;
+              schemaToUse = inputDef.properties || {};
+              requiredFields = inputDef.required || [];
             }
           }
 
@@ -108,6 +115,18 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             Object.keys(schemaToUse).length === 0
           ) {
             schemaToUse = null;
+          }
+
+          // Determine field order: required fields first, then any remaining properties
+          if (schemaToUse && typeof schemaToUse === 'object') {
+            const allKeys = Object.keys(schemaToUse);
+            const orderedFields = [
+              ...requiredFields.filter(key => allKeys.includes(key)),
+              ...allKeys.filter(key => !requiredFields.includes(key))
+            ];
+            setFieldOrder(orderedFields);
+          } else {
+            setFieldOrder([]);
           }
 
           setInputSchema(schemaToUse);
@@ -125,12 +144,14 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
           setFormData(initialData);
         } else {
           setInputSchema(null);
+          setFieldOrder([]);
           setFormData({ unstructuredSchema: '' });
           setPromptVersion(undefined);
         }
       } catch (error) {
         console.error('Error fetching prompt config:', error);
         setInputSchema(null);
+        setFieldOrder([]);
         setFormData({ unstructuredSchema: '' });
         setPromptVersion(undefined);
         setPromptDeployment(undefined);
@@ -263,8 +284,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             placeholder={placeholder || title || fieldName}
             min={minimum}
             max={maximum}
+            controls={false}
             className={inputClassName}
-            style={{ boxShadow: 'none', width: '100%' }}
+            type='number'
+            style={{ boxShadow: 'none', width: '100%', paddingLeft: 0 }}
           />
         );
 
@@ -275,7 +298,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             onChange={(e) => handleChange(fieldName, e.target.checked)}
             className="text-white"
           >
-            {title || fieldName}
+            <Text_12_400_B3B3B3>{title || fieldName}</Text_12_400_B3B3B3>
           </Checkbox>
         );
 
@@ -336,10 +359,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             {inputSchema?.title || 'Please enter the following details'}
           </h2>
 
-          {/* Dynamic Fields */}
-          {inputSchema && Object.keys(inputSchema).map((fieldName) => {
+          {/* Dynamic Fields - ordered by required array */}
+          {inputSchema && fieldOrder.map((fieldName) => {
             const fieldSchema = inputSchema[fieldName];
-            if (fieldName === 'title') return null; // Skip title field
+            if (!fieldSchema || fieldName === 'title') return null; // Skip if field doesn't exist or is title
 
             return (
               <div key={fieldName} className="space-y-2">
