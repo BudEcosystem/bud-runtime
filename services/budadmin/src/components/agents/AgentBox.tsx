@@ -953,12 +953,6 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if system prompt is not empty
-    if (!session.systemPrompt || session.systemPrompt.trim() === "") {
-      errorToast("System prompt cannot be empty");
-      return;
-    }
-
     // Check if prompt_id exists (it should be auto-generated)
     if (!session.promptId) {
       console.error("promptId is missing from session! This should not happen.");
@@ -977,12 +971,9 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: [
-          {
-            role: "system",
-            content: session.systemPrompt
-          }
-        ],
+        messages: session.systemPrompt?.trim()
+          ? [{ role: "system", content: session.systemPrompt }]
+          : [],
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
@@ -1019,6 +1010,11 @@ function AgentBoxInner({
         if (workflowId) {
           // Store workflow_id in session for system prompt status tracking
           updateSession(session.id, { systemPromptWorkflowId: workflowId });
+        }
+
+        // If system prompt was cleared, update session to reflect cleared state
+        if (!session.systemPrompt?.trim()) {
+          updateSession(session.id, { systemPrompt: '' });
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
@@ -1076,12 +1072,6 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if there are any messages
-    if (!messages || messages.length === 0) {
-      errorToast("Prompt messages cannot be empty");
-      return;
-    }
-
     setIsSavingPromptMessages(true);
 
     try {
@@ -1093,10 +1083,10 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: messages.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content
-        })),
+        // Filter out messages with empty content, send empty array if all are empty
+        messages: messages
+          .filter((msg: any) => msg.content?.trim())
+          .map((msg: any) => ({ role: msg.role, content: msg.content })),
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
@@ -1133,6 +1123,12 @@ function AgentBoxInner({
         if (workflowId) {
           // Store workflow_id in session for prompt messages status tracking
           updateSession(session.id, { promptMessagesWorkflowId: workflowId });
+        }
+
+        // If messages were cleared (empty array sent), update session to reflect cleared state
+        const sentMessages = messages.filter((msg: any) => msg.content?.trim());
+        if (sentMessages.length === 0) {
+          updateSession(session.id, { promptMessages: '[]' });
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
