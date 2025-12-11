@@ -85,6 +85,18 @@
             else:
                 error_info["actionable_message"] = "Missing required Python module. Check your dependencies."
 
+        # API timeout errors (OpenAI/model endpoint)
+        elif "Request timed out" in logs or ("RuntimeError" in logs and "API failed" in logs):
+            error_info["category"] = "api_timeout"
+            error_info["error_type"] = "APITimeoutError"
+            # Try to extract the endpoint URL
+            url_match = re.search(r'error occurs at (https?://[^\s]+)', logs)
+            if url_match:
+                endpoint = url_match.group(1)
+                error_info["actionable_message"] = f"Model API endpoint not responding: {endpoint}. Check if the model service is running and accessible."
+            else:
+                error_info["actionable_message"] = "Model API endpoint not responding. Check if the model service is running and accessible."
+
         # Network errors
         elif "ConnectionError" in logs or "TimeoutError" in logs or "Connection refused" in logs:
             error_info["category"] = "network_error"
@@ -113,13 +125,30 @@
         error_lines = [line for line in logs.split('\n') if line.strip()]
         if error_lines:
             # Look for exception message (usually last non-empty line)
+            # Expanded list to catch more error types including RuntimeError
+            error_patterns = [
+                'Error:', 'Exception:', 'AssertionError:', 'ValueError:',
+                'RuntimeError:', 'TypeError:', 'KeyError:', 'IndexError:',
+                'Request timed out', 'API failed'
+            ]
             for line in reversed(error_lines):
-                if any(err in line for err in ['Error:', 'Exception:', 'AssertionError:', 'ValueError:']):
-                    error_info["error_message"] = line.strip()
+                # Skip progress bar lines (contain percentage indicators)
+                if '|' in line and '%' in line and ('/' in line or 'it/s' in line):
+                    continue
+                if any(err in line for err in error_patterns):
+                    error_info["error_message"] = line.strip()[:500]
                     break
 
             if not error_info["error_message"]:
-                error_info["error_message"] = error_lines[-1][:500]  # Last line, max 500 chars
+                # Find last meaningful line (skip progress bars and empty-ish lines)
+                for line in reversed(error_lines):
+                    stripped = line.strip()
+                    # Skip progress bars and ANSI escape sequences
+                    if '|' in stripped and '%' in stripped:
+                        continue
+                    if len(stripped) > 10:  # Skip very short lines
+                        error_info["error_message"] = stripped[:500]
+                        break
 
         # If no actionable message set, use error message
         if not error_info["actionable_message"]:
