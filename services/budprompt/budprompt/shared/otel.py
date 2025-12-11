@@ -25,6 +25,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pydantic_ai import Agent
+from pydantic_ai.agent import InstrumentationSettings
 
 from budprompt.commons.config import app_settings
 
@@ -108,8 +109,8 @@ class OTelManager:
         # Set as global tracer provider
         trace.set_tracer_provider(self._tracer_provider)
 
-        # Instrument all Pydantic AI agents
-        Agent.instrument_all()
+        # Instrument all Pydantic AI agents with OpenTelemetry Semantic Conventions v1.37.0
+        Agent.instrument_all(InstrumentationSettings(version=3))
 
         self._is_configured = True
         logger.info(f"OpenTelemetry configured: service_name={app_settings.name}")
