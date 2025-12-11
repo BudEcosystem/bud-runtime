@@ -185,6 +185,7 @@
       nixosModules = lib.genAttrs [ "common" "primary" ] makeModule;
       nixosConfigurations = lib.genAttrs [
         "primary-dev"
+        "primary-disk"
         "ingress"
         "worker"
       ] (host: makeNixos host "x86_64-linux");

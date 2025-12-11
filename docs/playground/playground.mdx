@@ -1,6 +1,6 @@
 ---
 title: "Playground"
-description: "Interactive workspace to experiment with cloud and local models across Bud projects"
+description: "Interactive workspace to experiment with cloud and local models across Bud projects."
 ---
 
 ## 1. Description
@@ -101,23 +101,31 @@ Copy prompts or responses for reuse, edit and resend user prompts, provide thumb
 ### 4.7 Configure settings
 
 1. Open the Settings panel in the Playground toolbar.
-1. Set presets, temperature, response length limit, repeat penalties, stop strings, optional notes and structured output options as needed. 
+1. Set presets, temperature, response length limit, repeat penalties, stop strings, optional notes and structured output options as needed.
 1. Subsequent prompts in the current window follow the selected configuration.
 
 ## 5. FAQs
 
-**Q1. How do I turn on the Playground in Bud Admin?**
+**Q1. What models can I try in the Playground?**
 
-Set `NEXT_PUBLIC_ENABLE_PLAYGROUND=true` and provide a `NEXT_PUBLIC_PLAYGROUND_URL` so the Playground link is available in the Bud Admin navigation.
+Cloud endpoints and local checkpoints (Hugging Face, URL, or disk-based) surfaced through Bud Admin deployments can be exercised, using the same authentication as production.
 
 **Q2. Which experiments does Playground support?**
 
-Playground includes interactive chat testing, side-by-side model comparisons, prompt templates, code generation views, and exportable results.
+Playground includes interactive chat testing, side-by-side model comparisons, and response metrics etc.
 
 **Q3. Can I tune model parameters while testing?**
 
-Yes. Temperature, top-k, and top-p controls are available so you can adjust generation settings between runs.
+Yes. Temperature, response limit, repeat penalty are available so you can adjust generation settings between runs.
 
-**Q4. How do I capture results for stakeholders?**
+**Q4. How are conversations stored?**
 
-Use the export option in the Playground to save conversations or comparison outputs for sharing or downstream analysis.
+Conversations are saved by default with timestamps, token usahe and model etc. They remain in the scope until deleted, preserving auditability for compliance.
+
+**Q5. Can I copy or rerun specific messages?**
+
+Yes. Prompts and responses include copy actions; prompts can be edited and resent, and assistant replies support thumbs-up/down feedback plus a retry control to regenerate them in place.
+
+**Q6. Does Playground support observability?**
+
+Yes. Latency, token counts, TTFT and backend identifiers appear alongside responses. Deep links to Observability tab help correlate Playground runs with full inference traces.
