@@ -287,3 +287,61 @@ class PrometheusCompatibleMetricsResponse(BaseModel):
     metric_type: str
     timestamp: str
     cluster_id: str
+
+
+# Node Events schemas
+class NodeEventSchema(BaseModel):
+    """Schema for a single Kubernetes node event."""
+
+    cluster_id: str
+    cluster_name: str
+    node_name: str
+    event_uid: str
+    event_type: str  # Normal, Warning
+    reason: str
+    message: str
+    source_component: str
+    source_host: str
+    first_timestamp: Optional[str] = None
+    last_timestamp: Optional[str] = None
+    event_count: int = 1
+
+
+class NodeEventsStoreRequest(BaseModel):
+    """Request to store node events."""
+
+    cluster_id: str
+    events: List[NodeEventSchema]
+
+
+class NodeEventsCountResponse(BaseModel):
+    """Response for node events count query."""
+
+    cluster_id: str
+    events_count: Dict[str, int]  # node_name -> count
+    from_time: Optional[datetime] = None
+    to_time: Optional[datetime] = None
+
+
+class NodeEventDetail(BaseModel):
+    """Detailed event information for display."""
+
+    event_type: str
+    reason: str
+    message: str
+    count: int
+    first_timestamp: Optional[datetime] = None
+    last_timestamp: Optional[datetime] = None
+    source_component: str
+    source_host: str
+
+
+class NodeEventsListResponse(BaseModel):
+    """Response for node events list query."""
+
+    cluster_id: str
+    node_name: str
+    events: List[NodeEventDetail]
+    total_events: int
+    from_time: Optional[datetime] = None
+    to_time: Optional[datetime] = None

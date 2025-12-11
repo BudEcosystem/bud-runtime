@@ -7,16 +7,14 @@ import { AppRequest } from "src/pages/api/requests";
 import { create } from "zustand";
 
 export type ClusterNodeEvent = {
-  type: string;
+  event_type: string;
   reason: string;
   message: string;
   count: number;
   first_timestamp: string;
   last_timestamp: string;
-  source: {
-    component: string;
-    host: string;
-  };
+  source_component: string;
+  source_host: string;
 };
 
 export type Node = {

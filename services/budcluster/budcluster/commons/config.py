@@ -87,6 +87,7 @@ class AppConfig(BaseAppConfig):
 
     # Bud Services
     bud_app_id: str = Field("budapp", alias="BUD_APP_ID")
+    bud_metrics_app_id: str = Field("budmetrics", alias="BUD_METRICS_APP_ID")
 
     # Deployment Status Sync Configuration
     deployment_sync_batch_size: int = Field(2, alias="DEPLOYMENT_SYNC_BATCH_SIZE")

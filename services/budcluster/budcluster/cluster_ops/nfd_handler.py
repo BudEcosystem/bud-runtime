@@ -95,9 +95,18 @@ class NFDSchedulableResourceDetector:
             logger.debug(f"Skipping node {node_name}: no devices and not ready")
             return None
 
+        # Extract internal IP from node addresses
+        internal_ip = None
+        if node.status and node.status.addresses:
+            internal_ip = next(
+                (addr.address for addr in node.status.addresses if addr.type == "InternalIP"),
+                None,
+            )
+
         return {
             "name": node_name,
             "id": self._generate_node_id(node_name),
+            "internal_ip": internal_ip,
             "status": schedulability_info["ready"],
             "devices": devices,
             "schedulability": schedulability_info,
