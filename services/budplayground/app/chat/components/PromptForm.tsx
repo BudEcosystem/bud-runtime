@@ -41,7 +41,8 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     try {
       const saved = sessionStorage.getItem(storageKey);
       return saved ? JSON.parse(saved) : null;
-    } catch {
+    } catch (error) {
+      console.error("Failed to retrieve or parse form data from sessionStorage:", error);
       return null;
     }
   }, [storageKey]);
@@ -51,8 +52,8 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     if (!storageKey) return;
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(data));
-    } catch {
-      // Ignore storage errors (e.g., quota exceeded)
+    } catch (error) {
+      console.error("Failed to save form data to sessionStorage:", error);
     }
   }, [storageKey]);
 
@@ -61,8 +62,8 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     if (!storageKey) return;
     try {
       sessionStorage.removeItem(storageKey);
-    } catch {
-      // Ignore storage errors
+    } catch (error) {
+      console.error("Failed to remove form data from sessionStorage:", error);
     }
   }, [storageKey]);
 
