@@ -623,7 +623,7 @@ impl EvaluatorConfig {
         inference_config: &InferenceConfig<'_, '_>,
         candidates: &[InferenceResult],
         inference_params: &mut InferenceParams,
-    ) -> Result<(ModelInferenceRequest, Vec<usize>), Error> {
+    ) -> Result<(ModelInferenceRequest<'_>, Vec<usize>), Error> {
         // Do this before we prepare the system message so we can use the correct max index in the system message
         let (candidate_message, skipped_indices) =
             self.prepare_candidate_message(inference_config.templates, candidates)?;

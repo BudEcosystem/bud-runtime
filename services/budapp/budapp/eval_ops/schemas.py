@@ -1020,6 +1020,38 @@ class DatasetScoresResponse(PaginatedSuccessResponse):
     scores: List[DatasetModelScore] = Field(default_factory=list, description="List of model scores")
 
 
+# ------------------------ Cross-Dataset Scores Schemas ------------------------
+
+
+class CrossDatasetScoreItem(BaseModel):
+    """Score entry for cross-dataset scores listing."""
+
+    rank: int = Field(..., description="Ranking by accuracy within the result set (1=best)")
+    dataset_id: UUID4 = Field(..., description="UUID of the dataset")
+    dataset_name: str = Field(..., description="Name of the dataset")
+    model_id: UUID4 = Field(..., description="UUID of the model")
+    model_name: str = Field(..., description="Model name")
+    model_display_name: Optional[str] = Field(None, description="Model display name")
+    model_icon: Optional[str] = Field(None, description="Model icon URL")
+    endpoint_id: UUID4 = Field(..., description="UUID of the endpoint")
+    endpoint_name: str = Field(..., description="Endpoint/deployment name")
+    accuracy: Optional[float] = Field(None, description="Accuracy metric used for ranking")
+    metrics: List[MetricValue] = Field(default_factory=list, description="All averaged metrics")
+    num_runs: int = Field(..., description="Number of runs averaged")
+    created_at: datetime = Field(..., description="Creation timestamp from most recent run")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class CrossDatasetScoresResponse(PaginatedSuccessResponse):
+    """Response for cross-dataset scores endpoint."""
+
+    scores: List[CrossDatasetScoreItem] = Field(default_factory=list, description="List of scores across datasets")
+
+
 class ExperimentSummary(BaseModel):
     """Summary statistics for an experiment."""
 
@@ -1159,3 +1191,39 @@ class HeatmapChartResponse(SuccessResponse):
     datasets: List[HeatmapDatasetInfo] = Field(..., description="List of datasets for column headers")
     deployments: List[DeploymentHeatmapData] = Field(..., description="Heatmap data per deployment")
     stats: HeatmapStats = Field(..., description="Statistics for color scaling")
+
+
+# ------------------------ All Evaluations Listing Schemas ------------------------
+
+
+class AllEvaluationsRunItem(BaseModel):
+    """Run information with pass down eval id to be added to model inference Details an evaluation for the all-evaluations listing."""
+
+    run_id: UUID4 = Field(..., description="Run UUID")
+    run_index: int = Field(..., description="Run index within experiment")
+    status: str = Field(..., description="Run status")
+    evaluation_job_id: Optional[str] = Field(None, description="BudEval job ID if evaluation was triggered")
+    created_at: Optional[datetime] = Field(None, description="Run creation timestamp")
+
+
+class AllEvaluationsItem(BaseModel):
+    """A single evaluation item for the all-evaluations listing."""
+
+    evaluation_id: UUID4 = Field(..., description="UUID of the evaluation")
+    evaluation_name: str = Field(..., description="Name of the evaluation")
+    experiment_id: UUID4 = Field(..., description="UUID of the parent experiment")
+    experiment_name: str = Field(..., description="Name of the parent experiment")
+    model: Optional[ModelDetail] = Field(None, description="Model details for this evaluation")
+    traits: List[TraitWithDatasets] = Field(..., description="Traits with their associated datasets")
+    status: str = Field(..., description="Evaluation status (pending/running/completed/failed)")
+    scores: Optional[EvaluationScore] = Field(None, description="Evaluation scores from BudEval")
+    runs: List[AllEvaluationsRunItem] = Field(default_factory=list, description="Runs in this evaluation")
+    created_at: Optional[datetime] = Field(None, description="Evaluation creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Evaluation update timestamp")
+    duration_in_seconds: Optional[int] = Field(None, description="Evaluation duration in seconds")
+
+
+class AllEvaluationsResponse(PaginatedSuccessResponse):
+    """Response schema for listing all evaluations."""
+
+    evaluations: List[AllEvaluationsItem] = Field(..., description="List of evaluations")

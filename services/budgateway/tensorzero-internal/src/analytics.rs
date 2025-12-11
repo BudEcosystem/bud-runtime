@@ -28,6 +28,7 @@ pub struct GatewayAnalyticsDatabaseInsert {
 
     /// Geographical data (populated by GeoIP lookup)
     pub country_code: Option<String>,
+    pub country_name: Option<String>,
     pub region: Option<String>,
     pub city: Option<String>,
     pub latitude: Option<f32>,
@@ -66,6 +67,8 @@ pub struct GatewayAnalyticsDatabaseInsert {
     pub response_timestamp: DateTime<Utc>,
     pub gateway_processing_ms: u32,
     pub total_duration_ms: u32,
+    #[serde(skip)]
+    pub model_latency_ms: Option<u32>,
 
     /// Model routing information
     pub model_name: Option<String>,
@@ -99,6 +102,7 @@ impl GatewayAnalyticsDatabaseInsert {
             proxy_chain: None,
             protocol_version: "HTTP/1.1".to_string(),
             country_code: None,
+            country_name: None,
             region: None,
             city: None,
             latitude: None,
@@ -127,6 +131,7 @@ impl GatewayAnalyticsDatabaseInsert {
             response_timestamp: now,
             gateway_processing_ms: 0,
             total_duration_ms: 0,
+            model_latency_ms: None,
             model_name: None,
             model_provider: None,
             model_version: None,

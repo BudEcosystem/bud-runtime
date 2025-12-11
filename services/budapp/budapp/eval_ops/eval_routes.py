@@ -11,11 +11,14 @@ from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.eval_ops.schemas import (
+    AllEvaluationsResponse,
     ConfigureRunsRequest,
     ConfigureRunsResponse,
     CreateEvalTagResponse,
     CreateExperimentRequest,
     CreateExperimentResponse,
+    CrossDatasetScoreItem,
+    CrossDatasetScoresResponse,
     DatasetFilter,
     DatasetModelScore,
     DatasetScoresResponse,
@@ -719,18 +722,24 @@ def get_heatmap_chart_data(
         Optional[datetime],
         Query(description="Filter runs before this date (ISO 8601)"),
     ] = None,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=50, description="Maximum number of deployments to return (default: 5)"),
+    ] = 5,
 ):
     """Get heatmap chart data for comparing deployments across datasets.
 
     Returns dataset benchmark scores for each selected deployment. Scores
     represent the average accuracy across all completed evaluation runs for
-    each dataset-deployment combination.
+    each dataset-deployment combination. By default, returns only the 5 most
+    recent deployments with successful runs.
 
     - **deployment_ids**: Optional comma-separated deployment UUIDs to compare. Returns all if not provided.
     - **trait_ids**: Optional comma-separated trait UUIDs to filter datasets.
     - **dataset_ids**: Optional comma-separated dataset UUIDs to filter.
     - **start_date**: Optional filter for runs after this date.
     - **end_date**: Optional filter for runs before this date.
+    - **limit**: Maximum number of deployments to return (default: 5, max: 50).
 
     Returns a `HeatmapChartResponse` with:
     - List of datasets (columns for the heatmap)
@@ -783,6 +792,7 @@ def get_heatmap_chart_data(
             dataset_ids=dataset_id_list,
             start_date=start_date,
             end_date=end_date,
+            limit=limit,
         )
 
         return HeatmapChartResponse(
@@ -798,6 +808,124 @@ def get_heatmap_chart_data(
     except Exception as e:
         logger.debug(f"Failed to get heatmap chart data: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get heatmap chart data") from e
+
+
+@router.get(
+    "/scores",
+    response_model=CrossDatasetScoresResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+def get_cross_dataset_scores(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    endpoint_id: Annotated[Optional[uuid.UUID], Query(description="Filter by endpoint ID")] = None,
+    model_id: Annotated[Optional[uuid.UUID], Query(description="Filter by model ID")] = None,
+    dataset_id: Annotated[Optional[uuid.UUID], Query(description="Filter by dataset ID")] = None,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    limit: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 50,
+):
+    """Get scores across multiple datasets with optional filters.
+
+    This endpoint retrieves scores for model/endpoint combinations across different datasets.
+    At least one filter (endpoint_id, model_id, or dataset_id) must be provided.
+
+    **Features:**
+    - Query scores across multiple datasets at once
+    - Filter by endpoint_id, model_id, and/or dataset_id (at least one required)
+    - One entry per unique dataset + model + endpoint combination
+    - Metrics averaged across all completed runs (non-zero values only)
+    - Ranked by accuracy metric (1 = best)
+    - Only shows completed evaluation runs
+    - Access control: only shows data from user's own experiments
+
+    **Query Parameters:**
+    - `endpoint_id`: Filter by specific endpoint (optional)
+    - `model_id`: Filter by specific model (optional)
+    - `dataset_id`: Filter by specific dataset (optional)
+    - `page`: Page number for pagination (default: 1)
+    - `limit`: Items per page (default: 50, max: 100)
+
+    **Returns:**
+    - `scores`: List of score entries with:
+        - `rank`: Ranking by accuracy (1=best)
+        - `dataset_id`, `dataset_name`: Dataset information
+        - `model_id`, `model_name`, `model_display_name`, `model_icon`: Model information
+        - `endpoint_id`, `endpoint_name`: Endpoint/deployment information
+        - `accuracy`: Accuracy metric value (used for ranking)
+        - `metrics`: List of all averaged metrics
+        - `num_runs`: Number of runs averaged
+        - `created_at`: Timestamp from most recent run
+    - `pagination`: Standard pagination metadata
+
+    **Example Response:**
+    ```json
+    {
+      "code": 200,
+      "object": "cross_dataset.scores",
+      "message": "Successfully retrieved scores",
+      "scores": [
+        {
+          "rank": 1,
+          "dataset_id": "uuid",
+          "dataset_name": "MMLU Benchmark",
+          "model_id": "uuid",
+          "model_name": "meta-llama/Llama-3.1-70B",
+          "endpoint_id": "uuid",
+          "endpoint_name": "llama-3-prod",
+          "accuracy": 87.4,
+          "metrics": [{"metric_name": "accuracy", "metric_value": 87.4}],
+          "num_runs": 3,
+          "created_at": "2025-01-15T10:30:00Z"
+        }
+      ],
+      "page": 1,
+      "limit": 50,
+      "total_record": 5,
+      "total_pages": 1
+    }
+    ```
+    """
+    # Validate that at least one filter is provided
+    if not endpoint_id and not model_id and not dataset_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one filter (endpoint_id, model_id, or dataset_id) must be provided",
+        )
+
+    try:
+        scores, total = ExperimentService(session).get_cross_dataset_scores(
+            user_id=current_user.id,
+            endpoint_id=endpoint_id,
+            model_id=model_id,
+            dataset_id=dataset_id,
+            page=page,
+            limit=limit,
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Failed to get cross-dataset scores: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve cross-dataset scores",
+        ) from e
+
+    # Convert to Pydantic models
+    score_models = [CrossDatasetScoreItem(**score) for score in scores]
+
+    return CrossDatasetScoresResponse(
+        code=status.HTTP_200_OK,
+        object="cross_dataset.scores",
+        message="Successfully retrieved scores",
+        scores=score_models,
+        page=page,
+        limit=limit,
+        total_record=total,
+    )
 
 
 @router.get(
@@ -1586,6 +1714,94 @@ async def get_experiment_evaluations(
     except Exception as e:
         logger.debug(f"Failed to get experiment evaluations: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get experiment evaluations") from e
+
+
+@router.get(
+    "/evaluations/all",
+    response_model=AllEvaluationsResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
+    },
+)
+async def get_all_evaluations(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    model_id: Annotated[
+        Optional[uuid.UUID],
+        Query(description="Filter evaluations by model ID"),
+    ] = None,
+    endpoint_id: Annotated[
+        Optional[uuid.UUID],
+        Query(description="Filter evaluations by endpoint ID (takes precedence over model_id)"),
+    ] = None,
+    search: Annotated[
+        Optional[str],
+        Query(description="Search evaluations by evaluation name, dataset name, or trait name"),
+    ] = None,
+    page: Annotated[
+        int,
+        Query(ge=1, description="Page number (1-indexed)"),
+    ] = 1,
+    page_size: Annotated[
+        int,
+        Query(ge=1, le=100, description="Number of items per page"),
+    ] = 20,
+):
+    """Get all evaluations for the current user with optional filtering.
+
+    This endpoint retrieves all evaluations across all experiments for the current user including:
+    - Evaluation details with model, traits, and datasets
+    - Real-time evaluation scores from BudEval service
+    - Runs associated with each evaluation
+
+    The scores are fetched asynchronously from the BudEval service.
+
+    - **model_id**: Optional UUID to filter evaluations by model
+    - **endpoint_id**: Optional UUID to filter evaluations by endpoint (takes precedence over model_id)
+    - **search**: Optional search term to filter by evaluation name, dataset name, or trait name
+    - **page**: Page number for pagination (1-indexed, default: 1)
+    - **page_size**: Number of items per page (default: 20, max: 100)
+    - **session**: Database session dependency
+    - **current_user**: The authenticated user requesting the evaluations
+
+    Returns an `AllEvaluationsResponse` with paginated evaluations.
+    """
+    try:
+        result = await ExperimentService(session).get_all_evaluations(
+            user_id=current_user.id,
+            model_id=model_id,
+            endpoint_id=endpoint_id,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+
+        return AllEvaluationsResponse(
+            code=status.HTTP_200_OK,
+            object="evaluations.list",
+            message="Successfully retrieved all evaluations",
+            evaluations=result["evaluations"],
+            total_record=result["total"],
+            page=result["page"],
+            limit=result["page_size"],
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(
+            f"Failed to get all evaluations: {e}",
+            exc_info=True,
+            extra={
+                "user_id": str(current_user.id),
+                "model_id": str(model_id) if model_id else None,
+                "endpoint_id": str(endpoint_id) if endpoint_id else None,
+                "search": search,
+                "page": page,
+                "page_size": page_size,
+            },
+        )
+        raise HTTPException(status_code=500, detail=f"Failed to get all evaluations: {str(e)}") from e
 
 
 @router.post(

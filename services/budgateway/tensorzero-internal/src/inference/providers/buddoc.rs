@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use uuid::Uuid;
 
+use super::helpers::handle_reqwest_error;
+
+const PROVIDER_TYPE: &str = "buddoc";
+
 #[derive(Debug)]
 pub struct BudDocProvider {
     pub api_base: String,
@@ -179,13 +183,7 @@ impl DocumentProcessingProvider for BudDocProvider {
 
         // Send the request
         let response = req_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                message: format!("Failed to send request to BudDoc: {}", e),
-                status_code: None,
-                provider_type: "BudDoc".to_string(),
-                raw_request: Some(raw_request.clone()),
-                raw_response: None,
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone()))
         })?;
 
         let status = response.status();
@@ -263,8 +261,6 @@ impl DocumentProcessingProvider for BudDocProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::documents::DocumentInput;
-    use std::sync::Arc;
 
     #[test]
     fn test_buddoc_request_serialization() {

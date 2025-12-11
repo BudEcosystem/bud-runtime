@@ -22,6 +22,7 @@ import { CustomBreadcrumb } from "@/components/ui/bud/card/DrawerBreadCrumbNavig
 import Tags from "src/flows/components/DrawerTags";
 import { useDrawer } from "src/hooks/useDrawer";
 import { capitalize } from "@/lib/utils";
+import { formatTimeToHMS } from "@/utils/formatTime";
 
 interface ExperimentDetails {
     id: string;
@@ -362,6 +363,7 @@ const ExperimentDetailsPage = () => {
                                             currentModel:
                                                 progressItem.current_model,
                                             eta: `${progressItem.eta_minutes} min`,
+                                            duration: formatTimeToHMS(progressItem.duration_in_seconds, 'short'),
                                             processingRate:
                                                 progressItem.processing_rate_per_min,
                                             averageScore:

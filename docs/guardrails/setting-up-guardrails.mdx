@@ -5,4 +5,140 @@ description: "Configuration guide"
 
 # Setting Up Guardrails
 
-*Content to be added*
+This guide covers configuring guardrail providers and deploying guardrails to your model endpoints.
+
+## Provider Configuration
+
+### Bud Sentinel
+
+<Note>
+Bud Sentinel is a proprietary service requiring a separate license. The deployment stack references the Bud Sentinel container image, but it's a gated image that won't pull without valid credentials. Contact sales for licensing.
+</Note>
+
+To configure Bud Sentinel:
+
+1. Set the Bud Sentinel base URL in your budapp environment configuration
+2. The system automatically syncs probes and rules from Bud Sentinel every 7 days
+3. New probes and rules become available in your guardrail profile configuration
+
+No additional API keys or manual sync is required—the guardrail service handles synchronization automatically.
+
+### OpenAI Moderation
+
+OpenAI provides content moderation models that can be used as guardrail providers:
+
+| Model | Description |
+|-------|-------------|
+| `text-moderation-latest` | Text-only moderation for general content filtering |
+| `omni-moderation-latest` | Advanced multi-modal moderation model |
+
+Configure by adding OpenAI as a provider with your API credentials.
+
+### Azure Content Safety
+
+Azure Content Safety integrates with your existing Azure infrastructure:
+
+| Model | Description |
+|-------|-------------|
+| `azure-content-safety-text` | Text content filtering and categorization |
+
+Requires your Azure Content Safety endpoint URL and API key.
+
+## Deploying Guardrails
+
+Guardrail deployment follows a three-step process: browse probes, create a profile, and deploy to endpoints.
+
+### Step 1: Browse Available Probes
+
+Use the probes API to discover available detection capabilities:
+
+- **List Probes** (`GET /guardrails/probes`) - Returns all available probes with filtering options for provider, guard type, and status
+- **Get Probe Details** (`GET /guardrails/probes/{id}`) - Retrieves detailed information about a specific probe including its rules
+- **List Probe Rules** (`GET /guardrails/probes/{id}/rules`) - Returns all rules associated with a probe
+- **Search Tags** (`GET /guardrails/probes/tags`) - Helps discover probes by tag/category
+
+Each probe includes metadata about what it detects, which guard types it supports (input/output), and the rules it contains.
+
+### Step 2: Create a Profile
+
+Profiles combine probes into a reusable guardrail configuration. See [Content Filtering](/guardrails/content-filtering) for detailed guidance on creating profiles with the right probe combinations.
+
+- **Create Profile** (`POST /guardrails/profiles`) - Creates a new guardrail profile with name, description, and optional project association
+- **Add Probes** (`POST /guardrails/profiles/{id}/probes`) - Adds selected probes to the profile with optional severity threshold overrides
+- **Configure Rules** - Fine-tune individual rules within probes, including enabling/disabling specific rules
+
+### Step 3: Deploy to Endpoints
+
+Deploy your configured profile to model endpoints:
+
+- **Create Deployment** (`POST /guardrails/deployments`) - Deploys a profile to one or more endpoints
+- **Standalone Deployment** - Deploy without an endpoint association for batch processing or testing scenarios
+
+Deployment creates an async workflow that:
+1. Validates the profile and endpoint configuration
+2. Creates the guardrail profile in the gateway
+3. Activates guardrails on the specified endpoints
+4. Sends notifications on success or failure
+
+### Deployment Status
+
+Monitor deployment status through the deployments API:
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Deployment initiated, waiting to start |
+| `deploying` | Configuration in progress |
+| `running` | Active and processing requests |
+| `unhealthy` | Issues detected, may need attention |
+| `failure` | Deployment failed—check logs for details |
+| `deleting` | Removal in progress |
+| `deleted` | Successfully removed |
+
+## Managing Deployments
+
+### Update Deployment
+
+Modify an existing deployment to change the associated profile or configuration:
+
+- **Update Deployment** (`PUT /guardrails/deployments/{id}`) - Updates deployment configuration
+
+### Remove Deployment
+
+Remove guardrails from endpoints:
+
+- **Delete Deployment** (`DELETE /guardrails/deployments/{id}`) - Removes the deployment and deactivates guardrails on associated endpoints
+
+### List Deployments
+
+View all active deployments:
+
+- **List Deployments** (`GET /guardrails/deployments`) - Returns deployments with filtering by project, endpoint, or status
+- **Get Deployment** (`GET /guardrails/deployments/{id}`) - Retrieves details for a specific deployment
+
+## Execution Configuration
+
+### Guard Types
+
+Configure when guardrails run:
+
+| Guard Type | When Applied |
+|------------|--------------|
+| `input` | Before the request reaches the model |
+| `output` | Before the response returns to the user |
+
+Profiles can specify guard types at the profile level, with per-probe overrides available.
+
+### Severity Thresholds
+
+Control detection sensitivity with severity thresholds (0.0 to 1.0):
+
+- **Low (0.0 - 0.3)**: Only flags severe violations
+- **Medium (0.4 - 0.6)**: Balanced detection
+- **High (0.7 - 1.0)**: Catches subtle issues
+
+Thresholds cascade: profile-level → probe-level → rule-level, with more specific settings taking precedence.
+
+## Next Steps
+
+- [Content Filtering](/guardrails/content-filtering) - Learn about detection categories and create profiles
+- [Custom Rules](/guardrails/custom-rules) - Create custom probes and rules

@@ -42,7 +42,7 @@ use crate::{
     tool::{ToolCall, ToolCallChunk},
 };
 
-use super::helpers::inject_extra_request_data;
+use super::helpers::{handle_reqwest_error, inject_extra_request_data};
 use super::helpers_thinking_block::{process_think_blocks, ThinkingState};
 use super::{
     openai::{
@@ -1127,13 +1127,7 @@ impl ImageGenerationProvider for TogetherProvider {
             .body(request_json.clone());
 
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                message: format!("Failed to send Together image generation request: {e}"),
-                status_code: None,
-                raw_request: Some(request_json.clone()),
-                raw_response: None,
-                provider_type: PROVIDER_TYPE.to_string(),
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone()))
         })?;
 
         let latency = Latency::NonStreaming {
@@ -1271,13 +1265,7 @@ impl TextToSpeechProvider for TogetherProvider {
             .body(request_json.clone());
 
         let res = request_builder.send().await.map_err(|e| {
-            Error::new(ErrorDetails::InferenceClient {
-                message: format!("Failed to send Together TTS request: {e}"),
-                status_code: e.status(),
-                raw_request: Some(request_json.clone()),
-                raw_response: None,
-                provider_type: PROVIDER_TYPE.to_string(),
-            })
+            handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone()))
         })?;
 
         let latency = Latency::NonStreaming {

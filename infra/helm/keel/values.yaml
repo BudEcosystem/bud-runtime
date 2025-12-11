@@ -2,11 +2,6 @@ keel:
   enabled: true
   helmProvider:
     version: "v3"
-  slack:
-    enabled: true
-    botName: "infrabot"
-    channel: "infra"
-    approvalsChannel: "infra"
   resources:
     limits:
       memory: 256Mi

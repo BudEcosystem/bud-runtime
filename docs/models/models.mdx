@@ -89,6 +89,7 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 - Evaluation traces and metrics (latency, token counts).
 - Benchmark results to compare backends and hardware settings.
 - Analytics that highlight regressions after model upgrades.
+- Refer to the [[Observability guide](https://budecosystem-b7b14df4.mintlify.app/observability/observability)] for deeper analytics and diagnostics coverage across models.
 
 ### 3.5 Quantized models and adapters
 
@@ -104,9 +105,9 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 
 ### 3.7 Evaluations
 
-- First-class evaluation runs with scenario tags (safety, hallucination, latency) that attach to each model version.
-- Baseline comparisons across providers to quantify quality vs cost trade-offs.
-- Store datasets for repeatable runs.
+- View result of first-class evaluation runs associated with each model version.
+- Compare evaluation results across various deployments, traits and datasets.
+- Identify the optimal configuration for the model.
 
 ### 3.8 Performance benchmarks
 
@@ -120,7 +121,7 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 
 1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
 2. Click on Models menu from the side menu.
-3. Click on +Model button.
+3. View the model listing page with counts of deployments, model type, and recommended cluster etc.
 
 ### 4.2 Add a cloud model
 
@@ -169,13 +170,7 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 2. Trigger a scan to validate checksums, signatures, and vulnerability results.
 3. Review findings and apply required remediations before approving the model for routing.
 
-### 4.9 Run an evaluation
-
-1. Open the model detail page and select Evaluations tab.
-2. Choose traits and datasets to run an evaluation.
-3. Execute the run and review baseline deltas before promoting the model or updating routes.
-
-### 4.10 Run a performance benchmark
+### 4.9 Run a performance benchmark
 
 1. Open the local model detail page and select Performance tab.
 2. Choose Run Performance Benchmark.
@@ -183,7 +178,7 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 4. Choose datasets and cluster for dataset based benchmark run.
 5. Provide Max Input Tokens, Max Output Tokens and select cluster for configuration based benchmark run.
 
-### 4.11 Add a quantized model variant
+### 4.10 Add a quantized model variant
 
 1. Open the local model detail page and select Adapters tab.
 1. Click See More for Quantised Models section.
@@ -192,13 +187,13 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 1. Choose Quantization method and provide quantization recipe (weight bits, weight granularity, activation bits, activation granularity and symmetric).
 3. Save the variant; it will appear alongside the base model for routing.
 
-### 4.12 View adapters
+### 4.11 View adapters
 
 1. Open the local model detail page and select Adapters tab.
 2. Review available adapters, their lineage (base model, dataset), and activation status.
 3. Enable or disable adapters for specific routes or projects as needed.
 
-### 4.13 Modify permissions for models
+### 4.12 Modify permissions for models
 
 1. Open the user management page and select user.
 2. Assign view access for users who should only browse model listings.

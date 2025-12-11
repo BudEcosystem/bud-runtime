@@ -139,6 +139,7 @@ pub async fn require_api_key(
     next: Next,
 ) -> Result<Response, Response> {
     let (parts, body) = request.into_parts();
+
     let bytes = to_bytes(body, 1024 * 1024).await.unwrap_or_default();
 
     // Extract the key as an owned String to avoid borrowing parts
@@ -163,6 +164,7 @@ pub async fn require_api_key(
     };
 
     let mut api_config = auth.validate_api_key(&key);
+
     if api_config.is_err() {
         return Err(auth_error_response(
             StatusCode::UNAUTHORIZED,
@@ -220,7 +222,6 @@ pub async fn require_api_key(
     }
 
     if !is_batch_or_file_endpoint {
-        // Parse the JSON body to validate and extract model name or prompt.id
         let val: Value = match serde_json::from_slice(&bytes) {
             Ok(v) => v,
             Err(_) => {

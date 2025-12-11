@@ -40,7 +40,7 @@ export interface PromptAgent {
 export interface PromptsListParams {
   page?: number;
   limit?: number;
-  search?: string;
+  search?: boolean;
   name?: string;
   prompt_type?: 'simple_prompt' | 'agent';
   project_id?: string;
@@ -135,11 +135,15 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
     set({ isLoading: true });
 
     try {
+      // Determine the search query - use params.name if provided, otherwise use state.searchQuery
+      const searchQuery = params?.name !== undefined ? params.name : state.searchQuery;
+      const hasSearchQuery = searchQuery && searchQuery.trim().length > 0;
+
       const queryParams: PromptsListParams = {
         page: params?.page || state.currentPage,
         limit: params?.limit || state.pageSize,
-        search: params?.search !== undefined ? params.search : state.searchQuery,
-        name: params?.name || state.searchQuery,
+        search: hasSearchQuery ? true : undefined,
+        name: hasSearchQuery ? searchQuery : undefined,
         prompt_type: params?.prompt_type || state.selectedType,
         project_id: params?.project_id || state.projectId,
         order_by: params?.order_by || state.orderBy,
@@ -147,7 +151,8 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
 
       // Remove undefined values
       Object.keys(queryParams).forEach(key => {
-        if (queryParams[key as keyof PromptsListParams] === undefined || queryParams[key as keyof PromptsListParams] === "") {
+        const value = queryParams[key as keyof PromptsListParams];
+        if (value === undefined || value === "") {
           delete queryParams[key as keyof PromptsListParams];
         }
       });

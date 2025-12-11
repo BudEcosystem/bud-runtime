@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 {
   # k3s ingress
   networking.firewall = {
@@ -19,8 +19,6 @@
     ];
   };
 
-  sops.secrets."k3s_server_token".sopsFile = ./secrets.yaml;
-
   environment = {
     variables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
     systemPackages = [ pkgs.kubernetes-helm ];
@@ -29,9 +27,7 @@
   services.k3s = {
     gracefulNodeShutdown.enable = true;
     enable = true;
-    tokenFile = config.sops.secrets."k3s_server_token".path;
 
-    extraKubeletConfig.maxPods = 512;
     extraFlags = [
       # can only enable IPv6 on fresh clusterInit
       # "--cluster-cidr=10.42.0.0/16,fd12:b0d8:b00b::/56"

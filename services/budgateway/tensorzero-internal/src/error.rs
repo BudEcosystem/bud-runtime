@@ -204,6 +204,12 @@ pub enum ErrorDetails {
     InferenceTimeout {
         variant_name: String,
     },
+    /// Timeout waiting for a response from a model provider (e.g., vLLM, OpenAI)
+    ProviderTimeout {
+        provider_type: String,
+        timeout_secs: u64,
+        raw_request: Option<String>,
+    },
     InputValidation {
         source: Box<Error>,
     },
@@ -456,6 +462,7 @@ impl ErrorDetails {
             ErrorDetails::InferenceNotFound { .. } => tracing::Level::WARN,
             ErrorDetails::InferenceServer { .. } => tracing::Level::ERROR,
             ErrorDetails::InferenceTimeout { .. } => tracing::Level::WARN,
+            ErrorDetails::ProviderTimeout { .. } => tracing::Level::WARN,
             ErrorDetails::InputValidation { .. } => tracing::Level::WARN,
             ErrorDetails::InternalError { .. } => tracing::Level::ERROR,
             ErrorDetails::InvalidBaseUrl { .. } => tracing::Level::ERROR,
@@ -557,6 +564,7 @@ impl ErrorDetails {
             ErrorDetails::InferenceNotFound { .. } => StatusCode::NOT_FOUND,
             ErrorDetails::InferenceServer { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorDetails::InferenceTimeout { .. } => StatusCode::REQUEST_TIMEOUT,
+            ErrorDetails::ProviderTimeout { .. } => StatusCode::GATEWAY_TIMEOUT,
             ErrorDetails::InvalidClientMode { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidTensorzeroUuid { .. } => StatusCode::BAD_REQUEST,
             ErrorDetails::InvalidUuid { .. } => StatusCode::BAD_REQUEST,
@@ -805,6 +813,9 @@ impl std::fmt::Display for ErrorDetails {
             }
             ErrorDetails::InferenceTimeout { variant_name } => {
                 write!(f, "Inference timed out for variant: {variant_name}")
+            }
+            ErrorDetails::ProviderTimeout { timeout_secs, .. } => {
+                write!(f, "Request timed out after {} seconds", timeout_secs)
             }
             ErrorDetails::InputValidation { source } => {
                 write!(f, "Input validation failed with messages: {source}")
@@ -1097,6 +1108,7 @@ impl Error {
                     ErrorDetails::BadCredentialsPreInference { .. } => "authentication_error",
                     ErrorDetails::CapabilityNotSupported { .. } => "invalid_request_error",
                     ErrorDetails::InferenceServer { .. } => "server_error",
+                    ErrorDetails::ProviderTimeout { .. } => "timeout_error",
                     _ => "internal_error"
                 },
                 "code": None::<String>
@@ -1135,6 +1147,14 @@ impl Error {
                 } => {
                     let provider_error = parse_provider_error_message(message);
                     Some((provider_error, *status_code))
+                }
+                ErrorDetails::ProviderTimeout { timeout_secs, .. } => {
+                    let provider_error = json!({
+                        "message": format!("Request timed out after {} seconds", timeout_secs),
+                        "type": "timeout_error",
+                        "timeout_seconds": timeout_secs
+                    });
+                    Some((provider_error, Some(StatusCode::GATEWAY_TIMEOUT)))
                 }
                 ErrorDetails::ModelProvidersExhausted { provider_errors } => {
                     // Recursively check nested errors
@@ -1223,6 +1243,17 @@ impl Error {
 
         // Check if this is a provider error that we should pass through
         match self.get_details() {
+            // For provider timeout errors, return a structured timeout response
+            ErrorDetails::ProviderTimeout { timeout_secs, .. } => {
+                let body = json!({
+                    "error": {
+                        "message": format!("Request timed out after {} seconds", timeout_secs),
+                        "type": "timeout_error",
+                        "timeout_seconds": timeout_secs
+                    }
+                });
+                (StatusCode::GATEWAY_TIMEOUT, body)
+            }
             // For provider client errors, include the provider error details
             ErrorDetails::InferenceClient {
                 message,
@@ -1325,5 +1356,80 @@ mod tests {
 
         let response = error.into_response();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_provider_timeout_error() {
+        let error = Error::new(ErrorDetails::ProviderTimeout {
+            provider_type: "vLLM".to_string(),
+            timeout_secs: 300,
+            raw_request: Some("test request".to_string()),
+        });
+
+        // Test status code is 504 GATEWAY_TIMEOUT
+        assert_eq!(error.status_code(), StatusCode::GATEWAY_TIMEOUT);
+
+        // Test log level is WARN
+        assert_eq!(error.get_details().level(), tracing::Level::WARN);
+
+        // Test error message contains timeout info
+        let error_string = error.to_string();
+        assert!(
+            error_string.contains("timed out"),
+            "Error should mention timeout: {error_string}"
+        );
+        assert!(
+            error_string.contains("300 seconds"),
+            "Error should include timeout duration: {error_string}"
+        );
+    }
+
+    #[test]
+    fn test_provider_timeout_response_json() {
+        let error = Error::new(ErrorDetails::ProviderTimeout {
+            provider_type: "openai".to_string(),
+            timeout_secs: 300,
+            raw_request: None,
+        });
+
+        let (status_code, body) = error.to_response_json();
+
+        // Verify status code
+        assert_eq!(status_code, StatusCode::GATEWAY_TIMEOUT);
+
+        // Verify JSON structure
+        let error_obj = body.get("error").expect("Should have error object");
+        assert_eq!(
+            error_obj.get("type").and_then(|v| v.as_str()),
+            Some("timeout_error")
+        );
+        assert_eq!(
+            error_obj.get("timeout_seconds").and_then(|v| v.as_u64()),
+            Some(300)
+        );
+        // Provider name is intentionally not included in user-facing response
+        assert!(error_obj.get("provider").is_none());
+        assert!(error_obj
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .contains("timed out"));
+    }
+
+    #[test]
+    fn test_provider_timeout_openai_error() {
+        let error = Error::new(ErrorDetails::ProviderTimeout {
+            provider_type: "anthropic".to_string(),
+            timeout_secs: 300,
+            raw_request: None,
+        });
+
+        let openai_error = error.to_openai_error();
+        let error_obj = openai_error.get("error").expect("Should have error object");
+
+        assert_eq!(
+            error_obj.get("type").and_then(|v| v.as_str()),
+            Some("timeout_error")
+        );
     }
 }

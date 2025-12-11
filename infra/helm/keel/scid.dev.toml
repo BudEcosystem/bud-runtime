@@ -1,0 +1,4 @@
+namespace = "kube-system"
+release_name = "keel"
+sops_value_paths = [ "values.enc.yaml" ]
+value_paths = [ "values.dev.yaml" ]

@@ -64,10 +64,8 @@ impl GeoIpService {
                 // Country information
                 if let Some(country) = city_data.country {
                     record.country_code = country.iso_code.map(|s| s.to_string());
-                    if record.country_code.is_none() {
-                        if let Some(names) = country.names {
-                            record.country_code = names.get("en").map(|s| s.to_string());
-                        }
+                    if let Some(names) = country.names {
+                        record.country_name = names.get("en").map(|s| s.to_string());
                     }
                 }
 

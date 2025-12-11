@@ -51,7 +51,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Install cargo-nextest, cargo-deny, and cargo-hack
         run: |
@@ -99,7 +99,15 @@ jobs:
       - run: df -h
       - name: "Free up disk space"
         run: |
+          # Remove large pre-installed software to free ~20GB for ClickHouse e2e tests
+          # See: https://github.com/actions/runner-images/discussions/9329
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/swift /usr/share/miniconda /usr/local/share/powershell
+          sudo rm -rf /opt/az /opt/microsoft /opt/pipx
+          # Docker images take significant space
+          docker system prune -af || true
+          # Show freed space
+          df -h
 
       - name: Cache cargo bin directory
         uses: actions/cache@v4
@@ -117,7 +125,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Install cargo-nextest
         run: |
@@ -203,7 +211,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -298,7 +306,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev jq netcat-openbsd
+          sudo apt-get install -y libsasl2-dev jq netcat-openbsd libssl-dev protobuf-compiler libopenblas-dev
 
       - name: Install vegeta
         run: |

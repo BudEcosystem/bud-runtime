@@ -953,12 +953,6 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if system prompt is not empty
-    if (!session.systemPrompt || session.systemPrompt.trim() === "") {
-      errorToast("System prompt cannot be empty");
-      return;
-    }
-
     // Check if prompt_id exists (it should be auto-generated)
     if (!session.promptId) {
       console.error("promptId is missing from session! This should not happen.");
@@ -977,12 +971,9 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: [
-          {
-            role: "system",
-            content: session.systemPrompt
-          }
-        ],
+        messages: session.systemPrompt?.trim()
+          ? [{ role: "system", content: session.systemPrompt }]
+          : [],
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
@@ -993,6 +984,14 @@ function AgentBoxInner({
       if (isEditVersionMode && editVersionData) {
         payload.version = editVersionData.versionNumber;
         payload.permanent = true;
+      }
+
+      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      if (isEditMode) {
+        payload.permanent = true;
+        if (session.name) {
+          payload.prompt_id = session.name;
+        }
       }
 
       // Start workflow status tracking
@@ -1011,6 +1010,11 @@ function AgentBoxInner({
         if (workflowId) {
           // Store workflow_id in session for system prompt status tracking
           updateSession(session.id, { systemPromptWorkflowId: workflowId });
+        }
+
+        // If system prompt was cleared, update session to reflect cleared state
+        if (!session.systemPrompt?.trim()) {
+          updateSession(session.id, { systemPrompt: '' });
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
@@ -1068,13 +1072,12 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if there are any messages
-    if (!messages || messages.length === 0) {
-      errorToast("Prompt messages cannot be empty");
-      return;
-    }
-
     setIsSavingPromptMessages(true);
+
+    // Filter out messages with empty content once, reuse for payload and state update
+    const filteredMessages = messages
+      .filter((msg: { content?: string }) => msg.content?.trim())
+      .map((msg: { role: string; content: string }) => ({ role: msg.role, content: msg.content }));
 
     try {
       // Build the payload for prompt-config endpoint
@@ -1085,10 +1088,7 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: messages.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content
-        })),
+        messages: filteredMessages,
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
@@ -1099,6 +1099,14 @@ function AgentBoxInner({
       if (isEditVersionMode && editVersionData) {
         payload.version = editVersionData.versionNumber;
         payload.permanent = true;
+      }
+
+      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      if (isEditMode) {
+        payload.permanent = true;
+        if (session.name) {
+          payload.prompt_id = session.name;
+        }
       }
 
       // Start workflow status tracking
@@ -1117,6 +1125,11 @@ function AgentBoxInner({
         if (workflowId) {
           // Store workflow_id in session for prompt messages status tracking
           updateSession(session.id, { promptMessagesWorkflowId: workflowId });
+        }
+
+        // If messages were cleared (empty array sent), update session to reflect cleared state
+        if (filteredMessages.length === 0) {
+          updateSession(session.id, { promptMessages: '[]' });
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
@@ -1275,9 +1288,19 @@ function AgentBoxInner({
             </span>
           </div>
           {isHovering && (
-            <PrimaryButton onClick={handleSaveClick}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] hover:!border-[#965CDE] group"
-              textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
+            <PrimaryButton
+              onClick={handleSaveClick}
+              disabled={!session?.selectedDeployment?.name}
+              classNames={`h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] group ${
+                !session?.selectedDeployment?.name
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:!bg-[#479d5f] hover:!border-[#965CDE]'
+              }`}
+              textClass={`!text-[0.625rem] !font-[400] ${
+                !session?.selectedDeployment?.name
+                  ? 'text-[#479d5f80]'
+                  : 'text-[#479d5f] group-hover:text-[#EEEEEE]'
+              }`}
             >
               {isAddVersionMode ? "Save Version" : isEditVersionMode ? "Save Changes" : "Save"}
             </PrimaryButton>

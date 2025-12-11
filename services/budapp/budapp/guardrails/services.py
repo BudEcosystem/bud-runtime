@@ -26,6 +26,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
+from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     APP_ICONS,
     EndpointStatusEnum,
@@ -773,6 +774,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             providers["bud_sentinel"] = {
                 "type": "bud_sentinel",
                 "probe_config": {},
+                "endpoint": app_settings.bud_sentinel_base_url,
                 "api_key_location": "none",  # Bud sentinel doesn't require credentials
             }
 
@@ -1321,7 +1323,51 @@ class GuardrailProfileDeploymentService(SessionMixin):
             offset, limit, filters, order_by, search
         )
 
-        db_profiles_response = [GuardrailProfileResponse.model_validate(db_profile[0]) for db_profile in db_profiles]
+        if not db_profiles:
+            return [], count
+
+        profile_ids = [db_profile[0].id for db_profile in db_profiles]
+
+        # Bulk fetch probe counts to avoid N+1 queries
+        probe_counts_q = (
+            select(GuardrailProfileProbe.profile_id, func.count(GuardrailProfileProbe.id).label("probe_count"))
+            .where(GuardrailProfileProbe.profile_id.in_(profile_ids))
+            .group_by(GuardrailProfileProbe.profile_id)
+        )
+        probe_counts_result = self.session.execute(probe_counts_q)
+        probe_counts = {row.profile_id: row.probe_count for row in probe_counts_result.all()}
+
+        # Bulk fetch deployment counts and standalone status
+        deployment_counts_q = (
+            select(
+                GuardrailDeployment.profile_id,
+                func.count(GuardrailDeployment.id).label("deployment_count"),
+                func.bool_or(GuardrailDeployment.endpoint_id.is_(None)).label("is_standalone"),
+            )
+            .where(GuardrailDeployment.profile_id.in_(profile_ids))
+            .where(GuardrailDeployment.status != GuardrailDeploymentStatusEnum.DELETED)
+            .group_by(GuardrailDeployment.profile_id)
+        )
+        deployment_counts_result = self.session.execute(deployment_counts_q)
+        deployment_counts = {
+            row.profile_id: (row.deployment_count, bool(row.is_standalone)) for row in deployment_counts_result.all()
+        }
+
+        db_profiles_response = []
+        for db_profile in db_profiles:
+            profile_id = db_profile[0].id
+            probe_count = probe_counts.get(profile_id, 0)
+            deployment_count, is_standalone = deployment_counts.get(profile_id, (0, False))
+
+            profile_response = GuardrailProfileResponse.model_validate(db_profile[0]).model_copy(
+                update={
+                    "probe_count": probe_count,
+                    "deployment_count": deployment_count,
+                    "is_standalone": is_standalone,
+                }
+            )
+            db_profiles_response.append(profile_response)
+
         return db_profiles_response, count
 
     async def create_profile(
@@ -1353,9 +1399,12 @@ class GuardrailProfileDeploymentService(SessionMixin):
             )
         )
 
+        profile_response = GuardrailProfileResponse.model_validate(db_profile).model_copy(
+            update={"probe_count": 0, "deployment_count": 0, "is_standalone": False}
+        )
+
         return GuardrailProfileDetailResponse(
-            profile=GuardrailProfileResponse.model_validate(db_profile),
-            probe_count=0,
+            profile=profile_response,
             message="Profile created successfully",
             code=HTTPStatus.HTTP_201_CREATED,
         )
@@ -1546,14 +1595,20 @@ class GuardrailProfileDeploymentService(SessionMixin):
             # Update the cache after profile update
             await GuardrailDeploymentWorkflowService(self.session).update_guardrail_profile_cache(profile_id)
 
-            # Get probe count
-            db_probe_count = await GuardrailsDeploymentDataManager(self.session).get_count_by_fields(
-                GuardrailProfileProbe, fields={"profile_id": profile_id}
+            probe_count, deployment_count, is_standalone = await GuardrailsDeploymentDataManager(
+                self.session
+            ).get_profile_counts(profile_id)
+
+            profile_response = GuardrailProfileResponse.model_validate(updated_profile).model_copy(
+                update={
+                    "probe_count": probe_count,
+                    "deployment_count": deployment_count,
+                    "is_standalone": is_standalone,
+                }
             )
 
             return GuardrailProfileDetailResponse(
-                profile=GuardrailProfileResponse.model_validate(updated_profile),
-                probe_count=db_probe_count,
+                profile=profile_response,
                 message="Profile updated successfully",
                 code=HTTPStatus.HTTP_200_OK,
             )
@@ -1641,17 +1696,22 @@ class GuardrailProfileDeploymentService(SessionMixin):
 
     async def retrieve_profile(self, profile_id: UUID) -> GuardrailProfileDetailResponse:
         """Retrieve a specific profile by ID."""
-        db_profile = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+        deployment_data_manager = GuardrailsDeploymentDataManager(self.session)
+        db_profile = await deployment_data_manager.retrieve_by_fields(
             GuardrailProfile, {"id": profile_id, "status": GuardrailStatusEnum.ACTIVE}
         )
+        probe_count, deployment_count, is_standalone = await deployment_data_manager.get_profile_counts(profile_id)
 
-        db_probe_count = await GuardrailsDeploymentDataManager(self.session).get_count_by_fields(
-            GuardrailProfileProbe, fields={"profile_id": profile_id}
+        profile_response = GuardrailProfileResponse.model_validate(db_profile).model_copy(
+            update={
+                "probe_count": probe_count,
+                "deployment_count": deployment_count,
+                "is_standalone": is_standalone,
+            }
         )
 
         return GuardrailProfileDetailResponse(
-            profile=db_profile,
-            probe_count=db_probe_count,
+            profile=profile_response,
             message="Profile retrieved successfully",
             code=HTTPStatus.HTTP_200_OK,
         )
@@ -1768,9 +1828,25 @@ class GuardrailProfileDeploymentService(SessionMixin):
             offset, limit, filters, order_by, search
         )
 
+        if not db_deployments:
+            return [], count
+
+        endpoint_ids = [deployment[0].endpoint_id for deployment in db_deployments if deployment[0].endpoint_id]
+        endpoint_names: dict[UUID, str] = {}
+
+        if endpoint_ids:
+            endpoint_rows = self.session.execute(
+                select(Endpoint.id, Endpoint.name).where(Endpoint.id.in_(endpoint_ids))
+            ).all()
+            endpoint_names = {row.id: row.name for row in endpoint_rows}
+
         db_deployments_response = [
-            GuardrailDeploymentResponse.model_validate(db_deployment[0]) for db_deployment in db_deployments
+            GuardrailDeploymentResponse.model_validate(db_deployment[0]).model_copy(
+                update={"endpoint_name": endpoint_names.get(db_deployment[0].endpoint_id)}
+            )
+            for db_deployment in db_deployments
         ]
+
         return db_deployments_response, count
 
     async def retrieve_deployment(self, deployment_id: UUID) -> GuardrailDeploymentDetailResponse:
@@ -1783,10 +1859,18 @@ class GuardrailProfileDeploymentService(SessionMixin):
         if not db_deployment:
             raise ClientException(message="Deployment not found", status_code=HTTPStatus.HTTP_404_NOT_FOUND)
 
+        endpoint_name = None
+        if db_deployment.endpoint_id:
+            endpoint_name = self.session.execute(
+                select(Endpoint.name).where(Endpoint.id == db_deployment.endpoint_id)
+            ).scalar_one_or_none()
+
+        deployment_response = GuardrailDeploymentResponse.model_validate(db_deployment).model_copy(
+            update={"endpoint_name": endpoint_name}
+        )
+
         return GuardrailDeploymentDetailResponse(
-            deployment=db_deployment,
-            message="Deployment retrieved successfully",
-            code=HTTPStatus.HTTP_200_OK,
+            deployment=deployment_response, message="Deployment retrieved successfully", code=HTTPStatus.HTTP_200_OK
         )
 
     async def edit_deployment(

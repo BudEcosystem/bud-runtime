@@ -32,7 +32,7 @@ export default function SelectModelForNewEvaluation() {
       limit,
       name: undefined,
       order_by: "created_at",
-      status: "running",
+      // status: "running",
     });
   }, []); // Empty dependency array = runs once on mount
 
@@ -47,7 +47,7 @@ export default function SelectModelForNewEvaluation() {
         limit,
         name: search || undefined,
         order_by: "created_at",
-        status: "running",
+        // status: "running",
       });
       setIsLoadingMore(false);
     };
@@ -87,7 +87,7 @@ export default function SelectModelForNewEvaluation() {
   // Handle search - debounced
   useEffect(() => {
     // Don't trigger on initial render (when search is empty)
-    if (search === "" && page === 1 && allEndpoints.length === 0) {
+    if (page === 1 && allEndpoints.length === 0) {
       return;
     }
 
@@ -99,7 +99,7 @@ export default function SelectModelForNewEvaluation() {
         limit,
         name: search || undefined,
         order_by: "created_at",
-        status: "running",
+        // status: "running",
       });
     }, 500);
 

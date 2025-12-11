@@ -1,0 +1,131 @@
+---
+title: "Playground"
+description: "Interactive workspace to experiment with cloud and local models across Bud projects."
+---
+
+## 1. Description
+
+The Playground module in Bud AI Foundry dashboard gives product teams, data scientists, and business stakeholders a safe environment to try cloud and local models (Hugging Face, URL-based, and disk-based) before routing traffic. It mirrors project context—deployments, routes, guardrails, and permissions—so experiments stay aligned with production governance while highlighting GPU-optional execution.
+
+The tab appears in the primary navigation alongside Projects, Models, and Clusters, giving one-click access to a secure session. It provides real-time inference, model comparison, and streaming output, and configurable settings to keep experimentation fast and repeatable across supported providers.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. Unified surface for cloud and local models
+
+Test managed cloud endpoints cloud endpoints and local checkpoints (Hugging Face, URL downloads, disk mounts) from the same console with identical controls for parameters, temperature, and safety toggles.
+
+### 2. Interactive testing with streaming feedback
+
+Run live inference with streaming responses, adjustable decoding parameters (temperature etc), and a chat interface so users can iterate quickly on prompts and observe results in real time.
+
+### 3. Built-in comparison workflow
+
+Compare models side-by-side in dedicated panes to spot quality or latency differences using the same prompts and independent parameter settings.
+
+### 4. Message-level controls
+
+Copy prompts or responses for reuse, edit and resend user prompts, provide thumbs-up/thumbs-down feedback on assistant replies, and trigger a retry to regenerate outputs while keeping the same context and metrics visible.
+
+## 3. Features
+
+### 3.1 Access and navigation
+
+- Launch Playground from the global side menu.
+- Use header search to locate models.
+- Quick actions include New chat window, Chat History, Settings and Delete Chat etc.
+
+### 3.2 Chat and single-model testing
+
+- Use the chat interface to send prompts to a selected model, with controls for temperature and other generation parameters.
+- View streaming responses, inspect generated content, and refine prompts iteratively.
+
+### 3.3 Model comparison
+
+- Open the new chat window workflow to place two or more models side-by-side.
+- Send the same prompt to each model and review outputs together to judge quality or latency differences.
+
+### 3.4 Session settings and safety
+
+- Configure presets, temperature, response limits, repeat penalties, stop strings, structured output, and conversation notes from the Settings panel to keep runs consistent.
+- Use stop strings and structured output toggles to align responses with downstream constraints.
+
+### 3.5 Response analysis and conversation history
+
+- Review response details and performance insights surfaced alongside model outputs.
+- Chat history drawer lists recent sessions with token usage etc.
+
+### 3.6 Message controls and feedback
+
+- Copy prompts or responses directly from each bubble to reuse them in new chats or templates.
+- Edit sent prompts inline to refine them and resend without losing conversation history. - Apply thumbs-up/down ratings on assistant replies to log quick qualitative feedback.
+- Use the retry control on assistant messages to regenerate the latest response while keeping the same model and context.
+
+## 4. How-to Guides
+
+### 4.1 Access the Playground
+
+1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+2. Click Playground in the side navigation to open the interface.
+
+### 4.2 Run a chat against a single model
+
+1. Open the Playground and select a model from the model selector.
+2. Adjust decoding parameters as needed.
+3. Enter your prompt in the chat and send to view streaming output.
+4. Refine prompts and resend until you achieve the desired response.
+
+### 4.3 Open multiple playground views
+
+1. In any chat, click the **\+** icon in the toolbar to open a new chat window.
+2. Load the desired model in the new pane; each window retains its own messages and settings.
+3. Use the kebab menu to close or delete a chat when you are finished.
+
+### 4.4 Compare multiple models
+
+1. Open new chat window.
+2. Load different models to the each chat window..
+3. Enter a same prompt and send to evaluate outputs.
+
+### 4.5 Use message actions (copy, edit, feedback, retry)
+
+1. Copy and edit icons available near to the prompt bubble. Select Edit to update and resend it.
+1. On assistant responses, use the copy icon to grab the output or the retry control to regenerate the reply with the same context.
+1. Click the thumbs-up or thumbs-down icons on responses to capture quick quality feedback.
+
+### 4.6 Access chat history
+
+1. Click Chat History icon in the Playground toolbar.
+1. View all previous chats and click on a chat to switch to past conversation.
+
+### 4.7 Configure settings
+
+1. Open the Settings panel in the Playground toolbar.
+1. Set presets, temperature, response length limit, repeat penalties, stop strings, optional notes and structured output options as needed.
+1. Subsequent prompts in the current window follow the selected configuration.
+
+## 5. FAQs
+
+**Q1. What models can I try in the Playground?**
+
+Cloud endpoints and local checkpoints (Hugging Face, URL, or disk-based) surfaced through Bud Admin deployments can be exercised, using the same authentication as production.
+
+**Q2. Which experiments does Playground support?**
+
+Playground includes interactive chat testing, side-by-side model comparisons, and response metrics etc.
+
+**Q3. Can I tune model parameters while testing?**
+
+Yes. Temperature, response limit, repeat penalty are available so you can adjust generation settings between runs.
+
+**Q4. How are conversations stored?**
+
+Conversations are saved by default with timestamps, token usahe and model etc. They remain in the scope until deleted, preserving auditability for compliance.
+
+**Q5. Can I copy or rerun specific messages?**
+
+Yes. Prompts and responses include copy actions; prompts can be edited and resent, and assistant replies support thumbs-up/down feedback plus a retry control to regenerate them in place.
+
+**Q6. Does Playground support observability?**
+
+Yes. Latency, token counts, TTFT and backend identifiers appear alongside responses. Deep links to Observability tab help correlate Playground runs with full inference traces.

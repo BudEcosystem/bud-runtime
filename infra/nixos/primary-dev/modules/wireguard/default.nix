@@ -43,17 +43,22 @@ let
 
     [Peer]
     # friendly_name = varun
-    PublicKey = pCbQgCvujD5lkzrWDHqiRlxk4SvwhxnXhvx1eJ2iVl4=
+    PublicKey = 0p3WlvhxK6HKq2tFapQvjCogeABgPcUjwW3veN3qGyw=
     AllowedIPs = 10.54.132.5/32
 
     [Peer]
     # friendly_name = adarsh
     PublicKey = H8awlBbJtoNKiEZruBVzqk0KzSc6u2VbCc8iPwwaQUc=
     AllowedIPs = 10.54.132.6/32
+
+    [Peer]
+    # friendly_name = karthik
+    PublicKey = MS4oL6uihxlozA61FYgBHl5fz7ck5d5gOdW1DXCkSSk=
+    AllowedIPs = 10.54.132.7/32
   '';
 in
 {
-  sops.secrets."misc/wireguard" = { };
+  sops.secrets."misc/wireguard".sopsFile = ./secrets.yaml;
   services.k3s.extraFlags = [ "--tls-san 10.54.132.1" ];
 
   networking = {

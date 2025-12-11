@@ -1,7 +1,6 @@
-{ config, ... }:
+{ ... }:
 let
-  primaryIp = config.global.budk8s.primaryIp;
-  nfsRoot = config.disko.devices.disk.nfs_data.content.partitions.nfs_data.content.mountpoint;
+  nfsRoot = "/nfs_data";
   budk8sCsiRoot = "${nfsRoot}/budk8s-nfs-csi";
 in
 {
@@ -11,8 +10,8 @@ in
   services.nfs.server = {
     enable = true;
     exports = ''
-      ${nfsRoot}        ${primaryIp}/24(rw,sync,no_subtree_check,no_root_squash,fsid=0,insecure)
-      ${budk8sCsiRoot}  ${primaryIp}/24(rw,sync,no_subtree_check,no_root_squash,insecure)
+      ${nfsRoot}        *(rw,sync,no_subtree_check,no_root_squash,fsid=0,insecure)
+      ${budk8sCsiRoot}  *(rw,sync,no_subtree_check,no_root_squash,insecure)
     '';
   };
 }

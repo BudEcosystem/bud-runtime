@@ -16,6 +16,8 @@ use crate::moderation::{
     ModerationRequest, ModerationResult,
 };
 
+use super::helpers::handle_reqwest_error;
+
 const PROVIDER_NAME: &str = "Azure Content Safety";
 const PROVIDER_TYPE: &str = "azure_content_safety";
 
@@ -798,19 +800,11 @@ impl AzureContentSafetyProvider {
                 .send()
                 .await
                 .map_err(|e| {
-                    let status = e.status();
-                    Error::new(ErrorDetails::InferenceClient {
-                        message: format!(
-                            "Error sending request to Azure Content Safety: {}",
-                            DisplayOrDebugGateway::new(e)
-                        ),
-                        status_code: status,
-                        provider_type: PROVIDER_TYPE.to_string(),
-                        raw_request: Some(
-                            serde_json::to_string(&azure_request).unwrap_or_default(),
-                        ),
-                        raw_response: None,
-                    })
+                    handle_reqwest_error(
+                        e,
+                        PROVIDER_TYPE,
+                        Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                    )
                 })?;
 
             if res.status().is_success() {
@@ -905,17 +899,11 @@ impl AzureContentSafetyProvider {
             .send()
             .await
             .map_err(|e| {
-                let status = e.status();
-                Error::new(ErrorDetails::InferenceClient {
-                    message: format!(
-                        "Error sending request to Azure Content Safety Groundedness: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    status_code: status,
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                )
             })?;
 
         if res.status().is_success() {
@@ -984,17 +972,11 @@ impl AzureContentSafetyProvider {
             .send()
             .await
             .map_err(|e| {
-                let status = e.status();
-                Error::new(ErrorDetails::InferenceClient {
-                    message: format!(
-                        "Error sending request to Azure Content Safety Protected Material: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    status_code: status,
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                )
             })?;
 
         if res.status().is_success() {
@@ -1063,17 +1045,11 @@ impl AzureContentSafetyProvider {
             .send()
             .await
             .map_err(|e| {
-                let status = e.status();
-                Error::new(ErrorDetails::InferenceClient {
-                    message: format!(
-                        "Error sending request to Azure Content Safety Protected Material Code: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    status_code: status,
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                )
             })?;
 
         if res.status().is_success() {
@@ -1146,17 +1122,11 @@ impl AzureContentSafetyProvider {
             .send()
             .await
             .map_err(|e| {
-                let status = e.status();
-                Error::new(ErrorDetails::InferenceClient {
-                    message: format!(
-                        "Error sending request to Azure Content Safety Prompt Shield: {}",
-                        DisplayOrDebugGateway::new(e)
-                    ),
-                    status_code: status,
-                    provider_type: PROVIDER_TYPE.to_string(),
-                    raw_request: Some(serde_json::to_string(&azure_request).unwrap_or_default()),
-                    raw_response: None,
-                })
+                handle_reqwest_error(
+                    e,
+                    PROVIDER_TYPE,
+                    Some(serde_json::to_string(&azure_request).unwrap_or_default()),
+                )
             })?;
 
         if res.status().is_success() {

@@ -305,6 +305,7 @@ impl ClientBuilder {
                                 guardrails: std::sync::Arc::new(tokio::sync::RwLock::new(
                                     tensorzero_internal::guardrail_table::GuardrailTable::new(),
                                 )),
+                                inference_batcher: None, // Embedded client uses direct writes
                             },
                         },
                         timeout: *timeout,
@@ -364,7 +365,7 @@ impl Client {
     }
 
     #[cfg(feature = "pyo3")]
-    pub fn get_config(&self) -> Option<Arc<Config>> {
+    pub fn get_config(&self) -> Option<Arc<Config<'_>>> {
         match &self.mode {
             ClientMode::EmbeddedGateway { gateway, .. } => Some(gateway.state.config.clone()),
             _ => None,
@@ -538,6 +539,7 @@ impl Client {
                         gateway.state.model_credential_store.clone(),
                         params.try_into().map_err(err_to_http)?,
                         None, // No analytics available for Rust client
+                        gateway.state.inference_batcher.clone(), // Use inference batcher from state
                     )
                     .await
                     .map_err(err_to_http)

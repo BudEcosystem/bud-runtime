@@ -5,4 +5,54 @@ description: "Create your own guardrails"
 
 # Custom Rules
 
-*Content to be added*
+<Note>
+Custom probes and rules are not yet available. This feature is planned for a future release.
+</Note>
+
+## Overview
+
+Custom rules will allow you to create organization-specific detection probes tailored to your unique requirements. This includes:
+
+- **Custom Probes**: Define new detection categories specific to your domain or policies
+- **Custom Rules**: Create detection patterns within probes for fine-grained control
+- **Domain-Specific Filtering**: Build guardrails for industry-specific compliance needs
+
+## Planned Capabilities
+
+### Custom Probe Creation
+
+Create probes that detect content specific to your organization:
+
+- Define probe name, description, and detection purpose
+- Specify guard types (input, output, or both)
+- Set default severity thresholds
+- Associate with specific modality types
+
+### Custom Rule Definition
+
+Within custom probes, define rules that specify:
+
+- Detection patterns and keywords
+- Contextual matching criteria
+- Rule-specific severity thresholds
+- Examples of content to flag
+
+### Use Cases
+
+Custom rules will support scenarios such as:
+
+- **Brand Protection**: Detect competitor mentions or brand guideline violations
+- **Industry Compliance**: Create rules for HIPAA, PCI-DSS, or other regulatory requirements
+- **Internal Policies**: Enforce organization-specific content guidelines
+- **Domain Terminology**: Flag or allow industry-specific terms
+
+## Current Alternatives
+
+While custom rules are not yet available, you can:
+
+1. **Use existing probes**: Combine built-in probes from Bud Sentinel, OpenAI, and Azure Content Safety
+2. **Configure thresholds**: Adjust severity thresholds to tune detection sensitivity
+3. **Enable/disable rules**: Fine-tune existing probes by enabling or disabling specific rules
+4. **Layer providers**: Use multiple providers for comprehensive coverage
+
+See [Content Filtering](/guardrails/content-filtering) for details on configuring existing probes and profiles.

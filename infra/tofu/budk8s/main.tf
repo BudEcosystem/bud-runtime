@@ -18,7 +18,9 @@ module "azure" {
   ingress_sku = {
     Standard_D32als_v6 = 2
   }
-  worker_sku = {}
+  worker_sku = {
+    Standard_D32als_v6 = 1
+  }
   disk_size = {
     primary      = 512
     primary_data = 4095
@@ -29,11 +31,11 @@ module "azure" {
 
 module "primary_nixos" {
   source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
-  attribute = ".#nixosConfigurations.primary.config.system.build.toplevel"
+  attribute = ".#nixosConfigurations.primary-dev.config.system.build.toplevel"
 }
 module "primary_disko" {
   source    = "github.com/nix-community/nixos-anywhere//terraform/nix-build"
-  attribute = ".#nixosConfigurations.primary.config.system.build.diskoScript"
+  attribute = ".#nixosConfigurations.primary-dev.config.system.build.diskoScript"
 }
 module "primary_install" {
   source            = "github.com/nix-community/nixos-anywhere//terraform/install"

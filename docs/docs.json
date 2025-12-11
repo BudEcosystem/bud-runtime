@@ -28,8 +28,8 @@
             "group": "Projects",
             "icon": "folder-tree",
             "pages": [
+              "projects/projects",
               "projects/creating-projects",
-              "projects/project-management",
               "projects/project-dashboard",
               "projects/project-settings"
             ]
@@ -100,6 +100,7 @@
             "group": "Playground",
             "icon": "flask",
             "pages": [
+              "playground/playground",
               "playground/using-playground",
               "playground/model-comparison",
               "playground/prompt-engineering",
@@ -110,6 +111,7 @@
             "group": "Observability",
             "icon": "chart-line",
             "pages": [
+              "observability/observability",
               "observability/dashboard-overview",
               "observability/request-analytics",
               "observability/performance-monitoring",
@@ -277,46 +279,54 @@
         "tab": "Developer Docs",
         "groups": [
           {
+            "group": "Self-Hosting",
+            "icon": "server",
+            "pages": [
+              "developer-docs/installation",
+              "developer-docs/helm-configuration"
+            ]
+          },
+          {
             "group": "Development",
             "icon": "code",
             "pages": [
-              "development/guidelines",
-              "development/architecture",
-              "development/environment"
+              "developer-docs/development/guidelines",
+              "developer-docs/development/architecture",
+              "developer-docs/development/environment"
             ]
           },
           {
             "group": "OpenAI-Compatible API",
             "icon": "puzzle-piece",
             "pages": [
-              "openai-api/chat",
-              "openai-api/embedding",
-              "openai-api/audio",
-              "openai-api/images",
-              "openai-api/batch",
-              "openai-api/realtime",
-              "openai-api/responses",
-              "openai-api/documents"
+              "developer-docs/openai-api/chat",
+              "developer-docs/openai-api/embedding",
+              "developer-docs/openai-api/audio",
+              "developer-docs/openai-api/images",
+              "developer-docs/openai-api/batch",
+              "developer-docs/openai-api/realtime",
+              "developer-docs/openai-api/responses",
+              "developer-docs/openai-api/documents"
             ]
           },
           {
             "group": "Features",
             "icon": "sparkles",
             "pages": [
-              "features/gateway",
-              "features/multi-lora-support",
-              "features/observability",
-              "features/images",
-              "features/settings",
-              "features/navigation",
-              "features/reusable-snippets"
+              "developer-docs/features/gateway",
+              "developer-docs/features/multi-lora-support",
+              "developer-docs/features/observability",
+              "developer-docs/features/images",
+              "developer-docs/features/settings",
+              "developer-docs/features/navigation",
+              "developer-docs/features/reusable-snippets"
             ]
           },
           {
             "group": "Cluster Setup",
             "icon": "network-wired",
             "pages": [
-              "cluster/cluster-setup"
+              "developer-docs/cluster/cluster-setup"
             ]
           }
         ]

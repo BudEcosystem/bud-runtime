@@ -29,6 +29,7 @@ use crate::error::{Error, ErrorDetails};
 use crate::function::FunctionConfig;
 use crate::function::{sample_variant, FunctionConfigChat};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
+use crate::inference_batcher::InferenceBatcher;
 use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::resolved_input::{FileWithPath, ResolvedInput};
@@ -167,6 +168,7 @@ pub async fn inference_handler(
         kafka_connection_info,
         authentication_info: _,
         model_credential_store,
+        inference_batcher,
         ..
     }): AppState,
     headers: HeaderMap,
@@ -221,6 +223,7 @@ pub async fn inference_handler(
         model_credential_store,
         params,
         analytics.as_ref().map(|ext| ext.0.clone()),
+        inference_batcher.clone(),
     )
     .await;
 
@@ -272,6 +275,12 @@ pub async fn inference_handler(
                 let config = config.clone();
                 let clickhouse_connection_info = clickhouse_connection_info.clone();
                 let kafka_connection_info = kafka_connection_info.clone();
+                // Only use batcher for async writes; sync writes need direct ClickHouse access
+                let inference_batcher_for_write = if async_writes {
+                    inference_batcher.clone()
+                } else {
+                    None
+                };
 
                 let write_future = tokio::spawn(async move {
                     write_inference(
@@ -286,6 +295,7 @@ pub async fn inference_handler(
                         gateway_response,
                         write_info.model_pricing,
                         None, // No guardrail records for standard inference endpoint
+                        inference_batcher_for_write.as_ref(),
                     )
                     .await;
                 });
@@ -392,7 +402,7 @@ pub struct InferenceIds {
 
 #[instrument(
     name="inference",
-    skip(config, http_client, clickhouse_connection_info, kafka_connection_info, params),
+    skip(config, http_client, clickhouse_connection_info, kafka_connection_info, params, inference_batcher),
     fields(
         function_name,
         model_name,
@@ -410,6 +420,7 @@ pub async fn inference(
     model_credential_store: Arc<std::sync::RwLock<HashMap<String, SecretString>>>,
     params: Params,
     analytics: Option<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
+    inference_batcher: Option<InferenceBatcher>,
 ) -> Result<InferenceOutput, Error> {
     let span = tracing::Span::current();
     if let Some(function_name) = &params.function_name {
@@ -576,6 +587,7 @@ pub async fn inference(
             object_store_info: &config.object_store_info,
         })
         .await?;
+
     // Keep sampling variants until one succeeds
     while !candidate_variant_names.is_empty() {
         let (variant_name, variant) = sample_variant(
@@ -649,6 +661,14 @@ pub async fn inference(
                     .or(model_used_info.gateway_request),
             };
 
+            // Only use batcher for async writes; sync writes need direct ClickHouse access
+            let async_writes = config.gateway.observability.async_writes;
+            let inference_batcher_for_stream = if async_writes {
+                inference_batcher.clone()
+            } else {
+                None
+            };
+
             let stream = create_stream(
                 function,
                 config.clone(),
@@ -656,6 +676,7 @@ pub async fn inference(
                 stream,
                 clickhouse_connection_info,
                 kafka_connection_info,
+                inference_batcher_for_stream,
             );
 
             return Ok(InferenceOutput::Streaming(Box::pin(stream)));
@@ -846,6 +867,7 @@ fn create_stream(
     mut stream: InferenceResultStream,
     clickhouse_connection_info: ClickHouseConnectionInfo,
     kafka_connection_info: KafkaConnectionInfo,
+    inference_batcher: Option<InferenceBatcher>,
 ) -> impl Stream<Item = Result<InferenceResponseChunk, Error>> + Send {
     async_stream::stream! {
         let mut buffer = vec![];
@@ -975,6 +997,7 @@ fn create_stream(
                             gateway_response,
                             model_pricing,
                             None, // No guardrail records for standard inference endpoint
+                            inference_batcher.as_ref(),
                         ).await;
 
                 }
@@ -1100,6 +1123,7 @@ pub async fn write_inference(
     gateway_response: Option<String>,
     model_pricing: Option<crate::model::ModelPricing>,
     guardrail_records: Option<Vec<crate::guardrail::GuardrailInferenceDatabaseInsert>>,
+    inference_batcher: Option<&InferenceBatcher>,
 ) {
     let mut futures: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = Vec::new();
     if config.gateway.observability.enabled.unwrap_or(true) {
@@ -1140,59 +1164,47 @@ pub async fn write_inference(
     let result_clone = result.clone();
     let metadata_clone = metadata.clone();
 
-    // ClickHouse writes
-    futures.push(Box::pin(async {
-        // Write the model responses to the ModelInference table
+    // ClickHouse writes - use batcher if available for better throughput
+    if let Some(batcher) = inference_batcher {
+        // Use batcher for fire-and-forget batched writes (non-blocking)
         for response in model_responses {
-            let _ = clickhouse_connection_info
-                .write(&[response], "ModelInference")
-                .await;
+            batcher.try_send_model_inference(response);
         }
-        // Write the inference to the Inference table
+
+        // Write the inference to the appropriate table
         match result {
             InferenceResult::Chat(result) => {
                 let chat_inference =
                     ChatInferenceDatabaseInsert::new(result, input.clone(), metadata);
-                let _ = clickhouse_connection_info
-                    .write(&[chat_inference], "ChatInference")
-                    .await;
+                batcher.try_send_chat_inference(chat_inference);
             }
             InferenceResult::Json(result) => {
                 let json_inference =
                     JsonInferenceDatabaseInsert::new(result, input.clone(), metadata);
-                let _ = clickhouse_connection_info
-                    .write(&[json_inference], "JsonInference")
-                    .await;
+                batcher.try_send_json_inference(json_inference);
             }
             InferenceResult::Embedding(result) => {
                 let embedding_inference =
                     EmbeddingInferenceDatabaseInsert::new(result, input.clone(), metadata);
-                let _ = clickhouse_connection_info
-                    .write(&[embedding_inference], "EmbeddingInference")
-                    .await;
+                batcher.try_send_embedding_inference(embedding_inference);
             }
             InferenceResult::AudioTranscription(result) => {
                 let audio_inference = AudioInferenceDatabaseInsert::new_transcription(
                     result,
-                    "audio file".to_string(), // Will be overridden with actual input
+                    "audio file".to_string(),
                     metadata,
                 );
-                let _ = clickhouse_connection_info
-                    .write(&[audio_inference], "AudioInference")
-                    .await;
+                batcher.try_send_audio_inference(audio_inference);
             }
             InferenceResult::AudioTranslation(result) => {
                 let audio_inference = AudioInferenceDatabaseInsert::new_translation(
                     result,
-                    "audio file".to_string(), // Will be overridden with actual input
+                    "audio file".to_string(),
                     metadata,
                 );
-                let _ = clickhouse_connection_info
-                    .write(&[audio_inference], "AudioInference")
-                    .await;
+                batcher.try_send_audio_inference(audio_inference);
             }
             InferenceResult::TextToSpeech(result) => {
-                // Extract the text input from the input
                 let text_input = input
                     .messages
                     .first()
@@ -1207,12 +1219,9 @@ pub async fn write_inference(
 
                 let audio_inference =
                     AudioInferenceDatabaseInsert::new_text_to_speech(result, text_input, metadata);
-                let _ = clickhouse_connection_info
-                    .write(&[audio_inference], "AudioInference")
-                    .await;
+                batcher.try_send_audio_inference(audio_inference);
             }
             InferenceResult::ImageGeneration(result) => {
-                // Extract the prompt from the input
                 let prompt = input
                     .messages
                     .first()
@@ -1226,19 +1235,15 @@ pub async fn write_inference(
                     .unwrap_or_else(|| "image prompt".to_string());
 
                 let image_inference = ImageInferenceDatabaseInsert::new(result, prompt, metadata);
-                let _ = clickhouse_connection_info
-                    .write(&[image_inference], "ImageInference")
-                    .await;
+                batcher.try_send_image_inference(image_inference);
             }
             InferenceResult::Moderation(result) => {
-                // Extract the input text from the input
                 let input_text = input
                     .messages
                     .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
                         ResolvedInputMessageContent::Text { value } => {
-                            // Handle both direct string values and JSON string values
                             match value {
                                 serde_json::Value::String(s) => Some(s.clone()),
                                 _ => value.as_str().map(|s| s.to_string()),
@@ -1250,22 +1255,139 @@ pub async fn write_inference(
 
                 let moderation_inference =
                     ModerationInferenceDatabaseInsert::new(result, input_text, metadata);
-                let _ = clickhouse_connection_info
-                    .write(&[moderation_inference], "ModerationInference")
-                    .await;
+                batcher.try_send_moderation_inference(moderation_inference);
             }
         }
 
         // Write guardrail records if provided
         if let Some(guardrail_records) = guardrail_records {
-            // Batch write all guardrail records at once for efficiency
             if !guardrail_records.is_empty() {
-                let _ = clickhouse_connection_info
-                    .write(&guardrail_records, "GuardrailInference")
-                    .await;
+                batcher.try_send_guardrail_inferences(guardrail_records);
             }
         }
-    }));
+    } else {
+        // Fallback to direct async writes when batcher is not available
+        futures.push(Box::pin(async {
+            // Write the model responses to the ModelInference table
+            for response in model_responses {
+                let _ = clickhouse_connection_info
+                    .write(&[response], "ModelInference")
+                    .await;
+            }
+            // Write the inference to the Inference table
+            match result {
+                InferenceResult::Chat(result) => {
+                    let chat_inference =
+                        ChatInferenceDatabaseInsert::new(result, input.clone(), metadata);
+                    let _ = clickhouse_connection_info
+                        .write(&[chat_inference], "ChatInference")
+                        .await;
+                }
+                InferenceResult::Json(result) => {
+                    let json_inference =
+                        JsonInferenceDatabaseInsert::new(result, input.clone(), metadata);
+                    let _ = clickhouse_connection_info
+                        .write(&[json_inference], "JsonInference")
+                        .await;
+                }
+                InferenceResult::Embedding(result) => {
+                    let embedding_inference =
+                        EmbeddingInferenceDatabaseInsert::new(result, input.clone(), metadata);
+                    let _ = clickhouse_connection_info
+                        .write(&[embedding_inference], "EmbeddingInference")
+                        .await;
+                }
+                InferenceResult::AudioTranscription(result) => {
+                    let audio_inference = AudioInferenceDatabaseInsert::new_transcription(
+                        result,
+                        "audio file".to_string(),
+                        metadata,
+                    );
+                    let _ = clickhouse_connection_info
+                        .write(&[audio_inference], "AudioInference")
+                        .await;
+                }
+                InferenceResult::AudioTranslation(result) => {
+                    let audio_inference = AudioInferenceDatabaseInsert::new_translation(
+                        result,
+                        "audio file".to_string(),
+                        metadata,
+                    );
+                    let _ = clickhouse_connection_info
+                        .write(&[audio_inference], "AudioInference")
+                        .await;
+                }
+                InferenceResult::TextToSpeech(result) => {
+                    let text_input = input
+                        .messages
+                        .first()
+                        .and_then(|msg| msg.content.first())
+                        .and_then(|content| match content {
+                            ResolvedInputMessageContent::Text { value } => {
+                                value.as_str().map(|s| s.to_string())
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| "text input".to_string());
+
+                    let audio_inference =
+                        AudioInferenceDatabaseInsert::new_text_to_speech(result, text_input, metadata);
+                    let _ = clickhouse_connection_info
+                        .write(&[audio_inference], "AudioInference")
+                        .await;
+                }
+                InferenceResult::ImageGeneration(result) => {
+                    let prompt = input
+                        .messages
+                        .first()
+                        .and_then(|msg| msg.content.first())
+                        .and_then(|content| match content {
+                            ResolvedInputMessageContent::Text { value } => {
+                                value.as_str().map(|s| s.to_string())
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| "image prompt".to_string());
+
+                    let image_inference = ImageInferenceDatabaseInsert::new(result, prompt, metadata);
+                    let _ = clickhouse_connection_info
+                        .write(&[image_inference], "ImageInference")
+                        .await;
+                }
+                InferenceResult::Moderation(result) => {
+                    let input_text = input
+                        .messages
+                        .first()
+                        .and_then(|msg| msg.content.first())
+                        .and_then(|content| match content {
+                            ResolvedInputMessageContent::Text { value } => {
+                                match value {
+                                    serde_json::Value::String(s) => Some(s.clone()),
+                                    _ => value.as_str().map(|s| s.to_string()),
+                                }
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| "moderation input".to_string());
+
+                    let moderation_inference =
+                        ModerationInferenceDatabaseInsert::new(result, input_text, metadata);
+                    let _ = clickhouse_connection_info
+                        .write(&[moderation_inference], "ModerationInference")
+                        .await;
+                }
+            }
+
+            // Write guardrail records if provided
+            if let Some(guardrail_records) = guardrail_records {
+                if !guardrail_records.is_empty() {
+                    let _ = clickhouse_connection_info
+                        .write(&guardrail_records, "GuardrailInference")
+                        .await;
+                }
+            }
+        }));
+    }
 
     // Kafka observability metrics
     let model_pricing = model_pricing.clone();
@@ -1981,6 +2103,7 @@ pub async fn write_blocked_inference(
     observability_metadata: Option<ObservabilityMetadata>,
     model_pricing: Option<crate::model::ModelPricing>,
     gateway_request: Option<String>,
+    inference_batcher: Option<&InferenceBatcher>,
 ) {
     use crate::inference::types::{
         current_timestamp, ChatInferenceResult, ContentBlockOutput, Latency, RequestMessage, Text,
@@ -2088,6 +2211,7 @@ pub async fn write_blocked_inference(
         None, // gateway_response
         model_pricing,
         Some(guardrail_records),
+        inference_batcher,
     )
     .await;
 }

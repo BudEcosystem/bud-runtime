@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Table, Tooltip } from "antd";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { LeaderBoardItem } from "src/hooks/useModels";
@@ -41,6 +41,20 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
   ) : null;
 }
 
+// Helper function to format decimal values to max 6 decimal places
+const formatDecimalValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "-";
+
+  const numValue = Number(value);
+  if (isNaN(numValue)) {
+    // Return the original string value if it's not a valid number
+    return String(value);
+  }
+
+  // Use toFixed(6) and convert back to number to remove trailing zeros
+  return Number(numValue.toFixed(6)).toString();
+};
+
 function LeaderboardsTable({
   data,
   leaderboardClasses,
@@ -48,9 +62,6 @@ function LeaderboardsTable({
   data: LeaderBoardItem[];
   leaderboardClasses?: string;
 }) {
-  const [orderBy, setOrderBy] = useState<string>("");
-  const [order, setOrder] = useState<string>("");
-
   const rows = useMemo(() => {
     let horizontalRows = [];
 
@@ -98,12 +109,50 @@ function LeaderboardsTable({
 
   return (
     <div
-      className={`${leaderboardClasses}`}
+      className={`${leaderboardClasses} leaderboards-table`}
       style={{
-        paddingBottom: "60px",
+        paddingBottom: "30px",
         paddingTop: ".4rem",
       }}
     >
+      <style jsx global>{`
+        .leaderboards-table .ant-table-body {
+          overflow-x: auto !important;
+          scrollbar-width: thin;
+          scrollbar-color: #757575 #1f1f1f;
+        }
+        .leaderboards-table .ant-table-body::-webkit-scrollbar {
+          height: 8px;
+        }
+        .leaderboards-table .ant-table-body::-webkit-scrollbar-track {
+          background: #1f1f1f;
+          border-radius: 4px;
+        }
+        .leaderboards-table .ant-table-body::-webkit-scrollbar-thumb {
+          background: #757575;
+          border-radius: 4px;
+        }
+        .leaderboards-table .ant-table-body::-webkit-scrollbar-thumb:hover {
+          background: #999999;
+        }
+        .leaderboards-table .ant-table-content {
+          position: relative;
+        }
+        .leaderboards-table .ant-table-content::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 8px;
+          width: 30px;
+          background: linear-gradient(to right, transparent, rgba(16, 16, 16, 0.9));
+          pointer-events: none;
+          z-index: 1;
+        }
+        .leaderboards-table:hover .ant-table-content::after {
+          opacity: 0.5;
+        }
+      `}</style>
       <Table<LeaderBoardItem>
         columns={[
           {
@@ -135,8 +184,8 @@ function LeaderboardsTable({
                 title: "Selected Model",
                 dataIndex: item.model?.uri,
                 key: item.model?.uri,
-                render: (text) => (
-                  <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>
+                render: (text: number | string) => (
+                  <Text_12_300_EEEEEE>{formatDecimalValue(text)}</Text_12_300_EEEEEE>
                 ),
                 sortIcon: SortIcon,
               };
@@ -144,7 +193,7 @@ function LeaderboardsTable({
             title: "Selected Model",
             dataIndex: "selected",
             key: "selected",
-            render: (text) => <Text_12_300_EEEEEE>{text}</Text_12_300_EEEEEE>,
+            render: (text: number | string) => <Text_12_300_EEEEEE>{formatDecimalValue(text)}</Text_12_300_EEEEEE>,
             sortIcon: SortIcon,
           },
           ...data
@@ -160,8 +209,8 @@ function LeaderboardsTable({
                 ),
                 dataIndex: item.model?.uri,
                 key: item.model?.uri,
-                render: (text) => (
-                  <Text_12_300_EEEEEE className="">{text}</Text_12_300_EEEEEE>
+                render: (text: number | string) => (
+                  <Text_12_300_EEEEEE className="">{formatDecimalValue(text)}</Text_12_300_EEEEEE>
                 ),
                 sortIcon: SortIcon,
               };
@@ -171,20 +220,7 @@ function LeaderboardsTable({
         dataSource={rows}
         bordered={false}
         footer={null}
-        virtual
-        onChange={(
-          pagination,
-          filters,
-          sorter: {
-            order: "ascend" | "descend";
-            field: string;
-          },
-          extra,
-        ) => {
-          setOrder(sorter.order === "ascend" ? "" : "-");
-          setOrderBy(sorter.field);
-        }}
-        showSorterTooltip={true}
+        scroll={{ x: 600 }}
         locale={{
           emptyText: (
             <NoDataFount

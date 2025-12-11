@@ -110,9 +110,6 @@ class PromptService(SessionMixin):
         search: bool = False,
     ) -> tuple[list[PromptModel], int]:
         """Get all active prompts with their related data."""
-        # Fetch active prompts
-        filters["status"] = PromptStatusEnum.ACTIVE
-
         # Fetch prompts with related data
         db_prompts, count = await PromptDataManager(self.session).get_all_active_prompts(
             offset, limit, filters, order_by, search

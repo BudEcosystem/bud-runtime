@@ -80,7 +80,7 @@ export default function NewEvaluation() {
               ]}
               ClassNames="mt-[.55rem]"
               InputClasses="pt-[.6rem] pb-[.4rem]"
-              formItemClassnames="mb-[.45rem]"
+              formItemClassnames="mb-[1.5rem]"
               infoText={"Enter Requests count"}
             />
             <TextAreaInput

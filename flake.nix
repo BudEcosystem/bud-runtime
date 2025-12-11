@@ -18,6 +18,11 @@
       url = "github:nix-community/disko/latest";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -29,6 +34,7 @@
       nixos-facter-modules,
       pre-commit-hooks,
       scid,
+      nixos-generators,
     }:
     let
       lib = nixpkgs.lib;
@@ -43,21 +49,28 @@
       forAllSystems = f: lib.genAttrs supportedSystems (forSystem f);
       forLinuxSystems = f: lib.genAttrs lib.platforms.linux (forSystem f);
 
+      makeModule = host: {
+        nix.nixPath = [ "nixpkgs=${nixpkgs}" ];
+        networking.hostName = host;
+        imports = [
+          disko.nixosModules.disko
+          sinan.nixosModules.server
+          scid.nixosModules.scid
+          ./infra/nixos/${host}/configuration.nix
+        ];
+      };
+
       makeNixos =
         host: system:
         lib.nixosSystem {
           inherit system;
-
           modules = [
             {
-              networking.hostName = host;
+              facter.reportPath = ./infra/nixos/${host}/facter.json;
+              networking.hostName = lib.mkForce host;
             }
-
-            disko.nixosModules.disko
-            sinan.nixosModules.server
-            scid.nixosModules.scid
+            self.nixosModules.common
             nixos-facter-modules.nixosModules.facter
-
             ./infra/nixos/${host}/configuration.nix
           ];
         };
@@ -152,17 +165,27 @@
           (
             forLinuxSystems (
               { system, pkgs }:
+              let
+                images = (import ./nix/images/primary.nix self.nixosModules.primary) {
+                  inherit lib;
+                  inherit system;
+                  inherit nixos-generators;
+                };
+              in
               {
                 container_status = pkgs.callPackage ./nix/container/status { };
                 container_budcustomer = pkgs.callPackage ./nix/container/budcustomer.nix {
                   budcustomer = self.packages.${system}.budcustomer;
                 };
               }
+              // images
             )
           );
 
+      nixosModules = lib.genAttrs [ "common" "primary" ] makeModule;
       nixosConfigurations = lib.genAttrs [
-        "primary"
+        "primary-dev"
+        "primary-disk"
         "ingress"
         "worker"
       ] (host: makeNixos host "x86_64-linux");
