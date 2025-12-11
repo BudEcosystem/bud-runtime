@@ -349,3 +349,126 @@ async def get_prometheus_compatible_metrics(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve metrics: {str(e)}",
         ) from e
+
+
+# Node Events endpoints
+
+
+@router.post("/events/store")
+async def store_node_events(
+    request: dict,
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+):
+    """Store node events from budcluster.
+
+    This endpoint receives node events collected from Kubernetes clusters
+    and stores them in ClickHouse for later querying.
+
+    Args:
+        request: Request body containing cluster_id and events list
+        service: Injected cluster metrics service
+
+    Returns:
+        Dict with stored count
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        cluster_id = request.get("cluster_id", "")
+        events = request.get("events", [])
+
+        count = await service.store_node_events(cluster_id, events)
+
+        return {"status": "success", "stored_count": count}
+
+    except Exception as e:
+        logger.error(f"Error storing node events: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to store node events: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/node-events-count")
+async def get_node_events_count(
+    cluster_id: str,
+    from_time: Optional[datetime] = Query(default=None),
+    to_time: Optional[datetime] = Query(default=None),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+):
+    """Get event counts per node for a cluster.
+
+    Args:
+        cluster_id: Cluster identifier
+        from_time: Start time (defaults to 24 hours ago)
+        to_time: End time (defaults to now)
+        service: Injected cluster metrics service
+
+    Returns:
+        Dict mapping node names to event counts
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        events_count = await service.get_node_events_count(cluster_id, from_time, to_time)
+
+        return {
+            "cluster_id": cluster_id,
+            "events_count": events_count,
+            "from_time": from_time.isoformat() if from_time else None,
+            "to_time": to_time.isoformat() if to_time else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting node events count: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve node events count: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/node-events/{node_name}")
+async def get_node_events(
+    cluster_id: str,
+    node_name: str,
+    from_time: Optional[datetime] = Query(default=None),
+    to_time: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, le=1000),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+):
+    """Get events for a specific node.
+
+    Args:
+        cluster_id: Cluster identifier
+        node_name: Node hostname
+        from_time: Start time (defaults to 24 hours ago)
+        to_time: End time (defaults to now)
+        limit: Maximum events to return
+        service: Injected cluster metrics service
+
+    Returns:
+        List of node events
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        events = await service.get_node_events(cluster_id, node_name, from_time, to_time, limit)
+
+        return {
+            "cluster_id": cluster_id,
+            "node_name": node_name,
+            "events": events,
+            "total_events": len(events),
+            "from_time": from_time.isoformat() if from_time else None,
+            "to_time": to_time.isoformat() if to_time else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting node events: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve node events: {str(e)}",
+        ) from e

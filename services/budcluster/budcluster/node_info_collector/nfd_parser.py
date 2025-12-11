@@ -175,6 +175,13 @@ class NFDLabelParser:
             for addr in status.addresses:
                 addresses.append({"type": addr.type, "address": addr.address})
 
+        # Extract internal IP directly for database storage
+        internal_ip = None
+        for addr_dict in addresses:
+            if addr_dict["type"] == "InternalIP":
+                internal_ip = addr_dict["address"]
+                break
+
         # Determine node status (ready/not ready)
         node_ready = False
         if status.conditions:
@@ -186,6 +193,7 @@ class NFDLabelParser:
         return {
             "node_name": node.metadata.name,
             "node_id": node.metadata.uid,
+            "internal_ip": internal_ip,
             "node_status": node_ready,
             "gpu_info": gpu_info,
             "cpu_info": cpu_info,

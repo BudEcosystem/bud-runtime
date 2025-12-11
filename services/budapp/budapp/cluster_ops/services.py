@@ -1638,10 +1638,10 @@ class ClusterService(SessionMixin):
             # Call budcluster service to get node details
             nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
 
-            # Fetch metrics from budmetrics and event counts from budcluster in parallel
+            # Fetch metrics from budmetrics and event counts from budmetrics in parallel
             events_endpoint = (
-                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/"
-                f"method/cluster/{db_cluster.cluster_id}/events-count-by-node"
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/"
+                f"method/cluster-metrics/{db_cluster.cluster_id}/node-events-count"
             )
 
             async with aiohttp.ClientSession() as http_session:
@@ -1664,9 +1664,10 @@ class ClusterService(SessionMixin):
                     events_by_hostname = {}
                     if events_resp.status == 200:
                         events_response = await events_resp.json()
-                        events_by_hostname = events_response.get("data", {})
+                        # budmetrics returns events_count dict
+                        events_by_hostname = events_response.get("events_count", {})
                     else:
-                        logger.warning(f"Failed to get event counts from budcluster: status {events_resp.status}")
+                        logger.warning(f"Failed to get event counts from budmetrics: status {events_resp.status}")
 
             # Helper function to extract system info from kernel_info
             def extract_system_info(node: dict) -> dict:
@@ -1819,8 +1820,6 @@ class ClusterService(SessionMixin):
         Args:
             cluster_id: The ID of the cluster to get events for
             node_hostname: The hostname of the node to get events for
-            page: The page number to get
-            size: The number of events to get
 
         Returns:
             Dict containing the node-wise events
@@ -1828,22 +1827,24 @@ class ClusterService(SessionMixin):
         db_cluster = await self.get_cluster_details(cluster_id)
 
         try:
-            events_cluster_endpoint = (
+            # Use budmetrics for node events (from ClickHouse)
+            events_endpoint = (
                 f"{app_settings.dapr_base_url}/v1.0/invoke"
-                f"/{app_settings.bud_cluster_app_id}/method"
-                f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
+                f"/{app_settings.bud_metrics_app_id}/method"
+                f"/cluster-metrics/{db_cluster.cluster_id}/node-events/{node_hostname}"
             )
 
-            async with aiohttp.ClientSession() as session, session.get(events_cluster_endpoint) as response:
+            async with aiohttp.ClientSession() as session, session.get(events_endpoint) as response:
                 response_data = await response.json()
 
                 logger.debug(f"Node-wise events response: {response_data}")
 
-                if response.status != 200 or response_data.get("object") == "error":
+                if response.status != 200:
                     logger.error(f"Failed to get node-wise events: {response.status} {response_data}")
                     raise ClientException("Failed to get node-wise events")
 
-                return response_data.get("data", {})
+                # Return events in expected format
+                return {"events": response_data.get("events", [])}
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")

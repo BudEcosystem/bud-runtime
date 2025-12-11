@@ -890,3 +890,104 @@ class ClusterMetricsService:
             timestamp=datetime.utcnow().isoformat() + "+00:00",
             cluster_id=cluster_id,
         )
+
+    # Node Events methods
+
+    async def store_node_events(
+        self,
+        cluster_id: str,
+        events: List[dict],
+    ) -> int:
+        """Store node events in ClickHouse.
+
+        Args:
+            cluster_id: Cluster identifier
+            events: List of event dictionaries
+
+        Returns:
+            Number of events stored
+        """
+        if not events:
+            return 0
+
+        logger.info(f"Storing {len(events)} events for cluster {cluster_id}")
+        return await self.repository.store_node_events(events)
+
+    async def get_node_events_count(
+        self,
+        cluster_id: str,
+        from_time: Optional[datetime] = None,
+        to_time: Optional[datetime] = None,
+    ) -> Dict[str, int]:
+        """Get event counts per node for a cluster.
+
+        Args:
+            cluster_id: Cluster identifier
+            from_time: Start time (default: last 24 hours)
+            to_time: End time (default: now)
+
+        Returns:
+            Dictionary mapping node names to event counts
+        """
+        # Default time range: last 24 hours
+        if not to_time:
+            to_time = datetime.utcnow()
+        if not from_time:
+            from_time = to_time - timedelta(hours=24)
+
+        result = await self.repository.get_node_events_count(cluster_id, from_time, to_time)
+
+        # Convert to dict
+        events_count = {}
+        for row in result:
+            node_name = row[0]
+            count = row[1]
+            events_count[node_name] = int(count)
+
+        return events_count
+
+    async def get_node_events(
+        self,
+        cluster_id: str,
+        node_name: str,
+        from_time: Optional[datetime] = None,
+        to_time: Optional[datetime] = None,
+        limit: int = 100,
+    ) -> List[dict]:
+        """Get events for a specific node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node name to get events for
+            from_time: Start time (default: last 24 hours)
+            to_time: End time (default: now)
+            limit: Maximum number of events to return
+
+        Returns:
+            List of event dictionaries
+        """
+        # Default time range: last 24 hours
+        if not to_time:
+            to_time = datetime.utcnow()
+        if not from_time:
+            from_time = to_time - timedelta(hours=24)
+
+        result = await self.repository.get_node_events(cluster_id, node_name, from_time, to_time, limit)
+
+        # Convert to list of dicts
+        events = []
+        for row in result:
+            events.append(
+                {
+                    "event_type": row[0],
+                    "reason": row[1],
+                    "message": row[2],
+                    "count": int(row[3]),
+                    "first_timestamp": row[4].isoformat() if row[4] else None,
+                    "last_timestamp": row[5].isoformat() if row[5] else None,
+                    "source_component": row[6],
+                    "source_host": row[7],
+                }
+            )
+
+        return events

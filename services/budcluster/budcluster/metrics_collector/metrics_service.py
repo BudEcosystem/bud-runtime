@@ -224,6 +224,11 @@ class MetricsCollectionService:
             if not success:
                 raise Exception(error_msg or "Failed to scrape and forward metrics")
 
+            # Collect and forward Kubernetes node events (non-blocking)
+            events_success, events_error = await self.otel_bridge.scrape_and_forward_events(cluster_id=str(cluster.id))
+            if not events_success:
+                logger.warning(f"Event collection failed for cluster {cluster.id}: {events_error}")
+
             # Update cluster with collection status
             await self._update_cluster_metrics_status(cluster.id, MetricsCollectionStatus.SUCCESS, datetime.utcnow())
 
