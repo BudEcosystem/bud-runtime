@@ -46,12 +46,35 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
 
   const [messageOpenStates, setMessageOpenStates] = React.useState<Record<string, boolean>>({});
 
-  // Sync messages state when promptMessages prop changes (e.g., from external delete)
+  // Sync messages state when promptMessages prop changes (e.g., from external delete or clear)
   React.useEffect(() => {
     try {
-      if (promptMessages && typeof promptMessages === 'string' && promptMessages.startsWith('[')) {
+      // Handle empty/cleared prompt messages - reset to default empty state
+      if (!promptMessages || promptMessages === '[]' || promptMessages === '') {
+        const defaultMessage: PromptMessage = {
+          id: `msg_${Date.now()}`,
+          role: 'system',
+          content: ''
+        };
+        setMessages([defaultMessage]);
+        setMessageOpenStates({ [defaultMessage.id]: true });
+        return;
+      }
+
+      if (typeof promptMessages === 'string' && promptMessages.startsWith('[')) {
         const parsedMessages = JSON.parse(promptMessages);
-        setMessages(parsedMessages);
+        // If parsed array is empty, reset to default
+        if (parsedMessages.length === 0) {
+          const defaultMessage: PromptMessage = {
+            id: `msg_${Date.now()}`,
+            role: 'system',
+            content: ''
+          };
+          setMessages([defaultMessage]);
+          setMessageOpenStates({ [defaultMessage.id]: true });
+        } else {
+          setMessages(parsedMessages);
+        }
       }
     } catch (e) {
       // Invalid JSON, keep current state
