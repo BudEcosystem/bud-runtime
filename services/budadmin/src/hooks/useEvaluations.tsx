@@ -143,8 +143,8 @@ export const useEvaluations = create<{
   evaluationDetails: any;
   experimentModels: any;
   experimentSummary: any;
-  experimentEvaluations: [],
-  experimentEvalTotal: number,
+  experimentEvaluations: any,
+  experimentEvalTotal: number | null,
 
   setSelectedEvals: (evaluation: any) => void;
   getEvaluations: (payload?: GetEvaluationsPayload) => Promise<any>;
