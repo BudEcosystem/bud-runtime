@@ -110,14 +110,30 @@ Copy prompts or responses for reuse, edit and resend user prompts, provide thumb
 
 Set `NEXT_PUBLIC_ENABLE_PLAYGROUND=true` and provide a `NEXT_PUBLIC_PLAYGROUND_URL` so the Playground link is available in the Bud Admin navigation.
 
-**Q2. Which experiments does Playground support?**
+**Q2. What models can I try in the Playground?**
+
+Cloud endpoints and local checkpoints (Hugging Face, URL, or disk-based) surfaced through Bud Admin deployments can be exercised, using the same authentication as production.
+
+**Q3. Which experiments does Playground support?**
 
 Playground includes interactive chat testing, side-by-side model comparisons, prompt templates, code generation views, and exportable results.
 
-**Q3. Can I tune model parameters while testing?**
+**Q4. Can I tune model parameters while testing?**
 
 Yes. Temperature, top-k, and top-p controls are available so you can adjust generation settings between runs.
 
-**Q4. How do I capture results for stakeholders?**
+**Q5. How are conversations stored?**
+
+Saved conversations record creator, timestamp, model/route, and tags. They remain in the project scope until deleted or archived, preserving auditability for compliance.
+
+**Q6. Can I copy or rerun specific messages?**
+
+Yes. Prompts and responses include copy actions; prompts can be edited and resent, and assistant replies support thumbs-up/down feedback plus a retry control to regenerate them in place.
+
+**Q7. Does Playground support observability?**
+
+Yes. Latency, token counts, and backend identifiers appear alongside responses. Deep links to Observability tab help correlate Playground runs with full inference traces.
+
+**Q8. How do I capture results for stakeholders?**
 
 Use the export option in the Playground to save conversations or comparison outputs for sharing or downstream analysis.
