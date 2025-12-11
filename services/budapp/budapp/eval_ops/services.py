@@ -2365,6 +2365,7 @@ class ExperimentService:
         model_id: Optional[uuid.UUID] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         search: Optional[str] = None,
+        search_name: bool = True,
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
@@ -2374,7 +2375,9 @@ class ExperimentService:
             user_id (uuid.UUID): ID of the user.
             model_id (Optional[uuid.UUID]): Optional model ID to filter evaluations.
             endpoint_id (Optional[uuid.UUID]): Optional endpoint ID to filter evaluations.
-            search (Optional[str]): Optional search term to filter by evaluation name, dataset name, or trait name.
+            search (Optional[str]): Optional search term to filter by evaluation name, dataset name, trait name,
+                and optionally endpoint name.
+            search_name (bool): If True, include endpoint/deployment name in search. Default: True.
             page (int): Page number for pagination (1-indexed).
             page_size (int): Number of items per page.
 
@@ -2438,6 +2441,7 @@ class ExperimentService:
         # Apply search filter if provided
         if search:
             search_term = f"%{search.lower()}%"
+            from sqlalchemy import or_
 
             # Search by evaluation name
             evaluation_name_match = EvaluationModel.name.ilike(search_term)
@@ -2472,16 +2476,31 @@ class ExperimentService:
                 .subquery()
             )
 
-            # Combine all search conditions with OR
-            from sqlalchemy import or_
+            # Build search conditions list
+            search_conditions = [
+                evaluation_name_match,
+                EvaluationModel.id.in_(evaluation_ids_with_dataset_match),
+                EvaluationModel.id.in_(evaluation_ids_with_trait_match),
+            ]
 
-            query = query.filter(
-                or_(
-                    evaluation_name_match,
-                    EvaluationModel.id.in_(evaluation_ids_with_dataset_match),
-                    EvaluationModel.id.in_(evaluation_ids_with_trait_match),
+            # Optionally search by endpoint/deployment name
+            if search_name:
+                # Search by endpoint name via runs
+                # Run -> Endpoint
+                evaluation_ids_with_endpoint_name_match = (
+                    self.session.query(RunModel.evaluation_id)
+                    .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                    .filter(
+                        EndpointModel.name.ilike(search_term),
+                        RunModel.evaluation_id.isnot(None),
+                    )
+                    .distinct()
+                    .subquery()
                 )
-            )
+                search_conditions.append(EvaluationModel.id.in_(evaluation_ids_with_endpoint_name_match))
+
+            # Combine all search conditions with OR
+            query = query.filter(or_(*search_conditions))
 
         # Get total count
         total = query.count()
