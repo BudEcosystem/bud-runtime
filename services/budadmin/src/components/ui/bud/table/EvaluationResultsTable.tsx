@@ -54,6 +54,21 @@ function TruncatedTextCell({ text }: { text: string }) {
   );
 }
 
+function getDatasetNamesFromTraits(traits: any[], arrayLength: number = 0): string {
+  if (!Array.isArray(traits)) return "-";
+
+  const names = traits
+    .flatMap(trait => trait?.datasets ?? [])
+    .map(dataset => dataset?.name)
+    .filter(Boolean);
+
+  if (!names.length) return "-";
+  const limitedNames =
+    arrayLength > 0 ? names.slice(0, arrayLength) : names;
+
+  return limitedNames.join(", ");
+}
+
 // Helper function to extract display text from models/traits data
 function getDisplayText(
   data: unknown,
@@ -105,10 +120,10 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
 
   // Use Zustand store
   const {
-    experimentsList,
-    experimentsListTotal,
+    experimentEvaluations,
+    experimentEvalTotal,
     loading,
-    getExperiments,
+    getEvaluationsData,
   } = useEvaluations();
 
   useHandleRouteChange(() => {
@@ -130,21 +145,21 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
     if (!model?.id) return;
 
     try {
-      const payload: GetExperimentsPayload = {
+      const payload = {
         page: currentPage,
-        limit: pageSize,
+        page_size: pageSize,
         search: debouncedSearchValue || undefined,
-        order: order || undefined,
-        orderBy: orderBy || undefined,
+        // order: order || undefined,
+        // orderBy: orderBy || undefined,
         model_id: model.id,
-        experiment_status: "completed",
+        // experiment_status: "completed",
       };
 
-      await getExperiments(payload);
+      await getEvaluationsData(payload);
     } catch (error) {
       console.error("Failed to fetch experiments for model:", error);
     }
-  }, [currentPage, pageSize, debouncedSearchValue, order, orderBy, model?.id, getExperiments]);
+  }, [currentPage, pageSize, debouncedSearchValue, order, orderBy, model?.id, getEvaluationsData]);
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -153,22 +168,22 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
 
   // Table data
   const tableData = useMemo(() => {
-    if (!experimentsList || !Array.isArray(experimentsList)) {
+    if (!experimentEvaluations || !Array.isArray(experimentEvaluations)) {
       return [];
     }
-    return experimentsList;
-  }, [experimentsList]);
+    return experimentEvaluations;
+  }, [experimentEvaluations]);
 
   // Table columns
   const columns: ColumnsType<ExperimentData> = [
     {
       title: "Deployment Name",
-      dataIndex: "models",
-      key: "models",
-      // width: 180,
-      ellipsis: true,
-      render: (models) => {
-        const displayText = getDisplayText(models, "deployment_name", "name");
+      dataIndex: "model",
+      key: "model",
+      width: 180,
+      ellipsis: false,
+      render: (model) => {
+        const displayText = getDisplayText(model, "deployment_name", "name");
         return <TruncatedTextCell text={displayText} />;
       },
     },
@@ -176,7 +191,7 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
       title: "Traits",
       dataIndex: "traits",
       key: "traits",
-      // width: 160,
+      width: 180,
       ellipsis: true,
       render: (traits) => {
         const displayText = getDisplayText(traits, "name", "name");
@@ -185,12 +200,21 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
     },
     {
       title: "Dataset",
-      dataIndex: "dataset_name",
-      key: "dataset_name",
-      // width: 160,
-      ellipsis: true,
-      render: (datasetName) => {
-        return <TruncatedTextCell text={datasetName || "-"} />;
+      dataIndex: "traits",
+      key: "traits",
+      width: 200,
+      render: (traits) => {
+        const displayText = getDatasetNamesFromTraits(traits, 1);
+        return <TruncatedTextCell text={displayText} />;
+      },
+    },
+    {
+      title: "Score",
+      dataIndex: "scores",
+      key: "scores",
+      width: 160,
+      render: (scores) => {
+        return <TruncatedTextCell text={scores.overall_accuracy || "-"} />;
       },
     },
   ];
@@ -206,27 +230,44 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
     <div className="pb-[30px] pt-[.4rem]">
       <div className="userTable evalTable relative CommonCustomPagination evaluation-results-table">
         <style jsx global>{`
-          .evaluation-results-table .ant-table-placeholder .ant-table-cell {
-            text-align: center !important;
-            padding: 16px !important;
-          }
-          .evaluation-results-table .ant-table-placeholder td {
-            width: 100% !important;
-          }
-          .evaluation-results-table .ant-table-tbody .ant-table-placeholder > td {
-            text-align: center !important;
-          }
-          .evaluation-results-table .ant-empty,
-          .evaluation-results-table .ant-table-empty .ant-table-tbody > tr > td {
-            text-align: center !important;
-          }
-          .evaluation-results-table .ant-table-placeholder .ant-table-cell > div {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-          }
-        `}</style>
+        .evaluation-results-table .ant-table-body {
+          overflow-x: auto !important;
+          scrollbar-width: thin;
+          scrollbar-color: #757575 #1f1f1f;
+        }
+        .evaluation-results-table .ant-table-body::-webkit-scrollbar {
+          height: 8px;
+        }
+        .evaluation-results-table .ant-table-body::-webkit-scrollbar-track {
+          background: #1f1f1f;
+          border-radius: 4px;
+        }
+        .evaluation-results-table .ant-table-body::-webkit-scrollbar-thumb {
+          background: #757575;
+          border-radius: 4px;
+        }
+        .evaluation-results-table .ant-table-body::-webkit-scrollbar-thumb:hover {
+          background: #999999;
+        }
+        .evaluation-results-table .ant-table-content {
+          position: relative;
+          overflow: auto;
+        }
+        .evaluation-results-table .ant-table-content::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 8px;
+          width: 30px;
+          background: linear-gradient(to right, transparent, rgba(16, 16, 16, 0.9));
+          pointer-events: none;
+          z-index: 1;
+        }
+        .evaluation-results-table:hover .ant-table-content::after {
+          opacity: 0.5;
+        }
+      `}</style>
         <Table<ExperimentData>
           columns={columns}
           dataSource={tableData}
@@ -234,7 +275,7 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
             className: "small-pagination",
             current: currentPage,
             pageSize: pageSize,
-            total: experimentsListTotal || 0,
+            total: experimentEvalTotal || 0,
             onChange: (page, size) => {
               setCurrentPage(page);
               setPageSize(size);
@@ -253,13 +294,13 @@ function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {
           rowKey="id"
           bordered={false}
           title={() => (
-            <div className="flex justify-between items-center px-[0.75rem] py-[1rem] gap-x-[.4rem]">
+            <div className="flex justify-between items-center px-[0.75rem] py-[1rem] gap-x-[1rem]">
               <Text_16_600_FFFFFF className="text-[#EEEEEE] whitespace-nowrap">
                 Evaluation Results
               </Text_16_600_FFFFFF>
-              <div className="flex items-center justify-between gap-x-[.4rem]">
+              <div className="flex items-center justify-between gap-x-[.4rem] flex-1">
                 <SearchHeaderInput
-                  placeholder="Search by name"
+                  placeholder="Search by name, traits, dataset"
                   searchValue={searchValue}
                   classNames="flex-1"
                   fullWidth={true}

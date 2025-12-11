@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Image, Input, Table } from "antd";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Image, Input, Popover, Table } from "antd";
 import type { TableProps } from "antd";
 import { useRouter as useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -14,6 +14,7 @@ import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import Tags from "src/flows/components/DrawerTags";
 import NoDataFount from "@/components/ui/noDataFount";
 import ComingSoon from "@/components/ui/comingSoon";
+import { ExperimentData, useEvaluations } from "@/hooks/useEvaluations";
 
 type ColumnsType<T extends object> = TableProps<T>["columns"];
 type TablePagination<T extends object> = NonNullable<
@@ -65,46 +66,96 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
   ) : null;
 }
 
-const columns: ColumnsType<DataType> = [
-  {
-    title: "Evaluation Type",
-    dataIndex: "type",
-    key: "type",
-    width: 170,
-    render: (text) => (
-      <Text_12_600_EEEEEE className="whitespace-nowrap">
-        {text}
-      </Text_12_600_EEEEEE>
-    ),
-    sorter: (a, b) => a.type.localeCompare(b.type),
-    sortIcon: SortIcon,
-  },
-  {
-    title: "Dataset",
-    dataIndex: "dataset",
-    key: "dataset",
-    width: 125,
-    render: (text) => (
-      <div className="inline-block">
-        <Tags name={text} color="#479D5F" />
-      </div>
-    ),
-    sorter: (a, b) => a.dataset.localeCompare(b.dataset),
-    sortIcon: SortIcon,
-  },
-  {
-    title: "Result",
-    dataIndex: "result",
-    key: "result",
-    render: (text) => (
-      <Text_12_400_EEEEEE className="whitespace-nowrap">
-        {text}
-      </Text_12_400_EEEEEE>
-    ),
-    sorter: (a, b) => a.result.localeCompare(b.result),
-    sortIcon: SortIcon,
-  },
-];
+const TEXT_TRUNCATION_LENGTH = 25;
+// Helper component for rendering truncated text with popover
+function TruncatedTextCell({ text }: { text: string }) {
+  if (!text || text === "-") {
+    return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
+  }
+
+  const needsTruncation = text.length > TEXT_TRUNCATION_LENGTH;
+  const truncatedText = needsTruncation
+    ? text.substring(0, TEXT_TRUNCATION_LENGTH) + "..."
+    : text;
+
+  if (needsTruncation) {
+    return (
+      <Popover
+        content={
+          <div className="max-w-[300px] break-words p-[.8rem]">
+            <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+          </div>
+        }
+        placement="top"
+      >
+        <div
+          className="cursor-pointer"
+          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
+        </div>
+      </Popover>
+    );
+  }
+
+  return (
+    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+    </div>
+  );
+}
+// Helper function to extract display text from models/traits data
+function getDisplayText(
+  data: unknown,
+  priorityKey: string = "name",
+  fallbackKey: string = "name"
+): string {
+  if (!data) return "-";
+
+  if (typeof data === "string") {
+    return data || "-";
+  }
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) return "-";
+    const texts = data
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          return item[priorityKey] || item[fallbackKey] || null;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    return texts.length > 0 ? texts.join(", ") : "-";
+  }
+
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    const value = obj[priorityKey] || obj[fallbackKey];
+    if (typeof value === "string" && value) {
+      return value;
+    }
+    return "-";
+  }
+
+  return "-";
+}
+
+function getDatasetNamesFromTraits(traits: any[], arrayLength: number = 0): string {
+  if (!Array.isArray(traits)) return "-";
+
+  const names = traits
+    .flatMap(trait => trait?.datasets ?? [])
+    .map(dataset => dataset?.name)
+    .filter(Boolean);
+
+  if (!names.length) return "-";
+  const limitedNames =
+    arrayLength > 0 ? names.slice(0, arrayLength) : names;
+
+  return limitedNames.join(", ");
+}
 
 const data: DataType[] = [
   {
@@ -142,21 +193,122 @@ function ModelEvalTable() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const router = useRouter();
-  const { projectId } = router.query; // Access the dynamic part of the route
+  const { projectId, deploymentId } = router.query; // Access the dynamic part of the route
   const { openDrawerWithStep } = useDrawer();
+
+  const {
+    experimentEvaluations,
+    experimentEvalTotal,
+    loading,
+    getEvaluationsData,
+  } = useEvaluations();
+  const [orderBy, setOrderBy] = useState<string>("created_at");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
+  const [order, setOrder] = useState<"-" | "">("");
+  
+  const columns: ColumnsType<ExperimentData> = [
+    {
+      title: "Traits",
+      dataIndex: "traits",
+      key: "traits",
+      // width: 160,
+      ellipsis: true,
+      render: (traits) => {
+        const displayText = getDisplayText(traits, "name", "name");
+        return <TruncatedTextCell text={displayText} />;
+      },
+    },
+    {
+      title: "Dataset",
+      dataIndex: "traits",
+      key: "traits",
+      // width: 160,
+      ellipsis: true,
+      render: (traits) => {
+        const displayText = getDatasetNamesFromTraits(traits, 1);
+        return <TruncatedTextCell text={displayText} />;
+      },
+    },
+    {
+      title: "Score",
+      dataIndex: "scores",
+      key: "scores",
+      // width: 160,
+      ellipsis: true,
+      render: (scores) => {
+        return <TruncatedTextCell text={scores.overall_accuracy || "-"} />;
+      },
+    },
+  ];
+  // Table data
+  const tableData = useMemo(() => {
+    console.log("Experiment Evaluations:", experimentEvaluations);
+    if (!experimentEvaluations || !Array.isArray(experimentEvaluations)) {
+      return [];
+    }
+    return experimentEvaluations;
+  }, [experimentEvaluations]);
 
   useEffect(() => {
     getProject(projectId as string);
     // openDrawerWithStep("use-model");
   }, [projectId]);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValue(searchValue);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 300);
 
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+  
+  const fetchExperiments = useCallback(async () => {
+    if (!deploymentId) return;
+
+    try {
+      const payload = {
+        page: currentPage,
+        page_size: pageSize,
+        search: debouncedSearchValue || undefined,
+        // order: order || undefined,
+        // orderBy: orderBy || undefined,
+        endpoint_id: deploymentId as string,
+        searchName: false
+        // experiment_status: "completed",
+      };
+
+      await getEvaluationsData(payload);
+    } catch (error) {
+      console.error("Failed to fetch experiments for model:", error);
+    }
+  }, [currentPage, pageSize, debouncedSearchValue, order, orderBy, deploymentId, getEvaluationsData]);
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    fetchExperiments();
+  }, [fetchExperiments]);
+  
   return (
-    <div className="relative">
-      <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" />
-      <Table<DataType>
+    <div className="relative CommonCustomPagination">
+      {/* <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" /> */}
+      <Table<ExperimentData>
         columns={columns}
-        pagination={false}
-        dataSource={data}
+        dataSource={tableData}
+        pagination={{
+          className: "small-pagination",
+          current: currentPage,
+          pageSize: pageSize,
+          total: experimentEvalTotal || 0,
+          onChange: (page, size) => {
+            setCurrentPage(page);
+            setPageSize(size);
+          },
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20", "50"],
+        }}
         bordered={false}
         footer={null}
         virtual
@@ -174,7 +326,7 @@ function ModelEvalTable() {
               {/* <Text_12_400_757575>Modal evaluations summary</Text_12_400_757575> */}
             </div>
             <div className="flex items-center justify-end gap-x-[.5rem]">
-              <SearchHeaderInput searchValue={""} setSearchValue={() => {}} />
+              <SearchHeaderInput placeholder="Search by traits, dataset" searchValue={searchValue} setSearchValue={setSearchValue} />
 
               <PrimaryButton
                 onClick={() => {
