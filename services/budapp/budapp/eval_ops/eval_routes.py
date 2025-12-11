@@ -2,7 +2,7 @@ import csv
 import io
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Generator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import StreamingResponse
@@ -1792,13 +1792,10 @@ async def get_all_evaluations(
                 page_size=10000,  # Large limit to get all records
             )
 
-            # Generate CSV
-            csv_content = _generate_evaluations_csv(result["evaluations"])
-
-            # Return as streaming response
+            # Return as streaming response with generator for memory efficiency
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             return StreamingResponse(
-                iter([csv_content]),
+                _generate_evaluations_csv(result["evaluations"]),
                 media_type="text/csv",
                 headers={"Content-Disposition": f"attachment; filename=evaluations_export_{timestamp}.csv"},
             )
@@ -1843,8 +1840,8 @@ async def get_all_evaluations(
         raise HTTPException(status_code=500, detail=f"Failed to get all evaluations: {str(e)}") from e
 
 
-def _generate_evaluations_csv(evaluations: list) -> str:
-    """Generate CSV content from evaluations data.
+def _generate_evaluations_csv(evaluations: list) -> Generator[str, None, None]:
+    """Generate CSV content from evaluations data as a generator for memory efficiency.
 
     Creates a CSV with columns:
     Deployment Name, Model Name, Dataset Name, Trait Name, Evaluation Name, Experiment Name, Score
@@ -1854,13 +1851,13 @@ def _generate_evaluations_csv(evaluations: list) -> str:
     Parameters:
         evaluations: List of AllEvaluationsItem objects
 
-    Returns:
-        CSV content as string
+    Yields:
+        CSV rows as strings
     """
     output = io.StringIO()
     writer = csv.writer(output)
 
-    # Write header
+    # Write header and yield it
     writer.writerow(
         [
             "Deployment Name",
@@ -1872,6 +1869,7 @@ def _generate_evaluations_csv(evaluations: list) -> str:
             "Score",
         ]
     )
+    yield output.getvalue()
 
     for evaluation in evaluations:
         # Extract base evaluation info
@@ -1908,6 +1906,9 @@ def _generate_evaluations_csv(evaluations: list) -> str:
                                         dataset_score = str(ds_score.get("accuracy"))
                                     break
 
+                        # Clear buffer and write row
+                        output.seek(0)
+                        output.truncate(0)
                         writer.writerow(
                             [
                                 deployment_name,
@@ -1919,8 +1920,11 @@ def _generate_evaluations_csv(evaluations: list) -> str:
                                 dataset_score,
                             ]
                         )
+                        yield output.getvalue()
                 else:
                     # Trait without datasets - still write a row
+                    output.seek(0)
+                    output.truncate(0)
                     writer.writerow(
                         [
                             deployment_name,
@@ -1932,8 +1936,11 @@ def _generate_evaluations_csv(evaluations: list) -> str:
                             overall_score,
                         ]
                     )
+                    yield output.getvalue()
         else:
             # No traits - write a single row with overall info
+            output.seek(0)
+            output.truncate(0)
             writer.writerow(
                 [
                     deployment_name,
@@ -1945,8 +1952,7 @@ def _generate_evaluations_csv(evaluations: list) -> str:
                     overall_score,
                 ]
             )
-
-    return output.getvalue()
+            yield output.getvalue()
 
 
 @router.post(
