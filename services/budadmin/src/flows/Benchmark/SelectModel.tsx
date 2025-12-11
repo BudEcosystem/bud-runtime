@@ -58,11 +58,10 @@ export default function SelectModel() {
             if (result.data.workflow_steps.provider_type === "cloud_model") {
               openDrawerWithStep("model_benchmark-credential-select");
             } else {
-              openDrawerWithStep("Benchmark-Configuration");
+              openDrawerWithStep("Select-Configuration");
             }
           }
         });
-        // openDrawerWithStep("Select-Nodes");
       }}
       nextText="Next"
     >

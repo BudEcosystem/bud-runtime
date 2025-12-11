@@ -84,6 +84,51 @@ export type Dataset = {
   tags?: {};
 };
 
+// Node Configuration Types
+export type TPPPOption = {
+  tp_size: number;
+  pp_size: number;
+  max_replicas: number;
+  total_devices_needed: number;
+  description: string;
+};
+
+export type DeviceTypeConfiguration = {
+  device_type: string;
+  device_name: string | null;
+  device_model: string | null;
+  total_devices: number;
+  nodes_count: number;
+  max_devices_per_node: number;
+  memory_per_device_gb: number;
+  tp_pp_options: TPPPOption[];
+  min_tp_required: number;
+  supports_pipeline_parallelism: boolean;
+};
+
+export type ModelMemoryInfo = {
+  model_id: string;
+  model_name: string | null;
+  model_uri: string | null;
+  estimated_weight_memory_gb: number;
+  min_tp_for_model: number;
+};
+
+export type NodeConfigurationResponse = {
+  cluster_id: string;
+  model_info: ModelMemoryInfo;
+  device_configurations: DeviceTypeConfiguration[];
+  selected_nodes: string[];
+  hardware_mode: string;
+};
+
+export type SelectedConfiguration = {
+  device_type: string;
+  tp_size: number;
+  pp_size: number;
+  replicas: number;
+};
+
 export const usePerfomanceBenchmark = create<{
   totalPages: number;
   totalUsers: number;
@@ -103,6 +148,11 @@ export const usePerfomanceBenchmark = create<{
   selectedModel: Model | null;
   runAsSimulation: boolean;
   hardwareMode: "dedicated" | "shared" | null;
+
+  // Node Configuration state
+  nodeConfigurations: NodeConfigurationResponse | null;
+  selectedConfiguration: SelectedConfiguration | null;
+  loadingConfigurations: boolean;
 
   benchmarks: Benchmark[];
   currentWorkflow: WorkflowType | null;
@@ -144,6 +194,11 @@ export const usePerfomanceBenchmark = create<{
   stepSix: () => any;
   stepSeven: () => any;
   stepEight: () => any;
+
+  // Node Configuration methods
+  fetchNodeConfigurations: () => Promise<NodeConfigurationResponse | null>;
+  setSelectedConfiguration: (config: SelectedConfiguration | null) => void;
+  stepConfigurationOptions: () => Promise<any>;
 }>((set, get) => ({
   filters: {},
   totalPages: 0,
@@ -169,6 +224,11 @@ export const usePerfomanceBenchmark = create<{
   selectedCredentials: null,
   hardwareMode: null,
   totalDataset: null,
+
+  // Node Configuration state
+  nodeConfigurations: null,
+  selectedConfiguration: null,
+  loadingConfigurations: false,
   setSelectedCredentials: (credentials: Credentials | null) => {
     set({ selectedCredentials: credentials });
   },
@@ -217,6 +277,9 @@ export const usePerfomanceBenchmark = create<{
       totalDataset: null,
       evalWith: "",
       hardwareMode: null,
+      nodeConfigurations: null,
+      selectedConfiguration: null,
+      loadingConfigurations: false,
     });
   },
 
@@ -645,6 +708,99 @@ export const usePerfomanceBenchmark = create<{
       return response;
     } catch (error) {
       console.error("Error creating model:", error);
+    } finally {
+      get().setLoading(false);
+    }
+  },
+
+  // Node Configuration methods
+  fetchNodeConfigurations: async () => {
+    const clusterId = get().selectedCluster?.id;
+    const modelId = get().selectedModel?.id;
+    const nodes = get().selectedNodes;
+    const hardwareMode = get().hardwareMode;
+    const stepTwoData = get().stepTwoData;
+
+    if (!clusterId || !modelId || !nodes.length) {
+      errorToast("Missing required data for configuration options");
+      return null;
+    }
+
+    // Extract hostnames from selected nodes
+    const hostnames = nodes
+      .map((node) => node.hostname)
+      .filter((h): h is string => !!h);
+
+    if (!hostnames.length) {
+      errorToast("No valid hostnames found in selected nodes");
+      return null;
+    }
+
+    set({ loadingConfigurations: true });
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/node-configurations`,
+        {
+          model_id: modelId,
+          cluster_id: clusterId,
+          hostnames: hostnames,
+          hardware_mode: hardwareMode || "dedicated",
+          input_tokens: stepTwoData?.max_input_tokens
+            ? parseInt(stepTwoData.max_input_tokens)
+            : 1024,
+          output_tokens: stepTwoData?.max_output_tokens
+            ? parseInt(stepTwoData.max_output_tokens)
+            : 512,
+          concurrency: get().stepOneData?.concurrent_requests || 10,
+        },
+      );
+      if (response?.data) {
+        set({ nodeConfigurations: response.data });
+        return response.data as NodeConfigurationResponse;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching node configurations:", error);
+      errorToast("Failed to fetch configuration options");
+      return null;
+    } finally {
+      set({ loadingConfigurations: false });
+    }
+  },
+
+  setSelectedConfiguration: (config: SelectedConfiguration | null) => {
+    set({ selectedConfiguration: config });
+  },
+
+  stepConfigurationOptions: async () => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const config = get().selectedConfiguration;
+
+    if (!config) {
+      errorToast("Please select a configuration");
+      return;
+    }
+
+    get().setLoading(true);
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/run-workflow`,
+        {
+          ...get().stepOneData,
+          workflow_id: workflowId,
+          step_number: 6,
+          trigger_workflow: false,
+          selected_device_type: config.device_type,
+          tp_size: config.tp_size,
+          pp_size: config.pp_size,
+          replicas: config.replicas,
+        },
+      );
+      get().getWorkflow();
+      return response;
+    } catch (error) {
+      console.error("Error saving configuration options:", error);
+      errorToast("Failed to save configuration options");
     } finally {
       get().setLoading(false);
     }

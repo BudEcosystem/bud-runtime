@@ -272,6 +272,11 @@ class BenchmarkService(SessionMixin):
                 "model_id",
                 "model",
                 "provider_type",
+                # Configuration options (step 6)
+                "selected_device_type",
+                "tp_size",
+                "pp_size",
+                "replicas",
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
@@ -750,6 +755,89 @@ class BenchmarkService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"progress": bud_simulation_response, "current_step": workflow_current_step}
         )
+
+    async def get_node_configurations(self, request) -> Dict:
+        """Get node configuration options by proxying to budsim service.
+
+        This method:
+        1. Validates the model exists and gets its URI
+        2. Proxies the request to budsim service
+        3. Enriches the response with model display name
+
+        Args:
+            request: NodeConfigurationProxyRequest with model_id, cluster_id, hostnames, etc.
+
+        Returns:
+            Dict containing node configuration options from budsim
+
+        Raises:
+            ClientException: If model not found or budsim request fails
+        """
+        from budmicroframe.shared.dapr_service import DaprService
+
+        # 1. Get model info from database
+        db_model = await ModelDataManager(self.session).get_by_field("id", request.model_id)
+        if not db_model:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Model with id {request.model_id} not found",
+            )
+
+        model_uri = db_model.pretrained_model_name_or_path
+        model_name = db_model.name
+
+        # 2. Build request payload for budsim
+        budsim_payload = {
+            "model_id": str(request.model_id),
+            "cluster_id": str(request.cluster_id),
+            "hostnames": request.hostnames,
+            "hardware_mode": request.hardware_mode,
+            "input_tokens": request.input_tokens,
+            "output_tokens": request.output_tokens,
+            "concurrency": request.concurrency,
+            "model_uri": model_uri,
+        }
+
+        # 3. Proxy request to budsim service
+        try:
+            with DaprService() as dapr_service:
+                response = dapr_service.invoke_method(
+                    app_id="budsim",
+                    method_name="simulator/node-configurations",
+                    data=budsim_payload,
+                    http_verb="POST",
+                )
+
+            if response.status_code != 200:
+                error_msg = "Failed to get configurations from simulator"
+                try:
+                    error_data = response.json()
+                    if "message" in error_data:
+                        error_msg = error_data["message"]
+                except Exception:
+                    pass
+                raise ClientException(
+                    status_code=response.status_code,
+                    message=error_msg,
+                )
+
+            result = response.json()
+
+            # 4. Enrich model info with display name
+            if result.get("model_info"):
+                result["model_info"]["model_name"] = model_name
+                result["model_info"]["model_id"] = str(request.model_id)
+
+            return result
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to proxy request to budsim: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Failed to get node configurations from simulator",
+            )
 
 
 class BenchmarkRequestMetricsService(SessionMixin):
