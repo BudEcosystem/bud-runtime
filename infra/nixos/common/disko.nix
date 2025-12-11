@@ -1,6 +1,6 @@
-{ ... }:
+{ config, ... }:
 let
-  disk = "nvme0n1";
+  disk = config.global.disk.master;
 in
 {
   disko.devices = {
