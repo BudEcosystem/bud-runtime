@@ -10,7 +10,6 @@ from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from budeval.commons.config import app_settings
 from budeval.commons.logging import logging
 from budeval.evals.schema import EvaluationRequest
-from budeval.evals.workflows import EvaluationWorkflow
 
 
 logger = logging.getLogger(__name__)
@@ -386,6 +385,9 @@ def monitor_job_workflow(ctx: wf.DaprWorkflowContext, monitor_request: str):
                 logger_local.error(f"Job {job_id} failed - extracting error details")
 
             # Extract error information from failed job
+            # Lazy import to avoid circular dependency
+            from budeval.evals.workflows import EvaluationWorkflow
+
             error_extraction_result = yield ctx.call_activity(
                 EvaluationWorkflow.extract_job_error,
                 input=json.dumps({"job_id": job_id, "kubeconfig": data.get("kubeconfig")}),
