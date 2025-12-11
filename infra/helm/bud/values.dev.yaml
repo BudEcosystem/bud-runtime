@@ -32,8 +32,6 @@ microservices:
         image: budstudio/askbud:nightly
     budapp:
         image: budstudio/budapp:nightly
-        env:
-            LOG_LEVEL: DEBUG
     budcluster:
         image: budstudio/budcluster:nightly
     budmetrics:
