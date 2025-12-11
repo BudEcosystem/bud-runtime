@@ -21,6 +21,10 @@ from .schemas import (
     GPUMetricsResponse,
     MetricsAggregationRequest,
     MetricsAggregationResponse,
+    NodeEventDetail,
+    NodeEventsCountResponse,
+    NodeEventsListResponse,
+    NodeEventsStoreRequest,
     NodeMetricsResponse,
     PodMetricsResponse,
     PrometheusCompatibleMetricsResponse,
@@ -356,7 +360,7 @@ async def get_prometheus_compatible_metrics(
 
 @router.post("/events/store")
 async def store_node_events(
-    request: dict,
+    request: NodeEventsStoreRequest,
     service: ClusterMetricsService = Depends(get_cluster_metrics_service),
 ):
     """Store node events from budcluster.
@@ -375,10 +379,8 @@ async def store_node_events(
         HTTPException: 500 on server error
     """
     try:
-        cluster_id = request.get("cluster_id", "")
-        events = request.get("events", [])
-
-        count = await service.store_node_events(cluster_id, events)
+        events_dict = [event.model_dump() for event in request.events]
+        count = await service.store_node_events(request.cluster_id, events_dict)
 
         return {"status": "success", "stored_count": count}
 
@@ -390,13 +392,13 @@ async def store_node_events(
         ) from e
 
 
-@router.get("/{cluster_id}/node-events-count")
+@router.get("/{cluster_id}/node-events-count", response_model=NodeEventsCountResponse)
 async def get_node_events_count(
     cluster_id: str,
     from_time: Optional[datetime] = Query(default=None),
     to_time: Optional[datetime] = Query(default=None),
     service: ClusterMetricsService = Depends(get_cluster_metrics_service),
-):
+) -> NodeEventsCountResponse:
     """Get event counts per node for a cluster.
 
     Args:
@@ -412,14 +414,18 @@ async def get_node_events_count(
         HTTPException: 500 on server error
     """
     try:
-        events_count = await service.get_node_events_count(cluster_id, from_time, to_time)
+        # Handle default time range here to ensure response reflects the actual query window
+        effective_to_time = to_time or datetime.utcnow()
+        effective_from_time = from_time or (effective_to_time - timedelta(hours=24))
 
-        return {
-            "cluster_id": cluster_id,
-            "events_count": events_count,
-            "from_time": from_time.isoformat() if from_time else None,
-            "to_time": to_time.isoformat() if to_time else None,
-        }
+        events_count = await service.get_node_events_count(cluster_id, effective_from_time, effective_to_time)
+
+        return NodeEventsCountResponse(
+            cluster_id=cluster_id,
+            events_count=events_count,
+            from_time=effective_from_time,
+            to_time=effective_to_time,
+        )
 
     except Exception as e:
         logger.error(f"Error getting node events count: {e}")
@@ -429,7 +435,7 @@ async def get_node_events_count(
         ) from e
 
 
-@router.get("/{cluster_id}/node-events/{node_name}")
+@router.get("/{cluster_id}/node-events/{node_name}", response_model=NodeEventsListResponse)
 async def get_node_events(
     cluster_id: str,
     node_name: str,
@@ -437,7 +443,7 @@ async def get_node_events(
     to_time: Optional[datetime] = Query(default=None),
     limit: int = Query(default=100, le=1000),
     service: ClusterMetricsService = Depends(get_cluster_metrics_service),
-):
+) -> NodeEventsListResponse:
     """Get events for a specific node.
 
     Args:
@@ -455,16 +461,23 @@ async def get_node_events(
         HTTPException: 500 on server error
     """
     try:
-        events = await service.get_node_events(cluster_id, node_name, from_time, to_time, limit)
+        # Handle default time range here to ensure response reflects the actual query window
+        effective_to_time = to_time or datetime.utcnow()
+        effective_from_time = from_time or (effective_to_time - timedelta(hours=24))
 
-        return {
-            "cluster_id": cluster_id,
-            "node_name": node_name,
-            "events": events,
-            "total_events": len(events),
-            "from_time": from_time.isoformat() if from_time else None,
-            "to_time": to_time.isoformat() if to_time else None,
-        }
+        events = await service.get_node_events(cluster_id, node_name, effective_from_time, effective_to_time, limit)
+
+        # Convert dict events to NodeEventDetail models
+        event_details = [NodeEventDetail(**event) for event in events]
+
+        return NodeEventsListResponse(
+            cluster_id=cluster_id,
+            node_name=node_name,
+            events=event_details,
+            total_events=len(event_details),
+            from_time=effective_from_time,
+            to_time=effective_to_time,
+        )
 
     except Exception as e:
         logger.error(f"Error getting node events: {e}")

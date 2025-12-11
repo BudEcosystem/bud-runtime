@@ -98,10 +98,10 @@ class NFDSchedulableResourceDetector:
         # Extract internal IP from node addresses
         internal_ip = None
         if node.status and node.status.addresses:
-            for addr in node.status.addresses:
-                if addr.type == "InternalIP":
-                    internal_ip = addr.address
-                    break
+            internal_ip = next(
+                (addr.address for addr in node.status.addresses if addr.type == "InternalIP"),
+                None,
+            )
 
         return {
             "name": node_name,

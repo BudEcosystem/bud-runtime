@@ -176,11 +176,10 @@ class NFDLabelParser:
                 addresses.append({"type": addr.type, "address": addr.address})
 
         # Extract internal IP directly for database storage
-        internal_ip = None
-        for addr_dict in addresses:
-            if addr_dict["type"] == "InternalIP":
-                internal_ip = addr_dict["address"]
-                break
+        internal_ip = next(
+            (addr_dict["address"] for addr_dict in addresses if addr_dict["type"] == "InternalIP"),
+            None,
+        )
 
         # Determine node status (ready/not ready)
         node_ready = False
