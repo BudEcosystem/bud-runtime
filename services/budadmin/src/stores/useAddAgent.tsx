@@ -60,6 +60,7 @@ export const useAddAgent = create<{
   warningData: WarningData | null;
   promptMessages: any[];
   promptTags: Tag[];
+  formResetKey: number;
 
   setLoading: (loading: boolean) => void;
   setCurrentWorkflow: (workflow: WorkflowType) => void;
@@ -88,6 +89,7 @@ export const useAddAgent = create<{
   requestCount: 0,
   currentWorkflow: null,
   selectedProject: null,
+  formResetKey: 0,
   selectedAgentType: null,
   selectedModel: null,
   agentConfiguration: {
@@ -162,7 +164,7 @@ export const useAddAgent = create<{
   },
 
   reset: () => {
-    set({
+    set((state) => ({
       currentWorkflow: null,
       selectedProject: null,
       selectedAgentType: null,
@@ -184,7 +186,9 @@ export const useAddAgent = create<{
       promptMessages: [],
       loading: false,
       requestCount: 0,
-    });
+      // Increment formResetKey to force remount of form components in AgentConfiguration
+      formResetKey: state.formResetKey + 1,
+    }));
   },
 
   getWorkflow: async (id?: string) => {
