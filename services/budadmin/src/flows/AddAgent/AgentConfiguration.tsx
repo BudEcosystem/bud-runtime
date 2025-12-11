@@ -2,9 +2,9 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Form, InputNumber, Switch } from "antd";
+import { InputNumber, Switch } from "antd";
 import { errorToast } from "@/components/toast";
 import TextInput from "../components/TextInput";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
@@ -15,23 +15,24 @@ import { useAddAgent } from "@/stores/useAddAgent";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
+import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 
 export default function AgentConfiguration() {
   const { openDrawerWithStep } = useDrawer();
-  const [form] = Form.useForm();
+  const { form } = useContext(BudFormContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Use the Add Agent store for workflow management
   const {
     currentWorkflow,
     selectedProject,
-    selectedModel,
     setAgentConfiguration,
     setDeploymentConfiguration,
     setWarningData,
     getWorkflow,
     getPromptTags,
-    promptTags
+    promptTags,
+    formResetKey
   } = useAddAgent();
 
   // Get the active agent session to retrieve promptId
@@ -51,6 +52,18 @@ export default function AgentConfiguration() {
   const [rateLimitValue, setRateLimitValue] = useState(10);
   // Trigger workflow is always true for agent deployments
   const triggerWorkflow = true;
+
+
+  // Reset form fields when component mounts or when starting a new agent flow
+  useEffect(() => {
+    if (form && form.resetFields) {
+      form.resetFields(['deploymentName', 'tags', 'description']);
+    }
+    // Reset local state as well
+    setDeploymentName("");
+    setTags([]);
+    setDescription("");
+  }, [formResetKey]);
 
   // Fetch prompt tags on component mount
   useEffect(() => {
@@ -75,16 +88,19 @@ export default function AgentConfiguration() {
     }
   }, [currentWorkflow?.workflow_id, getWorkflow]);
 
-  const handleNext = async () => {
+  const handleNext = async (values: any) => {
     try {
-      await form.validateFields();
+      // Use form values passed from BudForm's onFinish callback
+      const formDeploymentName = values.deploymentName || deploymentName;
+      const formTags = values.tags || tags;
+      const formDescription = values.description || description;
 
-      if (!deploymentName) {
+      if (!formDeploymentName) {
         errorToast("Please enter a deployment name");
         return;
       }
 
-      if (tags.length === 0) {
+      if (!formTags || formTags.length === 0) {
         errorToast("Please add at least one tag");
         return;
       }
@@ -99,8 +115,8 @@ export default function AgentConfiguration() {
       try {
         // Store configuration data in the Add Agent store
         const configData = {
-          name: deploymentName,
-          description,
+          name: formDeploymentName,
+          description: formDescription,
           system_prompt: "", // Will be set in a later step
           temperature: 0.7,
           max_tokens: 2048,
@@ -114,9 +130,9 @@ export default function AgentConfiguration() {
 
         // Store deployment configuration in the store
         const deploymentConfig = {
-          deploymentName,
-          tags,
-          description,
+          deploymentName: formDeploymentName,
+          tags: formTags,
+          description: formDescription,
           minConcurrency,
           maxConcurrency,
           autoScale,
@@ -132,9 +148,9 @@ export default function AgentConfiguration() {
         const payload: any = {
           workflow_id: currentWorkflow.workflow_id,
           step_number: 4,
-          name: deploymentName,
-          description: description || "",
-          tags: tags,
+          name: formDeploymentName,
+          description: formDescription || "",
+          tags: formTags,
           auto_scale: autoScale,
           caching: autoCaching,
           concurrency: [minConcurrency, maxConcurrency],
