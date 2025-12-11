@@ -62,9 +62,7 @@ const buildPropertiesFromVariables = (
 
 const buildRequiredFields = (variables: AgentVariable[]): string[] => {
   return variables
-    .filter(
-      (variable) => variable.required && variable.name && variable.name.trim(),
-    )
+    .filter((variable) => variable.name && variable.name.trim())
     .map((variable) => variable.name);
 };
 
