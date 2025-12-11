@@ -1000,6 +1000,7 @@ class DatasetModelScore(BaseModel):
     model_name: str = Field(..., description="Model name")
     model_display_name: Optional[str] = Field(None, description="Model display name")
     model_icon: Optional[str] = Field(None, description="Model icon URL")
+    provider_icon: Optional[str] = Field(None, description="Provider icon URL")
     endpoint_name: str = Field(..., description="Endpoint/deployment name")
     accuracy: Optional[float] = Field(None, description="Accuracy metric used for ranking")
     metrics: List[MetricValue] = Field(default_factory=list, description="All averaged metrics")
