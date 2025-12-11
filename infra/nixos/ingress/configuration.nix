@@ -9,6 +9,7 @@ in
     ../common/configuration.nix
     ../dev/configuration.nix
     ../master/configuration.nix
+    ../disk/configuration.nix
   ];
 
   boot.supportedFilesystems = [ "nfs" ];
