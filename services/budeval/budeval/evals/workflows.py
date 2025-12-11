@@ -402,6 +402,11 @@ class EvaluationWorkflow:
                     "gpu_error": f"GPU Error: {primary_error['message']}",
                     "configuration": f"Configuration Error: {primary_error['message']}",
                     "network_error": f"Network Error: {primary_error['message']}",
+                    "api_timeout": f"API Timeout: {primary_error['message']}",
+                    "dependency_missing": f"Missing Dependency: {primary_error['message']}",
+                    "file_missing": f"File Not Found: {primary_error['message']}",
+                    "invalid_input": f"Invalid Input: {primary_error['message']}",
+                    "infrastructure": f"Infrastructure Error: {primary_error['message']}",
                 }
                 user_message = category_messages.get(
                     primary_error["category"], f"Evaluation Failed: {primary_error['message']}"
@@ -409,7 +414,7 @@ class EvaluationWorkflow:
             else:
                 user_message = f"All {len(failed_job_ids)} evaluation job(s) failed"
 
-            notification_req.payload.event = "opencompass_evaluation_failed"
+            notification_req.payload.event = "monitor_eval_job_progress"
             notification_req.payload.content = NotificationContent(
                 title="OpenCompass Evaluation Failed",
                 message=user_message,
