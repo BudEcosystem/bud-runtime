@@ -143,18 +143,45 @@ microservices:
     # Optional per-service node scheduling (overrides global)
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   budcustomer:
     enabled: true
     image: budstudio/budcustomer:0.4.5
     env: {}
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   budplayground:
     enabled: true
     image: budstudio/budplayground:0.4.5
     env: {}
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 2
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   # backend exposed services
   budgateway:
     enabled: true
@@ -195,6 +222,15 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   askbud:
     enabled: true
     image: budstudio/askbud:0.4.5
@@ -205,6 +241,15 @@ microservices:
       INFERENCE_URL: http://52.241.253.58/v1/
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   budapp:
     enabled: true
     image: budstudio/budapp:0.4.5
@@ -227,6 +272,15 @@ microservices:
       BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015/v1/"
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   # backend internal services
   budcluster:
     enabled: true
@@ -260,6 +314,15 @@ microservices:
       PROMETHEUS_PORT: "9090"
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration (longer stabilization for workflows)
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 80
+      targetMemoryUtilizationPercentage: 70
+      scaleDownStabilizationSeconds: 600
+      scaleUpStabilizationSeconds: 60
   budmetrics:
     enabled: true
     daprid: budmetrics
@@ -276,6 +339,15 @@ microservices:
       CLICKHOUSE_TTL_CLUSTER_METRICS: "30"
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   budmodel:
     enabled: true
     image: budstudio/budmodel:0.4.5
@@ -286,6 +358,15 @@ microservices:
       LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration (lower CPU due to I/O-bound workload)
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 2
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 70
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 60
   budeval:
     enabled: true
     image: budstudio/budeval:0.4.5
@@ -294,6 +375,15 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration (longer stabilization for evaluation workflows)
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 2
+      targetCPUUtilizationPercentage: 75
+      targetMemoryUtilizationPercentage: 80
+      scaleDownStabilizationSeconds: 600
+      scaleUpStabilizationSeconds: 60
   budsim:
     enabled: true
     image: budstudio/budsim:0.4.5
@@ -302,6 +392,15 @@ microservices:
       LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration (longer stabilization for ML optimization workflows)
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 75
+      targetMemoryUtilizationPercentage: 80
+      scaleDownStabilizationSeconds: 600
+      scaleUpStabilizationSeconds: 60
   buddoc:
     enabled: true
     image: budstudio/buddoc:0.4.5
@@ -314,6 +413,15 @@ microservices:
       TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration (lower CPU due to document processing)
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 2
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 70
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 60
   budnotify:
     enabled: true
     image: budstudio/budnotify:0.4.5
@@ -321,6 +429,15 @@ microservices:
     pubsubTopic: notificationMessages
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration (fast scale-up for notifications)
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 0
   budprompt:
     enabled: true
     daprid: budprompt
@@ -334,6 +451,15 @@ microservices:
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
     nodeSelector: {}
     affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   global:
     env:
       PROMETHEUS_URL: https://metric.bud.studio
