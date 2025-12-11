@@ -1291,9 +1291,19 @@ function AgentBoxInner({
             </span>
           </div>
           {isHovering && (
-            <PrimaryButton onClick={handleSaveClick}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] hover:!border-[#965CDE] group"
-              textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
+            <PrimaryButton
+              onClick={handleSaveClick}
+              disabled={!session?.selectedDeployment?.name}
+              classNames={`h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] group ${
+                !session?.selectedDeployment?.name
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:!bg-[#479d5f] hover:!border-[#965CDE]'
+              }`}
+              textClass={`!text-[0.625rem] !font-[400] ${
+                !session?.selectedDeployment?.name
+                  ? 'text-[#479d5f80]'
+                  : 'text-[#479d5f] group-hover:text-[#EEEEEE]'
+              }`}
             >
               {isAddVersionMode ? "Save Version" : isEditVersionMode ? "Save Changes" : "Save"}
             </PrimaryButton>

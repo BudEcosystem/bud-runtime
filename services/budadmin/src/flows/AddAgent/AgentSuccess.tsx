@@ -114,6 +114,9 @@ export default function AgentSuccess() {
   const handleClose = () => {
     // Clear agent session data to prevent stale data in new flows
     resetSessionState();
+    // Reset the add agent store to clear form data and increment formResetKey
+    // This ensures the next agent creation flow starts with a clean form
+    reset();
     // Refresh the prompts list
     fetchPrompts();
     // Close the drawer
