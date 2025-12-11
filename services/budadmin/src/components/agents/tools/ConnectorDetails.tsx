@@ -138,8 +138,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           if (oauthResponse.data && oauthResponse.data.tools) {
             allTools = oauthResponse.data.tools;
           }
+        } catch (error) {
+          // Silently ignore errors from fetchOAuthTools - no toast needed
+        }
 
-          // On success, also call GET /prompts/tools
+        // Also call GET /prompts/tools to get regular tools
+        try {
           const regularResponse = await ConnectorService.fetchTools({
             prompt_id: promptId,
             connector_id: connector.id,
@@ -159,6 +163,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             });
           }
         } catch (error) {
+          // If regular fetch also fails, throw to show error toast
           throw error;
         }
       } else {
@@ -241,12 +246,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       // Mark as processed
       oauthCallbackProcessed.current = true;
 
-      // Helper function to clean up OAuth-specific URL params (preserves agent and prompt params)
+      // Helper function to clean up OAuth-specific URL params (preserves connector, agent and prompt params)
       const cleanupOAuthParams = () => {
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.delete('code');
         urlParams.delete('state');
-        urlParams.delete('connector');
+        // Keep 'connector' param so back navigation works properly
 
         const cleanUrl = urlParams.toString()
           ? `${window.location.pathname}?${urlParams.toString()}`
