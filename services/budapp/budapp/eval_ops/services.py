@@ -88,6 +88,7 @@ from budapp.eval_ops.schemas import (
     Trait as TraitSchema,
 )
 from budapp.model_ops.models import Model as ModelTable
+from budapp.model_ops.models import Provider as ProviderModel
 from budapp.workflow_ops.crud import (
     WorkflowDataManager,
     WorkflowStepDataManager,
@@ -2612,8 +2613,8 @@ class ExperimentService:
     ) -> Optional[Any]:
         """Calculate evaluation scores from ExpMetric table.
 
-        This method calculates scores similar to get_dataset_scores by aggregating
-        metrics from completed runs and calculating overall accuracy.
+        This method calculates scores similar to get_experiment by averaging
+        all metric values for each run and computing overall score.
 
         Parameters:
             evaluation: The evaluation model instance.
@@ -2637,8 +2638,15 @@ class ExperimentService:
         completed_runs = [r for r in runs if r.status == RunStatusEnum.COMPLETED.value]
         running_runs = [r for r in runs if r.status == RunStatusEnum.RUNNING.value]
 
+        # Filter out failed/cancelled/skipped runs (matching get_experiment logic)
+        excluded_statuses = {
+            RunStatusEnum.FAILED.value,
+            RunStatusEnum.CANCELLED.value,
+            RunStatusEnum.SKIPPED.value,
+        }
+
         if not completed_runs and not running_runs:
-            # All runs are pending
+            # All runs are pending or excluded
             return EvaluationScore(
                 status="pending",
                 overall_accuracy=None,
@@ -2653,42 +2661,52 @@ class ExperimentService:
                 datasets=[],
             )
 
-        # Aggregate metrics from completed runs
-        # Group metrics by dataset (via run's dataset_version_id)
-        dataset_metrics: Dict[uuid.UUID, Dict[str, List[float]]] = {}
-        all_accuracy_values: List[float] = []
+        # Calculate scores similar to get_experiment:
+        # For each run, average ALL metric values, then average across valid runs
+        all_run_scores: List[float] = []
+        dataset_run_scores: Dict[uuid.UUID, List[float]] = {}
+        dataset_metrics_data: Dict[uuid.UUID, Dict[str, List[float]]] = {}
 
         for run in completed_runs:
-            run_metrics = metrics_by_run.get(run.id, [])
+            # Skip excluded status runs
+            if run.status in excluded_statuses:
+                continue
 
-            # Get dataset info from run
+            run_metrics = metrics_by_run.get(run.id, [])
             dataset_version_id = run.dataset_version_id
 
-            if dataset_version_id not in dataset_metrics:
-                dataset_metrics[dataset_version_id] = {}
+            # Initialize dataset tracking
+            if dataset_version_id not in dataset_run_scores:
+                dataset_run_scores[dataset_version_id] = []
+                dataset_metrics_data[dataset_version_id] = {}
 
+            # Calculate run score (average of all metrics) - matching get_experiment logic
+            if run_metrics:
+                total = sum(float(m.metric_value) for m in run_metrics if m.metric_value)
+                run_score = round(total / len(run_metrics), 2)
+
+                # Only include runs with score > 0 (matching get_experiment logic)
+                if run_score > 0:
+                    all_run_scores.append(run_score)
+                    dataset_run_scores[dataset_version_id].append(run_score)
+
+            # Also track individual metrics for detailed breakdown
             for metric in run_metrics:
                 metric_name = metric.metric_name
+                if metric_name not in dataset_metrics_data[dataset_version_id]:
+                    dataset_metrics_data[dataset_version_id][metric_name] = []
 
-                if metric_name not in dataset_metrics[dataset_version_id]:
-                    dataset_metrics[dataset_version_id][metric_name] = []
-
-                # Only include non-zero values for averaging
                 if metric.metric_value and metric.metric_value > 0:
-                    dataset_metrics[dataset_version_id][metric_name].append(float(metric.metric_value))
+                    dataset_metrics_data[dataset_version_id][metric_name].append(float(metric.metric_value))
 
-                    # Track accuracy for overall calculation
-                    if metric_name.lower() == "accuracy":
-                        all_accuracy_values.append(float(metric.metric_value))
-
-        # Calculate overall accuracy (average of all accuracy values)
+        # Calculate overall score (average of all run scores)
         overall_accuracy = None
-        if all_accuracy_values:
-            overall_accuracy = round(sum(all_accuracy_values) / len(all_accuracy_values), 2)
+        if all_run_scores:
+            overall_accuracy = round(sum(all_run_scores) / len(all_run_scores), 2)
 
         # Build dataset scores list
         datasets_scores = []
-        for dataset_version_id, metrics_dict in dataset_metrics.items():
+        for dataset_version_id in dataset_run_scores:
             # Get dataset info
             dataset_version = self.session.get(ExpDatasetVersion, dataset_version_id)
             dataset_name = "Unknown"
@@ -2697,9 +2715,15 @@ class ExperimentService:
                 if dataset:
                     dataset_name = dataset.name
 
+            # Calculate dataset-level score (average of run scores for this dataset)
+            dataset_score = None
+            run_scores = dataset_run_scores[dataset_version_id]
+            if run_scores:
+                dataset_score = round(sum(run_scores) / len(run_scores), 2)
+
             # Calculate averaged metrics for this dataset
-            dataset_accuracy = None
             dataset_metrics_list = []
+            metrics_dict = dataset_metrics_data.get(dataset_version_id, {})
             for metric_name, values in metrics_dict.items():
                 if values:
                     avg_value = round(sum(values) / len(values), 2)
@@ -2709,14 +2733,12 @@ class ExperimentService:
                             "metric_value": avg_value,
                         }
                     )
-                    if metric_name.lower() == "accuracy":
-                        dataset_accuracy = avg_value
 
             datasets_scores.append(
                 {
                     "dataset_id": str(dataset_version_id),
                     "dataset_name": dataset_name,
-                    "accuracy": dataset_accuracy,
+                    "accuracy": dataset_score,  # Now represents avg of all metrics, not just accuracy
                     "metrics": dataset_metrics_list,
                 }
             )
@@ -3029,7 +3051,7 @@ class ExperimentService:
             dataset_version_ids = [dv.id for dv in dataset_versions]
 
             # Query all completed runs for this dataset's versions
-            # Join with Endpoint, Model, and Experiment for access control and model info
+            # Join with Endpoint, Model, Provider, and Experiment for access control and model info
             runs_query = (
                 self.session.query(
                     RunModel.id.label("run_id"),
@@ -3039,10 +3061,12 @@ class ExperimentService:
                     ModelTable.id.label("model_id"),
                     ModelTable.name.label("model_name"),
                     ModelTable.icon.label("model_icon"),
+                    ProviderModel.icon.label("provider_icon"),
                     ExperimentModel.id.label("experiment_id"),
                 )
                 .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
                 .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .outerjoin(ProviderModel, ModelTable.provider_id == ProviderModel.id)
                 .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
                 .filter(
                     RunModel.dataset_version_id.in_(dataset_version_ids),
@@ -3068,6 +3092,7 @@ class ExperimentService:
                         "model_id": model_id,
                         "model_name": run_row.model_name,
                         "model_icon": run_row.model_icon,
+                        "provider_icon": run_row.provider_icon,
                         "endpoint_name": run_row.endpoint_name,
                         "run_ids": [],
                         "latest_created_at": run_row.created_at,
@@ -3131,6 +3156,7 @@ class ExperimentService:
                         "model_id": model_id,
                         "model_name": model_info["model_name"],
                         "model_icon": model_info["model_icon"],
+                        "provider_icon": model_info["provider_icon"] or model_info["model_icon"],
                         "endpoint_name": model_info["endpoint_name"],
                         "accuracy": accuracy_value,
                         "metrics": averaged_metrics,
