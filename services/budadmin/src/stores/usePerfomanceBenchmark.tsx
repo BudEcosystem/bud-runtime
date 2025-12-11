@@ -587,7 +587,7 @@ export const usePerfomanceBenchmark = create<{
           ...get().stepOneData,
           ...get().stepTwoData,
           workflow_id: workflowId,
-          step_number: 5,
+          step_number: 6,
           // "trigger_workflow": false,
           model_id: modelId,
         },
@@ -614,7 +614,7 @@ export const usePerfomanceBenchmark = create<{
         `${tempApiBaseUrl}/benchmark/run-workflow`,
         {
           ...get().stepOneData,
-          step_number: 5,
+          step_number: 6,
           trigger_workflow: false,
           workflow_id: workflowId,
           credential_id: credentials?.id,
@@ -642,7 +642,7 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 6,
+          step_number: 8,
           // "trigger_workflow": false,
         },
       );
@@ -669,7 +669,7 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 7,
+          step_number: 8,
           // "trigger_workflow": false,
           user_confirmation: true,
         },
@@ -694,7 +694,7 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 8,
+          step_number: 9,
           // "trigger_workflow": false,
           run_as_simulation: simulation,
           trigger_workflow: true,
@@ -788,7 +788,7 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 6,
+          step_number: 7,
           trigger_workflow: false,
           selected_device_type: config.device_type,
           tp_size: config.tp_size,
