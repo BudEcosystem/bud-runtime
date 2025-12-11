@@ -1074,6 +1074,11 @@ function AgentBoxInner({
 
     setIsSavingPromptMessages(true);
 
+    // Filter out messages with empty content once, reuse for payload and state update
+    const filteredMessages = messages
+      .filter((msg: { content?: string }) => msg.content?.trim())
+      .map((msg: { role: string; content: string }) => ({ role: msg.role, content: msg.content }));
+
     try {
       // Build the payload for prompt-config endpoint
       const payload: any = {
@@ -1083,10 +1088,7 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        // Filter out messages with empty content, send empty array if all are empty
-        messages: messages
-          .filter((msg: { content?: string }) => msg.content?.trim())
-          .map((msg: { role: string; content: string }) => ({ role: msg.role, content: msg.content })),
+        messages: filteredMessages,
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
@@ -1126,8 +1128,7 @@ function AgentBoxInner({
         }
 
         // If messages were cleared (empty array sent), update session to reflect cleared state
-        const sentMessages = messages.filter((msg: { content?: string }) => msg.content?.trim());
-        if (sentMessages.length === 0) {
+        if (filteredMessages.length === 0) {
           updateSession(session.id, { promptMessages: '[]' });
         }
 
