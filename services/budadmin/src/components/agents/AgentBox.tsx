@@ -1085,8 +1085,8 @@ function AgentBoxInner({
         stream: getStreamSetting(),
         // Filter out messages with empty content, send empty array if all are empty
         messages: messages
-          .filter((msg: any) => msg.content?.trim())
-          .map((msg: any) => ({ role: msg.role, content: msg.content })),
+          .filter((msg: { content?: string }) => msg.content?.trim())
+          .map((msg: { role: string; content: string }) => ({ role: msg.role, content: msg.content })),
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: true,
@@ -1126,7 +1126,7 @@ function AgentBoxInner({
         }
 
         // If messages were cleared (empty array sent), update session to reflect cleared state
-        const sentMessages = messages.filter((msg: any) => msg.content?.trim());
+        const sentMessages = messages.filter((msg: { content?: string }) => msg.content?.trim());
         if (sentMessages.length === 0) {
           updateSession(session.id, { promptMessages: '[]' });
         }
