@@ -1735,6 +1735,10 @@ async def get_all_evaluations(
         Optional[uuid.UUID],
         Query(description="Filter evaluations by endpoint ID (takes precedence over model_id)"),
     ] = None,
+    search: Annotated[
+        Optional[str],
+        Query(description="Search evaluations by evaluation name, dataset name, or trait name"),
+    ] = None,
     page: Annotated[
         int,
         Query(ge=1, description="Page number (1-indexed)"),
@@ -1755,6 +1759,7 @@ async def get_all_evaluations(
 
     - **model_id**: Optional UUID to filter evaluations by model
     - **endpoint_id**: Optional UUID to filter evaluations by endpoint (takes precedence over model_id)
+    - **search**: Optional search term to filter by evaluation name, dataset name, or trait name
     - **page**: Page number for pagination (1-indexed, default: 1)
     - **page_size**: Number of items per page (default: 20, max: 100)
     - **session**: Database session dependency
@@ -1767,6 +1772,7 @@ async def get_all_evaluations(
             user_id=current_user.id,
             model_id=model_id,
             endpoint_id=endpoint_id,
+            search=search,
             page=page,
             page_size=page_size,
         )
@@ -1790,6 +1796,7 @@ async def get_all_evaluations(
                 "user_id": str(current_user.id),
                 "model_id": str(model_id) if model_id else None,
                 "endpoint_id": str(endpoint_id) if endpoint_id else None,
+                "search": search,
                 "page": page,
                 "page_size": page_size,
             },
