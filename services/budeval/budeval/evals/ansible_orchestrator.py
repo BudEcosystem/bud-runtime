@@ -702,3 +702,63 @@ spec:
             logger.error(f"Failed to parse job logs: {e}", exc_info=True)
             # Return empty dict on error - monitoring will continue
             return {}
+
+    def extract_job_error(
+        self,
+        job_id: str,
+        kubeconfig: Optional[str] = None,
+    ) -> dict:
+        """Extract structured error information from a failed job's pod logs.
+
+        Args:
+            job_id: Job name to extract error from
+            kubeconfig: Optional kubeconfig JSON
+
+        Returns:
+            dict: Error information with categorization
+                {
+                    "success": False,
+                    "error_type": "AssertionError",
+                    "error_message": "...",
+                    "category": "dataset_missing",
+                    "actionable_message": "...",
+                    "file": "path/to/file.py",
+                    "line": 90
+                }
+        """
+        temp_id = f"extract-error-{uuid.uuid4().hex[:8]}"
+        playbook = "extract_opencompass_error_k8s.yml"
+
+        files, extravars = self._parse_kubeconfig(kubeconfig, temp_id)
+        extravars["namespace"] = StorageConfig.get_current_namespace()
+        extravars["job_name"] = job_id
+        extravars["temp_id"] = temp_id
+
+        try:
+            self._run_ansible_playbook(playbook, temp_id, files, extravars)
+            results_file = Path(tempfile.gettempdir()) / f"job_error_{temp_id}.json"
+
+            if results_file.exists():
+                with open(results_file, "r") as f:
+                    error_info = json.load(f)
+                results_file.unlink()
+                return error_info
+            else:
+                logger.warning(f"Error extraction results file not found for job {job_id}")
+                return {
+                    "success": False,
+                    "error_type": "ExtractionFailed",
+                    "category": "infrastructure",
+                    "error_message": "Could not extract error from pod logs",
+                    "actionable_message": "Check pod logs manually for error details",
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to extract error from job {job_id}: {e}", exc_info=True)
+            return {
+                "success": False,
+                "category": "unknown",
+                "error_type": "ExtractionException",
+                "error_message": str(e),
+                "actionable_message": "Error extraction failed. Check cluster connectivity and permissions.",
+            }
