@@ -776,14 +776,14 @@ class BenchmarkService(SessionMixin):
         from budmicroframe.shared.dapr_service import DaprService
 
         # 1. Get model info from database
-        db_model = await ModelDataManager(self.session).get_by_field("id", request.model_id)
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": request.model_id})
         if not db_model:
             raise ClientException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 message=f"Model with id {request.model_id} not found",
             )
 
-        model_uri = db_model.pretrained_model_name_or_path
+        model_uri = db_model.uri
         model_name = db_model.name
 
         # 2. Build request payload for budsim
@@ -804,7 +804,7 @@ class BenchmarkService(SessionMixin):
                 response = dapr_service.invoke_method(
                     app_id="budsim",
                     method_name="simulator/node-configurations",
-                    data=budsim_payload,
+                    data=json.dumps(budsim_payload),
                     http_verb="POST",
                 )
 
