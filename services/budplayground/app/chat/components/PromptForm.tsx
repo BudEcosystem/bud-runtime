@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Input, InputNumber, Checkbox, Image, message } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
@@ -29,6 +29,42 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
   const [promptVersion, setPromptVersion] = useState<string | undefined>();
   const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Storage key for persisting form data across tab switches
+  const storageKey = useMemo(() => {
+    return promptIds.length > 0 ? `promptForm_${promptIds[0]}` : null;
+  }, [promptIds]);
+
+  // Helper to get saved form data from sessionStorage
+  const getSavedFormData = useCallback((): Record<string, any> | null => {
+    if (!storageKey) return null;
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, [storageKey]);
+
+  // Helper to save form data to sessionStorage
+  const saveFormData = useCallback((data: Record<string, any>) => {
+    if (!storageKey) return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(data));
+    } catch {
+      // Ignore storage errors (e.g., quota exceeded)
+    }
+  }, [storageKey]);
+
+  // Helper to clear saved form data from sessionStorage
+  const clearSavedFormData = useCallback(() => {
+    if (!storageKey) return;
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [storageKey]);
 
   // Listen for multiple events to trigger refresh when returning to playground
   useEffect(() => {
@@ -131,7 +167,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
 
           setInputSchema(schemaToUse);
 
-          // Initialize form data with default values
+          // Initialize form data with default values, then restore any saved data
           const initialData: Record<string, any> = {};
           if (schemaToUse && typeof schemaToUse === 'object') {
             Object.keys(schemaToUse).forEach((key: string) => {
@@ -141,7 +177,21 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
           } else {
             initialData['unstructuredSchema'] = '';
           }
-          setFormData(initialData);
+
+          // Restore saved form data from sessionStorage (preserves user input across tab switches)
+          const savedData = getSavedFormData();
+          if (savedData) {
+            // Merge saved data with initial data, only for fields that exist in current schema
+            const mergedData = { ...initialData };
+            Object.keys(savedData).forEach(key => {
+              if (key in initialData) {
+                mergedData[key] = savedData[key];
+              }
+            });
+            setFormData(mergedData);
+          } else {
+            setFormData(initialData);
+          }
         } else {
           setInputSchema(null);
           setFieldOrder([]);
@@ -161,7 +211,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     };
 
     fetchPromptConfigs();
-  }, [promptIds, apiKey, accessKey, refreshTrigger]);
+  }, [promptIds, apiKey, accessKey, refreshTrigger, getSavedFormData]);
 
   // Fetch endpoints when ready and deployment name is available
   useEffect(() => {
@@ -192,10 +242,11 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
   }, [promptDeployment, endpoints, chatId, setDeployment, setDeploymentLock, getChat]);
 
   const handleChange = (fieldName: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
+    setFormData(prev => {
+      const newData = { ...prev, [fieldName]: value };
+      saveFormData(newData);
+      return newData;
+    });
   };
 
 
@@ -253,6 +304,9 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
       // Unstructured input - send input field
       payload.input = formData['unstructuredSchema'] || '';
     }
+
+    // Clear saved form data from sessionStorage on successful submit
+    clearSavedFormData();
 
     // Pass the prompt data to parent to initiate chat
     onSubmit(payload);
