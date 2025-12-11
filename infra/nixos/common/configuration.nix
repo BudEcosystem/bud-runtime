@@ -3,6 +3,8 @@ let
   host = config.networking.hostName;
 in
 {
+  imports = [ ./disko.nix ];
+
   global.userdata = {
     email = "sinan@bud.studio";
     domain = "bud.studio";
