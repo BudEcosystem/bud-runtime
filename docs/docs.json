@@ -100,6 +100,7 @@
             "group": "Playground",
             "icon": "flask",
             "pages": [
+              "playground/playground",
               "playground/using-playground",
               "playground/model-comparison",
               "playground/prompt-engineering",
