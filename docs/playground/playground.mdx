@@ -47,39 +47,39 @@ Copy prompts or responses for reuse, edit and resend user prompts, provide thumb
 
 ### 3.4 Session settings and safety
 
-- Configure presets, temperature, response limits, repeat penalties, stop strings, structured output, and conversation notes from the Settings panel to keep runs consistent. 
+- Configure presets, temperature, response limits, repeat penalties, stop strings, structured output, and conversation notes from the Settings panel to keep runs consistent.
 - Use stop strings and structured output toggles to align responses with downstream constraints.
 
-### 3.5 Response analysis 
+### 3.5 Response analysis and conversation history
 
 - Review response details and performance insights surfaced alongside model outputs.
+- Chat history drawer lists recent sessions with token usage etc.
 
 ### 3.6 Message controls and feedback
 
 - Copy prompts or responses directly from each bubble to reuse them in new chats or templates.
-- Edit sent prompts inline to refine them and resend without losing conversation history. - Apply thumbs-up/down ratings on assistant replies to log quick qualitative feedback. 
+- Edit sent prompts inline to refine them and resend without losing conversation history. - Apply thumbs-up/down ratings on assistant replies to log quick qualitative feedback.
 - Use the retry control on assistant messages to regenerate the latest response while keeping the same model and context.
 
 ## 4. How-to Guides
 
 ### 4.1 Access the Playground
 
-1. In Bud Admin, ensure `NEXT_PUBLIC_ENABLE_PLAYGROUND` is set to `true` and `NEXT_PUBLIC_PLAYGROUND_URL` points to your BudPlayground deployment.
-2. Click **Playground** in the side navigation (or visit `/playground`) to open the interface.
+1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+2. Click Playground in the side navigation to open the interface.
 
 ### 4.2 Run a chat against a single model
 
 1. Open the Playground and select a model from the model selector.
-2. Adjust decoding parameters (temperature, top-k, top-p) as needed.
+2. Adjust decoding parameters as needed.
 3. Enter your prompt in the chat and send to view streaming output.
-4. Refine prompts and resend until you achieve the desired response, then export if you want to share the result.
+4. Refine prompts and resend until you achieve the desired response.
 
 ### 4.3 Compare multiple models
 
-1. Switch to the comparison view.
-2. Add two or more models to the comparison panes.
-3. Enter a shared prompt and send to evaluate outputs together.
-4. Export or capture the comparison summary for later reference.
+1. Open new chat window.
+2. Load different models to the each chat window.
+3. Enter a same prompt and send to evaluate outputs.
 
 ### 4.4 Use prompt templates and code-focused modes
 
