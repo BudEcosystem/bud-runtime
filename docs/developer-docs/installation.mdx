@@ -1,0 +1,249 @@
+---
+title: 'Installation Guide'
+description: 'Deploy the Bud-Stack platform on Kubernetes'
+icon: 'download'
+---
+
+## Quick Start
+
+The fastest way to deploy Bud-Stack is using the automated nix-based installer:
+
+### Prerequisites
+
+| Requirement | Purpose |
+|-------------|---------|
+| Linux system | Deployment host |
+| sudo access | For k3s and system configuration |
+| Internet connectivity | Download packages and images |
+| Nix 2.8+ (with flakes) | Package management |
+
+### Step 1: Install Nix (if not installed)
+
+```bash
+curl -L https://nixos.org/nix/install | sh -s -- --daemon
+```
+
+After installation, restart your shell or run:
+```bash
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+```
+
+Enable flakes (add to `~/.config/nix/nix.conf`):
+```
+experimental-features = nix-command flakes
+```
+
+### Step 2: Deploy Bud-Stack
+
+Run the single deployment command:
+
+```bash
+nix run github:BudEcosystem/bud-runtime#k8s_deploy runtime
+```
+
+This command automatically:
+1. Clones the bud-runtime repository
+2. Installs k3s (lightweight Kubernetes) if not present
+3. Installs Traefik ingress controller
+4. Installs Keel for auto-updates
+5. Installs Dapr service mesh
+6. Installs cert-manager for TLS
+7. **Opens vim for configuration** - edit your settings here
+8. Deploys the full Bud-Stack platform
+
+### Step 3: Configure (Interactive)
+
+When vim opens with the configuration file:
+1. Set your domain: `ingress.hosts.root: "bud.yourdomain.com"`
+2. Change default passwords for production
+3. Save and exit (`:wq`)
+
+### Step 4: Add GPU Support (Optional)
+
+For NVIDIA GPU workloads:
+
+```bash
+nix run github:BudEcosystem/bud-runtime#k8s_deploy nvidia
+```
+
+This installs the NVIDIA GPU Operator for GPU-accelerated inference.
+
+### Step 5: Verify Installation
+
+```bash
+# Check all pods are running
+kubectl get pods -A
+
+# Check services
+kubectl get svc -A
+```
+
+Expected pod status after ~5 minutes:
+```
+NAMESPACE     NAME                              READY   STATUS    RESTARTS   AGE
+bud           bud-budadmin-xxx                  1/1     Running   0          5m
+bud           bud-budapp-xxx                    2/2     Running   0          5m
+bud           bud-budcluster-xxx                2/2     Running   0          5m
+bud           bud-budgateway-xxx                1/1     Running   0          5m
+bud           bud-budmetrics-xxx                2/2     Running   0          5m
+bud           bud-budmodel-xxx                  2/2     Running   0          5m
+bud           bud-budsim-xxx                    2/2     Running   0          5m
+bud           bud-clickhouse-xxx                1/1     Running   0          5m
+bud           bud-keycloak-xxx                  1/1     Running   0          5m
+bud           bud-minio-xxx                     1/1     Running   0          5m
+bud           bud-postgresql-xxx                1/1     Running   0          5m
+bud           bud-valkey-primary-xxx            1/1     Running   0          5m
+```
+
+---
+
+## Manual Helm Deployment (Alternative)
+
+For users with existing Kubernetes clusters or advanced customization needs.
+
+### Prerequisites
+
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Kubernetes cluster | 1.25+ | Platform runtime |
+| kubectl | Latest | Cluster management |
+| Helm | 3.8+ | Package deployment |
+| Storage class | - | Persistent volumes |
+| Dapr | 1.12+ | Service mesh (cluster-wide) |
+
+**Optional:**
+- SOPS + age for secrets encryption
+- cert-manager for TLS certificate management
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/BudEcosystem/bud-runtime.git
+cd bud-runtime
+```
+
+### Step 2: Add Bitnami Helm Repository
+
+```bash
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+```
+
+### Step 3: Update Chart Dependencies
+
+```bash
+helm dependency update infra/helm/bud/
+```
+
+### Step 4: Create Your Values Override
+
+Create a `my-values.yaml` file with your configuration:
+
+```yaml
+# Minimum required configuration
+ingress:
+  enabled: true
+  https: internal  # Options: disabled, internal, external
+  hosts:
+    root: "bud.yourdomain.com"
+
+# Change default passwords (IMPORTANT for production)
+postgresql:
+  auth:
+    postgresPassword: "<your-secure-password>"
+    password: "<your-secure-password>"
+
+valkey:
+  auth:
+    password: "<your-secure-password>"
+
+clickhouse:
+  auth:
+    password: "<your-secure-password>"
+
+minio:
+  auth:
+    rootUser: "<your-access-key>"
+    rootPassword: "<your-secret-key>"
+
+keycloak:
+  auth:
+    adminUser: admin
+    adminPassword: "<your-secure-password>"
+
+# Optional: Image pull secrets for private registry
+imagePullSecrets:
+  - name: your-registry-secret
+```
+
+for the full configuration view this [page](/developer-docs/helm-configuration)
+
+### Step 5: Install Bud-Stack
+
+```bash
+helm install bud infra/helm/bud/ \
+  -f values.yaml \
+  -f my-values.yaml \
+  -n bud-system \
+  --create-namespace
+```
+
+### Step 6: Verify Installation
+
+```bash
+# Check all pods are running
+kubectl get pods -n bud-system
+
+# Check ingress configuration
+kubectl get ingress -n bud-system
+
+# Check services
+kubectl get svc -n bud-system
+```
+
+---
+
+## Post-Installation
+
+### 1. Access the Dashboard
+
+Navigate to your configured domain (e.g., `https://admin.bud.yourdomain.com`).
+
+
+## Upgrading
+
+To upgrade an existing installation:
+
+```bash
+# Update dependencies
+helm dependency update infra/helm/bud/
+
+# Upgrade release
+helm upgrade bud infra/helm/bud/ \
+  -f my-values.yaml \
+  -n bud-system
+```
+
+## Uninstalling
+
+To remove Bud-Stack:
+
+```bash
+helm uninstall bud -n bud-system
+
+# Optional: Remove namespace and persistent volumes
+kubectl delete namespace bud-system
+kubectl delete pvc -l app.kubernetes.io/instance=bud
+```
+
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Helm Configuration" icon="gear" href="/developer-docs/helm-configuration">
+    Detailed configuration reference for all Helm values
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/developer-docs/development/architecture">
+    Learn about the platform architecture
+  </Card>
+</CardGroup>

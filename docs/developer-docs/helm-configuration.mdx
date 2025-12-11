@@ -1,0 +1,619 @@
+---
+title: 'Helm Configuration'
+description: 'Complete reference for configuring Bud-Stack via Helm values'
+icon: 'gear'
+---
+
+
+This document provides a complete reference for configuring Bud-Stack via Helm values.
+
+<Note>
+Run `helm show values infra/helm/bud/` to see all available configuration options.
+</Note>
+
+## Values Files Overview
+
+The Helm chart provides several configuration files for different purposes:
+
+### Core Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `values.yaml` | Default configuration - base settings for all deployments. Contains all available parameters with sensible defaults. |
+| `example.standalone.yaml` | Example for standalone/development deployments with nightly images, Keel auto-updates, and minimal storage. |
+| `example.secrets.yaml` | Template for sensitive configuration - contains example secrets with generation commands. Copy and customize for your deployment. |
+
+### Environment-Specific Overrides
+
+| File | Purpose |
+|------|---------|
+| `values.dev.yaml` | Development environment overrides |
+| `values.stage.yaml` | Staging environment overrides |
+| `values.enc.yaml` | Encrypted production secrets (SOPS-encrypted) |
+
+### Example: values.yaml (Default Configuration)
+
+The main `values.yaml` contains all configurable parameters:
+
+```yaml
+# Global settings
+imagePullPolicy: "IfNotPresent"
+deploymentAnnotations: {}
+
+# Storage configuration
+storage:
+  budmodelRegistry:
+    className: ""
+    size: 32Gi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  https: disabled
+  hosts:
+    root: "bud.example.com"
+
+# Microservices configuration
+microservices:
+  budapp:
+    enabled: true
+    image: budstudio/budapp:0.4.5
+    # ... service-specific settings
+```
+
+### Example: example.standalone.yaml
+
+For standalone deployments with auto-updates:
+
+```yaml
+ingress:
+  https: disabled
+  hosts:
+    root: bane.tsnet.sinanmohd.com
+
+imagePullPolicy: "Always"
+deploymentAnnotations:
+  keel.sh/policy: force
+  keel.sh/trigger: poll
+  keel.sh/match-tag: true
+  keel.sh/pollSchedule: "@every 1m"
+
+storage:
+  budmodelRegistry:
+    size: "128Gi"
+
+microservices:
+  budadmin:
+    image: budstudio/budadmin:nightly
+  budapp:
+    image: budstudio/budapp:nightly
+  # ... other nightly images
+  global:
+    env:
+      SUPER_USER_EMAIL: root@example.com
+      SUPER_USER_PASSWORD: <generate-with-tr-command>
+```
+
+### Example: example.secrets.yaml
+
+Template for sensitive values (copy and customize):
+
+```yaml
+microservices:
+  rsaKeys:
+    # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
+    privateKeyPassword: <generate-random-password>
+    # Generate with: openssl genrsa -aes256 -out private_key.pem 2048
+    privateKey: <paste-your-encrypted-pem-key-here>
+    # Generate with: openssl rsa -in private_key.pem -pubout -out public_key.pem
+    publicKey: <paste-your-public-pem-key-here>
+  budapp:
+    env:
+      # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64
+      JWT_SECRET_KEY: <generate-64-char-secret>
+      # https://huggingface.co/docs/hub/en/security-tokens
+      HF_TOKEN: <your-huggingface-token>
+      # tr -dc 'a-f0-9' < /dev/urandom | head -c 88
+      AES_KEY_HEX: <generate-88-char-hex>
+  global:
+    env:
+      OPENAI_API_KEY: <your-openai-key>
+      # tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64
+      PASSWORD_SALT: <generate-64-char-salt>
+      SUPER_USER_EMAIL: root@example.com
+      SUPER_USER_PASSWORD: <generate-secure-password>
+
+keycloak:
+  auth:
+    adminUser: admin
+    adminPassword: <secure-password>
+
+daprExtra:
+  crypto:
+    symmetricKey: <generate-32-char-key>
+    # Generate with: openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096
+    asymmetricKey: <paste-your-4096-bit-rsa-key-here>
+
+minio:
+  auth:
+    rootUser: bud-runtime
+    rootPassword: <secure-password>
+```
+
+### Usage Examples
+
+Values files are merged in order, with later files overriding earlier ones. Always start with `values.yaml` for defaults:
+
+```bash
+# Development deployment with standalone config
+helm install bud infra/helm/bud/ \
+  -f infra/helm/bud/values.yaml \
+  -f infra/helm/bud/example.standalone.yaml \
+  -n bud-dev --create-namespace
+
+# Production with separate secrets file
+helm install bud infra/helm/bud/ \
+  -f infra/helm/bud/values.yaml \
+  -f my-secrets.yaml \
+  -n bud-prod --create-namespace
+
+# Production with encrypted secrets (SOPS)
+sops -d infra/helm/bud/values.enc.yaml > /tmp/secrets.yaml
+helm install bud infra/helm/bud/ \
+  -f infra/helm/bud/values.yaml \
+  -f /tmp/secrets.yaml \
+  -n bud-prod
+rm /tmp/secrets.yaml
+
+# Full production deployment (defaults + environment + secrets)
+helm install bud infra/helm/bud/ \
+  -f infra/helm/bud/values.yaml \
+  -f infra/helm/bud/values.stage.yaml \
+  -f my-secrets.yaml \
+  -n bud-stage --create-namespace
+```
+
+<Note>
+Always keep your secrets file (`my-secrets.yaml` or `values.enc.yaml`) out of version control. Use SOPS encryption for GitOps workflows.
+</Note>
+
+---
+
+## Global Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `imagePullSecrets` | List of Kubernetes secrets for pulling images from private registries | `[]` |
+| `imagePullPolicy` | Image pull policy for all containers. Options: `Always`, `IfNotPresent`, `Never` | `IfNotPresent` |
+| `deploymentAnnotations` | Annotations applied to all deployments (e.g., for Keel auto-updates) | `{}` |
+| `global.nodeSelector` | Node selector applied to all microservices | `{}` |
+| `global.affinity` | Affinity rules applied to all microservices | `{}` |
+
+---
+
+## Ingress Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `ingress.enabled` | Enable ingress resources for external access | `true` |
+| `ingress.https` | TLS mode. Options: `disabled`, `internal` (self-signed), `external` (cert-manager) | `disabled` |
+| `ingress.hosts.root` | Root domain for the platform. Subdomains are auto-derived (e.g., `admin.`, `api.`, `gateway.`) | `bud.example.com` |
+| `ingress.hosts.budadmin` | Override subdomain for budadmin frontend | `""` (auto: `admin.{root}`) |
+| `ingress.hosts.budapp` | Override subdomain for budapp API | `""` (auto: `api.{root}`) |
+| `ingress.hosts.budgateway` | Override subdomain for inference gateway | `""` (auto: `gateway.{root}`) |
+| `ingress.hosts.s3` | Override subdomain for MinIO S3 | `""` (auto: `s3.{root}`) |
+| `ingress.hosts.onyx` | Override subdomain for Onyx chat | `""` (auto: `chat.{root}`) |
+
+---
+
+## Storage Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `storage.budmodelRegistry.className` | Storage class for model registry PVC. Empty uses cluster default | `""` |
+| `storage.budmodelRegistry.size` | Size of model registry persistent volume | `32Gi` |
+| `storage.budmodelAddDir.className` | Storage class for additional model directory | `""` |
+| `storage.budmodelAddDir.size` | Size of additional model directory | `20Gi` |
+| `storage.budevalDataset.className` | Storage class for evaluation datasets | `""` |
+| `storage.budevalDataset.size` | Size of evaluation datasets volume | `32Gi` |
+| `storage.budappStaticDir.className` | Storage class for budapp static files | `""` |
+| `storage.budappStaticDir.size` | Size of static files volume | `20Gi` |
+
+---
+
+## PostgreSQL Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `postgresql.enabled` | Deploy PostgreSQL as part of the chart | `true` |
+| `postgresql.architecture` | PostgreSQL architecture. Options: `standalone`, `replication` | `standalone` |
+| `postgresql.auth.postgresPassword` | Password for the `postgres` admin user | `bud` |
+| `postgresql.auth.username` | Default database username | `bud` |
+| `postgresql.auth.password` | Default database password | `bud` |
+| `postgresql.primary.resources.requests.memory` | Memory request for PostgreSQL | `256Mi` |
+| `postgresql.primary.resources.limits.memory` | Memory limit for PostgreSQL | `512Mi` |
+| `postgresql.primary.nodeSelector` | Node selector for PostgreSQL pod | `{}` |
+| `postgresqlExtra.autoCreateDB` | List of databases to auto-create on startup | `[keycloak, budask, budapp, ...]` |
+
+---
+
+## Valkey (Redis) Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `valkey.enabled` | Deploy Valkey (Redis-compatible) as part of the chart | `true` |
+| `valkey.architecture` | Valkey architecture. Options: `standalone`, `replication` | `standalone` |
+| `valkey.auth.password` | Valkey authentication password | `bud` |
+| `valkey.commonConfiguration` | Redis configuration. Includes keyspace notifications for Dapr | See values.yaml |
+| `valkey.primary.resources.requests.memory` | Memory request for Valkey | `512Mi` |
+| `valkey.primary.resources.limits.memory` | Memory limit for Valkey | `1Gi` |
+| `valkey.primary.livenessProbe.initialDelaySeconds` | Initial delay for liveness probe | `30` |
+| `valkey.primary.livenessProbe.failureThreshold` | Failure threshold for liveness probe | `10` |
+
+---
+
+## ClickHouse Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `clickhouse.enabled` | Deploy ClickHouse for analytics | `true` |
+| `clickhouse.replicaCount` | Number of ClickHouse replicas | `1` |
+| `clickhouse.shards` | Number of ClickHouse shards | `1` |
+| `clickhouse.auth.username` | ClickHouse admin username | `bud` |
+| `clickhouse.auth.password` | ClickHouse admin password | `bud` |
+| `clickhouse.resources.requests.memory` | Memory request for ClickHouse | `1Gi` |
+| `clickhouse.resources.limits.memory` | Memory limit for ClickHouse | `4Gi` |
+| `clickhouse.keeper.replicaCount` | Number of ClickHouse Keeper replicas | `1` |
+| `clickhouseExtra.autoCreateDB` | List of databases to auto-create | `[budproxy, budeval, metrics]` |
+
+---
+
+## MinIO Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `minio.enabled` | Deploy MinIO for object storage | `true` |
+| `minio.auth.rootUser` | MinIO root access key | Required |
+| `minio.auth.rootPassword` | MinIO root secret key | Required |
+| `minio.resources.requests.memory` | Memory request for MinIO | `512Mi` |
+| `minio.resources.limits.memory` | Memory limit for MinIO | `1024Mi` |
+| `minio.provisioning.enabled` | Enable automatic bucket provisioning | `true` |
+| `minio.provisioning.buckets` | List of buckets to create | `[novu-local, models-registry, model-info, onyx-file-store-bucket]` |
+
+---
+
+## Keycloak Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `keycloak.enabled` | Deploy Keycloak for authentication | `true` |
+| `keycloak.proxy` | Proxy mode for Keycloak | `edge` |
+| `keycloak.auth.adminUser` | Keycloak admin username | `admin` |
+| `keycloak.auth.adminPassword` | Keycloak admin password | Required |
+| `keycloak.resources.limits.memory` | Memory limit for Keycloak | `2Gi` |
+| `keycloak.postgresql.enabled` | Use embedded PostgreSQL (should be `false` to use chart's PostgreSQL) | `false` |
+| `keycloak.externalDatabase.host` | External PostgreSQL host | `{{ $.Release.Name }}-postgresql` |
+| `keycloak.externalDatabase.database` | Keycloak database name | `keycloak` |
+
+---
+
+## Kafka Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `kafka.enabled` | Deploy Kafka for event streaming | `true` |
+| `kafka.clusterId` | Kafka cluster identifier | `bud` |
+| `kafka.controller.resources.requests.memory` | Memory request for Kafka controller | `1024Mi` |
+| `kafka.controller.resources.limits.memory` | Memory limit for Kafka controller | `2048Mi` |
+| `kafka.sasl.client.users` | SASL usernames for client authentication | `[budproxy, dapr]` |
+| `kafka.sasl.client.passwords` | SASL passwords for client authentication | `[budproxy, dapr]` |
+
+---
+
+## MongoDB Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `mongodb.enabled` | Deploy MongoDB for document storage | `true` |
+| `mongodb.architecture` | MongoDB architecture | `standalone` |
+| `mongodb.auth.enabled` | Enable MongoDB authentication | `true` |
+| `mongodb.auth.usernames` | MongoDB usernames | `[novu_user]` |
+| `mongodb.auth.passwords` | MongoDB passwords | `[novu_password]` |
+| `mongodb.auth.databases` | MongoDB databases | `[novu_db]` |
+
+---
+
+## Microservices - budapp
+
+Main API service handling users, projects, models, and endpoints.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budapp.enabled` | Enable budapp deployment | `true` |
+| `microservices.budapp.image` | Container image for budapp | `budstudio/budapp:0.4.5` |
+| `microservices.budapp.daprid` | Dapr application ID | `budapp` |
+| `microservices.budapp.corsOrigins` | Allowed CORS origins | `[http://localhost:3000, http://localhost:3001]` |
+| `microservices.budapp.env.KEYCLOAK_SERVER_URL` | Keycloak server URL | `http://{{ $.Release.Name }}-keycloak/` |
+| `microservices.budapp.env.DEFAULT_REALM_NAME` | Default Keycloak realm | `bud-keycloak` |
+| `microservices.budapp.env.KEYCLOAK_VERIFY_SSL` | Verify Keycloak SSL certificates | `false` |
+| `microservices.budapp.env.BUD_CONNECT_BASE_URL` | Bud Connect service URL | `https://budconnect.bud.studio` |
+| `microservices.budapp.env.CLOUD_MODEL_SEEDER_ENGINE` | Model seeder engine type | `tensorzero` |
+| `microservices.budapp.nodeSelector` | Node selector for budapp | `{}` |
+
+---
+
+## Microservices - budadmin
+
+Next.js frontend dashboard.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budadmin.enabled` | Enable budadmin deployment | `true` |
+| `microservices.budadmin.image` | Container image for budadmin | `budstudio/budadmin:0.4.5` |
+| `microservices.budadmin.env.NEXT_PUBLIC_LOGO_URL` | Custom logo URL for dashboard | `""` |
+| `microservices.budadmin.env.NEXT_PUBLIC_LOGO_AUTH_URL` | Custom logo URL for auth pages | `""` |
+| `microservices.budadmin.env.NEXT_PUBLIC_FAVICON_URL` | Custom favicon URL | `""` |
+| `microservices.budadmin.env.NEXT_PUBLIC_ENABLE_DEV_MODE` | Enable development features (build-time only) | `""` |
+| `microservices.budadmin.nodeSelector` | Node selector for budadmin | `{}` |
+
+---
+
+## Microservices - budcluster
+
+Cluster lifecycle management service.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budcluster.enabled` | Enable budcluster deployment | `true` |
+| `microservices.budcluster.image` | Container image for budcluster | `budstudio/budcluster:0.4.5` |
+| `microservices.budcluster.daprid` | Dapr application ID | `budcluster` |
+| `microservices.budcluster.env.LOG_LEVEL` | Logging level | `INFO` |
+| `microservices.budcluster.env.RSA_KEY_NAME` | RSA key filename for credential encryption | `rsa-private-key.pem` |
+| `microservices.budcluster.env.VOLUME_TYPE` | Volume type for model storage | `local` |
+| `microservices.budcluster.env.VALIDATE_CERTS` | Validate TLS certificates | `false` |
+| `microservices.budcluster.env.REGISTRY_SERVER` | Container registry URL | `https://budimages.azurecr.io` |
+| `microservices.budcluster.env.ENGINE_CONTAINER_PORT` | Inference engine port | `8000` |
+| `microservices.budcluster.env.METRICS_COLLECTION_ENABLED` | Enable metrics collection | `true` |
+| `microservices.budcluster.env.METRICS_COLLECTION_TIMEOUT` | Metrics collection timeout (seconds) | `30` |
+| `microservices.budcluster.env.METRICS_BATCH_SIZE` | Metrics batch size | `20000` |
+| `microservices.budcluster.env.NODE_INFO_COLLECTOR_IMAGE_CPU` | CPU node info collector image | `budstudio/node-info-collector-cpu:0.1.0` |
+| `microservices.budcluster.env.NODE_INFO_COLLECTOR_IMAGE_CUDA` | CUDA node info collector image | `budimages.azurecr.io/...` |
+| `microservices.budcluster.env.NODE_INFO_COLLECTOR_IMAGE_HPU` | HPU node info collector image | `budimages.azurecr.io/...` |
+
+---
+
+## Microservices - budgateway
+
+Rust-based high-performance API gateway.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budgateway.enabled` | Enable budgateway deployment | `true` |
+| `microservices.budgateway.image` | Container image for budgateway | `budstudio/budgateway:0.4.5` |
+| `microservices.budgateway.env` | Environment variables | `{}` |
+| `microservices.budgateway.nodeSelector` | Node selector for budgateway | `{}` |
+
+---
+
+## Microservices - budmodel
+
+Model registry and leaderboard service.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budmodel.enabled` | Enable budmodel deployment | `true` |
+| `microservices.budmodel.image` | Container image for budmodel | `budstudio/budmodel:0.4.5` |
+| `microservices.budmodel.daprid` | Dapr application ID | `budmodel` |
+| `microservices.budmodel.storageClassName` | Storage class for model cache | `nfs-csi` |
+| `microservices.budmodel.storageSize` | Size of model cache volume | `32Gi` |
+| `microservices.budmodel.env.LOG_LEVEL` | Logging level | `INFO` |
+
+---
+
+## Microservices - budmetrics
+
+Observability service with ClickHouse analytics.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budmetrics.enabled` | Enable budmetrics deployment | `true` |
+| `microservices.budmetrics.image` | Container image for budmetrics | `budstudio/budmetrics:0.4.5` |
+| `microservices.budmetrics.daprid` | Dapr application ID | `budmetrics` |
+| `microservices.budmetrics.env.CLICKHOUSE_HOST` | ClickHouse host | `{{ .Release.Name }}-clickhouse` |
+| `microservices.budmetrics.env.CLICKHOUSE_PORT` | ClickHouse port | `9000` |
+| `microservices.budmetrics.env.CLICKHOUSE_DB_NAME` | ClickHouse database name | `budproxy` |
+| `microservices.budmetrics.env.CLICKHOUSE_TTL_CLUSTER_METRICS` | Metrics retention in days | `30` |
+
+---
+
+## Microservices - budsim
+
+Performance simulation and optimization service.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budsim.enabled` | Enable budsim deployment | `true` |
+| `microservices.budsim.image` | Container image for budsim | `budstudio/budsim:0.4.5` |
+| `microservices.budsim.daprid` | Dapr application ID | `budsim` |
+| `microservices.budsim.env.LOG_LEVEL` | Logging level | `INFO` |
+
+---
+
+## Microservices - budnotify
+
+Notification and pub/sub messaging service.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.budnotify.enabled` | Enable budnotify deployment | `true` |
+| `microservices.budnotify.image` | Container image for budnotify | `budstudio/budnotify:0.4.5` |
+| `microservices.budnotify.daprid` | Dapr application ID | `budnotify` |
+| `microservices.budnotify.pubsubTopic` | Kafka topic for notifications | `notificationMessages` |
+
+---
+
+## Microservices - askbud
+
+AI assistant service for cluster and performance analysis.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.askbud.enabled` | Enable askbud deployment | `true` |
+| `microservices.askbud.image` | Container image for askbud | `budstudio/askbud:0.4.5` |
+| `microservices.askbud.daprid` | Dapr application ID | `askbud` |
+| `microservices.askbud.model` | AI model for assistant | `bud-gpt-oss-20b-ada28b58` |
+| `microservices.askbud.env.INFERENCE_API_KEY` | API key for inference | `test` |
+| `microservices.askbud.env.INFERENCE_URL` | Inference service URL | Required |
+
+---
+
+## Microservices - Other Services
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microservices.buddoc.enabled` | Enable document processing service | `true` |
+| `microservices.buddoc.image` | Container image | `budstudio/buddoc:0.4.5` |
+| `microservices.buddoc.env.MAX_FILE_SIZE_MB` | Maximum file size for uploads | `50` |
+| `microservices.buddoc.env.VLM_API_TIMEOUT` | VLM API timeout in seconds | `300` |
+| `microservices.budeval.enabled` | Enable model evaluation service | `true` |
+| `microservices.budeval.image` | Container image | `budstudio/budeval:0.4.5` |
+| `microservices.budeval.storageClassName` | Storage class for datasets | `nfs-csi` |
+| `microservices.budcustomer.enabled` | Enable customer portal | `true` |
+| `microservices.budcustomer.image` | Container image | `budstudio/budcustomer:0.4.5` |
+| `microservices.budplayground.enabled` | Enable model playground | `true` |
+| `microservices.budplayground.image` | Container image | `budstudio/budplayground:0.4.5` |
+| `microservices.budprompt.enabled` | Enable prompt management service | `true` |
+| `microservices.budprompt.image` | Container image | `budstudio/budprompt:0.4.5` |
+| `microservices.mcpgateway.enabled` | Enable MCP gateway | `true` |
+| `microservices.mcpgateway.image` | Container image | `budstudio/mcpgateway:latest` |
+| `microservices.budsentinel.enabled` | Enable Sentinel (closed source) | `false` |
+
+---
+
+## OpenTelemetry Collector
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `otelCollector.enabled` | Enable OpenTelemetry Collector | `true` |
+| `otelCollector.image.repository` | Collector image repository | `otel/opentelemetry-collector-contrib` |
+| `otelCollector.image.tag` | Collector image tag | `0.91.0` |
+| `otelCollector.replicas` | Number of collector replicas | `1` |
+| `otelCollector.logLevel` | Logging level | `info` |
+| `otelCollector.batchSize` | Batch size for metrics export | `10000` |
+| `otelCollector.batchTimeout` | Batch timeout | `10s` |
+| `otelCollector.memoryLimit` | Memory limit in MB | `2048` |
+| `otelCollector.resources.limits.memory` | Kubernetes memory limit | `2Gi` |
+| `otelCollector.resources.limits.cpu` | Kubernetes CPU limit | `1000m` |
+| `otelCollector.clickhouse.host` | ClickHouse host for export | `clickhouse` |
+| `otelCollector.clickhouse.database` | ClickHouse database | `metrics` |
+| `otelCollector.clickhouse.ttl` | Data retention period | `720h` (30 days) |
+
+---
+
+## Onyx Configuration
+
+AI-powered knowledge assistant with document search capabilities.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `onyx.enabled` | Enable Onyx deployment | `false` |
+| `onyx.global.version` | Onyx image version | `latest` |
+| `onyx.global.pullPolicy` | Image pull policy | `Always` |
+| `onyx.postgresql.enabled` | Use Onyx's own PostgreSQL (should be `false`) | `false` |
+| `onyx.valkey.enabled` | Use Onyx's own Redis (should be `false`) | `false` |
+| `onyx.minio.enabled` | Use Onyx's own MinIO (should be `false`) | `false` |
+| `onyx.vespa.enabled` | Enable Vespa search engine | `true` |
+| `onyx.vespa.replicaCount` | Number of Vespa replicas | `1` |
+| `onyx.vespa.resources.requests.cpu` | Vespa CPU request | `4000m` |
+| `onyx.vespa.resources.requests.memory` | Vespa memory request | `8000Mi` |
+| `onyx.vespa.resources.limits.memory` | Vespa memory limit | `32000Mi` |
+| `onyx.nginx.enabled` | Use Onyx's nginx (should be `false`, bud uses Traefik) | `false` |
+| `onyx.configMap.AUTH_TYPE` | Authentication type | `oidc` |
+| `onyx.configMap.KEYCLOAK_REALM` | Keycloak realm | `bud-keycloak` |
+| `onyx.webserver.replicaCount` | Web server replicas | `1` |
+| `onyx.api.replicaCount` | API server replicas | `1` |
+
+---
+
+## External Services Configuration
+
+Use external services instead of chart-deployed ones.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `externalServices.minio.endpoint` | External S3/MinIO endpoint | `""` |
+| `externalServices.minio.auth.accessKey` | S3 access key | `""` |
+| `externalServices.minio.auth.secretKey` | S3 secret key | `""` |
+| `externalServices.minio.buckets.modelRegistry` | Model registry bucket name | `models-registry` |
+| `externalServices.minio.buckets.modelInfo` | Model info bucket name | `model-info` |
+| `externalServices.postgresql.host` | External PostgreSQL host | `""` |
+| `externalServices.postgresql.port` | External PostgreSQL port | `5432` |
+| `externalServices.postgresql.databases.<service>.name` | Database name per service | Service-specific |
+| `externalServices.postgresql.databases.<service>.username` | Database username per service | Service-specific |
+| `externalServices.postgresql.databases.<service>.password` | Database password per service | Service-specific |
+
+---
+
+## Dapr Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `dapr.enabled` | Deploy Dapr as part of this chart (recommended: install separately) | `false` |
+
+<Note>
+Dapr should be installed cluster-wide before deploying Bud-Stack:
+
+```bash
+# Via CLI
+dapr init -k
+
+# Via Helm
+helm repo add dapr https://dapr.github.io/helm-charts/
+helm install dapr dapr/dapr -n dapr-system --create-namespace
+```
+</Note>
+
+---
+
+## Secrets Management (SOPS)
+
+### Generate Age Key
+
+```bash
+# Generate key pair
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Get public key
+grep -Eom1 "age1.*$" ~/.config/sops/age/keys.txt
+```
+
+### Create Encrypted Values
+
+```bash
+# Create encrypted values file
+sops --encrypt --age <public-key> my-secrets.yaml > values.enc.yaml
+
+# Edit encrypted file
+sops values.enc.yaml
+```
+
+### Deploy with Encrypted Values
+
+```bash
+# Decrypt and deploy
+sops -d infra/helm/bud/values.enc.yaml | \
+  helm upgrade --install bud infra/helm/bud/ -f - -n bud-system
+```
+
+---
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/developer-docs/installation">
+    Quick start installation guide
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/developer-docs/development/architecture">
+    Platform architecture overview
+  </Card>
+</CardGroup>
