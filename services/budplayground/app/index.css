@@ -8,6 +8,12 @@
 .ant-input-number .ant-input-number-input {
   background-color: transparent !important;
   color: white !important;
+  padding-left: 0 !important;
+}
+.ant-input-number-input-wrap {
+  input {
+    padding-left: 0 !important;
+  }
 }
 
 .ant-input-number .ant-input-number-input::placeholder {
