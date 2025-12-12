@@ -49,6 +49,8 @@ from .direct_search import DirectSearchOptimizer
 from .evolution import Evolution
 from .models import SimulationResultsCRUD, SimulationResultsSchema
 from .schemas import (
+    BenchmarkConfigRequest,
+    BenchmarkConfigResponse,
     ClusterInfo,
     ClusterMetrics,
     ClusterRecommendationRequest,
@@ -2909,4 +2911,188 @@ class SimulationService:
             tp_pp_options=tp_pp_options,
             min_tp_required=min_tp,
             supports_pipeline_parallelism=supports_pp,
+        )
+
+    @staticmethod
+    def generate_benchmark_config(
+        request: BenchmarkConfigRequest,
+    ) -> Union[BenchmarkConfigResponse, ErrorResponse]:
+        """Generate deployment configuration for benchmark with user-selected parameters.
+
+        Unlike get_deployment_configs which fetches from saved simulation results,
+        this method generates configuration directly from user selections.
+
+        Args:
+            request: BenchmarkConfigRequest containing cluster_id, model_id, model_uri,
+                    hostnames, device_type, tp_size, pp_size, replicas, and token configuration.
+
+        Returns:
+            BenchmarkConfigResponse with node_groups array containing full deployment configs.
+
+        Raises:
+            ValueError: If cluster or nodes not found, or configuration is invalid.
+        """
+        # 1. Get cluster info from state store
+        try:
+            with DaprService() as dapr_service:
+                cluster_info_raw = dapr_service.get_state(
+                    app_settings.statestore_name, app_settings.cluster_info_state_key
+                )
+
+            if not cluster_info_raw or not cluster_info_raw.data:
+                raise ValueError("No cluster information available in state store")
+
+            cluster_info = SimulationService.validate_cluster_info(cluster_info_raw.data.decode("utf-8"))
+        except Exception as e:
+            logger.exception(f"Failed to retrieve cluster info: {e}")
+            raise ValueError(f"Failed to retrieve cluster information: {str(e)}") from e
+
+        # 2. Filter to selected cluster
+        cluster_info = [c for c in cluster_info if c["id"] == str(request.cluster_id)]
+        if not cluster_info:
+            raise ValueError(f"Cluster {request.cluster_id} not found in state store")
+
+        cluster = cluster_info[0]
+
+        # 3. Filter nodes by hostname and find matching device
+        selected_device = None
+        device_memory_gb = 0.0
+        device_name = request.device_type
+        device_model = None
+        raw_name = None
+
+        for node in cluster.get("nodes", []):
+            node_name = node.get("name") or node.get("hostname")
+            if node_name in request.hostnames:
+                # Find device matching requested type
+                # Use exact matching since user selected the exact device type from /node-configurations
+                for device in node.get("devices", []):
+                    device_stored_type = device.get("type", "").lower()
+                    if device_stored_type == request.device_type.lower():
+                        selected_device = device
+                        device_memory_gb = device.get("mem_per_GPU_in_GB", 0)
+                        device_name = device.get("name", request.device_type)
+                        device_model = device.get("device_model")
+                        raw_name = device.get("raw_name")
+                        break
+                if selected_device:
+                    break
+
+        if not selected_device:
+            raise ValueError(f"No device of type {request.device_type} found on selected nodes")
+
+        # 4. Calculate model memory requirements
+        estimated_weight_memory_gb = 0.0
+        kv_cache_memory_gb = 0.0
+
+        if request.model_uri:
+            try:
+                from llm_memory_calculator import calculate_memory
+
+                seq_length = int((request.input_tokens + request.output_tokens) * 1.1)
+                memory_report = calculate_memory(
+                    model_id_or_config=request.model_uri,
+                    batch_size=request.concurrency,
+                    seq_length=seq_length,
+                    precision="bf16",
+                    tensor_parallel=request.tp_size,
+                )
+
+                if hasattr(memory_report, "weight_memory_gb"):
+                    estimated_weight_memory_gb = memory_report.weight_memory_gb
+                if hasattr(memory_report, "kv_cache_gb"):
+                    kv_cache_memory_gb = memory_report.kv_cache_gb
+
+                logger.info(
+                    f"Model memory calculated: weights={estimated_weight_memory_gb:.2f}GB, "
+                    f"kv_cache={kv_cache_memory_gb:.2f}GB"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to calculate model memory: {e}, using device memory")
+                estimated_weight_memory_gb = device_memory_gb * 0.7  # Conservative estimate
+
+        total_memory_gb = estimated_weight_memory_gb + kv_cache_memory_gb
+        if total_memory_gb < 1.0:
+            # Fallback: use 70% of device memory
+            total_memory_gb = device_memory_gb * 0.7
+        # Round up to integer for K8s resource specification compatibility
+        total_memory_gb = math.ceil(total_memory_gb)
+
+        # 5. Determine image based on device type
+        device_type_lower = request.device_type.lower()
+        if device_type_lower == "cuda":
+            image = app_settings.vllm_cuda_image
+        elif device_type_lower == "hpu":
+            image = app_settings.vllm_hpu_image
+        else:
+            image = app_settings.vllm_cpu_image
+
+        # 6. Build args and envs
+        args = {
+            "model": request.model_uri,
+            "tensor-parallel-size": request.tp_size,
+            "pipeline-parallel-size": request.pp_size,
+            "block-size": 32,
+            "scheduler-delay-factor": 0.14,
+            "max-num-seqs": max(request.concurrency, 72),
+            "enable-chunked-prefill": device_type_lower == "cuda",
+            "enable-prefix-caching": True,
+        }
+
+        envs = {}
+        if device_type_lower in ("cuda", "hpu"):
+            envs["VLLM_TARGET_DEVICE"] = device_type_lower
+        else:
+            envs["VLLM_TARGET_DEVICE"] = "cpu"
+            envs["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+
+        # 7. Build labels for handler to extract concurrency
+        labels = {
+            "concurrency": str(request.concurrency),
+            "device_name": device_name,
+        }
+
+        # 8. Create NodeGroupConfiguration
+        config_id = str(uuid.uuid4())
+        hardware_mode_str = (
+            request.hardware_mode.value if hasattr(request.hardware_mode, "value") else str(request.hardware_mode)
+        )
+
+        node_group = NodeGroupConfiguration(
+            config_id=config_id,
+            name=device_name,
+            labels=labels,
+            type=device_type_lower,
+            tp_size=request.tp_size,
+            pp_size=request.pp_size,
+            envs=envs,
+            args=args,
+            replicas=request.replicas,
+            image=image,
+            memory=total_memory_gb,
+            weight_memory_gb=estimated_weight_memory_gb,
+            kv_cache_memory_gb=kv_cache_memory_gb,
+            hardware_mode=hardware_mode_str,
+            # Performance metrics - placeholder values for benchmarks
+            ttft=0.0,
+            throughput_per_user=0.0,
+            e2e_latency=0.0,
+            error_rate=0.0,
+            cost_per_million_tokens=0.0,
+            # Device identification
+            device_name=device_name,
+            device_model=device_model,
+            raw_name=raw_name,
+        )
+
+        logger.info(
+            f"Generated benchmark config: device={device_type_lower}, tp={request.tp_size}, "
+            f"pp={request.pp_size}, replicas={request.replicas}, memory={total_memory_gb:.2f}GB, "
+            f"weight_memory={estimated_weight_memory_gb:.2f}GB, kv_cache={kv_cache_memory_gb:.2f}GB"
+        )
+
+        return BenchmarkConfigResponse(
+            cluster_id=request.cluster_id,
+            model_id=request.model_id,
+            node_groups=[node_group],
         )

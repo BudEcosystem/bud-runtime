@@ -436,3 +436,35 @@ class NodeConfigurationResponse(ResponseBase):
     )
     selected_nodes: List[str] = Field(..., description="Nodes included in calculation")
     hardware_mode: str = Field(..., description="Hardware mode used for calculation")
+
+
+class BenchmarkConfigRequest(BaseModel):
+    """Request for generating benchmark deployment configuration.
+
+    This schema is used by the /simulator/benchmark-config endpoint to generate
+    full deployment configurations for benchmark workflows with user-selected parameters.
+    """
+
+    cluster_id: uuid.UUID = Field(..., description="ID of the cluster")
+    model_id: uuid.UUID = Field(..., description="ID of the model")
+    model_uri: str = Field(..., description="Model URI/path for deployment")
+    hostnames: List[str] = Field(..., description="List of selected node hostnames")
+    device_type: str = Field(..., description="Selected device type: cuda, cpu, hpu, cpu_high")
+    tp_size: int = Field(..., description="Tensor parallelism size")
+    pp_size: int = Field(default=1, description="Pipeline parallelism size")
+    replicas: int = Field(default=1, description="Number of replicas")
+    input_tokens: int = Field(default=1024, description="Expected input token count")
+    output_tokens: int = Field(default=512, description="Expected output token count")
+    concurrency: int = Field(default=10, description="Expected concurrent requests")
+    hardware_mode: HardwareMode = Field(
+        default=HardwareMode.DEDICATED, description="Hardware mode: dedicated or shared"
+    )
+
+
+class BenchmarkConfigResponse(ResponseBase):
+    """Response schema for benchmark deployment configuration."""
+
+    object: lowercase_string = "benchmark_config"
+    cluster_id: uuid.UUID = Field(..., description="Cluster ID")
+    model_id: uuid.UUID = Field(..., description="Model ID")
+    node_groups: List[NodeGroupConfiguration] = Field(..., description="Deployment configuration for each node group")

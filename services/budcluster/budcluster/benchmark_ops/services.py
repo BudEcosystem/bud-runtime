@@ -53,6 +53,12 @@ class BenchmarkService(SessionMixin):
             default_storage_class=request.default_storage_class,
             default_access_mode=request.default_access_mode,
             storage_size_gb=request.storage_size_gb,
+            # Benchmark configuration options from step 6
+            hardware_mode=request.hardware_mode,
+            selected_device_type=request.selected_device_type,
+            tp_size=request.tp_size,
+            pp_size=request.pp_size,
+            replicas=request.replicas,
         )
 
         if request.credential_id:

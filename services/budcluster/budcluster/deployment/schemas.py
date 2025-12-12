@@ -79,6 +79,12 @@ class RunBenchmarkParams(BaseModel):
     nodes: List[Dict[str, Any]] | None = None
     datasets: Optional[list[dict]] = None
     is_performance_benchmark: bool = False
+    # Configuration options from benchmark workflow step 6
+    hardware_mode: Optional[str] = None
+    selected_device_type: Optional[str] = None
+    tp_size: Optional[int] = None
+    pp_size: Optional[int] = None
+    replicas: Optional[int] = None
 
 
 class CommonDeploymentParams(BaseModel):
