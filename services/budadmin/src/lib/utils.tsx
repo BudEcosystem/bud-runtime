@@ -262,3 +262,57 @@ export function removeUnderScoreAndCapatalise(value: string) {
     return value?.charAt(0).toUpperCase() + value?.slice(1).toLowerCase();
   }
 }
+
+// Helper function to extract display text from models/traits data
+export function getDisplayText(
+  data: unknown,
+  priorityKey: string = "name",
+  fallbackKey: string = "name"
+): string {
+  if (!data) return "-";
+
+  if (typeof data === "string") {
+    return data || "-";
+  }
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) return "-";
+    const texts = data
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          return item[priorityKey] || item[fallbackKey] || null;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    return texts.length > 0 ? texts.join(", ") : "-";
+  }
+
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    const value = obj[priorityKey] || obj[fallbackKey];
+    if (typeof value === "string" && value) {
+      return value;
+    }
+    return "-";
+  }
+
+  return "-";
+}
+
+// Helper function to extract dataset names from traits array
+export function getDatasetNamesFromTraits(traits: any[], arrayLength: number = 0): string {
+  if (!Array.isArray(traits)) return "-";
+
+  const names = traits
+    .flatMap(trait => trait?.datasets ?? [])
+    .map(dataset => dataset?.name)
+    .filter(Boolean);
+
+  if (!names.length) return "-";
+  const limitedNames =
+    arrayLength > 0 ? names.slice(0, arrayLength) : names;
+
+  return limitedNames.join(", ");
+}
