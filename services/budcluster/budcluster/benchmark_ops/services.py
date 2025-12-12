@@ -49,6 +49,10 @@ class BenchmarkService(SessionMixin):
             output_tokens=request.max_output_tokens,
             notification_metadata=request.notification_metadata,
             source_topic=request.source_topic,
+            # Storage configuration
+            default_storage_class=request.default_storage_class,
+            default_access_mode=request.default_access_mode,
+            storage_size_gb=request.storage_size_gb,
         )
 
         if request.credential_id:

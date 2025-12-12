@@ -332,6 +332,26 @@ class BenchmarkService(SessionMixin):
         self, current_step_number: int, request: dict, db_workflow: WorkflowModel, current_user_id: UUID
     ):
         """Add run benchmark workflow step."""
+        # Fetch cluster settings for storage configuration
+        default_storage_class = None
+        default_access_mode = None
+        cluster_id = request.get("cluster_id")
+        if cluster_id:
+            try:
+                cluster_service = ClusterService(self.session)
+                cluster_settings = await cluster_service.get_cluster_settings(cluster_id)
+                if cluster_settings:
+                    default_storage_class = cluster_settings.default_storage_class
+                    default_access_mode = cluster_settings.default_access_mode
+                    logger.debug(
+                        "Using cluster defaults for %s -> storage_class=%s access_mode=%s",
+                        cluster_id,
+                        default_storage_class,
+                        default_access_mode,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to fetch cluster settings for cluster %s: %s", cluster_id, exc)
+
         # insert benchmark in budapp db
         benchmark_id = None
         with BenchmarkCRUD() as crud:
@@ -366,6 +386,9 @@ class BenchmarkService(SessionMixin):
                 "workflow_id": str(db_workflow.id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            # Storage configuration from cluster settings
+            "default_storage_class": default_storage_class,
+            "default_access_mode": default_access_mode,
         }
 
         # Update current workflow step

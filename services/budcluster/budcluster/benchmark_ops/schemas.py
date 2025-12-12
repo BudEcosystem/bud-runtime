@@ -34,6 +34,16 @@ class RunBenchmarkRequest(CloudEventBase):
     run_as_simulation: bool
     credential_id: Optional[UUID] = None
     simulator_id: Optional[UUID] = None
+    # Configuration options from benchmark workflow step 6
+    hardware_mode: Optional[str] = None
+    selected_device_type: Optional[str] = None
+    tp_size: Optional[int] = None
+    pp_size: Optional[int] = None
+    replicas: Optional[int] = None
+    # Storage configuration (from cluster settings)
+    default_storage_class: Optional[str] = None
+    default_access_mode: Optional[str] = None
+    storage_size_gb: Optional[float] = None
 
 
 class LLMBenchmarkResultSchema(BaseModel):
