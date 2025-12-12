@@ -773,8 +773,6 @@ class BenchmarkService(SessionMixin):
         Raises:
             ClientException: If model not found or budsim request fails
         """
-        from budmicroframe.shared.dapr_service import DaprService
-
         # 1. Get model info from database
         db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": request.model_id})
         if not db_model:
@@ -786,10 +784,20 @@ class BenchmarkService(SessionMixin):
         model_uri = db_model.uri
         model_name = db_model.name
 
-        # 2. Build request payload for budsim
+        # 2. Get cluster info and translate id to cluster_id for budsim
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"id": request.cluster_id}
+        )
+        if not db_cluster:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            )
+
+        # 3. Build request payload for budsim (use cluster_id, not database id)
         budsim_payload = {
             "model_id": str(request.model_id),
-            "cluster_id": str(request.cluster_id),
+            "cluster_id": str(db_cluster.cluster_id),
             "hostnames": request.hostnames,
             "hardware_mode": request.hardware_mode,
             "input_tokens": request.input_tokens,
@@ -798,37 +806,27 @@ class BenchmarkService(SessionMixin):
             "model_uri": model_uri,
         }
 
-        # 3. Proxy request to budsim service
+        # 4. Proxy request to budsim service via HTTP
+        budsim_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/budsim/method/simulator/node-configurations"
+
         try:
-            with DaprService() as dapr_service:
-                response = dapr_service.invoke_method(
-                    app_id="budsim",
-                    method_name="simulator/node-configurations",
-                    data=json.dumps(budsim_payload),
-                    http_verb="POST",
-                )
+            async with aiohttp.ClientSession() as session:
+                async with session.post(budsim_endpoint, json=budsim_payload) as response:
+                    result = await response.json()
 
-            if response.status_code != 200:
-                error_msg = "Failed to get configurations from simulator"
-                try:
-                    error_data = response.json()
-                    if "message" in error_data:
-                        error_msg = error_data["message"]
-                except Exception:
-                    pass
-                raise ClientException(
-                    status_code=response.status_code,
-                    message=error_msg,
-                )
+                    if response.status != 200:
+                        error_msg = result.get("message", "Failed to get configurations from simulator")
+                        raise ClientException(
+                            status_code=response.status,
+                            message=error_msg,
+                        )
 
-            result = response.json()
+                    # 5. Enrich model info with display name
+                    if result.get("model_info"):
+                        result["model_info"]["model_name"] = model_name
+                        result["model_info"]["model_id"] = str(request.model_id)
 
-            # 4. Enrich model info with display name
-            if result.get("model_info"):
-                result["model_info"]["model_name"] = model_name
-                result["model_info"]["model_id"] = str(request.model_id)
-
-            return result
+                    return result
 
         except ClientException:
             raise

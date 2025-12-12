@@ -651,7 +651,7 @@ async def get_node_configurations(
     """
     try:
         result = await BenchmarkService(session).get_node_configurations(request)
-        return NodeConfigurationProxyResponse(**result).to_http_response()
+        return NodeConfigurationProxyResponse(**result)
     except ClientException as e:
         logger.exception(f"Failed to get node configurations: {e}")
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
