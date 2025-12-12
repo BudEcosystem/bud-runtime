@@ -32,6 +32,16 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
   const { selectedProject } = useAddAgent();
   const session = sessions.find(s => s.id === sessionId);
 
+  // Debug logging
+  console.log('[LoadModel] Rendering:', {
+    sessionId,
+    hasSession: !!session,
+    hasSelectedDeployment: !!session?.selectedDeployment,
+    selectedDeploymentName: session?.selectedDeployment?.name,
+    sessionsCount: sessions.length,
+    sessionIds: sessions.map(s => s.id),
+  });
+
   const modelIconUrl = useMemo(() => {
     const model = session?.selectedDeployment?.model;
     if (!model) {

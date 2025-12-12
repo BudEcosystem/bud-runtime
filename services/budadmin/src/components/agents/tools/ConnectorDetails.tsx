@@ -10,6 +10,8 @@ import { ToolDetails } from './ToolDetails';
 import { ConnectorService } from 'src/services/connectorService';
 import { CredentialConfigStep } from './CredentialConfigStep';
 import { ToolSelectionStep } from './ToolSelectionStep';
+import { useAgentStore } from '@/stores/useAgentStore';
+import { OAuthState, OAuthSessionData, clearOAuthUrlState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
 
 interface Tool {
   id: string;
@@ -43,15 +45,6 @@ interface ConnectorDetailsProps {
 // OAuth state management helpers
 const OAUTH_STATE_KEY = 'oauth_connector_state';
 
-interface OAuthState {
-  promptId: string;
-  connectorId: string;
-  connectorName: string;
-  workflowId?: string;
-  step: 1 | 2;
-  timestamp: number;
-}
-
 const saveOAuthState = (state: OAuthState) => {
   try {
     localStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(state));
@@ -79,11 +72,9 @@ const getOAuthState = (): OAuthState | null => {
 };
 
 const clearOAuthState = () => {
-  try {
-    localStorage.removeItem(OAUTH_STATE_KEY);
-  } catch (error) {
-    // Silently fail - localStorage might not be available
-  }
+  // Use clearOAuthUrlState which only clears URL-related state
+  // This preserves session data (selectedDeployment, etc.) for restoration in agents/index.tsx
+  clearOAuthUrlState();
 };
 
 // Helper to identify redirect URI fields
@@ -98,8 +89,32 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   workflowId,
 }) => {
   const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
+  const { getSessionByPromptId } = useAgentStore();
 
-  const [step, setStep] = useState<1 | 2>(connector.isFromConnectedSection ? 2 : 1);
+  // Determine initial step - check if this is an OAuth callback for this connector
+  const getInitialStep = (): 1 | 2 => {
+    if (connector.isFromConnectedSection) return 2;
+
+    // Check if we're in an OAuth callback for this specific connector
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+
+      if (code && state) {
+        // This is an OAuth callback - get saved state to verify it's for this connector
+        const savedState = getOAuthState();
+        if (savedState && savedState.connectorId === connector.id) {
+          // OAuth callback for this connector - start at step 2 to prevent flicker
+          return 2;
+        }
+      }
+    }
+
+    return 1;
+  };
+
+  const [step, setStep] = useState<1 | 2>(getInitialStep());
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -117,7 +132,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
-    if (!promptId) return;
+    // CRITICAL: Use saved OAuth prompt ID if available (for OAuth callback scenarios)
+    // The promptId prop might be stale during OAuth redirect
+    const effectivePromptId = getOAuthPromptId() || promptId;
+
+    if (!effectivePromptId) return;
 
     setIsLoadingTools(true);
     try {
@@ -130,7 +149,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       if (authType && authType.toLowerCase() !== 'open') {
         try {
           const oauthResponse = await ConnectorService.fetchOAuthTools({
-            prompt_id: promptId,
+            prompt_id: effectivePromptId,
             connector_id: connector.id,
             version: 1,
           });
@@ -145,7 +164,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         // Also call GET /prompts/tools to get regular tools
         try {
           const regularResponse = await ConnectorService.fetchTools({
-            prompt_id: promptId,
+            prompt_id: effectivePromptId,
             connector_id: connector.id,
             page: 1,
             limit: 100,
@@ -169,7 +188,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       } else {
         // auth_type is "Open" or not set, only call GET /prompts/tools
         const response = await ConnectorService.fetchTools({
-          prompt_id: promptId,
+          prompt_id: effectivePromptId,
           connector_id: connector.id,
           page: 1,
           limit: 100,
@@ -477,14 +496,52 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             const authorizationUrl = oauthResponse.data?.authorization_url;
 
             if (authorizationUrl) {
-              // Save state before redirecting
+              // Get current session data to preserve model selection and other settings
+              const currentSession = promptId ? getSessionByPromptId(promptId) : undefined;
+
+              // Get agent ID from URL to preserve it across OAuth redirect
+              const urlParams = new URLSearchParams(window.location.search);
+              const agentId = urlParams.get('agent') || undefined;
+
+              // Build session data to restore after OAuth
+              const sessionData: OAuthSessionData | undefined = currentSession ? {
+                modelId: currentSession.modelId,
+                modelName: currentSession.modelName,
+                systemPrompt: currentSession.systemPrompt,
+                promptMessages: currentSession.promptMessages,
+                name: currentSession.name,
+                selectedDeployment: currentSession.selectedDeployment,
+              } : undefined;
+
+              // Debug logging for OAuth state preservation
+              console.log('[OAuth] Saving session data before redirect:', {
+                promptId,
+                hasCurrentSession: !!currentSession,
+                hasSelectedDeployment: !!currentSession?.selectedDeployment,
+                selectedDeploymentName: currentSession?.selectedDeployment?.name,
+                sessionData
+              });
+
+              // CRITICAL: Save prompt ID in dedicated localStorage key for reliable restoration
+              if (promptId) {
+                saveOAuthPromptId(promptId);
+              }
+
+              // CRITICAL: Save session data in dedicated localStorage key for model restoration
+              if (sessionData) {
+                saveOAuthSessionData(sessionData);
+              }
+
+              // Save state before redirecting (includes session data for restoration)
               saveOAuthState({
                 promptId: promptId,
                 connectorId: connector.id,
                 connectorName: connector.name,
                 workflowId: workflowId,
+                agentId: agentId,
                 step: 1,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                sessionData: sessionData,
               });
 
               // Redirect to OAuth provider

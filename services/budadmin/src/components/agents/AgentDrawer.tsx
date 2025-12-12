@@ -12,6 +12,7 @@ import AgentSelector from "./AgentSelector";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { removePromptFromUrl } from "@/utils/urlUtils";
+import { hasOAuthPromptId } from "@/hooks/useOAuthCallback";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
@@ -107,10 +108,34 @@ const AgentDrawer: React.FC = () => {
     if (!isAgentDrawerOpen) return;
 
     // Check if this is an OAuth callback - don't create new session
-    const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+    // Check: localStorage flag, URL params, OR dedicated OAuth prompt ID storage
+    const isOAuthCallbackFlag = localStorage.getItem('oauth_should_open_drawer') === 'true';
+    const hasOAuthParamsInUrl = typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('code') &&
+      new URLSearchParams(window.location.search).has('state');
+    const hasSavedOAuthPromptId = hasOAuthPromptId(); // Check dedicated storage
 
-    if (isOAuthCallback) {
-      // OAuth callback - session should already exist, don't create new one
+    // Also check OAuth state which contains session data
+    const hasOAuthState = !!localStorage.getItem('oauth_connector_state');
+    // Check for saved session data (most reliable indicator of OAuth in progress)
+    const hasOAuthSessionData = !!localStorage.getItem('oauth_session_data');
+
+    console.log('[AgentDrawer] Session creation check:', {
+      isAgentDrawerOpen,
+      activeSessionsLength: activeSessions.length,
+      isOAuthCallbackFlag,
+      hasOAuthParamsInUrl,
+      hasSavedOAuthPromptId,
+      hasOAuthState,
+      hasOAuthSessionData,
+      isEditMode,
+      isAddVersionMode,
+      isEditVersionMode,
+    });
+
+    if (isOAuthCallbackFlag || hasOAuthParamsInUrl || hasSavedOAuthPromptId || hasOAuthState || hasOAuthSessionData) {
+      // OAuth in progress - session should already exist or will be restored, don't create new one
+      console.log('[AgentDrawer] OAuth in progress, skipping session creation');
       return;
     }
 
@@ -121,6 +146,7 @@ const AgentDrawer: React.FC = () => {
 
     // Only create session if none exist AND not OAuth callback AND not in any special mode
     if (activeSessions.length === 0) {
+      console.log('[AgentDrawer] Creating new session');
       createSession();
     }
   }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode, isAddVersionMode, isEditVersionMode]);
@@ -156,6 +182,17 @@ const AgentDrawer: React.FC = () => {
     // Don't update URL if we're on the add-agent success step
     // This allows AgentSuccess component to clear the URL parameters
     if (currentFlow === 'add-agent' && step?.id === 'add-agent-success') {
+      return;
+    }
+
+    // Don't update URL during OAuth callback - let the OAuth handler manage it
+    const hasOAuthParamsInUrl = typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('code') &&
+      new URLSearchParams(window.location.search).has('state');
+    const hasSavedOAuthPromptId = hasOAuthPromptId(); // Check dedicated storage
+
+    if (hasOAuthParamsInUrl || hasSavedOAuthPromptId) {
+      // OAuth in progress - don't update URL, let OAuth handler manage it
       return;
     }
 

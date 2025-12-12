@@ -157,6 +157,10 @@ interface AgentStore {
 
   // Prompt cleanup tracking
   addDeletedPromptId: (sessionId: string, promptId: string) => void;
+
+  // OAuth Session Restoration
+  restoreSessionWithPromptId: (promptId: string, sessionData?: Partial<AgentSession>) => string;
+  getSessionByPromptId: (promptId: string) => AgentSession | undefined;
 }
 
 const generateId = () => {
@@ -641,5 +645,74 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
           isEditVersionMode: true,
           editVersionData: versionData
         });
+      },
+
+      // OAuth Session Restoration - creates or restores a session with a specific prompt ID
+      restoreSessionWithPromptId: (promptId: string, sessionData?: Partial<AgentSession>) => {
+        const existingSessions = get().sessions;
+        const activeSessionIds = get().activeSessionIds;
+
+        // Debug logging
+        console.log('[useAgentStore] restoreSessionWithPromptId called:', {
+          promptId,
+          sessionData,
+          hasSelectedDeployment: !!sessionData?.selectedDeployment,
+          selectedDeploymentName: sessionData?.selectedDeployment?.name,
+          existingSessionsCount: existingSessions.length,
+        });
+
+        // Check if session with this prompt ID already exists
+        const existingSession = existingSessions.find(s => s.promptId === promptId);
+        if (existingSession) {
+          console.log('[useAgentStore] Found existing session, updating:', existingSession.id);
+          // Update existing session with new data if provided
+          if (sessionData) {
+            set({
+              sessions: existingSessions.map(s =>
+                s.id === existingSession.id
+                  ? { ...s, ...sessionData, updatedAt: new Date() }
+                  : s
+              ),
+              selectedSessionId: existingSession.id
+            });
+          }
+          return existingSession.id;
+        }
+
+        // Limit to maximum 3 active sessions
+        if (activeSessionIds.length >= 3) {
+          infoToast("Maximum of 3 agent boxes allowed");
+          return activeSessionIds[activeSessionIds.length - 1];
+        }
+
+        // Create new session with the specific prompt ID (not auto-generated)
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(),
+          promptId: promptId, // Use the provided promptId, NOT auto-generated
+          position: existingSessions.length,
+          updatedAt: new Date(),
+        };
+
+        console.log('[useAgentStore] Created new session:', {
+          sessionId: newSession.id,
+          promptId: newSession.promptId,
+          hasSelectedDeployment: !!newSession.selectedDeployment,
+          selectedDeploymentName: newSession.selectedDeployment?.name,
+        });
+
+        set({
+          sessions: [...existingSessions, newSession],
+          activeSessionIds: [...activeSessionIds, newSession.id],
+          selectedSessionId: newSession.id
+        });
+
+        return newSession.id;
+      },
+
+      // Get session by prompt ID
+      getSessionByPromptId: (promptId: string) => {
+        return get().sessions.find(s => s.promptId === promptId);
       }
     }));

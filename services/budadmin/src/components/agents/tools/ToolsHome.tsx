@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useConnectors, Connector } from '@/stores/useConnectors';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
+import { getOAuthState, isOAuthCallback } from '@/hooks/useOAuthCallback';
 
 interface ToolsHomeProps {
   promptId?: string;
@@ -55,9 +56,19 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     }
   }, [promptId, fetchConnectedTools, fetchUnregisteredTools]);
 
-  // Restore connector state from URL on initial load
+  // Restore connector state from URL on initial load (or from OAuth state)
   useEffect(() => {
-    const connectorId = searchParams.get('connector');
+    // Check if this is an OAuth callback - get connector ID from saved state
+    const oauthState = getOAuthState();
+    const isOAuthReturn = isOAuthCallback();
+
+    // Get connector ID from URL or OAuth state
+    let connectorId = searchParams.get('connector');
+
+    // If OAuth callback and we have saved connector ID, use that
+    if (isOAuthReturn && oauthState?.connectorId && !connectorId) {
+      connectorId = oauthState.connectorId;
+    }
 
     // Reset refs when connector ID changes
     if (connectorId !== lastConnectorIdRef.current) {
@@ -91,7 +102,15 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
   // Set selected connector when details are fetched
   useEffect(() => {
-    const connectorId = searchParams.get('connector');
+    // Check if this is an OAuth callback
+    const oauthState = getOAuthState();
+    const isOAuthReturn = isOAuthCallback();
+
+    // Get connector ID from URL or OAuth state
+    let connectorId = searchParams.get('connector');
+    if (isOAuthReturn && oauthState?.connectorId && !connectorId) {
+      connectorId = oauthState.connectorId;
+    }
 
     // Only proceed if we have connector ID and details loaded
     if (!connectorId || !selectedConnectorDetails || selectedConnectorDetails.id !== connectorId) {
