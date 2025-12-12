@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Input, Checkbox, Spin } from 'antd';
+import { Input, Checkbox, Spin, Tooltip } from 'antd';
 import { useConnectors, Connector, CredentialSchemaField } from '@/stores/useConnectors';
 import { Text_10_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
@@ -635,24 +635,63 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       case 'text':
       default: {
         const isRedirectUri = isRedirectUriField(field.field);
+        const handleCopyUri = async () => {
+          const value = formData[field.field];
+          if (value) {
+            try {
+              await navigator.clipboard.writeText(value);
+              successToast('URI copied to clipboard');
+            } catch {
+              errorToast('Failed to copy URI');
+            }
+          }
+        };
+
         return (
           <div key={field.field}>
             {renderLabel()}
-            <Input
-              placeholder={field.label}
-              value={formData[field.field] || ''}
-              onChange={(e) => handleInputChange(field.field, e.target.value)}
-              className={inputClassName}
-              style={{
-                ...inputStyle,
-                ...(isRedirectUri && {
-                  cursor: 'not-allowed',
-                  opacity: 0.7,
-                }),
-              }}
-              autoComplete="off"
-              disabled={isRedirectUri}
-            />
+            <div className={isRedirectUri ? 'flex items-center gap-2' : ''}>
+              <Input
+                placeholder={field.label}
+                value={formData[field.field] || ''}
+                onChange={(e) => handleInputChange(field.field, e.target.value)}
+                className={inputClassName}
+                style={{
+                  ...inputStyle,
+                  ...(isRedirectUri && {
+                    cursor: 'not-allowed',
+                    opacity: 0.7,
+                  }),
+                }}
+                autoComplete="off"
+                disabled={isRedirectUri}
+              />
+              {isRedirectUri && (
+                <Tooltip title="Copy URI" placement="top">
+                  <button
+                    onClick={handleCopyUri}
+                    className="p-1.5 rounded hover:bg-[#2A2A2A] transition-colors flex-shrink-0"
+                    style={{ transform: 'none' }}
+                    type="button"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#808080"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
+                </Tooltip>
+              )}
+            </div>
           </div>
         );
       }
