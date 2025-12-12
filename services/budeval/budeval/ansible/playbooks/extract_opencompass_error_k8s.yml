@@ -3,7 +3,7 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: Get pod for job
+    - name: Get pods for job
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ namespace }}"
@@ -12,14 +12,25 @@
         kubeconfig: "{{ kubeconfig_path | default(omit) }}"
       register: pod_info
 
+    - name: Select failed pod (prefer failed/terminated pods for error extraction)
+      set_fact:
+        target_pod: >-
+          {{
+            (pod_info.resources | selectattr('status.phase', 'equalto', 'Failed') | list | first | default(none)) or
+            (pod_info.resources | selectattr('status.containerStatuses', 'defined') |
+              selectattr('status.containerStatuses.0.state.terminated', 'defined') | list | first | default(none)) or
+            (pod_info.resources | first | default(none))
+          }}
+      when: pod_info.resources | length > 0
+
     - name: Get pod logs (last 500 lines for full error context)
       kubernetes.core.k8s_log:
         namespace: "{{ namespace }}"
-        name: "{{ pod_info.resources[0].metadata.name }}"
+        name: "{{ target_pod.metadata.name }}"
         tail_lines: 500
         kubeconfig: "{{ kubeconfig_path | default(omit) }}"
       register: pod_logs
-      when: pod_info.resources | length > 0
+      when: pod_info.resources | length > 0 and target_pod is defined and target_pod
 
     - name: Parse error from logs
       shell: |
@@ -159,7 +170,7 @@
         EOF
       args:
         executable: /bin/bash
-      when: pod_info.resources | length > 0
+      when: pod_info.resources | length > 0 and target_pod is defined and target_pod
 
     - name: Handle case where pod not found
       shell: |
