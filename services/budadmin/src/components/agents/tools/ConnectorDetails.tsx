@@ -115,6 +115,20 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const headerRef = React.useRef<HTMLDivElement>(null);
   const oauthCallbackProcessed = React.useRef(false);
 
+  // Memoized handler for copying redirect URI to clipboard
+  const handleCopyUri = React.useCallback(async (fieldName: string) => {
+    const value = formData[fieldName];
+    if (value) {
+      try {
+        await navigator.clipboard.writeText(value);
+        successToast('URI copied to clipboard');
+      } catch (error) {
+        console.error('Failed to copy URI:', error);
+        errorToast('Failed to copy URI');
+      }
+    }
+  }, [formData]);
+
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
     if (!promptId) return;
@@ -635,17 +649,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       case 'text':
       default: {
         const isRedirectUri = isRedirectUriField(field.field);
-        const handleCopyUri = async () => {
-          const value = formData[field.field];
-          if (value) {
-            try {
-              await navigator.clipboard.writeText(value);
-              successToast('URI copied to clipboard');
-            } catch {
-              errorToast('Failed to copy URI');
-            }
-          }
-        };
 
         return (
           <div key={field.field}>
@@ -669,7 +672,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               {isRedirectUri && (
                 <Tooltip title="Copy URI" placement="top">
                   <button
-                    onClick={handleCopyUri}
+                    onClick={() => handleCopyUri(field.field)}
                     className="p-1.5 rounded hover:bg-[#2A2A2A] transition-colors flex-shrink-0"
                     style={{ transform: 'none' }}
                     type="button"
