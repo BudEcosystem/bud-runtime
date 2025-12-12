@@ -73,6 +73,17 @@ class OTelManager:
         """Get the configured TracerProvider instance."""
         return self._tracer_provider
 
+    def get_tracer(self, name: str) -> trace.Tracer:
+        """Get a tracer instance for creating spans.
+
+        Args:
+            name: Name of the tracer (typically __name__ of the calling module)
+
+        Returns:
+            Tracer instance for creating spans
+        """
+        return trace.get_tracer(name)
+
     def configure(self) -> None:
         """Configure OpenTelemetry for Pydantic AI agent instrumentation.
 
@@ -110,7 +121,13 @@ class OTelManager:
         trace.set_tracer_provider(self._tracer_provider)
 
         # Instrument all Pydantic AI agents with OpenTelemetry Semantic Conventions v1.37.0
-        Agent.instrument_all(InstrumentationSettings(version=3))
+        # Pass tracer_provider explicitly to ensure child spans inherit parent context
+        Agent.instrument_all(
+            InstrumentationSettings(
+                tracer_provider=self._tracer_provider,
+                version=3,
+            )
+        )
 
         self._is_configured = True
         logger.info(f"OpenTelemetry configured: service_name={app_settings.name}")
