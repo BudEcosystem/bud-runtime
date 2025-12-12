@@ -70,12 +70,55 @@ class ResponsesService:
                 yield chunk
         except Exception as e:
             span.record_exception(e)
-            span.set_attribute(ErrorAttributes.TYPE, type(e).__name__)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, type(e).__name__)
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise
         finally:
             context.detach(context_token)
             span.end()
+
+    def _set_response_attributes(self, span, result) -> None:
+        """Set OpenTelemetry span attributes from OpenAI response.
+
+        Args:
+            span: The OpenTelemetry span to set attributes on
+            result: The OpenAI Response object
+        """
+        # Required response attributes
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_ID, result.id)
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_CREATED_AT, result.created_at)
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_MODEL, result.model)
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_OBJECT, result.object)
+
+        # Optional response attributes
+        if result.status:
+            span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_STATUS, result.status)
+
+        # Sampling parameters
+        if result.temperature is not None:
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_TEMPERATURE, result.temperature)
+        if result.top_p is not None:
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_TOP_P, result.top_p)
+        if result.max_output_tokens is not None:
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_MAX_TOKENS, result.max_output_tokens)
+
+        # OpenAI-specific
+        if result.service_tier:
+            span.set_attribute(GenAIAttributes.GEN_AI_OPENAI_RESPONSE_SERVICE_TIER, result.service_tier)
+        if result.text:
+            span.set_attribute(GenAIAttributes.GEN_AI_OUTPUT_TYPE, result.text.model_dump_json())
+
+        # Usage attributes
+        if result.usage:
+            span.set_attribute(GenAIAttributes.GEN_AI_USAGE_INPUT_TOKENS, result.usage.input_tokens)
+            span.set_attribute(GenAIAttributes.GEN_AI_USAGE_OUTPUT_TOKENS, result.usage.output_tokens)
+            span.set_attribute(GenAIAttributes.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
+
+        # Output content
+        if result.output:
+            span.set_attribute(
+                GenAIAttributes.GEN_AI_OUTPUT_MESSAGES, json.dumps([item.model_dump() for item in result.output])
+            )
 
     async def execute_prompt(
         self,
@@ -107,15 +150,15 @@ class ResponsesService:
         context_token = context.attach(ctx)
 
         # Set attributes using semantic conventions
-        span.set_attribute(GenAIAttributes.OPERATION_NAME, "invoke_agent")
-        span.set_attribute(GenAIAttributes.PROMPT_ID, prompt_params.id)
-        span.set_attribute(GenAIAttributes.PROMPT_VERSION, prompt_params.version or "default")
+        span.set_attribute(GenAIAttributes.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_attribute(GenAIAttributes.GEN_AI_PROMPT_ID, prompt_params.id)
+        span.set_attribute(GenAIAttributes.GEN_AI_PROMPT_VERSION, prompt_params.version or "default")
         span.set_attribute(
-            GenAIAttributes.PROMPT_VARIABLES,
+            GenAIAttributes.GEN_AI_PROMPT_VARIABLES,
             json.dumps(prompt_params.variables) if prompt_params.variables else "null",
         )
         span.set_attribute(
-            GenAIAttributes.INPUT_MESSAGES,
+            GenAIAttributes.GEN_AI_INPUT_MESSAGES,
             json.dumps(input)
             if isinstance(input, str)
             else json.dumps([item.model_dump() for item in input])
@@ -201,8 +244,12 @@ class ResponsesService:
                     },
                 )
             else:
-                # Add prompt info to non-streaming OpenAI-formatted response
                 logger.debug("Non Streaming response requested")
+
+                # Set response attributes for non-streaming
+                self._set_response_attributes(span, result)
+
+                # Add prompt info to non-streaming OpenAI-formatted response
                 return result.model_copy(
                     update={
                         "prompt": BudResponsePrompt(
@@ -215,7 +262,7 @@ class ResponsesService:
 
         except ValidationError as e:
             span.record_exception(e)
-            span.set_attribute(ErrorAttributes.TYPE, "ValidationError")
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, "ValidationError")
             span.set_status(Status(StatusCode.ERROR, "Validation error"))
             logger.exception("Validation error during response creation")
             message, param, code = extract_validation_error_details(e)
@@ -228,7 +275,7 @@ class ResponsesService:
 
         except ClientException as e:
             span.record_exception(e)
-            span.set_attribute(ErrorAttributes.TYPE, "ClientException")
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, "ClientException")
             span.set_status(Status(StatusCode.ERROR, e.message))
             logger.error("Client error during response creation: %s", e.message)
             # Extract param and code from ClientException params if available
@@ -250,14 +297,14 @@ class ResponsesService:
 
         except OpenAIResponseException as e:
             span.record_exception(e)
-            span.set_attribute(ErrorAttributes.TYPE, "OpenAIResponseException")
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, "OpenAIResponseException")
             span.set_status(Status(StatusCode.ERROR, e.message))
             # Re-raise OpenAIResponseException as-is (from our own code above)
             raise
 
         except Exception as e:
             span.record_exception(e)
-            span.set_attribute(ErrorAttributes.TYPE, type(e).__name__)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, type(e).__name__)
             span.set_status(Status(StatusCode.ERROR, str(e)))
             logger.error("Unexpected error during prompt execution: %s", str(e))
             raise OpenAIResponseException(

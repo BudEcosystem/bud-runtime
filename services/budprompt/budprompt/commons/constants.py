@@ -17,13 +17,15 @@
 """The constants used in the budprompt module."""
 
 from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import (
-    GEN_AI_AGENT_DESCRIPTION,
-    GEN_AI_AGENT_ID,
-    GEN_AI_AGENT_NAME,
+    GEN_AI_OPENAI_RESPONSE_SERVICE_TIER,
     GEN_AI_OPERATION_NAME,
-    GEN_AI_REQUEST_MODEL,
+    GEN_AI_OUTPUT_MESSAGES,
+    GEN_AI_OUTPUT_TYPE,
+    GEN_AI_REQUEST_MAX_TOKENS,
+    GEN_AI_REQUEST_TEMPERATURE,
+    GEN_AI_REQUEST_TOP_P,
+    GEN_AI_RESPONSE_ID,
     GEN_AI_RESPONSE_MODEL,
-    GEN_AI_SYSTEM,
     GEN_AI_USAGE_INPUT_TOKENS,
     GEN_AI_USAGE_OUTPUT_TOKENS,
 )
@@ -49,22 +51,32 @@ class GenAIAttributes:
     Reference: https://opentelemetry.io/docs/specs/semconv/gen-ai/
     """
 
-    # Standard attributes (values from SDK)
-    OPERATION_NAME = GEN_AI_OPERATION_NAME
-    AGENT_NAME = GEN_AI_AGENT_NAME
-    AGENT_ID = GEN_AI_AGENT_ID
-    AGENT_DESCRIPTION = GEN_AI_AGENT_DESCRIPTION
-    REQUEST_MODEL = GEN_AI_REQUEST_MODEL
-    RESPONSE_MODEL = GEN_AI_RESPONSE_MODEL
-    SYSTEM = GEN_AI_SYSTEM
-    USAGE_INPUT_TOKENS = GEN_AI_USAGE_INPUT_TOKENS
-    USAGE_OUTPUT_TOKENS = GEN_AI_USAGE_OUTPUT_TOKENS
+    # Standard attributes (from SDK)
+    GEN_AI_OPERATION_NAME = GEN_AI_OPERATION_NAME
+    GEN_AI_RESPONSE_ID = GEN_AI_RESPONSE_ID
+    GEN_AI_RESPONSE_MODEL = GEN_AI_RESPONSE_MODEL
+    GEN_AI_USAGE_INPUT_TOKENS = GEN_AI_USAGE_INPUT_TOKENS
+    GEN_AI_USAGE_OUTPUT_TOKENS = GEN_AI_USAGE_OUTPUT_TOKENS
 
-    # Custom attributes (BudPrompt specific)
-    PROMPT_ID = "gen_ai.prompt.id"
-    PROMPT_VERSION = "gen_ai.prompt.version"
-    PROMPT_VARIABLES = "gen_ai.prompt.variables"
-    INPUT_MESSAGES = "gen_ai.input.messages"
+    # Request/sampling params (from SDK)
+    GEN_AI_REQUEST_TEMPERATURE = GEN_AI_REQUEST_TEMPERATURE
+    GEN_AI_REQUEST_TOP_P = GEN_AI_REQUEST_TOP_P
+    GEN_AI_REQUEST_MAX_TOKENS = GEN_AI_REQUEST_MAX_TOKENS
+
+    # OpenAI-specific (from SDK)
+    GEN_AI_OPENAI_RESPONSE_SERVICE_TIER = GEN_AI_OPENAI_RESPONSE_SERVICE_TIER
+    GEN_AI_OUTPUT_TYPE = GEN_AI_OUTPUT_TYPE
+    GEN_AI_OUTPUT_MESSAGES = GEN_AI_OUTPUT_MESSAGES
+
+    # Custom attributes (BudPrompt specific - no SDK equivalent)
+    GEN_AI_PROMPT_ID = "gen_ai.prompt.id"
+    GEN_AI_PROMPT_VERSION = "gen_ai.prompt.version"
+    GEN_AI_PROMPT_VARIABLES = "gen_ai.prompt.variables"
+    GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+    GEN_AI_RESPONSE_CREATED_AT = "gen_ai.response.created_at"
+    GEN_AI_RESPONSE_OBJECT = "gen_ai.response.object"
+    GEN_AI_RESPONSE_STATUS = "gen_ai.response.status"
+    GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
 
 
 class ErrorAttributes:
@@ -73,4 +85,4 @@ class ErrorAttributes:
     Reference: https://opentelemetry.io/docs/specs/semconv/attributes-registry/error/
     """
 
-    TYPE = ERROR_TYPE
+    ERROR_TYPE = ERROR_TYPE
