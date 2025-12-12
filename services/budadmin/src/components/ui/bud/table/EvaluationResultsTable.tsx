@@ -1,58 +1,18 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { notification, Table, Popover } from "antd";
+import { notification, Table } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { Model } from "src/hooks/useModels";
 import { useRouter } from "next/router";
-import { Text_12_400_EEEEEE, Text_16_600_FFFFFF } from "../../text";
+import { Text_16_600_FFFFFF } from "../../text";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "../../noDataFount";
 import useHandleRouteChange from "@/lib/useHandleRouteChange";
 import { useEvaluations, ExperimentData, GetExperimentsPayload } from "src/hooks/useEvaluations";
 import { getDatasetNamesFromTraits, getDisplayText } from "@/lib/utils";
-
-// Constants
-const TEXT_TRUNCATION_LENGTH = 25;
+import { TruncatedTextCell } from "@/components/ui/TruncatedTextCell";
 
 interface EvaluationResultsTableProps {
   model?: Model;
-}
-
-// Helper component for rendering truncated text with popover
-function TruncatedTextCell({ text }: { text: string }) {
-  if (!text || text === "-") {
-    return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
-  }
-
-  const needsTruncation = text.length > TEXT_TRUNCATION_LENGTH;
-  const truncatedText = needsTruncation
-    ? text.substring(0, TEXT_TRUNCATION_LENGTH) + "..."
-    : text;
-
-  if (needsTruncation) {
-    return (
-      <Popover
-        content={
-          <div className="max-w-[300px] break-words p-[.8rem]">
-            <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-          </div>
-        }
-        placement="top"
-      >
-        <div
-          className="cursor-pointer"
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        >
-          <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
-        </div>
-      </Popover>
-    );
-  }
-
-  return (
-    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-      <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-    </div>
-  );
 }
 
 function EvaluationResultsTable({ model }: EvaluationResultsTableProps) {

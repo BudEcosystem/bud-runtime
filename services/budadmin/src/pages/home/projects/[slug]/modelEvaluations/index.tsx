@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, Input, Popover, Table } from "antd";
+import { Image, Input, Table } from "antd";
 import type { TableProps } from "antd";
 import { useRouter as useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -7,7 +7,6 @@ import { useProjects } from "src/hooks/useProjects";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import {
   Text_12_400_757575,
-  Text_12_400_EEEEEE,
   Text_12_600_EEEEEE,
 } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
@@ -16,6 +15,7 @@ import NoDataFount from "@/components/ui/noDataFount";
 import ComingSoon from "@/components/ui/comingSoon";
 import { ExperimentData, useEvaluations } from "@/hooks/useEvaluations";
 import { getDatasetNamesFromTraits, getDisplayText } from "@/lib/utils";
+import { TruncatedTextCell } from "@/components/ui/TruncatedTextCell";
 
 type ColumnsType<T extends object> = TableProps<T>["columns"];
 type TablePagination<T extends object> = NonNullable<
@@ -65,45 +65,6 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
       </svg>
     )
   ) : null;
-}
-
-const TEXT_TRUNCATION_LENGTH = 25;
-// Helper component for rendering truncated text with popover
-function TruncatedTextCell({ text }: { text: string }) {
-  if (!text || text === "-") {
-    return <Text_12_400_EEEEEE>-</Text_12_400_EEEEEE>;
-  }
-
-  const needsTruncation = text.length > TEXT_TRUNCATION_LENGTH;
-  const truncatedText = needsTruncation
-    ? text.substring(0, TEXT_TRUNCATION_LENGTH) + "..."
-    : text;
-
-  if (needsTruncation) {
-    return (
-      <Popover
-        content={
-          <div className="max-w-[300px] break-words p-[.8rem]">
-            <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-          </div>
-        }
-        placement="top"
-      >
-        <div
-          className="cursor-pointer"
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        >
-          <Text_12_400_EEEEEE>{truncatedText}</Text_12_400_EEEEEE>
-        </div>
-      </Popover>
-    );
-  }
-
-  return (
-    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-      <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
-    </div>
-  );
 }
 
 const data: DataType[] = [
@@ -156,7 +117,7 @@ function ModelEvalTable() {
   const [pageSize, setPageSize] = useState(5);
   const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
   const [order, setOrder] = useState<"-" | "">("");
-  
+
   const columns: ColumnsType<ExperimentData> = [
     {
       title: "Traits",
@@ -204,7 +165,7 @@ function ModelEvalTable() {
     getProject(projectId as string);
     // openDrawerWithStep("use-model");
   }, [projectId]);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchValue(searchValue);
@@ -213,7 +174,7 @@ function ModelEvalTable() {
 
     return () => clearTimeout(timer);
   }, [searchValue]);
-  
+
   const fetchExperiments = useCallback(async () => {
     if (typeof deploymentId !== 'string') return;
 
@@ -239,7 +200,7 @@ function ModelEvalTable() {
   useEffect(() => {
     fetchExperiments();
   }, [fetchExperiments]);
-  
+
   return (
     <div className="relative CommonCustomPagination">
       {/* <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" /> */}
