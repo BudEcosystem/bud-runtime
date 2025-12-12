@@ -331,7 +331,11 @@ const AgentDrawer: React.FC = () => {
                 <div className="h-full w-full">
                   <AgentIframe
                     sessionId={activeSessions[0]?.id}
-                    promptIds={activeSessions.map(session => session.promptId).filter(Boolean) as string[]}
+                    promptIds={
+                      isEditMode
+                        ? activeSessions.map(session => session.name).filter(Boolean) as string[]
+                        : activeSessions.map(session => session.promptId).filter(Boolean) as string[]
+                    }
                     typeFormMessage={typeFormMessage}
                   />
                 </div>
