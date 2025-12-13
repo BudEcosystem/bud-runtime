@@ -2,8 +2,8 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
+import { BudDropdownMenu } from "@/components/ui/dropDown";
 import {
-  Text_14_400_EEEEEE,
   Text_12_400_B3B3B3,
   Text_10_400_B3B3B3,
 } from "@/components/ui/text";
@@ -11,49 +11,11 @@ import React, { useEffect, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import {
   usePerfomanceBenchmark,
-  DeviceTypeConfiguration,
   TPPPOption,
   SelectedConfiguration,
 } from "src/stores/usePerfomanceBenchmark";
-import { Alert, InputNumber, Radio, Select, Spin } from "antd";
+import { Alert, InputNumber, Spin } from "antd";
 import { LoadingOutlined } from "@ant-design/icons";
-
-interface DeviceTypeCardProps {
-  config: DeviceTypeConfiguration;
-  selected: boolean;
-  onClick: () => void;
-}
-
-function DeviceTypeCard({ config, selected, onClick }: DeviceTypeCardProps) {
-  return (
-    <div
-      onClick={onClick}
-      className={`p-4 border rounded-lg cursor-pointer transition-all ${
-        selected
-          ? "border-[#5B9FFF] bg-[#1F3A5F20]"
-          : "border-[#333] hover:border-[#555] bg-[#1a1a1a]"
-      }`}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <Text_14_400_EEEEEE className="font-medium">
-          {config.device_type.toUpperCase()}
-        </Text_14_400_EEEEEE>
-        <Radio checked={selected} />
-      </div>
-      <div className="space-y-1">
-        {config.device_name && (
-          <Text_10_400_B3B3B3>{config.device_name}</Text_10_400_B3B3B3>
-        )}
-        <Text_10_400_B3B3B3>
-          {config.total_devices} devices across {config.nodes_count} nodes
-        </Text_10_400_B3B3B3>
-        <Text_10_400_B3B3B3>
-          {config.memory_per_device_gb.toFixed(1)} GB per device
-        </Text_10_400_B3B3B3>
-      </div>
-    </div>
-  );
-}
 
 export default function SelectConfiguration() {
   const { openDrawerWithStep } = useDrawer();
@@ -153,6 +115,18 @@ export default function SelectConfiguration() {
   const canProceed =
     selectedDeviceType && selectedTPPP && replicas > 0 && !loadingConfigurations;
 
+  // Transform device configurations to dropdown items
+  const deviceTypeItems = nodeConfigurations?.device_configurations?.map((config) => ({
+    label: `${config.device_type.toUpperCase()} - ${config.total_devices} devices (${config.memory_per_device_gb.toFixed(1)} GB each)`,
+    value: config.device_type,
+  })) || [];
+
+  // Transform TP/PP options to dropdown items
+  const tpppItems = tpppOptions.map((option) => ({
+    label: `TP=${option.tp_size}, PP=${option.pp_size} (${option.description})`,
+    value: `${option.tp_size}-${option.pp_size}`,
+  }));
+
   return (
     <BudForm
       data={{}}
@@ -229,82 +203,35 @@ export default function SelectConfiguration() {
                 </div>
               )}
 
-              {/* Device Type Selection */}
-              {nodeConfigurations.device_configurations.length > 1 && (
-                <div>
-                  <Text_12_400_B3B3B3 className="mb-3 block">
-                    Select Device Type
-                  </Text_12_400_B3B3B3>
-                  <div className="grid grid-cols-1 gap-3">
-                    {nodeConfigurations.device_configurations.map((config) => (
-                      <DeviceTypeCard
-                        key={config.device_type}
-                        config={config}
-                        selected={selectedDeviceType === config.device_type}
-                        onClick={() => setSelectedDeviceType(config.device_type)}
-                      />
-                    ))}
-                  </div>
-                </div>
+              {/* Device Type Selection - Dropdown */}
+              {deviceTypeItems.length > 0 && (
+                <BudDropdownMenu
+                  name="device_type"
+                  label="Device Type"
+                  infoText="Select the device type for deployment"
+                  placeholder="Select device type"
+                  items={deviceTypeItems}
+                  onChange={(value: string) => setSelectedDeviceType(value)}
+                />
               )}
 
-              {/* Single Device Type Display */}
-              {nodeConfigurations.device_configurations.length === 1 && (
+              {/* TP/PP Configuration - Dropdown */}
+              {currentDeviceConfig && tpppItems.length > 0 && (
                 <div>
-                  <Text_12_400_B3B3B3 className="mb-3 block">
-                    Device Type
-                  </Text_12_400_B3B3B3>
-                  <DeviceTypeCard
-                    config={nodeConfigurations.device_configurations[0]}
-                    selected={true}
-                    onClick={() => {}}
-                  />
-                </div>
-              )}
-
-              {/* TP/PP Configuration */}
-              {currentDeviceConfig && tpppOptions.length > 0 && (
-                <div>
-                  <Text_12_400_B3B3B3 className="mb-3 block">
-                    TP/PP Configuration
-                  </Text_12_400_B3B3B3>
-                  <Select
-                    className="w-full"
-                    value={
-                      selectedTPPP
-                        ? `${selectedTPPP.tp_size}-${selectedTPPP.pp_size}`
-                        : undefined
-                    }
-                    onChange={(value) => {
+                  <BudDropdownMenu
+                    name="tp_pp"
+                    label="TP/PP Configuration"
+                    infoText="Select tensor and pipeline parallelism settings"
+                    placeholder="Select TP/PP configuration"
+                    items={tpppItems}
+                    onChange={(value: string) => {
                       const [tp, pp] = value.split("-").map(Number);
                       const option = tpppOptions.find(
                         (o) => o.tp_size === tp && o.pp_size === pp
                       );
                       setSelectedTPPP(option || null);
                     }}
-                    placeholder="Select TP/PP configuration"
-                    disabled={isSharedMode && tpppOptions.length === 1}
-                  >
-                    {tpppOptions.map((option) => (
-                      <Select.Option
-                        key={`${option.tp_size}-${option.pp_size}`}
-                        value={`${option.tp_size}-${option.pp_size}`}
-                        disabled={
-                          isSharedMode &&
-                          (option.tp_size !== 1 || option.pp_size !== 1)
-                        }
-                      >
-                        <div className="flex justify-between items-center">
-                          <span>
-                            TP={option.tp_size}, PP={option.pp_size}
-                          </span>
-                          <Text_10_400_B3B3B3 className="ml-2">
-                            ({option.description})
-                          </Text_10_400_B3B3B3>
-                        </div>
-                      </Select.Option>
-                    ))}
-                  </Select>
+                  />
                   {selectedTPPP && (
                     <Text_10_400_B3B3B3 className="mt-2 block">
                       Devices needed: {selectedTPPP.total_devices_needed} | Max

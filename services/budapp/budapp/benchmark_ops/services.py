@@ -647,16 +647,15 @@ class BenchmarkService(SessionMixin):
                 raise HTTPException(
                     detail=f"Benchmark not found: {benchmark_id}", status_code=status.HTTP_404_NOT_FOUND
                 )
-        model_id = db_benchmark.model_id
-        model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
-        model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
+        # Get model directly via ORM (like endpoint version does)
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": db_benchmark.model_id})
         cluster_id = db_benchmark.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
         return ModelClusterDetail(
             id=db_benchmark.id,
             name=db_benchmark.name,
             status=db_benchmark.status,
-            model=model_detail["model"],
+            model=db_model,
             cluster=cluster_detail,
         )
 
