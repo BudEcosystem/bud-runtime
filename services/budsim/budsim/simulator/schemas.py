@@ -389,6 +389,16 @@ class NodeConfigurationRequest(BaseModel):
     concurrency: int = Field(default=10, description="Expected concurrent requests")
     model_uri: Optional[str] = Field(None, description="Model URI for memory calculation")
 
+    @model_validator(mode="before")
+    def validate_model_uri(cls, values):
+        """Resolve model_uri to local path if available."""
+        model_uri = values.get("model_uri")
+        if model_uri and not model_uri.startswith("/") and not model_uri.startswith("http"):
+            local_model_path = Path(app_settings.model_registry_dir, model_uri)
+            if local_model_path.exists():
+                values["model_uri"] = local_model_path.as_posix()
+        return values
+
 
 class TPPPOption(BaseModel):
     """A single valid TP/PP combination."""
@@ -459,6 +469,16 @@ class BenchmarkConfigRequest(BaseModel):
     hardware_mode: HardwareMode = Field(
         default=HardwareMode.DEDICATED, description="Hardware mode: dedicated or shared"
     )
+
+    @model_validator(mode="before")
+    def validate_model_uri(cls, values):
+        """Resolve model_uri to local path if available."""
+        model_uri = values.get("model_uri")
+        if model_uri and not model_uri.startswith("/") and not model_uri.startswith("http"):
+            local_model_path = Path(app_settings.model_registry_dir, model_uri)
+            if local_model_path.exists():
+                values["model_uri"] = local_model_path.as_posix()
+        return values
 
 
 class BenchmarkConfigResponse(ResponseBase):

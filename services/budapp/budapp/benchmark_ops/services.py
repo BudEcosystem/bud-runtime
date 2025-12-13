@@ -804,7 +804,7 @@ class BenchmarkService(SessionMixin):
                 message=f"Model with id {request.model_id} not found",
             )
 
-        model_uri = db_model.uri
+        model_uri = db_model.local_path or db_model.uri
         model_name = db_model.name
 
         # 2. Get cluster info and translate id to cluster_id for budsim

@@ -3018,33 +3018,37 @@ class SimulationService:
         # Round up to integer for K8s resource specification compatibility
         total_memory_gb = math.ceil(total_memory_gb)
 
-        # 5. Determine image based on device type
+        # 5. Get engine image from BudConnect API (same as simulator/run)
         device_type_lower = request.device_type.lower()
-        if device_type_lower == "cuda":
-            image = app_settings.vllm_cuda_image
-        elif device_type_lower == "hpu":
-            image = app_settings.vllm_hpu_image
-        else:
-            image = app_settings.vllm_cpu_image
+        target_device = "cpu" if device_type_lower in ("cpu", "cpu_high") else device_type_lower
 
-        # 6. Build args and envs
-        args = {
+        # Call BudConnect API to get compatible engines with image
+        image = None
+        try:
+            compatible_engines = get_compatible_engines(request.model_uri)
+            # Find engine matching our device type
+            for engine in compatible_engines:
+                if (
+                    engine.get("engine_name") == "vllm"
+                    and normalize_device_type(engine.get("device", "")) == target_device
+                ):
+                    image = engine.get("image")
+                    logger.info(f"Got image from BudConnect API: {image}")
+                    break
+        except Exception as e:
+            logger.warning(f"Failed to get compatible engines from BudConnect: {e}")
+
+        # 6. Build args and envs using full engine args (same as simulator/run)
+        engine_config = {
             "model": request.model_uri,
-            "tensor-parallel-size": request.tp_size,
-            "pipeline-parallel-size": request.pp_size,
-            "block-size": 32,
-            "scheduler-delay-factor": 0.14,
-            "max-num-seqs": max(request.concurrency, 72),
-            "enable-chunked-prefill": device_type_lower == "cuda",
-            "enable-prefix-caching": True,
+            "tensor_parallel_size": request.tp_size,
+            "pipeline_parallel_size": request.pp_size,
+            "target_device": target_device,
         }
 
-        envs = {}
-        if device_type_lower in ("cuda", "hpu"):
-            envs["VLLM_TARGET_DEVICE"] = device_type_lower
-        else:
-            envs["VLLM_TARGET_DEVICE"] = "cpu"
-            envs["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
+        args_and_envs = get_minimal_engine_args_and_envs("vllm", engine_config)
+        args = args_and_envs.get("args", {})
+        envs = args_and_envs.get("envs", {})
 
         # 7. Build labels for handler to extract concurrency
         labels = {
