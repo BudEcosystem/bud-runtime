@@ -277,21 +277,27 @@ export function ClusterCard({
               </Text_14_400_EEEEEE>
             </div>
             <div className="flex items-center justify-start gap-[.5rem] mt-[.55rem]">
-              <Tags
-                name="CPU"
-                color="#D1B854"
-                classNames="py-[.26rem] px-[.4rem]"
-              />
-              <Tags
-                name="GPU"
-                color="#D1B854"
-                classNames="py-[.26rem] px-[.4rem]"
-              />
-              <Tags
-                name="$123 to Run Evaluation"
-                color="#965CDE"
-                classNames="py-[.26rem] px-[.4rem]"
-              />
+              {data.cpu_count > 0 && (
+                <Tags
+                  name={`${data.cpu_count} CPU`}
+                  color="#D1B854"
+                  classNames="py-[.26rem] px-[.4rem]"
+                />
+              )}
+              {data.gpu_count > 0 && (
+                <Tags
+                  name={`${data.gpu_count} GPU`}
+                  color="#D1B854"
+                  classNames="py-[.26rem] px-[.4rem]"
+                />
+              )}
+              {data.hpu_count > 0 && (
+                <Tags
+                  name={`${data.hpu_count} HPU`}
+                  color="#D1B854"
+                  classNames="py-[.26rem] px-[.4rem]"
+                />
+              )}
             </div>
           </div>
 

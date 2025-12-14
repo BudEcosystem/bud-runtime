@@ -26,6 +26,7 @@ import { calculateEta } from "src/flows/utils/calculateETA";
 import IconRender from "src/flows/components/BudIconRender";
 import { useEvaluations } from "@/hooks/useEvaluations";
 import { useAddAgent } from "@/stores/useAddAgent";
+import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
 
 export function getFailedStep(data: WorkflowListItem) {
   return data?.progress?.steps?.find(
@@ -93,6 +94,7 @@ export function BudWidget({
 
   const { getWorkflow: getEvaluationWorkflow } = useEvaluations();
   const { getWorkflow: getAgentWorkflow } = useAddAgent();
+  const { getWorkflow: getBenchmarkWorkflow } = usePerfomanceBenchmark();
   const { openDrawerWithStep } = useDrawer();
   const { close } = useIsland();
   const [loading, setLoading] = useState(false);
@@ -170,6 +172,10 @@ export function BudWidget({
     if (data.workflow_type === "prompt_creation") {
       workflow = await getAgentWorkflow(data.id);
     }
+
+    if (data.workflow_type === "model_benchmark") {
+      workflow = await getBenchmarkWorkflow(data.id);
+    }
     setLoading(false);
     if (workflow.workflow_steps) {
       setProviderType(workflow.workflow_steps.provider_type);
@@ -207,7 +213,18 @@ export function BudWidget({
       return;
     }
 
-    openDrawerWithStep(step?.id);
+    // Handle benchmark step 2 specially - check eval_with to determine correct step
+    let stepId = step?.id;
+    if (data.workflow_type === "model_benchmark" && data.current_step === 2 && workflow?.workflow_steps) {
+      const evalWith = (workflow.workflow_steps as any).eval_with;
+      if (evalWith === "configuration") {
+        stepId = "add-Configuration";
+      } else if (evalWith === "dataset") {
+        stepId = "add-Datasets";
+      }
+    }
+
+    openDrawerWithStep(stepId);
     close();
     // openDrawerWithStep(currentStepId);
   };

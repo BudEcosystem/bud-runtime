@@ -43,7 +43,7 @@ class BenchmarkService(SessionMixin):
             cluster_id=request.bud_cluster_id,
             benchmark_id=request.benchmark_id,
             model=request.model,
-            endpoint_name=str(request.benchmark_id),
+            endpoint_name="benchmark-" + request.name,
             concurrency=request.concurrent_requests,
             input_tokens=request.max_input_tokens,
             output_tokens=request.max_output_tokens,

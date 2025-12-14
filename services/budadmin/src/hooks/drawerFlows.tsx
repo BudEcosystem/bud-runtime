@@ -2659,7 +2659,7 @@ const userUsage: DrawerFlowType = {
 const addBenchmark: DrawerFlowType = {
   title: "Add Benchmark",
   description: "Add Benchmark",
-  totalSteps: 10,
+  totalSteps: 9,
   steps: [
     {
       navigation: () => ["Benchmarks", "Create Benchmark"],
@@ -2682,6 +2682,10 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Select Nodes",
         },
         {
@@ -2690,7 +2694,15 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Benchmark Configuration",
+          title: "Configuration Options",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2715,6 +2727,10 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Select Nodes",
         },
         {
@@ -2723,7 +2739,15 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Benchmark Configuration",
+          title: "Configuration Options",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2748,6 +2772,10 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Select Nodes",
         },
         {
@@ -2756,7 +2784,15 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Benchmark Configuration",
+          title: "Configuration Options",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2781,6 +2817,10 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
           title: "Select Nodes",
         },
         {
@@ -2789,7 +2829,15 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Benchmark Configuration",
+          title: "Configuration Options",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2826,7 +2874,15 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Benchmark Configuration",
+          title: "Configuration Options",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2867,7 +2923,11 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Review & Confirm",
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2908,7 +2968,11 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Review & Confirm",
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2949,7 +3013,11 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Review & Confirm",
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
@@ -2990,16 +3058,20 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Review & Confirm",
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
     {
       navigation: () => ["Benchmarks", "Create Benchmark"],
-      id: "Benchmark-Configuration",
+      id: "Benchmarking-Progress",
       confirmClose: true,
       step: 8,
-      component: StepComponents["Benchmark-Configuration"],
+      component: StepComponents["Benchmarking-Progress"],
       progress: [
         {
           status: FormProgressStatus.completed,
@@ -3031,33 +3103,58 @@ const addBenchmark: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Review & Confirm",
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Result",
         },
       ],
     },
     {
       navigation: () => ["Benchmarks", "Create Benchmark"],
-      id: "simulate-run",
-      confirmClose: true,
-      step: 9,
-      component: StepComponents["simulate-run"],
-      progress: [],
-    },
-    {
-      navigation: () => ["Benchmarks", "Create Benchmark"],
-      id: "Benchmarking-Progress",
-      confirmClose: true,
-      step: 10,
-      component: StepComponents["Benchmarking-Progress"],
-      progress: [],
-    },
-    {
-      navigation: () => ["Benchmarks", "Create Benchmark"],
       id: "Benchmarking-Finished",
       confirmClose: false,
-      step: 11,
+      step: 9,
       component: StepComponents["Benchmarking-Finished"],
-      progress: [],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Create benchmark",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Eval with",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Hardware Mode",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Nodes",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Model",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configuration Options",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Running Benchmark",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Result",
+        },
+      ],
     },
   ],
 };

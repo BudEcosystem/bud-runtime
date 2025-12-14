@@ -25,12 +25,17 @@ export default function SelectModel() {
       page,
       limit,
       table_source: "model",
+      exclude_adapters: true,
     }).then((data) => {
       setModels(data);
     });
   }, [page]);
 
   const filteredModels = models?.filter((model) => {
+    // Exclude cloud models from benchmark listing
+    if (model.provider_type === "cloud_model") {
+      return false;
+    }
     return (
       model.name?.toLowerCase().includes(search.toLowerCase()) ||
       model.tags?.some((task) =>

@@ -153,6 +153,7 @@ export const usePerfomanceBenchmark = create<{
   nodeConfigurations: NodeConfigurationResponse | null;
   selectedConfiguration: SelectedConfiguration | null;
   loadingConfigurations: boolean;
+  configurationError: string | null;
 
   benchmarks: Benchmark[];
   currentWorkflow: WorkflowType | null;
@@ -229,6 +230,7 @@ export const usePerfomanceBenchmark = create<{
   nodeConfigurations: null,
   selectedConfiguration: null,
   loadingConfigurations: false,
+  configurationError: null,
   setSelectedCredentials: (credentials: Credentials | null) => {
     set({ selectedCredentials: credentials });
   },
@@ -280,6 +282,7 @@ export const usePerfomanceBenchmark = create<{
       nodeConfigurations: null,
       selectedConfiguration: null,
       loadingConfigurations: false,
+      configurationError: null,
     });
   },
 
@@ -315,7 +318,56 @@ export const usePerfomanceBenchmark = create<{
       );
       if (response) {
         const workflow: WorkflowType = response.data;
-        set({ currentWorkflow: workflow });
+        const steps = workflow.workflow_steps as any;
+
+        // Capture existing state BEFORE the set() call to preserve values if API doesn't return them
+        const existingState = get();
+        const existingStepOneData = existingState.stepOneData;
+        const existingStepTwoData = existingState.stepTwoData;
+
+        // Only create stepOneData if API has data OR existing data exists
+        const hasStepOneData = steps?.name || steps?.concurrent_requests || existingStepOneData;
+        const newStepOneData = hasStepOneData ? {
+          name: steps?.name ?? existingStepOneData?.name ?? "",
+          description: steps?.description ?? existingStepOneData?.description ?? "",
+          tags: steps?.tags ?? existingStepOneData?.tags ?? [],
+          concurrent_requests: steps?.concurrent_requests ?? existingStepOneData?.concurrent_requests,
+          eval_with: steps?.eval_with ?? existingStepOneData?.eval_with ?? "",
+        } : null;
+
+        // Only create stepTwoData if API has data OR existing data exists
+        const hasStepTwoData = steps?.max_input_tokens || steps?.max_output_tokens || existingStepTwoData;
+        const newStepTwoData = hasStepTwoData ? {
+          max_input_tokens: steps?.max_input_tokens ?? existingStepTwoData?.max_input_tokens ?? "",
+          max_output_tokens: steps?.max_output_tokens ?? existingStepTwoData?.max_output_tokens ?? "",
+        } : null;
+
+        set({
+          currentWorkflow: workflow,
+          // Step 1 data - preserve existing values if API response doesn't have them
+          stepOneData: newStepOneData,
+          evalWith: steps?.eval_with ?? existingStepOneData?.eval_with ?? "",
+          // Cluster and nodes - preserve existing values if API response doesn't have them
+          selectedCluster: steps?.cluster ?? existingState.selectedCluster,
+          nodeMetrics: steps?.nodes ?? existingState.nodeMetrics,
+          filteredNodeMetrics: steps?.nodes ?? existingState.filteredNodeMetrics,
+          // Hardware mode
+          hardwareMode: steps?.hardware_mode ?? existingState.hardwareMode,
+          // Model
+          selectedModel: steps?.model ?? existingState.selectedModel,
+          // Dataset
+          dataset: steps?.datasets ?? existingState.dataset ?? [],
+          // Step 2 data (tokens) - preserve existing values if API response doesn't have them
+          stepTwoData: newStepTwoData,
+          // Configuration - preserve existing values if API response doesn't have them
+          selectedConfiguration: steps?.selected_device_type ? {
+            device_type: steps.selected_device_type,
+            tp_size: steps.tp_size,
+            pp_size: steps.pp_size,
+            replicas: steps.replicas,
+          } : existingState.selectedConfiguration,
+        });
+
         return workflow;
       }
       // successToast(response.data.message);
@@ -447,7 +499,7 @@ export const usePerfomanceBenchmark = create<{
           trigger_workflow: false,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -475,7 +527,7 @@ export const usePerfomanceBenchmark = create<{
           datasets: get().selectedDataset.map((dataset) => dataset.id),
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -505,7 +557,7 @@ export const usePerfomanceBenchmark = create<{
           cluster_id: cluster?.id,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -533,7 +585,7 @@ export const usePerfomanceBenchmark = create<{
           hardware_mode: hardwareMode,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       return response;
     } catch (error) {
       console.error("Error saving hardware mode:", error);
@@ -563,7 +615,7 @@ export const usePerfomanceBenchmark = create<{
           hardware_mode: hardwareMode,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -592,7 +644,7 @@ export const usePerfomanceBenchmark = create<{
           model_id: modelId,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -620,7 +672,7 @@ export const usePerfomanceBenchmark = create<{
           credential_id: credentials?.id,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
     } catch (error) {
       console.error("Error creating model:", error);
@@ -646,7 +698,7 @@ export const usePerfomanceBenchmark = create<{
           // "trigger_workflow": false,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -674,7 +726,7 @@ export const usePerfomanceBenchmark = create<{
           user_confirmation: true,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -703,7 +755,7 @@ export const usePerfomanceBenchmark = create<{
           simulator_id: "",
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -736,7 +788,7 @@ export const usePerfomanceBenchmark = create<{
       return null;
     }
 
-    set({ loadingConfigurations: true });
+    set({ loadingConfigurations: true, configurationError: null });
     try {
       const response: any = await AppRequest.Post(
         `${tempApiBaseUrl}/benchmark/node-configurations`,
@@ -754,14 +806,25 @@ export const usePerfomanceBenchmark = create<{
           concurrency: get().stepOneData?.concurrent_requests || 10,
         },
       );
+      // Check for error response in body (API returns error object with 200/400 status)
+      if (response?.data?.object === "error" || response?.data?.code >= 400) {
+        const errorMessage =
+          response?.data?.message || "Failed to fetch configuration options";
+        set({ configurationError: errorMessage });
+        return null;
+      }
       if (response?.data) {
         set({ nodeConfigurations: response.data });
         return response.data as NodeConfigurationResponse;
       }
       return null;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching node configurations:", error);
-      errorToast("Failed to fetch configuration options");
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch configuration options";
+      set({ configurationError: errorMessage });
       return null;
     } finally {
       set({ loadingConfigurations: false });
@@ -796,7 +859,7 @@ export const usePerfomanceBenchmark = create<{
           replicas: config.replicas,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       return response;
     } catch (error) {
       console.error("Error saving configuration options:", error);

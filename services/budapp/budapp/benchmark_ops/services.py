@@ -657,6 +657,18 @@ class BenchmarkService(SessionMixin):
             status=db_benchmark.status,
             model=db_model,
             cluster=cluster_detail,
+            # Benchmark metadata
+            concurrency=db_benchmark.concurrency,
+            max_input_tokens=db_benchmark.max_input_tokens,
+            max_output_tokens=db_benchmark.max_output_tokens,
+            eval_with=db_benchmark.eval_with,
+            description=db_benchmark.description,
+            tags=db_benchmark.tags,
+            nodes=db_benchmark.nodes,
+            dataset_ids=db_benchmark.dataset_ids,
+            reason=db_benchmark.reason,
+            created_at=db_benchmark.created_at,
+            modified_at=db_benchmark.modified_at,
         )
 
     def get_field1_vs_field2_data(self, field1: str, field2: str, model_ids: Optional[List[str]] = None) -> dict:
@@ -1008,7 +1020,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
         """Get field1 vs field2 data."""
         # Use parameterized query to prevent SQL injection
         # Validate field names to prevent SQL injection
-        allowed_fields = ["prompt_len", "completion_len", "ttft", "tpot", "latency"]
+        allowed_fields = ["prompt_len", "output_len", "ttft", "tpot", "latency"]
         if field1 not in allowed_fields or field2 not in allowed_fields:
             raise ValueError(f"Invalid field names. Allowed fields: {allowed_fields}")
 

@@ -1,56 +1,30 @@
-import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import DeployModelSelect from "@/components/ui/bud/deploymentDrawer/DeployModelSelect";
-import React, { useEffect } from "react";
+import React from "react";
+import { useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
-import { useModels } from "src/hooks/useModels";
-import { useProjects } from "src/hooks/useProjects";
-import { useDeployModel } from "src/stores/useDeployModel";
-import ModelFilter from "@/components/ui/bud/deploymentDrawer/ModelFilter";
-import { StepComponentsType } from "..";
-import {
-  SpecificationTableItem,
-  SpecificationTableItemProps,
-} from "../components/SpecificationTableItem";
-import { capitalize, getFormattedToBillions } from "@/lib/utils";
-import { Image } from "antd"; // Added Checkbox import
+import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
+import { Image } from "antd";
 import { Text_12_400_B3B3B3, Text_24_600_EEEEEE } from "@/components/ui/text";
 
 export default function BenchmarkingFinished() {
-  const [page, setPage] = React.useState(1);
-  const [limit, setLimit] = React.useState(100);
-  const [models, setModels] = React.useState([]);
+  const router = useRouter();
+  const { currentWorkflow } = usePerfomanceBenchmark();
+  const { closeDrawer } = useDrawer();
 
-  const { loading, fetchModels } = useModels();
-  const [search, setSearch] = React.useState("");
-  const { selectedProjectId } = useProjects();
-  const {
-    selectedModel,
-    currentWorkflow,
-    createWorkflow,
-    updateModel,
-    setSelectedModel,
-  } = useDeployModel();
-  const {
-    openDrawerWithStep,
-    openDrawer,
-    setPreviousStep,
-    currentFlow,
-    step,
-    closeDrawer,
-  } = useDrawer();
-
-  useEffect(() => {}, []);
+  const handleViewReport = () => {
+    const benchmarkId = currentWorkflow?.workflow_id;
+    closeDrawer();
+    if (benchmarkId) {
+      router.push(`/modelRepo/benchmarks-history/${benchmarkId}`);
+    }
+  };
 
   return (
     <BudForm
       data={{}}
-      // disableNext={!selectedModel?.id}
-      onNext={async () => {
-        closeDrawer();
-      }}
+      onNext={handleViewReport}
       nextText="View Report"
     >
       <BudWraperBox>
