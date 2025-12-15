@@ -67,6 +67,7 @@ export type Dataset = {
   columns?: {};
   created_at?: string;
   description?: string;
+  display_name?: string;
   filename?: string;
   folder?: string;
   formatting?: string;
@@ -201,6 +202,9 @@ export const usePerfomanceBenchmark = create<{
   fetchNodeConfigurations: () => Promise<NodeConfigurationResponse | null>;
   setSelectedConfiguration: (config: SelectedConfiguration | null) => void;
   stepConfigurationOptions: () => Promise<any>;
+
+  // Cancel benchmark
+  cancelBenchmarkWorkflow: (workflowId: string) => Promise<any>;
 }>((set, get) => ({
   filters: {},
   totalPages: 0,
@@ -869,6 +873,27 @@ export const usePerfomanceBenchmark = create<{
       errorToast("Failed to save configuration options");
     } finally {
       get().setLoading(false);
+    }
+  },
+
+  // Cancel benchmark workflow
+  cancelBenchmarkWorkflow: async (workflowId: string) => {
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/cancel`,
+        {
+          workflow_id: workflowId,
+        },
+      );
+      if (response?.data) {
+        get().reset();
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error cancelling benchmark:", error);
+      errorToast("Failed to cancel benchmark");
+      return null;
     }
   },
 }));

@@ -317,3 +317,9 @@ class NodeConfigurationProxyResponse(BaseModel):
     device_configurations: list[DeviceTypeConfigurationResponse]
     selected_nodes: list[str]
     hardware_mode: str
+
+
+class CancelBenchmarkRequest(BaseModel):
+    """Request to cancel a running benchmark."""
+
+    workflow_id: UUID4

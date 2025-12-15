@@ -441,6 +441,131 @@ class BenchmarkService(SessionMixin):
             logger.error(f"Failed to perform run benchmark request: {e}")
             raise ClientException("Unable to perform run benchmark request to budcluster") from e
 
+    async def cancel_benchmark_workflow(self, workflow_id: UUID, current_user_id: UUID) -> None:
+        """Cancel a running benchmark workflow.
+
+        Args:
+            workflow_id: The ID of the workflow to cancel.
+            current_user_id: The ID of the current user.
+
+        Raises:
+            ClientException: If the workflow is not found, doesn't belong to user,
+                           is not a benchmark workflow, or is not in progress.
+        """
+        # Retrieve workflow
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowModel, {"id": workflow_id}, missing_ok=True
+        )
+        if not db_workflow:
+            raise ClientException("Workflow not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Validate user owns this workflow
+        if db_workflow.created_by != current_user_id:
+            raise ClientException("Not authorized to cancel this workflow", status_code=status.HTTP_403_FORBIDDEN)
+
+        # Validate workflow type
+        if db_workflow.workflow_type != WorkflowTypeEnum.MODEL_BENCHMARK:
+            raise ClientException("This workflow is not a benchmark workflow", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Validate workflow status
+        if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
+            raise ClientException("Benchmark is not currently running", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # Extract benchmark_id and dapr_workflow_id from workflow steps
+        keys_of_interest = [
+            "benchmark_id",
+            BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value,
+        ]
+
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        # Get dapr workflow id from budserve_cluster_events
+        budserve_cluster_response = required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value)
+        if not budserve_cluster_response:
+            raise ClientException("Benchmark process has not been initiated")
+
+        dapr_workflow_id = budserve_cluster_response.get("workflow_id")
+        if not dapr_workflow_id:
+            raise ClientException("Cannot find workflow ID for cancellation")
+
+        # Call budcluster cancel endpoint
+        try:
+            await self._perform_cancel_benchmark_request(dapr_workflow_id)
+        except ClientException as e:
+            raise e
+
+        # Update benchmark status to CANCELLED
+        benchmark_id = required_data.get("benchmark_id")
+        if benchmark_id:
+            with BenchmarkCRUD() as crud:
+                crud.update(
+                    data={"status": BenchmarkStatusEnum.CANCELLED},
+                    conditions={"id": benchmark_id},
+                )
+                logger.info(f"Benchmark {benchmark_id} status updated to CANCELLED")
+
+        # Delete the workflow
+        await WorkflowDataManager(self.session).delete_one(db_workflow)
+        logger.info(f"Workflow {workflow_id} deleted after cancellation")
+
+        # Send notification to user
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_workflow.title or "Benchmark",
+                message="Benchmark cancelled",
+                icon=db_workflow.icon or APP_ICONS["general"]["model_mono"],
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.MODEL_BENCHMARK_CANCELLED.value)
+            .set_notification_request(subscriber_ids=[str(current_user_id)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+    async def _perform_cancel_benchmark_request(self, workflow_id: str) -> dict:
+        """Perform cancel benchmark request to budcluster service.
+
+        Args:
+            workflow_id: The Dapr workflow ID to cancel.
+
+        Returns:
+            dict: Response from budcluster service.
+
+        Raises:
+            ClientException: If the request fails.
+        """
+        cancel_benchmark_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+
+        logger.debug(f"Performing cancel benchmark request to budcluster: {cancel_benchmark_endpoint}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cancel_benchmark_endpoint) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to cancel benchmark: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to cancel benchmark", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug("Successfully cancelled benchmark")
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.exception(f"Failed to send cancel benchmark request: {e}")
+            raise ClientException(
+                "Failed to cancel benchmark", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
+
     async def update_benchmark_status_from_notification_event(self, payload: NotificationPayload) -> None:
         """Add benchmark from notification event."""
         # Get workflow and workflow steps

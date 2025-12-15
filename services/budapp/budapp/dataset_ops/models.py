@@ -25,6 +25,7 @@ class DatasetSchema(PSQLBase, TimestampMixin):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String, nullable=True)
     description: Mapped[str] = mapped_column(String, nullable=True)
     tags: Mapped[dict] = mapped_column(JSONB, nullable=True)
     hf_hub_url: Mapped[str] = mapped_column(String, nullable=True)

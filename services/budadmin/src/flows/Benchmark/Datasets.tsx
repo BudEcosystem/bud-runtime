@@ -3,7 +3,7 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DeployModelSelect from "@/components/ui/bud/deploymentDrawer/DeployModelSelect";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import { useProjects } from "src/hooks/useProjects";
@@ -34,6 +34,23 @@ import {
   Dataset,
   usePerfomanceBenchmark,
 } from "src/stores/usePerfomanceBenchmark";
+
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 const defaultFilter = {
   name: "",
 };
@@ -114,39 +131,19 @@ function CardWithCheckBox({
       onMouseLeave={() => setHover(false)}
       className={`py-[.85rem] hover:bg-[#FFFFFF03] cursor-pointer hover:shadow-lg px-[1.4rem] border-b-[0.5px] border-t-[0.5px] border-t-[transparent] border-b-[#1F1F1F] hover:border-t-[.5px] hover:border-[#757575] flex-row flex items-start border-box ${ClassNames}`}
     >
-      <div className="mr-[1rem] flex flex-col justify-center">
-        <div className="bg-[#1F1F1F] w-[2.6875rem] h-[2.6875rem] rounded-[.52rem] flex justify-center items-center grow-0 shrink-0">
-          <Image
-            preview={false}
-            src={data.icon || "/images/drawer/zephyr.png"}
-            style={{ width: "1.67969rem", height: "1.67969rem" }}
-            alt="home"
-          />
-        </div>
-      </div>
-      <div className="flex-auto max-w-[91%]">
+      <div className="flex-auto max-w-[100%]">
         <div className="flex items-center justify-between max-w-[100%]">
           <div className="flex justify-start items-center gap-[.6rem] pb-[0.625rem]">
             <Text_14_400_EEEEEE className="leading-[100%]">
-              {data.name}
+              {data.display_name || data.name}
             </Text_14_400_EEEEEE>
             <div className="flex justify-start items-center gap-[.5rem]">
-              {/* {data.tags.map((item, index) => ( */}
               <Tags
-                // key={index}
-                name={data.formatting}
-                color="#D1B854"
-                classNames="py-[.32rem] "
-                textClass="leading-[100%] text-[.625rem] font-[400]"
-              />
-              <Tags
-                // key={index}
                 name={`${data.num_samples} Samples`}
                 color="#D1B854"
                 classNames="py-[.32rem] "
                 textClass="leading-[100%] text-[.625rem] font-[400]"
               />
-              {/* ))} */}
             </div>
           </div>
           <div className="w-[0.875rem] h-[0.875rem]">
@@ -176,6 +173,8 @@ export default function Datasets() {
   const [models, setModels] = React.useState([]);
 
   const [searchValue, setSearch] = React.useState("");
+  const debouncedSearchValue = useDebounce(searchValue, 300);
+
   const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } =
     useDrawer();
   const {
@@ -194,24 +193,32 @@ export default function Datasets() {
     name?: string;
   }>(defaultFilter);
 
+  // Load all datasets once on mount
   const load = useCallback(async () => {
     getDataset({
-      ...filter,
       page: currentPage,
       limit: pageSize,
-      name: searchValue ? searchValue : undefined,
-      search: !!searchValue,
       order_by: `${order}${orderBy}`,
     });
-  }, [currentPage, pageSize, searchValue]);
+  }, [currentPage, pageSize]);
 
   useEffect(() => {
     load();
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [searchValue]);
+  // Frontend filtering with debounced search
+  const filteredDataset = useMemo(() => {
+    if (!dataset) return [];
+    if (!debouncedSearchValue.trim()) return dataset;
+
+    const searchLower = debouncedSearchValue.toLowerCase().trim();
+    return dataset.filter((item: Dataset) =>
+      item.name?.toLowerCase().includes(searchLower) ||
+      item.description?.toLowerCase().includes(searchLower) ||
+      item.filename?.toLowerCase().includes(searchLower)
+    );
+  }, [dataset, debouncedSearchValue]);
+
   useEffect(() => {
     console.log("selectedDataset", selectedDataset);
   }, [selectedDataset]);
@@ -420,7 +427,9 @@ export default function Datasets() {
                 <Text_12_400_757575>
                   Datasets Available&nbsp;
                 </Text_12_400_757575>
-                <Text_12_600_EEEEEE>{totalDataset}</Text_12_600_EEEEEE>
+                <Text_12_600_EEEEEE>
+                  {debouncedSearchValue ? `${filteredDataset.length} / ${totalDataset}` : totalDataset}
+                </Text_12_600_EEEEEE>
               </div>
               <div className="flex items-center justify-start gap-[.7rem]">
                 <Text_12_600_EEEEEE>Select All</Text_12_600_EEEEEE>
@@ -433,11 +442,11 @@ export default function Datasets() {
             </div>
           </DrawerCard>
           <div className="">
-            {dataset?.length > 0 ? (
+            {filteredDataset?.length > 0 ? (
               <>
-                {dataset?.map((data: Dataset, index) => (
+                {filteredDataset?.map((data: Dataset, index) => (
                   <CardWithCheckBox
-                    key={index}
+                    key={data.id || index}
                     data={data}
                     handleClick={() => {
                       setSelectedDataset(data);
@@ -450,7 +459,9 @@ export default function Datasets() {
               </>
             ) : (
               <div className="flex justify-center items-center min-h-[4rem]">
-                <Text_12_300_EEEEEE>No dataset available</Text_12_300_EEEEEE>
+                <Text_12_300_EEEEEE>
+                  {debouncedSearchValue ? "No datasets match your search" : "No dataset available"}
+                </Text_12_300_EEEEEE>
               </div>
             )}
           </div>

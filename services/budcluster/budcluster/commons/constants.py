@@ -114,3 +114,4 @@ class BenchmarkStatusEnum(Enum):
     SUCCESS = "success"
     FAILED = "failed"
     PROCESSING = "processing"
+    CANCELLED = "cancelled"

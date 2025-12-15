@@ -14,6 +14,7 @@ class DatasetResponse(BaseModel):
 
     id: UUID
     name: str
+    display_name: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[dict] = None
     hf_hub_url: Optional[str] = None
@@ -42,6 +43,7 @@ class DatasetFilter(BaseModel):
 
 
 class DatasetUpdate(BaseModel):
+    display_name: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[dict] = None
     hf_hub_url: Optional[str] = None
