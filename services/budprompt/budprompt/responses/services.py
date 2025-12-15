@@ -93,6 +93,13 @@ class ResponsesService:
         # Optional response attributes
         if result.status:
             span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_STATUS, result.status)
+        if result.instructions:
+            span.set_attribute(
+                GenAIAttributes.GEN_AI_SYSTEM_INSTRUCTIONS,
+                result.instructions
+                if isinstance(result.instructions, str)
+                else json.dumps([item.model_dump() for item in result.instructions]),
+            )
 
         # Sampling parameters
         if result.temperature is not None:
@@ -155,16 +162,13 @@ class ResponsesService:
         span.set_attribute(GenAIAttributes.GEN_AI_PROMPT_VERSION, prompt_params.version or "default")
         span.set_attribute(
             GenAIAttributes.GEN_AI_PROMPT_VARIABLES,
-            json.dumps(prompt_params.variables) if prompt_params.variables else "null",
+            json.dumps(prompt_params.variables) if prompt_params.variables else "{}",
         )
-        span.set_attribute(
-            GenAIAttributes.GEN_AI_INPUT_MESSAGES,
-            json.dumps(input)
-            if isinstance(input, str)
-            else json.dumps([item.model_dump() for item in input])
-            if input
-            else "null",
-        )
+        if input:
+            span.set_attribute(
+                GenAIAttributes.GEN_AI_INPUT_MESSAGES,
+                input if isinstance(input, str) else json.dumps([item.model_dump() for item in input]),
+            )
 
         # Track if streaming (span cleanup handled by generator)
         is_streaming = False
