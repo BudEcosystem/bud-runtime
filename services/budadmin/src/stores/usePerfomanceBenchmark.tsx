@@ -127,6 +127,7 @@ export type SelectedConfiguration = {
   tp_size: number;
   pp_size: number;
   replicas: number;
+  num_prompts?: number;
 };
 
 export const usePerfomanceBenchmark = create<{
@@ -365,6 +366,7 @@ export const usePerfomanceBenchmark = create<{
             tp_size: steps.tp_size,
             pp_size: steps.pp_size,
             replicas: steps.replicas,
+            num_prompts: steps.num_prompts,
           } : existingState.selectedConfiguration,
         });
 
@@ -857,6 +859,7 @@ export const usePerfomanceBenchmark = create<{
           tp_size: config.tp_size,
           pp_size: config.pp_size,
           replicas: config.replicas,
+          num_prompts: config.num_prompts,
         },
       );
       await get().getWorkflow();

@@ -56,6 +56,7 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     tp_size: Optional[int] = None
     pp_size: Optional[int] = None
     replicas: Optional[int] = None
+    num_prompts: Optional[int] = None  # Total prompts to run (defaults to sum of dataset num_samples)
 
     # step 7
     credential_id: Optional[UUID] = None

@@ -820,11 +820,11 @@ const BenchmarkResult = () => {
 
   const processChartData = (Data: any, chartType: "input" | "output") => {
     // Input: avg_ttft, avg_tpot (no latency)
-    // Output: avg_tpot, avg_latency (no ttft)
+    // Output: avg_latency, avg_tpot (no ttft) - TPOT second to match Input chart colors
     const dimensions =
       chartType === "input"
         ? ["product", "avg_ttft", "avg_tpot"]
-        : ["product", "avg_tpot", "avg_latency"];
+        : ["product", "avg_latency", "avg_tpot"];
 
     // Helper to round bin_range values to integers (e.g., "0-26.1" -> "0-26")
     const formatBinRange = (binRange: string | undefined, binId: number) => {
@@ -1083,13 +1083,13 @@ const BenchmarkResult = () => {
                 {modelClusterDetails?.eval_with || "-"}
               </Text_14_400_EEEEEE>
             </div>
-            {modelClusterDetails?.eval_with === "dataset" && modelClusterDetails?.dataset_ids && (
+            {modelClusterDetails?.eval_with === "dataset" && modelClusterDetails?.dataset_names && (
               <>
                 <div className="w-[1px] h-[2.5rem] bg-[#1F1F1F]" />
                 <div className="flex flex-col">
-                  <Text_12_400_757575>Datasets</Text_12_400_757575>
+                  <Text_12_400_757575>Dataset</Text_12_400_757575>
                   <Text_14_400_EEEEEE className="mt-[.25rem]">
-                    {modelClusterDetails?.dataset_ids?.length || 0}
+                    {modelClusterDetails?.dataset_names?.join(", ") || "-"}
                   </Text_14_400_EEEEEE>
                 </div>
               </>
@@ -1099,6 +1099,15 @@ const BenchmarkResult = () => {
               <Text_12_400_757575>Hardware Mode</Text_12_400_757575>
               <Text_14_400_EEEEEE className="mt-[.25rem] capitalize">
                 {modelClusterDetails?.nodes?.[0]?.hardware_mode || "-"}
+              </Text_14_400_EEEEEE>
+            </div>
+            <div className="w-[1px] h-[2.5rem] bg-[#1F1F1F]" />
+            <div className="flex flex-col">
+              <Text_12_400_757575>Run Date</Text_12_400_757575>
+              <Text_14_400_EEEEEE className="mt-[.25rem]">
+                {modelClusterDetails?.created_at
+                  ? formatDate(modelClusterDetails.created_at)
+                  : "-"}
               </Text_14_400_EEEEEE>
             </div>
             {/* <div className="w-[1px] h-[2.5rem] bg-[#1F1F1F]" />
@@ -1257,18 +1266,13 @@ const BenchmarkResult = () => {
           </div>
           {/* Summary cards============== */}
           <div className="hR my-[1.5rem]"></div>
-          {/* perfomance table */}
-          <div>
-            <PerfomanceTable />
-          </div>
-          {/* perfomance table============== */}
-          <div className="hR mt-[1.5rem] mb-[1.1rem]"></div>
           {/* Benchmark analysis */}
           <div>
             <div className="">
               <Text_20_400_EEEEEE>Benchmark Analysis</Text_20_400_EEEEEE>
               <Text_16_400_757575 className="pt-[.15rem]">
-                Description
+                Detailed performance metrics including latency correlations,
+                input size impact, and token distribution patterns.
               </Text_16_400_757575>
             </div>
             <div className="flex justify-between items-start flex-wrap pt-[1.25rem] pb-[2rem] gap-y-[1.1rem]">
@@ -1285,6 +1289,12 @@ const BenchmarkResult = () => {
             </div>
           </div>
           {/* Benchmark analysis============== */}
+          <div className="hR mt-[1.5rem] mb-[1.1rem]"></div>
+          {/* perfomance table */}
+          <div>
+            <PerfomanceTable />
+          </div>
+          {/* perfomance table============== */}
         </div>
       </div>
     </DashBoardLayout>

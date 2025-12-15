@@ -616,6 +616,7 @@ class CreateDeploymentWorkflow:
                 datasets=run_benchmark_request_json.datasets,
                 benchmark_id=benchmark_id,
                 model_type=run_benchmark_request_json.model_type,
+                num_prompts=run_benchmark_request_json.num_prompts,
             )  # noqa: F841
             workflow_status = check_workflow_status_in_statestore(workflow_id)
             if workflow_status:
@@ -1077,6 +1078,7 @@ class CreateDeploymentWorkflow:
             output_tokens=deployment_request_json.output_tokens,
             datasets=deployment_request_json.datasets,
             model_type=model_type,
+            num_prompts=deployment_request_json.num_prompts,
         )
         workflow_run_performance_benchmark_request = WorkflowRunPerformanceBenchmarkRequest(
             cluster_config=deployment_request_json.cluster_config,
@@ -1708,6 +1710,7 @@ class CreateCloudDeploymentWorkflow:
             output_tokens=deployment_request_json.output_tokens,
             datasets=deployment_request_json.datasets,
             model_type=model_type,
+            num_prompts=deployment_request_json.num_prompts,
         )
         workflow_run_performance_benchmark_request = WorkflowRunPerformanceBenchmarkRequest(
             cluster_config=deployment_request_json.cluster_config,

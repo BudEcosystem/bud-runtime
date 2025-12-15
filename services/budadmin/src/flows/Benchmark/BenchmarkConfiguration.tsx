@@ -141,6 +141,13 @@ export default function BenchmarkConfiguration() {
       icon: "/images/drawer/tag.png",
       children: [],
     },
+    {
+      name: "Number of Prompts",
+      value: workflowData?.num_prompts ? [`${workflowData.num_prompts}`] : ["Default (dataset samples)"],
+      full: true,
+      icon: "/images/drawer/tag.png",
+      children: [],
+    },
   ];
 
   const hasConfiguration =

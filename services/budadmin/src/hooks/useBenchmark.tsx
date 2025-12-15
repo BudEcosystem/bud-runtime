@@ -57,6 +57,7 @@ export type ModelClusterDetails = {
   tags?: any[];
   nodes?: any[];
   dataset_ids?: string[];
+  dataset_names?: string[];
   reason?: string;
   created_at?: string;
   modified_at?: string;

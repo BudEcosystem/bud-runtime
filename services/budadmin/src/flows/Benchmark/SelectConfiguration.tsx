@@ -23,6 +23,7 @@ function ConfigurationFormContent({
   configurationError,
   selectedConfiguration,
   hardwareMode,
+  totalDatasetSamples,
   onConfigChange,
 }: {
   nodeConfigurations: any;
@@ -30,7 +31,8 @@ function ConfigurationFormContent({
   configurationError: string | null;
   selectedConfiguration: SelectedConfiguration | null;
   hardwareMode: string | null;
-  onConfigChange: (config: { deviceType: string | null; tppp: TPPPOption | null; replicas: number }) => void;
+  totalDatasetSamples: number;
+  onConfigChange: (config: { deviceType: string | null; tppp: TPPPOption | null; replicas: number; numPrompts?: number }) => void;
 }) {
   const { form } = useContext(BudFormContext);
 
@@ -40,6 +42,9 @@ function ConfigurationFormContent({
   const [selectedTPPP, setSelectedTPPP] = useState<TPPPOption | null>(null);
   const [replicas, setReplicas] = useState<number>(
     selectedConfiguration?.replicas || 1
+  );
+  const [numPrompts, setNumPrompts] = useState<number | undefined>(
+    selectedConfiguration?.num_prompts || undefined
   );
 
   // Get currently selected device config
@@ -104,8 +109,8 @@ function ConfigurationFormContent({
 
   // Notify parent of config changes
   useEffect(() => {
-    onConfigChange({ deviceType: selectedDeviceType, tppp: selectedTPPP, replicas });
-  }, [selectedDeviceType, selectedTPPP, replicas]);
+    onConfigChange({ deviceType: selectedDeviceType, tppp: selectedTPPP, replicas, numPrompts });
+  }, [selectedDeviceType, selectedTPPP, replicas, numPrompts]);
 
   // Transform device configurations to dropdown items
   const deviceTypeItems = nodeConfigurations?.device_configurations?.map((config: any) => ({
@@ -202,6 +207,20 @@ function ConfigurationFormContent({
               }}
             />
           )}
+
+          {/* Number of Prompts */}
+          <TextInput
+            name="num_prompts"
+            label="Number of Prompts"
+            placeholder={totalDatasetSamples > 0 ? `Default: ${totalDatasetSamples} (from datasets)` : "Enter number of prompts"}
+            infoText="Total prompts to run. If not set, defaults to sum of dataset samples."
+            allowOnlyNumbers={true}
+            rules={[]}
+            onChange={(value) => {
+              const numValue = value ? parseInt(value) : undefined;
+              setNumPrompts(numValue);
+            }}
+          />
         </div>
       )}
     </>
@@ -222,13 +241,21 @@ export default function SelectConfiguration() {
     setRunAsSimulation,
     stepSeven,
     stepEight,
+    selectedDataset,
   } = usePerfomanceBenchmark();
 
   const [currentConfig, setCurrentConfig] = useState<{
     deviceType: string | null;
     tppp: TPPPOption | null;
     replicas: number;
-  }>({ deviceType: null, tppp: null, replicas: 1 });
+    numPrompts?: number;
+  }>({ deviceType: null, tppp: null, replicas: 1, numPrompts: undefined });
+
+  // Calculate total dataset samples for default placeholder
+  const totalDatasetSamples = selectedDataset.reduce(
+    (sum, dataset) => sum + (dataset.num_samples || 0),
+    0
+  );
 
   // Fetch configurations on mount
   useEffect(() => {
@@ -246,6 +273,7 @@ export default function SelectConfiguration() {
       tp_size: currentConfig.tppp.tp_size,
       pp_size: currentConfig.tppp.pp_size,
       replicas: currentConfig.replicas,
+      num_prompts: currentConfig.numPrompts,
     };
 
     setSelectedConfiguration(config);
@@ -292,6 +320,7 @@ export default function SelectConfiguration() {
             configurationError={configurationError}
             selectedConfiguration={selectedConfiguration}
             hardwareMode={hardwareMode}
+            totalDatasetSamples={totalDatasetSamples}
             onConfigChange={setCurrentConfig}
           />
         </BudDrawerLayout>

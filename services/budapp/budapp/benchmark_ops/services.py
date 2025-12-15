@@ -277,6 +277,7 @@ class BenchmarkService(SessionMixin):
                 "tp_size",
                 "pp_size",
                 "replicas",
+                "num_prompts",
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
@@ -651,6 +652,18 @@ class BenchmarkService(SessionMixin):
         db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": db_benchmark.model_id})
         cluster_id = db_benchmark.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+
+        # Fetch dataset names if dataset_ids are present
+        dataset_names = []
+        if db_benchmark.dataset_ids:
+            with DatasetCRUD() as dataset_crud, dataset_crud.get_session() as dataset_session:
+                for dataset_id in db_benchmark.dataset_ids:
+                    db_dataset = dataset_crud.fetch_one(
+                        conditions={"id": dataset_id}, session=dataset_session, raise_on_error=False
+                    )
+                    if db_dataset:
+                        dataset_names.append(db_dataset.name)
+
         return ModelClusterDetail(
             id=db_benchmark.id,
             name=db_benchmark.name,
@@ -666,6 +679,7 @@ class BenchmarkService(SessionMixin):
             tags=db_benchmark.tags,
             nodes=db_benchmark.nodes,
             dataset_ids=db_benchmark.dataset_ids,
+            dataset_names=dataset_names if dataset_names else None,
             reason=db_benchmark.reason,
             created_at=db_benchmark.created_at,
             modified_at=db_benchmark.modified_at,
@@ -1031,7 +1045,6 @@ class BenchmarkRequestMetricsService(SessionMixin):
             FROM benchmark_request_metrics as b
             WHERE b.benchmark_id = :benchmark_id
         """
-        print(GET_DATA_QUERY)
         with BenchmarkRequestMetricsCRUD() as crud:
             analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params={"benchmark_id": benchmark_id})
 
