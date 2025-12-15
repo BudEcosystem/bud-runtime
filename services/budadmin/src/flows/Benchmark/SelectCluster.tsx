@@ -19,80 +19,6 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
 
 const SelectCluster: React.FC = (props: {}) => {
-  const list = {
-    clusters: [
-      {
-        id: "4d945f5b-a63b-4d36-b2ce-b5790c1e1c24",
-        cluster_id: "fe60be3f-8223-450e-a27a-b8a0b8ace1bd",
-        name: "Dev Cluster",
-        cost_per_token: 0.270178787700196,
-        total_resources: 1,
-        resources_used: 0,
-        resource_details: [
-          {
-            type: "CPU",
-            available: 1,
-            total: 1,
-          },
-        ],
-        required_devices: [
-          {
-            device_type: "cpu",
-            num_replicas: 1,
-            concurrency: 100,
-            cost_per_million_tokens: 0.270178787700196,
-          },
-        ],
-        benchmarks: {
-          replicas: 1,
-          concurrency: {
-            label: "Better",
-            value: 100,
-          },
-          ttft: null,
-          e2e_latency: null,
-          per_session_tokens_per_sec: null,
-          over_all_throughput: null,
-        },
-      },
-      {
-        id: "c8babaf4-ddc4-4361-bdee-cb8e492852e1",
-        cluster_id: "a12a48ac-22ef-4161-9581-629116b105e4",
-        name: "SPR",
-        cost_per_token: 0.4590258467128041,
-        total_resources: 16,
-        resources_used: 0,
-        resource_details: [
-          {
-            type: "CPU",
-            available: 16,
-            total: 16,
-          },
-        ],
-        required_devices: [
-          {
-            device_type: "cpu",
-            num_replicas: 1,
-            concurrency: 100,
-            cost_per_million_tokens: 0.4590258467128041,
-          },
-        ],
-        benchmarks: {
-          replicas: 1,
-          concurrency: {
-            label: "Better",
-            value: 100,
-          },
-          ttft: null,
-          e2e_latency: null,
-          per_session_tokens_per_sec: null,
-          over_all_throughput: null,
-        },
-      },
-    ],
-    status: "success",
-    workflow_id: "4e8e755e-395c-4d9e-b453-714bb7927526",
-  };
   const {
     currentWorkflow,
     currentWorkflowId,
@@ -143,10 +69,9 @@ const SelectCluster: React.FC = (props: {}) => {
       onNext={() => {
         stepThree().then((result) => {
           if (result) {
-            openDrawerWithStep("Select-Nodes");
+            openDrawerWithStep("Select-Hardware-Mode");
           }
         });
-        // openDrawerWithStep("Select-Nodes");
       }}
     >
       <BudWraperBox>
@@ -192,8 +117,7 @@ const SelectCluster: React.FC = (props: {}) => {
             </div>
             <div className="clusterCardWrap w-full ">
               <div className="clusterCard w-full mt-[0rem]">
-                {/* {recommendedCluster?.clusters?.length > 0 ? */}
-                {list?.clusters?.length > 0 ? (
+                {filteredClusters?.length > 0 ? (
                   <ClusterList
                     clusters={filteredClusters}
                     handleClusterSelection={(cluster) => {

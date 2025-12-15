@@ -180,6 +180,18 @@ class ModelClusterDetail(BaseModel):
     model: ModelDetailResponse
     cluster: Optional[ClusterResponse] = None
     deployment_config: Optional[dict] = None
+    # Benchmark metadata fields
+    concurrency: Optional[int] = None
+    max_input_tokens: Optional[int] = None
+    max_output_tokens: Optional[int] = None
+    eval_with: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[list] = None
+    nodes: Optional[list] = None
+    dataset_ids: Optional[list] = None
+    reason: Optional[str] = None
+    created_at: Optional[datetime] = None
+    modified_at: Optional[datetime] = None
 
 
 class ModelClusterDetailResponse(SuccessResponse):

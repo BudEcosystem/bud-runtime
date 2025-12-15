@@ -274,11 +274,21 @@ const BenchmarksTable = ({ showTableTitle }: { showTableTitle?: boolean }) => {
             title: "Node Type",
             dataIndex: "node_type",
             key: "node_type",
-            render: (text) => (
-              <div className="flex gap-[.4rem]">
-                <Text_12_400_EEEEEE>{text.toUpperCase()}</Text_12_400_EEEEEE>
-              </div>
-            ),
+            render: (text) => {
+              // Map node_type values to display labels
+              const getNodeTypeLabel = (nodeType: string) => {
+                if (!nodeType) return "-";
+                if (nodeType.toLowerCase().startsWith("cpu")) return "CPU";
+                if (nodeType.toLowerCase().startsWith("gpu")) return "GPU";
+                if (nodeType.toLowerCase().startsWith("hpu")) return "HPU";
+                return nodeType.toUpperCase();
+              };
+              return (
+                <div className="flex gap-[.4rem]">
+                  <Text_12_400_EEEEEE>{getNodeTypeLabel(text)}</Text_12_400_EEEEEE>
+                </div>
+              );
+            },
             sortIcon: SortIcon,
           },
           {

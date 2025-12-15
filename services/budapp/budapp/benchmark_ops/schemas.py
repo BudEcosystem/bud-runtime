@@ -40,6 +40,9 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     cluster_id: Optional[UUID] = None
     bud_cluster_id: Optional[UUID] = None
 
+    # step 3.5 - hardware mode
+    hardware_mode: Optional[Literal["dedicated", "shared"]] = None
+
     # step 4
     nodes: Optional[list[dict[str, Any]]] = None
 
@@ -48,13 +51,19 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     model: Optional[str] = None
     provider_type: Optional[str] = None
 
-    # step 6
-    credential_id: Optional[UUID] = None
+    # step 6 - configuration options (TP/PP/replicas)
+    selected_device_type: Optional[str] = None
+    tp_size: Optional[int] = None
+    pp_size: Optional[int] = None
+    replicas: Optional[int] = None
 
     # step 7
-    user_confirmation: Optional[bool] = None
+    credential_id: Optional[UUID] = None
 
     # step 8
+    user_confirmation: Optional[bool] = None
+
+    # step 9
     run_as_simulation: Optional[bool] = None
 
 
@@ -249,3 +258,61 @@ class BenchmarkFilterValueResponse(PaginatedSuccessResponse):
     """Benchmark filter values response schema."""
 
     result: list[str]
+
+
+# Node Configuration Proxy Schemas
+class NodeConfigurationProxyRequest(BaseModel):
+    """Request to get node configuration options from budsim."""
+
+    model_id: UUID
+    cluster_id: UUID
+    hostnames: list[str]
+    hardware_mode: Literal["dedicated", "shared"] = "dedicated"
+    input_tokens: int = 1024
+    output_tokens: int = 512
+    concurrency: int = 10
+
+
+class TPPPOptionResponse(BaseModel):
+    """TP/PP option response from budsim."""
+
+    tp_size: int
+    pp_size: int
+    max_replicas: int
+    total_devices_needed: int
+    description: str
+
+
+class DeviceTypeConfigurationResponse(BaseModel):
+    """Device configuration response from budsim."""
+
+    device_type: str
+    device_name: Optional[str] = None
+    device_model: Optional[str] = None
+    total_devices: int
+    nodes_count: int
+    max_devices_per_node: int
+    memory_per_device_gb: float
+    tp_pp_options: list[TPPPOptionResponse]
+    min_tp_required: int
+    supports_pipeline_parallelism: bool
+
+
+class ModelMemoryInfoResponse(BaseModel):
+    """Model memory info response from budsim."""
+
+    model_id: UUID
+    model_name: Optional[str] = None
+    model_uri: Optional[str] = None
+    estimated_weight_memory_gb: float
+    min_tp_for_model: int
+
+
+class NodeConfigurationProxyResponse(BaseModel):
+    """Response for node configuration options."""
+
+    cluster_id: UUID
+    model_info: ModelMemoryInfoResponse
+    device_configurations: list[DeviceTypeConfigurationResponse]
+    selected_nodes: list[str]
+    hardware_mode: str

@@ -1034,6 +1034,87 @@ class SimulatorHandler:
             raise Exception(f"Failed to get simulator config: {str(e)}") from e
         return node_list, metadata
 
+    async def get_benchmark_config(
+        self,
+        cluster_id: UUID,
+        model_id: UUID,
+        model_uri: str,
+        hostnames: list[str],
+        device_type: str,
+        tp_size: int,
+        pp_size: int,
+        replicas: int,
+        input_tokens: int = 1024,
+        output_tokens: int = 512,
+        concurrency: int = 10,
+        hardware_mode: str = "dedicated",
+    ):
+        """Get benchmark deployment configuration from BudSim.
+
+        This calls the /simulator/benchmark-config endpoint which generates
+        full deployment configuration from user-selected parameters.
+
+        Args:
+            cluster_id: The cluster ID
+            model_id: The model ID
+            model_uri: The model URI/path
+            hostnames: List of selected node hostnames
+            device_type: Selected device type (cuda, cpu, hpu)
+            tp_size: Tensor parallelism size
+            pp_size: Pipeline parallelism size
+            replicas: Number of replicas
+            input_tokens: Expected input token count
+            output_tokens: Expected output token count
+            concurrency: Expected concurrent requests
+            hardware_mode: Hardware mode (dedicated or shared)
+
+        Returns:
+            list: Node groups with full deployment configuration
+        """
+        request_data = {
+            "cluster_id": str(cluster_id),
+            "model_id": str(model_id),
+            "model_uri": model_uri,
+            "hostnames": hostnames,
+            "device_type": device_type,
+            "tp_size": tp_size,
+            "pp_size": pp_size,
+            "replicas": replicas,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "concurrency": concurrency,
+            "hardware_mode": hardware_mode,
+        }
+
+        logger.info(f"Getting benchmark config from budsim: {request_data}")
+        try:
+            url = (
+                f"http://localhost:{app_settings.dapr_http_port}/v1.0/invoke/budsim/method/simulator/benchmark-config"
+            )
+            async with AsyncHTTPClient() as http_client:
+                response = await http_client.send_request(
+                    "POST",
+                    url,
+                    json=request_data,
+                    follow_redirects=True,
+                )
+                response_str = response.body.decode("utf-8")
+                logger.info(f"Response from budsim benchmark-config: {response_str}")
+                if response.status_code != 200:
+                    raise Exception(f"Failed to get benchmark config: {response_str}")
+
+                response_data = json.loads(response_str)
+                node_groups = response_data.get("node_groups", [])
+
+                if not node_groups:
+                    raise Exception("No node groups returned from benchmark config endpoint")
+
+                logger.info(f"Received {len(node_groups)} node groups for benchmark")
+                return node_groups
+
+        except Exception as e:
+            raise Exception(f"Failed to get benchmark config: {str(e)}") from e
+
 
 class BudserveHandler:
     """BudserveHandler is responsible for interacting with the bud-serve service."""

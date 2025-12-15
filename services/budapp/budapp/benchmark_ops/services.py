@@ -267,10 +267,16 @@ class BenchmarkService(SessionMixin):
                 # "use_cache",
                 "cluster_id",
                 "bud_cluster_id",
+                "hardware_mode",
                 "nodes",
                 "model_id",
                 "model",
                 "provider_type",
+                # Configuration options (step 6)
+                "selected_device_type",
+                "tp_size",
+                "pp_size",
+                "replicas",
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
@@ -299,6 +305,12 @@ class BenchmarkService(SessionMixin):
             if missing_keys:
                 raise ClientException(f"Missing required data for run benchmark workflow: {', '.join(missing_keys)}")
 
+            # Apply hardware_mode to each node for budcluster deployment
+            hardware_mode = required_data.get("hardware_mode", "dedicated")
+            if "nodes" in required_data and required_data["nodes"]:
+                for node in required_data["nodes"]:
+                    node["hardware_mode"] = hardware_mode
+
             try:
                 if "datasets" in required_data:
                     with DatasetCRUD() as crud:
@@ -320,6 +332,26 @@ class BenchmarkService(SessionMixin):
         self, current_step_number: int, request: dict, db_workflow: WorkflowModel, current_user_id: UUID
     ):
         """Add run benchmark workflow step."""
+        # Fetch cluster settings for storage configuration
+        default_storage_class = None
+        default_access_mode = None
+        cluster_id = request.get("cluster_id")
+        if cluster_id:
+            try:
+                cluster_service = ClusterService(self.session)
+                cluster_settings = await cluster_service.get_cluster_settings(cluster_id)
+                if cluster_settings:
+                    default_storage_class = cluster_settings.default_storage_class
+                    default_access_mode = cluster_settings.default_access_mode
+                    logger.debug(
+                        "Using cluster defaults for %s -> storage_class=%s access_mode=%s",
+                        cluster_id,
+                        default_storage_class,
+                        default_access_mode,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to fetch cluster settings for cluster %s: %s", cluster_id, exc)
+
         # insert benchmark in budapp db
         benchmark_id = None
         with BenchmarkCRUD() as crud:
@@ -354,6 +386,9 @@ class BenchmarkService(SessionMixin):
                 "workflow_id": str(db_workflow.id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            # Storage configuration from cluster settings
+            "default_storage_class": default_storage_class,
+            "default_access_mode": default_access_mode,
         }
 
         # Update current workflow step
@@ -612,17 +647,28 @@ class BenchmarkService(SessionMixin):
                 raise HTTPException(
                     detail=f"Benchmark not found: {benchmark_id}", status_code=status.HTTP_404_NOT_FOUND
                 )
-        model_id = db_benchmark.model_id
-        model_detail_json_response = await ModelService(self.session).retrieve_model(model_id)
-        model_detail = json.loads(model_detail_json_response.body.decode("utf-8"))
+        # Get model directly via ORM (like endpoint version does)
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": db_benchmark.model_id})
         cluster_id = db_benchmark.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
         return ModelClusterDetail(
             id=db_benchmark.id,
             name=db_benchmark.name,
             status=db_benchmark.status,
-            model=model_detail["model"],
+            model=db_model,
             cluster=cluster_detail,
+            # Benchmark metadata
+            concurrency=db_benchmark.concurrency,
+            max_input_tokens=db_benchmark.max_input_tokens,
+            max_output_tokens=db_benchmark.max_output_tokens,
+            eval_with=db_benchmark.eval_with,
+            description=db_benchmark.description,
+            tags=db_benchmark.tags,
+            nodes=db_benchmark.nodes,
+            dataset_ids=db_benchmark.dataset_ids,
+            reason=db_benchmark.reason,
+            created_at=db_benchmark.created_at,
+            modified_at=db_benchmark.modified_at,
         )
 
     def get_field1_vs_field2_data(self, field1: str, field2: str, model_ids: Optional[List[str]] = None) -> dict:
@@ -743,6 +789,87 @@ class BenchmarkService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(
             db_workflow, {"progress": bud_simulation_response, "current_step": workflow_current_step}
         )
+
+    async def get_node_configurations(self, request) -> Dict:
+        """Get node configuration options by proxying to budsim service.
+
+        This method:
+        1. Validates the model exists and gets its URI
+        2. Proxies the request to budsim service
+        3. Enriches the response with model display name
+
+        Args:
+            request: NodeConfigurationProxyRequest with model_id, cluster_id, hostnames, etc.
+
+        Returns:
+            Dict containing node configuration options from budsim
+
+        Raises:
+            ClientException: If model not found or budsim request fails
+        """
+        # 1. Get model info from database
+        db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": request.model_id})
+        if not db_model:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Model with id {request.model_id} not found",
+            )
+
+        model_uri = db_model.local_path or db_model.uri
+        model_name = db_model.name
+
+        # 2. Get cluster info and translate id to cluster_id for budsim
+        db_cluster = await ClusterDataManager(self.session).retrieve_by_fields(
+            ClusterModel, {"id": request.cluster_id}
+        )
+        if not db_cluster:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            )
+
+        # 3. Build request payload for budsim (use cluster_id, not database id)
+        budsim_payload = {
+            "model_id": str(request.model_id),
+            "cluster_id": str(db_cluster.cluster_id),
+            "hostnames": request.hostnames,
+            "hardware_mode": request.hardware_mode,
+            "input_tokens": request.input_tokens,
+            "output_tokens": request.output_tokens,
+            "concurrency": request.concurrency,
+            "model_uri": model_uri,
+        }
+
+        # 4. Proxy request to budsim service via HTTP
+        budsim_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/budsim/method/simulator/node-configurations"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(budsim_endpoint, json=budsim_payload) as response:
+                    result = await response.json()
+
+                    if response.status != 200:
+                        error_msg = result.get("message", "Failed to get configurations from simulator")
+                        raise ClientException(
+                            status_code=response.status,
+                            message=error_msg,
+                        )
+
+                    # 5. Enrich model info with display name
+                    if result.get("model_info"):
+                        result["model_info"]["model_name"] = model_name
+                        result["model_info"]["model_id"] = str(request.model_id)
+
+                    return result
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to proxy request to budsim: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Failed to get node configurations from simulator",
+            )
 
 
 class BenchmarkRequestMetricsService(SessionMixin):
@@ -893,7 +1020,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
         """Get field1 vs field2 data."""
         # Use parameterized query to prevent SQL injection
         # Validate field names to prevent SQL injection
-        allowed_fields = ["prompt_len", "completion_len", "ttft", "tpot", "latency"]
+        allowed_fields = ["prompt_len", "output_len", "ttft", "tpot", "latency"]
         if field1 not in allowed_fields or field2 not in allowed_fields:
             raise ValueError(f"Invalid field names. Allowed fields: {allowed_fields}")
 
