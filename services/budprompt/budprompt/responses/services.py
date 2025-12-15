@@ -250,6 +250,9 @@ class ResponsesService:
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
             logger.debug("Config data for prompt: %s: %s", prompt_id, prompt_execute_data)
 
+            # Set stream attribute
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_STREAM, prompt_execute_data.stream or False)
+
             variables = prompt_params.variables
 
             result = await PromptExecutorService().execute_prompt(
