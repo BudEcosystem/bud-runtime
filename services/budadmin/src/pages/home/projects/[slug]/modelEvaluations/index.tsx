@@ -98,13 +98,12 @@ const data: DataType[] = [
 const applyFilter = () => {};
 
 function ModelEvalTable() {
-  const { openDrawer } = useDrawer();
+  const { openDrawerWithStep } = useDrawer();
   const { getProject } = useProjects();
   const [showSearch, setShowSearch] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const router = useRouter();
   const { projectId, deploymentId } = router.query; // Access the dynamic part of the route
-  const { openDrawerWithStep } = useDrawer();
 
   const {
     experimentEvaluations,
@@ -201,6 +200,17 @@ function ModelEvalTable() {
     fetchExperiments();
   }, [fetchExperiments]);
 
+  // Handle "Run Another Evaluation" button click
+  const handleRunEvaluation = useCallback(() => {
+    // Open the drawer with:
+    // - showExperimentSelect: true - to display experiment dropdown
+    // - endpointId: deploymentId - to skip the "Select Model" step since we already have the endpoint
+    openDrawerWithStep("new-evaluation", {
+      showExperimentSelect: true,
+      endpointId: deploymentId as string,
+    });
+  }, [openDrawerWithStep, deploymentId]);
+
   return (
     <div className="relative CommonCustomPagination">
       {/* <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" /> */}
@@ -239,9 +249,7 @@ function ModelEvalTable() {
               <SearchHeaderInput placeholder="Search by traits, dataset" searchValue={searchValue} setSearchValue={setSearchValue} />
 
               <PrimaryButton
-                onClick={() => {
-                  openDrawer("run-model-evaluations");
-                }}
+                onClick={handleRunEvaluation}
                 text="Run Another Evaluation"
               ></PrimaryButton>
               <PrimaryButton
