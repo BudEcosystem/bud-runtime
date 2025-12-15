@@ -118,7 +118,7 @@ export default function NewEvaluation() {
           const step1Payload = {
             step_number: 1,
             stage_data: {
-              name: values.EvaluationName.toLowerCase(),
+              name: values.EvaluationName,
               description: values.Description,
             },
           };
