@@ -30,7 +30,7 @@ class DatasetSchema(PSQLBase, TimestampMixin):
     hf_hub_url: Mapped[str] = mapped_column(String, nullable=True)
     ms_hub_url: Mapped[str] = mapped_column(String, nullable=True)
     script_url: Mapped[int] = mapped_column(String, nullable=True)
-    filename: Mapped[int] = mapped_column(String, nullable=True)
+    file_name: Mapped[str] = mapped_column(String, nullable=True)
     formatting: Mapped[str] = mapped_column(String, nullable=True)
     ranking: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     subset: Mapped[str] = mapped_column(String, nullable=True)

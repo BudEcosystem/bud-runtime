@@ -1,71 +1,4 @@
 {
-  "identity": {
-    "file_name": "identity.json"
-  },
-  "alpaca_en_demo": {
-    "file_name": "alpaca_en_demo.json"
-  },
-  "alpaca_zh_demo": {
-    "file_name": "alpaca_zh_demo.json"
-  },
-  "glaive_toolcall_en_demo": {
-    "file_name": "glaive_toolcall_en_demo.json",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "tools": "tools"
-    }
-  },
-  "glaive_toolcall_zh_demo": {
-    "file_name": "glaive_toolcall_zh_demo.json",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "tools": "tools"
-    }
-  },
-  "mllm_demo": {
-    "file_name": "mllm_demo.json",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "messages",
-      "images": "images"
-    },
-    "tags": {
-      "role_tag": "role",
-      "content_tag": "content",
-      "user_tag": "user",
-      "assistant_tag": "assistant"
-    }
-  },
-  "mllm_audio_demo": {
-    "file_name": "mllm_audio_demo.json",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "messages",
-      "audios": "audios"
-    },
-    "tags": {
-      "role_tag": "role",
-      "content_tag": "content",
-      "user_tag": "user",
-      "assistant_tag": "assistant"
-    }
-  },
-  "mllm_video_demo": {
-    "file_name": "mllm_video_demo.json",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "messages",
-      "videos": "videos"
-    },
-    "tags": {
-      "role_tag": "role",
-      "content_tag": "content",
-      "user_tag": "user",
-      "assistant_tag": "assistant"
-    }
-  },
   "alpaca_en": {
     "hf_hub_url": "llamafactory/alpaca_en",
     "ms_hub_url": "llamafactory/alpaca_en",
@@ -457,103 +390,6 @@
   "airoboros_de": {
     "hf_hub_url": "mayflowergmbh/airoboros-3.0_de"
   },
-  "ultrachat_de": {
-    "hf_hub_url": "mayflowergmbh/ultra-chat_de"
-  },
-  "dpo_en_demo": {
-    "file_name": "dpo_en_demo.json",
-    "ranking": true,
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "chosen": "chosen",
-      "rejected": "rejected"
-    }
-  },
-  "dpo_zh_demo": {
-    "file_name": "dpo_zh_demo.json",
-    "ranking": true,
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "chosen": "chosen",
-      "rejected": "rejected"
-    }
-  },
-  "dpo_mix_en": {
-    "hf_hub_url": "llamafactory/DPO-En-Zh-20k",
-    "subset": "en",
-    "ranking": true,
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "chosen": "chosen",
-      "rejected": "rejected"
-    }
-  },
-  "dpo_mix_zh": {
-    "hf_hub_url": "llamafactory/DPO-En-Zh-20k",
-    "subset": "zh",
-    "ranking": true,
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "chosen": "chosen",
-      "rejected": "rejected"
-    }
-  },
-  "ultrafeedback": {
-    "hf_hub_url": "llamafactory/ultrafeedback_binarized",
-    "ms_hub_url": "llamafactory/ultrafeedback_binarized",
-    "ranking": true,
-    "columns": {
-      "prompt": "instruction",
-      "chosen": "chosen",
-      "rejected": "rejected"
-    }
-  },
-  "rlhf_v": {
-    "hf_hub_url": "llamafactory/RLHF-V",
-    "ranking": true,
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "chosen": "chosen",
-      "rejected": "rejected",
-      "images": "images"
-    }
-  },
-  "vlfeedback": {
-    "hf_hub_url": "Zhihui/VLFeedback",
-    "ranking": true,
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "conversations",
-      "chosen": "chosen",
-      "rejected": "rejected",
-      "images": "images"
-    }
-  },
-  "orca_pairs": {
-    "hf_hub_url": "Intel/orca_dpo_pairs",
-    "ranking": true,
-    "columns": {
-      "prompt": "question",
-      "chosen": "chosen",
-      "rejected": "rejected",
-      "system": "system"
-    }
-  },
-  "hh_rlhf_en": {
-    "script_url": "hh_rlhf_en",
-    "ranking": true,
-    "columns": {
-      "prompt": "instruction",
-      "chosen": "chosen",
-      "rejected": "rejected",
-      "history": "history"
-    }
-  },
   "nectar_rm": {
     "hf_hub_url": "AstraMindAI/RLAIF-Nectar",
     "ms_hub_url": "AI-ModelScope/RLAIF-Nectar",
@@ -562,20 +398,6 @@
   "orca_dpo_de": {
     "hf_hub_url": "mayflowergmbh/intel_orca_dpo_pairs_de",
     "ranking": true
-  },
-  "kto_en_demo": {
-    "file_name": "kto_en_demo.json",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "messages",
-      "kto_tag": "label"
-    },
-    "tags": {
-      "role_tag": "role",
-      "content_tag": "content",
-      "user_tag": "user",
-      "assistant_tag": "assistant"
-    }
   },
   "kto_mix_en": {
     "hf_hub_url": "argilla/kto-mix-15k",
@@ -600,69 +422,11 @@
       "kto_tag": "label"
     }
   },
-  "wiki_demo": {
-    "file_name": "wiki_demo.txt",
-    "columns": {
-      "prompt": "text"
-    }
-  },
-  "c4_demo": {
-    "file_name": "c4_demo.json",
-    "columns": {
-      "prompt": "text"
-    }
-  },
-  "refinedweb": {
-    "hf_hub_url": "tiiuae/falcon-refinedweb",
-    "columns": {
-      "prompt": "content"
-    }
-  },
-  "redpajama_v2": {
-    "hf_hub_url": "togethercomputer/RedPajama-Data-V2",
-    "columns": {
-      "prompt": "raw_content"
-    },
-    "subset": "default"
-  },
-  "wikipedia_en": {
-    "hf_hub_url": "olm/olm-wikipedia-20221220",
-    "ms_hub_url": "AI-ModelScope/olm-wikipedia-20221220",
-    "columns": {
-      "prompt": "text"
-    }
-  },
   "wikipedia_zh": {
     "hf_hub_url": "pleisto/wikipedia-cn-20230720-filtered",
     "ms_hub_url": "AI-ModelScope/wikipedia-cn-20230720-filtered",
     "columns": {
       "prompt": "completion"
-    }
-  },
-  "pile": {
-    "hf_hub_url": "monology/pile-uncopyrighted",
-    "ms_hub_url": "AI-ModelScope/pile",
-    "columns": {
-      "prompt": "text"
-    }
-  },
-  "skypile": {
-    "hf_hub_url": "Skywork/SkyPile-150B",
-    "ms_hub_url": "AI-ModelScope/SkyPile-150B",
-    "columns": {
-      "prompt": "text"
-    }
-  },
-  "fineweb": {
-    "hf_hub_url": "HuggingFaceFW/fineweb",
-    "columns": {
-      "prompt": "text"
-    }
-  },
-  "fineweb_edu": {
-    "hf_hub_url": "HuggingFaceFW/fineweb-edu",
-    "columns": {
-      "prompt": "text"
     }
   },
   "the_stack": {

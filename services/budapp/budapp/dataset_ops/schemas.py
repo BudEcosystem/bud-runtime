@@ -19,7 +19,7 @@ class DatasetResponse(BaseModel):
     hf_hub_url: Optional[str] = None
     ms_hub_url: Optional[str] = None
     script_url: Optional[str] = None
-    filename: Optional[str] = None
+    file_name: Optional[str] = None
     formatting: Optional[str] = None
     ranking: bool
     subset: Optional[str] = None
@@ -47,7 +47,7 @@ class DatasetUpdate(BaseModel):
     hf_hub_url: Optional[str] = None
     ms_hub_url: Optional[str] = None
     script_url: Optional[str] = None
-    filename: Optional[str] = None
+    file_name: Optional[str] = None
     formatting: Optional[str] = None
     ranking: Optional[bool] = None
     subset: Optional[str] = None

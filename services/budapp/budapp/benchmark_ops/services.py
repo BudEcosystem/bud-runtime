@@ -898,10 +898,8 @@ class BenchmarkRequestMetricsService(SessionMixin):
             # Use parameterized query to prevent SQL injection
             if distribution_type == "prompt_len":
                 query = "SELECT MAX(prompt_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
-            elif distribution_type == "completion_len":
-                query = (
-                    "SELECT MAX(completion_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
-                )
+            elif distribution_type == "output_len":
+                query = "SELECT MAX(output_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
             elif distribution_type == "ttft":
                 query = "SELECT MAX(ttft) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
             elif distribution_type == "tpot":
@@ -946,7 +944,8 @@ class BenchmarkRequestMetricsService(SessionMixin):
 
         with BenchmarkRequestMetricsCRUD() as crud:
             params = {"dataset_ids": dataset_ids}
-            query = f"""  # nosec B608
+            # nosec B608 - distribution_type is validated against allowed values
+            query = f"""
                     WITH bins AS (
                         SELECT * FROM (VALUES
                             {", ".join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
@@ -967,7 +966,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
                         ,ROUND(COALESCE(AVG(m.output_len)::numeric, 0), 2) AS avg_output_len
                 """
             # nosec B608 - distribution_type is validated against allowed values
-            query += f"""  # nosec B608
+            query += f"""
                     FROM bins b
                     LEFT JOIN benchmark_request_metrics m
                         ON m.{distribution_type} >= b.bin_start

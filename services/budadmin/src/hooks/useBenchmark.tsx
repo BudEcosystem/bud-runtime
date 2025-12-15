@@ -299,7 +299,7 @@ export const useBenchmarks = create<{
     const response: any = await AppRequest.Post(
       `${tempApiBaseUrl}/benchmark/dataset/input-distribution?benchmark_id=${
         params.benchmark_id
-      }&num_bins=${params.num_bins || 10}`,
+      }&num_bins=${params.num_bins || 5}`,
       get().selectedBenchmark?.dataset_ids,
     );
     set({ inputDistribution: response?.data?.param?.result });
@@ -310,7 +310,7 @@ export const useBenchmarks = create<{
     const response: any = await AppRequest.Post(
       `${tempApiBaseUrl}/benchmark/dataset/output-distribution?benchmark_id=${
         params.benchmark_id
-      }&num_bins=${params.num_bins || 10}`,
+      }&num_bins=${params.num_bins || 5}`,
       get().selectedBenchmark?.dataset_ids,
     );
     set({ outputDistribution: response?.data?.param?.result });

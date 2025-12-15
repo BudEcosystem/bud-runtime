@@ -664,7 +664,7 @@ const BenchmarkResult = () => {
         <div className="flex justify-between align-center">
           <Text_19_600_EEEEEE>{data.title}</Text_19_600_EEEEEE>
         </div>
-        <Text_13_400_757575 className="mt-[1.35rem]">
+        <Text_13_400_757575 className="mt-[1.35rem] leading-5">
           {data.description}
         </Text_13_400_757575>
         {data?.chartData?.data?.length || data?.chartData?.source?.length ? (
@@ -747,20 +747,22 @@ const BenchmarkResult = () => {
   const inputOutputCharts = [
     {
       title: "Input Token Distribution",
-      description: "Description",
+      description:
+        "Shows how TTFT and TPOT vary across different input lengths.",
       value: "200",
       percentage: 2,
-      chartContainer: <BenchmarkChart data={inputDistributonData} />, // Pass your chart data here
-      chartData: inputDistributonData, // Pass your chart data here
+      chartContainer: <BenchmarkChart data={inputDistributonData} />,
+      chartData: inputDistributonData,
       classNames: "",
     },
     {
       title: "Output Token Distribution",
-      description: "Description",
+      description:
+        "Shows how TTFT and TPOT vary across different output lengths.",
       value: "200",
       percentage: 2,
-      chartContainer: <BenchmarkChart data={outputDistributonData} />, // Pass your chart data here
-      chartData: outputDistributonData, // Pass your chart data here
+      chartContainer: <BenchmarkChart data={outputDistributonData} />,
+      chartData: outputDistributonData,
       classNames: "",
     },
   ];
@@ -816,42 +818,50 @@ const BenchmarkResult = () => {
   //   openDrawerWithStep('Benchmarking-Progress')
   // }, []);
 
-  const processChartData = (Data: any) => {
-    const dimensions = [
-      "product",
-      "avg_ttft",
-      "avg_tpot",
-      "avg_latency",
-      "avg_output_len",
-      "p95_ttft",
-      "p95_tpot",
-      "p95_latency",
-    ];
+  const processChartData = (Data: any, chartType: "input" | "output") => {
+    // Input: avg_ttft, avg_tpot (no latency)
+    // Output: avg_tpot, avg_latency (no ttft)
+    const dimensions =
+      chartType === "input"
+        ? ["product", "avg_ttft", "avg_tpot"]
+        : ["product", "avg_tpot", "avg_latency"];
+
+    // Helper to round bin_range values to integers (e.g., "0-26.1" -> "0-26")
+    const formatBinRange = (binRange: string | undefined, binId: number) => {
+      if (!binRange) return String(binId);
+      const parts = binRange.split("-");
+      if (parts.length === 2) {
+        return `${Math.round(parseFloat(parts[0]))}-${Math.round(parseFloat(parts[1]))}`;
+      }
+      return binRange;
+    };
 
     const source =
-      Data?.map((item: any) => ({
-        product: String(item.bin_id),
-        avg_ttft: item.avg_ttft ?? 0,
-        avg_tpot: item.avg_tpot ?? 0,
-        avg_latency: item.avg_latency ?? 0,
-        avg_output_len: item.avg_output_len ?? 0,
-        p95_ttft: item.p95_ttft ?? 0,
-        p95_tpot: item.p95_tpot ?? 0,
-        p95_latency: item.p95_latency ?? 0,
-      })) || [];
+      Data?.map((item: any) => {
+        const baseData: any = {
+          product: formatBinRange(item.bin_range, item.bin_id),
+          avg_tpot: item.avg_tpot ?? 0,
+        };
+        if (chartType === "input") {
+          baseData.avg_ttft = item.avg_ttft ?? 0;
+        } else {
+          baseData.avg_latency = item.avg_latency ?? 0;
+        }
+        return baseData;
+      }) || [];
 
     return { dimensions, source };
   };
 
   useEffect(() => {
-    let data = processChartData(inputDistribution);
+    let data = processChartData(inputDistribution, "input");
     if (data) {
       setInputDistributonData(data);
     }
   }, [inputDistribution]);
 
   useEffect(() => {
-    let data = processChartData(outputDistribution);
+    let data = processChartData(outputDistribution, "output");
     if (data) {
       setOutputDistributonData(data);
     }
