@@ -16,6 +16,7 @@ import ComingSoon from "@/components/ui/comingSoon";
 import { ExperimentData, useEvaluations } from "@/hooks/useEvaluations";
 import { getDatasetNamesFromTraits, getDisplayText } from "@/lib/utils";
 import { TruncatedTextCell } from "@/components/ui/TruncatedTextCell";
+import { errorToast } from "@/components/toast";
 
 type ColumnsType<T extends object> = TableProps<T>["columns"];
 type TablePagination<T extends object> = NonNullable<
@@ -202,12 +203,17 @@ function ModelEvalTable() {
 
   // Handle "Run Another Evaluation" button click
   const handleRunEvaluation = useCallback(() => {
+    // Guard: Ensure deploymentId is a valid string before proceeding
+    if (typeof deploymentId !== 'string') {
+      errorToast("Cannot run evaluation without a valid deployment ID.");
+      return;
+    }
     // Open the drawer with:
     // - showExperimentSelect: true - to display experiment dropdown
     // - endpointId: deploymentId - to skip the "Select Model" step since we already have the endpoint
     openDrawerWithStep("new-evaluation", {
       showExperimentSelect: true,
-      endpointId: deploymentId as string,
+      endpointId: deploymentId,
     });
   }, [openDrawerWithStep, deploymentId]);
 
