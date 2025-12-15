@@ -57,7 +57,7 @@ export default function NewEvaluation() {
     } finally {
       setExperimentsLoading(false);
     }
-  }, [getExperiments, experimentsLoading, showExperimentSelect]);
+  }, [getExperiments, showExperimentSelect]);
 
   // Initial fetch - only when experiment select is shown
   useEffect(() => {
