@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
-from openai.types.responses import ResponseInputItem
+from openai.types.responses import Response, ResponseInputItem
 from opentelemetry import context, trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import ValidationError
@@ -52,10 +52,11 @@ class ResponsesService:
         self.redis_service = RedisService()
 
     async def _create_streaming_generator(self, result, span, context_token):
-        """Wrap streaming generator to manage span lifecycle.
+        """Wrap streaming generator to manage span lifecycle and capture response attributes.
 
         The span stays open during streaming and closes when the generator
-        is exhausted or encounters an error.
+        is exhausted or encounters an error. Parses SSE chunks to extract
+        the final response from 'response.completed' event for OTEL attributes.
 
         Args:
             result: The async generator from prompt execution
@@ -65,8 +66,23 @@ class ResponsesService:
         Yields:
             Chunks from the original generator
         """
+        final_response_dict = None
+
         try:
             async for chunk in result:
+                # Parse SSE chunk to check for response.completed event
+                if isinstance(chunk, str) and "response.completed" in chunk:
+                    # Extract the response object from the data line
+                    lines = chunk.strip().split("\n")
+                    for line in lines:
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])  # Remove "data: " prefix
+                                if data.get("type") == "response.completed":
+                                    final_response_dict = data.get("response")
+                                    break
+                            except json.JSONDecodeError:
+                                pass
                 yield chunk
         except Exception as e:
             span.record_exception(e)
@@ -74,7 +90,20 @@ class ResponsesService:
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise
         finally:
-            context.detach(context_token)
+            # Set response attributes by converting dict to Pydantic model
+            if final_response_dict:
+                try:
+                    response_obj = Response.model_validate(final_response_dict)
+                    self._set_response_attributes(span, response_obj)
+                except Exception as e:
+                    logger.warning("Failed to set streaming response attributes: %s", e)
+
+            # Context token may have been created in a different async context
+            # (request coroutine vs streaming generator), so handle gracefully
+            try:  # noqa: SIM105
+                context.detach(context_token)
+            except ValueError:
+                pass  # Token was created in different context, ignore
             span.end()
 
     def _set_response_attributes(self, span, result) -> None:
@@ -321,5 +350,8 @@ class ResponsesService:
             # Only cleanup here for non-streaming requests
             # For streaming, cleanup happens in _create_streaming_generator
             if not is_streaming:
-                context.detach(context_token)
+                try:  # noqa: SIM105
+                    context.detach(context_token)
+                except ValueError:
+                    pass  # Token was created in different context, ignore
                 span.end()
