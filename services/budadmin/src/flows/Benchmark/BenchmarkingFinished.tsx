@@ -14,7 +14,7 @@ export default function BenchmarkingFinished() {
   const { closeDrawer } = useDrawer();
 
   const handleViewReport = () => {
-    const benchmarkId = (currentWorkflow?.workflow_steps as any)?.benchmark_id;
+    const benchmarkId = currentWorkflow?.workflow_steps?.benchmark_id;
     closeDrawer();
     if (benchmarkId) {
       router.push(`/modelRepo/benchmarks-history/${benchmarkId}`);
