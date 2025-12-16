@@ -165,6 +165,11 @@ export default {
         source: '/agents',
         destination: '/home/agents',
       },
+
+      {
+        source: '/tools',
+        destination: '/home/tools',
+      },
     ];
   },
   env: {
