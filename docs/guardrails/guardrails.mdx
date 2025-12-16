@@ -15,35 +15,41 @@ As teams operationalize safety:
 - How do we preserve guard types, severity settings, and statuses through deployment?
 - How do project owners track which guardrails protect their deployments without jumping between tools?
 
-Bud AI Foundry addresses these questions with a governed catalog, detail pages that surface key metadata and examples, project‑aware tables, and a deployment workflow that bundles provider selection, probe/rule choices, deployment type, and guard type/severity settings.
-
-AI models can generate unpredictable outputs, and users may submit malicious or inappropriate inputs. Guardrails help you:
-
-- **Protect users** from harmful content including hate speech, violence, and self-harm.
-- **Ensure compliance** with organizational policies and regulatory requirements.
-- **Prevent misuse** by blocking prompt injection attacks and jailbreak attempts.
-- **Maintain brand safety** by filtering content that could damage reputation.
-- **Detect sensitive data** like PII before it's processed or leaked.
-
 ## 2. USPs (Unique Selling Propositions)
 
-### 1. Provider‑agnostic probe catalog
+### ### 1. Safety coverage for harmful content and brand protection
+
+Guardrails block hate speech, violence, self‑harm, and other harmful content to keep experiences safe while preserving brand reputation for downstream apps and end users.
+
+### 2. Compliance‑first policy enforcement
+
+Profiles codify organizational and regulatory policies so safety and compliance reviewers can audit guard types, severity thresholds, and status without bespoke checks.
+
+### 3. Prompt‑injection and jailbreak defense
+
+Probe catalogs and rule details make it easy to select protections that stop prompt injection, jailbreak attempts, and other misuse vectors before they reach models or tools.
+
+### 4. Sensitive data detection
+
+PII‑oriented probes detect sensitive fields and secrets before they are processed or leaked, with guard type chips and severity controls to tune coverage.
+
+### 5. Provider‑agnostic probe catalog
 
 Browse Bud Sentinel, Azure AI, AWS Bedrock, and custom probes side‑by‑side with unified metadata, icons, categories/tags, and guard type chips so safety choices remain portable across backends.
 
-### 2. Profile‑level governance with guard types and thresholds
+### 6. Profile‑level governance with guard types and thresholds
 
 Each guardrail profile carries guard types, severity threshold, status badge, tags, and timestamps in one header, enabling approvals and audits without querying multiple services.
 
-### 3. Deep probe and rule visibility
+### 7. Deep probe and rule visibility
 
 Open a profile to review metadata, guard type chips, and examples; during the multi‑step workflow, expand probes and their nested rule tables (with guard type badges and statuses) to validate coverage before deployment.
 
-### 4. Project‑aware inventory
+### 8. Project‑aware inventory
 
 Projects expose a Guardrail Profiles table with sorting, pagination, deletion controls, and navigation to profile detail pages, giving owners immediate insight into protections attached to their workloads.
 
-### 5. Actionable list experience
+### 9. Actionable list experience
 
 Search, dynamic category tags, a status filter (Active/Inactive/Pending), infinite scroll, and an “Add Guardrail” drawer on the main Guardrails page keep discovery fast while reducing navigation overhead.
 
