@@ -138,7 +138,7 @@ export default function ViewModel() {
         {showConfirm && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title={firstLineText}
               description={secondLineText}
               confirmText={

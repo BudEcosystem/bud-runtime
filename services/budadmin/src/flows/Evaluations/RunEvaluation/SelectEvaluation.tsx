@@ -282,7 +282,7 @@ export default function SelectEvaluation() {
                   <>
                     <div className="mt-[1.5rem]" />
                     <BudStepAlert
-                      type="warining"
+                      type="warning"
                       title="No Evaluations Found"
                       description="No evaluations match your search criteria. Try adjusting your search terms."
                     />

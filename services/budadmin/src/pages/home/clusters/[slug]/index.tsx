@@ -219,7 +219,7 @@ const ClusterDetailsPage = () => {
       cancelText: "Cancel",
       okText: "Delete",
       key: "delete-cluster",
-      type: "warining",
+      type: "warning",
     });
   };
 

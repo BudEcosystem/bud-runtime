@@ -129,7 +129,7 @@ const SelectCluster: React.FC = (props: {}) => {
                   <>
                     <div className="mt-[1.5rem]" />
                     <BudStepAlert
-                      type="warining"
+                      type="warning"
                       title="Cluster Not Found? Let’s Tweak Things!"
                       description='"Oops! It seems we couldn’t find any clusters that match your deployment settings. Try going BACK and tweaking a few things like concurrent requests, context length, tokens per second, or time to first token. Let’s get this deployment on the road!"'
                     />

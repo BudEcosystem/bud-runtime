@@ -152,7 +152,7 @@ export function BudForm(props: BudFormProps) {
         }}
         confirmText="Yes, cancel"
         cancelText="No, keep working"
-        type="warining"
+        type="warning"
 
       />
     </div>)}
