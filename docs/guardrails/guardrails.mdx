@@ -7,7 +7,7 @@ description: "Guardrails discovery, configuration, and probe management inside B
 
 The Guardrails module in Bud AI Foundry is a safety mechanisms that monitor, filters, and controls content flowing through AI model endpoints. They act as intelligent gatekeepers that analyze both user inputs and model outputs to detect and prevent harmful, inappropriate, or policy-violating content.
 
-The Guardrails catalog surfaces provider probes with names, providers, tags, statuses, guard types, and creation dates in a card grid, while a detail drawer and full detail page expose profile metadata, guard types, and probe/rule breakdowns. A multi‑step drawer workflow walks teams through selecting providers (Bud Sentinel, Azure AI, AWS Bedrock, or custom), choosing probes, refining rules, choosing deployment types, and pushing guardrails onto specific projects and endpoints.
+The Guardrails catalog surfaces provider probes with names, providers, tags, statuses, guard types, and creation dates in a card grid, while a detail drawer and full detail page expose profile metadata, guard types, taxonomy tags, and detection examples. A multi‑step drawer workflow walks teams through selecting providers (Bud Sentinel, Azure AI, AWS Bedrock, or custom), choosing probes, refining rules, choosing deployment types, and pushing guardrails onto specific projects and endpoints.
 
 As teams operationalize safety:
 
@@ -15,7 +15,7 @@ As teams operationalize safety:
 - How do we preserve guard types, severity settings, and statuses through deployment?
 - How do project owners track which guardrails protect their deployments without jumping between tools?
 
-Bud AI Foundry addresses these questions with a governed catalog, tabbed detail pages, project‑aware tables, and a deployment workflow that bundles provider selection, probe/rule choices, deployment type, and guard type/severity settings.
+Bud AI Foundry addresses these questions with a governed catalog, detail pages that surface key metadata and examples, project‑aware tables, and a deployment workflow that bundles provider selection, probe/rule choices, deployment type, and guard type/severity settings.
 
 AI models can generate unpredictable outputs, and users may submit malicious or inappropriate inputs. Guardrails help you:
 
@@ -37,7 +37,7 @@ Each guardrail profile carries guard types, severity threshold, status badge, ta
 
 ### 3. Deep probe and rule visibility
 
-Drill into a profile’s Probes tab to search, sort, and expand probes, then inspect nested rule tables with pagination, guard type badges, and statuses to validate coverage before deployment.
+Open a profile to review metadata, guard type chips, and examples; during the multi‑step workflow, expand probes and their nested rule tables (with guard type badges and statuses) to validate coverage before deployment.
 
 ### 4. Project‑aware inventory
 
@@ -49,7 +49,7 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), infini
 
 ## 3. Features
 
-### 3.1 Guardrails catalog 
+### 3.1 Guardrails catalog
 
 - Guardrail listing page displays guardrail name, provider, created date, truncated description with hover popover, tags, guard types, and a status dot; clicking opens a guardrail detail drawer.
 - Search bar in the header supports name/tag queries; dynamic category tags (Content Safety, DLP, Compliance, Harm, Jailbreak, Toxic, Bias, All) filter visible cards based on probe tags.
@@ -58,11 +58,21 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), infini
 
 ### 3.2 Guardrail detail page
 
-- Tabs: **General** (name, status badge, description, tags, severity threshold, created/modified timestamps, guard type chips) and **Probes** (searchable, sortable probe table with expandable rule lists).
-- Back button in the tab bar returns to the previous view; tab switching retains active tab state locally.
-- Probes tab includes debounce search, sortable Name/Status/Created At columns, a Refresh button, and nested rule tables with pagination and guard type badges.
+- Single‑page layout with the guardrail name, provider badge, description, modality, scanner type, guard type chips (input/output), and taxonomy tags (e.g., Content Safety | NSFW).
+
+- Examples section lists representative prompts/outputs to illustrate what the guardrail detects, with scrollable content for long lists.
+
+- Footer metadata shows Provider, Status, and Deployments along with **Back** and **Deploy** actions; Back returns to the previous view and Deploy reopens the deployment flow for the selected guardrail.
 
 ### 3.3 Project detail → Guardrails tab
+
+- Dedicated table inside project detail showing guardrail profiles tied to the project, with columns for Name, Guard Types (chips), Status, Created At, and a delete icon with confirmation modal.
+
+- Sorting and pagination controls reuse Bud table conventions; row click navigates to `/projects/[projectId]/guardrailDetails/[guardrailId]`.
+
+- Search, status filter (Active/Inactive/Draft), Refresh, and Add Guardrail buttons are wired in the header (currently hidden in the layout) for project‑level administration.
+
+### etail → Guardrails tab
 
 - Dedicated table inside project detail showing guardrail profiles tied to the project, with columns for Name, Guard Types (chips), Status, Created At, and a delete icon with confirmation modal.
 - Sorting and pagination controls reuse Bud table conventions; row click navigates to `/projects/[projectId]/guardrailDetails/[guardrailId]`.
