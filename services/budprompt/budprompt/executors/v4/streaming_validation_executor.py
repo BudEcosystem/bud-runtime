@@ -27,10 +27,11 @@ from openai.types.responses import (
     ResponseInProgressEvent,
 )
 from pydantic import ValidationError
-from pydantic_ai import Agent
+from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
@@ -104,7 +105,9 @@ class StreamingValidationExecutor:
         self.validation_prompt = validation_prompt
         self.messages = messages or []
         self.system_prompt = system_prompt
-        self.message_history = message_history or []
+        self.message_history = message_history or []  # IMMUTABLE - original input
+        # captured_messages: starts as copy, grows with each attempt (used as context for retries)
+        self.captured_messages: List[ModelMessage] = list(self.message_history)
         self.api_key = api_key
 
         # Extract retry count BEFORE popping (determine external loop count)
@@ -321,6 +324,72 @@ class StreamingValidationExecutor:
             )
         )
 
+    def _filter_final_result_tool_calls(self, messages: List[ModelMessage]) -> List[ModelMessage]:
+        """Remove final_result tool calls from message history for retry.
+
+        The final_result tool is pydantic-ai's internal mechanism for structured output.
+        When validation fails, we don't want to pass the failed final_result call to
+        the next attempt - it creates unprocessed tool call errors.
+
+        MCP tool calls (like read-wiki-structure) are preserved.
+
+        Args:
+            messages: The message history to filter
+
+        Returns:
+            Filtered message history without final_result tool calls
+        """
+        if not messages:
+            return messages
+
+        # Check if last message is a ModelResponse with final_result tool call
+        last_message = messages[-1]
+        if not isinstance(last_message, ModelResponse):
+            return messages
+
+        # Check for final_result tool calls
+        has_final_result = any(
+            isinstance(part, ToolCallPart) and part.tool_name == "final_result"
+            for part in last_message.parts
+        )
+
+        if has_final_result:
+            # Remove the last message containing final_result tool call
+            logger.debug("Filtering out final_result tool call from message history for retry")
+            return list(messages[:-1])
+
+        return messages
+
+    async def _wrapped_stream_events(self, agent: Agent, prompt: str) -> AsyncGenerator:
+        """Wrap agent streaming with message capture.
+
+        Uses capture_run_messages() to capture messages even if an exception occurs
+        before AgentRunResultEvent is yielded. Filters out final_result tool calls
+        before storing for retry.
+
+        Args:
+            agent: The pydantic-ai Agent to stream from
+            prompt: The user prompt to send
+
+        Yields:
+            Events from agent.run_stream_events()
+        """
+        with capture_run_messages() as attempt_messages:
+            try:
+                async for event in agent.run_stream_events(
+                    user_prompt=prompt,
+                    message_history=self.captured_messages  # Use accumulated context
+                ):
+                    yield event
+            finally:
+                # Always update captured_messages with what context manager captured
+                if attempt_messages:
+                    # Filter out final_result tool calls before storing
+                    self.captured_messages = self._filter_final_result_tool_calls(
+                        list(attempt_messages)
+                    )
+                    logger.debug(f"Captured {len(self.captured_messages)} messages (filtered)")
+
     async def _attempt_stream(self, attempt_number: int) -> AsyncGenerator:
         """Attempt streaming with validation using backup algorithm.
 
@@ -347,8 +416,8 @@ class StreamingValidationExecutor:
         # Create validator for this attempt
         validator = StreamingJSONValidator(self.output_model, self.field_validators)
 
-        # Stream events using run_stream_events() for full MCP support
-        async for event in agent.run_stream_events(user_prompt=current_prompt, message_history=self.message_history):
+        # Stream events using wrapped generator that captures messages and filters final_result
+        async for event in self._wrapped_stream_events(agent, current_prompt):
             logger.debug(
                 f"Received pydantic-ai event: {type(event).__name__}, is PartDeltaEvent: {isinstance(event, PartDeltaEvent)}"
             )
