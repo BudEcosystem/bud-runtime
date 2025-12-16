@@ -2,3 +2,4 @@ release_name = "bud-dev"
 namespace = "bud-dev"
 sops_value_paths = [ "values.enc.yaml" ]
 value_paths = [ "values.dev.yaml" ]
+dependencies = [ "cert-manager", "dapr", "nfs-csi" ]
