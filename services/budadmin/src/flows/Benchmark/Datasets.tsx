@@ -3,7 +3,7 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DeployModelSelect from "@/components/ui/bud/deploymentDrawer/DeployModelSelect";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import { useProjects } from "src/hooks/useProjects";
