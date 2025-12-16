@@ -146,6 +146,7 @@
             "group": "Guardrails",
             "icon": "shield-halved",
             "pages": [
+              "guardrails/guardrails",
               "guardrails/what-are-guardrails",
               "guardrails/setting-up-guardrails",
               "guardrails/content-filtering",
