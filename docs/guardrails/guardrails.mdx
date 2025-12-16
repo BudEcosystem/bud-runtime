@@ -129,21 +129,21 @@ The Add Guardrail workflow lists Bud Sentinel, Azure AI Foundry, AWS Bedrock, an
 
 **Q2. How do I know a guardrail’s status?**
 
-Status chips (Active, Inactive, Draft/Pending) appear as dots on catalog cards, tags in project tables, and labels on the detail page footer; colors align with Bud’s status palette for quick scanning.
+Status chips (Active, Inactive, Draft/Pending) appear as dots on catalog cards, tags in project tables, and labels on the detail page footer.
 
 **Q3. Can I see which rules a probe enforces?**
 
-Yes. In the multi‑step creation workflow, expand a probe row and scroll the nested rules table (with rule names, descriptions, guard types, and statuses); pagination lets you browse large rule sets before deploying.
+Yes. In the multi‑step creation workflow, expand a probe row and scroll the nested rules table (with rule names, descriptions, guard types, and statuses).
 
-**Q4. How do filters interact with search?**
+**Q4. Where do guardrails surface inside projects?**
 
-Search updates results immediately, while the Status popover applies only after clicking **Apply**; **Reset** clears the selection. Infinite scroll respects whichever search and status options you have active.
+Each project includes a Guardrails tab listing attached profiles with sorting, pagination, delete action, and navigation to the profile detail page, keeping project owners aware of active protections.
 
-**Q5. Where do guardrails surface inside projects?**
+**Q5. What is the difference between GuardRail Endpoint and Add to Existing Deployment?**
 
-Each project includes a **Guardrails** tab listing attached profiles with sorting, pagination, delete action, and navigation to the profile detail page, keeping project owners aware of active protections.
+Selecting GuardRail Endpoint provisions a standalone endpoint, while Add to Existing Deployment attaches the guardrail to a selected deployment/endpoint within a project.
 
-**Q6. What is the difference between GuardRail Endpoint and Add to Existing Deployment?**
+**Q6. How do I adjust or redeploy a guardrail after creation?**
 
 Selecting **GuardRail Endpoint** provisions a standalone endpoint in the workflow payload), while **Add to Existing Deployment** attaches the guardrail to a selected deployment/endpoint within a project using the status‑coded chips shown in the picker.
 
