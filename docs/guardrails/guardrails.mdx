@@ -5,17 +5,25 @@ description: "Guardrails discovery, configuration, and probe management inside B
 
 ## 1. Description
 
-The Guardrails module in Bud Admin centralizes probe discovery, profile configuration, and project deployment. The Guardrails catalog surfaces provider probes with names, providers, tags, statuses, guard types, and creation dates in a card grid, while a detail drawer and full detail page expose profile metadata, guard types, and probe/rule breakdowns. A multi‑step drawer workflow walks teams through selecting providers (Bud Sentinel, Azure AI, AWS Bedrock, or custom), choosing probes, refining rules, choosing deployment types, and pushing guardrails onto specific projects and endpoints.
+The Guardrails module in Bud AI Foundry is a safety mechanisms that monitor, filters, and controls content flowing through AI model endpoints. They act as intelligent gatekeepers that analyze both user inputs and model outputs to detect and prevent harmful, inappropriate, or policy-violating content. 
+
+The Guardrails catalog surfaces provider probes with names, providers, tags, statuses, guard types, and creation dates in a card grid, while a detail drawer and full detail page expose profile metadata, guard types, and probe/rule breakdowns. A multi‑step drawer workflow walks teams through selecting providers (Bud Sentinel, Azure AI, AWS Bedrock, or custom), choosing probes, refining rules, choosing deployment types, and pushing guardrails onto specific projects and endpoints.
 
 As teams operationalize safety:
 
 - How do we compare provider probes and quickly drill into rule coverage?
-
 - How do we preserve guard types, severity settings, and statuses through deployment?
-
 - How do project owners track which guardrails protect their deployments without jumping between tools?
 
 Bud AI Foundry addresses these questions with a governed catalog, tabbed detail pages, project‑aware tables, and a deployment workflow that bundles provider selection, probe/rule choices, deployment type, and guard type/severity settings.
+
+AI models can generate unpredictable outputs, and users may submit malicious or inappropriate inputs. Guardrails help you:
+
+- **Protect users** from harmful content including hate speech, violence, and self-harm.
+- **Ensure compliance** with organizational policies and regulatory requirements.
+- **Prevent misuse** by blocking prompt injection attacks and jailbreak attempts.
+- **Maintain brand safety** by filtering content that could damage reputation.
+- **Detect sensitive data** like PII before it's processed or leaked.
 
 ## 2. USPs (Unique Selling Propositions)
 
@@ -44,29 +52,21 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), infini
 ### 3.1 Guardrails catalog (Home → Guardrails)
 
 - Card grid lists guardrail name, provider, created date, truncated description with hover popover, tags, guard types, and a status dot; clicking opens a guardrail detail drawer.
-
 - Search bar in the header supports name/tag queries; dynamic category tags (Content Safety, DLP, Compliance, Harm, Jailbreak, Toxic, Bias, All) filter visible cards based on probe tags.
-
 - Filters popover offers a Status dropdown (Active, Inactive, Pending) with Apply/Reset actions and preserves choices until applied.
-
 - Infinite scroll automatically loads additional pages while preserving filters; loading and “No more guardrails to load” states guide navigation.
-
 - “Add Guardrail” button (permission‑gated) launches the multi‑step creation workflow; the page header mirrors other Bud Admin modules.
 
 ### 3.2 Guardrail detail page
 
 - Tabs: **General** (name, status badge, description, tags, severity threshold, created/modified timestamps, guard type chips) and **Probes** (searchable, sortable probe table with expandable rule lists).
-
 - Back button in the tab bar returns to the previous view; tab switching retains active tab state locally.
-
 - Probes tab includes debounce search, sortable Name/Status/Created At columns, a Refresh button, and nested rule tables with pagination and guard type badges.
 
 ### 3.3 Project detail → Guardrails tab
 
 - Dedicated table inside project detail showing guardrail profiles tied to the project, with columns for Name, Guard Types (chips), Status, Created At, and a delete icon with confirmation modal.
-
 - Sorting and pagination controls reuse Bud table conventions; row click navigates to `/projects/[projectId]/guardrailDetails/[guardrailId]`.
-
 - Search, status filter (Active/Inactive/Draft), Refresh, and Add Guardrail buttons are wired in the header (currently hidden in the layout) for project‑level administration.
 
 ## 4. How-to Guides
@@ -74,59 +74,42 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), infini
 ### 4.1 Access the Guardrails catalog
 
 1. Log in to Bud AI Foundry.
-
 2. Go to **Home → Guardrails** from the side menu.
-
 3. Browse the card grid; hover to read long descriptions or click a card to open details in a drawer.
 
 ### 4.2 Search and filter guardrails
 
 1. In the Guardrails page header, type a query (name or tag) into the search bar.
-
 2. Use category chips (e.g., Content Safety, Jailbreak) to scope results; select **All** to reset.
-
 3. Open the Filter popover, choose Status (Active/Inactive/Pending), then click **Apply** to reload cards or **Reset** to clear selections.
-
 4. Scroll down to trigger infinite loading; loading and “No more guardrails to load” states appear when the list ends.
 
 ### 4.3 Launch the Add Guardrail workflow
 
 1. From **Home → Guardrails**, click **Add Guardrail** (requires manage permission) to open the drawer workflow.
-
 2. If prompted for provider access, ensure the provider appears in the provider list before continuing.
 
 ### 4.4 Create and deploy a guardrail (multi‑step flow)
 
 1. **Select Provider**: Choose Bud Sentinel, a custom probe option, Azure AI Foundry, AWS Bedrock, or other providers returned by the API, then click **Next** to create a workflow tied to that provider.
-
 2. **Select Probes**: Search or filter probes (PII, Bias, All), select one or more probes, and use **See More** for probe details before continuing.
-
 3. **Configure PII rules (conditional)**: If a PII‑tagged probe is selected, search and select rules, use **Select All** when needed, and choose guard type chips shown for the probe; saving updates the workflow with rule selections.
-
 4. **Deployment Types**: Choose **GuardRail Endpoint** (standalone endpoint with `is_standalone=true`) or **Add to Existing Deployment** (maps to an existing deployment) before moving forward.
-
 5. **Select Project**: Search projects, pick a destination project, and persist the selection into the workflow.
-
 6. **Select Deployment/Endpoint**: Search and choose a deployment/endpoint within the project; status chips are color‑coded and the choice is stored in the workflow payload.
-
 7. **Probe Settings & Deploy**: Name the guardrail profile, pick guard types (Input, Output, Retrieval, Tools), set the severity slider, optionally add a description, and click **Deploy** to trigger the workflow and success screen.
 
 ### 4.5 Use the Guardrail detail page
 
 1. Open a guardrail from the catalog drawer or a project table; the dedicated page loads **General** and **Probes** tabs with a back button in the tab bar.
-
 2. In **General**, review the profile name, status badge (Active/Inactive/Draft), description, tags, severity threshold, and created/modified timestamps; guard types appear as color chips.
-
 3. Switch to **Probes**; search or sort by Name/Status/Created At, refresh the table, and expand probes to view paginated rules with guard type and status badges.
 
 ### 4.6 Manage project guardrails
 
 1. Navigate to **Home → Projects → [Project] → Guardrails**.
-
 2. Review the Guardrail Profiles table; click column headers to sort or use pagination controls to move through pages.
-
 3. Click a row to open the project‑scoped guardrail detail page at `/projects/[projectId]/guardrailDetails/[guardrailId]`.
-
 4. Use the header controls (search, status filter, Refresh, Add Guardrail) when visible; delete a profile via the trash icon and confirmation modal, then refresh to verify removal.
 
 ## 5. FAQ
