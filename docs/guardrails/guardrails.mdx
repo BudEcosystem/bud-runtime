@@ -58,25 +58,14 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), infini
 
 ### 3.2 Guardrail detail page
 
-- Single‑page layout with the guardrail name, provider badge, description, modality, scanner type, guard type chips (input/output), and taxonomy tags (e.g., Content Safety | NSFW).
-
+- Detail page shows the guardrail name, provider badge, description, modality, scanner type, guard type chips (input/output), and taxonomy tags (e.g., Content Safety | NSFW).
 - Examples section lists representative prompts/outputs to illustrate what the guardrail detects, with scrollable content for long lists.
-
-- Footer metadata shows Provider, Status, and Deployments along with **Back** and **Deploy** actions; Back returns to the previous view and Deploy reopens the deployment flow for the selected guardrail.
+- Footer metadata shows Provider, Status, and Deployments along with Back and Deploy actions; Back returns to the previous view and Deploy reopens the deployment flow for the selected guardrail.
 
 ### 3.3 Project detail → Guardrails tab
 
 - Dedicated table inside project detail showing guardrail profiles tied to the project, with columns for Name, Guard Types (chips), Status, Created At, and a delete icon with confirmation modal.
-
-- Sorting and pagination controls reuse Bud table conventions; row click navigates to `/projects/[projectId]/guardrailDetails/[guardrailId]`.
-
-- Search, status filter (Active/Inactive/Draft), Refresh, and Add Guardrail buttons are wired in the header (currently hidden in the layout) for project‑level administration.
-
-### etail → Guardrails tab
-
-- Dedicated table inside project detail showing guardrail profiles tied to the project, with columns for Name, Guard Types (chips), Status, Created At, and a delete icon with confirmation modal.
-- Sorting and pagination controls reuse Bud table conventions; row click navigates to `/projects/[projectId]/guardrailDetails/[guardrailId]`.
-- Search, status filter (Active/Inactive/Draft), Refresh, and Add Guardrail buttons are wired in the header (currently hidden in the layout) for project‑level administration.
+- Sorting and pagination are supported.
 
 ## 4. How-to Guides
 
