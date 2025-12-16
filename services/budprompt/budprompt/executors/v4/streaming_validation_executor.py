@@ -31,18 +31,21 @@ from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelRequest,
     ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
     ToolCallPart,
     ToolCallPartDelta,
+    ToolReturnPart,
 )
 from pydantic_ai.output import NativeOutput
 from pydantic_ai.run import AgentRunResultEvent
 
 from ...prompt.schemas import MCPToolConfig, Message
 from ...prompt.schemas import ModelSettings as ModelSettingsSchema
+from .openai_response_formatter import OpenAIResponseFormatter_V4
 from .openai_streaming_validation_formatter_v4 import OpenAIStreamingValidationFormatter_V4
 from .streaming_json_validator import StreamingJSONValidator, extract_field_validators
 
@@ -106,7 +109,7 @@ class StreamingValidationExecutor:
         self.messages = messages or []
         self.system_prompt = system_prompt
         self.message_history = message_history or []  # IMMUTABLE - original input
-        # captured_messages: starts as copy, grows with each attempt (used as context for retries)
+        # captured_messages: starts as copy, grows with each attempt (used for retries and output building)
         self.captured_messages: List[ModelMessage] = list(self.message_history)
         self.api_key = api_key
 
@@ -232,24 +235,19 @@ class StreamingValidationExecutor:
                     # Emit response.output_item.done for message
                     yield self.formatter.format_output_item_done()
 
-                    # Build output_items array manually for validation mode
-                    # We only include our upfront-created message item, not tool results
-                    output_items = []
-                    message_item = {
-                        "id": self.formatter.text_item_id,
-                        "type": "message",
-                        "status": "completed",
-                        "content": [
-                            {
-                                "type": "output_text",
-                                "annotations": [],
-                                "logprobs": [],
-                                "text": self.formatter.accumulated_text,
-                            }
-                        ],
-                        "role": "assistant",
-                    }
-                    output_items.append(message_item)
+                    # Build complete output items by merging:
+                    # - MCP tool calls from all attempts (captured_messages)
+                    # - Correct final output (final_result.new_messages())
+                    merged_messages = self._merge_messages_for_output(
+                        full_messages=self.captured_messages,
+                        final_messages=self.final_result.new_messages(),
+                    )
+                    response_formatter = OpenAIResponseFormatter_V4()
+                    output_items = await response_formatter.build_complete_output_items(
+                        all_messages=merged_messages,
+                        agent_result=self.final_result,
+                        tools=self.formatter.tools_config,
+                    )
 
                     # Emit final response.completed event with instructions and output
                     yield self.formatter.format_sse_from_event(
@@ -349,8 +347,7 @@ class StreamingValidationExecutor:
 
         # Check for final_result tool calls
         has_final_result = any(
-            isinstance(part, ToolCallPart) and part.tool_name == "final_result"
-            for part in last_message.parts
+            isinstance(part, ToolCallPart) and part.tool_name == "final_result" for part in last_message.parts
         )
 
         if has_final_result:
@@ -359,6 +356,53 @@ class StreamingValidationExecutor:
             return list(messages[:-1])
 
         return messages
+
+    def _merge_messages_for_output(
+        self,
+        full_messages: List[ModelMessage],
+        final_messages: List[ModelMessage],
+    ) -> List[ModelMessage]:
+        """Merge tool calls from full history with correct final output.
+
+        Combines:
+        - MCP tool calls and returns from full_messages (all attempts)
+        - Final assistant output from final_messages (last attempt only)
+
+        This ensures the output includes:
+        - All MCP tool interactions across retry attempts
+        - Only the correct/validated final response
+
+        Args:
+            full_messages: Complete message history from all attempts (may have stale responses)
+            final_messages: Messages from final successful attempt only
+
+        Returns:
+            Merged message list with MCP tool calls + correct final output
+        """
+        merged = []
+
+        # 1. Extract tool-related messages from full_messages (exclude final_result)
+        for message in full_messages:
+            if isinstance(message, ModelResponse):
+                # Check if this message has MCP tool calls (not final_result)
+                has_mcp_tools = any(
+                    isinstance(part, ToolCallPart) and part.tool_name != "final_result" for part in message.parts
+                )
+                if has_mcp_tools:
+                    merged.append(message)
+
+            elif isinstance(message, ModelRequest):
+                # Check if this message has MCP tool returns (not final_result)
+                has_mcp_returns = any(
+                    isinstance(part, ToolReturnPart) and part.tool_name != "final_result" for part in message.parts
+                )
+                if has_mcp_returns:
+                    merged.append(message)
+
+        # 2. Add final messages (correct validated output)
+        merged.extend(final_messages)
+
+        return merged
 
     async def _wrapped_stream_events(self, agent: Agent, prompt: str) -> AsyncGenerator:
         """Wrap agent streaming with message capture.
@@ -378,17 +422,15 @@ class StreamingValidationExecutor:
             try:
                 async for event in agent.run_stream_events(
                     user_prompt=prompt,
-                    message_history=self.captured_messages  # Use accumulated context
+                    message_history=self.captured_messages,  # Use accumulated context
                 ):
                     yield event
             finally:
                 # Always update captured_messages with what context manager captured
                 if attempt_messages:
-                    # Filter out final_result tool calls before storing
-                    self.captured_messages = self._filter_final_result_tool_calls(
-                        list(attempt_messages)
-                    )
-                    logger.debug(f"Captured {len(self.captured_messages)} messages (filtered)")
+                    # Store FILTERED messages for retry context and output building
+                    self.captured_messages = self._filter_final_result_tool_calls(list(attempt_messages))
+                    logger.debug(f"Captured {len(self.captured_messages)} messages")
 
     async def _attempt_stream(self, attempt_number: int) -> AsyncGenerator:
         """Attempt streaming with validation using backup algorithm.
