@@ -16,7 +16,9 @@ import ComingSoon from "@/components/ui/comingSoon";
 import { ExperimentData, useEvaluations } from "@/hooks/useEvaluations";
 import { getDatasetNamesFromTraits, getDisplayText } from "@/lib/utils";
 import { TruncatedTextCell } from "@/components/ui/TruncatedTextCell";
-import { errorToast } from "@/components/toast";
+import { errorToast, successToast } from "@/components/toast";
+import { tempApiBaseUrl } from "@/components/environment";
+import { axiosInstance } from "src/pages/api/requests";
 
 type ColumnsType<T extends object> = TableProps<T>["columns"];
 type TablePagination<T extends object> = NonNullable<
@@ -217,6 +219,47 @@ function ModelEvalTable() {
     });
   }, [openDrawerWithStep, deploymentId]);
 
+  // Handle "Export" button click - exports evaluations as CSV
+  const handleExport = useCallback(async () => {
+    if (typeof deploymentId !== 'string') {
+      errorToast("Cannot export without a valid deployment ID.");
+      return;
+    }
+
+    try {
+      const payload = {
+        search: debouncedSearchValue || undefined,
+        endpoint_id: deploymentId,
+        searchName: false,
+        export_format: 'csv',
+      };
+
+      const response = await axiosInstance.get(
+        `${tempApiBaseUrl}/experiments/evaluations/all`,
+        {
+          params: payload,
+          responseType: 'blob',
+        }
+      );
+
+      // Create a blob URL and trigger download
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `evaluations_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      successToast("Evaluations exported successfully");
+    } catch (error) {
+      console.error("Failed to export evaluations:", error);
+      errorToast("Failed to export evaluations");
+    }
+  }, [currentPage, pageSize, debouncedSearchValue, deploymentId]);
+
   return (
     <div className="relative CommonCustomPagination">
       {/* <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" /> */}
@@ -258,11 +301,7 @@ function ModelEvalTable() {
                 onClick={handleRunEvaluation}
                 text="Run Another Evaluation"
               ></PrimaryButton>
-              <PrimaryButton
-                onClick={() => {
-                  null;
-                }}
-              >
+              <PrimaryButton onClick={handleExport}>
                 <div className="flex items-center justify-center">
                   <div className="w-[.75rem] mr-[.25rem]">
                     <Image
