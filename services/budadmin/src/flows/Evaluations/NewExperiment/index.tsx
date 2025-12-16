@@ -6,6 +6,7 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import TagsInput from "@/components/ui/bud/dataEntry/TagsInput";
+import { colourOptions } from "@/components/ui/bud/dataEntry/TagsInputData";
 import { successToast } from "@/components/toast";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useEvaluations } from "src/hooks/useEvaluations";
@@ -14,6 +15,13 @@ import TextInput from "src/flows/components/TextInput";
 const NewExperimentForm = React.memo(function NewExperimentForm() {
   const { experimentTags, getExperimentTags } = useEvaluations();
 
+  // Add colors to tags that don't have one, cycling through the color palette
+  const tagsWithColor = React.useMemo(() => {
+    return (experimentTags || []).map((tag, index) => ({
+      ...tag,
+      color: tag.color || colourOptions[index % colourOptions.length].value,
+    }));
+  }, [experimentTags]);
 
   React.useEffect(() => {
     getExperimentTags();
@@ -55,38 +63,14 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
       <TagsInput
         label="Tags"
         required
-        options={experimentTags}
+        options={tagsWithColor}
         info="Add keywords to help organize and find your experiment later. Max 10 tags, 20 characters each."
         name="tags"
         placeholder="Select or Create tags that are relevant"
         rules={[
           {
-            validator: (_, value) => {
-              if (value && value.length > 10) {
-                return Promise.reject("Maximum 10 tags allowed");
-              }
-              if (
-                value &&
-                value.some((tag: any) => {
-                  const tagName = typeof tag === "string" ? tag : tag.name;
-                  return tagName && tagName.length > 20;
-                })
-              ) {
-                return Promise.reject("Each tag must be 20 characters or less");
-              }
-              if (
-                value &&
-                value.some((tag: any) => {
-                  const tagName = typeof tag === "string" ? tag : tag.name;
-                  return tagName && !/^[a-zA-Z0-9\-_]+$/.test(tagName);
-                })
-              ) {
-                return Promise.reject(
-                  "Tags can only contain letters, numbers, hyphens, and underscores",
-                );
-              }
-              return Promise.resolve();
-            },
+            required: true,
+            message: "Please add tags to create an experiment.",
           },
         ]}
         ClassNames="mb-[1rem]"
