@@ -163,6 +163,7 @@ class WorkflowService(SessionMixin):
             credential_id = required_data.get("credential_id")
             user_confirmation = required_data.get("user_confirmation")
             run_as_simulation = required_data.get("run_as_simulation")
+            benchmark_id = required_data.get("benchmark_id")
             adapter_model_id = required_data.get("adapter_model_id")
             endpoint_name = required_data.get("endpoint_name")
             deploy_config = required_data.get("deploy_config")
@@ -405,6 +406,7 @@ class WorkflowService(SessionMixin):
                 credential_id=credential_id,
                 user_confirmation=user_confirmation,
                 run_as_simulation=run_as_simulation,
+                benchmark_id=benchmark_id,
                 adapter_config=adapter_config if adapter_config else None,
                 adapter_deployment_events=adapter_deployment_events if adapter_deployment_events else None,
                 credential=db_credential if db_credential else None,
@@ -554,6 +556,7 @@ class WorkflowService(SessionMixin):
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
+                "benchmark_id",
             ],
             "evaluation": [BudServeWorkflowStepEventName.EVALUATION_EVENTS.value, "dataset_ids"],
             "add_adapter": [

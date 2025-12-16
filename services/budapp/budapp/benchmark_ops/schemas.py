@@ -56,6 +56,7 @@ class RunBenchmarkWorkflowStepData(BaseModel):
     tp_size: Optional[int] = None
     pp_size: Optional[int] = None
     replicas: Optional[int] = None
+    num_prompts: Optional[int] = None  # Total prompts to run (defaults to sum of dataset num_samples)
 
     # step 7
     credential_id: Optional[UUID] = None
@@ -316,3 +317,9 @@ class NodeConfigurationProxyResponse(BaseModel):
     device_configurations: list[DeviceTypeConfigurationResponse]
     selected_nodes: list[str]
     hardware_mode: str
+
+
+class CancelBenchmarkRequest(BaseModel):
+    """Request to cancel a running benchmark."""
+
+    workflow_id: UUID4

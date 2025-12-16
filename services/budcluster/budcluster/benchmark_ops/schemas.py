@@ -40,6 +40,7 @@ class RunBenchmarkRequest(CloudEventBase):
     tp_size: Optional[int] = None
     pp_size: Optional[int] = None
     replicas: Optional[int] = None
+    num_prompts: Optional[int] = None  # Total prompts to run (defaults to sum of dataset num_samples)
     # Storage configuration (from cluster settings)
     default_storage_class: Optional[str] = None
     default_access_mode: Optional[str] = None

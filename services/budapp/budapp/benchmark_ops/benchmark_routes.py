@@ -47,6 +47,7 @@ from .schemas import (
     BenchmarkFilterFields,
     BenchmarkFilterValueResponse,
     BenchmarkPaginatedResponse,
+    CancelBenchmarkRequest,
     NodeConfigurationProxyRequest,
     NodeConfigurationProxyResponse,
     RunBenchmarkWorkflowRequest,
@@ -660,4 +661,64 @@ async def get_node_configurations(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to get node configurations",
+        ).to_http_response()
+
+
+@benchmark_router.post(
+    "/cancel",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully cancelled benchmark",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request or benchmark cannot be cancelled",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Not authorized to cancel this benchmark",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Workflow not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Cancel a running benchmark",
+)
+@require_permissions(permissions=[PermissionEnum.BENCHMARK_MANAGE])
+async def cancel_benchmark(
+    request: CancelBenchmarkRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Cancel a running benchmark.
+
+    Args:
+        request: The cancel benchmark request containing workflow_id.
+        current_user: The current authenticated user.
+        session: Database session.
+
+    Returns:
+        SuccessResponse on successful cancellation.
+        ErrorResponse if cancellation fails.
+    """
+    try:
+        await BenchmarkService(session).cancel_benchmark_workflow(request.workflow_id, current_user.id)
+        return SuccessResponse(
+            object="benchmark.cancel",
+            message="Benchmark cancelled successfully",
+        ).to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to cancel benchmark: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to cancel benchmark: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to cancel benchmark",
         ).to_http_response()

@@ -3073,7 +3073,7 @@ class SimulationService:
             args=args,
             replicas=request.replicas,
             image=image,
-            memory=total_memory_gb,
+            memory=int(total_memory_gb * (1024**3)),  # Convert GB to bytes for deployment handler PVC sizing
             weight_memory_gb=estimated_weight_memory_gb,
             kv_cache_memory_gb=kv_cache_memory_gb,
             hardware_mode=hardware_mode_str,

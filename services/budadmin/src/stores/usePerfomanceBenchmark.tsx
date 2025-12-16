@@ -67,6 +67,7 @@ export type Dataset = {
   columns?: {};
   created_at?: string;
   description?: string;
+  display_name?: string;
   filename?: string;
   folder?: string;
   formatting?: string;
@@ -127,6 +128,7 @@ export type SelectedConfiguration = {
   tp_size: number;
   pp_size: number;
   replicas: number;
+  num_prompts?: number;
 };
 
 export const usePerfomanceBenchmark = create<{
@@ -200,6 +202,9 @@ export const usePerfomanceBenchmark = create<{
   fetchNodeConfigurations: () => Promise<NodeConfigurationResponse | null>;
   setSelectedConfiguration: (config: SelectedConfiguration | null) => void;
   stepConfigurationOptions: () => Promise<any>;
+
+  // Cancel benchmark
+  cancelBenchmarkWorkflow: (workflowId: string) => Promise<any>;
 }>((set, get) => ({
   filters: {},
   totalPages: 0,
@@ -365,6 +370,7 @@ export const usePerfomanceBenchmark = create<{
             tp_size: steps.tp_size,
             pp_size: steps.pp_size,
             replicas: steps.replicas,
+            num_prompts: steps.num_prompts,
           } : existingState.selectedConfiguration,
         });
 
@@ -857,6 +863,7 @@ export const usePerfomanceBenchmark = create<{
           tp_size: config.tp_size,
           pp_size: config.pp_size,
           replicas: config.replicas,
+          num_prompts: config.num_prompts,
         },
       );
       await get().getWorkflow();
@@ -866,6 +873,27 @@ export const usePerfomanceBenchmark = create<{
       errorToast("Failed to save configuration options");
     } finally {
       get().setLoading(false);
+    }
+  },
+
+  // Cancel benchmark workflow
+  cancelBenchmarkWorkflow: async (workflowId: string) => {
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/cancel`,
+        {
+          workflow_id: workflowId,
+        },
+      );
+      if (response?.data) {
+        get().reset();
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error cancelling benchmark:", error);
+      errorToast("Failed to cancel benchmark");
+      return null;
     }
   },
 }));

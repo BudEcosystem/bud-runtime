@@ -277,6 +277,7 @@ class BenchmarkService(SessionMixin):
                 "tp_size",
                 "pp_size",
                 "replicas",
+                "num_prompts",
                 "credential_id",
                 "user_confirmation",
                 "run_as_simulation",
@@ -439,6 +440,131 @@ class BenchmarkService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to perform run benchmark request: {e}")
             raise ClientException("Unable to perform run benchmark request to budcluster") from e
+
+    async def cancel_benchmark_workflow(self, workflow_id: UUID, current_user_id: UUID) -> None:
+        """Cancel a running benchmark workflow.
+
+        Args:
+            workflow_id: The ID of the workflow to cancel.
+            current_user_id: The ID of the current user.
+
+        Raises:
+            ClientException: If the workflow is not found, doesn't belong to user,
+                           is not a benchmark workflow, or is not in progress.
+        """
+        # Retrieve workflow
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+            WorkflowModel, {"id": workflow_id}, missing_ok=True
+        )
+        if not db_workflow:
+            raise ClientException("Workflow not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Validate user owns this workflow
+        if db_workflow.created_by != current_user_id:
+            raise ClientException("Not authorized to cancel this workflow", status_code=status.HTTP_403_FORBIDDEN)
+
+        # Validate workflow type
+        if db_workflow.workflow_type != WorkflowTypeEnum.MODEL_BENCHMARK:
+            raise ClientException("This workflow is not a benchmark workflow", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Validate workflow status
+        if db_workflow.status != WorkflowStatusEnum.IN_PROGRESS:
+            raise ClientException("Benchmark is not currently running", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # Extract benchmark_id and dapr_workflow_id from workflow steps
+        keys_of_interest = [
+            "benchmark_id",
+            BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value,
+        ]
+
+        required_data = {}
+        for db_workflow_step in db_workflow_steps:
+            for key in keys_of_interest:
+                if key in db_workflow_step.data:
+                    required_data[key] = db_workflow_step.data[key]
+
+        # Get dapr workflow id from budserve_cluster_events
+        budserve_cluster_response = required_data.get(BudServeWorkflowStepEventName.BUDSERVE_CLUSTER_EVENTS.value)
+        if not budserve_cluster_response:
+            raise ClientException("Benchmark process has not been initiated")
+
+        dapr_workflow_id = budserve_cluster_response.get("workflow_id")
+        if not dapr_workflow_id:
+            raise ClientException("Cannot find workflow ID for cancellation")
+
+        # Call budcluster cancel endpoint
+        try:
+            await self._perform_cancel_benchmark_request(dapr_workflow_id)
+        except ClientException as e:
+            raise e
+
+        # Update benchmark status to CANCELLED
+        benchmark_id = required_data.get("benchmark_id")
+        if benchmark_id:
+            with BenchmarkCRUD() as crud:
+                crud.update(
+                    data={"status": BenchmarkStatusEnum.CANCELLED},
+                    conditions={"id": benchmark_id},
+                )
+                logger.info(f"Benchmark {benchmark_id} status updated to CANCELLED")
+
+        # Delete the workflow
+        await WorkflowDataManager(self.session).delete_one(db_workflow)
+        logger.info(f"Workflow {workflow_id} deleted after cancellation")
+
+        # Send notification to user
+        notification_request = (
+            NotificationBuilder()
+            .set_content(
+                title=db_workflow.title or "Benchmark",
+                message="Benchmark cancelled",
+                icon=db_workflow.icon or APP_ICONS["general"]["model_mono"],
+            )
+            .set_payload(workflow_id=str(db_workflow.id), type=NotificationTypeEnum.MODEL_BENCHMARK_CANCELLED.value)
+            .set_notification_request(subscriber_ids=[str(current_user_id)])
+            .build()
+        )
+        await BudNotifyService().send_notification(notification_request)
+
+    async def _perform_cancel_benchmark_request(self, workflow_id: str) -> dict:
+        """Perform cancel benchmark request to budcluster service.
+
+        Args:
+            workflow_id: The Dapr workflow ID to cancel.
+
+        Returns:
+            dict: Response from budcluster service.
+
+        Raises:
+            ClientException: If the request fails.
+        """
+        cancel_benchmark_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/cancel/{workflow_id}"
+
+        logger.debug(f"Performing cancel benchmark request to budcluster: {cancel_benchmark_endpoint}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(cancel_benchmark_endpoint) as response:
+                    response_data = await response.json()
+                    if response.status != 200 or response_data.get("object") == "error":
+                        logger.error(f"Failed to cancel benchmark: {response.status} {response_data}")
+                        raise ClientException(
+                            "Failed to cancel benchmark", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    logger.debug("Successfully cancelled benchmark")
+                    return response_data
+        except ClientException as e:
+            raise e
+        except Exception as e:
+            logger.exception(f"Failed to send cancel benchmark request: {e}")
+            raise ClientException(
+                "Failed to cancel benchmark", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            ) from e
 
     async def update_benchmark_status_from_notification_event(self, payload: NotificationPayload) -> None:
         """Add benchmark from notification event."""
@@ -651,6 +777,18 @@ class BenchmarkService(SessionMixin):
         db_model = await ModelDataManager(self.session).retrieve_by_fields(Model, {"id": db_benchmark.model_id})
         cluster_id = db_benchmark.cluster_id
         cluster_detail = await ClusterService(self.session).get_cluster_details(cluster_id)
+
+        # Fetch dataset names if dataset_ids are present
+        dataset_names = []
+        if db_benchmark.dataset_ids:
+            with DatasetCRUD() as dataset_crud, dataset_crud.get_session() as dataset_session:
+                for dataset_id in db_benchmark.dataset_ids:
+                    db_dataset = dataset_crud.fetch_one(
+                        conditions={"id": dataset_id}, session=dataset_session, raise_on_error=False
+                    )
+                    if db_dataset:
+                        dataset_names.append(db_dataset.name)
+
         return ModelClusterDetail(
             id=db_benchmark.id,
             name=db_benchmark.name,
@@ -666,6 +804,7 @@ class BenchmarkService(SessionMixin):
             tags=db_benchmark.tags,
             nodes=db_benchmark.nodes,
             dataset_ids=db_benchmark.dataset_ids,
+            dataset_names=dataset_names if dataset_names else None,
             reason=db_benchmark.reason,
             created_at=db_benchmark.created_at,
             modified_at=db_benchmark.modified_at,
@@ -898,10 +1037,8 @@ class BenchmarkRequestMetricsService(SessionMixin):
             # Use parameterized query to prevent SQL injection
             if distribution_type == "prompt_len":
                 query = "SELECT MAX(prompt_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
-            elif distribution_type == "completion_len":
-                query = (
-                    "SELECT MAX(completion_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
-                )
+            elif distribution_type == "output_len":
+                query = "SELECT MAX(output_len) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
             elif distribution_type == "ttft":
                 query = "SELECT MAX(ttft) FROM benchmark_request_metrics WHERE dataset_id = ANY(:dataset_ids)"
             elif distribution_type == "tpot":
@@ -946,7 +1083,8 @@ class BenchmarkRequestMetricsService(SessionMixin):
 
         with BenchmarkRequestMetricsCRUD() as crud:
             params = {"dataset_ids": dataset_ids}
-            query = f"""  # nosec B608
+            # nosec B608 - distribution_type is validated against allowed values
+            query = f"""
                     WITH bins AS (
                         SELECT * FROM (VALUES
                             {", ".join([f"({bin_id}, {bin_start}, {bin_end})" for bin_id, bin_start, bin_end in bins])}
@@ -967,7 +1105,7 @@ class BenchmarkRequestMetricsService(SessionMixin):
                         ,ROUND(COALESCE(AVG(m.output_len)::numeric, 0), 2) AS avg_output_len
                 """
             # nosec B608 - distribution_type is validated against allowed values
-            query += f"""  # nosec B608
+            query += f"""
                     FROM bins b
                     LEFT JOIN benchmark_request_metrics m
                         ON m.{distribution_type} >= b.bin_start
@@ -1032,7 +1170,6 @@ class BenchmarkRequestMetricsService(SessionMixin):
             FROM benchmark_request_metrics as b
             WHERE b.benchmark_id = :benchmark_id
         """
-        print(GET_DATA_QUERY)
         with BenchmarkRequestMetricsCRUD() as crud:
             analysis_data = crud.execute_raw_query(query=text(GET_DATA_QUERY), params={"benchmark_id": benchmark_id})
 

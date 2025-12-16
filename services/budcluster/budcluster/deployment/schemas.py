@@ -85,6 +85,7 @@ class RunBenchmarkParams(BaseModel):
     tp_size: Optional[int] = None
     pp_size: Optional[int] = None
     replicas: Optional[int] = None
+    num_prompts: Optional[int] = None  # Total prompts to run (defaults to sum of dataset num_samples)
 
 
 class CommonDeploymentParams(BaseModel):
@@ -205,6 +206,7 @@ class RunPerformanceBenchmarkRequest(BaseModel):
     input_tokens: Optional[int]
     output_tokens: Optional[int]
     datasets: Optional[list[dict]] = None
+    num_prompts: Optional[int] = None  # Total prompts to run (defaults to sum of dataset num_samples)
 
 
 class WorkflowRunPerformanceBenchmarkRequest(BaseModel):

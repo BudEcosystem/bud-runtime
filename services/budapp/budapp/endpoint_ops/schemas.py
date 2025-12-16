@@ -189,6 +189,7 @@ class ModelClusterDetail(BaseModel):
     tags: Optional[list] = None
     nodes: Optional[list] = None
     dataset_ids: Optional[list] = None
+    dataset_names: Optional[list] = None
     reason: Optional[str] = None
     created_at: Optional[datetime] = None
     modified_at: Optional[datetime] = None

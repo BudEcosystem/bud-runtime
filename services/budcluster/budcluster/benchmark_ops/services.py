@@ -59,6 +59,7 @@ class BenchmarkService(SessionMixin):
             tp_size=request.tp_size,
             pp_size=request.pp_size,
             replicas=request.replicas,
+            num_prompts=request.num_prompts,
         )
 
         if request.credential_id:
