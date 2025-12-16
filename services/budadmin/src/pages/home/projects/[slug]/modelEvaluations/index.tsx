@@ -228,8 +228,6 @@ function ModelEvalTable() {
 
     try {
       const payload = {
-        page: currentPage,
-        page_size: pageSize,
         search: debouncedSearchValue || undefined,
         endpoint_id: deploymentId,
         searchName: false,
