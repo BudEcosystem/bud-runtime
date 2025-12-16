@@ -1,0 +1,2 @@
+namespace = "cert-manager-issuer"
+release_name = "cert-manager-issuer"

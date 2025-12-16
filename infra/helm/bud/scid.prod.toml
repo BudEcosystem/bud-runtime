@@ -1,4 +1,4 @@
 release_name = "bud"
 namespace = "bud"
-value_paths = [ "values.standalone.yaml", "example.secrets.yaml" ]
+value_paths = [ "example.standalone.yaml", "example.secrets.yaml" ]
 dependencies = [ "cert-manager", "dapr", "nfs-csi" ]
