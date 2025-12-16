@@ -29,6 +29,13 @@ class EvaluationEngine(str, Enum):
     OPENCOMPASS = "opencompass"
 
 
+class EvalMode(str, Enum):
+    """Supported evaluation modes."""
+
+    GEN = "gen"
+    PPL = "ppl"
+
+
 # --- Evaluation Job Info --- #
 class EvalModelInfo(BaseModel):
     """Model information for evaluation."""
@@ -44,6 +51,12 @@ class EvalDataset(BaseModel):
 
     dataset_id: str = Field(..., description="ID of the dataset to be evaluated")
     run_id: str = Field(..., description="ID of the run to be evaluated")
+    eval_mode: Optional[EvalMode] = Field(
+        default=None,
+        description=(
+            "Evaluation mode for the dataset (generation or perplexity); defaults to the request mode when omitted"
+        ),
+    )
 
 
 class EvalConfig(BaseModel):
@@ -63,6 +76,12 @@ class EvaluationRequest(CloudEventBase):
 
     # Nested model info structure
     eval_model_info: EvalModelInfo = Field(..., description="Model information for evaluation")
+
+    # Evaluation mode
+    eval_mode: EvalMode = Field(
+        default=EvalMode.GEN,
+        description="Evaluation mode (e.g., generation or perplexity)",
+    )
 
     # Structured datasets instead of simple strings
     eval_datasets: List[EvalDataset] = Field(..., description="Evaluation datasets")
