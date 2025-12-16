@@ -72,6 +72,34 @@ const NewExperimentForm = React.memo(function NewExperimentForm() {
             required: true,
             message: "Please add tags to create an experiment.",
           },
+          {
+            validator: (_, value) => {
+              if (value && value.length > 10) {
+                return Promise.reject("Maximum 10 tags allowed");
+              }
+              if (
+                value &&
+                value.some((tag: any) => {
+                  const tagName = typeof tag === "string" ? tag : tag.name;
+                  return tagName && tagName.length > 20;
+                })
+              ) {
+                return Promise.reject("Each tag must be 20 characters or less");
+              }
+              if (
+                value &&
+                value.some((tag: any) => {
+                  const tagName = typeof tag === "string" ? tag : tag.name;
+                  return tagName && !/^[a-zA-Z0-9\-_]+$/.test(tagName);
+                })
+              ) {
+                return Promise.reject(
+                  "Tags can only contain letters, numbers, hyphens, and underscores",
+                );
+              }
+              return Promise.resolve();
+            },
+          },
         ]}
         ClassNames="mb-[1rem]"
         SelectClassNames="mb-[.5rem]"
