@@ -117,22 +117,30 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), infini
 
 ## 5. FAQ
 
-**What providers and guardrail types are supported?**
+**Q1. What providers and guardrail types are supported?**
 
 The Add Guardrail workflow lists Bud Sentinel, Azure AI Foundry, AWS Bedrock, and custom probes (plus any moderation providers returned by the API). Guard types span input/output and related stages (e.g., retrieval/tools) with probes for PII, jailbreak, toxicity, bias, profanity, regex, and semantic checks.
 
-**How do I know a guardrail’s status?**
+**Q2. How do I know a guardrail’s status?**
 
-Status chips (Active, Inactive, Draft/Pending) appear as dots on catalog cards, badges on the General tab, and tags in project tables; colors align with Bud’s status palette for quick scanning.
+Status chips (Active, Inactive, Draft/Pending) appear as dots on catalog cards, tags in project tables, and labels on the detail page footer; colors align with Bud’s status palette for quick scanning.
 
-**Can I see which rules a probe enforces?**
+**Q3. Can I see which rules a probe enforces?**
 
-Yes. In the **Probes** tab, expand a probe row to view the nested rules table with rule names, descriptions, guard types, and statuses; pagination lets you browse large rule sets.
+Yes. In the multi‑step creation workflow, expand a probe row and scroll the nested rules table (with rule names, descriptions, guard types, and statuses); pagination lets you browse large rule sets before deploying.
 
-**How do filters interact with search?**
+**Q4. How do filters interact with search?**
 
 Search updates results immediately, while the Status popover applies only after clicking **Apply**; **Reset** clears the selection. Infinite scroll respects whichever search and status options you have active.
 
-**Where do guardrails surface inside projects?**
+**Q5. Where do guardrails surface inside projects?**
 
 Each project includes a **Guardrails** tab listing attached profiles with sorting, pagination, delete action, and navigation to the profile detail page, keeping project owners aware of active protections.
+
+**Q6. What is the difference between GuardRail Endpoint and Add to Existing Deployment?**
+
+Selecting **GuardRail Endpoint** provisions a standalone endpoint `is_standalone=true` in the workflow payload), while **Add to Existing Deployment** attaches the guardrail to a selected deployment/endpoint within a project using the status‑coded chips shown in the picker.
+
+**Q7. How do I adjust or redeploy a guardrail after creation?**
+
+From the catalog or project table, open the guardrail detail page and click **Deploy** in the footer to reopen the deployment flow. You can reselect deployments, tweak probe settings such as guard types or severity, and redeploy without recreating the profile from scratch.
