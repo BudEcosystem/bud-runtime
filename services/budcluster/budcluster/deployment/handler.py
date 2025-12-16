@@ -390,6 +390,8 @@ class DeploymentHandler:
                 node["args"]["reasoning-parser"] = reasoning_parser_type
                 # Add other reasoning parser configurations as needed
 
+            node["args"]["trust-remote-code"] = True
+
             # Update the full_node_list with the modified args
             full_node_list[_idx]["args"] = node["args"].copy()
 
