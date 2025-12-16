@@ -124,7 +124,7 @@ export default function ViewProjectCredential() {
         {showConfirm && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title={firstLineText}
               description={secondLineText}
               confirmText="Delete Credential"

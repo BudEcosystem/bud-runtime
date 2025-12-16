@@ -134,7 +134,7 @@ function DeploymentListTable() {
                 setConfirmVisible(false);
             },
             okText: 'Delete',
-            type: 'warining'
+            type: 'warning'
         });
     }
     useEffect(() => {

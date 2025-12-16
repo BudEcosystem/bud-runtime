@@ -140,7 +140,7 @@ function AgentsPromptsListTable() {
                 setConfirmVisible(false);
             },
             okText: 'Delete',
-            type: 'warining'
+            type: 'warning'
         });
     };
 

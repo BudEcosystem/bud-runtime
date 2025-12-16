@@ -34,7 +34,7 @@ export default function AddWorkerConfigStatus() {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to stop finding the hardware for deployment"
               description="We highly recommend that you continue the process to find the best hardware for the required concurrency"
               cancelText="Continue Scanning"

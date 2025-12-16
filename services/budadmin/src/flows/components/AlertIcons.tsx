@@ -2,13 +2,13 @@ import { Image } from "antd";
 import React from "react";
 
 type Props = {
-  type: "warining" | "failed" | "success";
+  type: "warning" | "failed" | "success";
 };
 
 export default function AlertIcons(props: Props) {
   return (
     <div className="width-69 height-69 ">
-      {props.type == "warining" && (
+      {props.type == "warning" && (
         <Image
           preview={false}
           src="/images/drawer/warning.png"

@@ -17,7 +17,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import AlertIcons from "./AlertIcons";
 
 export interface Props {
-  type?: "warining" | "failed" | "success";
+  type?: "warning" | "failed" | "success";
   confirmText?: string;
   cancelText?: string;
   title?: string;
