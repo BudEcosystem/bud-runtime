@@ -153,6 +153,12 @@ import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
 import AddAgentSuccess from "./AddAgent/AgentSuccess";
 import AddAgentSelectType from "./AddAgent/SelectAgentType";
 import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
+import ViewToolDetails from "./ViewTool/ViewToolDetails";
+import SelectToolSource from "./AddTool/SelectToolSource";
+import BudToolsCatalogue from "./AddTool/BudToolsCatalogue";
+import OpenAPISpecification from "./AddTool/OpenAPISpecification";
+import ToolDetailsExpanded from "./AddTool/ToolDetailsExpanded";
+import CreatingToolStatus from "./AddTool/CreatingToolStatus";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -325,6 +331,13 @@ export const StepComponents = {
   "add-agent-deployment-warning": AddAgentDeploymentWarning,
   "add-agent-success": AddAgentSuccess,
   "edit-agent-drawer": AgentEditDrawer,
+  // Tools
+  "view-tool-details": ViewToolDetails,
+  "select-tool-source": SelectToolSource,
+  "bud-tools-catalogue": BudToolsCatalogue,
+  "openapi-specification": OpenAPISpecification,
+  "tool-details-expanded": ToolDetailsExpanded,
+  "creating-tool-status": CreatingToolStatus,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;
