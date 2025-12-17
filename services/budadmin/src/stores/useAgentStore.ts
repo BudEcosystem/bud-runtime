@@ -652,19 +652,9 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         const existingSessions = get().sessions;
         const activeSessionIds = get().activeSessionIds;
 
-        // Debug logging
-        console.log('[useAgentStore] restoreSessionWithPromptId called:', {
-          promptId,
-          sessionData,
-          hasSelectedDeployment: !!sessionData?.selectedDeployment,
-          selectedDeploymentName: sessionData?.selectedDeployment?.name,
-          existingSessionsCount: existingSessions.length,
-        });
-
         // Check if session with this prompt ID already exists
         const existingSession = existingSessions.find(s => s.promptId === promptId);
         if (existingSession) {
-          console.log('[useAgentStore] Found existing session, updating:', existingSession.id);
           // Update existing session with new data if provided
           if (sessionData) {
             set({
@@ -694,13 +684,6 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
           position: existingSessions.length,
           updatedAt: new Date(),
         };
-
-        console.log('[useAgentStore] Created new session:', {
-          sessionId: newSession.id,
-          promptId: newSession.promptId,
-          hasSelectedDeployment: !!newSession.selectedDeployment,
-          selectedDeploymentName: newSession.selectedDeployment?.name,
-        });
 
         set({
           sessions: [...existingSessions, newSession],
