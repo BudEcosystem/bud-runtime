@@ -120,22 +120,8 @@ const AgentDrawer: React.FC = () => {
     // Check for saved session data (most reliable indicator of OAuth in progress)
     const hasOAuthSessionData = !!localStorage.getItem('oauth_session_data');
 
-    console.log('[AgentDrawer] Session creation check:', {
-      isAgentDrawerOpen,
-      activeSessionsLength: activeSessions.length,
-      isOAuthCallbackFlag,
-      hasOAuthParamsInUrl,
-      hasSavedOAuthPromptId,
-      hasOAuthState,
-      hasOAuthSessionData,
-      isEditMode,
-      isAddVersionMode,
-      isEditVersionMode,
-    });
-
     if (isOAuthCallbackFlag || hasOAuthParamsInUrl || hasSavedOAuthPromptId || hasOAuthState || hasOAuthSessionData) {
       // OAuth in progress - session should already exist or will be restored, don't create new one
-      console.log('[AgentDrawer] OAuth in progress, skipping session creation');
       return;
     }
 
@@ -146,7 +132,6 @@ const AgentDrawer: React.FC = () => {
 
     // Only create session if none exist AND not OAuth callback AND not in any special mode
     if (activeSessions.length === 0) {
-      console.log('[AgentDrawer] Creating new session');
       createSession();
     }
   }, [isAgentDrawerOpen, activeSessions.length, createSession, isEditMode, isAddVersionMode, isEditVersionMode]);
@@ -207,12 +192,6 @@ const AgentDrawer: React.FC = () => {
 
     // Only update if the URL param is different from what we want to set
     if (currentPromptParam !== newPromptParam) {
-      console.log('🔄 AgentDrawer updating URL:', {
-        currentPrompt: currentPromptParam,
-        newPrompt: newPromptParam,
-        willAddPrompt: !!newPromptParam
-      });
-
       // Build URL manually to avoid encoding commas
       // Use window.location to get the actual browser URL
       const currentPath = window.location.pathname;
@@ -245,17 +224,12 @@ const AgentDrawer: React.FC = () => {
       // Add new prompt param if exists (without encoding commas)
       if (newPromptParam) {
         queryParts.push(`prompt=${newPromptParam}`);
-        console.log('✓ Adding prompt parameter:', newPromptParam);
       }
-
-      console.log('🔧 Final query parts:', queryParts);
 
       // Build the final URL
       const newUrl = queryParts.length > 0
         ? `${currentPath}?${queryParts.join('&')}`
         : currentPath;
-
-      console.log('✓ New URL:', newUrl);
 
       // Use window.history.replaceState to update URL
       window.history.replaceState(
