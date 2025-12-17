@@ -1683,7 +1683,45 @@ class KubernetesHandler(BaseClusterHandler):
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         # Wait for port-forward to be ready
-        await asyncio.sleep(2)
+        # Wait up to 10 seconds for the port to be open
+        import socket
+        import time
+
+        start_time = time.time()
+        port_ready = False
+
+        while time.time() - start_time < 10.0:
+            if process.poll() is not None:
+                break
+
+            try:
+                # Try to connect to the local port
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.5)
+                # Use localhost to match the bind address logic probably used elsewhere or default
+                result = sock.connect_ex(("127.0.0.1", local_port))
+                sock.close()
+
+                if result == 0:
+                    port_ready = True
+                    # Give it a tiny bit more time for the application to be ready to accept data
+                    await asyncio.sleep(0.1)
+                    break
+            except Exception:
+                pass
+
+            await asyncio.sleep(0.5)
+
+        # Check if process is still running or if we timed out
+        if not port_ready and process.poll() is None:
+            # If timed out but process still running, kill it
+            process.terminate()
+            try:
+                process.wait(timeout=1.0)
+            except Exception:
+                process.kill()
+
+            raise KubernetesException(f"{log_prefix}port-forward timed out waiting for port {local_port} to be open")
 
         # Check if process is still running
         if process.poll() is not None:
