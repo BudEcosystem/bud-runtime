@@ -7,7 +7,7 @@ description: "Guardrails discovery, configuration, and probe management inside B
 
 The Guardrails module in Bud AI Foundry is a safety mechanisms that monitor, filters, and controls content flowing through AI model endpoints. They act as intelligent gatekeepers that analyze both user inputs and model outputs to detect and prevent harmful, inappropriate, or policy-violating content.
 
-The Guardrails catalog surfaces provider probes with names, providers, tags, statuses, guard types, and creation dates in a card grid, while a detail drawer and full detail page expose profile metadata, guard types, taxonomy tags, and detection examples. A multi‑step drawer workflow walks teams through selecting providers (Bud Sentinel, Azure AI, AWS Bedrock, or custom), choosing probes, refining rules, choosing deployment types, and pushing guardrails onto specific projects and endpoints.
+The Guardrails catalog surfaces provider probes with names, providers, tags, statuses, guard types, and creation dates in a card grid, while a detail drawer and full detail page expose profile metadata, guard types, taxonomy tags, and detection examples. A multi‑step drawer workflow walks teams through selecting providers (Bud Sentinel, Azure AI, and OpenAI), choosing probes, refining rules, choosing deployment types, and pushing guardrails onto specific projects and endpoints.
 
 As teams operationalize safety:
 
@@ -35,7 +35,7 @@ PII‑oriented probes detect sensitive fields and secrets before they are proces
 
 ### 5. Provider‑agnostic probe catalog
 
-Browse Bud Sentinel, Azure AI, AWS Bedrock, and custom probes side‑by‑side with unified metadata, icons, categories/tags, and guard type chips so safety choices remain portable across backends.
+Browse Bud Sentinel, Azure AI, and OpenAI probes side‑by‑side with unified metadata, icons, categories/tags, and guard type chips so safety choices remain portable across backends.
 
 ### 6. Profile‑level governance with guard types and thresholds
 
@@ -95,7 +95,7 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), and an
 
 ### 4.4 Create and deploy a guardrail (multi‑step flow)
 
-1. **Select Provider**: Choose Bud Sentinel, a custom probe option, OpenAI, Azure AI Foundry, AWS Bedrock, or other providers returned by the API, then click Next to create a workflow tied to that provider.
+1. **Select Provider**: Choose Bud Sentinel, a custom probe option, OpenAI, Azure AI Foundry, OpenAI, or other providers returned by the API, then click Next to create a workflow tied to that provider.
 2. **Select Probes**: Search or filter probes (PII, Bias, All), select one or more probes, and use See More for probe details before continuing. If Bud Sentinel is chosen, choose probes from Personally Identifiable Information, Secrets, and Safety.
 4. **Deployment Types**: Choose GuardRail Endpoint (standalone endpoint) or Add to Existing Deployment (maps to an existing deployment) before moving forward.
 5. **Select Project**: Search projects, pick a destination project, and persist the selection into the workflow.
@@ -125,7 +125,7 @@ Search, dynamic category tags, a status filter (Active/Inactive/Pending), and an
 
 **Q1. What providers and guardrail types are supported?**
 
-The Add Guardrail workflow lists Bud Sentinel, Azure AI Foundry, AWS Bedrock, and custom probes (plus any moderation providers returned by the API). Guard types span input/output and related stages (e.g., retrieval/tools) with probes for PII, jailbreak, toxicity, bias, profanity, regex, and semantic checks.
+The Add Guardrail workflow lists Bud Sentinel, Azure AI Foundry, OpenAI, and custom probes (plus any moderation providers returned by the API). Guard types span input/output and related stages (e.g., retrieval/tools) with probes for PII, jailbreak, toxicity, bias, profanity, regex, and semantic checks.
 
 **Q2. How do I know a guardrail’s status?**
 
