@@ -4,12 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { Input, Checkbox, Spin, Tooltip } from 'antd';
 import { useConnectors, Connector, CredentialSchemaField } from '@/stores/useConnectors';
 import { Text_10_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE } from '@/components/ui/text';
-import { PrimaryButton, SecondaryButton } from '@/components/ui/bud/form/Buttons';
-import CustomSelect from 'src/flows/components/CustomSelect';
 import { successToast, errorToast } from '@/components/toast';
 import { toast } from 'react-toastify';
 import { ToolDetails } from './ToolDetails';
 import { ConnectorService } from 'src/services/connectorService';
+import { CredentialConfigStep } from './CredentialConfigStep';
+import { ToolSelectionStep } from './ToolSelectionStep';
+import { useAgentStore } from '@/stores/useAgentStore';
+import { OAuthState, OAuthSessionData, clearOAuthUrlState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
+import CustomSelect from 'src/flows/components/CustomSelect';
 
 interface Tool {
   id: string;
@@ -43,15 +46,6 @@ interface ConnectorDetailsProps {
 // OAuth state management helpers
 const OAUTH_STATE_KEY = 'oauth_connector_state';
 
-interface OAuthState {
-  promptId: string;
-  connectorId: string;
-  connectorName: string;
-  workflowId?: string;
-  step: 1 | 2;
-  timestamp: number;
-}
-
 const saveOAuthState = (state: OAuthState) => {
   try {
     localStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(state));
@@ -79,11 +73,9 @@ const getOAuthState = (): OAuthState | null => {
 };
 
 const clearOAuthState = () => {
-  try {
-    localStorage.removeItem(OAUTH_STATE_KEY);
-  } catch (error) {
-    // Silently fail - localStorage might not be available
-  }
+  // Use clearOAuthUrlState which only clears URL-related state
+  // This preserves session data (selectedDeployment, etc.) for restoration in agents/index.tsx
+  clearOAuthUrlState();
 };
 
 // Helper to identify redirect URI fields
@@ -98,8 +90,32 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   workflowId,
 }) => {
   const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
+  const { getSessionByPromptId } = useAgentStore();
 
-  const [step, setStep] = useState<1 | 2>(connector.isFromConnectedSection ? 2 : 1);
+  // Determine initial step - check if this is an OAuth callback for this connector
+  const getInitialStep = (): 1 | 2 => {
+    if (connector.isFromConnectedSection) return 2;
+
+    // Check if we're in an OAuth callback for this specific connector
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+
+      if (code && state) {
+        // This is an OAuth callback - get saved state to verify it's for this connector
+        const savedState = getOAuthState();
+        if (savedState && savedState.connectorId === connector.id) {
+          // OAuth callback for this connector - start at step 2 to prevent flicker
+          return 2;
+        }
+      }
+    }
+
+    return 1;
+  };
+
+  const [step, setStep] = useState<1 | 2>(getInitialStep());
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -131,7 +147,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
-    if (!promptId) return;
+    // CRITICAL: Use saved OAuth prompt ID if available (for OAuth callback scenarios)
+    // The promptId prop might be stale during OAuth redirect
+    const effectivePromptId = getOAuthPromptId() || promptId;
+
+    if (!effectivePromptId) return;
 
     setIsLoadingTools(true);
     try {
@@ -144,7 +164,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       if (authType && authType.toLowerCase() !== 'open') {
         try {
           const oauthResponse = await ConnectorService.fetchOAuthTools({
-            prompt_id: promptId,
+            prompt_id: effectivePromptId,
             connector_id: connector.id,
             version: 1,
           });
@@ -152,10 +172,15 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           if (oauthResponse.data && oauthResponse.data.tools) {
             allTools = oauthResponse.data.tools;
           }
+        } catch (error) {
+          // No user-facing toast, but log for developers
+          console.error('[ConnectorDetails] Failed to fetch OAuth tools, proceeding with regular tools:', error);
+        }
 
-          // On success, also call GET /prompts/tools
+        // Also call GET /prompts/tools to get regular tools
+        try {
           const regularResponse = await ConnectorService.fetchTools({
-            prompt_id: promptId,
+            prompt_id: effectivePromptId,
             connector_id: connector.id,
             page: 1,
             limit: 100,
@@ -173,12 +198,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             });
           }
         } catch (error) {
+          // If regular fetch also fails, throw to show error toast
           throw error;
         }
       } else {
         // auth_type is "Open" or not set, only call GET /prompts/tools
         const response = await ConnectorService.fetchTools({
-          prompt_id: promptId,
+          prompt_id: effectivePromptId,
           connector_id: connector.id,
           page: 1,
           limit: 100,
@@ -255,12 +281,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       // Mark as processed
       oauthCallbackProcessed.current = true;
 
-      // Helper function to clean up OAuth-specific URL params (preserves agent and prompt params)
+      // Helper function to clean up OAuth-specific URL params (preserves connector, agent and prompt params)
       const cleanupOAuthParams = () => {
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.delete('code');
         urlParams.delete('state');
-        urlParams.delete('connector');
+        // Keep 'connector' param so back navigation works properly
 
         const cleanUrl = urlParams.toString()
           ? `${window.location.pathname}?${urlParams.toString()}`
@@ -285,8 +311,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
         // Fetch tools
         await fetchTools();
-
-        successToast('OAuth authorization successful');
       } catch (error: any) {
         errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
       } finally {
@@ -486,14 +510,43 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             const authorizationUrl = oauthResponse.data?.authorization_url;
 
             if (authorizationUrl) {
-              // Save state before redirecting
+              // Get current session data to preserve model selection and other settings
+              const currentSession = promptId ? getSessionByPromptId(promptId) : undefined;
+
+              // Get agent ID from URL to preserve it across OAuth redirect
+              const urlParams = new URLSearchParams(window.location.search);
+              const agentId = urlParams.get('agent') || undefined;
+
+              // Build session data to restore after OAuth
+              const sessionData: OAuthSessionData | undefined = currentSession ? {
+                modelId: currentSession.modelId,
+                modelName: currentSession.modelName,
+                systemPrompt: currentSession.systemPrompt,
+                promptMessages: currentSession.promptMessages,
+                name: currentSession.name,
+                selectedDeployment: currentSession.selectedDeployment,
+              } : undefined;
+
+              // CRITICAL: Save prompt ID in dedicated localStorage key for reliable restoration
+              if (promptId) {
+                saveOAuthPromptId(promptId);
+              }
+
+              // CRITICAL: Save session data in dedicated localStorage key for model restoration
+              if (sessionData) {
+                saveOAuthSessionData(sessionData);
+              }
+
+              // Save state before redirecting (includes session data for restoration)
               saveOAuthState({
                 promptId: promptId,
                 connectorId: connector.id,
                 connectorName: connector.name,
                 workflowId: workflowId,
+                agentId: agentId,
                 step: 1,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                sessionData: sessionData,
               });
 
               // Redirect to OAuth provider
@@ -523,7 +576,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   };
 
   const handleConnect = async () => {
-    if (!promptId) {
+    // Use saved OAuth prompt ID if available (for OAuth callback scenarios)
+    const effectivePromptId = getOAuthPromptId() || promptId;
+
+    if (!effectivePromptId) {
       errorToast('Prompt ID is missing');
       return;
     }
@@ -537,7 +593,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     try {
       const payload = {
-        prompt_id: promptId,
+        prompt_id: effectivePromptId,
         connector_id: connector.id,
         tool_ids: selectedTools,
         version: 1
@@ -569,7 +625,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   };
 
   const handleDisconnect = async () => {
-    if (!promptId) {
+    // Use saved OAuth prompt ID if available (for OAuth callback scenarios)
+    const effectivePromptId = getOAuthPromptId() || promptId;
+
+    if (!effectivePromptId) {
       errorToast('Prompt ID is missing');
       return;
     }
@@ -577,7 +636,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setIsDisconnecting(true);
 
     try {
-      const response = await ConnectorService.disconnectConnector(promptId, connector.id);
+      const response = await ConnectorService.disconnectConnector(effectivePromptId, connector.id);
 
       if (response.status === 200 || response.status === 204) {
         successToast('Connector disconnected successfully');
@@ -789,181 +848,32 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       >
         {/* first step */}
         {step === 1 && (
-          <div className='flex flex-col h-full justify-between'>
-            {/* Dynamic Input Fields based on credential_schema */}
-            <div className="space-y-3 mb-6 px-[1.125rem]">
-              {getVisibleFields(selectedConnectorDetails?.credential_schema || [])
-                .sort((a, b) => a.order - b.order)
-                .map(field => renderFormField(field))}
-            </div>
-            <div style={{
-              marginTop: '18px',
-              paddingTop: '18px',
-              paddingBottom: '18px',
-              borderRadius: '0 0 11px 11px',
-              borderTop: '0.5px solid #1F1F1F',
-              background: 'rgba(255, 255, 255, 0.03)',
-              backdropFilter: 'blur(5px)'
-            }} className='px-[1rem]'>
-              <div className='flex justify-end items-center px-[1rem]'>
-                <PrimaryButton
-                  onClick={handleContinue}
-                  loading={isRegistering}
-                  disabled={isRegistering || !isStepOneValid()}
-                  style={{
-                    cursor: (isRegistering || !isStepOneValid()) ? 'not-allowed' : 'pointer',
-                    transform: 'none'
-                  }}
-                  classNames="h-[1.375rem] rounded-[0.375rem] "
-                  textClass="!text-[0.625rem] !font-[400]"
-                >
-                  {isRegistering ? 'Registering...' : 'Continue'}
-                </PrimaryButton>
-              </div>
-            </div>
-          </div>
+          <CredentialConfigStep
+            credentialSchema={selectedConnectorDetails?.credential_schema || []}
+            formData={formData}
+            onInputChange={handleInputChange}
+            onContinue={handleContinue}
+            isRegistering={isRegistering}
+            isValid={isStepOneValid()}
+          />
         )}
 
         {/* second step */}
         {step === 2 && (
-          <div className='flex flex-col h-full justify-between'>
-            {isLoadingTools ? (
-              <div className="flex justify-center items-center py-8">
-                <Spin />
-              </div>
-            ) : (
-              <>
-                <div>
-                  {/* Select All Tools */}
-                  <div className="flex items-center gap-2 mb-4 px-[1.125rem]">
-                    <Checkbox
-                      checked={selectAll}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
-                    />
-                    <Text_12_400_EEEEEE className="text-nowrap">Select all tools</Text_12_400_EEEEEE>
-                  </div>
-
-                  {/* Tools List */}
-                  <div className="space-y-2 mb-1 mx-[.5rem] border-[.5px] border-[#1F1F1F] rounded-[.5rem] ">
-                    {availableTools.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-[#808080]">
-                        No tools available
-                      </div>
-                    ) : (
-                      availableTools.map((tool) => {
-                        const toolId = tool.id;
-                        const toolName = tool.name;
-
-                        if (!toolId) return null; // Skip if no ID
-
-                        return (
-                          <div
-                            key={toolId}
-                            onClick={() => handleToolClick(tool)}
-                            className="flex items-center justify-between px-[0.625rem] py-[0.46875rem] rounded-lg hover:bg-[#1A1A1A] border-[.5px] border-[transparent] hover:border-[#2A2A2A] cursor-pointer"
-                          >
-                            <div className='flex items-center justify-start gap-[.5rem]'>
-                              <Checkbox
-                                checked={selectedTools.includes(toolId)}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleToolToggle(tool, e.target.checked);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="AntCheckbox text-[#757575] w-[0.75rem] h-[0.75rem] text-[0.875rem]"
-                              />
-                              <Text_12_400_EEEEEE className="text-white">{toolName}</Text_12_400_EEEEEE>
-                            </div>
-                            <button
-                              className="cursor-pointer hover:opacity-70 transition-opacity"
-                              style={{ transform: 'none' }}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-[#808080]"
-                              >
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-            {/* Buttons - Only show on step 2 */}
-            {step === 2 && (
-              <div style={{
-                marginTop: '18px',
-                paddingTop: '18px',
-                paddingBottom: '18px',
-                borderRadius: '0 0 11px 11px',
-                borderTop: '0.5px solid #1F1F1F',
-                background: 'rgba(255, 255, 255, 0.03)',
-                backdropFilter: 'blur(5px)'
-              }} className='px-[1rem]'>
-                {connector.isFromConnectedSection ? (
-                  // Show Save and Disconnect buttons for connected tools
-                  <div className='flex justify-between items-center'>
-                    <SecondaryButton
-                      onClick={handleConnect}
-                      loading={isConnecting}
-                      disabled={isConnecting || selectedTools.length === 0 || isDisconnecting}
-                      style={{
-                        cursor: (isConnecting || selectedTools.length === 0 || isDisconnecting) ? 'not-allowed' : 'pointer',
-                        transform: 'none'
-                      }}
-                      classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !transition-colors !tranform-none"
-                      textClass="!text-[0.625rem] !font-[400] !transition-colors !tranform-none"
-                    >
-                      {isConnecting ? 'Saving...' : 'Save'}
-                    </SecondaryButton>
-                    <PrimaryButton
-                      onClick={handleDisconnect}
-                      loading={isDisconnecting}
-                      disabled={isDisconnecting || isConnecting}
-                      style={{
-                        cursor: (isDisconnecting || isConnecting) ? 'not-allowed' : 'pointer',
-                        transform: 'none'
-                      }}
-                      classNames="h-[1.375rem] rounded-[0.375rem] !border-[#361519] bg-[#952f2f26] group"
-                      textClass="!text-[0.625rem] !font-[400] text-[#E82E2E] group-hover:text-[#EEEEEE]"
-                    >
-                      {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                    </PrimaryButton>
-                  </div>
-                ) : (
-                  // Show Connect button for unregistered tools
-                  <div className='flex justify-end items-center'>
-                    <PrimaryButton
-                      onClick={handleConnect}
-                      loading={isConnecting}
-                      disabled={isConnecting || selectedTools.length === 0}
-                      style={{
-                        cursor: (isConnecting || selectedTools.length === 0) ? 'not-allowed' : 'pointer',
-                        transform: 'none'
-                      }}
-                      classNames="h-[1.375rem] rounded-[0.375rem]"
-                      textClass="!text-[0.625rem] !font-[400]"
-                    >
-                      {isConnecting ? 'Connecting...' : 'Connect'}
-                    </PrimaryButton>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <ToolSelectionStep
+            availableTools={availableTools}
+            selectedTools={selectedTools}
+            selectAll={selectAll}
+            isLoadingTools={isLoadingTools}
+            isConnecting={isConnecting}
+            isDisconnecting={isDisconnecting}
+            isFromConnectedSection={connector.isFromConnectedSection || false}
+            onSelectAll={handleSelectAll}
+            onToolToggle={handleToolToggle}
+            onToolClick={handleToolClick}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+          />
         )}
 
       </div>
