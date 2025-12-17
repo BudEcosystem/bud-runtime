@@ -173,7 +173,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
             allTools = oauthResponse.data.tools;
           }
         } catch (error) {
-          // Silently ignore errors from fetchOAuthTools - no toast needed
+          // No user-facing toast, but log for developers
+          console.error('[ConnectorDetails] Failed to fetch OAuth tools, proceeding with regular tools:', error);
         }
 
         // Also call GET /prompts/tools to get regular tools
