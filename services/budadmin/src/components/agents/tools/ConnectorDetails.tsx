@@ -527,15 +527,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 selectedDeployment: currentSession.selectedDeployment,
               } : undefined;
 
-              // Debug logging for OAuth state preservation
-              console.log('[OAuth] Saving session data before redirect:', {
-                promptId,
-                hasCurrentSession: !!currentSession,
-                hasSelectedDeployment: !!currentSession?.selectedDeployment,
-                selectedDeploymentName: currentSession?.selectedDeployment?.name,
-                sessionData
-              });
-
               // CRITICAL: Save prompt ID in dedicated localStorage key for reliable restoration
               if (promptId) {
                 saveOAuthPromptId(promptId);
