@@ -157,6 +157,12 @@ import AddAgentSelectType from "./AddAgent/SelectAgentType";
 import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
 import LogDetailsDrawer from "src/pages/home/agentDetails/[agentId]/logs/LogDetailsDrawer";
 import NewPipeline from "./Pipeline/NewPipeline";
+import ViewToolDetails from "./ViewTool/ViewToolDetails";
+import SelectToolSource from "./AddTool/SelectToolSource";
+import BudToolsCatalogue from "./AddTool/BudToolsCatalogue";
+import OpenAPISpecification from "./AddTool/OpenAPISpecification";
+import ToolDetailsExpanded from "./AddTool/ToolDetailsExpanded";
+import CreatingToolStatus from "./AddTool/CreatingToolStatus";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -335,6 +341,14 @@ export const StepComponents = {
 
   // Pipelines
   "new-pipeline": NewPipeline,
+
+  // Tools
+  "view-tool-details": ViewToolDetails,
+  "select-tool-source": SelectToolSource,
+  "bud-tools-catalogue": BudToolsCatalogue,
+  "openapi-specification": OpenAPISpecification,
+  "tool-details-expanded": ToolDetailsExpanded,
+  "creating-tool-status": CreatingToolStatus,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;

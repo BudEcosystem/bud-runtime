@@ -5035,6 +5035,27 @@ const newPipeline: DrawerFlowType = {
   ],
 };
 
+const viewTool: DrawerFlowType = {
+  title: "View Tool",
+  description: "View tool details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Tools", "View Tool"],
+      id: "view-tool-details",
+      step: 1,
+      component: StepComponents["view-tool-details"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "View Tool",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const pipelineExecutionDetails: DrawerFlowType = {
   title: "Execution Details",
   description: "View workflow execution details",
@@ -5056,6 +5077,86 @@ const pipelineExecutionDetails: DrawerFlowType = {
   ],
 };
 
+const addTool: DrawerFlowType = {
+  title: "Add Tool",
+  description: "Add a new tool",
+  totalSteps: 3,
+  steps: [
+    {
+      navigation: () => ["Tools", "Add Tool"],
+      id: "select-tool-source",
+      step: 1,
+      component: StepComponents["select-tool-source"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Source",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Tools", "Add Tool", "Bud Catalogue"],
+      id: "bud-tools-catalogue",
+      step: 2,
+      component: StepComponents["bud-tools-catalogue"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Source",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Tools",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Tools", "Add Tool", "OpenAPI Specification"],
+      id: "openapi-specification",
+      step: 2,
+      component: StepComponents["openapi-specification"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Source",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Configure",
+        },
+      ],
+      confirmClose: true,
+    },
+    {
+      navigation: () => ["Tools", "Add Tool", "Creating Tool"],
+      id: "creating-tool-status",
+      step: 3,
+      component: StepComponents["creating-tool-status"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Source",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Creating",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const pipelineCreateSchedule: DrawerFlowType = {
   title: "Create Schedule",
   description: "Create a workflow schedule",
@@ -5070,6 +5171,27 @@ const pipelineCreateSchedule: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "Create Schedule",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const toolDetailsExpanded: DrawerFlowType = {
+  title: "Tool Details",
+  description: "View tool details and sub-tools",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Tools", "Tool Details"],
+      id: "tool-details-expanded",
+      step: 1,
+      component: StepComponents["tool-details-expanded"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Tool Details",
         },
       ],
       confirmClose: false,
@@ -5152,6 +5274,10 @@ const flows = {
   "new-pipeline": newPipeline,
   "pipeline-execution-details": pipelineExecutionDetails,
   "pipeline-create-schedule": pipelineCreateSchedule,
+  // tools
+  "view-tool": viewTool,
+  "add-tool": addTool,
+  "tool-details-expanded": toolDetailsExpanded,
 };
 
 export const flowMapping: {
