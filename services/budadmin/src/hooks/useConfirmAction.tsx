@@ -14,7 +14,7 @@ export type ConfirmActionProps = {
   cancelAction: () => void;
   message: string;
   description: string;
-  type: "warining" | "failed" | "success";
+  type: "warning" | "failed" | "success";
   key: string;
 };
 

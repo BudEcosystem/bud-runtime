@@ -71,8 +71,10 @@ import AddBenchmark from "./Benchmark/AddBenchmark";
 import Datasets from "./Benchmark/Datasets";
 import Configuration from "./Benchmark/Configuration";
 import SelectCluster from "./Benchmark/SelectCluster";
+import SelectHardwareMode from "./Benchmark/SelectHardwareMode";
 import SelectNodes from "./Benchmark/SelectNodes";
 import SelectModel from "./Benchmark/SelectModel";
+import SelectConfiguration from "./Benchmark/SelectConfiguration";
 import BenchmarkConfiguration from "./Benchmark/BenchmarkConfiguration";
 import SimulateRun from "./Benchmark/SimulateRun";
 import BenchmarkingProgress from "./Benchmark/BenchmarkingProgress";
@@ -233,9 +235,11 @@ export const StepComponents = {
   "Datasets": Datasets,
   "Configuration": Configuration,
   "Select-Cluster": SelectCluster,
+  "Select-Hardware-Mode": SelectHardwareMode,
   "Select-Nodes": SelectNodes,
   "Select-Model": SelectModel,
   "model_benchmark-credential-select": AddBenchmarkCredentialSelect,
+  "Select-Configuration": SelectConfiguration,
   "Benchmark-Configuration": BenchmarkConfiguration,
   "simulate-run": SimulateRun,
   "Benchmarking-Progress": BenchmarkingProgress,

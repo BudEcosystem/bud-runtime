@@ -38,6 +38,7 @@ class DeploymentPerformance:
         provider_type: Literal["local", "cloud"] = "local",
         benchmark_id: Optional[UUID] = None,
         model_type: Optional[str] = None,
+        num_prompts: Optional[int] = None,
     ):
         """Construct all the necessary attributes for the DeploymentPerformance object.
 
@@ -64,6 +65,7 @@ class DeploymentPerformance:
         self.provider_type = provider_type
         self.benchmark_id = benchmark_id
         self.model_type = model_type
+        self.num_prompts = num_prompts
 
     def _verify_target_performance(self, result: Dict):
         """Verify the performance of the deployment against the target performance."""
@@ -117,6 +119,7 @@ class DeploymentPerformance:
                 latency_factors=latency_factors,
                 datasets=self.datasets,
                 benchmark_id=self.benchmark_id,
+                num_prompts=self.num_prompts,
             )
             print(f"Benchmark Result: {result}")
             benchmark_status = False

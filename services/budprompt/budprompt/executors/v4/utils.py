@@ -32,6 +32,26 @@ from budprompt.prompt.schemas import Message
 logger = logging.get_logger(__name__)
 
 
+def strip_none_values(data: Any) -> Any:
+    """Recursively remove keys with None values from dicts and process lists.
+
+    When users pass null for a variable, we want Pydantic to use schema defaults
+    instead of treating null as an explicit value. This function strips None values
+    from dictionaries and recursively processes lists to handle nested structures.
+
+    Args:
+        data: Data structure (dict, list, or other) that may contain None values.
+
+    Returns:
+        New data structure with None values removed from dictionaries at all nesting levels.
+    """
+    if isinstance(data, dict):
+        return {k: strip_none_values(v) for k, v in data.items() if v is not None}
+    if isinstance(data, list):
+        return [strip_none_values(item) for item in data]
+    return data
+
+
 def clean_model_cache():
     """Clean up any temporary modules from sys.modules."""
     modules_to_remove = [key for key in sys.modules if key.startswith("temp_models_")]

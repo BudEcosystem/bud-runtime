@@ -76,7 +76,7 @@ export interface PromptChatRequest {
   prompt: {
     id: string;
     version?: string;
-    variables?: Record<string, string>;
+    variables?: Record<string, any>;  // Support all types: string, number, boolean, array, object
   };
   input?: string;
   model?: string;

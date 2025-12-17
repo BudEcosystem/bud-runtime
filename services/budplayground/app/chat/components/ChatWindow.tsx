@@ -424,7 +424,13 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       const variables = data.prompt.variables.content || data.prompt.variables;
 
       userMessage = Object.entries(variables)
-        .map(([k, v]) => `${k}: ${v}`)
+        .map(([k, v]) => {
+          // Handle objects and arrays by stringifying them
+          if (typeof v === 'object' && v !== null) {
+            return `${k}: ${JSON.stringify(v)}`;
+          }
+          return `${k}: ${v}`;
+        })
         .join('\n');
     }
 

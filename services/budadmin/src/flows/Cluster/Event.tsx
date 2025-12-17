@@ -50,7 +50,7 @@ function ClusterEventItem({ data }: ClusterEventItemProps) {
           classNames="smallClose !pt-[.25rem] !pb-[.25rem]"
         />
         <Tags
-          name={data?.type}
+          name={data?.event_type}
           color="#EC7575"
           closable
           classNames="smallClose !pt-[.25rem] !pb-[.25rem]"
@@ -59,7 +59,7 @@ function ClusterEventItem({ data }: ClusterEventItemProps) {
       <div className="">
         <Text_12_400_EEEEEE>{data.message}</Text_12_400_EEEEEE>
         <Text_10_400_757575 className="pt-[.375rem]">
-          {data.source.host} = ‘${data.source.host}’ and {data.reason}
+          {data.source_host} - {data.source_component} ({data.reason})
         </Text_10_400_757575>
       </div>
     </div>

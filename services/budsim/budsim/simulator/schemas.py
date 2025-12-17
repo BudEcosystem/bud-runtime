@@ -372,3 +372,119 @@ class NodeGroupConfigurationValidator:
         # Multi-node PP requires CUDA devices with appropriate interconnect
         if pp_size > 1 and device_type != "cuda":
             raise ValueError("Multi-node pipeline parallelism requires CUDA devices")
+
+
+# Node Configuration Schemas for Benchmark Flow
+class NodeConfigurationRequest(BaseModel):
+    """Request schema for getting valid configurations for selected nodes."""
+
+    model_id: uuid.UUID = Field(..., description="ID of the selected model")
+    cluster_id: uuid.UUID = Field(..., description="ID of the selected cluster")
+    hostnames: List[str] = Field(..., description="List of selected node hostnames")
+    hardware_mode: HardwareMode = Field(
+        default=HardwareMode.DEDICATED, description="Hardware mode: dedicated or shared"
+    )
+    input_tokens: int = Field(default=1024, description="Expected input token count")
+    output_tokens: int = Field(default=512, description="Expected output token count")
+    concurrency: int = Field(default=10, description="Expected concurrent requests")
+    model_uri: Optional[str] = Field(None, description="Model URI for memory calculation")
+
+    @model_validator(mode="before")
+    def validate_model_uri(cls, values):
+        """Resolve model_uri to local path if available."""
+        model_uri = values.get("model_uri")
+        if model_uri and not model_uri.startswith("/") and not model_uri.startswith("http"):
+            local_model_path = Path(app_settings.model_registry_dir, model_uri)
+            if local_model_path.exists():
+                values["model_uri"] = local_model_path.as_posix()
+        return values
+
+
+class TPPPOption(BaseModel):
+    """A single valid TP/PP combination."""
+
+    tp_size: int = Field(..., description="Tensor parallelism size")
+    pp_size: int = Field(..., description="Pipeline parallelism size")
+    max_replicas: int = Field(..., description="Maximum replicas with this configuration")
+    total_devices_needed: int = Field(..., description="Devices needed per replica (TP * PP)")
+    description: str = Field(..., description="Human-readable description")
+
+
+class DeviceTypeConfiguration(BaseModel):
+    """Configuration options for a specific device type."""
+
+    device_type: str = Field(..., description="Device type: cuda, hpu, cpu, cpu_high")
+    device_name: Optional[str] = Field(None, description="Specific device name e.g., A100, H100")
+    device_model: Optional[str] = Field(None, description="Device model for exact matching")
+    total_devices: int = Field(..., description="Total devices of this type on selected nodes")
+    nodes_count: int = Field(..., description="Number of nodes with this device type")
+    max_devices_per_node: int = Field(..., description="Maximum devices on a single node")
+    memory_per_device_gb: float = Field(..., description="Memory per device in GB")
+    tp_pp_options: List[TPPPOption] = Field(..., description="Valid TP/PP combinations")
+    min_tp_required: int = Field(default=1, description="Minimum TP required for model")
+    supports_pipeline_parallelism: bool = Field(default=True, description="Whether device type supports PP")
+
+
+class ModelMemoryInfo(BaseModel):
+    """Model memory requirements."""
+
+    model_id: uuid.UUID = Field(..., description="Model ID")
+    model_name: Optional[str] = Field(None, description="Model display name")
+    model_uri: Optional[str] = Field(None, description="Model URI/path")
+    estimated_weight_memory_gb: float = Field(..., description="Estimated model weight memory in GB")
+    min_tp_for_model: int = Field(default=1, description="Minimum TP to fit model in memory")
+
+
+class NodeConfigurationResponse(ResponseBase):
+    """Response schema for node configuration options."""
+
+    object: lowercase_string = "node_configurations"
+    cluster_id: uuid.UUID = Field(..., description="Cluster ID")
+    model_info: ModelMemoryInfo = Field(..., description="Model memory requirements")
+    device_configurations: List[DeviceTypeConfiguration] = Field(
+        ..., description="Configuration options per device type"
+    )
+    selected_nodes: List[str] = Field(..., description="Nodes included in calculation")
+    hardware_mode: str = Field(..., description="Hardware mode used for calculation")
+
+
+class BenchmarkConfigRequest(BaseModel):
+    """Request for generating benchmark deployment configuration.
+
+    This schema is used by the /simulator/benchmark-config endpoint to generate
+    full deployment configurations for benchmark workflows with user-selected parameters.
+    """
+
+    cluster_id: uuid.UUID = Field(..., description="ID of the cluster")
+    model_id: uuid.UUID = Field(..., description="ID of the model")
+    model_uri: str = Field(..., description="Model URI/path for deployment")
+    hostnames: List[str] = Field(..., description="List of selected node hostnames")
+    device_type: str = Field(..., description="Selected device type: cuda, cpu, hpu, cpu_high")
+    tp_size: int = Field(..., description="Tensor parallelism size")
+    pp_size: int = Field(default=1, description="Pipeline parallelism size")
+    replicas: int = Field(default=1, description="Number of replicas")
+    input_tokens: int = Field(default=1024, description="Expected input token count")
+    output_tokens: int = Field(default=512, description="Expected output token count")
+    concurrency: int = Field(default=10, description="Expected concurrent requests")
+    hardware_mode: HardwareMode = Field(
+        default=HardwareMode.DEDICATED, description="Hardware mode: dedicated or shared"
+    )
+
+    @model_validator(mode="before")
+    def validate_model_uri(cls, values):
+        """Resolve model_uri to local path if available."""
+        model_uri = values.get("model_uri")
+        if model_uri and not model_uri.startswith("/") and not model_uri.startswith("http"):
+            local_model_path = Path(app_settings.model_registry_dir, model_uri)
+            if local_model_path.exists():
+                values["model_uri"] = local_model_path.as_posix()
+        return values
+
+
+class BenchmarkConfigResponse(ResponseBase):
+    """Response schema for benchmark deployment configuration."""
+
+    object: lowercase_string = "benchmark_config"
+    cluster_id: uuid.UUID = Field(..., description="Cluster ID")
+    model_id: uuid.UUID = Field(..., description="Model ID")
+    node_groups: List[NodeGroupConfiguration] = Field(..., description="Deployment configuration for each node group")

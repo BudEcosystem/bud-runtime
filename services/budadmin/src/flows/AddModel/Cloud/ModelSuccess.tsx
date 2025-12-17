@@ -102,7 +102,7 @@ const ModelSuccessCard: React.FC = () => {
         {showConfirm && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="Mismatch between selected modality and uploaded model"
               description="You have selected the [LLM] modality, but you have uploaded an [embedding] model. Please confirm if you want to proceed with this upload despite the mismatch."
               confirmText={"Delete Model"}

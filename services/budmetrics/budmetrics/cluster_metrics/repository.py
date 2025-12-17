@@ -923,3 +923,173 @@ class ClusterMetricsRepository:
 
         result = await self.client.execute_query(query, params={"cluster_id": cluster_id})
         return result[0][0] if result and result[0][0] else None
+
+    # Node Events methods
+
+    async def store_node_events(
+        self,
+        events: List[dict],
+    ) -> int:
+        """Store node events in ClickHouse.
+
+        Args:
+            events: List of event dictionaries with schema matching NodeEvents table
+
+        Returns:
+            Number of events stored
+        """
+        if not events:
+            return 0
+
+        from datetime import datetime as dt
+
+        # Prepare data as list of tuples for insert_data
+        columns = [
+            "ts",
+            "cluster_id",
+            "cluster_name",
+            "node_name",
+            "event_uid",
+            "event_type",
+            "reason",
+            "message",
+            "source_component",
+            "source_host",
+            "first_timestamp",
+            "last_timestamp",
+            "event_count",
+        ]
+
+        data_rows = []
+        for event in events:
+            # Parse timestamps
+            last_ts = event.get("last_timestamp")
+            if last_ts:
+                if isinstance(last_ts, str):
+                    try:
+                        last_ts = dt.fromisoformat(last_ts.replace("Z", "+00:00"))
+                    except ValueError:
+                        last_ts = dt.utcnow()
+            else:
+                last_ts = dt.utcnow()
+
+            first_ts = event.get("first_timestamp")
+            if first_ts:
+                if isinstance(first_ts, str):
+                    try:
+                        first_ts = dt.fromisoformat(first_ts.replace("Z", "+00:00"))
+                    except ValueError:
+                        first_ts = last_ts
+            else:
+                first_ts = last_ts
+
+            # Create tuple in column order
+            data_rows.append(
+                (
+                    last_ts,  # ts
+                    event.get("cluster_id", ""),
+                    event.get("cluster_name", ""),
+                    event.get("node_name", ""),
+                    event.get("event_uid", ""),
+                    event.get("event_type", "Normal"),
+                    event.get("reason", ""),
+                    event.get("message", ""),
+                    event.get("source_component", ""),
+                    event.get("source_host", ""),
+                    first_ts,  # first_timestamp
+                    last_ts,  # last_timestamp
+                    event.get("event_count", 1),
+                )
+            )
+
+        # Execute batch insert using insert_data method
+        await self.client.insert_data("metrics.NodeEvents", data_rows, columns)
+        logger.info(f"Stored {len(data_rows)} node events")
+        return len(data_rows)
+
+    async def get_node_events_count(
+        self,
+        cluster_id: str,
+        from_time: datetime,
+        to_time: datetime,
+    ) -> List[Tuple]:
+        """Get event counts per node for a cluster.
+
+        Args:
+            cluster_id: Cluster identifier
+            from_time: Start time for query window
+            to_time: End time for query window
+
+        Returns:
+            List of tuples: (node_name, total_event_count)
+        """
+        query = """
+        SELECT
+            node_name,
+            sum(event_count) AS total_events
+        FROM metrics.NodeEvents
+        WHERE cluster_id = %(cluster_id)s
+          AND ts BETWEEN %(from_time)s AND %(to_time)s
+        GROUP BY node_name
+        ORDER BY node_name
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={
+                "cluster_id": cluster_id,
+                "from_time": from_time,
+                "to_time": to_time,
+            },
+        )
+
+    async def get_node_events(
+        self,
+        cluster_id: str,
+        node_name: str,
+        from_time: datetime,
+        to_time: datetime,
+        limit: int = 100,
+    ) -> List[Tuple]:
+        """Get events for a specific node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node name to get events for
+            from_time: Start time for query window
+            to_time: End time for query window
+            limit: Maximum number of events to return
+
+        Returns:
+            List of tuples: (event_type, reason, message, event_count,
+                           first_timestamp, last_timestamp, source_component, source_host)
+        """
+        query = """
+        SELECT
+            event_type,
+            reason,
+            message,
+            sum(event_count) AS total_count,
+            min(first_timestamp) AS first_ts,
+            max(last_timestamp) AS last_ts,
+            anyLast(source_component) AS source_component,
+            anyLast(source_host) AS source_host
+        FROM metrics.NodeEvents
+        WHERE cluster_id = %(cluster_id)s
+          AND node_name = %(node_name)s
+          AND ts BETWEEN %(from_time)s AND %(to_time)s
+        GROUP BY event_type, reason, message
+        ORDER BY last_ts DESC
+        LIMIT %(limit)s
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={
+                "cluster_id": cluster_id,
+                "node_name": node_name,
+                "from_time": from_time,
+                "to_time": to_time,
+                "limit": limit,
+            },
+        )

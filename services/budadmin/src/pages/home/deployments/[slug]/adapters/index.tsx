@@ -190,7 +190,7 @@ export default function AdaptersTable() {
         setConfirmVisible(false);
       },
       okText: "Delete",
-      type: "warining",
+      type: "warning",
     });
   };
 

@@ -824,6 +824,65 @@ class ClickHouseMigration:
 
         logger.info("All cluster metrics tables created successfully")
 
+    async def create_node_events_table(self):
+        """Create NodeEvents table for storing Kubernetes node events."""
+        logger.info("Creating NodeEvents table...")
+
+        # Ensure metrics database exists
+        try:
+            await self.client.execute_query("CREATE DATABASE IF NOT EXISTS metrics")
+        except Exception as e:
+            logger.error(f"Error creating metrics database: {e}")
+            raise
+
+        ttl_days = get_cluster_metrics_ttl_days()
+        query_node_events = f"""
+        CREATE TABLE IF NOT EXISTS metrics.NodeEvents
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            node_name String,
+            event_uid String,
+            event_type LowCardinality(String),
+            reason LowCardinality(String),
+            message String CODEC(ZSTD(3)),
+            source_component LowCardinality(String),
+            source_host String,
+            first_timestamp DateTime64(3),
+            last_timestamp DateTime64(3),
+            event_count UInt32 DEFAULT 1
+        )
+        ENGINE = ReplacingMergeTree(ts)
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, node_name, reason, ts, event_uid)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_node_events)
+            logger.info("NodeEvents table created successfully")
+
+            # Add indexes for efficient queries
+            indexes = [
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_cluster_time (cluster_id, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_event_type (event_type) TYPE set(10) GRANULARITY 4",
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_node_name (node_name) TYPE bloom_filter(0.01) GRANULARITY 8",
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_reason (reason) TYPE set(100) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating NodeEvents table: {e}")
+            raise
+
     async def create_hami_gpu_metrics_table(self):
         """Create HAMI GPU time-slicing metrics table for tracking vGPU allocation and utilization."""
         logger.info("Creating HAMI GPU metrics table...")
@@ -905,6 +964,7 @@ class ClickHouseMigration:
             "metrics.PodMetrics",
             "metrics.GPUMetrics",
             "metrics.HAMIGPUMetrics",
+            "metrics.NodeEvents",
         ]
 
         if self.include_model_inference:
@@ -1178,6 +1238,7 @@ class ClickHouseMigration:
             await self.create_gateway_blocking_events_table()
             await self.create_cluster_metrics_tables()  # Add cluster metrics tables
             await self.create_hami_gpu_metrics_table()  # Add HAMI GPU time-slicing metrics table
+            await self.create_node_events_table()  # Add NodeEvents table for K8s node events
             await self.migrate_node_metrics_network_columns()  # Add network columns to NodeMetrics (legacy migration)
             await self.setup_cluster_metrics_materialized_views()  # Set up materialized views for cluster metrics
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration

@@ -279,7 +279,7 @@ export default function WorkerDetails() {
         {showConfirm && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title={"You're about to delete the worker"}
               description={"Are you sure you want to delete this worker?"}
               confirmText={"Delete Worker"}

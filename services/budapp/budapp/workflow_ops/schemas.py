@@ -84,6 +84,7 @@ class RetrieveWorkflowStepData(BaseModel):
     credential_id: UUID4 | None = None
     user_confirmation: bool | None = None
     run_as_simulation: bool | None = None
+    benchmark_id: UUID4 | None = None
     adapter_config: AddAdapterWorkflowStepData | None = None
     adapter_deployment_events: dict | None = None
     credential: ProprietaryCredentialResponse | None = None

@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Spin } from 'antd';
+import { Input, Checkbox, Spin, Tooltip } from 'antd';
 import { useConnectors, Connector, CredentialSchemaField } from '@/stores/useConnectors';
-import { Text_10_400_B3B3B3, Text_14_400_EEEEEE } from '@/components/ui/text';
+import { Text_10_400_B3B3B3, Text_12_400_EEEEEE, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { successToast, errorToast } from '@/components/toast';
 import { toast } from 'react-toastify';
 import { ToolDetails } from './ToolDetails';
@@ -12,6 +12,7 @@ import { CredentialConfigStep } from './CredentialConfigStep';
 import { ToolSelectionStep } from './ToolSelectionStep';
 import { useAgentStore } from '@/stores/useAgentStore';
 import { OAuthState, OAuthSessionData, clearOAuthUrlState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
+import CustomSelect from 'src/flows/components/CustomSelect';
 
 interface Tool {
   id: string;
@@ -129,6 +130,20 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const [headerHeight, setHeaderHeight] = useState<number>(0);
   const headerRef = React.useRef<HTMLDivElement>(null);
   const oauthCallbackProcessed = React.useRef(false);
+
+  // Memoized handler for copying redirect URI to clipboard
+  const handleCopyUri = React.useCallback(async (fieldName: string) => {
+    const value = formData[fieldName];
+    if (value) {
+      try {
+        await navigator.clipboard.writeText(value);
+        successToast('URI copied to clipboard');
+      } catch (error) {
+        console.error('Failed to copy URI:', error);
+        errorToast('Failed to copy URI');
+      }
+    }
+  }, [formData]);
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
@@ -295,8 +310,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
         // Fetch tools
         await fetchTools();
-
-        successToast('OAuth authorization successful');
       } catch (error: any) {
         errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
       } finally {
@@ -571,7 +584,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   };
 
   const handleConnect = async () => {
-    if (!promptId) {
+    // Use saved OAuth prompt ID if available (for OAuth callback scenarios)
+    const effectivePromptId = getOAuthPromptId() || promptId;
+
+    if (!effectivePromptId) {
       errorToast('Prompt ID is missing');
       return;
     }
@@ -585,7 +601,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     try {
       const payload = {
-        prompt_id: promptId,
+        prompt_id: effectivePromptId,
         connector_id: connector.id,
         tool_ids: selectedTools,
         version: 1
@@ -617,7 +633,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   };
 
   const handleDisconnect = async () => {
-    if (!promptId) {
+    // Use saved OAuth prompt ID if available (for OAuth callback scenarios)
+    const effectivePromptId = getOAuthPromptId() || promptId;
+
+    if (!effectivePromptId) {
       errorToast('Prompt ID is missing');
       return;
     }
@@ -625,7 +644,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     setIsDisconnecting(true);
 
     try {
-      const response = await ConnectorService.disconnectConnector(promptId, connector.id);
+      const response = await ConnectorService.disconnectConnector(effectivePromptId, connector.id);
 
       if (response.status === 200 || response.status === 204) {
         successToast('Connector disconnected successfully');
@@ -644,6 +663,110 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       return connector.icon;
     }
     return connector.name.charAt(0).toUpperCase();
+  };
+
+  const renderFormField = (field: CredentialSchemaField) => {
+    const inputClassName = "!bg-[#1A1A1A] border-[#1F1F1F] hover:border-[#3A3A3A] focus:border-[#965CDE] text-[#EEEEEE] text-[0.6875rem] font-[400] placeholder:text-[#808080] rounded-[.5rem] h-[1.9375rem]";
+    const inputStyle = {
+      backgroundColor: '#1A1A1A',
+      borderColor: '#2A2A2A',
+      color: 'white',
+    };
+
+    const renderLabel = () => (
+      <Text_12_400_EEEEEE className="mb-1 block">
+        {field.label}
+        {field.required && <span className="text-[#E82E2E] ml-0.5">*</span>}
+      </Text_12_400_EEEEEE>
+    );
+
+    switch (field.type) {
+      case 'dropdown':
+        return (
+          <div key={field.field}>
+            {renderLabel()}
+            <CustomSelect
+              name={field.field}
+              placeholder={field.label}
+              value={formData[field.field]}
+              onChange={(value) => handleInputChange(field.field, value)}
+              selectOptions={field.options?.map(opt => ({ label: opt.replace(/_/g, ' '), value: opt }))}
+              InputClasses="!h-[1.9375rem] min-h-[1.9375rem] !text-[0.6875rem] !py-[.45rem]"
+            />
+          </div>
+        );
+
+      case 'password':
+        return (
+          <div key={field.field}>
+            {renderLabel()}
+            <Input
+              type="password"
+              placeholder={field.label}
+              value={formData[field.field] || ''}
+              onChange={(e) => handleInputChange(field.field, e.target.value)}
+              className={inputClassName}
+              style={inputStyle}
+              autoComplete="new-password"
+            />
+          </div>
+        );
+
+      case 'url':
+      case 'text':
+      default: {
+        const isRedirectUri = isRedirectUriField(field.field);
+
+        return (
+          <div key={field.field}>
+            {renderLabel()}
+            <div className={isRedirectUri ? 'flex items-center gap-2' : ''}>
+              <Input
+                placeholder={field.label}
+                value={formData[field.field] || ''}
+                onChange={(e) => handleInputChange(field.field, e.target.value)}
+                className={inputClassName}
+                style={{
+                  ...inputStyle,
+                  ...(isRedirectUri && {
+                    cursor: 'not-allowed',
+                    opacity: 0.7,
+                  }),
+                }}
+                autoComplete="off"
+                disabled={isRedirectUri}
+              />
+              {isRedirectUri && (
+                <Tooltip title="Copy URI" placement="top">
+                  <button
+                    onClick={() => handleCopyUri(field.field)}
+                    className="p-1.5 rounded hover:bg-[#2A2A2A] transition-colors flex-shrink-0"
+                    style={{ transform: 'none' }}
+                    type="button"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-[#808080]"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
+                </Tooltip>
+              )}
+            </div>
+          </div>
+        );
+      }
+    }
   };
 
   const isStepOneValid = () => {

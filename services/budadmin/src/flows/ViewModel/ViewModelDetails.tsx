@@ -17,10 +17,9 @@ import type { TabsProps } from "antd";
 import General from "./General/General";
 import CustomDropDown from "../components/CustomDropDown";
 import Evaluations from "./Evaluations/Evaluations";
-import PerformanceDetailed from "./Perfomance/Perfomance";
 import Advanced from "./Advanced/Advanced";
 import { useModels } from "src/hooks/useModels";
-import { assetBaseUrl, enableDevMode } from "@/components/environment";
+import { assetBaseUrl } from "@/components/environment";
 import BudStepAlert from "../components/BudStepAlert";
 import { successToast } from "@/components/toast";
 import ModelVerificationStatus from "../components/ModelVerificationStatus";
@@ -81,11 +80,6 @@ export default function ViewModel() {
         children: <Evaluations model={selectedModel} />,
       },
       {
-        key: "3",
-        label: "Performance",
-        children: <PerformanceDetailed data={selectedModel} />,
-      },
-      {
         key: "4",
         label: "Advanced",
         children: <Advanced data={selectedModel} />,
@@ -111,13 +105,8 @@ export default function ViewModel() {
     // Hide certain tabs for cloud models
     if (selectedModel?.provider_type === "cloud_model") {
       filtered = filtered.filter(
-        (item) => item.key !== "3" && item.key !== "4" && item.key !== "5",
+        (item) => item.key !== "4" && item.key !== "5",
       );
-    }
-
-    // Hide Performance tab when dev mode is disabled
-    if (!enableDevMode) {
-      filtered = filtered.filter((item) => item.key !== "3");
     }
 
     setFilteredItems(filtered);
@@ -149,7 +138,7 @@ export default function ViewModel() {
         {showConfirm && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title={firstLineText}
               description={secondLineText}
               confirmText={

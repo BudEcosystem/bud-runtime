@@ -616,6 +616,7 @@ class CreateDeploymentWorkflow:
                 datasets=run_benchmark_request_json.datasets,
                 benchmark_id=benchmark_id,
                 model_type=run_benchmark_request_json.model_type,
+                num_prompts=run_benchmark_request_json.num_prompts,
             )  # noqa: F841
             workflow_status = check_workflow_status_in_statestore(workflow_id)
             if workflow_status:
@@ -803,45 +804,39 @@ class CreateDeploymentWorkflow:
         # fetch simulator configuration
         try:
             if deployment_request_json.is_performance_benchmark and deployment_request_json.nodes:
-                # TODO: perform validation of nodes
-                simulator_config = []
-                for node in deployment_request_json.nodes:
-                    node_info = {
-                        "id": node["id"],
-                        "name": node["hostname"],
-                        "devices": [
-                            {
-                                "name": node["hostname"],
-                                "type": node["devices"][0]["type"],
-                                "image": "aibrix/vllm-openai:v0.7.3.self.post1"
-                                if node["devices"][0]["type"] == "cuda"
-                                else "budimages.azurecr.io/budecosystem/bud-runtime-cpu:0.09",
-                                "memory": 21722998784 if node["devices"][0]["type"] == "cuda" else 40762560000,
-                                "num_cpus": -1 if node["devices"][0]["type"] == "cuda" else 1,
-                                "replica": 2 if node["devices"][0]["type"] == "cuda" else 1,
-                                "tp_size": 1,
-                                "core_count": 4 if node["devices"][0]["type"] == "cuda" else 14,
-                                "concurrency": 18 if node["devices"][0]["type"] == "cuda" else 100,
-                                "args": {
-                                    "model": deployment_request_json.model,
-                                    "block-size": 32,
-                                    "tensor-parallel-size": 1,
-                                    "pipeline-parallel-size": 1,
-                                    "scheduler-delay-factor": 0.14,
-                                    "max-num-seqs": 72,
-                                    "enable-chunked-prefill": True,
-                                    "enable-prefix-caching": True,
-                                },
-                            }
-                        ],
-                    }
-                    if node["devices"][0]["type"] == "cuda":
-                        node_info["devices"][0]["envs"] = {"VLLM_TARGET_DEVICE": "cuda"}
-                    else:
-                        node_info["devices"][0]["envs"] = {
-                            "VLLM_ALLOW_RUNTIME_LORA_UPDATING": "True",
-                        }
-                    simulator_config.append(node_info)
+                # Get benchmark deployment configuration from BudSim
+                # Extract hostnames from nodes
+                hostnames = [node.get("hostname") or node.get("name") for node in deployment_request_json.nodes]
+
+                # Use user-selected configuration from benchmark flow step 6
+                # Fallback to defaults if not provided
+                device_type = deployment_request_json.selected_device_type
+                if not device_type and deployment_request_json.nodes:
+                    # Fallback: use first device type from first node
+                    device_type = deployment_request_json.nodes[0].get("devices", [{}])[0].get("type", "cpu")
+
+                tp_size = deployment_request_json.tp_size or 1
+                pp_size = deployment_request_json.pp_size or 1
+                replicas = deployment_request_json.replicas or 1
+                hardware_mode = deployment_request_json.hardware_mode or "dedicated"
+
+                simulator_config = asyncio.run(
+                    SimulatorHandler().get_benchmark_config(
+                        cluster_id=deployment_request_json.cluster_id,
+                        model_id=deployment_request_json.model_id,
+                        model_uri=deployment_request_json.model,
+                        hostnames=hostnames,
+                        device_type=device_type,
+                        tp_size=tp_size,
+                        pp_size=pp_size,
+                        replicas=replicas,
+                        input_tokens=deployment_request_json.input_tokens or 1024,
+                        output_tokens=deployment_request_json.output_tokens or 512,
+                        concurrency=deployment_request_json.concurrency or 10,
+                        hardware_mode=hardware_mode,
+                    )
+                )
+                logger.info(f"Benchmark config received from budsim: {simulator_config}")
             elif deployment_request_json.simulator_id:
                 simulator_config, metadata = asyncio.run(
                     SimulatorHandler().get_cluster_simulator_config(
@@ -1083,6 +1078,7 @@ class CreateDeploymentWorkflow:
             output_tokens=deployment_request_json.output_tokens,
             datasets=deployment_request_json.datasets,
             model_type=model_type,
+            num_prompts=deployment_request_json.num_prompts,
         )
         workflow_run_performance_benchmark_request = WorkflowRunPerformanceBenchmarkRequest(
             cluster_config=deployment_request_json.cluster_config,
@@ -1714,6 +1710,7 @@ class CreateCloudDeploymentWorkflow:
             output_tokens=deployment_request_json.output_tokens,
             datasets=deployment_request_json.datasets,
             model_type=model_type,
+            num_prompts=deployment_request_json.num_prompts,
         )
         workflow_run_performance_benchmark_request = WorkflowRunPerformanceBenchmarkRequest(
             cluster_config=deployment_request_json.cluster_config,

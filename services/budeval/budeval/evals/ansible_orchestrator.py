@@ -318,7 +318,7 @@ class AnsibleOrchestrator:
                             "restartPolicy": "Never",
                         }
                     },
-                    "backoffLimit": 1,
+                    "backoffLimit": 0,
                 },
             }
 
@@ -558,7 +558,7 @@ spec:
         - name: cache-volume
           emptyDir: {{}}
       restartPolicy: Never
-  backoffLimit: 1
+  backoffLimit: 0
 """
 
     def verify_cluster_connection(self, kubeconfig: Optional[str] = None) -> bool:

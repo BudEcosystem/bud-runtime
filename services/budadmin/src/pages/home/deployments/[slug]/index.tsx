@@ -11,7 +11,6 @@ import GeneralDeploymentInfo from "./components/GeneralDeploymentInfo";
 import { useProjects } from "src/hooks/useProjects";
 import WorkersTable from "../../projects/[slug]/workers";
 import ModelEvalTable from "../../projects/[slug]/modelEvaluations";
-import BenchmarkTable from "../../projects/[slug]/benchmarks";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import TagsList from "src/flows/components/TagsList";
 import { useEndPoints } from "src/hooks/useEndPoint";
@@ -235,35 +234,6 @@ const ProjectDetailsPage = () => {
       ),
       key: "4",
       children: <DeploymentSettings />,
-    },
-    {
-      label: (
-        <div className="flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width=".875rem"
-            height=".875rem"
-            viewBox="0 0 14 15"
-            fill="none"
-          >
-            <path
-              d="M12.6875 12.3672C12.6842 12.6073 12.4901 12.8014 12.25 12.8047H2.33352C1.77079 12.8014 1.31579 12.3464 1.3125 11.7837V1.86719C1.3125 1.62546 1.50828 1.42969 1.75 1.42969C1.99172 1.42969 2.1875 1.62546 2.1875 1.86719V7.40867L3.08602 6.73765V6.73819C3.07672 6.67038 3.07672 6.60148 3.08602 6.53367C3.08602 5.96985 3.54266 5.5132 4.10649 5.5132C4.67032 5.5132 5.12751 5.96983 5.12751 6.53367C5.12751 6.61843 5.11603 6.7032 5.09251 6.78469L7.18103 8.53469C7.31447 8.47344 7.45994 8.44172 7.60651 8.44117C7.69565 8.44281 7.78424 8.45649 7.86901 8.48219L10.15 5.78117C10.0942 5.65047 10.0647 5.50937 10.0625 5.36719C10.0625 4.9543 10.3114 4.58187 10.6925 4.42383C11.0743 4.26633 11.5134 4.35328 11.8054 4.64531C12.0969 4.93733 12.1844 5.37648 12.0264 5.75765C11.8683 6.13937 11.4964 6.3882 11.0835 6.3882C10.9944 6.38655 10.9058 6.37288 10.821 6.34718L8.48751 9.03616C8.5433 9.16741 8.57283 9.30796 8.57501 9.45069C8.57501 10.0145 8.11783 10.4712 7.55399 10.4712C6.99017 10.4712 6.53352 10.0145 6.53352 9.45069C6.53297 9.36592 6.545 9.28116 6.56852 9.19967L4.48 7.44967C4.34656 7.51092 4.20109 7.54263 4.05398 7.54318C3.88882 7.54099 3.72695 7.49943 3.58148 7.42068L2.1875 8.50568V11.7836C2.1875 11.8225 2.20281 11.8597 2.23016 11.887C2.2575 11.9143 2.29469 11.9297 2.33352 11.9297H12.25C12.4901 11.9329 12.6842 12.1271 12.6875 12.3672Z"
-              fill="#B3B3B3"
-            />
-          </svg>
-          <Text_14_600_FFFFFF
-            className="hover:text-[#EEEEEE]"
-            style={{
-              color: activeTab === "5" ? "#EEEEEE" : "#B3B3B3",
-            }}
-          >
-            Benchmarks
-          </Text_14_600_FFFFFF>
-        </div>
-      ),
-      key: "5",
-      children: <BenchmarkTable />,
-      hide: !enableDevMode,
     },
     {
       label: (

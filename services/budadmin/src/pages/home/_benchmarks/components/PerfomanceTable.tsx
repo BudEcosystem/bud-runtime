@@ -76,12 +76,40 @@ function PerfomanceTable() {
       <Table<RequestMetricsData>
         columns={[
           {
-            title: "Request output throughput token per second",
+            title: "Input Tokens",
+            dataIndex: "prompt_len",
+            sorter: true,
+            key: "prompt_len",
+            sortOrder:
+              orderBy === "prompt_len"
+                ? order === "-"
+                  ? "descend"
+                  : "ascend"
+                : undefined,
+            render: (text) => <Text_12_400_EEEEEE>{text ?? "-"}</Text_12_400_EEEEEE>,
+            sortIcon: SortIcon,
+          },
+          {
+            title: "Output Tokens",
+            dataIndex: "output_len",
+            sorter: true,
+            key: "output_len",
+            sortOrder:
+              orderBy === "output_len"
+                ? order === "-"
+                  ? "descend"
+                  : "ascend"
+                : undefined,
+            render: (text) => <Text_12_400_EEEEEE>{text ?? "-"}</Text_12_400_EEEEEE>,
+            sortIcon: SortIcon,
+          },
+          {
+            title: "Output Throughput (tok/s)",
             dataIndex: "req_output_throughput",
             key: "req_output_throughput",
             render: (text) => (
               <Text_12_400_EEEEEE className="text-nowrap">
-                {text.toFixed(4) + " s"}
+                {text?.toFixed(2) || "-"}
               </Text_12_400_EEEEEE>
             ),
             sortOrder:
@@ -94,24 +122,52 @@ function PerfomanceTable() {
             sortIcon: SortIcon,
           },
           {
-            title: "Inter Token Latency s",
-            dataIndex: "itl_sum",
-            key: "itl_sum",
-            width: 150,
+            title: "TTFT (s)",
+            dataIndex: "ttft",
+            key: "ttft",
+            sorter: true,
             sortOrder:
-              orderBy === "itl_sum"
+              orderBy === "ttft"
                 ? order === "-"
                   ? "descend"
                   : "ascend"
                 : undefined,
-            sorter: true,
             render: (text) => (
-              <Text_12_400_EEEEEE>{text.toFixed(4) + " s"}</Text_12_400_EEEEEE>
+              <Text_12_400_EEEEEE>{text?.toFixed(4) || "-"}</Text_12_400_EEEEEE>
             ),
             sortIcon: SortIcon,
           },
           {
-            title: "Error Message",
+            title: "ITL Mean (s)",
+            dataIndex: "itl",
+            key: "itl",
+            sorter: false,
+            render: (itl: number[]) => {
+              const mean = itl?.length > 0 ? itl.reduce((a, b) => a + b, 0) / itl.length : null;
+              return (
+                <Text_12_400_EEEEEE>{mean?.toFixed(4) || "-"}</Text_12_400_EEEEEE>
+              );
+            },
+            sortIcon: SortIcon,
+          },
+          {
+            title: "E2E Latency (s)",
+            dataIndex: "latency",
+            key: "latency",
+            sorter: true,
+            sortOrder:
+              orderBy === "latency"
+                ? order === "-"
+                  ? "descend"
+                  : "ascend"
+                : undefined,
+            render: (text) => (
+              <Text_12_400_EEEEEE>{text?.toFixed(4) || "-"}</Text_12_400_EEEEEE>
+            ),
+            sortIcon: SortIcon,
+          },
+          {
+            title: "Error",
             dataIndex: "error",
             key: "error",
             sortOrder:
@@ -122,63 +178,8 @@ function PerfomanceTable() {
                 : undefined,
             sorter: true,
             render: (text) => (
-              <Text_12_400_EEEEEE>{text || "N/A"}</Text_12_400_EEEEEE>
+              <Text_12_400_EEEEEE>{text || "-"}</Text_12_400_EEEEEE>
             ),
-            sortIcon: SortIcon,
-          },
-          // {
-          //   title: 'Error Code',
-          //   dataIndex: 'errorCode',
-          //   key: 'errorCode',
-          //   sorter: true,
-          //   sortOrder: orderBy === 'errorCode' ? order === '-' ? 'descend' : 'ascend' : undefined,
-          //   width: 150,
-          //   render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
-          //   sortIcon: SortIcon,
-          // },
-          {
-            title: "End to End Latency s",
-            dataIndex: "latency",
-            key: "latency",
-            sorter: true,
-            sortOrder:
-              orderBy === "latency"
-                ? order === "-"
-                  ? "descend"
-                  : "ascend"
-                : undefined,
-            width: 150,
-            render: (text) => (
-              <Text_12_400_EEEEEE>{text.toFixed(4) + " s"}</Text_12_400_EEEEEE>
-            ),
-            sortIcon: SortIcon,
-          },
-          {
-            title: "Number Input Tokens",
-            dataIndex: "prompt_len",
-            sorter: true,
-            key: "prompt_len",
-            sortOrder:
-              orderBy === "prompt_len"
-                ? order === "-"
-                  ? "descend"
-                  : "ascend"
-                : undefined,
-            render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
-            sortIcon: SortIcon,
-          },
-          {
-            title: "Number Output Tokens",
-            dataIndex: "output_len",
-            sorter: true,
-            key: "output_len",
-            sortOrder:
-              orderBy === "output_len"
-                ? order === "-"
-                  ? "descend"
-                  : "ascend"
-                : undefined,
-            render: (text) => <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>,
             sortIcon: SortIcon,
           },
         ]}

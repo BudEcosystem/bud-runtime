@@ -28,6 +28,12 @@ export type Benchmark = {
   vendor_type?: string;
   status?: string;
   concurrentRequest?: string;
+  concurrency?: number;
+  max_input_tokens?: number;
+  max_output_tokens?: number;
+  nodes?: any[];
+  description?: string;
+  tags?: any[];
   tpot?: string;
   ttft?: string;
   id?: string;
@@ -42,6 +48,19 @@ export type ModelClusterDetails = {
   model: Model;
   name?: string;
   status?: string;
+  // Benchmark metadata
+  concurrency?: number;
+  max_input_tokens?: number;
+  max_output_tokens?: number;
+  eval_with?: string;
+  description?: string;
+  tags?: any[];
+  nodes?: any[];
+  dataset_ids?: string[];
+  dataset_names?: string[];
+  reason?: string;
+  created_at?: string;
+  modified_at?: string;
 };
 export type BenchmarkResult = {
   output_throughput: number;
@@ -50,38 +69,38 @@ export type BenchmarkResult = {
   median_itl_ms: number;
   median_e2el_ms: number;
   p25_ttft_ms: number;
-  p25_throughput: number;
+  p25_output_throughput_per_user: number;
   p25_tpot_ms: number;
   p25_itl_ms: number;
   p25_e2el_ms: number;
   modified_at: string;
-  p75_throughput: number;
+  p75_output_throughput_per_user: number;
   p75_ttft_ms: number;
   p75_tpot_ms: number;
   p75_itl_ms: number;
   p75_e2el_ms: number;
   successful_requests: number;
-  p95_throughput: number;
+  p95_output_throughput_per_user: number;
   p95_ttft_ms: number;
   p95_tpot_ms: number;
   p95_itl_ms: number;
   p95_e2el_ms: number;
   duration: number;
   total_input_tokens: number;
-  p99_throughput: number;
+  p99_output_throughput_per_user: number;
   p99_ttft_ms: number;
   p99_tpot_ms: number;
   p99_itl_ms: number;
   p99_e2el_ms: number;
   id: string;
   total_output_tokens: number;
-  min_throughput: number;
+  min_output_throughput_per_user: number;
   min_ttft_ms: number;
   min_tpot_ms: number;
   min_itl_ms: number;
   min_e2el_ms: number;
   request_throughput: number;
-  max_throughput: number;
+  max_output_throughput_per_user: number;
   max_ttft_ms: number;
   max_tpot_ms: number;
   max_itl_ms: number;
@@ -92,6 +111,7 @@ export type BenchmarkResult = {
   mean_tpot_ms: number;
   mean_itl_ms: number;
   mean_e2el_ms: number;
+  mean_output_throughput_per_user: number;
   created_at: string;
 };
 export type BenchmarkAnalysisInput = {
@@ -125,17 +145,16 @@ export type DistributionParams = {
 export type RequestMetricsData = {
   benchmark_id?: string;
   dataset_id?: string;
-  limerrorit?: string;
-  itl: [];
+  itl: number[];
   itl_sum: number;
   latency: number;
   output_len: number;
   prompt_len: number;
   req_output_throughput: number;
-  success: string;
+  success: boolean;
+  error: string | null;
   tpot: number;
   ttft: number;
-  errorCode: any;
 };
 
 // create zustand store
@@ -281,7 +300,7 @@ export const useBenchmarks = create<{
     const response: any = await AppRequest.Post(
       `${tempApiBaseUrl}/benchmark/dataset/input-distribution?benchmark_id=${
         params.benchmark_id
-      }&num_bins=${params.num_bins || 10}`,
+      }&num_bins=${params.num_bins || 5}`,
       get().selectedBenchmark?.dataset_ids,
     );
     set({ inputDistribution: response?.data?.param?.result });
@@ -292,7 +311,7 @@ export const useBenchmarks = create<{
     const response: any = await AppRequest.Post(
       `${tempApiBaseUrl}/benchmark/dataset/output-distribution?benchmark_id=${
         params.benchmark_id
-      }&num_bins=${params.num_bins || 10}`,
+      }&num_bins=${params.num_bins || 5}`,
       get().selectedBenchmark?.dataset_ids,
     );
     set({ outputDistribution: response?.data?.param?.result });

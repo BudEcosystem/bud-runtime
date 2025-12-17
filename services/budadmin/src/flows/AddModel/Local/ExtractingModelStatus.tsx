@@ -93,7 +93,7 @@ export default function ExtractingModel() {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to stop the extraction process"
               description="If the extraction process is stopped, the model will not be added to the model repository. "
               cancelText="Continue Extraction"

@@ -156,7 +156,7 @@ export default function DeployModelHardwareMode() {
             <HardwareModeCard
               mode="shared"
               title="Shared Hardware"
-              description="Multi-tenant resource sharing with GPU time-slicing. Multiple deployments share the same hardware through efficient scheduling."
+              description="Multiple deployments share the same hardware through efficient scheduling."
               icon="/images/gift.png"
               badge="Cost Efficient"
               badgeColor="green"

@@ -1270,7 +1270,8 @@ function AgentBoxInner({
       onMouseLeave={() => setIsHovering(false)}
     >
       {/* Overlay for inactive boxes - prevents scroll capture by flowgram */}
-      {!isActive && (
+      {/* Only show overlay when there are multiple boxes - single box should work normally */}
+      {!isActive && totalSessions > 1 && (
         <div
           className="absolute inset-0 z-50 cursor-pointer bg-transparent"
           onClick={onActivate}

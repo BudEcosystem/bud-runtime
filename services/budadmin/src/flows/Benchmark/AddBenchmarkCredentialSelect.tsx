@@ -24,7 +24,7 @@ export default function AddBenchmarkCredentialSelect() {
           return;
         } else {
           await updateCredentials(selectedCredentials);
-          openDrawerWithStep("Benchmark-Configuration");
+          openDrawerWithStep("Select-Configuration");
         }
       }}
       onBack={() => {

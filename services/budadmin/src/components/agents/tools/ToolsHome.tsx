@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useConnectors, Connector } from '@/stores/useConnectors';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
-import { getOAuthState, isOAuthCallback } from '@/hooks/useOAuthCallback';
+import { getOAuthState, isOAuthCallback, clearOAuthState } from '@/hooks/useOAuthCallback';
 
 interface ToolsHomeProps {
   promptId?: string;
@@ -227,9 +227,14 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     hasSetConnectorFromUrl.current = false;
     lastConnectorIdRef.current = null;
 
-    // Remove connector parameter from URL while preserving all other parameters
+    // Clear ALL OAuth state to prevent re-triggering connector restoration
+    clearOAuthState();
+
+    // Remove connector AND OAuth callback params from URL
     const params = new URLSearchParams(window.location.search);
     params.delete('connector');
+    params.delete('code');   // Clear OAuth params if still present
+    params.delete('state');  // Clear OAuth params if still present
     const newUrl = `${window.location.pathname}?${params.toString()}`;
 
     // Use window.history.pushState to avoid Next.js router interference

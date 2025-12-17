@@ -1,7 +1,7 @@
 import { Image } from "antd";
 import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { UIMessage } from "ai";
+import type { Message as AIMessage } from "ai";
 import { MemoizedMarkdown } from "./MenorizedMarkdown";
 import { CopyText } from "../components/display/CopyText";
 import { Metrics } from "../../../types/chat";
@@ -281,9 +281,9 @@ function AIMessage(props: MessageProps & { reload: () => void }) {
 
 interface MessagesProps {
   chatId: string;
-  messages: UIMessage[];
+  messages: AIMessage[];
   reload: () => void;
-  onEdit: (content: string, message: UIMessage) => void;
+  onEdit: (content: string, message: AIMessage) => void;
 }
 
 

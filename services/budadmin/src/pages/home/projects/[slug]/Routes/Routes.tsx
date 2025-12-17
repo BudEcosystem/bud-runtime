@@ -149,7 +149,7 @@ const RoutesComponent: React.FC<RoutesProps> = ({ data }) => {
         setConfirmVisible(false);
       },
       okText: "Delete",
-      type: "warining",
+      type: "warning",
     });
   };
 
