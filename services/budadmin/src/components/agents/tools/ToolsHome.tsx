@@ -30,6 +30,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     fetchConnectorDetails,
     selectedConnectorDetails,
     isLoadingDetails,
+    clearSelectedConnectorDetails,
   } = useConnectors();
 
   const [connectedExpanded, setConnectedExpanded] = useState(true);
@@ -45,6 +46,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   const hasRestoredFromUrl = useRef(false);
   const hasSetConnectorFromUrl = useRef(false);
   const lastConnectorIdRef = useRef<string | null>(null);
+  const isBackNavigationRef = useRef(false);
 
   // Initial load - Fetch both connected and unregistered tools
   useEffect(() => {
@@ -58,6 +60,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
   // Restore connector state from URL on initial load (or from OAuth state)
   useEffect(() => {
+    // Skip if user explicitly navigated back
+    if (isBackNavigationRef.current) {
+      return;
+    }
+
     // Check if this is an OAuth callback - get connector ID from saved state
     const oauthState = getOAuthState();
     const isOAuthReturn = isOAuthCallback();
@@ -102,6 +109,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
   // Set selected connector when details are fetched
   useEffect(() => {
+    // Skip if user explicitly navigated back
+    if (isBackNavigationRef.current) {
+      return;
+    }
+
     // Check if this is an OAuth callback
     const oauthState = getOAuthState();
     const isOAuthReturn = isOAuthCallback();
@@ -219,6 +231,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   };
 
   const handleBackToList = () => {
+    // Set back navigation flag FIRST to prevent effects from re-triggering
+    isBackNavigationRef.current = true;
+
     setSelectedConnector(null);
     setViewMode('list');
 
@@ -227,24 +242,24 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     hasSetConnectorFromUrl.current = false;
     lastConnectorIdRef.current = null;
 
-    // Clear ALL OAuth state to prevent re-triggering connector restoration
+    // Clear connector details from store to prevent effects from restoring
+    clearSelectedConnectorDetails();
+
+    // Clear OAuth localStorage state (does not affect URL)
     clearOAuthState();
 
-    // Remove connector AND OAuth callback params from URL
-    const params = new URLSearchParams(window.location.search);
-    params.delete('connector');
-    params.delete('code');   // Clear OAuth params if still present
-    params.delete('state');  // Clear OAuth params if still present
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-
-    // Use window.history.pushState to avoid Next.js router interference
-    window.history.pushState({}, '', newUrl);
+    // NOTE: URL is intentionally NOT modified to preserve all existing params
 
     // Refresh both lists when coming back
     if (promptId) {
       fetchConnectedTools({ page: 1, prompt_id: promptId });
       fetchUnregisteredTools({ page: 1, prompt_id: promptId });
     }
+
+    // Reset back navigation flag after effects have settled
+    requestAnimationFrame(() => {
+      isBackNavigationRef.current = false;
+    });
   };
 
   // Show loading state when fetching connector from URL
