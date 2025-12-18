@@ -1,0 +1,174 @@
+---
+title: "Evaluations"
+description: "Designing, running, and comparing automated model evaluations in Bud Admin"
+---
+
+## 1. Description
+
+The Evaluation module in Bud Admin brings together the Experiments tab and the Evaluations Hub so teams can discover benchmarks, inspect results, and launch new runs from a single workspace. The catalog supports name search, trait filters, and modality badges, while detail pages surface description, tags, and tabbed views for Details, Leaderboard, and Evaluations Explorer. Project-level evaluation pages include table summaries plus actions to start another evaluation or export results.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. Tabbed evaluation workspace
+
+Experiments and the Evaluations Hub sit under a single tab bar, with a consistent **New experiment** action that opens the run drawer so teams can add studies without leaving the page.
+
+### 2. Discovery through search and traits
+
+Keyword search, live counts, and horizontal trait chips help reviewers narrow the evaluation catalog. Cards render modality badges, tag chips, and meta links (GitHub, paper, website) to keep context close at hand.
+
+### 3. Detail pages with navigable tabs
+
+Evaluation detail pages include breadcrumbs/back controls, a tag expander, and three tabs—Details, Leaderboard, and Evaluations Explorer—so reviewers can pivot between dataset information, ranking tables, and historical runs.
+
+### 4. Experiment lists with flexible filters
+
+The Experiments tab provides search, pagination, optional status/tag/model/date filters, and sortable columns for experiment names, models, traits, status, tags, and created dates, giving operators a concise way to track benchmarking activity.
+
+### 5. Project-level actions and exports
+
+Project evaluation tables surface traits, dataset references, and scores while offering buttons to run another evaluation against a deployment or export CSV results for offline review.
+
+### 6. Reusable run context and metadata
+
+Evaluation cards and detail pages expose tags, modality badges, and metadata links so teams can understand provenance and rerun studies with consistent context.
+
+### 7. Coverage across cloud and local deployments
+
+Run drawers support targeting cloud-hosted models and local deployments (Hugging Face, URL, or disk-based) so evaluations stay aligned with where models are served.
+
+## 3. Features
+
+### 3.1 Evaluation catalog
+
+- Search bar with placeholder guidance (e.g., finance, problem solving) for quick discovery, plus a live counter showing how many evaluations match.
+
+- Horizontal trait filters (multi-select pills) for narrowing by skill or domain.
+
+- Cards show modality badges (text, image, video, actions, embeddings), trait tags, trimmed descriptions with “See more” popovers, creator avatars, creation dates, and metadata links (GitHub, paper, website).
+
+- Card click opens the evaluation detail page while preserving loader feedback.
+
+### 3.2 Evaluation detail page
+
+- **Details tab:** Dataset summary, descriptive tags, and provenance to understand scope and requirements.
+
+- **Leaderboard tab:** Ranked table of model results for the evaluation with comparative scores.
+
+- **Evaluations Explorer tab:** Table of historical evaluation runs and datasets to trace regressions or improvements over time.
+
+- Tag chips with “+X more / Show less” expanders reveal all domains, modalities, and traits.
+
+- Breadcrumbs and back controls return to the catalog without losing context.
+
+### 3.3 Experiments and runs
+
+- Experiments list shows experiment name, models, traits, tags, status, and created date with pagination, sorting, and search.
+
+- Optional filters for status, tags, model, and created date help narrow the table.
+
+- Table cells expand via popovers when text is truncated, making it easy to view long model or trait lists.
+
+- Sorting indicators and pagers keep navigation consistent for longer experiment histories.
+
+### 3.4 Project-scoped evaluations
+
+- Project evaluation pages list traits, dataset names, and scores for the selected deployment with search and pagination.
+
+- **Run Another Evaluation** opens the evaluation drawer for the active deployment, helping teams launch another run without leaving the project context.
+
+- **Export** downloads a CSV of evaluations for the project so results can be shared offline.
+
+### 3.5 Dataset and trait management
+
+- Trait chips are fetched centrally to keep filter lists consistent across catalog and experiment screens.
+
+- Modality-aware icons clarify whether an evaluation measures text, image, video, action, or embedding capabilities.
+
+## 4. How-to Guides
+
+### 4.1 Access the Evaluation module
+
+1. Log in to the Bud AI Foundry dashboard.
+
+2. From the side menu, select **Evaluations** to open the catalog view.
+
+3. Review the listing grid with counts showing how many evaluations match current filters.
+
+### 4.2 Discover an evaluation with search and filters
+
+1. In the catalog header, type keywords (e.g., “finance”, “reasoning”) into the search bar.
+
+2. Toggle trait pills to include or exclude skills or domains. The count updates immediately.
+
+3. Click an evaluation card to open details and use metadata links (GitHub, paper, website) as needed.
+
+### 4.3 Review evaluation details
+
+1. On the detail page, scan the description and tags. Expand additional tags with **\+X more** when present.
+
+2. Switch to **Details** to see datasets and scope, **Leaderboard** for ranked results, or **Evaluations Explorer** for run timelines.
+
+3. Use breadcrumbs or the back control to return to the catalog.
+
+### 4.4 Run an evaluation for a project
+
+1. Open **Projects → [Project] → Evaluations**.
+
+2. Click **Run Another Evaluation** to open the drawer for the active deployment. Ensure a valid deployment ID is selected.
+
+3. Follow the drawer steps to choose the experiment, traits, and deployment, then start the run.
+
+### 4.5 Compare models with leaderboards
+
+1. Open an evaluation detail page and select the **Leaderboard** tab.
+
+2. Sort or scan rows to compare benchmark scores across models and deployments.
+
+3. Use the **Evaluations Explorer** tab to correlate leaderboard positions with specific runs and timestamps.
+
+### 4.6 Export evaluation results
+
+1. From a project’s evaluations page, click **Export**.
+
+2. Confirm the CSV download. The file includes evaluation details for offline review.
+
+### 4.7 Manage experiments and runs
+
+1. Navigate to **Evaluations → Experiments**.
+
+2. Use search and optional status or tag filters to locate an experiment.
+
+3. Review experiment rows for models, traits, status, tags, and created dates.
+
+4. Open the **New experiment** drawer from the tab bar when you need to add another study.
+
+## 5. FAQs
+
+**Q1. How do I start a new experiment?**
+
+Use the **New experiment** button in the Evaluations tab bar to open the run drawer and add a study without leaving the page.
+
+**Q2. How do I find evaluations relevant to my domain?**
+
+Use the search bar and trait pills on the catalog page to filter by domain or skill. Counts adjust instantly so you know how many fit your criteria.
+
+**Q3. What tabs should I check on the evaluation detail page?**
+
+Start with **Details** for scope, **Leaderboard** for rankings, and **Evaluations Explorer** for run history and dataset context before making routing decisions.
+
+**Q4. Can I export evaluation outcomes?**
+
+Yes. Project evaluation pages include an **Export** button that downloads CSV data for audits or custom reporting.
+
+**Q5. How do I launch another evaluation for a deployment?**
+
+Open the project’s Evaluations page, ensure the deployment ID is set in the route, and click **Run Another Evaluation** to start a new run.
+
+**Q6. Can I target both cloud and local models in evaluations?**
+
+Yes. The run drawer supports cloud deployments alongside local Hugging Face, URL-based, and disk-based models so benchmarking matches where models are hosted.
+
+**Q7. How do I check what traits or modalities an evaluation covers?**
+
+Review the trait chips and modality badges on catalog cards or the detail page. Use the **\+X more** expander to see the full list when tags are truncated.
