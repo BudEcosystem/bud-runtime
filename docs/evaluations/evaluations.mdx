@@ -50,7 +50,7 @@ The Evaluations Explorer tab preserves each dataset item with its metric, prompt
 
 - **Details tab:** Dataset summary, descriptive tags, advantages, constraints and provenance to understand scope and requirements.
 - **Leaderboard tab:** Ranked table of model results for the evaluation with comparative scores.
-- **Evaluations Explorer tab:** Table of historical evaluation runs and datasets, with prompt text, model responses, and metrics to trace regressions or improvements over time. Each row aligns a dataset item with its evaluated metric and includes exemplar request and response context sourced from the dataset’s website so teams can confirm model behavior against prompts.
+- **Evaluations Explorer tab:** Table of prompt text, model responses, and metrics of dataset to trace regressions or improvements over time. Each row aligns a dataset item with its evaluated metric and includes exemplar request and response context sourced from the dataset’s website so teams can confirm model behavior against prompts.
 
 ### 3.3 Experiments and runs
 
@@ -124,21 +124,9 @@ The Evaluations Explorer tab preserves each dataset item with its metric, prompt
 
 ### 4.5 Evaluation Explorer
 
-1. Select the **Evaluations Explorer** tab to open the run-level table.
-
-2. Confirm the dataset and metric context shown above the table before reviewing rows.
-
-3. Use the **Metric** chip set to verify which metric is applied to the examples in view, sorting or filtering (when available)
-
-   to focus comparisons.
-
-4. Read the **Prompt** column to inspect the dataset requests sourced from the dataset website for traceability, then check the
-
-   **Response** column to see the captured model outputs for each item.
-
-5. Remember that prompts and responses are drawn from the dataset’s published examples to make validation easier, and use table
-
-   pagination or sorting to navigate historical runs without losing context.
+1. Open an evaluation detail page and select the Evaluation Explorer tab.
+4. View each dataset item with its evaluated metric and includes exemplar request and response context sourced from the dataset’s website.
+5. Teams can confirm model behavior at a glance rather than inferring results from aggregate scores alone.
 
 ### 4.5 Run an evaluation for a project
 
