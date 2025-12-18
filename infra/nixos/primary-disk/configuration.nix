@@ -1,6 +1,7 @@
 {
   imports = [
     ./modules/scid.nix
-    ../primary
+    ../primary/configuration.nix
+    ../disk/configuration.nix
   ];
 }
