@@ -22,6 +22,7 @@ from budmicroframe.commons import logging
 from opentelemetry import trace
 from opentelemetry.baggage.propagation import W3CBaggagePropagator
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -138,6 +139,11 @@ class OTelManager:
 
         # Set as global tracer provider
         trace.set_tracer_provider(self._tracer_provider)
+
+        # Instrument httpx to inject traceparent headers into outgoing HTTP requests
+        # This enables trace context propagation when Pydantic AI calls external APIs (e.g., budgateway)
+        HTTPXClientInstrumentor().instrument(tracer_provider=self._tracer_provider)
+        logger.debug("httpx instrumented for outgoing trace context propagation")
 
         # Instrument all Pydantic AI agents with OpenTelemetry Semantic Conventions v1.37.0
         # Pass tracer_provider explicitly to ensure child spans inherit parent context
