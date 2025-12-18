@@ -1696,11 +1696,10 @@ class KubernetesHandler(BaseClusterHandler):
 
             try:
                 # Try to connect to the local port
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(0.5)
-                # Use localhost to match the bind address logic probably used elsewhere or default
-                result = sock.connect_ex(("127.0.0.1", local_port))
-                sock.close()
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(0.5)
+                    # Use localhost to match the bind address logic probably used elsewhere or default
+                    result = sock.connect_ex(("127.0.0.1", local_port))
 
                 if result == 0:
                     port_ready = True
