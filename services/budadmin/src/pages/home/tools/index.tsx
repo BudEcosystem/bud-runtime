@@ -219,9 +219,9 @@ const Tools = () => {
                           Usages
                         </Text_13_400_B3B3B3>
                       </div>
-                      <span className="bg-[#965CDE33] text-[#CFABFC] px-3 py-[5px] rounded-[6px] border border-[#CFABFC] text-[0.625rem] leading-[100%]">
+                      {/* <span className="bg-[#965CDE33] text-[#CFABFC] px-3 py-[5px] rounded-[6px] border border-[#CFABFC] text-[0.625rem] leading-[100%]">
                         {tool.category}
-                      </span>
+                      </span> */}
                     </div>
                   </div>
                 ))}
