@@ -18,6 +18,18 @@ export interface OAuthSessionData {
     name: string;
     model?: any;
   };
+
+  // Agent mode flags (to restore after OAuth)
+  isEditMode?: boolean;
+  editingPromptId?: string | null;
+  isAddVersionMode?: boolean;
+  addVersionPromptId?: string | null;
+  isEditVersionMode?: boolean;
+  editVersionData?: {
+    versionId: string;
+    versionNumber: number;
+    isDefault: boolean;
+  } | null;
 }
 
 export interface OAuthState {

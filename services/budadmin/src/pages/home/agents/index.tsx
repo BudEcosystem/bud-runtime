@@ -409,6 +409,14 @@ export default function PromptsAgents() {
       });
 
       if (isOAuthCallbackDetected && !oauthProcessedRef.current) {
+        // Check if layout has already handled OAuth (drawer is already open or transitioning)
+        const { isAgentDrawerOpen, isTransitioningToAgentDrawer, sessions } = useAgentStore.getState();
+        if (isAgentDrawerOpen || isTransitioningToAgentDrawer || sessions.length > 0) {
+          console.log('[OAuth] Session already restored by layout, skipping');
+          oauthProcessedRef.current = true;
+          return;
+        }
+
         // OAuth callback detected - restore session with ORIGINAL prompt ID from dedicated storage
         oauthProcessedRef.current = true;
 

@@ -39,6 +39,12 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import pkg from '@novu/notification-center/package.json';
 import { enableDevMode } from "@/components/environment";
 import AgentDrawer from "@/components/agents/AgentDrawer";
+import {
+  isOAuthCallback,
+  getOAuthPromptId,
+  getOAuthSessionData,
+} from "@/hooks/useOAuthCallback";
+import { useAgentStore } from "@/stores/useAgentStore";
 
 interface LayoutProps {
   children: ReactNode;
@@ -91,6 +97,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const router = useRouter();
   const { isDrawerOpen, showMinimizedItem } = useDrawer();
   const [isHydrated, setIsHydrated] = useState(false);
+  const oauthProcessedRef = React.useRef(false);
   const [isHovered, setIsHovered] = useState<any>();
   const pathname = usePathname();
   const { isVisible } = useOverlay();
@@ -240,6 +247,76 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     getUser();
   }, []);
 
+  // Global OAuth callback handling - ensures OAuth works from any page
+  useEffect(() => {
+    const handleGlobalOAuthCallback = async () => {
+      // Check if this is an OAuth callback
+      const isOAuth = isOAuthCallback();
+      const savedPromptId = getOAuthPromptId();
+      const savedSessionData = getOAuthSessionData();
+
+      // Only proceed if we have OAuth indicators
+      if (!isOAuth && !savedPromptId && !savedSessionData) {
+        return;
+      }
+
+      // Prevent multiple processing
+      if (oauthProcessedRef.current) {
+        return;
+      }
+
+      // Mark as being processed
+      oauthProcessedRef.current = true;
+
+      console.log('[Layout OAuth] Detected OAuth callback, restoring session');
+
+      try {
+        const {
+          setEditMode,
+          setAddVersionMode,
+          setEditVersionMode,
+          restoreSessionWithPromptId,
+          openAgentDrawer,
+        } = useAgentStore.getState();
+
+        // Restore agent mode flags if present
+        if (savedSessionData) {
+          if (savedSessionData.isEditMode && savedSessionData.editingPromptId) {
+            setEditMode(savedSessionData.editingPromptId);
+          }
+          if (savedSessionData.isAddVersionMode && savedSessionData.addVersionPromptId) {
+            setAddVersionMode(savedSessionData.addVersionPromptId);
+          }
+          if (savedSessionData.isEditVersionMode && savedSessionData.editVersionData) {
+            setEditVersionMode(savedSessionData.editVersionData);
+          }
+        }
+
+        // Restore session with prompt ID
+        if (savedPromptId) {
+          restoreSessionWithPromptId(savedPromptId, {
+            name: savedSessionData?.name || `Agent 1`,
+            modelId: savedSessionData?.modelId,
+            modelName: savedSessionData?.modelName,
+            systemPrompt: savedSessionData?.systemPrompt,
+            promptMessages: savedSessionData?.promptMessages,
+            selectedDeployment: savedSessionData?.selectedDeployment,
+          });
+        }
+
+        // Open the agent drawer after a short delay to ensure state is set
+        requestAnimationFrame(() => {
+          openAgentDrawer();
+        });
+
+        console.log('[Layout OAuth] Session restored successfully');
+      } catch (error) {
+        console.error('[Layout OAuth] Error restoring session:', error);
+      }
+    };
+
+    handleGlobalOAuthCallback();
+  }, [router.query.code, router.query.state]);
 
   // useEffect(() => {
   //   console.log("Novu Notification Center version:", pkg.version);
