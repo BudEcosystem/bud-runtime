@@ -408,98 +408,102 @@ export default function PromptsAgents() {
         oauthProcessedRef: oauthProcessedRef.current,
       });
 
+      // Track whether OAuth was handled to determine if we should process agentId separately
+      let oauthHandled = false;
+
       if (isOAuthCallbackDetected && !oauthProcessedRef.current) {
         // Check if layout has already handled OAuth (drawer is already open or transitioning)
         const { isAgentDrawerOpen, isTransitioningToAgentDrawer, sessions } = useAgentStore.getState();
         if (isAgentDrawerOpen || isTransitioningToAgentDrawer || sessions.length > 0) {
-          console.log('[OAuth] Session already restored by layout, skipping');
+          console.log('[OAuth] Session already restored by layout, skipping OAuth restoration');
           oauthProcessedRef.current = true;
-          return;
-        }
+          oauthHandled = true;
+          // Don't return here - still need to process agentId if present
+        } else {
+          // OAuth callback detected - restore session with ORIGINAL prompt ID from dedicated storage
+          oauthProcessedRef.current = true;
 
-        // OAuth callback detected - restore session with ORIGINAL prompt ID from dedicated storage
-        oauthProcessedRef.current = true;
+          try {
+            showLoader();
 
-        try {
-          showLoader();
+            // PRIORITY: Use prompt ID from dedicated localStorage (most reliable)
+            // This was saved right before OAuth redirect in ConnectorDetails
+            const effectivePromptId = savedPromptId || oauthState?.promptId;
 
-          // PRIORITY: Use prompt ID from dedicated localStorage (most reliable)
-          // This was saved right before OAuth redirect in ConnectorDetails
-          const effectivePromptId = savedPromptId || oauthState?.promptId;
+            if (!effectivePromptId) {
+              console.error('No prompt ID found for OAuth restoration');
+              errorToast('Failed to restore session - prompt ID not found');
+              hideLoader();
+              // Don't return - still try to process agentId if present
+            } else {
+              // Use agent ID from URL or saved OAuth state
+              const effectiveAgentId = (agentId as string) || oauthState?.agentId;
 
-          if (!effectivePromptId) {
-            console.error('No prompt ID found for OAuth restoration');
-            errorToast('Failed to restore session - prompt ID not found');
-            hideLoader();
-            return;
-          }
+              // PRIORITY: Use session data from dedicated localStorage (most reliable)
+              // This includes model selection saved right before OAuth redirect
+              const effectiveSessionData = savedSessionData || oauthState?.sessionData;
 
-          // Use agent ID from URL or saved OAuth state
-          const effectiveAgentId = (agentId as string) || oauthState?.agentId;
+              // Debug logging for OAuth restoration
+              console.log('[OAuth] Restoring session after redirect:', {
+                effectivePromptId,
+                effectiveAgentId,
+                hasSavedSessionData: !!savedSessionData,
+                hasOAuthStateSessionData: !!oauthState?.sessionData,
+                effectiveSessionData,
+                selectedDeployment: effectiveSessionData?.selectedDeployment,
+              });
 
-          // PRIORITY: Use session data from dedicated localStorage (most reliable)
-          // This includes model selection saved right before OAuth redirect
-          const effectiveSessionData = savedSessionData || oauthState?.sessionData;
+              // CRITICAL: Restore session FIRST before opening any drawers
+              // This ensures the session exists with correct prompt ID before AgentDrawer renders
+              restoreSessionWithPromptId(effectivePromptId, {
+                name: effectiveSessionData?.name || `Agent 1`,
+                modelId: effectiveSessionData?.modelId,
+                modelName: effectiveSessionData?.modelName,
+                systemPrompt: effectiveSessionData?.systemPrompt,
+                promptMessages: effectiveSessionData?.promptMessages,
+                selectedDeployment: effectiveSessionData?.selectedDeployment,
+                workflowId: oauthState?.workflowId,
+              });
 
-          // Debug logging for OAuth restoration
-          console.log('[OAuth] Restoring session after redirect:', {
-            effectivePromptId,
-            effectiveAgentId,
-            hasSavedSessionData: !!savedSessionData,
-            hasOAuthStateSessionData: !!oauthState?.sessionData,
-            effectiveSessionData,
-            selectedDeployment: effectiveSessionData?.selectedDeployment,
-          });
+              // Fetch workflow details if we have an agent ID (from OAuth state)
+              if (effectiveAgentId) {
+                const workflowResponse = await AppRequest.Get(
+                  `${tempApiBaseUrl}/workflows/${effectiveAgentId}`
+                );
 
-          // CRITICAL: Restore session FIRST before opening any drawers
-          // This ensures the session exists with correct prompt ID before AgentDrawer renders
-          restoreSessionWithPromptId(effectivePromptId, {
-            name: effectiveSessionData?.name || `Agent 1`,
-            modelId: effectiveSessionData?.modelId,
-            modelName: effectiveSessionData?.modelName,
-            systemPrompt: effectiveSessionData?.systemPrompt,
-            promptMessages: effectiveSessionData?.promptMessages,
-            selectedDeployment: effectiveSessionData?.selectedDeployment,
-            workflowId: oauthState?.workflowId,
-          });
+                if (workflowResponse?.data) {
+                  // Open the add agent drawer
+                  openDrawer("add-agent");
+                }
+              }
 
-          // Fetch workflow details if we have an agent ID
-          if (effectiveAgentId) {
-            const workflowResponse = await AppRequest.Get(
-              `${tempApiBaseUrl}/workflows/${effectiveAgentId}`
-            );
+              // Open the agent drawer AFTER session is restored
+              requestAnimationFrame(() => {
+                openAgentDrawer();
+              });
 
-            if (workflowResponse?.data) {
-              // Open the add agent drawer
-              openDrawer("add-agent");
+              // Mark as processed
+              hasProcessedUrlRef.current = true;
+              oauthHandled = true;
+
+              // Session data in localStorage will be overwritten on next OAuth flow
+              // No need to clear it here - keeping it doesn't cause issues
+              console.log('[OAuth] Session restored successfully');
             }
+          } catch (error) {
+            console.error('Error restoring OAuth session:', error);
+            errorToast('Failed to restore session after OAuth');
+          } finally {
+            hideLoader();
           }
-
-          // Open the agent drawer AFTER session is restored
-          requestAnimationFrame(() => {
-            openAgentDrawer();
-          });
-
-          // Mark as processed
-          hasProcessedUrlRef.current = true;
-
-          // Session data in localStorage will be overwritten on next OAuth flow
-          // No need to clear it here - keeping it doesn't cause issues
-          console.log('[OAuth] Session restored successfully');
-        } catch (error) {
-          console.error('Error restoring OAuth session:', error);
-          errorToast('Failed to restore session after OAuth');
-        } finally {
-          hideLoader();
         }
-
-        return; // Exit early - OAuth callback handled
       }
 
-      // Regular (non-OAuth) flow below
+      // IMPORTANT: Continue to process agentId if OAuth didn't already handle it
+      // This ensures agentId parameter is processed for non-OAuth flows or if OAuth failed
 
-      // If agent parameter exists, open add agent workflow and fetch workflow details
-      if (agentId && typeof agentId === 'string') {
+      // If agent parameter exists and wasn't already handled by OAuth, open add agent workflow and fetch workflow details
+      if (agentId && typeof agentId === 'string' && !oauthHandled) {
         try {
           showLoader();
 
