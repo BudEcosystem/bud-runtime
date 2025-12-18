@@ -1707,8 +1707,8 @@ class KubernetesHandler(BaseClusterHandler):
                     # Give it a tiny bit more time for the application to be ready to accept data
                     await asyncio.sleep(0.1)
                     break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"An error occurred while polling port {local_port}: {e}")
 
             await asyncio.sleep(0.5)
 
