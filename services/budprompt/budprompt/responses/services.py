@@ -23,6 +23,7 @@ from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
 from openai.types.responses import Response, ResponseInputItem
 from opentelemetry import context, trace
+from opentelemetry.context import Context
 from opentelemetry.trace import Status, StatusCode
 from pydantic import ValidationError
 
@@ -161,6 +162,7 @@ class ResponsesService:
         prompt_params: BudResponsePrompt,
         input: Optional[Union[str, List[ResponseInputItem]]] = None,
         api_key: Optional[str] = None,
+        trace_context: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Execute prompt using template from Redis.
 
@@ -168,6 +170,8 @@ class ResponsesService:
             prompt_params: Prompt parameters including id, version, and variables
             input: Optional input text for the prompt
             api_key: Optional API key for authorization
+            trace_context: Optional OpenTelemetry context extracted from incoming request headers
+                          for distributed tracing (parent span from upstream services like budgateway)
 
         Returns:
             Dictionary containing the execution result
@@ -179,7 +183,13 @@ class ResponsesService:
 
         # NOTE: Use manual span management to support streaming
         # For streaming, we need the span to stay open until streaming completes
-        span = tracer.start_span("invoke_agent budprompt")
+
+        # Use passed trace context if available (extracted from request headers)
+        # This enables proper parent-child span relationships in distributed tracing
+        parent_ctx = trace_context if trace_context else context.get_current()
+
+        # Start span as child of parent context for proper distributed tracing
+        span = tracer.start_span("invoke_agent budprompt", context=parent_ctx)
 
         # Set span as current context so child spans (Pydantic AI) attach to it
         ctx = trace.set_span_in_context(span)

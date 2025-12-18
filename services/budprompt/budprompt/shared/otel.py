@@ -14,16 +14,20 @@
 #  limitations under the License.
 #  -----------------------------------------------------------------------------
 
-"""OpenTelemetry configuration for Pydantic AI instrumentation."""
+"""OpenTelemetry configuration for Pydantic AI instrumentation and trace context propagation."""
 
 from typing import Optional
 
 from budmicroframe.commons import logging
 from opentelemetry import trace
+from opentelemetry.baggage.propagation import W3CBaggagePropagator
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from pydantic_ai import Agent
 from pydantic_ai.agent import InstrumentationSettings
 
@@ -85,10 +89,13 @@ class OTelManager:
         return trace.get_tracer(name)
 
     def configure(self) -> None:
-        """Configure OpenTelemetry for Pydantic AI agent instrumentation.
+        """Configure OpenTelemetry for Pydantic AI agent instrumentation and trace context propagation.
 
-        Sets up the TracerProvider with OTLP HTTP exporter and instruments
-        all Pydantic AI agents. Configuration is read from app_settings:
+        Sets up the TracerProvider with OTLP HTTP exporter, configures W3C TraceContext
+        propagator for extracting traceparent headers from incoming requests, and instruments
+        Pydantic AI agents.
+
+        Configuration is read from app_settings:
             - OTEL_SDK_DISABLED: Whether OTEL SDK is disabled
             - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP HTTP endpoint
         """
@@ -101,6 +108,18 @@ class OTelManager:
             return
 
         endpoint = app_settings.otel_exporter_endpoint
+
+        # Configure W3C TraceContext propagator for extracting traceparent headers
+        # This enables distributed tracing context propagation from upstream services
+        set_global_textmap(
+            CompositePropagator(
+                [
+                    TraceContextTextMapPropagator(),
+                    W3CBaggagePropagator(),
+                ]
+            )
+        )
+        logger.debug("W3C TraceContext propagator configured")
 
         # Create resource with service name
         resource = Resource.create(
