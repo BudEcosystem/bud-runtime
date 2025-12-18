@@ -135,6 +135,7 @@
             "group": "Evaluations",
             "icon": "chart-bar",
             "pages": [
+              "evaluations/evaluations",
               "evaluations/evaluation-overview",
               "evaluations/creating-evaluation-sets",
               "evaluations/running-evaluations",
