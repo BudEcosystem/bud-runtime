@@ -1,11 +1,11 @@
 ---
 title: "Evaluations"
-description: "Designing, running, and comparing automated model evaluations in Bud Admin"
+description: "Designing, running, and comparing automated model evaluations in Bud AI Foundry."
 ---
 
 ## 1. Description
 
-The Evaluation module in Bud Admin brings together the Experiments tab and the Evaluations Hub so teams can discover benchmarks, inspect results, and launch new runs from a single workspace. The catalog supports name search, trait filters, and modality badges, while detail pages surface description, tags, and tabbed views for Details, Leaderboard, and Evaluations Explorer. Project-level evaluation pages include table summaries plus actions to start another evaluation or export results.
+The Evaluation module in Bud AI Foundry centralizes how teams validate model quality across Bud-hosted cloud deployments and local checkpoints (Hugging Face, URL-download, and disk-mounted). It bundles curated public benchmarks with organization-defined traits so evaluators can score latency, accuracy, and safety before promoting routes to production. Listing, detail, and experiment views are designed to be self-service with governance, giving product owners, red-teamers, and MLOps engineers a consistent way to compare candidates across clusters.
 
 ## 2. USPs (Unique Selling Propositions)
 
@@ -42,47 +42,34 @@ Run drawers support targeting cloud-hosted models and local deployments (Hugging
 ### 3.1 Evaluation catalog
 
 - Search bar with placeholder guidance (e.g., finance, problem solving) for quick discovery, plus a live counter showing how many evaluations match.
-
 - Horizontal trait filters (multi-select pills) for narrowing by skill or domain.
-
 - Cards show modality badges (text, image, video, actions, embeddings), trait tags, trimmed descriptions with “See more” popovers, creator avatars, creation dates, and metadata links (GitHub, paper, website).
-
 - Card click opens the evaluation detail page while preserving loader feedback.
 
 ### 3.2 Evaluation detail page
 
 - **Details tab:** Dataset summary, descriptive tags, and provenance to understand scope and requirements.
-
 - **Leaderboard tab:** Ranked table of model results for the evaluation with comparative scores.
-
 - **Evaluations Explorer tab:** Table of historical evaluation runs and datasets to trace regressions or improvements over time.
-
 - Tag chips with “+X more / Show less” expanders reveal all domains, modalities, and traits.
-
 - Breadcrumbs and back controls return to the catalog without losing context.
 
 ### 3.3 Experiments and runs
 
 - Experiments list shows experiment name, models, traits, tags, status, and created date with pagination, sorting, and search.
-
 - Optional filters for status, tags, model, and created date help narrow the table.
-
 - Table cells expand via popovers when text is truncated, making it easy to view long model or trait lists.
-
 - Sorting indicators and pagers keep navigation consistent for longer experiment histories.
 
 ### 3.4 Project-scoped evaluations
 
 - Project evaluation pages list traits, dataset names, and scores for the selected deployment with search and pagination.
-
 - **Run Another Evaluation** opens the evaluation drawer for the active deployment, helping teams launch another run without leaving the project context.
-
 - **Export** downloads a CSV of evaluations for the project so results can be shared offline.
 
 ### 3.5 Dataset and trait management
 
 - Trait chips are fetched centrally to keep filter lists consistent across catalog and experiment screens.
-
 - Modality-aware icons clarify whether an evaluation measures text, image, video, action, or embedding capabilities.
 
 ## 4. How-to Guides
@@ -90,57 +77,43 @@ Run drawers support targeting cloud-hosted models and local deployments (Hugging
 ### 4.1 Access the Evaluation module
 
 1. Log in to the Bud AI Foundry dashboard.
-
 2. From the side menu, select **Evaluations** to open the catalog view.
-
 3. Review the listing grid with counts showing how many evaluations match current filters.
 
 ### 4.2 Discover an evaluation with search and filters
 
 1. In the catalog header, type keywords (e.g., “finance”, “reasoning”) into the search bar.
-
 2. Toggle trait pills to include or exclude skills or domains. The count updates immediately.
-
 3. Click an evaluation card to open details and use metadata links (GitHub, paper, website) as needed.
 
 ### 4.3 Review evaluation details
 
 1. On the detail page, scan the description and tags. Expand additional tags with **\+X more** when present.
-
 2. Switch to **Details** to see datasets and scope, **Leaderboard** for ranked results, or **Evaluations Explorer** for run timelines.
-
 3. Use breadcrumbs or the back control to return to the catalog.
 
 ### 4.4 Run an evaluation for a project
 
 1. Open **Projects → [Project] → Evaluations**.
-
 2. Click **Run Another Evaluation** to open the drawer for the active deployment. Ensure a valid deployment ID is selected.
-
 3. Follow the drawer steps to choose the experiment, traits, and deployment, then start the run.
 
 ### 4.5 Compare models with leaderboards
 
 1. Open an evaluation detail page and select the **Leaderboard** tab.
-
 2. Sort or scan rows to compare benchmark scores across models and deployments.
-
 3. Use the **Evaluations Explorer** tab to correlate leaderboard positions with specific runs and timestamps.
 
 ### 4.6 Export evaluation results
 
 1. From a project’s evaluations page, click **Export**.
-
 2. Confirm the CSV download. The file includes evaluation details for offline review.
 
 ### 4.7 Manage experiments and runs
 
 1. Navigate to **Evaluations → Experiments**.
-
 2. Use search and optional status or tag filters to locate an experiment.
-
 3. Review experiment rows for models, traits, status, tags, and created dates.
-
 4. Open the **New experiment** drawer from the tab bar when you need to add another study.
 
 ## 5. FAQs
