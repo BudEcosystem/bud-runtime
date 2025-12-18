@@ -281,14 +281,23 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
         // Restore agent mode flags if present
         if (savedSessionData) {
-          if (savedSessionData.isEditMode && savedSessionData.editingPromptId) {
-            setEditMode(savedSessionData.editingPromptId);
+          const {
+            isEditMode,
+            editingPromptId,
+            isAddVersionMode,
+            addVersionPromptId,
+            isEditVersionMode,
+            editVersionData,
+          } = savedSessionData;
+
+          if (isEditMode && editingPromptId) {
+            setEditMode(editingPromptId);
           }
-          if (savedSessionData.isAddVersionMode && savedSessionData.addVersionPromptId) {
-            setAddVersionMode(savedSessionData.addVersionPromptId);
+          if (isAddVersionMode && addVersionPromptId) {
+            setAddVersionMode(addVersionPromptId);
           }
-          if (savedSessionData.isEditVersionMode && savedSessionData.editVersionData) {
-            setEditVersionMode(savedSessionData.editVersionData);
+          if (isEditVersionMode && editVersionData) {
+            setEditVersionMode(editVersionData);
           }
         }
 
