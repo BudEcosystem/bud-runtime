@@ -85,13 +85,13 @@ The Evaluations Explorer tab preserves each dataset item with its metric, prompt
 3. In the catalog header, type keywords (e.g., “finance”, “reasoning”) into the search bar.
 4. Toggle trait pills to include or exclude skills or domains. The dataset count updates immediately.
 
-### 4.3 Evaluations details
+### 4.3 Review evaluation details (Details tab)
 
 1. Click a dataset to open detail page.
 2. On the detail page, view the description, tags and mutiple tabs.
 3. Use breadcrumbs or the back control to return to the catalog.
 
-#### 4.3.1 Details
+#### 4.3.1 Introduction, reasons, expectations, advantages, and constraints
 
 1. View the Introduction summary describing the dataset or evaluation scope.
 2. Review the bullet lists under Why Run this Eval? and What to Expect? to understand goals and coverage.
@@ -99,35 +99,35 @@ The Evaluations Explorer tab preserves each dataset item with its metric, prompt
 
 #### 4.3.2 Evaluation values and token estimates
 
-1. Review **Evaluation Values** to see bar chart scores sourced from leaderboard accuracy for the available models.
-2. Note **Total Input tokens** and **Expected Output** values to estimate usage before running or comparing models.
+1. Review Evaluation Values to see bar chart scores sourced from models already evaluated on the platform.
+2. Note Total Input tokens and Expected Output values to estimate usage before running or comparing models.
 
 #### 4.3.3 Metadata links and provenance
 
-1. Use the **GitHub**, **Paper**, or **Website** chips when present to open supporting references in new tabs.
+1. Use the GitHub, Paper, or Website chips when present to open supporting references in new tabs.
 2. Keep the detail page open to avoid losing context while reviewing external material.
 
 #### 4.3.4 Modalities
 
-1. Scan the **Input** and **Output** modality panels to verify whether the evaluation covers text, image, or audio.
+1. Scan the Input and Output modality panels to verify whether the evaluation covers text, image, or audio.
 2. Confirm the modality chips match the domains you plan to assess before launching new runs.
 
 #### 4.3.5 Domains, concepts, qualifications, language, skills, task types, and age distribution
 
 1. Review the domain, concept, human qualification, language, skills identified, and task type tag groups to validate scope.
-2. If provided, inspect the **Age Distribution** chart to see the evaluator demographic for the dataset.
+2. If provided, inspect the Age Distribution chart to see the evaluator demographic for the dataset.
 
-### 4.4 Run an evaluation for a project
-
-1. Open **Projects → [Project] → Evaluations**.
-2. Click **Run Another Evaluation** to open the drawer for the active deployment. Ensure a valid deployment ID is selected.
-3. Follow the drawer steps to choose the experiment, traits, and deployment, then start the run.
-
-### 4.5 Compare models with leaderboards
+### 4.4 Compare models with leaderboards
 
 1. Open an evaluation detail page and select the **Leaderboard** tab.
 2. Sort or scan rows to compare benchmark scores across models and deployments.
 3. Use the **Evaluations Explorer** tab to correlate leaderboard positions with specific runs and timestamps.
+
+### 4.5 Run an evaluation for a project
+
+1. Open **Projects → [Project] → Evaluations**.
+2. Click **Run Another Evaluation** to open the drawer for the active deployment. Ensure a valid deployment ID is selected.
+3. Follow the drawer steps to choose the experiment, traits, and deployment, then start the run.
 
 ### 4.6 Export evaluation results
 
