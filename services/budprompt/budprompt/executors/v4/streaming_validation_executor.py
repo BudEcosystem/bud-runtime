@@ -364,21 +364,24 @@ class StreamingValidationExecutor:
                     if final_result:
                         # Extract the final validated data
                         # For structured output, the data is in final_result.output (NativeOutput or direct value)
+                        from budprompt.executors.v4.utils import apply_schema_defaults
+
                         if hasattr(final_result, "output") and final_result.output is not None:
                             # Extract from output attribute (pydantic-ai's AgentRunResult.output)
                             if hasattr(final_result.output, "model_dump"):
-                                final_validated_data = final_result.output.model_dump()
+                                final_validated_data = apply_schema_defaults(final_result.output)
                             elif isinstance(final_result.output, dict):
-                                final_validated_data = final_result.output
+                                final_validated_data = self._apply_defaults_to_dict(final_result.output)
                             else:
                                 # Output is the raw Pydantic model instance
                                 final_validated_data = final_result.output
                                 if hasattr(final_validated_data, "model_dump"):
-                                    final_validated_data = final_validated_data.model_dump()
+                                    final_validated_data = apply_schema_defaults(final_validated_data)
                         elif hasattr(final_result, "model_dump"):
-                            final_validated_data = final_result.model_dump()
+                            final_validated_data = apply_schema_defaults(final_result)
                         else:
                             final_validated_data = final_result if isinstance(final_result, dict) else {}
+                            final_validated_data = self._apply_defaults_to_dict(final_validated_data)
 
                         logger.debug(f"Final validated data: {final_validated_data}")
 
@@ -457,7 +460,8 @@ class StreamingValidationExecutor:
 
                 except (ValueError, ValidationError) as e:
                     # Validation failed - capture state before re-raising
-                    self.validated_fields = validator.validated_data.copy()
+                    # Apply defaults to validated_data to ensure consistency on retry
+                    self.validated_fields = self._apply_defaults_to_dict(validator.validated_data.copy())
                     self.failed_fields = {
                         k: v for k, v in validator.attempted_data.items() if k not in validator.validated_data
                     }
@@ -536,6 +540,8 @@ class StreamingValidationExecutor:
                                 if validation_result["valid"]:
                                     # Get current validated data
                                     current_validated = validation_result.get("validated_data", {})
+                                    # Apply defaults for any None values before sending to client
+                                    current_validated = self._apply_defaults_to_dict(current_validated)
 
                                     # Compute delta (only changed fields)
                                     field_delta = self._compute_field_delta(current_validated)
@@ -569,7 +575,8 @@ class StreamingValidationExecutor:
 
                         except (ValueError, ValidationError) as e:
                             # Capture validation state before re-raising (same as backup lines 328-334)
-                            self.validated_fields = validator.validated_data.copy()
+                            # Apply defaults to validated_data to ensure consistency on retry
+                            self.validated_fields = self._apply_defaults_to_dict(validator.validated_data.copy())
                             self.failed_fields = {
                                 k: v for k, v in validator.attempted_data.items() if k not in validator.validated_data
                             }
@@ -759,3 +766,24 @@ Generate the complete corrected {model_name} object with all fields."""
             json_str += "}"
 
         return json_str
+
+    def _apply_defaults_to_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply schema defaults to a dict using self.output_model.
+
+        Args:
+            data: Dict with field values (may contain None)
+
+        Returns:
+            Dict with None values replaced by model defaults
+        """
+        if not data or not hasattr(self.output_model, "model_fields"):
+            return data
+
+        from pydantic_core import PydanticUndefined
+
+        result = data.copy()
+        for field_name, field_info in self.output_model.model_fields.items():
+            if result.get(field_name) is None and field_info.default is not PydanticUndefined:
+                result[field_name] = field_info.default
+
+        return result
