@@ -4,7 +4,8 @@ set -o xtrace
 set +o nounset
 
 bud_config_dir="${XDG_DATA_HOME:-$HOME/.config}/bud"
-bud_share_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bud"
+bud_share_dir="$HOME/.local/share/bud"
+bud_override_yaml="$bud_share_dir/bud.override.yaml"
 
 bud_repo="https://github.com/BudEcosystem/bud-runtime.git"
 bud_repo_local="$bud_share_dir/bud-runtime"
@@ -77,55 +78,24 @@ k8s_ensure() {
 	fi
 }
 
-helm_install() {
-	name="$1"
-	namespace_and_releasename="$2"
-	shift 2
+scid() {
+	scid_config="$(mktemp budk8s_deploy.XXXXXXXXXXXXXXXX)"
+	cat <<-EOF >"$scid_config"
+		branch = "master"
+		repo_url = "https://github.com/BudEcosystem/bud-runtime.git"
 
-	chart_path="$bud_repo_local/infra/helm/$name"
-	values_path="$chart_path/values.yaml"
-	scid_path="$chart_path/scid.toml"
+		[helm]
+		charts_path = "infra/helm"
+		env = "prod"
+	EOF
 
-	if [ -z "$namespace_and_releasename" ]; then
-		namespace="$(tq -f "$scid_path" '.namespace')"
-		release_name="$(tq -f "$scid_path" '.release_name')"
-	else
-		namespace="$namespace_and_releasename"
-		release_name="$namespace_and_releasename"
+	if [ ! -r "$bud_override_yaml" ]; then
+		curl "https://raw.githubusercontent.com/BudEcosystem/bud-runtime/refs/heads/master/infra/helm/bud/example.standalone.yaml" >"$bud_override_yaml"
 	fi
 
-	if tq -f "$scid_path" '.chart_path_override' >/dev/null 2>&1; then
-		chart_path="$chart_path/$(tq -f "$scid_path" '.chart_path_override')"
-	fi
-
-	helm upgrade \
-		--install \
-		-n "$namespace" \
-		--create-namespace \
-		"$release_name" \
-		"$chart_path" \
-		-f "$values_path" \
-		"$@"
-}
-helm_ensure() {
-	if ! k8s_clusterrole_exists keel; then
-		helm_install keel "" -f "$bud_repo_local/infra/helm/keel/example.noslack.yaml"
-	fi
-
-	if ! k8s_apiresources_exists 'components' 'dapr.io/v1alpha1'; then
-		helm_install dapr ""
-	fi
-
-	if ! k8s_apiresources_exists 'certificates' 'cert-manager.io/v1'; then
-		chart_version="v$(yq -r '.dependencies[] | select(.name == "cert-manager") | .version' "$bud_repo_local/infra/helm/cert-manager/Chart.yaml")"
-		kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/$chart_version/cert-manager.crds.yaml"
-		helm_install cert-manager "" --skip-crds --set cert-manager.crds.enabled=false
-	fi
-
-	vim "$bud_repo_local/infra/helm/bud/example.standalone.yaml"
-	helm_install bud bud \
-		-f "$bud_repo_local/infra/helm/bud/example.standalone.yaml" \
-		-f "$bud_repo_local/infra/helm/bud/example.secrets.yaml"
+	cd "$bud_share_dir" || return 1
+	SCID_CONFIG="$scid_config" scid
+	cd - || return 1
 }
 
 nvidia_ensure() {
@@ -179,7 +149,7 @@ runtime)
 	dir_ensure
 	k8s_ensure
 	traefik_ensure
-	helm_ensure
+	scid
 	;;
 nvidia)
 	k8s_ensure

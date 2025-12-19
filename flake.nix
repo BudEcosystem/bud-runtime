@@ -159,7 +159,9 @@
 
               budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };
               no_new_global_env = pkgs.callPackage ./nix/packages/no_new_global_env.nix { };
-              k8s_deploy = pkgs.callPackage ./nix/packages/k8s_deploy { };
+              k8s_deploy = pkgs.callPackage ./nix/packages/k8s_deploy {
+                scid = scid.packages.${system}.scid;
+              };
             }
           ))
           (
