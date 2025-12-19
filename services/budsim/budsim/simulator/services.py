@@ -2068,13 +2068,16 @@ class SimulationService:
             supports_pipeline_parallelism=getattr(template_result, "supports_pipeline_parallelism", None),
             # CPU cores for cpu/cpu_high deployments
             # Shared mode: use total cores (pods burst to full capacity, K8s handles scheduling)
-            # Dedicated mode: subtract utilized cores to get truly available
+            # Dedicated mode: subtract utilized cores to get truly available (min 1 core)
             cores=(
                 (
                     int(getattr(template_result, "cores", 0))
                     if top_k_configs.get("hardware_mode", "dedicated") == "shared"
-                    else int(
-                        getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0)
+                    else max(
+                        1,
+                        int(
+                            getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0)
+                        ),
                     )
                 )
                 if template_result.device_type in ("cpu", "cpu_high") and getattr(template_result, "cores", None)
