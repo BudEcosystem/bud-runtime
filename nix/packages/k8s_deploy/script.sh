@@ -78,7 +78,7 @@ k8s_ensure() {
 	fi
 }
 
-scid() {
+helm_ensure() {
 	scid_config="$(mktemp budk8s_deploy.XXXXXXXXXXXXXXXX)"
 	cat <<-EOF >"$scid_config"
 		branch = "master"
@@ -149,7 +149,7 @@ runtime)
 	dir_ensure
 	k8s_ensure
 	traefik_ensure
-	scid
+	helm_ensure
 	;;
 nvidia)
 	k8s_ensure
