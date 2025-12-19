@@ -470,6 +470,9 @@ class DirectSearchOptimizer:
                         f"message={self._last_validation_result.get('message', 'N/A')}"
                     )
 
+                # Retrieve cached optimal max_loras for this configuration
+                optimal_max_loras = self._max_loras_cache.get(cache_key)
+
                 # Return minimal result - memory validation result from _validate_config
                 result = SearchResult(
                     config=config,
@@ -485,6 +488,7 @@ class DirectSearchOptimizer:
                     error_rate=0,
                     weight_memory=weight_memory,
                     kv_cache_memory=kv_cache_memory,
+                    max_loras=optimal_max_loras,  # Include optimized max_loras
                 )
                 # Cache and store result
                 self._evaluation_cache[cache_key] = result

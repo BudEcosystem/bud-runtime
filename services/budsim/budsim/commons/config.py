@@ -57,6 +57,9 @@ class AppConfig(BaseAppConfig):
     # Simulation method
     default_simulation_method: str = Field("heuristic", alias="DEFAULT_SIMULATION_METHOD")
 
+    # CPU optimization: skip master/control-plane nodes for CPU deployments
+    skip_master_node_for_cpu: bool = Field(True, alias="SKIP_MASTER_NODE_FOR_CPU")
+
     # Bud Connect
     bud_connect_url: str = Field(..., alias="BUD_CONNECT_URL")
 

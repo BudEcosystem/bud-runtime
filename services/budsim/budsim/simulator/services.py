@@ -184,9 +184,9 @@ class SimulationService:
                     device_type = device["type"]
                     available_count = device["available_count"]
 
-                    # Skip master/control-plane nodes for CPU deployments only
+                    # Skip master/control-plane nodes for CPU deployments only (if configured)
                     device_type_lower = device_type.lower()
-                    if device_type_lower in ("cpu", "cpu_high"):
+                    if app_settings.skip_master_node_for_cpu and device_type_lower in ("cpu", "cpu_high"):
                         is_master = node.get("is_master", False)
                         if is_master:
                             logger.info(f"Skipping master node {node_name} for CPU deployment")
