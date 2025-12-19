@@ -79,7 +79,7 @@ k8s_ensure() {
 }
 
 helm_ensure() {
-	scid_config="$(mktemp budk8s_deploy.XXXXXXXXXXXXXXXX)"
+	scid_config="$(mktemp --suffix=.budk8sdeploy)"
 	cat <<-EOF >"$scid_config"
 		branch = "master"
 		repo_url = "https://github.com/BudEcosystem/bud-runtime.git"
