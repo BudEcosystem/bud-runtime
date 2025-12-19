@@ -7,6 +7,7 @@ storageClass: default
 accessMode: ReadWriteOnce
 deviceType: ""  # cpu_high, cuda, hpu - used for node affinity
 hardwareMode: "dedicated"  # dedicated or shared - used for pod affinity
+skipMasterNodeForCpu: true  # skip master/control-plane nodes for CPU deployments
 
 imagePullSecrets:
   name: bud-registry-secret

@@ -216,6 +216,7 @@ class DeploymentHandler:
             "volume_type": app_settings.volume_type,
             "model_name": namespace,
             "adapters": adapters,
+            "skipMasterNodeForCpu": app_settings.skip_master_node_for_cpu,
         }
 
         # Add storage class configuration if provided, otherwise fall back to default
@@ -361,11 +362,12 @@ class DeploymentHandler:
             supports_lora = node.get("supports_lora", False)
             if supports_lora:
                 # Use optimized max_loras from budsim if available, otherwise default to 5
-                max_loras = node.get("max_loras", 5)
+                # Note: node.get("max_loras", 5) doesn't work if max_loras is explicitly None
+                max_loras = node.get("max_loras") or 5
                 node["args"]["max-loras"] = max_loras
                 node["args"]["max-lora-rank"] = 256
                 node["args"]["enable-lora"] = True
-                source = "optimized by budsim" if "max_loras" in node else "default"
+                source = "optimized by budsim" if node.get("max_loras") else "default"
                 logger.info(f"LoRA enabled: max-loras={max_loras} ({source}), max-lora-rank=256")
 
             # Calculate max_model_len dynamically
@@ -788,6 +790,7 @@ api_key_location = "env::API_KEY"
             "volume_type": app_settings.volume_type,
             "deviceType": device_type,
             "hardwareMode": hardware_mode,
+            "skipMasterNodeForCpu": app_settings.skip_master_node_for_cpu,
         }
 
         # Add storage class configuration if provided
