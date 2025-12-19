@@ -3,12 +3,8 @@
 set -o xtrace
 set +o nounset
 
-bud_config_dir="${XDG_DATA_HOME:-$HOME/.config}/bud"
 bud_share_dir="$HOME/.local/share/bud"
 bud_override_yaml="$bud_share_dir/bud.override.yaml"
-
-bud_repo="https://github.com/BudEcosystem/bud-runtime.git"
-bud_repo_local="$bud_share_dir/bud-runtime"
 k3s_kubeconfig_path="/etc/rancher/k3s/k3s.yaml"
 
 print_usage() {
@@ -28,18 +24,6 @@ is_nixos() {
 }
 
 dir_ensure() {
-	if [ -d "$bud_repo_local" ]; then
-		output="$(git -C "$bud_repo_local" stash push)" || exit 1
-		git -C "$bud_repo_local" pull || exit 1
-
-		if ! echo "$output" | grep -q 'No local changes to save'; then
-			git -C "$bud_repo_local" stash pop || exit 1
-		fi
-	else
-		git clone "$bud_repo" "$bud_repo_local" || exit 1
-	fi
-
-	mkdir -p "$bud_config_dir"
 	mkdir -p "$bud_share_dir"
 }
 
