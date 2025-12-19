@@ -115,7 +115,7 @@ async def get_leaderboard_by_models(
 
 @leaderboard_router.get("/models-uris")
 async def get_leaderboard_by_model_uris(
-    model_uris: Annotated[List[str] | None, Query(description="List of model URIs to filter by")] = None,
+    model_uris: Annotated[List[str], Query(description="List of model URIs to filter by", default_factory=list)],
 ) -> Response:
     """Get the leaderboards for the given model URIs.
 
