@@ -2066,9 +2066,20 @@ class SimulationService:
             chat_template=getattr(template_result, "chat_template", None),
             supports_lora=getattr(template_result, "supports_lora", None),
             supports_pipeline_parallelism=getattr(template_result, "supports_pipeline_parallelism", None),
-            # Available CPU cores for cpu/cpu_high deployments (total - utilized)
+            # CPU cores for cpu/cpu_high deployments
+            # Shared mode: use total cores (pods burst to full capacity, K8s handles scheduling)
+            # Dedicated mode: subtract utilized cores to get truly available (min 1 core)
             cores=(
-                int(getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0))
+                (
+                    int(getattr(template_result, "cores", 0))
+                    if top_k_configs.get("hardware_mode", "dedicated") == "shared"
+                    else max(
+                        1,
+                        int(
+                            getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0)
+                        ),
+                    )
+                )
                 if template_result.device_type in ("cpu", "cpu_high") and getattr(template_result, "cores", None)
                 else None
             ),
@@ -2960,6 +2971,10 @@ class SimulationService:
         device_name = request.device_type
         device_model = None
         raw_name = None
+        # CPU-specific fields
+        device_cores = None
+        device_physical_cores = None
+        device_utilized_cores = None
 
         for node in cluster.get("nodes", []):
             node_name = node.get("name") or node.get("hostname")
@@ -2974,6 +2989,11 @@ class SimulationService:
                         device_name = device.get("name", request.device_type)
                         device_model = device.get("device_model")
                         raw_name = device.get("raw_name")
+                        # Extract CPU cores info for cpu/cpu_high devices
+                        if device_stored_type in ("cpu", "cpu_high"):
+                            device_cores = device.get("cores")
+                            device_physical_cores = device.get("physical_cores")
+                            device_utilized_cores = device.get("utilized_cores", 0.0)
                         break
                 if selected_device:
                     break
@@ -3056,11 +3076,43 @@ class SimulationService:
             "device_name": device_name,
         }
 
-        # 8. Create NodeGroupConfiguration
-        config_id = str(uuid.uuid4())
+        # 8. Determine hardware mode string
         hardware_mode_str = (
             request.hardware_mode.value if hasattr(request.hardware_mode, "value") else str(request.hardware_mode)
         )
+
+        # 9. Calculate CPU cores for cpu/cpu_high devices
+        available_cores = None
+        if device_type_lower in ("cpu", "cpu_high"):
+            # Priority: cores (threads) > physical_cores
+            total_cores = device_cores or device_physical_cores
+            if total_cores is not None:
+                if hardware_mode_str == "shared":
+                    # Shared mode: use total cores (each pod can burst to full capacity)
+                    # Don't subtract utilized cores - let K8s handle scheduling
+                    available_cores = int(total_cores)
+                    logger.info(
+                        f"CPU cores (shared mode): total={total_cores}, "
+                        f"setting cores={available_cores} (full capacity for bursting)"
+                    )
+                else:
+                    # Dedicated mode: subtract utilized cores to get truly available
+                    utilized = device_utilized_cores or 0.0
+                    available_cores = int(total_cores - utilized)
+                    # Ensure at least 1 core is available
+                    available_cores = max(1, available_cores)
+                    logger.info(
+                        f"CPU cores (dedicated mode): total={total_cores}, utilized={utilized:.1f}, "
+                        f"available={available_cores}"
+                    )
+            else:
+                logger.warning(
+                    f"No cores info found for {device_type_lower} device {device_name}. "
+                    "Deployment will use default core count."
+                )
+
+        # 10. Create NodeGroupConfiguration
+        config_id = str(uuid.uuid4())
 
         node_group = NodeGroupConfiguration(
             config_id=config_id,
@@ -3087,12 +3139,15 @@ class SimulationService:
             device_name=device_name,
             device_model=device_model,
             raw_name=raw_name,
+            # CPU cores for cpu/cpu_high deployments
+            cores=available_cores,
         )
 
         logger.info(
             f"Generated benchmark config: device={device_type_lower}, tp={request.tp_size}, "
             f"pp={request.pp_size}, replicas={request.replicas}, memory={total_memory_gb:.2f}GB, "
             f"weight_memory={estimated_weight_memory_gb:.2f}GB, kv_cache={kv_cache_memory_gb:.2f}GB"
+            + (f", cores={available_cores}" if available_cores else "")
         )
 
         return BenchmarkConfigResponse(
