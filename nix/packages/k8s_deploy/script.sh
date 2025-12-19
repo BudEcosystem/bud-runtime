@@ -92,9 +92,10 @@ helm_ensure() {
 	if [ ! -r "$bud_override_yaml" ]; then
 		curl "https://raw.githubusercontent.com/BudEcosystem/bud-runtime/refs/heads/master/infra/helm/bud/example.standalone.yaml" >"$bud_override_yaml"
 	fi
+	vim "$bud_override_yaml"
 
 	cd "$bud_share_dir" || return 1
-	SCID_CONFIG="$scid_config" scid
+	SCID_CONFIG="$scid_config" scid --force-re-run
 	cd - || return 1
 }
 
