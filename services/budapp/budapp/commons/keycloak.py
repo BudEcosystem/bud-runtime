@@ -139,8 +139,9 @@ class KeycloakManager:
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
             "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
-            "ssoSessionIdleTimeout": 3600,  # 1 hour in seconds
-            "ssoSessionMaxLifespan": 3600,  # 1 hour in seconds
+            "accessTokenLifespan": 1800,  # 30 minutes in seconds
+            "ssoSessionIdleTimeout": 86400,  # 24 hours in seconds
+            "ssoSessionMaxLifespan": 86400,  # 24 hours in seconds
             "offlineSessionIdleTimeout": 2592000,  # 30 days in seconds
             "offlineSessionMaxLifespan": 2592000,  # 30 days in seconds
         }
@@ -1084,7 +1085,12 @@ class KeycloakManager:
             raise
 
     async def authenticate_user(
-        self, username: str, password: str, realm_name: str, credentials: TenantClientSchema
+        self,
+        username: str,
+        password: str,
+        realm_name: str,
+        credentials: TenantClientSchema,
+        remember_me: bool = False,
     ) -> dict:
         """Authenticate a user and return access & refresh tokens.
 
@@ -1093,6 +1099,7 @@ class KeycloakManager:
             password: Password of the user to authenticate
             realm_name: Name of the realm to authenticate the user in
             credentials: Contains client_id and (optional) client_secret
+            remember_me: If True, request offline_access scope for 30-day sessions
 
         Returns:
             dict: Contains access_token, refresh_token, etc.
@@ -1115,13 +1122,17 @@ class KeycloakManager:
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
 
+            # Build scope based on remember_me setting
+            base_scope = "openid profile email roles"
+            scope = f"{base_scope} offline_access" if remember_me else base_scope
+
             # Log authentication attempt details (without sensitive info)
             logger.info(
                 f"Attempting Keycloak authentication: username={username}, realm={realm_name}, "
-                f"client_id={credentials.client_named_id}"
+                f"client_id={credentials.client_named_id}, remember_me={remember_me}"
             )
 
-            token = openid_client.token(username, password, scope="openid profile email roles")
+            token = openid_client.token(username, password, scope=scope)
             logger.info(f"Successfully authenticated user {username} in realm {realm_name}")
             return token
         except KeycloakAuthenticationError as e:
