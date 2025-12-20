@@ -495,7 +495,7 @@ export default function PromptsAgents() {
                   }
                 } catch (error) {
                   // Silently fail - new prompts won't have config saved yet
-                  console.debug('[OAuth] No saved config found for prompt, using localStorage data if available');
+                  // This is expected for new prompts that haven't been saved to backend
                 }
               }
 
