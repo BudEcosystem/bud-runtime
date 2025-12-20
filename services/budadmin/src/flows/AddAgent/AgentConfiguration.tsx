@@ -88,6 +88,10 @@ export default function AgentConfiguration() {
   // CRITICAL: Fetch workflow from URL agent ID if currentWorkflow is null
   // This handles the case when returning from OAuth and opening this step directly
   useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
     const fetchWorkflowFromUrl = async () => {
       // Only attempt once to prevent infinite loops
       if (hasAttemptedWorkflowFetch.current) return;
@@ -96,8 +100,7 @@ export default function AgentConfiguration() {
       if (currentWorkflow?.workflow_id) return;
 
       // Get agent ID from URL (this is the workflow ID)
-      const agentIdFromUrl = router.query.agent as string ||
-        (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('agent') : null);
+      const agentIdFromUrl = router.query.agent as string;
 
       if (!agentIdFromUrl) {
         return;
@@ -116,7 +119,7 @@ export default function AgentConfiguration() {
     };
 
     fetchWorkflowFromUrl();
-  }, [currentWorkflow?.workflow_id, router.query.agent, getWorkflow]);
+  }, [router.isReady, currentWorkflow?.workflow_id, router.query.agent, getWorkflow]);
 
   // Load workflow on component mount if it exists (refresh workflow data)
   useEffect(() => {
