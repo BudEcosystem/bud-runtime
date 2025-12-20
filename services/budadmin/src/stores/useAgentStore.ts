@@ -71,6 +71,10 @@ export interface AgentSession {
     topP?: number;
     stream?: boolean;
   };
+  // Schema and settings flags (persisted across OAuth redirects)
+  allowMultipleCalls?: boolean;
+  structuredInputEnabled?: boolean;
+  structuredOutputEnabled?: boolean;
 }
 
 interface AgentStore {

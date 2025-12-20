@@ -26,45 +26,7 @@ import { usePromptSchemaWorkflow } from "@/hooks/usePromptSchemaWorkflow";
 import { usePrompts } from "@/hooks/usePrompts";
 import { loadPromptForEditing } from "@/utils/promptHelpers";
 import { removePromptFromUrl } from "@/utils/urlUtils";
-
-// Schema interface for prompt config
-interface PromptSchema {
-  $defs?: {
-    Input?: { properties?: Record<string, { type?: string; title?: string; default?: string }> };
-    Output?: { properties?: Record<string, { type?: string; title?: string; default?: string }> };
-  };
-}
-
-// Helper to generate variable ID (defined outside component to avoid recreation)
-const generateVarId = () => `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-// Helper to parse schema properties into AgentVariable array
-const parseSchemaToVariables = (
-  schema: PromptSchema | null | undefined,
-  defKey: 'Input' | 'Output',
-  type: 'input' | 'output'
-): AgentVariable[] => {
-  try {
-    const properties = schema?.$defs?.[defKey]?.properties;
-    if (!properties || typeof properties !== 'object') return [];
-
-    const validDataTypes = ['string', 'number', 'boolean', 'object', 'array'] as const;
-    type DataType = typeof validDataTypes[number];
-
-    return Object.entries(properties).map(([name, prop]) => ({
-      id: generateVarId(),
-      name: name,
-      value: '',
-      type: type,
-      description: prop?.title || '',
-      dataType: (validDataTypes.includes(prop?.type as DataType) ? prop?.type : 'string') as DataType,
-      defaultValue: prop?.default || '',
-    }));
-  } catch (error) {
-    console.error("Failed to parse schema to variables:", error);
-    return [];
-  }
-};
+import { parseSchemaToVariables, generateVarId } from "@/utils/schemaParser";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -347,8 +309,9 @@ function AgentBoxInner({
   const [isSavingSystemPrompt, setIsSavingSystemPrompt] = useState(false);
   const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
-  const [structuredInputEnabled, setStructuredInputEnabled] = useState(false);
-  const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(false);
+  // Initialize from session for OAuth restoration, fallback to false
+  const [structuredInputEnabled, setStructuredInputEnabled] = useState(session?.structuredInputEnabled ?? false);
+  const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(session?.structuredOutputEnabled ?? false);
   const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
   const [setAsDefault, setSetAsDefault] = useState(editVersionData?.isDefault ?? false);
 
@@ -568,6 +531,22 @@ function AgentBoxInner({
 
   const handleLlmRetryLimitChange = (value: number) => {
     if (session) updateSession(session.id, { llm_retry_limit: value });
+  };
+
+  // Handler for allowMultipleCalls checkbox - syncs to session for OAuth persistence
+  const handleAllowMultipleCallsChange = (value: boolean) => {
+    if (session) updateSession(session.id, { allowMultipleCalls: value });
+  };
+
+  // Handlers for structured input/output toggles - syncs to session for OAuth persistence
+  const handleStructuredInputEnabledChange = (enabled: boolean) => {
+    setStructuredInputEnabled(enabled);
+    if (session) updateSession(session.id, { structuredInputEnabled: enabled });
+  };
+
+  const handleStructuredOutputEnabledChange = (enabled: boolean) => {
+    setStructuredOutputEnabled(enabled);
+    if (session) updateSession(session.id, { structuredOutputEnabled: enabled });
   };
 
   const handleStreamToggle = (checked: boolean) => {
@@ -976,7 +955,7 @@ function AgentBoxInner({
           : [],
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
-        allow_multiple_calls: true,
+        allow_multiple_calls: session.allowMultipleCalls ?? true,
         system_prompt_role: "system"
       };
 
@@ -1091,7 +1070,7 @@ function AgentBoxInner({
         messages: filteredMessages,
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
-        allow_multiple_calls: true,
+        allow_multiple_calls: session.allowMultipleCalls ?? true,
         system_prompt_role: "system"
       };
 
@@ -1502,8 +1481,8 @@ function AgentBoxInner({
             onAddOutputVariable={handleAddOutputVariable}
             onVariableChange={handleVariableChange}
             onDeleteVariable={handleDeleteVariable}
-            onStructuredInputEnabledChange={setStructuredInputEnabled}
-            onStructuredOutputEnabledChange={setStructuredOutputEnabled}
+            onStructuredInputEnabledChange={handleStructuredInputEnabledChange}
+            onStructuredOutputEnabledChange={handleStructuredOutputEnabledChange}
             structuredInputEnabled={structuredInputEnabled}
             structuredOutputEnabled={structuredOutputEnabled}
             onSystemPromptChange={handleSystemPromptChange}
@@ -1511,6 +1490,8 @@ function AgentBoxInner({
             localSystemPrompt={localSystemPrompt}
             localPromptMessages={localPromptMessages}
             onLlmRetryLimitChange={handleLlmRetryLimitChange}
+            allowMultipleCalls={session.allowMultipleCalls ?? false}
+            onAllowMultipleCallsChange={handleAllowMultipleCallsChange}
             onSavePromptSchema={handleSavePromptSchema}
             isSaving={isSaving}
             onSaveSystemPrompt={handleSaveSystemPrompt}

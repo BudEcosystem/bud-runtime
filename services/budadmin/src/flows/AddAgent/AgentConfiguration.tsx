@@ -2,8 +2,9 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useRouter } from "next/router";
 import { InputNumber, Switch } from "antd";
 import { errorToast } from "@/components/toast";
 import TextInput from "../components/TextInput";
@@ -19,8 +20,11 @@ import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 
 export default function AgentConfiguration() {
   const { openDrawerWithStep } = useDrawer();
+  const router = useRouter();
   const { form } = useContext(BudFormContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(false);
+  const hasAttemptedWorkflowFetch = useRef(false);
 
   // Use the Add Agent store for workflow management
   const {
@@ -81,7 +85,43 @@ export default function AgentConfiguration() {
     }
   }, [promptTags]);
 
-  // Load workflow on component mount if it exists
+  // CRITICAL: Fetch workflow from URL agent ID if currentWorkflow is null
+  // This handles the case when returning from OAuth and opening this step directly
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const fetchWorkflowFromUrl = async () => {
+      // Only attempt once to prevent infinite loops
+      if (hasAttemptedWorkflowFetch.current) return;
+
+      // Skip if we already have a workflow
+      if (currentWorkflow?.workflow_id) return;
+
+      // Get agent ID from URL (this is the workflow ID)
+      const agentIdFromUrl = router.query.agent as string;
+
+      if (!agentIdFromUrl) {
+        return;
+      }
+
+      hasAttemptedWorkflowFetch.current = true;
+      setIsLoadingWorkflow(true);
+
+      try {
+        await getWorkflow(agentIdFromUrl);
+      } catch (error) {
+        console.error('Error fetching workflow:', error);
+      } finally {
+        setIsLoadingWorkflow(false);
+      }
+    };
+
+    fetchWorkflowFromUrl();
+  }, [router.isReady, currentWorkflow?.workflow_id, router.query.agent, getWorkflow]);
+
+  // Load workflow on component mount if it exists (refresh workflow data)
   useEffect(() => {
     if (currentWorkflow?.workflow_id) {
       getWorkflow(currentWorkflow.workflow_id);
@@ -272,7 +312,7 @@ export default function AgentConfiguration() {
       onBack={handleBack}
       backText="Back"
       nextText="Next"
-      disableNext={isSubmitting}
+      disableNext={isSubmitting || isLoadingWorkflow}
     >
       <BudWraperBox>
         <BudDrawerLayout>

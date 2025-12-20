@@ -268,8 +268,6 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       // Mark as being processed
       oauthProcessedRef.current = true;
 
-      console.log('[Layout OAuth] Detected OAuth callback, restoring session');
-
       try {
         const {
           setEditMode,
@@ -313,14 +311,22 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           });
         }
 
-        // Open the agent drawer after a short delay to ensure state is set
-        requestAnimationFrame(() => {
-          openAgentDrawer();
-        });
+        // Get workflow next step from saved session data
+        // CRITICAL: If we have an agent ID in URL, we're in add-agent workflow
+        // Default to "add-agent-configuration" as the next step after AgentDrawer save
+        const urlParams = new URLSearchParams(window.location.search);
+        const agentIdFromUrl = urlParams.get('agent');
+        const savedWorkflowNextStep = savedSessionData?.workflowNextStep;
+        const workflowNextStep = savedWorkflowNextStep ||
+          (agentIdFromUrl ? "add-agent-configuration" : undefined);
 
-        console.log('[Layout OAuth] Session restored successfully');
+        // Open the agent drawer after a short delay to ensure state is set
+        // CRITICAL: Pass workflowNextStep to ensure the next step is triggered after save
+        requestAnimationFrame(() => {
+          openAgentDrawer(undefined, workflowNextStep);
+        });
       } catch (error) {
-        console.error('[Layout OAuth] Error restoring session:', error);
+        console.error('[Layout] Error restoring OAuth session:', error);
       }
     };
 

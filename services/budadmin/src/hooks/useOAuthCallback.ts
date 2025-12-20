@@ -7,6 +7,19 @@ const OAUTH_PROCESSED_KEY = 'oauth_callback_processed';
 const OAUTH_PROMPT_ID_KEY = 'oauth_original_prompt_id'; // Dedicated key for prompt ID preservation
 const OAUTH_SESSION_DATA_KEY = 'oauth_session_data'; // Dedicated key for session data preservation
 
+// Variable interface for schema persistence
+interface OAuthAgentVariable {
+  id: string;
+  name: string;
+  value: string;
+  type: "input" | "output";
+  description?: string;
+  dataType?: "string" | "number" | "boolean" | "array" | "object";
+  defaultValue?: string;
+  required?: boolean;
+  validation?: string;
+}
+
 export interface OAuthSessionData {
   modelId?: string;
   modelName?: string;
@@ -30,6 +43,27 @@ export interface OAuthSessionData {
     versionNumber: number;
     isDefault: boolean;
   } | null;
+
+  // Schema variables (to restore after OAuth)
+  inputVariables?: OAuthAgentVariable[];
+  outputVariables?: OAuthAgentVariable[];
+
+  // Session settings (to restore after OAuth)
+  llm_retry_limit?: number;
+  settings?: {
+    temperature?: number;
+    maxTokens?: number;
+    topP?: number;
+    stream?: boolean;
+  };
+
+  // Schema and settings flags (to restore after OAuth)
+  allowMultipleCalls?: boolean;
+  structuredInputEnabled?: boolean;
+  structuredOutputEnabled?: boolean;
+
+  // Workflow context for add-agent flow continuation after OAuth
+  workflowNextStep?: string;
 }
 
 export interface OAuthState {

@@ -520,7 +520,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
               // Get agent store state to preserve edit/add version modes across OAuth
               const agentStoreState = useAgentStore.getState();
 
-              // Build session data to restore after OAuth (includes agent mode flags)
+              // Build session data to restore after OAuth (includes agent mode flags and schema data)
               const sessionData: OAuthSessionData | undefined = currentSession ? {
                 modelId: currentSession.modelId,
                 modelName: currentSession.modelName,
@@ -535,6 +535,18 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 addVersionPromptId: agentStoreState.addVersionPromptId,
                 isEditVersionMode: agentStoreState.isEditVersionMode,
                 editVersionData: agentStoreState.editVersionData,
+                // Include schema variables for restoration after OAuth
+                inputVariables: currentSession.inputVariables,
+                outputVariables: currentSession.outputVariables,
+                // Include session settings for restoration after OAuth
+                llm_retry_limit: currentSession.llm_retry_limit,
+                settings: currentSession.settings,
+                // Include schema and settings flags for restoration after OAuth
+                allowMultipleCalls: currentSession.allowMultipleCalls,
+                structuredInputEnabled: currentSession.structuredInputEnabled,
+                structuredOutputEnabled: currentSession.structuredOutputEnabled,
+                // Include workflow context for add-agent flow continuation after OAuth
+                workflowNextStep: agentStoreState.workflowContext?.nextStep,
               } : undefined;
 
               // CRITICAL: Save prompt ID in dedicated localStorage key for reliable restoration
