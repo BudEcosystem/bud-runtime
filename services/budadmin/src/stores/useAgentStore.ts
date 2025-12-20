@@ -469,13 +469,6 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         const nextStep = workflowContext.nextStep;
         const isInWorkflow = workflowContext.isInWorkflow;
 
-        // Debug logging for workflow context
-        console.log('[AgentStore] closeAgentDrawer called with workflow context:', {
-          isInWorkflow,
-          nextStep,
-          workflowContext,
-        });
-
         // Base state to set when closing
         const baseState: Partial<AgentStore> = {
           isAgentDrawerOpen: false,
@@ -504,18 +497,14 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
         // If we're in a workflow and have a next step, trigger it after closing
         if (workflowContext.isInWorkflow && nextStep) {
-          console.log('[AgentStore] Triggering next step after save:', nextStep);
           // Use setTimeout to ensure the drawer closes before opening the next step
           setTimeout(() => {
             // Import useDrawer dynamically to avoid circular dependencies
             import('../hooks/useDrawer').then(({ useDrawer }) => {
               const { openDrawerWithStep } = useDrawer.getState();
-              console.log('[AgentStore] Calling openDrawerWithStep:', nextStep);
               openDrawerWithStep(nextStep);
             });
           }, 100);
-        } else {
-          console.log('[AgentStore] NOT triggering next step. isInWorkflow:', isInWorkflow, 'nextStep:', nextStep);
         }
       },
 

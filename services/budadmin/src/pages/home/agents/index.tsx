@@ -401,14 +401,6 @@ export default function PromptsAgents() {
       // The localStorage check is important because URL params might be cleaned up before this runs
       const isOAuthCallbackDetected = isOAuthCallbackFromUrl || !!savedPromptId || !!oauthState;
 
-      console.log('[OAuth] Detection check:', {
-        isOAuthCallbackFromUrl,
-        hasSavedPromptId: !!savedPromptId,
-        hasOAuthState: !!oauthState,
-        isOAuthCallbackDetected,
-        oauthProcessedRef: oauthProcessedRef.current,
-      });
-
       // Track whether OAuth was handled to determine if we should process agentId separately
       let oauthHandled = false;
 
@@ -416,7 +408,6 @@ export default function PromptsAgents() {
         // Check if layout has already handled OAuth (drawer is already open or transitioning)
         const { isAgentDrawerOpen, isTransitioningToAgentDrawer, sessions } = useAgentStore.getState();
         if (isAgentDrawerOpen || isTransitioningToAgentDrawer || sessions.length > 0) {
-          console.log('[OAuth] Session already restored by layout, skipping OAuth restoration');
           oauthProcessedRef.current = true;
           oauthHandled = true;
           // Don't return here - still need to process agentId if present
@@ -443,16 +434,6 @@ export default function PromptsAgents() {
               // PRIORITY: Use session data from dedicated localStorage (most reliable)
               // This includes model selection saved right before OAuth redirect
               const effectiveSessionData = savedSessionData || oauthState?.sessionData;
-
-              // Debug logging for OAuth restoration
-              console.log('[OAuth] Restoring session after redirect:', {
-                effectivePromptId,
-                effectiveAgentId,
-                hasSavedSessionData: !!savedSessionData,
-                hasOAuthStateSessionData: !!oauthState?.sessionData,
-                effectiveSessionData,
-                selectedDeployment: effectiveSessionData?.selectedDeployment,
-              });
 
               // CRITICAL: Restore session FIRST before opening any drawers
               // This ensures the session exists with correct prompt ID before AgentDrawer renders
@@ -510,7 +491,6 @@ export default function PromptsAgents() {
                     // Update session with schema data if any was found
                     if (Object.keys(sessionUpdates).length > 0) {
                       updateSession(effectivePromptId, sessionUpdates);
-                      console.log('[OAuth] Schema data restored from API:', sessionUpdates);
                     }
                   }
                 } catch (error) {
@@ -530,15 +510,6 @@ export default function PromptsAgents() {
               const workflowNextStep = savedWorkflowNextStep ||
                 (effectiveAgentId ? "add-agent-configuration" : undefined);
 
-              // Debug logging for OAuth workflow restoration
-              console.log('[OAuth] Restoring workflow context:', {
-                savedWorkflowNextStep,
-                workflowNextStep,
-                effectiveAgentId,
-                workflowId: oauthState?.workflowId,
-                effectiveSessionData,
-              });
-
               // IMPORTANT: We do NOT call openDrawer("add-agent") here because it would:
               // 1. Open at step 1 (SelectAgentType), which has a useEffect that resets workflowContext
               // 2. This would reset nextStep to null, breaking the workflow continuation
@@ -555,10 +526,6 @@ export default function PromptsAgents() {
               // Mark as processed
               hasProcessedUrlRef.current = true;
               oauthHandled = true;
-
-              // Session data in localStorage will be overwritten on next OAuth flow
-              // No need to clear it here - keeping it doesn't cause issues
-              console.log('[OAuth] Session restored successfully');
             }
           } catch (error) {
             console.error('Error restoring OAuth session:', error);

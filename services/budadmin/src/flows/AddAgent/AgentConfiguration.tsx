@@ -100,23 +100,16 @@ export default function AgentConfiguration() {
         (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('agent') : null);
 
       if (!agentIdFromUrl) {
-        console.log('[AgentConfiguration] No agent ID in URL, cannot fetch workflow');
         return;
       }
 
-      console.log('[AgentConfiguration] Fetching workflow from URL agent ID:', agentIdFromUrl);
       hasAttemptedWorkflowFetch.current = true;
       setIsLoadingWorkflow(true);
 
       try {
-        const workflow = await getWorkflow(agentIdFromUrl);
-        if (workflow) {
-          console.log('[AgentConfiguration] Workflow fetched successfully:', workflow.workflow_id);
-        } else {
-          console.error('[AgentConfiguration] Failed to fetch workflow');
-        }
+        await getWorkflow(agentIdFromUrl);
       } catch (error) {
-        console.error('[AgentConfiguration] Error fetching workflow:', error);
+        console.error('Error fetching workflow:', error);
       } finally {
         setIsLoadingWorkflow(false);
       }

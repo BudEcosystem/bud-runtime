@@ -549,13 +549,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 workflowNextStep: agentStoreState.workflowContext?.nextStep,
               } : undefined;
 
-              // Debug logging for OAuth state
-              console.log('[OAuth] Saving session data before redirect:', {
-                workflowNextStep: agentStoreState.workflowContext?.nextStep,
-                workflowContext: agentStoreState.workflowContext,
-                sessionData,
-              });
-
               // CRITICAL: Save prompt ID in dedicated localStorage key for reliable restoration
               if (promptId) {
                 saveOAuthPromptId(promptId);
