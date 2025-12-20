@@ -313,9 +313,25 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           });
         }
 
+        // Get workflow next step from saved session data
+        // CRITICAL: If we have an agent ID in URL, we're in add-agent workflow
+        // Default to "add-agent-configuration" as the next step after AgentDrawer save
+        const urlParams = new URLSearchParams(window.location.search);
+        const agentIdFromUrl = urlParams.get('agent');
+        const savedWorkflowNextStep = savedSessionData?.workflowNextStep;
+        const workflowNextStep = savedWorkflowNextStep ||
+          (agentIdFromUrl ? "add-agent-configuration" : undefined);
+
+        console.log('[Layout OAuth] Workflow context:', {
+          savedWorkflowNextStep,
+          workflowNextStep,
+          agentIdFromUrl,
+        });
+
         // Open the agent drawer after a short delay to ensure state is set
+        // CRITICAL: Pass workflowNextStep to ensure the next step is triggered after save
         requestAnimationFrame(() => {
-          openAgentDrawer();
+          openAgentDrawer(undefined, workflowNextStep);
         });
 
         console.log('[Layout OAuth] Session restored successfully');

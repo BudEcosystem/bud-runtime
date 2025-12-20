@@ -38,6 +38,7 @@ import { useOAuthCallback, getOAuthState, isOAuthCallback as checkIsOAuthCallbac
 import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
+import { parseSchemaToVariables } from "@/utils/schemaParser";
 
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
@@ -463,24 +464,93 @@ export default function PromptsAgents() {
                 promptMessages: effectiveSessionData?.promptMessages,
                 selectedDeployment: effectiveSessionData?.selectedDeployment,
                 workflowId: oauthState?.workflowId,
+                // Restore schema variables from OAuth session data
+                inputVariables: effectiveSessionData?.inputVariables,
+                outputVariables: effectiveSessionData?.outputVariables,
+                // Restore session settings from OAuth session data
+                llm_retry_limit: effectiveSessionData?.llm_retry_limit,
+                settings: effectiveSessionData?.settings,
+                // Restore schema and settings flags from OAuth session data
+                allowMultipleCalls: effectiveSessionData?.allowMultipleCalls,
+                structuredInputEnabled: effectiveSessionData?.structuredInputEnabled,
+                structuredOutputEnabled: effectiveSessionData?.structuredOutputEnabled,
               });
 
-              // Fetch workflow details if we have an agent ID (from OAuth state)
-              if (effectiveAgentId) {
-                const workflowResponse = await AppRequest.Get(
-                  `${tempApiBaseUrl}/workflows/${effectiveAgentId}`
-                );
+              // IMPORTANT: Fetch schema data from backend API to ensure input/output variables are restored
+              // This is more reliable than localStorage for complex nested objects
+              const promptName = effectiveSessionData?.name;
+              if (promptName) {
+                try {
+                  const configResponse = await AppRequest.Get(
+                    `${tempApiBaseUrl}/prompts/prompt-config/${promptName}`
+                  );
 
-                if (workflowResponse?.data) {
-                  // Open the add agent drawer
-                  openDrawer("add-agent");
+                  if (configResponse?.data) {
+                    const configData = configResponse.data;
+                    const sessionUpdates: Record<string, unknown> = {};
+
+                    // Parse and update input schema variables
+                    if (configData.input_schema) {
+                      const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
+                      if (inputVars.length > 0) {
+                        sessionUpdates.inputVariables = inputVars;
+                        sessionUpdates.structuredInputEnabled = true;
+                      }
+                    }
+
+                    // Parse and update output schema variables
+                    if (configData.output_schema) {
+                      const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
+                      if (outputVars.length > 0) {
+                        sessionUpdates.outputVariables = outputVars;
+                        sessionUpdates.structuredOutputEnabled = true;
+                      }
+                    }
+
+                    // Update session with schema data if any was found
+                    if (Object.keys(sessionUpdates).length > 0) {
+                      updateSession(effectivePromptId, sessionUpdates);
+                      console.log('[OAuth] Schema data restored from API:', sessionUpdates);
+                    }
+                  }
+                } catch (error) {
+                  // Silently fail - new prompts won't have config saved yet
+                  console.debug('[OAuth] No saved config found for prompt, using localStorage data if available');
                 }
               }
 
-              // Open the agent drawer AFTER session is restored
-              requestAnimationFrame(() => {
-                openAgentDrawer();
+              // Get the workflow next step from OAuth session data
+              // CRITICAL FALLBACK: If we have an agentId (workflow ID), we're in the add-agent flow.
+              // The next step after AgentDrawer should be "add-agent-configuration".
+              // We use effectiveSessionData?.workflowNextStep if available, otherwise fallback.
+              const savedWorkflowNextStep = effectiveSessionData?.workflowNextStep;
+
+              // ROBUST FALLBACK: If agentId exists (we're in add-agent workflow),
+              // default to "add-agent-configuration" as the next step
+              const workflowNextStep = savedWorkflowNextStep ||
+                (effectiveAgentId ? "add-agent-configuration" : undefined);
+
+              // Debug logging for OAuth workflow restoration
+              console.log('[OAuth] Restoring workflow context:', {
+                savedWorkflowNextStep,
+                workflowNextStep,
+                effectiveAgentId,
+                workflowId: oauthState?.workflowId,
+                effectiveSessionData,
               });
+
+              // IMPORTANT: We do NOT call openDrawer("add-agent") here because it would:
+              // 1. Open at step 1 (SelectAgentType), which has a useEffect that resets workflowContext
+              // 2. This would reset nextStep to null, breaking the workflow continuation
+              // Instead, we just open the AgentDrawer with the correct workflowContext.
+              // When the user saves, closeAgentDrawer will call openDrawerWithStep(nextStep)
+              // which will open the workflow drawer at the correct step.
+
+              // Open the agent drawer synchronously with the workflow context
+              // Using setTimeout with 0 to ensure state updates have settled
+              setTimeout(() => {
+                openAgentDrawer(oauthState?.workflowId, workflowNextStep);
+              }, 0);
 
               // Mark as processed
               hasProcessedUrlRef.current = true;
