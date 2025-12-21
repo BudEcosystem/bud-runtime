@@ -4,6 +4,7 @@ from uuid import UUID
 from budmicroframe.commons.schemas import CloudEventBase
 from pydantic import BaseModel, Field
 
+
 # Maximum benchmark name length to ensure Kubernetes namespace stays within 63 char limit
 # Namespace format: bud-{cleaned_name}-{uuid8} = 4 + name + 1 + 8 = name max 50 chars
 MAX_BENCHMARK_NAME_LENGTH = 50

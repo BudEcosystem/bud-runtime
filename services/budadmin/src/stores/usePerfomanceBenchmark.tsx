@@ -482,23 +482,24 @@ export const usePerfomanceBenchmark = create<{
     } catch (error: any) {
       console.error("Error creating benchmark:", error);
       // Handle validation errors from API (Pydantic 422 errors)
-      if (error?.response?.data?.detail) {
-        const details = error.response.data.detail;
-        if (Array.isArray(details)) {
-          const messages = details.map((d: any) => d.msg || d.message).join(", ");
-          errorToast(messages || "Validation error");
-        } else if (typeof details === "string") {
-          errorToast(details);
+      let errorMessage = "Failed to create benchmark";
+      const detail = error?.response?.data?.detail;
+
+      if (detail) {
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((d: any) => d.msg || d.message).join(", ") || "Validation error";
+        } else if (typeof detail === "string") {
+          errorMessage = detail;
         } else {
-          errorToast("Validation error");
+          errorMessage = "Validation error";
         }
       } else if (error?.response?.data?.message) {
-        errorToast(error.response.data.message);
+        errorMessage = error.response.data.message;
       } else if (error?.message) {
-        errorToast(error.message);
-      } else {
-        errorToast("Failed to create benchmark");
+        errorMessage = error.message;
       }
+
+      errorToast(errorMessage);
       return null;
     } finally {
       get().setLoading(false);

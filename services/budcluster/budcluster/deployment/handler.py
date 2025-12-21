@@ -72,8 +72,9 @@ class DeploymentHandler:
         # Reserved: "bud-" (4) + "-" (1) + unique_id (8) = 13 characters
         # Max cleaned_name length: 63 - 13 = 50 characters
         max_name_length = 50
-        if len(cleaned_name) > max_name_length:
-            cleaned_name = cleaned_name[:max_name_length].rstrip("-")
+        cleaned_name = cleaned_name[:max_name_length].rstrip("-")
+        if not cleaned_name:
+            cleaned_name = "benchmark"
         return f"bud-{cleaned_name}-{unique_id}"
 
     def _get_cpu_affinity(self, tp_size: int):

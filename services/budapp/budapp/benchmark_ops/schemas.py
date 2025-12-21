@@ -10,6 +10,7 @@ from budapp.commons.schemas import PaginatedSuccessResponse
 from ..cluster_ops.schemas import ClusterResponse
 from ..model_ops.schemas import ModelResponse
 
+
 # Maximum benchmark name length to ensure Kubernetes namespace stays within 63 char limit
 # Namespace format: bud-{cleaned_name}-{uuid8} = 4 + name + 1 + 8 = name max 50 chars
 MAX_BENCHMARK_NAME_LENGTH = 50
