@@ -2,14 +2,18 @@ from typing import Any, Literal, Optional
 from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# Maximum benchmark name length to ensure Kubernetes namespace stays within 63 char limit
+# Namespace format: bud-{cleaned_name}-{uuid8} = 4 + name + 1 + 8 = name max 50 chars
+MAX_BENCHMARK_NAME_LENGTH = 50
 
 
 class RunBenchmarkRequest(CloudEventBase):
     """Request body for running a benchmark."""
 
     benchmark_id: UUID
-    name: str
+    name: str = Field(..., max_length=MAX_BENCHMARK_NAME_LENGTH)
     tags: Optional[list[dict[str, str]]] = None
     description: str
     concurrent_requests: int

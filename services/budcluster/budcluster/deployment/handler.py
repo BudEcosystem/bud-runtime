@@ -63,9 +63,17 @@ class DeploymentHandler:
     def _get_namespace(self, endpoint_name: str):
         # Generates a unique 8-character identifier
         unique_id = uuid.uuid4().hex[:8]
-        # Clean the enpoint name by replacing non-alphanumeric characters with hyphens
+        # Clean the endpoint name by replacing non-alphanumeric characters with hyphens
         cleaned_name = re.sub(r"[^a-zA-Z0-9-]", "-", endpoint_name).lower()
-        # return "llama-test-f94b"
+        # Remove consecutive hyphens
+        cleaned_name = re.sub(r"-+", "-", cleaned_name).strip("-")
+        # Kubernetes namespace limit is 63 characters
+        # Format: bud-{cleaned_name}-{unique_id}
+        # Reserved: "bud-" (4) + "-" (1) + unique_id (8) = 13 characters
+        # Max cleaned_name length: 63 - 13 = 50 characters
+        max_name_length = 50
+        if len(cleaned_name) > max_name_length:
+            cleaned_name = cleaned_name[:max_name_length].rstrip("-")
         return f"bud-{cleaned_name}-{unique_id}"
 
     def _get_cpu_affinity(self, tp_size: int):
