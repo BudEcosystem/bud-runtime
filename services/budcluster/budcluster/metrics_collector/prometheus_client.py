@@ -13,7 +13,7 @@ from kubernetes.client.exceptions import ApiException
 from ..cluster_ops.kubernetes import KubernetesHandler
 from ..commons.config import app_settings
 from ..commons.exceptions import KubernetesException
-from ..commons.metrics_config import get_hami_scheduler_port, is_hami_metrics_enabled
+from ..commons.metrics_config import get_hami_device_plugin_port, get_hami_scheduler_port, is_hami_metrics_enabled
 from .schemas import Metric, MetricSample, PrometheusQueryResult
 
 
@@ -318,5 +318,100 @@ class PrometheusClient:
             # Handle missing HAMI service gracefully
             if "not found" in str(e):
                 logger.warning(f"HAMI scheduler service not available: {e}")
+                return None
+            raise
+
+    @asynccontextmanager
+    async def _create_hami_device_plugin_port_forward(self) -> AsyncGenerator[int, None]:
+        """Create a port-forward to the HAMI device plugin monitor service.
+
+        The device plugin monitor provides per-container metrics like:
+        - vGPU_device_memory_limit_in_bytes: Memory limit per container
+        - vGPU_device_memory_usage_in_bytes: Actual memory usage per container
+
+        Yields:
+            Local port number where HAMI device plugin metrics are accessible
+
+        Raises:
+            KubernetesException: If HAMI device plugin service not found or port-forward fails
+        """
+        device_plugin_service = "hami-device-plugin-monitor"
+        hami_namespace = "kube-system"
+
+        try:
+            v1 = client.CoreV1Api(api_client=self.k8s_handler.api_client)
+            service = v1.read_namespaced_service(name=device_plugin_service, namespace=hami_namespace)
+        except ApiException as e:
+            if e.status == 404:
+                raise KubernetesException(
+                    f"HAMI device plugin service {device_plugin_service} not found in namespace {hami_namespace}. "
+                    "HAMI may not be installed on this cluster."
+                ) from e
+            raise KubernetesException(f"Failed to get HAMI device plugin service: {e}") from e
+
+        # Find the service port that corresponds to the configured NodePort
+        device_plugin_nodeport = get_hami_device_plugin_port()  # Default: 31992
+        service_port = None
+
+        for port in service.spec.ports:
+            if port.node_port == device_plugin_nodeport:
+                service_port = port.port
+                break
+
+        if not service_port:
+            available_ports = [(p.port, p.node_port) for p in service.spec.ports]
+            raise KubernetesException(
+                f"HAMI device plugin service does not expose NodePort {device_plugin_nodeport}. "
+                f"Available ports: {available_ports}"
+            )
+
+        # Delegate port-forwarding to KubernetesHandler
+        async with self.k8s_handler.create_port_forward(
+            service_name=device_plugin_service,
+            namespace=hami_namespace,
+            target_port=service_port,
+            label="HAMI-DevicePlugin",
+        ) as local_port:
+            yield local_port
+
+    async def get_hami_device_plugin_metrics(self) -> Optional[str]:
+        """Get HAMI device plugin metrics with per-container memory limit and usage.
+
+        This provides more accurate memory metrics than the scheduler:
+        - vGPU_device_memory_limit_in_bytes: Per-container memory limit
+        - vGPU_device_memory_usage_in_bytes: Actual per-container memory usage
+
+        Returns:
+            Raw Prometheus metrics text from HAMI device plugin, or None if not available
+
+        Raises:
+            KubernetesException: If HAMI device plugin service not found or port-forward fails
+        """
+        if not is_hami_metrics_enabled():
+            logger.debug("HAMI metrics collection is disabled")
+            return None
+
+        try:
+            async with self._create_hami_device_plugin_port_forward() as local_port:
+                metrics_url = f"http://localhost:{local_port}/metrics"
+                logger.info(f"Scraping HAMI device plugin metrics from {metrics_url}")
+
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.get(
+                            metrics_url, timeout=aiohttp.ClientTimeout(total=self.timeout)
+                        ) as response:
+                            response.raise_for_status()
+                            metrics_text = await response.text()
+                            logger.info(f"Successfully scraped {len(metrics_text)} bytes of HAMI device plugin metrics")
+                            return metrics_text
+                    except aiohttp.ClientError as e:
+                        logger.error(f"Failed to scrape HAMI device plugin metrics from {metrics_url}: {e}")
+                        raise
+
+        except KubernetesException as e:
+            # Handle missing device plugin service gracefully
+            if "not found" in str(e):
+                logger.warning(f"HAMI device plugin service not available: {e}")
                 return None
             raise

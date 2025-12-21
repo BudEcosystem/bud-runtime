@@ -217,6 +217,25 @@ def get_hami_scheduler_port() -> int:
         return 31993
 
 
+def get_hami_device_plugin_port() -> int:
+    """Get the HAMI device plugin monitor port for metrics scraping.
+
+    The device plugin provides per-container memory limit and usage metrics
+    (vGPU_device_memory_limit_in_bytes, vGPU_device_memory_usage_in_bytes).
+
+    Returns:
+        Port number for HAMI device plugin metrics endpoint (default: 31992)
+
+    Example:
+        >>> get_hami_device_plugin_port()
+        31992
+    """
+    try:
+        return int(os.getenv("HAMI_DEVICE_PLUGIN_PORT", "31992"))
+    except ValueError:
+        return 31992
+
+
 def get_queries_with_hami(base_queries: List[str]) -> List[str]:
     """Get queries with HAMI metrics added if enabled.
 
@@ -234,3 +253,37 @@ def get_queries_with_hami(base_queries: List[str]) -> List[str]:
     if is_hami_metrics_enabled():
         return base_queries + QUERY_CATEGORIES["hami_gpu"]
     return base_queries
+
+
+def is_dcgm_metrics_enabled() -> bool:
+    """Check if DCGM GPU metrics collection is enabled.
+
+    DCGM metrics provide hardware-level GPU data like temperature, power,
+    and actual utilization (as opposed to HAMI which provides scheduling data).
+
+    Returns:
+        True if DCGM metrics are enabled, False otherwise
+
+    Example:
+        >>> is_dcgm_metrics_enabled()  # Returns based on env var
+        True
+    """
+    return os.getenv("ENABLE_DCGM_METRICS", "true").lower() == "true"
+
+
+def get_dcgm_exporter_config() -> Dict[str, str]:
+    """Get DCGM Exporter configuration for metrics scraping.
+
+    Returns:
+        Dict with namespace, service name, and port for DCGM Exporter
+
+    Example:
+        >>> config = get_dcgm_exporter_config()
+        >>> config["namespace"]
+        'gpu-operator'
+    """
+    return {
+        "namespace": os.getenv("DCGM_EXPORTER_NAMESPACE", "gpu-operator"),
+        "service": os.getenv("DCGM_EXPORTER_SERVICE", "nvidia-dcgm-exporter"),
+        "port": os.getenv("DCGM_EXPORTER_PORT", "9400"),
+    }

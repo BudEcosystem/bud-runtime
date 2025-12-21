@@ -841,10 +841,11 @@ class ClusterService(SessionMixin):
                 device_type = device.get("type", "").lower()
 
                 # Increment the appropriate counter
-                if device_type == "cpu":
+                # Device types from budcluster: "cpu", "cpu_high", "cuda", "gpu", "hpu"
+                if device_type in ("cpu", "cpu_high"):
                     cpu_count += 1
                     cpu_total_workers += worker_count
-                elif device_type == "gpu":
+                elif device_type in ("gpu", "cuda"):
                     gpu_count += 1
                     gpu_total_workers += worker_count
                 elif device_type == "hpu":
@@ -1797,10 +1798,16 @@ class ClusterService(SessionMixin):
                 }
 
                 # Add GPU field if node has GPUs
-                gpu_count = node_info.get("gpu_count", 0)
+                # Use GPU data from budmetrics (DCGM-based utilization) if available
+                # Falls back to budcluster's hardware_info for GPU count
+                metrics_gpu_count = node_metric.get("gpu_count", 0)
+                hardware_gpu_count = node_info.get("gpu_count", 0)
+                gpu_count = metrics_gpu_count if metrics_gpu_count > 0 else hardware_gpu_count
                 if gpu_count > 0:
+                    # GPU utilization from budmetrics (DCGM_FI_PROF_GR_ENGINE_ACTIVE)
+                    gpu_utilization = node_metric.get("gpu_utilization_percent", 0)
                     node_response["gpu"] = {
-                        "current": 0,  # No usage data available from hardware_info
+                        "current": round(gpu_utilization, 2),
                         "capacity": gpu_count,
                     }
 

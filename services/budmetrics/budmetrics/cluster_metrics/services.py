@@ -20,21 +20,30 @@ from .schemas import (
     BudAppNetworkOutMetrics,
     BudAppNodeMetrics,
     BudAppStorageMetrics,
+    ClusterGPUMetricsResponse,
+    ClusterGPUSummary,
     ClusterHealthStatus,
     ClusterMetricsQuery,
     ClusterMetricsResponse,
     ClusterResourceSummary,
+    GPUDeviceResponse,
     GPUMetricsResponse,
     GPUMetricsSummary,
+    GPUTimeSeriesResponse,
+    HAMISliceResponse,
     MetricsAggregationRequest,
     MetricsAggregationResponse,
     MetricsTimeSeries,
     NetworkTimeSeriesPoint,
+    NodeGPUMetricsResponse,
+    NodeGPUSummary,
+    NodeGPUSummaryItem,
     NodeMetricsResponse,
     NodeMetricsSummary,
     PodMetricsResponse,
     PodMetricsSummary,
     PrometheusCompatibleMetricsResponse,
+    SliceActivityItem,
     TimeSeriesPoint,
 )
 
@@ -120,11 +129,43 @@ class ClusterMetricsService:
             NodeMetricsResponse with node metrics and time series data
         """
         # Execute queries in parallel for better performance
-        result, timeseries_result, cluster_name = await asyncio.gather(
+        result, timeseries_result, gpu_result, cluster_name = await asyncio.gather(
             self.repository.get_node_metrics(cluster_id, from_time, to_time),
             self.repository.get_node_network_timeseries(cluster_id, from_time, to_time),
+            self.repository.get_node_gpu_metrics(cluster_id),
             self.repository.get_cluster_name(cluster_id, "NodeMetrics"),
         )
+
+        # Build GPU metrics per node
+        # (node_name, gpu_count, avg_gpu_utilization_percent, avg_memory_utilization_percent)
+        # Note: HAMIGPUMetrics uses hostname (e.g., "netweb") while NodeMetrics uses IP (e.g., "172.20.20.31")
+        # We store by hostname and also compute cluster-level aggregates for fallback
+        node_gpu_metrics: Dict[str, Dict[str, float]] = {}
+        cluster_gpu_totals = {"gpu_count": 0, "gpu_util_sum": 0.0, "mem_util_sum": 0.0, "node_count": 0}
+        for row in gpu_result:
+            node_name = row[0]
+            gpu_count = int(row[1] or 0)
+            gpu_util = float(row[2] or 0)
+            mem_util = float(row[3] or 0)
+            node_gpu_metrics[node_name] = {
+                "gpu_count": gpu_count,
+                "gpu_utilization_percent": gpu_util,
+                "gpu_memory_utilization_percent": mem_util,
+            }
+            # Aggregate for cluster-level fallback
+            cluster_gpu_totals["gpu_count"] += gpu_count
+            cluster_gpu_totals["gpu_util_sum"] += gpu_util * gpu_count
+            cluster_gpu_totals["mem_util_sum"] += mem_util * gpu_count
+            cluster_gpu_totals["node_count"] += 1
+
+        # Compute cluster-level averages for fallback when node names don't match
+        cluster_gpu_avg = {}
+        if cluster_gpu_totals["gpu_count"] > 0:
+            cluster_gpu_avg = {
+                "gpu_count": cluster_gpu_totals["gpu_count"],
+                "gpu_utilization_percent": cluster_gpu_totals["gpu_util_sum"] / cluster_gpu_totals["gpu_count"],
+                "gpu_memory_utilization_percent": cluster_gpu_totals["mem_util_sum"] / cluster_gpu_totals["gpu_count"],
+            }
 
         # Build time series data per node
         node_timeseries: Dict[str, List[NetworkTimeSeriesPoint]] = {}
@@ -140,10 +181,13 @@ class ClusterMetricsService:
 
             node_timeseries[node_name].append(NetworkTimeSeriesPoint(timestamp=timestamp, mbps=mbps))
 
-        # Build node metrics with time series
+        # Build node metrics with time series and GPU data
         nodes = []
         for row in result:
             node_name = row[0]
+            # Try exact match first, then fallback to cluster-level GPU data
+            # (HAMIGPUMetrics uses hostname while NodeMetrics uses IP)
+            gpu_data = node_gpu_metrics.get(node_name) or cluster_gpu_avg
             nodes.append(
                 NodeMetricsSummary(
                     node_name=node_name,
@@ -161,6 +205,9 @@ class ClusterMetricsService:
                     network_receive_bytes_per_sec=row[12],
                     network_transmit_bytes_per_sec=row[13],
                     network_bandwidth_time_series=node_timeseries.get(node_name, []),
+                    gpu_count=gpu_data.get("gpu_count", 0),
+                    gpu_utilization_percent=gpu_data.get("gpu_utilization_percent", 0.0),
+                    gpu_memory_utilization_percent=gpu_data.get("gpu_memory_utilization_percent", 0.0),
                     timestamp=row[14],
                 )
             )
@@ -991,3 +1038,415 @@ class ClusterMetricsService:
             )
 
         return events
+
+    # ============ HAMI GPU Metrics methods ============
+
+    async def get_cluster_hami_gpu_metrics(
+        self,
+        cluster_id: str,
+    ) -> ClusterGPUMetricsResponse:
+        """Get cluster-wide HAMI GPU metrics.
+
+        Args:
+            cluster_id: Cluster identifier
+
+        Returns:
+            ClusterGPUMetricsResponse with devices, slices, and summary
+        """
+        # Execute queries in parallel
+        devices_result, slices_result = await asyncio.gather(
+            self.repository.get_cluster_hami_gpu_devices(cluster_id),
+            self.repository.get_cluster_hami_gpu_slices(cluster_id),
+        )
+
+        # Process slices first to calculate per-device utilization from HAMI
+        # (needed because DCGM may show 0% even when GPU is active in time-slicing mode)
+        slices = []
+        device_slice_utils: Dict[str, list] = {}  # device_uuid -> list of slice utilizations
+        nodes_summary: Dict[str, dict] = {}
+        for row in slices_result:
+            memory_limit_bytes = int(row[6] or 0)
+            memory_used_bytes = int(row[7] or 0)
+            memory_utilization = 0.0
+            if memory_limit_bytes > 0:
+                memory_utilization = (memory_used_bytes / memory_limit_bytes) * 100
+
+            slice_item = HAMISliceResponse(
+                pod_name=row[0],
+                pod_namespace=row[1],
+                container_name=row[2] or "",
+                device_uuid=row[3],
+                device_index=row[4],
+                node_name=row[5],
+                memory_limit_bytes=memory_limit_bytes,
+                memory_limit_gb=memory_limit_bytes / (1024**3),
+                memory_used_bytes=memory_used_bytes,
+                memory_used_gb=memory_used_bytes / (1024**3),
+                memory_utilization_percent=memory_utilization,
+                core_limit_percent=float(row[8] or 0),
+                core_used_percent=float(row[9] or 0),
+                gpu_utilization_percent=float(row[10] or 0),
+                status=row[11] or "unknown",
+            )
+            slices.append(slice_item)
+
+            # Track slice utilization per device and per node
+            device_uuid = row[3]
+            node_name = row[5]
+            if row[11] == "running":
+                # Track per-device utilization for device-level aggregation
+                if device_uuid not in device_slice_utils:
+                    device_slice_utils[device_uuid] = []
+                slice_util = float(row[10] or 0)
+                if slice_util > 0:
+                    device_slice_utils[device_uuid].append(slice_util)
+
+                # Track per-node for node summary
+                if node_name in nodes_summary:
+                    nodes_summary[node_name]["active_slices"] += 1
+                    nodes_summary[node_name]["slice_utils"].append(slice_util)
+
+        # Process devices with HAMI-based utilization fallback
+        devices = []
+        for row in devices_result:
+            device_uuid = row[0]
+            node_name = row[3]
+            # DCGM hardware metrics
+            dcgm_gpu_util = float(row[14]) if len(row) > 14 and row[14] is not None else None
+
+            # Use HAMI slice utilization if DCGM shows 0 but slices are active
+            slice_utils = device_slice_utils.get(device_uuid, [])
+            hami_gpu_util = max(slice_utils) if slice_utils else 0
+            gpu_util = hami_gpu_util if (dcgm_gpu_util == 0 or dcgm_gpu_util is None) and hami_gpu_util > 0 else dcgm_gpu_util
+
+            device = GPUDeviceResponse(
+                device_uuid=device_uuid,
+                device_index=row[1],
+                device_type=row[2] or "Unknown",
+                node_name=node_name,
+                total_memory_gb=float(row[4] or 0),
+                memory_allocated_gb=float(row[5] or 0),
+                memory_utilization_percent=float(row[6] or 0),
+                core_utilization_percent=float(row[7] or 0),
+                cores_allocated_percent=float(row[8] or 0),
+                shared_containers_count=int(row[9] or 0),
+                hardware_mode=row[10] or "unknown",
+                last_metrics_update=row[11],
+                temperature_celsius=float(row[12]) if len(row) > 12 and row[12] is not None else None,
+                power_watts=float(row[13]) if len(row) > 13 and row[13] is not None else None,
+                gpu_utilization_percent=gpu_util,
+            )
+            devices.append(device)
+
+            # Build node summary structure
+            if node_name not in nodes_summary:
+                nodes_summary[node_name] = {
+                    "gpu_count": 0,
+                    "total_memory_gb": 0,
+                    "allocated_memory_gb": 0,
+                    "active_slices": 0,
+                    "slice_utils": [],
+                }
+            nodes_summary[node_name]["gpu_count"] += 1
+            nodes_summary[node_name]["total_memory_gb"] += float(row[4] or 0)
+            nodes_summary[node_name]["allocated_memory_gb"] += float(row[5] or 0)
+
+        # Build node summary items
+        node_items = []
+        for node_name, summary in nodes_summary.items():
+            gpu_count = summary["gpu_count"]
+            total_mem = summary["total_memory_gb"]
+            allocated_mem = summary["allocated_memory_gb"]
+            slice_utils = summary["slice_utils"]
+
+            # Use HAMI slice utilization for consistency
+            # Only average non-zero slices (active workloads)
+            non_zero_slice_utils = [u for u in slice_utils if u > 0]
+            avg_util = sum(non_zero_slice_utils) / len(non_zero_slice_utils) if non_zero_slice_utils else 0
+
+            node_items.append(
+                NodeGPUSummaryItem(
+                    node_name=node_name,
+                    gpu_count=gpu_count,
+                    total_memory_gb=total_mem,
+                    allocated_memory_gb=allocated_mem,
+                    memory_utilization_percent=(allocated_mem / total_mem * 100) if total_mem > 0 else 0,
+                    avg_gpu_utilization_percent=avg_util,
+                    active_slices=summary["active_slices"],
+                )
+            )
+
+        # Build cluster summary
+        total_gpus = len(devices)
+        total_memory = sum(d.total_memory_gb for d in devices)
+        allocated_memory = sum(d.memory_allocated_gb for d in devices)
+        total_slices = len(slices)
+        active_slices = sum(1 for s in slices if s.status == "running")
+
+        # Calculate average GPU utilization using HAMI slice values for consistency
+        # Only average non-zero running slices (active workloads)
+        running_slices_util = [s.gpu_utilization_percent for s in slices if s.status == "running"]
+        non_zero_slice_utils = [u for u in running_slices_util if u > 0]
+        avg_utilization = sum(non_zero_slice_utils) / len(non_zero_slice_utils) if non_zero_slice_utils else 0
+
+        cluster_summary = ClusterGPUSummary(
+            total_gpus=total_gpus,
+            total_memory_gb=total_memory,
+            allocated_memory_gb=allocated_memory,
+            available_memory_gb=total_memory - allocated_memory,
+            memory_utilization_percent=(allocated_memory / total_memory * 100) if total_memory > 0 else 0,
+            avg_gpu_utilization_percent=avg_utilization,
+            total_slices=total_slices,
+            active_slices=active_slices,
+        )
+
+        return ClusterGPUMetricsResponse(
+            cluster_id=cluster_id,
+            timestamp=datetime.utcnow(),
+            summary=cluster_summary,
+            nodes=node_items,
+            devices=devices,
+            slices=slices,
+        )
+
+    async def get_node_hami_gpu_metrics(
+        self,
+        cluster_id: str,
+        node_name: str,
+    ) -> NodeGPUMetricsResponse:
+        """Get HAMI GPU metrics for a specific node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node hostname
+
+        Returns:
+            NodeGPUMetricsResponse with devices, slices, and summary
+        """
+        # Execute queries in parallel
+        devices_result, slices_result = await asyncio.gather(
+            self.repository.get_node_hami_gpu_devices(cluster_id, node_name),
+            self.repository.get_node_hami_gpu_slices(cluster_id, node_name),
+        )
+
+        # Process slices first to calculate per-device utilization from HAMI
+        # (needed because DCGM may show 0% even when GPU is active in time-slicing mode)
+        slices = []
+        active_slices = 0
+        device_slice_utils: dict[str, list[float]] = {}  # device_uuid -> list of slice utilizations
+        for row in slices_result:
+            memory_limit_bytes = int(row[6] or 0)
+            memory_used_bytes = int(row[7] or 0)
+            memory_utilization = 0.0
+            if memory_limit_bytes > 0:
+                memory_utilization = (memory_used_bytes / memory_limit_bytes) * 100
+
+            slice_item = HAMISliceResponse(
+                pod_name=row[0],
+                pod_namespace=row[1],
+                container_name=row[2] or "",
+                device_uuid=row[3],
+                device_index=row[4],
+                node_name=row[5],
+                memory_limit_bytes=memory_limit_bytes,
+                memory_limit_gb=memory_limit_bytes / (1024**3),
+                memory_used_bytes=memory_used_bytes,
+                memory_used_gb=memory_used_bytes / (1024**3),
+                memory_utilization_percent=memory_utilization,
+                core_limit_percent=float(row[8] or 0),
+                core_used_percent=float(row[9] or 0),
+                gpu_utilization_percent=float(row[10] or 0),
+                status=row[11] or "unknown",
+            )
+            slices.append(slice_item)
+
+            if row[11] == "running":
+                active_slices += 1
+                # Track slice utilization per device for device-level aggregation
+                device_uuid = row[3]
+                if device_uuid not in device_slice_utils:
+                    device_slice_utils[device_uuid] = []
+                slice_util = float(row[10] or 0)
+                if slice_util > 0:
+                    device_slice_utils[device_uuid].append(slice_util)
+
+        # Process devices with HAMI-based utilization fallback
+        # Query returns: device_uuid, device_index, device_type, node_name, total_memory_gb,
+        # memory_allocated_gb, memory_utilization_percent, core_utilization_percent,
+        # total_cores_percent, shared_containers_count, hardware_mode, last_update,
+        # temperature_celsius, power_watts, sm_clock_mhz, mem_clock_mhz, gpu_utilization_percent
+        devices = []
+        for row in devices_result:
+            device_uuid = row[0]
+            # DCGM hardware metrics (indices 12-16)
+            temperature_celsius = float(row[12]) if len(row) > 12 and row[12] is not None else None
+            power_watts = float(row[13]) if len(row) > 13 and row[13] is not None else None
+            sm_clock_mhz = int(row[14]) if len(row) > 14 and row[14] is not None else None
+            mem_clock_mhz = int(row[15]) if len(row) > 15 and row[15] is not None else None
+            dcgm_gpu_util = float(row[16]) if len(row) > 16 and row[16] is not None else None
+
+            # Use HAMI slice utilization if DCGM shows 0 but slices are active
+            # This handles time-slicing mode where DCGM may miss bursty GPU usage
+            slice_utils = device_slice_utils.get(device_uuid, [])
+            hami_gpu_util = max(slice_utils) if slice_utils else 0
+            gpu_util = hami_gpu_util if (dcgm_gpu_util == 0 or dcgm_gpu_util is None) and hami_gpu_util > 0 else dcgm_gpu_util
+
+            device = GPUDeviceResponse(
+                device_uuid=device_uuid,
+                device_index=row[1],
+                device_type=row[2] or "Unknown",
+                node_name=row[3],
+                total_memory_gb=float(row[4] or 0),
+                memory_allocated_gb=float(row[5] or 0),
+                memory_utilization_percent=float(row[6] or 0),
+                core_utilization_percent=float(row[7] or 0),
+                cores_allocated_percent=float(row[8] or 0),
+                shared_containers_count=int(row[9] or 0),
+                hardware_mode=row[10] or "unknown",
+                last_metrics_update=row[11],
+                temperature_celsius=temperature_celsius,
+                power_watts=power_watts,
+                sm_clock_mhz=sm_clock_mhz,
+                memory_clock_mhz=mem_clock_mhz,
+                gpu_utilization_percent=gpu_util,
+            )
+            devices.append(device)
+
+        # Build summary
+        gpu_count = len(devices)
+        total_memory = sum(d.total_memory_gb for d in devices)
+        allocated_memory = sum(d.memory_allocated_gb for d in devices)
+
+        # Calculate average GPU utilization using HAMI slice values for consistency
+        # Only average non-zero running slices (active workloads)
+        running_slices_util = [s.gpu_utilization_percent for s in slices if s.status == "running"]
+        non_zero_slice_utils = [u for u in running_slices_util if u > 0]
+        avg_utilization = sum(non_zero_slice_utils) / len(non_zero_slice_utils) if non_zero_slice_utils else 0
+
+        summary = NodeGPUSummary(
+            gpu_count=gpu_count,
+            total_memory_gb=total_memory,
+            allocated_memory_gb=allocated_memory,
+            memory_utilization_percent=(allocated_memory / total_memory * 100) if total_memory > 0 else 0,
+            avg_gpu_utilization_percent=avg_utilization,
+            active_slices=active_slices,
+        )
+
+        return NodeGPUMetricsResponse(
+            cluster_id=cluster_id,
+            node_name=node_name,
+            timestamp=datetime.utcnow(),
+            devices=devices,
+            slices=slices,
+            summary=summary,
+        )
+
+    async def get_node_gpu_timeseries(
+        self,
+        cluster_id: str,
+        node_name: str,
+        hours: int = 6,
+    ) -> GPUTimeSeriesResponse:
+        """Get GPU timeseries data for a node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node hostname
+            hours: Number of hours to look back
+
+        Returns:
+            GPUTimeSeriesResponse with timeseries data for charts
+        """
+        gpu_result, slice_result = await self.repository.get_node_gpu_timeseries(
+            cluster_id, node_name, hours
+        )
+
+        # Process GPU timeseries - organize by timestamp and GPU
+        timestamps_set = set()
+        gpu_data: Dict[int, Dict[int, Dict[str, float]]] = {}  # gpu_index -> timestamp -> metrics
+
+        for row in gpu_result:
+            bucket = int(row[0])
+            gpu_index = int(row[1])
+            timestamps_set.add(bucket)
+
+            if gpu_index not in gpu_data:
+                gpu_data[gpu_index] = {}
+
+            gpu_data[gpu_index][bucket] = {
+                "utilization": float(row[2] or 0),
+                "memory": float(row[3] or 0),
+                "temperature": float(row[4] or 0),
+                "power": float(row[5] or 0),
+            }
+
+        # Sort timestamps
+        timestamps = sorted(timestamps_set)
+
+        # Build per-GPU arrays
+        gpu_indices = sorted(gpu_data.keys())
+        gpu_utilization = []
+        memory_utilization = []
+        temperature = []
+        power = []
+
+        for gpu_index in gpu_indices:
+            util_arr = []
+            mem_arr = []
+            temp_arr = []
+            pow_arr = []
+
+            for ts in timestamps:
+                metrics = gpu_data[gpu_index].get(ts, {})
+                util_arr.append(metrics.get("utilization", 0))
+                mem_arr.append(metrics.get("memory", 0))
+                temp_arr.append(metrics.get("temperature", 0))
+                pow_arr.append(metrics.get("power", 0))
+
+            gpu_utilization.append(util_arr)
+            memory_utilization.append(mem_arr)
+            temperature.append(temp_arr)
+            power.append(pow_arr)
+
+        # Process slice timeseries
+        slice_data: Dict[str, Dict[str, any]] = {}  # slice_key -> {namespace, data_by_ts}
+
+        for row in slice_result:
+            bucket = int(row[0])
+            pod_name = row[1]
+            namespace = row[2]
+            utilization = float(row[3] or 0)
+
+            slice_key = f"{namespace}/{pod_name}"
+            if slice_key not in slice_data:
+                slice_data[slice_key] = {
+                    "namespace": namespace,
+                    "pod_name": pod_name,
+                    "data_by_ts": {},
+                }
+
+            slice_data[slice_key]["data_by_ts"][bucket] = utilization
+
+        # Build slice activity items
+        slice_activity = []
+        for slice_key, info in slice_data.items():
+            data = []
+            for ts in timestamps:
+                data.append(info["data_by_ts"].get(ts, 0))
+
+            slice_activity.append(
+                SliceActivityItem(
+                    slice_name=info["pod_name"],
+                    namespace=info["namespace"],
+                    data=data,
+                )
+            )
+
+        return GPUTimeSeriesResponse(
+            timestamps=timestamps,
+            gpu_utilization=gpu_utilization,
+            memory_utilization=memory_utilization,
+            temperature=temperature,
+            power=power,
+            slice_activity=slice_activity,
+        )

@@ -49,6 +49,10 @@ class NodeMetricsSummary(BaseModel):
     network_receive_bytes_per_sec: float = 0.0
     network_transmit_bytes_per_sec: float = 0.0
     network_bandwidth_time_series: List[NetworkTimeSeriesPoint] = []
+    # GPU metrics from DCGM/HAMI
+    gpu_count: int = 0
+    gpu_utilization_percent: float = 0.0
+    gpu_memory_utilization_percent: float = 0.0
     timestamp: datetime
 
 
@@ -345,3 +349,127 @@ class NodeEventsListResponse(BaseModel):
     total_events: int
     from_time: Optional[datetime] = None
     to_time: Optional[datetime] = None
+
+
+# ============ GPU Metrics Schemas for HAMI ============
+
+
+class GPUDeviceResponse(BaseModel):
+    """Detailed GPU device metrics response."""
+
+    device_uuid: str
+    device_index: int
+    device_type: str
+    node_name: str
+    total_memory_gb: float
+    memory_allocated_gb: float
+    memory_utilization_percent: float
+    core_utilization_percent: float  # HAMI allocation percentage
+    cores_allocated_percent: float
+    shared_containers_count: int
+    hardware_mode: str
+    last_metrics_update: datetime
+    temperature_celsius: Optional[float] = None
+    power_watts: Optional[float] = None
+    sm_clock_mhz: Optional[int] = None
+    memory_clock_mhz: Optional[int] = None
+    gpu_utilization_percent: Optional[float] = None  # Actual GPU utilization from DCGM
+
+
+class HAMISliceResponse(BaseModel):
+    """HAMI slice (container GPU allocation) metrics response."""
+
+    pod_name: str
+    pod_namespace: str
+    container_name: str
+    device_uuid: str
+    device_index: int
+    node_name: str
+    memory_limit_bytes: int
+    memory_limit_gb: float
+    memory_used_bytes: int
+    memory_used_gb: float
+    memory_utilization_percent: float
+    core_limit_percent: float
+    core_used_percent: float
+    gpu_utilization_percent: float
+    status: str  # "running", "pending", "terminated", "unknown"
+
+
+class NodeGPUSummary(BaseModel):
+    """Summary of GPU metrics for a single node."""
+
+    gpu_count: int
+    total_memory_gb: float
+    allocated_memory_gb: float
+    memory_utilization_percent: float
+    avg_gpu_utilization_percent: float
+    active_slices: int
+
+
+class NodeGPUMetricsResponse(BaseModel):
+    """Response for node-specific GPU metrics."""
+
+    cluster_id: str
+    node_name: str
+    timestamp: datetime
+    devices: List[GPUDeviceResponse]
+    slices: List[HAMISliceResponse]
+    summary: NodeGPUSummary
+
+
+class ClusterGPUSummary(BaseModel):
+    """Summary of GPU metrics for entire cluster."""
+
+    total_gpus: int
+    total_memory_gb: float
+    allocated_memory_gb: float
+    available_memory_gb: float
+    memory_utilization_percent: float
+    avg_gpu_utilization_percent: float
+    total_slices: int
+    active_slices: int
+    avg_temperature_celsius: Optional[float] = None
+    total_power_watts: Optional[float] = None
+
+
+class NodeGPUSummaryItem(BaseModel):
+    """Summary of GPU metrics for a node within cluster response."""
+
+    node_name: str
+    gpu_count: int
+    total_memory_gb: float
+    allocated_memory_gb: float
+    memory_utilization_percent: float
+    avg_gpu_utilization_percent: float
+    active_slices: int
+
+
+class ClusterGPUMetricsResponse(BaseModel):
+    """Response for cluster-wide GPU metrics."""
+
+    cluster_id: str
+    timestamp: datetime
+    summary: ClusterGPUSummary
+    nodes: List[NodeGPUSummaryItem]
+    devices: List[GPUDeviceResponse]
+    slices: List[HAMISliceResponse]
+
+
+class SliceActivityItem(BaseModel):
+    """Slice activity data for timeseries charts."""
+
+    slice_name: str
+    namespace: str
+    data: List[float]
+
+
+class GPUTimeSeriesResponse(BaseModel):
+    """Response for GPU timeseries data."""
+
+    timestamps: List[int]  # Unix milliseconds
+    gpu_utilization: List[List[float]]  # Per GPU utilization over time
+    memory_utilization: List[List[float]]  # Per GPU memory over time
+    temperature: List[List[float]]  # Per GPU temperature over time
+    power: List[List[float]]  # Per GPU power over time
+    slice_activity: List[SliceActivityItem]  # Per slice activity over time

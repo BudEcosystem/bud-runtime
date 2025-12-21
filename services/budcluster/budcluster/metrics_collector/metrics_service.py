@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..cluster_ops.crud import ClusterDataManager
 from ..commons.config import app_settings
 from ..commons.constants import ClusterStatusEnum
-from ..commons.metrics_config import get_queries_for_cluster_type
+from ..commons.metrics_config import get_queries_for_cluster_type, get_queries_with_hami
 from .exceptions import NamespaceNotFoundError
 from .otel_bridge import OTelBridge
 from .schemas import (
@@ -191,15 +191,23 @@ class MetricsCollectionService:
                 error=f"Cluster status is {cluster.status}",
             )
 
+        # Store cluster attributes in local variables to avoid DetachedInstanceError
+        # The cluster object may become detached from session during async operations
+        cluster_id_str = str(cluster.id)
+        cluster_name = cluster.name if hasattr(cluster, "name") else cluster_id_str
+        cluster_platform = cluster.platform
+        cluster_configuration = cluster.configuration
+        cluster_last_metrics = cluster.last_metrics_collection
+
         try:
             # Decrypt kubeconfig
-            kubeconfig = self.crypto.decrypt_data(cluster.configuration)
+            kubeconfig = self.crypto.decrypt_data(cluster_configuration)
 
             # Setup OTel scraping for this cluster
             success, error_msg = await self.otel_bridge.setup_cluster_scraping(
-                cluster_id=str(cluster.id),
-                cluster_name=cluster.name if hasattr(cluster, "name") else str(cluster.id),
-                cluster_platform=cluster.platform,
+                cluster_id=cluster_id_str,
+                cluster_name=cluster_name,
+                cluster_platform=cluster_platform,
                 kubeconfig=kubeconfig,
                 prometheus_namespace=app_settings.prometheus_namespace,
                 prometheus_service=app_settings.prometheus_service_name,
@@ -208,14 +216,15 @@ class MetricsCollectionService:
             if not success:
                 raise Exception(error_msg or "Failed to setup OTel scraping")
 
-            # Get cluster-type-specific queries
+            # Get cluster-type-specific queries with HAMI metrics if enabled
             # Uses configuration from commons/metrics_config.py
-            queries = get_queries_for_cluster_type(cluster.platform)
-            logger.debug(f"Using {len(queries)} queries for cluster type '{cluster.platform}'")
+            base_queries = get_queries_for_cluster_type(cluster_platform)
+            queries = get_queries_with_hami(base_queries)
+            logger.debug(f"Using {len(queries)} queries for cluster type '{cluster_platform}' (HAMI enabled: {len(queries) > len(base_queries)})")
 
             # Trigger initial scraping
             success, error_msg = await self.otel_bridge.scrape_and_forward_metrics(
-                cluster_id=str(cluster.id),
+                cluster_id=cluster_id_str,
                 queries=queries,
                 duration=timedelta(minutes=5),
                 step="30s",
@@ -224,19 +233,35 @@ class MetricsCollectionService:
             if not success:
                 raise Exception(error_msg or "Failed to scrape and forward metrics")
 
+            # Collect and forward HAMI GPU metrics (separate from Prometheus)
+            hami_success, hami_error = await self.otel_bridge.scrape_and_forward_hami_metrics(
+                cluster_id=cluster_id_str,
+                kubeconfig=kubeconfig,
+            )
+            if not hami_success:
+                logger.warning(f"HAMI metrics collection failed for cluster {cluster_id_str}: {hami_error}")
+
+            # Collect and forward DCGM GPU metrics (hardware-level: temp, power, utilization)
+            dcgm_success, dcgm_error = await self.otel_bridge.scrape_and_forward_dcgm_metrics(
+                cluster_id=cluster_id_str,
+                kubeconfig=kubeconfig,
+            )
+            if not dcgm_success:
+                logger.warning(f"DCGM metrics collection failed for cluster {cluster_id_str}: {dcgm_error}")
+
             # Collect and forward Kubernetes node events (non-blocking)
-            events_success, events_error = await self.otel_bridge.scrape_and_forward_events(cluster_id=str(cluster.id))
+            events_success, events_error = await self.otel_bridge.scrape_and_forward_events(cluster_id=cluster_id_str)
             if not events_success:
-                logger.warning(f"Event collection failed for cluster {cluster.id}: {events_error}")
+                logger.warning(f"Event collection failed for cluster {cluster_id_str}: {events_error}")
 
             # Update cluster with collection status
-            await self._update_cluster_metrics_status(cluster.id, MetricsCollectionStatus.SUCCESS, datetime.utcnow())
+            await self._update_cluster_metrics_status(cluster_id_str, MetricsCollectionStatus.SUCCESS, datetime.utcnow())
 
             logger.info(f"Successfully configured metrics collection for cluster {cluster_id}")
 
             return ClusterMetricsInfo(
-                cluster_id=str(cluster.id),
-                cluster_name=cluster.name if hasattr(cluster, "name") else str(cluster.id),
+                cluster_id=cluster_id_str,
+                cluster_name=cluster_name,
                 status=MetricsCollectionStatus.SUCCESS,
                 metrics_count=len(queries),  # Number of configured queries
                 last_collection=datetime.utcnow(),
@@ -247,38 +272,38 @@ class MetricsCollectionService:
             logger.error(f"Prometheus namespace not found for cluster {cluster_id}: {e}")
 
             # Clean up on failure
-            await self.otel_bridge.cleanup_cluster(str(cluster.id))
+            await self.otel_bridge.cleanup_cluster(cluster_id_str)
 
             # Mark cluster as ERROR
-            await self._mark_cluster_error(cluster.id, str(e))
+            await self._mark_cluster_error(cluster_id_str, str(e))
 
             return ClusterMetricsInfo(
-                cluster_id=str(cluster.id),
-                cluster_name=cluster.name if hasattr(cluster, "name") else str(cluster.id),
+                cluster_id=cluster_id_str,
+                cluster_name=cluster_name,
                 status=MetricsCollectionStatus.FAILED,
                 error=str(e),
-                last_collection=cluster.last_metrics_collection,
+                last_collection=cluster_last_metrics,
             )
 
         except Exception as e:
             logger.error(f"Failed to setup metrics collection for cluster {cluster_id}: {e}")
 
             # Clean up on failure
-            await self.otel_bridge.cleanup_cluster(str(cluster.id))
+            await self.otel_bridge.cleanup_cluster(cluster_id_str)
 
             # Update cluster with failure status
             await self._update_cluster_metrics_status(
-                cluster.id,
+                cluster_id_str,
                 MetricsCollectionStatus.FAILED,
-                cluster.last_metrics_collection,  # Keep previous successful time
+                cluster_last_metrics,  # Keep previous successful time
             )
 
             return ClusterMetricsInfo(
-                cluster_id=str(cluster.id),
-                cluster_name=cluster.name if hasattr(cluster, "name") else str(cluster.id),
+                cluster_id=cluster_id_str,
+                cluster_name=cluster_name,
                 status=MetricsCollectionStatus.FAILED,
                 error=str(e),
-                last_collection=cluster.last_metrics_collection,
+                last_collection=cluster_last_metrics,
             )
 
     async def _update_cluster_metrics_status(
