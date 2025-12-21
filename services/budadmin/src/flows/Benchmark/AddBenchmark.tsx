@@ -67,12 +67,14 @@ function AddBenchmarkFormContent({
             placeholder="Enter Name"
             rules={[
               { required: true, message: "Please enter benchmark name" },
+              { max: 50, message: "Benchmark name must be 50 characters or less" },
             ]}
             ClassNames="mt-[.3rem]"
             formItemClassnames="pb-[.6rem] mb-[1rem]"
-            infoText="Enter the benchmark name"
+            infoText="Enter the benchmark name (max 50 characters)"
             InputClasses="py-[.5rem]"
             replaceSpacesWithHyphens={true}
+            maxLength={50}
           />
           <TagsInput
             label="Tags"
