@@ -220,7 +220,9 @@ class MetricsCollectionService:
             # Uses configuration from commons/metrics_config.py
             base_queries = get_queries_for_cluster_type(cluster_platform)
             queries = get_queries_with_hami(base_queries)
-            logger.debug(f"Using {len(queries)} queries for cluster type '{cluster_platform}' (HAMI enabled: {len(queries) > len(base_queries)})")
+            logger.debug(
+                f"Using {len(queries)} queries for cluster type '{cluster_platform}' (HAMI enabled: {len(queries) > len(base_queries)})"
+            )
 
             # Trigger initial scraping
             success, error_msg = await self.otel_bridge.scrape_and_forward_metrics(
@@ -255,7 +257,9 @@ class MetricsCollectionService:
                 logger.warning(f"Event collection failed for cluster {cluster_id_str}: {events_error}")
 
             # Update cluster with collection status
-            await self._update_cluster_metrics_status(cluster_id_str, MetricsCollectionStatus.SUCCESS, datetime.utcnow())
+            await self._update_cluster_metrics_status(
+                cluster_id_str, MetricsCollectionStatus.SUCCESS, datetime.utcnow()
+            )
 
             logger.info(f"Successfully configured metrics collection for cluster {cluster_id}")
 

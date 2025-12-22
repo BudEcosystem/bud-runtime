@@ -1117,7 +1117,9 @@ class ClusterMetricsService:
             # Use HAMI slice utilization if DCGM shows 0 but slices are active
             slice_utils = device_slice_utils.get(device_uuid, [])
             hami_gpu_util = max(slice_utils) if slice_utils else 0
-            gpu_util = hami_gpu_util if (dcgm_gpu_util == 0 or dcgm_gpu_util is None) and hami_gpu_util > 0 else dcgm_gpu_util
+            gpu_util = (
+                hami_gpu_util if (dcgm_gpu_util == 0 or dcgm_gpu_util is None) and hami_gpu_util > 0 else dcgm_gpu_util
+            )
 
             device = GPUDeviceResponse(
                 device_uuid=device_uuid,
@@ -1289,7 +1291,9 @@ class ClusterMetricsService:
             # This handles time-slicing mode where DCGM may miss bursty GPU usage
             slice_utils = device_slice_utils.get(device_uuid, [])
             hami_gpu_util = max(slice_utils) if slice_utils else 0
-            gpu_util = hami_gpu_util if (dcgm_gpu_util == 0 or dcgm_gpu_util is None) and hami_gpu_util > 0 else dcgm_gpu_util
+            gpu_util = (
+                hami_gpu_util if (dcgm_gpu_util == 0 or dcgm_gpu_util is None) and hami_gpu_util > 0 else dcgm_gpu_util
+            )
 
             device = GPUDeviceResponse(
                 device_uuid=device_uuid,
@@ -1357,9 +1361,7 @@ class ClusterMetricsService:
         Returns:
             GPUTimeSeriesResponse with timeseries data for charts
         """
-        gpu_result, slice_result = await self.repository.get_node_gpu_timeseries(
-            cluster_id, node_name, hours
-        )
+        gpu_result, slice_result = await self.repository.get_node_gpu_timeseries(cluster_id, node_name, hours)
 
         # Process GPU timeseries - organize by timestamp and GPU
         timestamps_set = set()
@@ -1429,7 +1431,7 @@ class ClusterMetricsService:
 
         # Build slice activity items
         slice_activity = []
-        for slice_key, info in slice_data.items():
+        for _slice_key, info in slice_data.items():
             data = []
             for ts in timestamps:
                 data.append(info["data_by_ts"].get(ts, 0))

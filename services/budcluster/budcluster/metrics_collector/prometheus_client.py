@@ -403,7 +403,9 @@ class PrometheusClient:
                         ) as response:
                             response.raise_for_status()
                             metrics_text = await response.text()
-                            logger.info(f"Successfully scraped {len(metrics_text)} bytes of HAMI device plugin metrics")
+                            logger.info(
+                                f"Successfully scraped {len(metrics_text)} bytes of HAMI device plugin metrics"
+                            )
                             return metrics_text
                     except aiohttp.ClientError as e:
                         logger.error(f"Failed to scrape HAMI device plugin metrics from {metrics_url}: {e}")

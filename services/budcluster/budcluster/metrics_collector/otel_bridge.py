@@ -7,7 +7,6 @@ the central OTel Collector, handling port-forwarding and metric transformation.
 import asyncio
 import json
 import socket
-import subprocess
 import tempfile
 import time
 from contextlib import contextmanager
@@ -630,13 +629,15 @@ class OTelBridge:
 
             for metric_name, samples in parsed_metrics.items():
                 for sample in samples:
-                    metrics_data.append({
-                        "metric": {
-                            "__name__": metric_name,
-                            **sample["labels"],
-                        },
-                        "values": [[current_timestamp, str(sample["value"])]],
-                    })
+                    metrics_data.append(
+                        {
+                            "metric": {
+                                "__name__": metric_name,
+                                **sample["labels"],
+                            },
+                            "values": [[current_timestamp, str(sample["value"])]],
+                        }
+                    )
 
             if not metrics_data:
                 logger.debug(f"No HAMI metrics to forward for cluster {cluster_id}")
@@ -714,13 +715,15 @@ class OTelBridge:
                     continue
 
                 for sample in samples:
-                    metrics_data.append({
-                        "metric": {
-                            "__name__": metric_name,
-                            **sample["labels"],
-                        },
-                        "values": [[current_timestamp, str(sample["value"])]],
-                    })
+                    metrics_data.append(
+                        {
+                            "metric": {
+                                "__name__": metric_name,
+                                **sample["labels"],
+                            },
+                            "values": [[current_timestamp, str(sample["value"])]],
+                        }
+                    )
 
             if not metrics_data:
                 logger.debug(f"No DCGM metrics to forward for cluster {cluster_id}")
@@ -787,13 +790,17 @@ class OTelBridge:
             pf_cmd = ["kubectl", "--kubeconfig", kubeconfig_path]
             if not app_settings.validate_certs:
                 pf_cmd.append("--insecure-skip-tls-verify")
-            pf_cmd.extend([
-                "-n", namespace,
-                "port-forward",
-                "--address", "127.0.0.1",
-                f"service/{service}",
-                f"{local_port}:{port}",
-            ])
+            pf_cmd.extend(
+                [
+                    "-n",
+                    namespace,
+                    "port-forward",
+                    "--address",
+                    "127.0.0.1",
+                    f"service/{service}",
+                    f"{local_port}:{port}",
+                ]
+            )
 
             pf_process = await asyncio.create_subprocess_exec(
                 *pf_cmd,

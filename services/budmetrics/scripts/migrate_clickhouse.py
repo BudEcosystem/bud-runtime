@@ -1253,9 +1253,7 @@ class ClickHouseMigration:
 
         try:
             # Drop existing view to ensure we get the latest definition
-            await self.client.execute_query(
-                "DROP VIEW IF EXISTS metrics.mv_populate_hami_slice_metrics"
-            )
+            await self.client.execute_query("DROP VIEW IF EXISTS metrics.mv_populate_hami_slice_metrics")
             logger.info("Dropped existing mv_populate_hami_slice_metrics (if any)")
 
             # Create the refreshable materialized view
