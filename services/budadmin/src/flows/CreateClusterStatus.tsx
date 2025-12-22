@@ -34,7 +34,7 @@ export default function CreateClusterStatus() {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to cancel the cluster creation process"
               description="Please note that this will stop the process of adding the cluster to the repository"
               cancelText="Continue Creating"

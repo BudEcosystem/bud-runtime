@@ -90,7 +90,7 @@ from .schema_builder import CustomModelGenerator
 from .streaming_validation_executor import StreamingValidationExecutor
 from .template_renderer import render_template
 from .tool_loaders import ToolRegistry
-from .utils import contains_pydantic_model, validate_input_data_type, validate_template_variables
+from .utils import contains_pydantic_model, strip_none_values, validate_input_data_type, validate_template_variables
 
 
 logger = logging.get_logger(__name__)
@@ -171,7 +171,9 @@ class SimplePromptExecutor_V4:
                 # Structured input: create model with validation and validate
                 input_model = await self._get_input_model_with_validation(input_schema, input_validation)
                 try:
-                    validated_input = input_model.model_validate(variables, extra="forbid")
+                    # Strip None values so Pydantic uses schema defaults for missing fields
+                    cleaned_variables = strip_none_values(variables)
+                    validated_input = input_model.model_validate(cleaned_variables, extra="forbid")
                     validated_variables = validated_input.model_dump()
                 except ValidationError as e:
                     # Extract validation error details (message, param, code)

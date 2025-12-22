@@ -285,13 +285,14 @@ class PrometheusMetricsClient:
             HTTPException: If there's an error querying the events
         """
         try:
-            create_cluster_endpoint = (
+            # Use budmetrics for node event counts (from ClickHouse)
+            events_endpoint = (
                 f"{app_settings.dapr_base_url}/v1.0/invoke"
-                f"/{app_settings.bud_cluster_app_id}/method"
-                f"/cluster/{self.config.cluster_id}/events-count-by-node"
+                f"/{app_settings.bud_metrics_app_id}/method"
+                f"/cluster-metrics/{self.config.cluster_id}/node-events-count"
             )
 
-            response = requests.get(create_cluster_endpoint, timeout=30)
+            response = requests.get(events_endpoint, timeout=30)
 
             if response.status_code != 200:
                 raise HTTPException(
@@ -305,11 +306,9 @@ class PrometheusMetricsClient:
 
             events_data = response.json()
             # Extract the events count for the specific node from the response
-            # Assuming the response contains a mapping of node IPs to event counts
+            # budmetrics returns events_count dict
 
-            # Fetch the node details
-
-            return events_data.get("data", {}).get(node_name, 0)
+            return events_data.get("events_count", {}).get(node_name, 0)
 
         except HTTPException as e:
             # Properly format the error response

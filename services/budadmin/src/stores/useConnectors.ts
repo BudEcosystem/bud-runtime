@@ -75,6 +75,7 @@ interface ConnectorsStore {
   fetchUnregisteredTools: (params?: ConnectorsListParams) => Promise<void>;
   fetchConnectorDetails: (connectorId: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
+  clearSelectedConnectorDetails: () => void;
 }
 
 export const useConnectors = create<ConnectorsStore>((set, get) => {
@@ -208,6 +209,11 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     // Filter actions
     setSearchQuery: (query) => {
       set({ searchQuery: query });
+    },
+
+    // Clear selected connector details (used when navigating back)
+    clearSelectedConnectorDetails: () => {
+      set({ selectedConnectorDetails: null });
     },
   };
 });

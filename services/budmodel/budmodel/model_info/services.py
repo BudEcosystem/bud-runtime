@@ -1336,14 +1336,6 @@ class ModelSecurityScanService:
 
         notification_req = notification_request.model_copy(deep=True)
 
-        filtered_env = {
-            "PSQL_PORT": str(app_settings.psql_port),
-            "PSQL_DB_NAME": app_settings.psql_dbname,
-            "PSQL_HOST": app_settings.psql_host,
-            "CLAMD_HOST": app_settings.clamd_host,
-            "CLAMD_PORT": str(app_settings.clamd_port),
-        }
-
         scan_result = {
             "total_issues": 0,
             "total_scanned": 0,
@@ -1411,8 +1403,19 @@ class ModelSecurityScanService:
                         logger.exception("Error updating workflow eta in state store: %s", e)
 
                 try:
+                    # Use env -i to clear environment before firejail to avoid
+                    # "too many environment variables" error in container environments
                     scan_result = subprocess.run(
                         [
+                            "env",
+                            "-i",
+                            f"PATH={os.environ.get('PATH', '/usr/local/bin:/usr/bin:/bin')}",
+                            "PYTHONPATH=/app",
+                            f"PSQL_HOST={app_settings.psql_host}",
+                            f"PSQL_PORT={str(app_settings.psql_port)}",
+                            f"PSQL_DB_NAME={app_settings.psql_dbname}",
+                            f"CLAMD_HOST={app_settings.clamd_host}",
+                            f"CLAMD_PORT={str(app_settings.clamd_port)}",
                             "firejail",
                             "--debug",
                             "--quiet",
@@ -1425,10 +1428,10 @@ class ModelSecurityScanService:
                         capture_output=True,
                         text=True,
                         check=True,
-                        env=filtered_env,
                     )
                 except Exception as e:
                     logger.exception("Error while scanning inside sandbox: %s", e)
+                    raise
             notification_req.payload.content = NotificationContent(
                 title="Security scan completed",
                 message="Security scan on the given model is completed",

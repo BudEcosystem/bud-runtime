@@ -2,14 +2,19 @@ from typing import Any, Literal, Optional
 from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+# Maximum benchmark name length to ensure Kubernetes namespace stays within 63 char limit
+# Namespace format: bud-{cleaned_name}-{uuid8} = 4 + name + 1 + 8 = name max 50 chars
+MAX_BENCHMARK_NAME_LENGTH = 50
 
 
 class RunBenchmarkRequest(CloudEventBase):
     """Request body for running a benchmark."""
 
     benchmark_id: UUID
-    name: str
+    name: str = Field(..., max_length=MAX_BENCHMARK_NAME_LENGTH)
     tags: Optional[list[dict[str, str]]] = None
     description: str
     concurrent_requests: int
@@ -34,6 +39,17 @@ class RunBenchmarkRequest(CloudEventBase):
     run_as_simulation: bool
     credential_id: Optional[UUID] = None
     simulator_id: Optional[UUID] = None
+    # Configuration options from benchmark workflow step 6
+    hardware_mode: Optional[str] = None
+    selected_device_type: Optional[str] = None
+    tp_size: Optional[int] = None
+    pp_size: Optional[int] = None
+    replicas: Optional[int] = None
+    num_prompts: Optional[int] = None  # Total prompts to run (defaults to sum of dataset num_samples)
+    # Storage configuration (from cluster settings)
+    default_storage_class: Optional[str] = None
+    default_access_mode: Optional[str] = None
+    storage_size_gb: Optional[float] = None
 
 
 class LLMBenchmarkResultSchema(BaseModel):
@@ -44,12 +60,13 @@ class LLMBenchmarkResultSchema(BaseModel):
     request_throughput: Optional[float] = None
     input_throughput: Optional[float] = None
     output_throughput: Optional[float] = None
-    p25_throughput: Optional[float] = None
-    p75_throughput: Optional[float] = None
-    p95_throughput: Optional[float] = None
-    p99_throughput: Optional[float] = None
-    min_throughput: Optional[float] = None
-    max_throughput: Optional[float] = None
+    mean_output_throughput_per_user: Optional[float] = None
+    p25_output_throughput_per_user: Optional[float] = None
+    p75_output_throughput_per_user: Optional[float] = None
+    p95_output_throughput_per_user: Optional[float] = None
+    p99_output_throughput_per_user: Optional[float] = None
+    min_output_throughput_per_user: Optional[float] = None
+    max_output_throughput_per_user: Optional[float] = None
     mean_ttft_ms: Optional[float] = None
     median_ttft_ms: Optional[float] = None
     p25_ttft_ms: Optional[float] = None

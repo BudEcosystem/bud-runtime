@@ -824,6 +824,65 @@ class ClickHouseMigration:
 
         logger.info("All cluster metrics tables created successfully")
 
+    async def create_node_events_table(self):
+        """Create NodeEvents table for storing Kubernetes node events."""
+        logger.info("Creating NodeEvents table...")
+
+        # Ensure metrics database exists
+        try:
+            await self.client.execute_query("CREATE DATABASE IF NOT EXISTS metrics")
+        except Exception as e:
+            logger.error(f"Error creating metrics database: {e}")
+            raise
+
+        ttl_days = get_cluster_metrics_ttl_days()
+        query_node_events = f"""
+        CREATE TABLE IF NOT EXISTS metrics.NodeEvents
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            cluster_name String,
+            node_name String,
+            event_uid String,
+            event_type LowCardinality(String),
+            reason LowCardinality(String),
+            message String CODEC(ZSTD(3)),
+            source_component LowCardinality(String),
+            source_host String,
+            first_timestamp DateTime64(3),
+            last_timestamp DateTime64(3),
+            event_count UInt32 DEFAULT 1
+        )
+        ENGINE = ReplacingMergeTree(ts)
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, node_name, reason, ts, event_uid)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_node_events)
+            logger.info("NodeEvents table created successfully")
+
+            # Add indexes for efficient queries
+            indexes = [
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_cluster_time (cluster_id, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_event_type (event_type) TYPE set(10) GRANULARITY 4",
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_node_name (node_name) TYPE bloom_filter(0.01) GRANULARITY 8",
+                "ALTER TABLE metrics.NodeEvents ADD INDEX IF NOT EXISTS idx_reason (reason) TYPE set(100) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating NodeEvents table: {e}")
+            raise
+
     async def create_hami_gpu_metrics_table(self):
         """Create HAMI GPU time-slicing metrics table for tracking vGPU allocation and utilization."""
         logger.info("Creating HAMI GPU metrics table...")
@@ -856,7 +915,14 @@ class ClickHouseMigration:
             memory_utilization_percent Float64 CODEC(Gorilla),
 
             -- Hardware mode
-            hardware_mode LowCardinality(String) DEFAULT 'whole-gpu'  -- 'time-slicing', 'mig', 'whole-gpu'
+            hardware_mode LowCardinality(String) DEFAULT 'whole-gpu',  -- 'time-slicing', 'mig', 'whole-gpu'
+
+            -- DCGM hardware metrics (enriched from DCGM Exporter when available)
+            temperature_celsius Float64 DEFAULT 0 CODEC(Gorilla),
+            power_watts Float64 DEFAULT 0 CODEC(Gorilla),
+            sm_clock_mhz UInt32 DEFAULT 0,
+            mem_clock_mhz UInt32 DEFAULT 0,
+            gpu_utilization_percent Float64 DEFAULT 0 CODEC(Gorilla)
         )
         ENGINE = ReplacingMergeTree()
         PARTITION BY toYYYYMM(ts)
@@ -886,6 +952,70 @@ class ClickHouseMigration:
             logger.error(f"Error creating HAMIGPUMetrics table: {e}")
             raise
 
+    async def create_hami_slice_metrics_table(self):
+        """Create HAMI slice metrics table for tracking per-container GPU allocation and utilization."""
+        logger.info("Creating HAMI slice metrics table...")
+
+        ttl_days = get_cluster_metrics_ttl_days()
+        query_hami_slice_metrics = f"""
+        CREATE TABLE IF NOT EXISTS metrics.HAMISliceMetrics
+        (
+            ts DateTime64(3) CODEC(Delta, ZSTD),
+            cluster_id String,
+            node_name String,
+
+            -- Device identification
+            device_uuid String,
+            device_index UInt8,
+
+            -- Pod/Container identification
+            pod_name String,
+            pod_namespace String,
+            container_name String,
+
+            -- Memory allocation (bytes)
+            memory_limit_bytes Int64 CODEC(DoubleDelta, ZSTD),
+            memory_used_bytes Int64 CODEC(DoubleDelta, ZSTD),
+
+            -- Core allocation (percent)
+            core_limit_percent Float64 CODEC(Gorilla),
+            core_used_percent Float64 CODEC(Gorilla),
+
+            -- GPU utilization
+            gpu_utilization_percent Float64 CODEC(Gorilla),
+
+            -- Status
+            status LowCardinality(String) DEFAULT 'unknown'  -- 'running', 'pending', 'terminated', 'unknown'
+        )
+        ENGINE = ReplacingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (cluster_id, node_name, device_uuid, pod_namespace, pod_name, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query_hami_slice_metrics)
+            logger.info("HAMISliceMetrics table created successfully")
+
+            # Add indexes for HAMISliceMetrics
+            indexes = [
+                "ALTER TABLE metrics.HAMISliceMetrics ADD INDEX IF NOT EXISTS idx_cluster_node_device_time (cluster_id, node_name, device_uuid, ts) TYPE minmax GRANULARITY 1",
+                "ALTER TABLE metrics.HAMISliceMetrics ADD INDEX IF NOT EXISTS idx_pod_namespace (pod_namespace) TYPE set(100) GRANULARITY 4",
+                "ALTER TABLE metrics.HAMISliceMetrics ADD INDEX IF NOT EXISTS idx_status (status) TYPE set(10) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating HAMISliceMetrics table: {e}")
+            raise
+
     async def verify_tables(self):
         """Verify that tables were created successfully."""
         # Tables in budproxy database (or configured database)
@@ -905,6 +1035,8 @@ class ClickHouseMigration:
             "metrics.PodMetrics",
             "metrics.GPUMetrics",
             "metrics.HAMIGPUMetrics",
+            "metrics.HAMISliceMetrics",
+            "metrics.NodeEvents",
         ]
 
         if self.include_model_inference:
@@ -1106,6 +1238,188 @@ class ClickHouseMigration:
             logger.error(f"Error setting up cluster metrics materialized views: {e}")
             raise
 
+    async def create_hami_slice_metrics_materialized_view(self):
+        """Create or recreate the HAMI Slice Metrics materialized view.
+
+        This view populates HAMISliceMetrics from vGPU* metrics in otel_metrics_gauge,
+        providing per-pod/container GPU allocation data for time-slicing.
+
+        NOTE: Uses REFRESH EVERY 1 MINUTE (Refreshable MV) instead of streaming MV because
+        streaming MVs with complex JOINs between CTEs don't work correctly in ClickHouse.
+        Each CTE filters different MetricNames, and streaming MVs only see the current INSERT
+        batch, causing JOINs to fail. Refreshable MVs run on a schedule and see all data.
+        """
+        logger.info("Setting up HAMI Slice Metrics materialized view (Refreshable)...")
+
+        try:
+            # Drop existing view to ensure we get the latest definition
+            await self.client.execute_query("DROP VIEW IF EXISTS metrics.mv_populate_hami_slice_metrics")
+            logger.info("Dropped existing mv_populate_hami_slice_metrics (if any)")
+
+            # Create the refreshable materialized view
+            # Uses REFRESH EVERY 1 MINUTE to periodically aggregate vGPU metrics
+            # Uses device plugin metrics (vGPU_device_memory_limit/usage) for accurate per-container data
+            mv_query = """
+            CREATE MATERIALIZED VIEW metrics.mv_populate_hami_slice_metrics
+            REFRESH EVERY 1 MINUTE
+            TO metrics.HAMISliceMetrics
+            AS
+            WITH
+            -- Memory limit from device plugin (per-container limit)
+            memory_limit AS (
+                SELECT
+                    toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+                    ResourceAttributes['cluster_id'] AS cluster_id,
+                    Attributes['deviceuuid'] AS device_uuid,
+                    Attributes['podname'] AS pod_name,
+                    Attributes['podnamespace'] AS pod_namespace,
+                    Attributes['ctrname'] AS container_name,
+                    avg(Value) AS memory_limit_bytes
+                FROM metrics.otel_metrics_gauge
+                WHERE MetricName = 'vGPU_device_memory_limit_in_bytes'
+                  AND ResourceAttributes['cluster_id'] IS NOT NULL
+                  AND ResourceAttributes['cluster_id'] != ''
+                  AND Attributes['deviceuuid'] IS NOT NULL
+                  AND Attributes['podname'] IS NOT NULL
+                  AND TimeUnix >= now() - INTERVAL 5 MINUTE
+                GROUP BY ts, cluster_id, device_uuid, pod_name, pod_namespace, container_name
+            ),
+            -- Memory usage from device plugin (actual per-container usage)
+            memory_usage AS (
+                SELECT
+                    toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+                    ResourceAttributes['cluster_id'] AS cluster_id,
+                    Attributes['deviceuuid'] AS device_uuid,
+                    Attributes['podname'] AS pod_name,
+                    Attributes['podnamespace'] AS pod_namespace,
+                    Attributes['ctrname'] AS container_name,
+                    avg(Value) AS memory_used_bytes
+                FROM metrics.otel_metrics_gauge
+                WHERE MetricName = 'vGPU_device_memory_usage_in_bytes'
+                  AND ResourceAttributes['cluster_id'] IS NOT NULL
+                  AND ResourceAttributes['cluster_id'] != ''
+                  AND Attributes['deviceuuid'] IS NOT NULL
+                  AND Attributes['podname'] IS NOT NULL
+                  AND TimeUnix >= now() - INTERVAL 5 MINUTE
+                GROUP BY ts, cluster_id, device_uuid, pod_name, pod_namespace, container_name
+            ),
+            -- Core metrics from scheduler
+            core_metrics AS (
+                SELECT
+                    toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+                    ResourceAttributes['cluster_id'] AS cluster_id,
+                    Attributes['deviceuuid'] AS device_uuid,
+                    Attributes['podname'] AS pod_name,
+                    Attributes['podnamespace'] AS pod_namespace,
+                    avg(Value) AS core_used_percent
+                FROM metrics.otel_metrics_gauge
+                WHERE MetricName = 'vGPUCorePercentage'
+                  AND ResourceAttributes['cluster_id'] IS NOT NULL
+                  AND ResourceAttributes['cluster_id'] != ''
+                  AND Attributes['deviceuuid'] IS NOT NULL
+                  AND Attributes['podname'] IS NOT NULL
+                  AND TimeUnix >= now() - INTERVAL 5 MINUTE
+                GROUP BY ts, cluster_id, device_uuid, pod_name, pod_namespace
+            ),
+            -- Device info for device_index and node_name
+            device_info AS (
+                SELECT
+                    cluster_id,
+                    device_uuid,
+                    argMax(device_index, ts) AS device_index,
+                    argMax(node_name, ts) AS node_name
+                FROM metrics.HAMIGPUMetrics
+                WHERE cluster_id IS NOT NULL AND device_uuid IS NOT NULL
+                GROUP BY cluster_id, device_uuid
+            )
+            -- Note: Pod status is joined at query time in repository.py
+            -- using kube_pod_status_phase for accurate real-time status
+            SELECT
+                l.ts AS ts,
+                l.cluster_id AS cluster_id,
+                COALESCE(d.node_name, '') AS node_name,
+                l.device_uuid AS device_uuid,
+                COALESCE(d.device_index, 0) AS device_index,
+                l.pod_name AS pod_name,
+                l.pod_namespace AS pod_namespace,
+                l.container_name AS container_name,
+                toInt64(l.memory_limit_bytes) AS memory_limit_bytes,
+                toInt64(COALESCE(u.memory_used_bytes, 0)) AS memory_used_bytes,
+                100.0 AS core_limit_percent,
+                COALESCE(c.core_used_percent, 0) AS core_used_percent,
+                COALESCE(c.core_used_percent, 0) AS gpu_utilization_percent,
+                -- Status is determined at query time by joining with kube_pod_status_phase
+                'unknown' AS status
+            FROM memory_limit l
+            LEFT JOIN memory_usage u
+                ON l.ts = u.ts
+                AND l.cluster_id = u.cluster_id
+                AND l.device_uuid = u.device_uuid
+                AND l.pod_name = u.pod_name
+                AND l.pod_namespace = u.pod_namespace
+                AND l.container_name = u.container_name
+            LEFT JOIN core_metrics c
+                ON l.ts = c.ts
+                AND l.cluster_id = c.cluster_id
+                AND l.device_uuid = c.device_uuid
+                AND l.pod_name = c.pod_name
+                AND l.pod_namespace = c.pod_namespace
+            LEFT JOIN device_info d
+                ON l.cluster_id = d.cluster_id
+                AND l.device_uuid = d.device_uuid
+            """
+
+            await self.client.execute_query(mv_query)
+            logger.info("✓ Created mv_populate_hami_slice_metrics materialized view")
+
+        except Exception as e:
+            logger.error(f"Error creating HAMI Slice Metrics materialized view: {e}")
+            raise
+
+    async def migrate_hami_gpu_metrics_dcgm_columns(self):
+        """Add DCGM hardware metrics columns to HAMIGPUMetrics table.
+
+        This migration adds columns for DCGM Exporter data (temperature, power, clocks)
+        that enrich the HAMI time-slicing metrics with hardware-level data.
+        """
+        logger.info("Adding DCGM columns to HAMIGPUMetrics table...")
+
+        table_ref = "metrics.HAMIGPUMetrics"
+
+        try:
+            # Check which columns already exist
+            existing_columns_query = """
+            SELECT name FROM system.columns
+            WHERE database = 'metrics' AND table = 'HAMIGPUMetrics'
+            """
+            existing_columns_result = await self.client.execute_query(existing_columns_query)
+            existing_col_names = {row[0] for row in existing_columns_result} if existing_columns_result else set()
+
+            # Columns to add
+            new_columns = {
+                "temperature_celsius": "Float64 DEFAULT 0",
+                "power_watts": "Float64 DEFAULT 0",
+                "sm_clock_mhz": "UInt32 DEFAULT 0",
+                "mem_clock_mhz": "UInt32 DEFAULT 0",
+                "gpu_utilization_percent": "Float64 DEFAULT 0",
+            }
+
+            columns_to_add = []
+            for col_name, col_type in new_columns.items():
+                if col_name not in existing_col_names:
+                    columns_to_add.append(f"ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+
+            if columns_to_add:
+                alter_query = f"ALTER TABLE {table_ref} {', '.join(columns_to_add)}"
+                await self.client.execute_query(alter_query)
+                logger.info(f"Added DCGM columns to HAMIGPUMetrics: {list(new_columns.keys())}")
+            else:
+                logger.info("DCGM columns already exist in HAMIGPUMetrics")
+
+        except Exception as e:
+            logger.error(f"Error adding DCGM columns to HAMIGPUMetrics: {e}")
+            raise
+
     async def migrate_node_metrics_network_columns(self):
         """Add network columns to existing NodeMetrics table for legacy deployments.
 
@@ -1178,6 +1492,10 @@ class ClickHouseMigration:
             await self.create_gateway_blocking_events_table()
             await self.create_cluster_metrics_tables()  # Add cluster metrics tables
             await self.create_hami_gpu_metrics_table()  # Add HAMI GPU time-slicing metrics table
+            await self.create_hami_slice_metrics_table()  # Add HAMI slice metrics for per-container GPU tracking
+            await self.migrate_hami_gpu_metrics_dcgm_columns()  # Add DCGM columns for hardware metrics
+            await self.create_hami_slice_metrics_materialized_view()  # Create MV for vGPU slice data
+            await self.create_node_events_table()  # Add NodeEvents table for K8s node events
             await self.migrate_node_metrics_network_columns()  # Add network columns to NodeMetrics (legacy migration)
             await self.setup_cluster_metrics_materialized_views()  # Set up materialized views for cluster metrics
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration

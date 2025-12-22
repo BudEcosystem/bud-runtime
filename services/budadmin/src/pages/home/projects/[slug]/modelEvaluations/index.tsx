@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Input, Table } from "antd";
 import type { TableProps } from "antd";
 import { useRouter as useRouter } from "next/router";
@@ -7,13 +7,18 @@ import { useProjects } from "src/hooks/useProjects";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import {
   Text_12_400_757575,
-  Text_12_400_EEEEEE,
   Text_12_600_EEEEEE,
 } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import Tags from "src/flows/components/DrawerTags";
 import NoDataFount from "@/components/ui/noDataFount";
 import ComingSoon from "@/components/ui/comingSoon";
+import { ExperimentData, useEvaluations } from "@/hooks/useEvaluations";
+import { getDatasetNamesFromTraits, getDisplayText } from "@/lib/utils";
+import { TruncatedTextCell } from "@/components/ui/TruncatedTextCell";
+import { errorToast, successToast } from "@/components/toast";
+import { tempApiBaseUrl } from "@/components/environment";
+import { axiosInstance } from "src/pages/api/requests";
 
 type ColumnsType<T extends object> = TableProps<T>["columns"];
 type TablePagination<T extends object> = NonNullable<
@@ -65,47 +70,6 @@ function SortIcon({ sortOrder }: { sortOrder: string }) {
   ) : null;
 }
 
-const columns: ColumnsType<DataType> = [
-  {
-    title: "Evaluation Type",
-    dataIndex: "type",
-    key: "type",
-    width: 170,
-    render: (text) => (
-      <Text_12_600_EEEEEE className="whitespace-nowrap">
-        {text}
-      </Text_12_600_EEEEEE>
-    ),
-    sorter: (a, b) => a.type.localeCompare(b.type),
-    sortIcon: SortIcon,
-  },
-  {
-    title: "Dataset",
-    dataIndex: "dataset",
-    key: "dataset",
-    width: 125,
-    render: (text) => (
-      <div className="inline-block">
-        <Tags name={text} color="#479D5F" />
-      </div>
-    ),
-    sorter: (a, b) => a.dataset.localeCompare(b.dataset),
-    sortIcon: SortIcon,
-  },
-  {
-    title: "Result",
-    dataIndex: "result",
-    key: "result",
-    render: (text) => (
-      <Text_12_400_EEEEEE className="whitespace-nowrap">
-        {text}
-      </Text_12_400_EEEEEE>
-    ),
-    sorter: (a, b) => a.result.localeCompare(b.result),
-    sortIcon: SortIcon,
-  },
-];
-
 const data: DataType[] = [
   {
     type: "FaithDial",
@@ -137,26 +101,183 @@ const data: DataType[] = [
 const applyFilter = () => {};
 
 function ModelEvalTable() {
-  const { openDrawer } = useDrawer();
+  const { openDrawerWithStep } = useDrawer();
   const { getProject } = useProjects();
   const [showSearch, setShowSearch] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const router = useRouter();
-  const { projectId } = router.query; // Access the dynamic part of the route
-  const { openDrawerWithStep } = useDrawer();
+  const { projectId, deploymentId } = router.query; // Access the dynamic part of the route
+
+  const {
+    experimentEvaluations,
+    experimentEvalTotal,
+    loading,
+    getEvaluationsData,
+  } = useEvaluations();
+  const [orderBy, setOrderBy] = useState<string>("created_at");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
+  const [order, setOrder] = useState<"-" | "">("");
+
+  const columns: ColumnsType<ExperimentData> = [
+    {
+      title: "Traits",
+      dataIndex: "traits",
+      key: "traits",
+      // width: 160,
+      ellipsis: true,
+      render: (traits) => {
+        const displayText = getDisplayText(traits, "name", "name");
+        return <TruncatedTextCell text={displayText} />;
+      },
+    },
+    {
+      title: "Dataset",
+      dataIndex: "traits",
+      key: "traits",
+      // width: 160,
+      ellipsis: true,
+      render: (traits) => {
+        const displayText = getDatasetNamesFromTraits(traits, 1);
+        return <TruncatedTextCell text={displayText} />;
+      },
+    },
+    {
+      title: "Score",
+      dataIndex: "scores",
+      key: "scores",
+      // width: 160,
+      ellipsis: true,
+      render: (scores) => {
+         return <TruncatedTextCell text={scores?.overall_accuracy || "-"} />;
+      },
+    },
+  ];
+  // Table data
+  const tableData = useMemo(() => {
+    console.log("Experiment Evaluations:", experimentEvaluations);
+    if (!experimentEvaluations || !Array.isArray(experimentEvaluations)) {
+      return [];
+    }
+    return experimentEvaluations;
+  }, [experimentEvaluations]);
 
   useEffect(() => {
     getProject(projectId as string);
     // openDrawerWithStep("use-model");
   }, [projectId]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValue(searchValue);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  const fetchExperiments = useCallback(async () => {
+    if (typeof deploymentId !== 'string') return;
+
+    try {
+      const payload = {
+        page: currentPage,
+        page_size: pageSize,
+        search: debouncedSearchValue || undefined,
+        // order: order || undefined,
+        // orderBy: orderBy || undefined,
+        endpoint_id: deploymentId as string,
+        searchName: false
+        // experiment_status: "completed",
+      };
+
+      await getEvaluationsData(payload);
+    } catch (error) {
+      console.error("Failed to fetch experiments for model:", error);
+    }
+  }, [currentPage, pageSize, debouncedSearchValue, order, orderBy, deploymentId, getEvaluationsData]);
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    fetchExperiments();
+  }, [fetchExperiments]);
+
+  // Handle "Run Another Evaluation" button click
+  const handleRunEvaluation = useCallback(() => {
+    // Guard: Ensure deploymentId is a valid string before proceeding
+    if (typeof deploymentId !== 'string') {
+      errorToast("Cannot run evaluation without a valid deployment ID.");
+      return;
+    }
+    // Open the drawer with:
+    // - showExperimentSelect: true - to display experiment dropdown
+    // - endpointId: deploymentId - to skip the "Select Model" step since we already have the endpoint
+    openDrawerWithStep("new-evaluation", {
+      showExperimentSelect: true,
+      endpointId: deploymentId,
+    });
+  }, [openDrawerWithStep, deploymentId]);
+
+  // Handle "Export" button click - exports evaluations as CSV
+  const handleExport = useCallback(async () => {
+    if (typeof deploymentId !== 'string') {
+      errorToast("Cannot export without a valid deployment ID.");
+      return;
+    }
+
+    try {
+      const payload = {
+        search: debouncedSearchValue || undefined,
+        endpoint_id: deploymentId,
+        searchName: false,
+        export_format: 'csv',
+      };
+
+      const response = await axiosInstance.get(
+        `${tempApiBaseUrl}/experiments/evaluations/all`,
+        {
+          params: payload,
+          responseType: 'blob',
+        }
+      );
+
+      // Create a blob URL and trigger download
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `evaluations_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      successToast("Evaluations exported successfully");
+    } catch (error) {
+      console.error("Failed to export evaluations:", error);
+      errorToast("Failed to export evaluations");
+    }
+  }, [currentPage, pageSize, debouncedSearchValue, deploymentId]);
+
   return (
-    <div className="relative">
-      <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" />
-      <Table<DataType>
+    <div className="relative CommonCustomPagination">
+      {/* <ComingSoon shrink={true} scaleValue={0.9} comingYpos="-15vh" /> */}
+      <Table<ExperimentData>
         columns={columns}
-        pagination={false}
-        dataSource={data}
+        dataSource={tableData}
+        pagination={{
+          className: "small-pagination",
+          current: currentPage,
+          pageSize: pageSize,
+          total: experimentEvalTotal || 0,
+          onChange: (page, size) => {
+            setCurrentPage(page);
+            setPageSize(size);
+          },
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20", "50"],
+        }}
         bordered={false}
         footer={null}
         virtual
@@ -174,19 +295,13 @@ function ModelEvalTable() {
               {/* <Text_12_400_757575>Modal evaluations summary</Text_12_400_757575> */}
             </div>
             <div className="flex items-center justify-end gap-x-[.5rem]">
-              <SearchHeaderInput searchValue={""} setSearchValue={() => {}} />
+              <SearchHeaderInput placeholder="Search by traits, dataset" searchValue={searchValue} setSearchValue={setSearchValue} />
 
               <PrimaryButton
-                onClick={() => {
-                  openDrawer("run-model-evaluations");
-                }}
+                onClick={handleRunEvaluation}
                 text="Run Another Evaluation"
               ></PrimaryButton>
-              <PrimaryButton
-                onClick={() => {
-                  null;
-                }}
-              >
+              <PrimaryButton onClick={handleExport}>
                 <div className="flex items-center justify-center">
                   <div className="w-[.75rem] mr-[.25rem]">
                     <Image

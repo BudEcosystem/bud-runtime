@@ -171,9 +171,14 @@ function CompareGraph({ data }: { data: SingleGuageChartData }) {
   );
 }
 
-const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
+const NodeRow = ({ ip, data, clusterId }: { data: Node; ip: string; clusterId: string }) => {
+  const router = useRouter();
   const { setSelectedNode } = useCluster();
   const { openDrawer } = useDrawer();
+
+  const handleRowClick = () => {
+    router.push(`/home/clusters/${clusterId}/nodes/${data.hostname}`);
+  };
   const tagData = [
     { name: "CPU", color: "#D1B854", hide: !data?.cpu },
     { name: "HPU", color: "#D1B854", hide: !data?.gpu },
@@ -206,11 +211,11 @@ const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
       label1: "Memory",
       label2: "",
     },
-    // Add GPU gauge
+    // Add GPU gauge showing actual utilization from DCGM metrics
     ...(data.gpu ? [{
       barColor: "#965CDE",  // Purple color for GPU
       text: data.gpu.capacity + " GPU" + (data.gpu.capacity !== 1 ? "s" : ""),
-      data: data.gpu.capacity > 0 ? 100 : 0,  // Show full bar if GPUs exist
+      data: data.gpu.current || 0,  // GPU utilization percentage from DCGM
       label1: "GPU",
       label2: "",
     }] : [{
@@ -223,7 +228,10 @@ const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
   ];
 
   return (
-    <div className="group flex justify-start items-start border-b-[2px] border-b-[#111111] border-t-[2px] border-t-[transparent] hover:border-t-[#3e3e3e] hover:border-b-[#3e3e3e] pt-[1rem]  pb-[.65rem]">
+    <div
+      onClick={handleRowClick}
+      className="group flex justify-start items-start border-b-[2px] border-b-[#111111] border-t-[2px] border-t-[transparent] hover:border-t-[#3e3e3e] hover:border-b-[#3e3e3e] pt-[1rem] pb-[.65rem] cursor-pointer hover:bg-[#0a0a0a] transition-colors"
+    >
       <div className="w-[21.15%] ml-[.9rem]">
         <div className="flex justify-start items-center">
           <div>
@@ -319,7 +327,8 @@ const NodeRow = ({ ip, data }: { data: Node; ip: string }) => {
       <div className="flex flex-col flex-auto justify-start items-center flex-auto pr-[.9rem]">
         <Button
           className="flex justify-center items-center group border-[1px] border-[#757575] bg-[#1F1F1F] max-w-[5.6rem] max-h-[1.8rem] gap-[.1rem] px-[.2rem] pl-[.6rem] pr-[.3rem] mt-[2.5rem] hover:border-[#EEEEEE] opacity-0 group-hover:opacity-100"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             openDrawer("cluster-event");
             setSelectedNode(data);
           }}
@@ -371,7 +380,7 @@ const ClusterNodes: React.FC<GeneralProps> = () => {
     <div className="w-full pt-[0.5rem]">
       {nodeMetrics && Object.keys(nodeMetrics).length > 0 ? (
         Object.keys(nodeMetrics).map((key, index) => (
-          <NodeRow key={index} data={nodeMetrics[key]} ip={key} />
+          <NodeRow key={index} data={nodeMetrics[key]} ip={key} clusterId={clustersId as string} />
         ))
       ) : (
         <>

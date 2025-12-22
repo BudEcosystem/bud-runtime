@@ -16,7 +16,7 @@ export default function DeleteCluster() {
       <BudWraperBox>
         <BudDrawerLayout>
           <BudStepAlert
-            type="warining"
+            type="warning"
             title="You're about to delete the cluster"
             description="You are about to delete the cluster. Once deleted, you won’t be able to recover. Please confirm, if you would like to proceed."
             confirmText="Delete Cluster"

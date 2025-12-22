@@ -29,7 +29,7 @@ import { Cluster, useCluster } from "src/hooks/useCluster";
 import ClusterGeneral from "./General";
 import DeploymentListTable from "./Deploymnets";
 import CostAnalysis from "./CostAnalysis";
-import ClusterNodes from "./Nodes";
+import ClusterNodes from "./nodes";
 import HealthStatus from "./HealthStatus";
 import Analytics from "./Analytics";
 import ClusterTags from "src/flows/components/ClusterTags";
@@ -219,7 +219,7 @@ const ClusterDetailsPage = () => {
       cancelText: "Cancel",
       okText: "Delete",
       key: "delete-cluster",
-      type: "warining",
+      type: "warning",
     });
   };
 

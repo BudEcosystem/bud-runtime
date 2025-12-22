@@ -32,6 +32,58 @@ from budprompt.prompt.schemas import Message
 logger = logging.get_logger(__name__)
 
 
+def strip_none_values(data: Any) -> Any:
+    """Recursively remove keys with None values from dicts and process lists.
+
+    When users pass null for a variable, we want Pydantic to use schema defaults
+    instead of treating null as an explicit value. This function strips None values
+    from dictionaries and recursively processes lists to handle nested structures.
+
+    Args:
+        data: Data structure (dict, list, or other) that may contain None values.
+
+    Returns:
+        New data structure with None values removed from dictionaries at all nesting levels.
+    """
+    if isinstance(data, dict):
+        return {k: strip_none_values(v) for k, v in data.items() if v is not None}
+    if isinstance(data, list):
+        return [strip_none_values(item) for item in data]
+    return data
+
+
+def apply_schema_defaults(data: Any) -> Any:
+    """Apply defaults from Pydantic model to its dict representation.
+
+    Gets defaults directly from the model's field definitions instead of
+    parsing JSON schema. This avoids complexity with $ref/$defs resolution.
+
+    Args:
+        data: Pydantic model instance or dict
+
+    Returns:
+        Dict with None/missing values replaced by model defaults
+    """
+    # If it's a Pydantic model, get defaults from model_fields
+    if hasattr(data, "model_dump") and hasattr(data, "model_fields"):
+        from pydantic_core import PydanticUndefined
+
+        result = data.model_dump()
+
+        for field_name, field_info in data.model_fields.items():
+            # Apply default if value is None and field has a default
+            if result.get(field_name) is None and field_info.default is not PydanticUndefined:
+                result[field_name] = field_info.default
+
+        return result
+
+    # Fallback: just convert to dict if possible
+    if hasattr(data, "model_dump"):
+        return data.model_dump()
+
+    return data
+
+
 def clean_model_cache():
     """Clean up any temporary modules from sys.modules."""
     modules_to_remove = [key for key in sys.modules if key.startswith("temp_models_")]

@@ -29,9 +29,13 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
       });
 
       const formatLegendText = (text: string) => {
-        return text
-          .replace(/[^a-zA-Z0-9]/g, " ")
-          .replace(/\b\w/g, (char) => char.toUpperCase());
+        const labelMap: Record<string, string> = {
+          avg_ttft: "Mean TTFT",
+          avg_tpot: "Mean TPOT",
+          avg_latency: "Mean Latency",
+          avg_output_len: "Mean Output Length",
+        };
+        return labelMap[text] || text.replace(/[^a-zA-Z0-9]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
       };
 
       const option = {
@@ -46,7 +50,7 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
             fontSize: 13,
             fontWeight: 400,
           },
-          icon: "square",
+          icon: "roundRect",
           itemWidth: 11,
           itemHeight: 11,
           itemStyle: {
@@ -75,7 +79,7 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
               (item) =>
                 `<div style="margin-bottom: 7px;">
                    <span style="display:inline-block;width:10px;height:10px;background-color:${item.color};margin-right:15px;border-radius:2px;font-size:13px;"></span>
-                   <span style="margin-right: 15px;display:inline-block;min-width:50px;">${item.value[item.seriesName]}%</span>
+                   <span style="margin-right: 15px;display:inline-block;min-width:50px;">${item.value[item.seriesName]}s</span>
                    ${item.seriesName}
                  </div>`,
             );
@@ -107,12 +111,6 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
             color: "#6A6E76",
             fontSize: 13,
             fontWeight: 300,
-            formatter: (value) => {
-              const maxLength = 5;
-              return value.length > maxLength
-                ? value.slice(0, maxLength) + "..."
-                : value;
-            },
           },
           axisTick: {
             show: false,
@@ -136,44 +134,37 @@ const BenchmarkChart: React.FC<BenchmarkChartProps> = ({ data }) => {
             fontWeight: 300,
           },
         },
-        series: [
-          {
-            type: "bar",
-            barWidth: 8,
-            barGap: "0%",
-            itemStyle: {
-              color: "#FF895E",
-              borderRadius: [5, 5, 0, 0],
+        // Generate series dynamically based on dimensions (excluding 'product' which is x-axis)
+        series: (() => {
+          const colors = ["#FF895E", "#479D5F", "#4077E6", "#D1B854"];
+          const metricDimensions = data.dimensions.filter(d => d !== "product");
+          return metricDimensions.map((_, index) => ({
+            type: "line",
+            smooth: true,
+            symbol: "circle",
+            symbolSize: 6,
+            lineStyle: {
+              width: 2,
+              color: colors[index % colors.length],
             },
-          },
-          {
-            type: "bar",
-            barWidth: 8,
-            barGap: "0%",
             itemStyle: {
-              color: "#479D5F",
-              borderRadius: [5, 5, 0, 0],
+              color: colors[index % colors.length],
             },
-          },
-          {
-            type: "bar",
-            barWidth: 8,
-            barGap: "0%",
-            itemStyle: {
-              color: "#4077E6",
-              borderRadius: [5, 5, 0, 0],
+            areaStyle: {
+              color: {
+                type: "linear",
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: colors[index % colors.length] + "40" },
+                  { offset: 1, color: colors[index % colors.length] + "05" },
+                ],
+              },
             },
-          },
-          {
-            type: "bar",
-            barWidth: 8,
-            barGap: "0%",
-            itemStyle: {
-              color: "#D1B854",
-              borderRadius: [5, 5, 0, 0],
-            },
-          },
-        ],
+          }));
+        })(),
       };
 
       myChart.setOption(option);

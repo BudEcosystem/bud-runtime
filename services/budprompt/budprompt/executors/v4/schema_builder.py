@@ -295,12 +295,15 @@ class CustomModelGenerator:
             if field_name in required_fields:
                 field_definitions[field_name] = (python_type, ...)  # Required field
             else:
+                # Get default value from JSON schema, fall back to None if not specified
+                default_value = field_schema.get("default")
+
                 # Make the type Optional if it's not required
                 # Don't wrap None type in Optional
                 if python_type is not type(None):
-                    field_definitions[field_name] = (Optional[python_type], None)
+                    field_definitions[field_name] = (Optional[python_type], default_value)
                 else:
-                    field_definitions[field_name] = (type(None), None)
+                    field_definitions[field_name] = (type(None), default_value)
 
         # Create base model first
         base_model = create_model(model_name, **field_definitions)

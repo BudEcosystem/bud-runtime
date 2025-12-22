@@ -633,8 +633,8 @@ class ClusterService(SessionMixin):
             )
 
             # Run The Grafana Creation Workflow
-            grafana = Grafana()
-            await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus", cluster_data.name)
+            # grafana = Grafana()
+            # await grafana.create_dashboard_from_file(bud_cluster_id, "prometheus", cluster_data.name)
 
             logger.debug(f"Cluster created successfully: {db_cluster.id}")
         except Exception as e:
@@ -841,10 +841,11 @@ class ClusterService(SessionMixin):
                 device_type = device.get("type", "").lower()
 
                 # Increment the appropriate counter
-                if device_type == "cpu":
+                # Device types from budcluster: "cpu", "cpu_high", "cuda", "gpu", "hpu"
+                if device_type in ("cpu", "cpu_high"):
                     cpu_count += 1
                     cpu_total_workers += worker_count
-                elif device_type == "gpu":
+                elif device_type in ("gpu", "cuda"):
                     gpu_count += 1
                     gpu_total_workers += worker_count
                 elif device_type == "hpu":
@@ -1638,10 +1639,10 @@ class ClusterService(SessionMixin):
             # Call budcluster service to get node details
             nodes_data = await self._perform_get_cluster_nodes_request(db_cluster.cluster_id)
 
-            # Fetch metrics from budmetrics and event counts from budcluster in parallel
+            # Fetch metrics from budmetrics and event counts from budmetrics in parallel
             events_endpoint = (
-                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/"
-                f"method/cluster/{db_cluster.cluster_id}/events-count-by-node"
+                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/"
+                f"method/cluster-metrics/{db_cluster.cluster_id}/node-events-count"
             )
 
             async with aiohttp.ClientSession() as http_session:
@@ -1664,9 +1665,10 @@ class ClusterService(SessionMixin):
                     events_by_hostname = {}
                     if events_resp.status == 200:
                         events_response = await events_resp.json()
-                        events_by_hostname = events_response.get("data", {})
+                        # budmetrics returns events_count dict
+                        events_by_hostname = events_response.get("events_count", {})
                     else:
-                        logger.warning(f"Failed to get event counts from budcluster: status {events_resp.status}")
+                        logger.warning(f"Failed to get event counts from budmetrics: status {events_resp.status}")
 
             # Helper function to extract system info from kernel_info
             def extract_system_info(node: dict) -> dict:
@@ -1796,10 +1798,16 @@ class ClusterService(SessionMixin):
                 }
 
                 # Add GPU field if node has GPUs
-                gpu_count = node_info.get("gpu_count", 0)
+                # Use GPU data from budmetrics (DCGM-based utilization) if available
+                # Falls back to budcluster's hardware_info for GPU count
+                metrics_gpu_count = node_metric.get("gpu_count", 0)
+                hardware_gpu_count = node_info.get("gpu_count", 0)
+                gpu_count = metrics_gpu_count if metrics_gpu_count > 0 else hardware_gpu_count
                 if gpu_count > 0:
+                    # GPU utilization from budmetrics (DCGM_FI_PROF_GR_ENGINE_ACTIVE)
+                    gpu_utilization = node_metric.get("gpu_utilization_percent", 0)
                     node_response["gpu"] = {
-                        "current": 0,  # No usage data available from hardware_info
+                        "current": round(gpu_utilization, 2),
                         "capacity": gpu_count,
                     }
 
@@ -1819,8 +1827,6 @@ class ClusterService(SessionMixin):
         Args:
             cluster_id: The ID of the cluster to get events for
             node_hostname: The hostname of the node to get events for
-            page: The page number to get
-            size: The number of events to get
 
         Returns:
             Dict containing the node-wise events
@@ -1828,22 +1834,24 @@ class ClusterService(SessionMixin):
         db_cluster = await self.get_cluster_details(cluster_id)
 
         try:
-            events_cluster_endpoint = (
+            # Use budmetrics for node events (from ClickHouse)
+            events_endpoint = (
                 f"{app_settings.dapr_base_url}/v1.0/invoke"
-                f"/{app_settings.bud_cluster_app_id}/method"
-                f"/cluster/{db_cluster.cluster_id}/node-wise-events/{node_hostname}"
+                f"/{app_settings.bud_metrics_app_id}/method"
+                f"/cluster-metrics/{db_cluster.cluster_id}/node-events/{node_hostname}"
             )
 
-            async with aiohttp.ClientSession() as session, session.get(events_cluster_endpoint) as response:
+            async with aiohttp.ClientSession() as session, session.get(events_endpoint) as response:
                 response_data = await response.json()
 
                 logger.debug(f"Node-wise events response: {response_data}")
 
-                if response.status != 200 or response_data.get("object") == "error":
+                if response.status != 200:
                     logger.error(f"Failed to get node-wise events: {response.status} {response_data}")
                     raise ClientException("Failed to get node-wise events")
 
-                return response_data.get("data", {})
+                # Return events in expected format
+                return {"events": response_data.get("events", [])}
 
         except Exception as e:
             raise ClientException(f"Failed to get node-wise events: {str(e)}")

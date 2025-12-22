@@ -8,6 +8,7 @@ in
     ../budk8s/configuration.nix
     ../common/configuration.nix
     ../dev/configuration.nix
+    ../disk/configuration.nix
   ];
 
   boot.supportedFilesystems = [ "nfs" ];

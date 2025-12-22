@@ -27,6 +27,8 @@ import { useRouter } from "next/router";
 import ComingSoon from "@/components/ui/comingSoon";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import CardWithBgAndTag from "@/components/ui/CardWithBgAndTag";
+import { useGPUMetrics, getUtilizationColor } from "src/hooks/useGPUMetrics";
+import { Cpu, HardDrive, Activity, Layers } from "lucide-react";
 
 const segmentOptions = ["today", "7days", "month"];
 const segmentOptionsMap = {
@@ -312,6 +314,32 @@ const GuageCharts = ({
   );
 };
 
+// GPU Summary Card Component
+interface GPUSummaryCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+  color?: string;
+}
+
+const GPUSummaryCard: React.FC<GPUSummaryCardProps> = ({ title, value, subtitle, icon, color = "#965CDE" }) => {
+  return (
+    <div className="bg-[#101010] rounded-lg p-4 border border-[#1F1F1F] flex flex-col gap-2 min-w-[180px] flex-1">
+      <div className="flex items-center justify-between">
+        <Text_13_400_757575>{title}</Text_13_400_757575>
+        <div style={{ color }} className="opacity-70">
+          {icon}
+        </div>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <Text_26_400_EEEEEE style={{ color }}>{value}</Text_26_400_EEEEEE>
+        {subtitle && <Text_13_400_757575>{subtitle}</Text_13_400_757575>}
+      </div>
+    </div>
+  );
+};
+
 const ClusterGeneral: React.FC<GeneralProps> = ({
   data,
   isActive = false,
@@ -329,6 +357,7 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
   const [chartRefreshKey, setChartRefreshKey] = useState<number>(0);
 
   const { getClusterMetrics } = useCluster();
+  const { metrics: gpuMetrics, fetchGPUMetrics } = useGPUMetrics();
   useLoaderOnLoding(loading);
 
   useEffect(() => {
@@ -344,6 +373,13 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
         });
     }
   }, [router.isReady, clustersId, selectedSegment]);
+
+  // Fetch GPU metrics for clusters with GPU hardware
+  useEffect(() => {
+    if (router.isReady && clustersId && data?.hardware_type?.includes("GPU")) {
+      fetchGPUMetrics(clustersId as string);
+    }
+  }, [router.isReady, clustersId, data?.hardware_type]);
 
   // Refresh charts when tab becomes active
   useEffect(() => {
@@ -539,6 +575,42 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
           <CardWithBgAndTag key={index} {...item} />
         ))}
       </div>
+
+      {/* GPU Summary Section */}
+      {data?.hardware_type?.includes("GPU") && gpuMetrics?.summary && (
+        <div className="mt-[1.55rem]">
+          <Text_19_600_EEEEEE className="mb-[1rem]">GPU Overview</Text_19_600_EEEEEE>
+          <div className="flex gap-4 flex-wrap">
+            <GPUSummaryCard
+              title="Total GPUs"
+              value={gpuMetrics.summary.total_gpus}
+              icon={<Cpu size={18} />}
+              color="#965CDE"
+            />
+            <GPUSummaryCard
+              title="GPU Memory"
+              value={`${gpuMetrics.summary.memory_utilization_percent.toFixed(1)}%`}
+              subtitle={`${gpuMetrics.summary.allocated_memory_gb.toFixed(1)} / ${gpuMetrics.summary.total_memory_gb.toFixed(1)} GB`}
+              icon={<HardDrive size={18} />}
+              color={getUtilizationColor(gpuMetrics.summary.memory_utilization_percent)}
+            />
+            <GPUSummaryCard
+              title="GPU Compute"
+              value={`${gpuMetrics.summary.avg_gpu_utilization_percent.toFixed(1)}%`}
+              subtitle="Avg utilization"
+              icon={<Activity size={18} />}
+              color={getUtilizationColor(gpuMetrics.summary.avg_gpu_utilization_percent)}
+            />
+            <GPUSummaryCard
+              title="Active Slices"
+              value={gpuMetrics.summary.active_slices}
+              subtitle={`of ${gpuMetrics.summary.total_slices} total`}
+              icon={<Layers size={18} />}
+              color="#3F8EF7"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Metrics Section with Time Period Filter */}
       {isHydrated && (

@@ -67,6 +67,7 @@ export type Dataset = {
   columns?: {};
   created_at?: string;
   description?: string;
+  display_name?: string;
   filename?: string;
   folder?: string;
   formatting?: string;
@@ -82,6 +83,52 @@ export type Dataset = {
   status?: string;
   subset?: {};
   tags?: {};
+};
+
+// Node Configuration Types
+export type TPPPOption = {
+  tp_size: number;
+  pp_size: number;
+  max_replicas: number;
+  total_devices_needed: number;
+  description: string;
+};
+
+export type DeviceTypeConfiguration = {
+  device_type: string;
+  device_name: string | null;
+  device_model: string | null;
+  total_devices: number;
+  nodes_count: number;
+  max_devices_per_node: number;
+  memory_per_device_gb: number;
+  tp_pp_options: TPPPOption[];
+  min_tp_required: number;
+  supports_pipeline_parallelism: boolean;
+};
+
+export type ModelMemoryInfo = {
+  model_id: string;
+  model_name: string | null;
+  model_uri: string | null;
+  estimated_weight_memory_gb: number;
+  min_tp_for_model: number;
+};
+
+export type NodeConfigurationResponse = {
+  cluster_id: string;
+  model_info: ModelMemoryInfo;
+  device_configurations: DeviceTypeConfiguration[];
+  selected_nodes: string[];
+  hardware_mode: string;
+};
+
+export type SelectedConfiguration = {
+  device_type: string;
+  tp_size: number;
+  pp_size: number;
+  replicas: number;
+  num_prompts?: number;
 };
 
 export const usePerfomanceBenchmark = create<{
@@ -102,6 +149,13 @@ export const usePerfomanceBenchmark = create<{
   selectedDataset: Dataset[];
   selectedModel: Model | null;
   runAsSimulation: boolean;
+  hardwareMode: "dedicated" | "shared" | null;
+
+  // Node Configuration state
+  nodeConfigurations: NodeConfigurationResponse | null;
+  selectedConfiguration: SelectedConfiguration | null;
+  loadingConfigurations: boolean;
+  configurationError: string | null;
 
   benchmarks: Benchmark[];
   currentWorkflow: WorkflowType | null;
@@ -130,17 +184,27 @@ export const usePerfomanceBenchmark = create<{
   setSelecteUnselectAllDataset: (selectAll: boolean) => void;
   setSelectedDataset: (dataset: Dataset) => void;
   setSelectedModel: (model: Model) => void;
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => void;
 
   createBenchmark: (data: CreateForm) => any;
   stepTwo: (data: StepTwo) => any;
   stepTwoDataset: () => any;
   stepThree: () => any;
+  stepHardwareMode: () => Promise<any>;
   stepFour: () => any;
   stepFive: () => any;
   updateCredentials: (credentials: Credentials) => any;
   stepSix: () => any;
   stepSeven: () => any;
   stepEight: () => any;
+
+  // Node Configuration methods
+  fetchNodeConfigurations: () => Promise<NodeConfigurationResponse | null>;
+  setSelectedConfiguration: (config: SelectedConfiguration | null) => void;
+  stepConfigurationOptions: () => Promise<any>;
+
+  // Cancel benchmark
+  cancelBenchmarkWorkflow: (workflowId: string) => Promise<any>;
 }>((set, get) => ({
   filters: {},
   totalPages: 0,
@@ -164,12 +228,22 @@ export const usePerfomanceBenchmark = create<{
   selectedDataset: [],
   selectedModel: null,
   selectedCredentials: null,
+  hardwareMode: null,
   totalDataset: null,
+
+  // Node Configuration state
+  nodeConfigurations: null,
+  selectedConfiguration: null,
+  loadingConfigurations: false,
+  configurationError: null,
   setSelectedCredentials: (credentials: Credentials | null) => {
     set({ selectedCredentials: credentials });
   },
   setSelectedModel: (model: any) => {
     set({ selectedModel: model });
+  },
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => {
+    set({ hardwareMode: mode });
   },
   setNodeMetrics: (nodeMetrics: any) => {
     set({ nodeMetrics: nodeMetrics });
@@ -209,6 +283,11 @@ export const usePerfomanceBenchmark = create<{
       selectedDataset: [],
       totalDataset: null,
       evalWith: "",
+      hardwareMode: null,
+      nodeConfigurations: null,
+      selectedConfiguration: null,
+      loadingConfigurations: false,
+      configurationError: null,
     });
   },
 
@@ -244,7 +323,57 @@ export const usePerfomanceBenchmark = create<{
       );
       if (response) {
         const workflow: WorkflowType = response.data;
-        set({ currentWorkflow: workflow });
+        const steps = workflow.workflow_steps as any;
+
+        // Capture existing state BEFORE the set() call to preserve values if API doesn't return them
+        const existingState = get();
+        const existingStepOneData = existingState.stepOneData;
+        const existingStepTwoData = existingState.stepTwoData;
+
+        // Only create stepOneData if API has data OR existing data exists
+        const hasStepOneData = steps?.name || steps?.concurrent_requests || existingStepOneData;
+        const newStepOneData = hasStepOneData ? {
+          name: steps?.name ?? existingStepOneData?.name ?? "",
+          description: steps?.description ?? existingStepOneData?.description ?? "",
+          tags: steps?.tags ?? existingStepOneData?.tags ?? [],
+          concurrent_requests: steps?.concurrent_requests ?? existingStepOneData?.concurrent_requests,
+          eval_with: steps?.eval_with ?? existingStepOneData?.eval_with ?? "",
+        } : null;
+
+        // Only create stepTwoData if API has data OR existing data exists
+        const hasStepTwoData = steps?.max_input_tokens || steps?.max_output_tokens || existingStepTwoData;
+        const newStepTwoData = hasStepTwoData ? {
+          max_input_tokens: steps?.max_input_tokens ?? existingStepTwoData?.max_input_tokens ?? "",
+          max_output_tokens: steps?.max_output_tokens ?? existingStepTwoData?.max_output_tokens ?? "",
+        } : null;
+
+        set({
+          currentWorkflow: workflow,
+          // Step 1 data - preserve existing values if API response doesn't have them
+          stepOneData: newStepOneData,
+          evalWith: steps?.eval_with ?? existingStepOneData?.eval_with ?? "",
+          // Cluster and nodes - preserve existing values if API response doesn't have them
+          selectedCluster: steps?.cluster ?? existingState.selectedCluster,
+          nodeMetrics: steps?.nodes ?? existingState.nodeMetrics,
+          filteredNodeMetrics: steps?.nodes ?? existingState.filteredNodeMetrics,
+          // Hardware mode
+          hardwareMode: steps?.hardware_mode ?? existingState.hardwareMode,
+          // Model
+          selectedModel: steps?.model ?? existingState.selectedModel,
+          // Dataset
+          dataset: steps?.datasets ?? existingState.dataset ?? [],
+          // Step 2 data (tokens) - preserve existing values if API response doesn't have them
+          stepTwoData: newStepTwoData,
+          // Configuration - preserve existing values if API response doesn't have them
+          selectedConfiguration: steps?.selected_device_type ? {
+            device_type: steps.selected_device_type,
+            tp_size: steps.tp_size,
+            pp_size: steps.pp_size,
+            replicas: steps.replicas,
+            num_prompts: steps.num_prompts,
+          } : existingState.selectedConfiguration,
+        });
+
         return workflow;
       }
       // successToast(response.data.message);
@@ -350,8 +479,28 @@ export const usePerfomanceBenchmark = create<{
       set({ currentWorkflowId: response.data.workflow_id });
       console.log("response", response);
       return response;
-    } catch (error) {
-      console.error("Error creating model:", error);
+    } catch (error: any) {
+      console.error("Error creating benchmark:", error);
+      // Handle validation errors from API (Pydantic 422 errors)
+      let errorMessage = "Failed to create benchmark";
+      const detail = error?.response?.data?.detail;
+
+      if (detail) {
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((d: any) => d.msg || d.message).join(", ") || "Validation error";
+        } else if (typeof detail === "string") {
+          errorMessage = detail;
+        } else {
+          errorMessage = "Validation error";
+        }
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      errorToast(errorMessage);
+      return null;
     } finally {
       get().setLoading(false);
     }
@@ -376,7 +525,7 @@ export const usePerfomanceBenchmark = create<{
           trigger_workflow: false,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -404,7 +553,7 @@ export const usePerfomanceBenchmark = create<{
           datasets: get().selectedDataset.map((dataset) => dataset.id),
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -434,7 +583,7 @@ export const usePerfomanceBenchmark = create<{
           cluster_id: cluster?.id,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -443,9 +592,37 @@ export const usePerfomanceBenchmark = create<{
       get().setLoading(false);
     }
   },
+  stepHardwareMode: async () => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const hardwareMode = get().hardwareMode;
+    if (!hardwareMode) {
+      errorToast("Please select a hardware mode");
+      return;
+    }
+    get().setLoading(true);
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/run-workflow`,
+        {
+          ...get().stepOneData,
+          workflow_id: workflowId,
+          step_number: 4,
+          trigger_workflow: false,
+          hardware_mode: hardwareMode,
+        },
+      );
+      await get().getWorkflow();
+      return response;
+    } catch (error) {
+      console.error("Error saving hardware mode:", error);
+    } finally {
+      get().setLoading(false);
+    }
+  },
   stepFour: async () => {
     const workflowId = get().currentWorkflow?.workflow_id;
     const nodes = get().selectedNodes;
+    const hardwareMode = get().hardwareMode;
     console.log("cluster", nodes);
     if (!nodes) {
       errorToast("Please select nodes");
@@ -458,12 +635,13 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 4,
+          step_number: 5,
           trigger_workflow: false,
           nodes: nodes,
+          hardware_mode: hardwareMode,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -487,12 +665,12 @@ export const usePerfomanceBenchmark = create<{
           ...get().stepOneData,
           ...get().stepTwoData,
           workflow_id: workflowId,
-          step_number: 5,
+          step_number: 6,
           // "trigger_workflow": false,
           model_id: modelId,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -514,13 +692,13 @@ export const usePerfomanceBenchmark = create<{
         `${tempApiBaseUrl}/benchmark/run-workflow`,
         {
           ...get().stepOneData,
-          step_number: 5,
+          step_number: 6,
           trigger_workflow: false,
           workflow_id: workflowId,
           credential_id: credentials?.id,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
     } catch (error) {
       console.error("Error creating model:", error);
@@ -542,11 +720,11 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 6,
+          step_number: 8,
           // "trigger_workflow": false,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -569,12 +747,12 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 7,
+          step_number: 8,
           // "trigger_workflow": false,
           user_confirmation: true,
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
@@ -594,7 +772,7 @@ export const usePerfomanceBenchmark = create<{
         {
           ...get().stepOneData,
           workflow_id: workflowId,
-          step_number: 8,
+          step_number: 9,
           // "trigger_workflow": false,
           run_as_simulation: simulation,
           trigger_workflow: true,
@@ -603,13 +781,139 @@ export const usePerfomanceBenchmark = create<{
           simulator_id: "",
         },
       );
-      get().getWorkflow();
+      await get().getWorkflow();
       // successToast(response.data.message);
       return response;
     } catch (error) {
       console.error("Error creating model:", error);
     } finally {
       get().setLoading(false);
+    }
+  },
+
+  // Node Configuration methods
+  fetchNodeConfigurations: async () => {
+    const clusterId = get().selectedCluster?.id;
+    const modelId = get().selectedModel?.id;
+    const nodes = get().selectedNodes;
+    const hardwareMode = get().hardwareMode;
+    const stepTwoData = get().stepTwoData;
+
+    if (!clusterId || !modelId || !nodes.length) {
+      errorToast("Missing required data for configuration options");
+      return null;
+    }
+
+    // Extract hostnames from selected nodes
+    const hostnames = nodes
+      .map((node) => node.hostname)
+      .filter((h): h is string => !!h);
+
+    if (!hostnames.length) {
+      errorToast("No valid hostnames found in selected nodes");
+      return null;
+    }
+
+    set({ loadingConfigurations: true, configurationError: null });
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/node-configurations`,
+        {
+          model_id: modelId,
+          cluster_id: clusterId,
+          hostnames: hostnames,
+          hardware_mode: hardwareMode || "dedicated",
+          input_tokens: stepTwoData?.max_input_tokens
+            ? parseInt(stepTwoData.max_input_tokens)
+            : 1024,
+          output_tokens: stepTwoData?.max_output_tokens
+            ? parseInt(stepTwoData.max_output_tokens)
+            : 512,
+          concurrency: get().stepOneData?.concurrent_requests || 10,
+        },
+      );
+      // Check for error response in body (API returns error object with 200/400 status)
+      if (response?.data?.object === "error" || response?.data?.code >= 400) {
+        const errorMessage =
+          response?.data?.message || "Failed to fetch configuration options";
+        set({ configurationError: errorMessage });
+        return null;
+      }
+      if (response?.data) {
+        set({ nodeConfigurations: response.data });
+        return response.data as NodeConfigurationResponse;
+      }
+      return null;
+    } catch (error: any) {
+      console.error("Error fetching node configurations:", error);
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch configuration options";
+      set({ configurationError: errorMessage });
+      return null;
+    } finally {
+      set({ loadingConfigurations: false });
+    }
+  },
+
+  setSelectedConfiguration: (config: SelectedConfiguration | null) => {
+    set({ selectedConfiguration: config });
+  },
+
+  stepConfigurationOptions: async () => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const config = get().selectedConfiguration;
+
+    if (!config) {
+      errorToast("Please select a configuration");
+      return;
+    }
+
+    get().setLoading(true);
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/run-workflow`,
+        {
+          ...get().stepOneData,
+          workflow_id: workflowId,
+          step_number: 7,
+          trigger_workflow: false,
+          selected_device_type: config.device_type,
+          tp_size: config.tp_size,
+          pp_size: config.pp_size,
+          replicas: config.replicas,
+          num_prompts: config.num_prompts,
+        },
+      );
+      await get().getWorkflow();
+      return response;
+    } catch (error) {
+      console.error("Error saving configuration options:", error);
+      errorToast("Failed to save configuration options");
+    } finally {
+      get().setLoading(false);
+    }
+  },
+
+  // Cancel benchmark workflow
+  cancelBenchmarkWorkflow: async (workflowId: string) => {
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/benchmark/cancel`,
+        {
+          workflow_id: workflowId,
+        },
+      );
+      if (response?.data) {
+        get().reset();
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error cancelling benchmark:", error);
+      errorToast("Failed to cancel benchmark");
+      return null;
     }
   },
 }));

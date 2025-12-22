@@ -853,3 +853,126 @@ class LatencyDistributionResponse(SuccessResponse):
     bucket_definitions: List[Dict[str, Union[int, str]]] = Field(
         ..., description="The bucket ranges used for the distribution"
     )
+
+
+# ============ GPU Metrics Proxy Schemas ============
+
+
+class GPUDeviceMetrics(BaseModel):
+    """GPU device metrics data."""
+
+    device_uuid: str
+    device_index: int
+    device_type: str
+    node_name: str
+    total_memory_gb: float
+    memory_allocated_gb: float
+    memory_utilization_percent: float
+    core_utilization_percent: float
+    cores_allocated_percent: float
+    shared_containers_count: int
+    hardware_mode: str
+    last_metrics_update: datetime
+    temperature_celsius: Optional[float] = None
+    power_watts: Optional[float] = None
+    sm_clock_mhz: Optional[int] = None
+    memory_clock_mhz: Optional[int] = None
+
+
+class HAMISliceMetrics(BaseModel):
+    """HAMI slice (container GPU allocation) metrics data."""
+
+    pod_name: str
+    pod_namespace: str
+    container_name: str
+    device_uuid: str
+    device_index: int
+    node_name: str
+    memory_limit_bytes: int
+    memory_limit_gb: float
+    memory_used_bytes: int
+    memory_used_gb: float
+    memory_utilization_percent: float
+    core_limit_percent: float
+    core_used_percent: float
+    gpu_utilization_percent: float
+    status: str
+
+
+class NodeGPUSummaryMetrics(BaseModel):
+    """Summary of GPU metrics for a single node."""
+
+    gpu_count: int
+    total_memory_gb: float
+    allocated_memory_gb: float
+    memory_utilization_percent: float
+    avg_gpu_utilization_percent: float
+    active_slices: int
+
+
+class NodeGPUMetricsResponse(SuccessResponse):
+    """Response for node-specific GPU metrics."""
+
+    cluster_id: str
+    node_name: str
+    timestamp: datetime
+    devices: List[GPUDeviceMetrics]
+    slices: List[HAMISliceMetrics]
+    summary: NodeGPUSummaryMetrics
+
+
+class ClusterGPUSummaryMetrics(BaseModel):
+    """Summary of GPU metrics for entire cluster."""
+
+    total_gpus: int
+    total_memory_gb: float
+    allocated_memory_gb: float
+    available_memory_gb: float
+    memory_utilization_percent: float
+    avg_gpu_utilization_percent: float
+    total_slices: int
+    active_slices: int
+    avg_temperature_celsius: Optional[float] = None
+    total_power_watts: Optional[float] = None
+
+
+class NodeGPUSummaryItem(BaseModel):
+    """Summary of GPU metrics for a node within cluster response."""
+
+    node_name: str
+    gpu_count: int
+    total_memory_gb: float
+    allocated_memory_gb: float
+    memory_utilization_percent: float
+    avg_gpu_utilization_percent: float
+    active_slices: int
+
+
+class ClusterGPUMetricsResponse(SuccessResponse):
+    """Response for cluster-wide GPU metrics."""
+
+    cluster_id: str
+    timestamp: datetime
+    summary: ClusterGPUSummaryMetrics
+    nodes: List[NodeGPUSummaryItem]
+    devices: List[GPUDeviceMetrics]
+    slices: List[HAMISliceMetrics]
+
+
+class SliceActivityData(BaseModel):
+    """Slice activity data for timeseries charts."""
+
+    slice_name: str
+    namespace: str
+    data: List[float]
+
+
+class GPUTimeSeriesResponse(SuccessResponse):
+    """Response for GPU timeseries data."""
+
+    timestamps: List[int]
+    gpu_utilization: List[List[float]]
+    memory_utilization: List[List[float]]
+    temperature: List[List[float]]
+    power: List[List[float]]
+    slice_activity: List[SliceActivityData]

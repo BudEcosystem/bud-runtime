@@ -283,7 +283,7 @@ export default function ViewUser() {
         {showConfirm && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title={firstLineText}
               description={secondLineText}
               confirmText="Delete User"

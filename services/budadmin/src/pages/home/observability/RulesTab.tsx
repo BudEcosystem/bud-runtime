@@ -187,7 +187,7 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
         }
       },
       okText: "Delete Rule",
-      type: "warining",
+      type: "warning",
       loading: deletingRuleId === ruleId,
       key: "delete-rule",
     });

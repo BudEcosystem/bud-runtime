@@ -43,12 +43,23 @@ class BenchmarkService(SessionMixin):
             cluster_id=request.bud_cluster_id,
             benchmark_id=request.benchmark_id,
             model=request.model,
-            endpoint_name=str(request.benchmark_id),
+            endpoint_name="benchmark-" + request.name,
             concurrency=request.concurrent_requests,
             input_tokens=request.max_input_tokens,
             output_tokens=request.max_output_tokens,
             notification_metadata=request.notification_metadata,
             source_topic=request.source_topic,
+            # Storage configuration
+            default_storage_class=request.default_storage_class,
+            default_access_mode=request.default_access_mode,
+            storage_size_gb=request.storage_size_gb,
+            # Benchmark configuration options from step 6
+            hardware_mode=request.hardware_mode,
+            selected_device_type=request.selected_device_type,
+            tp_size=request.tp_size,
+            pp_size=request.pp_size,
+            replicas=request.replicas,
+            num_prompts=request.num_prompts,
         )
 
         if request.credential_id:

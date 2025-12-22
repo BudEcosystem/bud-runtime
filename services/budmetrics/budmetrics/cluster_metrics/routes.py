@@ -14,13 +14,20 @@ from starlette.status import HTTP_404_NOT_FOUND, HTTP_500_INTERNAL_SERVER_ERROR
 from ..observability.models import ClickHouseClient, ClickHouseConfig
 from .repository import ClusterMetricsRepository
 from .schemas import (
+    ClusterGPUMetricsResponse,
     ClusterHealthStatus,
     ClusterMetricsQuery,
     ClusterMetricsResponse,
     ClusterResourceSummary,
     GPUMetricsResponse,
+    GPUTimeSeriesResponse,
     MetricsAggregationRequest,
     MetricsAggregationResponse,
+    NodeEventDetail,
+    NodeEventsCountResponse,
+    NodeEventsListResponse,
+    NodeEventsStoreRequest,
+    NodeGPUMetricsResponse,
     NodeMetricsResponse,
     PodMetricsResponse,
     PrometheusCompatibleMetricsResponse,
@@ -348,4 +355,238 @@ async def get_prometheus_compatible_metrics(
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve metrics: {str(e)}",
+        ) from e
+
+
+# Node Events endpoints
+
+
+@router.post("/events/store")
+async def store_node_events(
+    request: NodeEventsStoreRequest,
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+):
+    """Store node events from budcluster.
+
+    This endpoint receives node events collected from Kubernetes clusters
+    and stores them in ClickHouse for later querying.
+
+    Args:
+        request: Request body containing cluster_id and events list
+        service: Injected cluster metrics service
+
+    Returns:
+        Dict with stored count
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        events_dict = [event.model_dump() for event in request.events]
+        count = await service.store_node_events(request.cluster_id, events_dict)
+
+        return {"status": "success", "stored_count": count}
+
+    except Exception as e:
+        logger.error(f"Error storing node events: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to store node events: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/node-events-count", response_model=NodeEventsCountResponse)
+async def get_node_events_count(
+    cluster_id: str,
+    from_time: Optional[datetime] = Query(default=None),
+    to_time: Optional[datetime] = Query(default=None),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> NodeEventsCountResponse:
+    """Get event counts per node for a cluster.
+
+    Args:
+        cluster_id: Cluster identifier
+        from_time: Start time (defaults to 24 hours ago)
+        to_time: End time (defaults to now)
+        service: Injected cluster metrics service
+
+    Returns:
+        Dict mapping node names to event counts
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        # Handle default time range here to ensure response reflects the actual query window
+        effective_to_time = to_time or datetime.utcnow()
+        effective_from_time = from_time or (effective_to_time - timedelta(hours=24))
+
+        events_count = await service.get_node_events_count(cluster_id, effective_from_time, effective_to_time)
+
+        return NodeEventsCountResponse(
+            cluster_id=cluster_id,
+            events_count=events_count,
+            from_time=effective_from_time,
+            to_time=effective_to_time,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting node events count: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve node events count: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/node-events/{node_name}", response_model=NodeEventsListResponse)
+async def get_node_events(
+    cluster_id: str,
+    node_name: str,
+    from_time: Optional[datetime] = Query(default=None),
+    to_time: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, le=1000),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> NodeEventsListResponse:
+    """Get events for a specific node.
+
+    Args:
+        cluster_id: Cluster identifier
+        node_name: Node hostname
+        from_time: Start time (defaults to 24 hours ago)
+        to_time: End time (defaults to now)
+        limit: Maximum events to return
+        service: Injected cluster metrics service
+
+    Returns:
+        List of node events
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        # Handle default time range here to ensure response reflects the actual query window
+        effective_to_time = to_time or datetime.utcnow()
+        effective_from_time = from_time or (effective_to_time - timedelta(hours=24))
+
+        events = await service.get_node_events(cluster_id, node_name, effective_from_time, effective_to_time, limit)
+
+        # Convert dict events to NodeEventDetail models
+        event_details = [NodeEventDetail(**event) for event in events]
+
+        return NodeEventsListResponse(
+            cluster_id=cluster_id,
+            node_name=node_name,
+            events=event_details,
+            total_events=len(event_details),
+            from_time=effective_from_time,
+            to_time=effective_to_time,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting node events: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve node events: {str(e)}",
+        ) from e
+
+
+# ============ HAMI GPU Metrics endpoints ============
+
+
+@router.get("/{cluster_id}/hami-gpu", response_model=ClusterGPUMetricsResponse)
+async def get_cluster_hami_gpu_metrics(
+    cluster_id: str,
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> ClusterGPUMetricsResponse:
+    """Get cluster-wide HAMI GPU metrics.
+
+    Returns GPU device metrics and slice allocations for all nodes in the cluster.
+    Includes summary statistics for the entire cluster.
+
+    Args:
+        cluster_id: Cluster identifier
+        service: Injected cluster metrics service
+
+    Returns:
+        ClusterGPUMetricsResponse with devices, slices, and summary
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_cluster_hami_gpu_metrics(cluster_id)
+
+    except Exception as e:
+        logger.error(f"Error getting cluster HAMI GPU metrics: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve cluster GPU metrics: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/nodes/{hostname}/hami-gpu", response_model=NodeGPUMetricsResponse)
+async def get_node_hami_gpu_metrics(
+    cluster_id: str,
+    hostname: str,
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> NodeGPUMetricsResponse:
+    """Get HAMI GPU metrics for a specific node.
+
+    Returns GPU device metrics and slice allocations for the specified node.
+    Includes summary statistics for the node.
+
+    Args:
+        cluster_id: Cluster identifier
+        hostname: Node hostname
+        service: Injected cluster metrics service
+
+    Returns:
+        NodeGPUMetricsResponse with devices, slices, and summary
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_node_hami_gpu_metrics(cluster_id, hostname)
+
+    except Exception as e:
+        logger.error(f"Error getting node HAMI GPU metrics: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve node GPU metrics: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/nodes/{hostname}/hami-gpu/timeseries", response_model=GPUTimeSeriesResponse)
+async def get_node_gpu_timeseries(
+    cluster_id: str,
+    hostname: str,
+    hours: int = Query(default=6, ge=1, le=168),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> GPUTimeSeriesResponse:
+    """Get GPU timeseries data for a specific node.
+
+    Returns historical GPU metrics for charts including utilization,
+    memory, temperature, power, and slice activity.
+
+    Args:
+        cluster_id: Cluster identifier
+        hostname: Node hostname
+        hours: Number of hours to look back (1-168, default 6)
+        service: Injected cluster metrics service
+
+    Returns:
+        GPUTimeSeriesResponse with timeseries arrays for charts
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_node_gpu_timeseries(cluster_id, hostname, hours)
+
+    except Exception as e:
+        logger.error(f"Error getting node GPU timeseries: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve GPU timeseries: {str(e)}",
         ) from e

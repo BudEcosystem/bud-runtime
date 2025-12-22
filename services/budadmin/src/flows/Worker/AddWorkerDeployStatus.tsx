@@ -39,7 +39,7 @@ export default function AddWorkerDeployStatus() {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to stop the deployment process"
               description="We highly recommend that you continue the process to deploy the workers"
               cancelText="Continue Scanning"

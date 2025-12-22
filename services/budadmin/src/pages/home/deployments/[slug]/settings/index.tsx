@@ -244,7 +244,7 @@ const DeploymentSettings: React.FC = () => {
           okText: "Yes, Save Settings",
           cancelText: "Cancel",
           loading: saveLoading,
-          type: "warining",
+          type: "warning",
           key: "save-deployment-settings",
           okAction: async () => {
             const success = await handleSave(values);

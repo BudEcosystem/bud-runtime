@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+/* Ant Design InputNumber dark theme overrides */
+.ant-input-number {
+  background-color: transparent !important;
+}
+
+.ant-input-number .ant-input-number-input {
+  background-color: transparent !important;
+  color: white !important;
+  padding-left: 0 !important;
+}
+.ant-input-number-input-wrap {
+  input {
+    padding-left: 0 !important;
+  }
+}
+
+.ant-input-number .ant-input-number-input::placeholder {
+  color: #666666 !important;
+}
+
+.ant-input-number-focused,
+.ant-input-number:focus,
+.ant-input-number:focus-within {
+  background-color: transparent !important;
+}
+
+.ant-input-number .ant-input-number-handler-wrap {
+  background-color: transparent !important;
+}
+
+.ant-input-number .ant-input-number-handler {
+  border-color: #333333 !important;
+}
+
+.ant-input-number .ant-input-number-handler-up-inner,
+.ant-input-number .ant-input-number-handler-down-inner {
+  color: #666666 !important;
+}

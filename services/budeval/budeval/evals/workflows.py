@@ -371,15 +371,59 @@ class EvaluationWorkflow:
             and monitoring_result.get("failed_jobs")
             and len(monitoring_result.get("failed_jobs", [])) > 0
         ):
-            # All jobs failed - no successful completions
+            # All jobs failed - extract error details
             failed_job_ids = monitoring_result.get("failed_jobs", [])
+            job_details = monitoring_result.get("job_details", {})
+
+            # Collect error details from all failed jobs
+            error_summaries = []
+            for job_id in failed_job_ids:
+                job_info = job_details.get(job_id, {})
+                error_details = job_info.get("error_details", {})
+
+                error_summaries.append(
+                    {
+                        "job_id": job_id,
+                        "category": error_details.get("category", "unknown"),
+                        "error_type": error_details.get("error_type", "UnknownError"),
+                        "message": error_details.get("actionable_message")
+                        or error_details.get("error_message", "Unknown error"),
+                        "file": error_details.get("file"),
+                        "line": error_details.get("line"),
+                    }
+                )
+
+            # Build user-friendly error message
+            primary_error = error_summaries[0] if error_summaries else None
+            if primary_error:
+                category_messages = {
+                    "dataset_missing": f"Dataset Error: {primary_error['message']}",
+                    "out_of_memory": f"Out of Memory: {primary_error['message']}",
+                    "gpu_error": f"GPU Error: {primary_error['message']}",
+                    "configuration": f"Configuration Error: {primary_error['message']}",
+                    "network_error": f"Network Error: {primary_error['message']}",
+                    "api_timeout": f"API Timeout: {primary_error['message']}",
+                    "dependency_missing": f"Missing Dependency: {primary_error['message']}",
+                    "file_missing": f"File Not Found: {primary_error['message']}",
+                    "invalid_input": f"Invalid Input: {primary_error['message']}",
+                    "infrastructure": f"Infrastructure Error: {primary_error['message']}",
+                }
+                user_message = category_messages.get(
+                    primary_error["category"], f"Evaluation Failed: {primary_error['message']}"
+                )
+            else:
+                user_message = f"All {len(failed_job_ids)} evaluation job(s) failed"
+
             notification_req.payload.event = "monitor_eval_job_progress"
             notification_req.payload.content = NotificationContent(
-                title="All Evaluation Jobs Failed",
-                message=f"All {len(failed_job_ids)} evaluation job(s) failed. Failed job IDs: {', '.join(failed_job_ids)}",
+                title="OpenCompass Evaluation Failed",
+                message=user_message,
                 status=WorkflowStatus.FAILED,
                 result={
                     "evaluation_id": str(evaluate_model_request_json.eval_id),
+                    "failed_jobs": len(failed_job_ids),
+                    "error_category": primary_error["category"] if primary_error else "unknown",
+                    "error_details": error_summaries,
                 },
             )
             dapr_workflows.publish_notification(
@@ -650,6 +694,35 @@ class EvaluationWorkflow:
                 message="Failed to check job status",
                 code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
             ).model_dump(mode="json")
+
+    @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
+    @staticmethod
+    def extract_job_error(
+        ctx: wf.WorkflowActivityContext,
+        extract_request: str,
+    ) -> dict:
+        """Extract error information from a failed job.
+
+        Args:
+            ctx (WorkflowActivityContext): The context of the Dapr workflow, providing
+                access to workflow instance information.
+            extract_request (str): A JSON string containing the job_id and kubeconfig.
+
+        Returns:
+            dict: Result containing success status and error_info.
+        """
+        logger = logging.getLogger("::EVAL:: ExtractJobError")
+        request = json.loads(extract_request)
+        job_id = request.get("job_id")
+        kubeconfig = request.get("kubeconfig")
+
+        try:
+            orchestrator = AnsibleOrchestrator()
+            error_info = orchestrator.extract_job_error(job_id, kubeconfig)
+            return {"success": True, "error_info": error_info}
+        except Exception as e:
+            logger.error(f"Error extracting error info: {e}", exc_info=True)
+            return {"success": False, "error_info": {"category": "unknown", "error_message": str(e)}}
 
     @dapr_workflows.register_activity  # type: ignore [reportUnknownReturnType,reportArgumentType] # noqa
     @staticmethod

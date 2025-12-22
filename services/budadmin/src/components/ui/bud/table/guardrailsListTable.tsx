@@ -145,7 +145,7 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
         setConfirmVisible(false);
       },
       okText: 'Delete',
-      type: 'warining'
+      type: 'warning'
     });
   }
 
