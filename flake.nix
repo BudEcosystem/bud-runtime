@@ -64,15 +64,23 @@
         host: system:
         lib.nixosSystem {
           inherit system;
-          modules = [
-            {
-              facter.reportPath = ./infra/nixos/${host}/facter.json;
-              networking.hostName = lib.mkForce host;
-            }
-            self.nixosModules.common
-            nixos-facter-modules.nixosModules.facter
-            ./infra/nixos/${host}/configuration.nix
-          ];
+          modules =
+            let
+              facter_report_path = ./infra/nixos/${host}/facter.json;
+            in
+            [
+              {
+                networking.hostName = lib.mkForce host;
+              }
+              self.nixosModules.common
+              nixos-facter-modules.nixosModules.facter
+              ./infra/nixos/${host}/configuration.nix
+            ]
+            ++ lib.optional (builtins.pathExists (builtins.toString facter_report_path)) [
+              {
+                facter.reportPath = ./infra/nixos/${host}/facter.json;
+              }
+            ];
         };
     in
     {
@@ -168,8 +176,14 @@
             forLinuxSystems (
               { system, pkgs }:
               let
-                images = (import ./nix/images/primary.nix self.nixosModules.primary) {
+                images_budk8s = (import ./nix/images/primary self.nixosModules) {
                   inherit lib;
+                  inherit system;
+                  inherit nixos-generators;
+                };
+                images_installer = (import ./nix/images/installer self.nixosModules) {
+                  inherit lib;
+                  inherit disko;
                   inherit system;
                   inherit nixos-generators;
                 };
@@ -180,7 +194,8 @@
                   budcustomer = self.packages.${system}.budcustomer;
                 };
               }
-              // images
+              // images_budk8s
+              // images_installer
             )
           );
 
