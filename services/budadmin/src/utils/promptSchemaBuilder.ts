@@ -34,18 +34,23 @@ const convertDefaultValue = (value: string, dataType?: string): any => {
   if (!value || !value.trim()) return undefined;
   switch (dataType) {
     case "number":
-      return Number(value) || 0;
+      const num = parseFloat(value);
+      return isFinite(num) ? num : undefined;
     case "boolean":
       return value.toLowerCase() === "true";
     case "array":
       try {
-        return JSON.parse(value);
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
       } catch {
         return [];
       }
     case "object":
       try {
-        return JSON.parse(value);
+        const parsed = JSON.parse(value);
+        return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          ? parsed
+          : {};
       } catch {
         return {};
       }
