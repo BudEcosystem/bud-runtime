@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Input, Tooltip } from 'antd';
 import { CredentialSchemaField } from '@/stores/useConnectors';
 import { Text_12_400_EEEEEE } from '@/components/ui/text';
@@ -38,12 +38,17 @@ export const CredentialConfigStep: React.FC<CredentialConfigStepProps> = ({
   isRegistering,
   isValid,
 }) => {
+  // Track which field was just copied (for tooltip feedback)
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   // Handler for copying redirect URI to clipboard
   const handleCopyUri = async (fieldName: string) => {
     const value = formData[fieldName];
     if (value) {
       try {
         await navigator.clipboard.writeText(value);
+        setCopiedField(fieldName);
+        setTimeout(() => setCopiedField(null), 2000);
       } catch (error) {
         console.error('Failed to copy URI:', error);
       }
@@ -116,8 +121,9 @@ export const CredentialConfigStep: React.FC<CredentialConfigStepProps> = ({
       default: {
         const isRedirectUri = isRedirectUriField(field.field, field.label);
 
+        const isCopied = copiedField === field.field;
         const copyButton = isRedirectUri ? (
-          <Tooltip title="Copy Redirect URI" placement="top">
+          <Tooltip title={isCopied ? "Copied" : "Copy Redirect URI"} placement="top">
             <button
               onClick={(e) => {
                 e.preventDefault();
