@@ -75,6 +75,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
     try {
       const params: any = {
+        modality: ['text_input','text_output'],
         page,
         limit: pageSize,
         search: Boolean(search)
