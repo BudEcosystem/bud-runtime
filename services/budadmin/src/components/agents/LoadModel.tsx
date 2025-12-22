@@ -124,7 +124,6 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       }
     } catch (error) {
       console.error("Error fetching deployments:", error);
-      errorToast("Failed to load deployments");
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
