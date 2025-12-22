@@ -1106,20 +1106,14 @@ async def get_cluster_gpu_metrics(
                 message="Cluster not found",
             ).to_http_response()
 
-        # Forward to budmetrics via Dapr HTTP API
+        # Forward to budmetrics via Dapr service invocation
         # Use cluster.cluster_id (budcluster ID) not cluster_id (budapp ID)
-        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/cluster-metrics/{cluster.cluster_id}/hami-gpu"
-        async with aiohttp.ClientSession() as http_session:
-            async with http_session.get(metrics_endpoint) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    logger.error(f"Budmetrics returned {response.status}: {error_text}")
-                    return ErrorResponse(
-                        code=response.status,
-                        message=f"Failed to get GPU metrics: {error_text}",
-                    ).to_http_response()
+        result = await DaprService.invoke_service(
+            app_settings.bud_metrics_app_id,
+            f"cluster-metrics/{cluster.cluster_id}/hami-gpu",
+            method="GET",
+        )
+        return result
     except ClientException as e:
         logger.error(f"Client error getting cluster GPU metrics: {e}")
         return ErrorResponse(
@@ -1174,20 +1168,14 @@ async def get_node_gpu_metrics(
                 message="Cluster not found",
             ).to_http_response()
 
-        # Forward to budmetrics via Dapr HTTP API
+        # Forward to budmetrics via Dapr service invocation
         # Use cluster.cluster_id (budcluster ID) not cluster_id (budapp ID)
-        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/cluster-metrics/{cluster.cluster_id}/nodes/{hostname}/hami-gpu"
-        async with aiohttp.ClientSession() as http_session:
-            async with http_session.get(metrics_endpoint) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    logger.error(f"Budmetrics returned {response.status}: {error_text}")
-                    return ErrorResponse(
-                        code=response.status,
-                        message=f"Failed to get node GPU metrics: {error_text}",
-                    ).to_http_response()
+        result = await DaprService.invoke_service(
+            app_settings.bud_metrics_app_id,
+            f"cluster-metrics/{cluster.cluster_id}/nodes/{hostname}/hami-gpu",
+            method="GET",
+        )
+        return result
     except ClientException as e:
         logger.error(f"Client error getting node GPU metrics: {e}")
         return ErrorResponse(
@@ -1243,20 +1231,15 @@ async def get_node_gpu_timeseries(
                 message="Cluster not found",
             ).to_http_response()
 
-        # Forward to budmetrics via Dapr HTTP API
+        # Forward to budmetrics via Dapr service invocation
         # Use cluster.cluster_id (budcluster ID) not cluster_id (budapp ID)
-        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/cluster-metrics/{cluster.cluster_id}/nodes/{hostname}/hami-gpu/timeseries"
-        async with aiohttp.ClientSession() as http_session:
-            async with http_session.get(metrics_endpoint, params={"hours": hours}) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    error_text = await response.text()
-                    logger.error(f"Budmetrics returned {response.status}: {error_text}")
-                    return ErrorResponse(
-                        code=response.status,
-                        message=f"Failed to get GPU timeseries: {error_text}",
-                    ).to_http_response()
+        result = await DaprService.invoke_service(
+            app_settings.bud_metrics_app_id,
+            f"cluster-metrics/{cluster.cluster_id}/nodes/{hostname}/hami-gpu/timeseries",
+            method="GET",
+            params={"hours": hours},
+        )
+        return result
     except ClientException as e:
         logger.error(f"Client error getting GPU timeseries: {e}")
         return ErrorResponse(

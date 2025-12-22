@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Flex, Table, Tag, Tooltip, Progress, Spin } from "antd";
 import * as echarts from "echarts";
+import { useRouter } from "next/router";
 import {
   Text_10_400_EEEEEE,
   Text_12_400_757575,
@@ -16,11 +17,9 @@ import {
 } from "@/components/ui/text";
 import {
   useGPUMetrics,
-  GPUDevice,
   HAMISlice,
   GPUClusterSummary,
   NodeGPUSummary,
-  formatMemoryGB,
   getSliceStatusColor,
   getUtilizationColor,
 } from "src/hooks/useGPUMetrics";
@@ -106,152 +105,6 @@ const GPUSummary: React.FC<GPUSummaryProps> = ({ summary }) => {
           color="#D1B854"
         />
       )}
-    </div>
-  );
-};
-
-// ============ GPU Device Card ============
-
-interface GPUDeviceCardProps {
-  device: GPUDevice;
-}
-
-const GPUDeviceCard: React.FC<GPUDeviceCardProps> = ({ device }) => {
-  const memoryChartRef = useRef<HTMLDivElement>(null);
-  const gpuChartRef = useRef<HTMLDivElement>(null);
-
-  // Helper to create gauge options
-  const createGaugeOption = (value: number, color: string) => ({
-    series: [
-      {
-        type: "gauge",
-        center: ["50%", "65%"],
-        radius: "95%",
-        startAngle: 200,
-        endAngle: -20,
-        min: 0,
-        max: 100,
-        splitNumber: 10,
-        itemStyle: { color },
-        progress: {
-          show: true,
-          width: 10,
-          roundCap: true,
-        },
-        pointer: { show: false },
-        axisLine: {
-          roundCap: true,
-          lineStyle: { width: 10, color: [[1, "#1F1F1F"]] },
-        },
-        axisTick: { show: false },
-        splitLine: { show: false },
-        axisLabel: { show: false },
-        title: { show: false },
-        detail: {
-          valueAnimation: true,
-          offsetCenter: [0, "15%"],
-          fontSize: 18,
-          fontWeight: "bold",
-          color: "#EEEEEE",
-          formatter: "{value}%",
-        },
-        data: [{ value: value.toFixed(1) }],
-      },
-    ],
-  });
-
-  useEffect(() => {
-    if (!memoryChartRef.current) return;
-    const chart = echarts.init(memoryChartRef.current);
-    chart.setOption(createGaugeOption(device.memory_utilization_percent, getUtilizationColor(device.memory_utilization_percent)));
-    const handleResize = () => chart.resize();
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      chart.dispose();
-    };
-  }, [device.memory_utilization_percent]);
-
-  useEffect(() => {
-    if (!gpuChartRef.current) return;
-    const chart = echarts.init(gpuChartRef.current);
-    // Use gpu_utilization_percent (actual DCGM utilization) instead of core_utilization_percent (always 0 in time-slicing mode)
-    const utilization = device.gpu_utilization_percent ?? device.core_utilization_percent;
-    chart.setOption(createGaugeOption(utilization, getUtilizationColor(utilization)));
-    const handleResize = () => chart.resize();
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      chart.dispose();
-    };
-  }, [device.gpu_utilization_percent, device.core_utilization_percent]);
-
-  return (
-    <div className="bg-[#111113] rounded-lg p-5 border border-[#1F1F1F]">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <Text_16_400_EEEEEE>{device.device_type}</Text_16_400_EEEEEE>
-          <Text_12_400_757575 className="mt-1">
-            {device.node_name} • GPU {device.device_index}
-          </Text_12_400_757575>
-        </div>
-        <Tag color="#965CDE" className="m-0">
-          {device.hardware_mode}
-        </Tag>
-      </div>
-
-      {/* Dual Gauges: Memory & GPU Utilization */}
-      <div className="flex gap-4 mb-3">
-        {/* Memory Gauge */}
-        <div className="flex-1 text-center">
-          <div ref={memoryChartRef} style={{ width: "100%", height: 120 }} />
-          <Text_12_400_757575 className="block mt-[-8px]">Memory</Text_12_400_757575>
-          <Text_10_400_EEEEEE className="text-[#757575]">
-            {device.memory_allocated_gb.toFixed(1)} / {device.total_memory_gb.toFixed(1)} GB
-          </Text_10_400_EEEEEE>
-        </div>
-
-        {/* GPU Utilization Gauge */}
-        <div className="flex-1 text-center">
-          <div ref={gpuChartRef} style={{ width: "100%", height: 120 }} />
-          <Text_12_400_757575 className="block mt-[-8px]">GPU Compute</Text_12_400_757575>
-          <Text_10_400_EEEEEE className="text-[#757575]">
-            {device.shared_containers_count} container{device.shared_containers_count !== 1 ? "s" : ""}
-          </Text_10_400_EEEEEE>
-        </div>
-      </div>
-
-      {/* Device Details Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-[#1F1F1F]">
-        {device.temperature_celsius != null && (
-          <div className="text-center">
-            <Text_12_400_757575 className="block">Temp</Text_12_400_757575>
-            <Text_12_400_EEEEEE style={{ color: device.temperature_celsius > 80 ? "#EC7575" : device.temperature_celsius > 60 ? "#FA8C16" : "#EEEEEE" }}>
-              {device.temperature_celsius}°C
-            </Text_12_400_EEEEEE>
-          </div>
-        )}
-        {device.power_watts != null && (
-          <div className="text-center">
-            <Text_12_400_757575 className="block">Power</Text_12_400_757575>
-            <Text_12_400_EEEEEE>{device.power_watts.toFixed(0)}W</Text_12_400_EEEEEE>
-          </div>
-        )}
-        {device.sm_clock_mhz != null && (
-          <div className="text-center">
-            <Text_12_400_757575 className="block">SM Clock</Text_12_400_757575>
-            <Text_12_400_EEEEEE>{device.sm_clock_mhz} MHz</Text_12_400_EEEEEE>
-          </div>
-        )}
-        <div className="text-center">
-          <Text_12_400_757575 className="block">UUID</Text_12_400_757575>
-          <Tooltip title={device.device_uuid}>
-            <Text_12_400_EEEEEE className="truncate max-w-[80px] inline-block">
-              {device.device_uuid.substring(4, 12)}...
-            </Text_12_400_EEEEEE>
-          </Tooltip>
-        </div>
-      </div>
     </div>
   );
 };
@@ -483,21 +336,21 @@ const MemoryAllocationChart: React.FC<MemoryAllocationChartProps> = ({ slices, t
 
 // ============ Main GPUMetrics Component ============
 
-interface GPUMetricsProps {
-  cluster_id: string;
-}
+const GPUMetrics: React.FC = () => {
+  const router = useRouter();
+  const { clustersId } = router.query;
+  const cluster_id = clustersId as string;
 
-const GPUMetrics: React.FC<GPUMetricsProps> = ({ cluster_id }) => {
   const { metrics, loading, error, fetchGPUMetrics } = useGPUMetrics();
   const [refreshKey, setRefreshKey] = useState(0);
 
   useLoaderOnLoding(loading);
 
   useEffect(() => {
-    if (cluster_id) {
+    if (router.isReady && cluster_id) {
       fetchGPUMetrics(cluster_id);
     }
-  }, [cluster_id, refreshKey]);
+  }, [router.isReady, cluster_id, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
