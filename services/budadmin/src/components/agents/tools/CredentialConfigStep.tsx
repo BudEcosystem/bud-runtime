@@ -1,16 +1,25 @@
 'use client';
 
 import React from 'react';
-import { Input } from 'antd';
+import { Input, Tooltip } from 'antd';
 import { CredentialSchemaField } from '@/stores/useConnectors';
 import { Text_12_400_EEEEEE } from '@/components/ui/text';
 import { PrimaryButton } from '@/components/ui/bud/form/Buttons';
 import CustomSelect from 'src/flows/components/CustomSelect';
 
-// Helper to identify redirect URI fields
-const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
-const isRedirectUriField = (fieldName: string) =>
-  REDIRECT_URI_FIELDS.includes(fieldName.toLowerCase());
+// Helper to identify redirect URI fields - check both field name and common patterns
+const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url', 'redirecturi', 'redirecturl', 'callbackurl'];
+const isRedirectUriField = (fieldName: string, label?: string) => {
+  const normalizedField = fieldName.toLowerCase().replace(/[_-]/g, '');
+  const normalizedLabel = label?.toLowerCase().replace(/[_-]/g, '') || '';
+
+  // Check if field name matches any known patterns
+  const fieldMatches = REDIRECT_URI_FIELDS.some(f => normalizedField.includes(f.replace(/[_-]/g, '')));
+  // Check if label contains "redirect" and "uri" or "url"
+  const labelMatches = (normalizedLabel.includes('redirect') && (normalizedLabel.includes('uri') || normalizedLabel.includes('url')));
+
+  return fieldMatches || labelMatches;
+};
 
 interface CredentialConfigStepProps {
   credentialSchema: CredentialSchemaField[];
@@ -29,6 +38,18 @@ export const CredentialConfigStep: React.FC<CredentialConfigStepProps> = ({
   isRegistering,
   isValid,
 }) => {
+  // Handler for copying redirect URI to clipboard
+  const handleCopyUri = async (fieldName: string) => {
+    const value = formData[fieldName];
+    if (value) {
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (error) {
+        console.error('Failed to copy URI:', error);
+      }
+    }
+  };
+
   // Helper function to filter visible fields based on grant_type selection
   const getVisibleFields = (fields: CredentialSchemaField[]): CredentialSchemaField[] => {
     const grantTypeValue = formData['grant_type'];
@@ -93,7 +114,38 @@ export const CredentialConfigStep: React.FC<CredentialConfigStepProps> = ({
       case 'url':
       case 'text':
       default: {
-        const isRedirectUri = isRedirectUriField(field.field);
+        const isRedirectUri = isRedirectUriField(field.field, field.label);
+
+        const copyButton = isRedirectUri ? (
+          <Tooltip title="Copy Redirect URI" placement="top">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCopyUri(field.field);
+              }}
+              className="flex items-center justify-center hover:bg-[#2A2A2A] rounded transition-colors p-0.5"
+              type="button"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-[#808080] hover:text-[#EEEEEE] transition-colors"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          </Tooltip>
+        ) : undefined;
+
         return (
           <div key={field.field}>
             {renderLabel()}
@@ -111,6 +163,7 @@ export const CredentialConfigStep: React.FC<CredentialConfigStepProps> = ({
               }}
               autoComplete="off"
               disabled={isRedirectUri}
+              suffix={copyButton}
             />
           </div>
         );

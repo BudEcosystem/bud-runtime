@@ -137,10 +137,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     if (value) {
       try {
         await navigator.clipboard.writeText(value);
-        successToast('URI copied to clipboard');
       } catch (error) {
         console.error('Failed to copy URI:', error);
-        errorToast('Failed to copy URI');
       }
     }
   }, [formData]);
@@ -750,32 +748,31 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 autoComplete="off"
                 disabled={isRedirectUri}
               />
-              {isRedirectUri && (
-                <Tooltip title="Copy URI" placement="top">
-                  <button
-                    onClick={() => handleCopyUri(field.field)}
-                    className="p-1.5 rounded hover:bg-[#2A2A2A] transition-colors flex-shrink-0"
-                    style={{ transform: 'none' }}
-                    type="button"
+              <Tooltip title="Copy Redirect URI" placement="top">
+                <button
+                  onClick={() => handleCopyUri(field.field)}
+                  className="p-1.5 rounded hover:bg-[#2A2A2A] transition-colors flex-shrink-0"
+                  style={{ transform: 'none' }}
+                  type="button"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-[#808080] hover:text-[#EEEEEE]"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-[#808080]"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                    </svg>
-                  </button>
-                </Tooltip>
-              )}
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                </button>
+              </Tooltip>
+
             </div>
           </div>
         );
