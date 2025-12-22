@@ -122,6 +122,13 @@
             ]
           },
           {
+            "group": "Dashboard",
+            "icon": "gauge-high",
+            "pages": [
+              "dashboard/dashboard"
+            ]
+          },
+          {
             "group": "Prompts & Agents",
             "icon": "wand-magic-sparkles",
             "pages": [
