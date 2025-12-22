@@ -23,7 +23,7 @@ import {
   getSliceStatusColor,
   getUtilizationColor,
 } from "src/hooks/useGPUMetrics";
-import { GPUTimeSeriesCharts } from "./GPUTimeSeriesCharts";
+import { GPUTimeSeriesCharts } from "@/components/charts/gpuCharts/GPUTimeSeriesCharts";
 import { Node, useCluster } from "src/hooks/useCluster";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import NoDataFount from "@/components/ui/noDataFount";
