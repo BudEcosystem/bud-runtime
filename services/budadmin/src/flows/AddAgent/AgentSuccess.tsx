@@ -11,7 +11,7 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
 import { ModelFlowInfoCard } from "@/components/ui/bud/deploymentDrawer/DeployModelSpecificationInfo";
 import { useAddAgent } from "@/stores/useAddAgent";
-import { usePromptsAgents } from "@/stores/usePromptsAgents";
+import { usePrompts } from "src/hooks/usePrompts";
 import { useAgentStore } from "@/stores/useAgentStore";
 import CustomDropDown from "../components/CustomDropDown";
 import CustomPopover from "../components/customPopover";
@@ -64,12 +64,13 @@ const generateJavaScriptCode = (apiUrl: string, config?: EndpointConfig) => {
 export default function AgentSuccess() {
   const router = useRouter();
   const { closeDrawer } = useDrawer();
-  const { fetchPrompts } = usePromptsAgents();
+  const { getPrompts } = usePrompts();
   const { resetSessionState } = useAgentStore();
 
   // Get data from the Add Agent store
   const {
     currentWorkflow,
+    selectedProject,
     deploymentConfiguration,
     reset
   } = useAddAgent();
@@ -117,8 +118,16 @@ export default function AgentSuccess() {
     // Reset the add agent store to clear form data and increment formResetKey
     // This ensures the next agent creation flow starts with a clean form
     reset();
-    // Refresh the prompts list
-    fetchPrompts();
+    // Refresh the prompts list for the current project
+    const projectId = selectedProject?.id || currentWorkflow?.workflow_steps?.project?.id;
+    if (projectId) {
+      getPrompts({
+        page: 1,
+        limit: 1000,
+        order_by: '-created_at',
+        project_id: projectId,
+      }, projectId);
+    }
     // Close the drawer
     closeDrawer();
   };
