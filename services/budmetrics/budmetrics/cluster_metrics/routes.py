@@ -14,17 +14,20 @@ from starlette.status import HTTP_404_NOT_FOUND, HTTP_500_INTERNAL_SERVER_ERROR
 from ..observability.models import ClickHouseClient, ClickHouseConfig
 from .repository import ClusterMetricsRepository
 from .schemas import (
+    ClusterGPUMetricsResponse,
     ClusterHealthStatus,
     ClusterMetricsQuery,
     ClusterMetricsResponse,
     ClusterResourceSummary,
     GPUMetricsResponse,
+    GPUTimeSeriesResponse,
     MetricsAggregationRequest,
     MetricsAggregationResponse,
     NodeEventDetail,
     NodeEventsCountResponse,
     NodeEventsListResponse,
     NodeEventsStoreRequest,
+    NodeGPUMetricsResponse,
     NodeMetricsResponse,
     PodMetricsResponse,
     PrometheusCompatibleMetricsResponse,
@@ -484,4 +487,106 @@ async def get_node_events(
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve node events: {str(e)}",
+        ) from e
+
+
+# ============ HAMI GPU Metrics endpoints ============
+
+
+@router.get("/{cluster_id}/hami-gpu", response_model=ClusterGPUMetricsResponse)
+async def get_cluster_hami_gpu_metrics(
+    cluster_id: str,
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> ClusterGPUMetricsResponse:
+    """Get cluster-wide HAMI GPU metrics.
+
+    Returns GPU device metrics and slice allocations for all nodes in the cluster.
+    Includes summary statistics for the entire cluster.
+
+    Args:
+        cluster_id: Cluster identifier
+        service: Injected cluster metrics service
+
+    Returns:
+        ClusterGPUMetricsResponse with devices, slices, and summary
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_cluster_hami_gpu_metrics(cluster_id)
+
+    except Exception as e:
+        logger.error(f"Error getting cluster HAMI GPU metrics: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve cluster GPU metrics: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/nodes/{hostname}/hami-gpu", response_model=NodeGPUMetricsResponse)
+async def get_node_hami_gpu_metrics(
+    cluster_id: str,
+    hostname: str,
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> NodeGPUMetricsResponse:
+    """Get HAMI GPU metrics for a specific node.
+
+    Returns GPU device metrics and slice allocations for the specified node.
+    Includes summary statistics for the node.
+
+    Args:
+        cluster_id: Cluster identifier
+        hostname: Node hostname
+        service: Injected cluster metrics service
+
+    Returns:
+        NodeGPUMetricsResponse with devices, slices, and summary
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_node_hami_gpu_metrics(cluster_id, hostname)
+
+    except Exception as e:
+        logger.error(f"Error getting node HAMI GPU metrics: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve node GPU metrics: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/nodes/{hostname}/hami-gpu/timeseries", response_model=GPUTimeSeriesResponse)
+async def get_node_gpu_timeseries(
+    cluster_id: str,
+    hostname: str,
+    hours: int = Query(default=6, ge=1, le=168),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> GPUTimeSeriesResponse:
+    """Get GPU timeseries data for a specific node.
+
+    Returns historical GPU metrics for charts including utilization,
+    memory, temperature, power, and slice activity.
+
+    Args:
+        cluster_id: Cluster identifier
+        hostname: Node hostname
+        hours: Number of hours to look back (1-168, default 6)
+        service: Injected cluster metrics service
+
+    Returns:
+        GPUTimeSeriesResponse with timeseries arrays for charts
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_node_gpu_timeseries(cluster_id, hostname, hours)
+
+    except Exception as e:
+        logger.error(f"Error getting node GPU timeseries: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve GPU timeseries: {str(e)}",
         ) from e

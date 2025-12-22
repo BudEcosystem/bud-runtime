@@ -328,6 +328,139 @@ GROUP BY
     Attributes['node'],
     toUInt8OrZero(Attributes['gpu']);
 
+-- Materialized View for HAMI GPU Metrics (Time-Slicing)
+-- This will automatically populate metrics.HAMIGPUMetrics from HAMI scheduler metrics
+-- HAMI provides GPU time-slicing metrics different from DCGM hardware metrics
+CREATE MATERIALIZED VIEW IF NOT EXISTS metrics.mv_populate_hami_gpu_metrics
+TO metrics.HAMIGPUMetrics
+AS
+WITH
+-- Get device overview (metadata) from nodeGPUOverview metric
+-- nodeGPUOverview contains device UUID, type, index, and memory limit in labels
+device_overview AS (
+    SELECT
+        toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+        ResourceAttributes['cluster_id'] AS cluster_id,
+        anyLast(ResourceAttributes['cluster_name']) AS cluster_name,
+        Attributes['nodeid'] AS node_name,
+        Attributes['deviceuuid'] AS device_uuid,
+        anyLast(Attributes['devicetype']) AS device_type,
+        toUInt8OrZero(Attributes['deviceidx']) AS device_index,
+        -- devicememorylimit is in MiB, convert to GB
+        max(toFloat64OrZero(Attributes['devicememorylimit'])) / 1024.0 AS total_memory_gb
+    FROM metrics.otel_metrics_gauge
+    WHERE MetricName = 'nodeGPUOverview'
+      AND ResourceAttributes['cluster_id'] IS NOT NULL
+      AND ResourceAttributes['cluster_id'] != ''
+      AND Attributes['deviceuuid'] IS NOT NULL
+      AND Attributes['deviceuuid'] != ''
+    GROUP BY ts, cluster_id, node_name, device_uuid, device_index
+),
+-- Get core allocation percentage from GPUDeviceCoreAllocated
+core_allocated AS (
+    SELECT
+        toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+        ResourceAttributes['cluster_id'] AS cluster_id,
+        Attributes['deviceuuid'] AS device_uuid,
+        avg(Value) AS core_allocated_percent
+    FROM metrics.otel_metrics_gauge
+    WHERE MetricName = 'GPUDeviceCoreAllocated'
+      AND ResourceAttributes['cluster_id'] IS NOT NULL
+      AND ResourceAttributes['cluster_id'] != ''
+      AND Attributes['deviceuuid'] IS NOT NULL
+    GROUP BY ts, cluster_id, device_uuid
+),
+-- Get memory allocation (in bytes, convert to GB)
+memory_allocated AS (
+    SELECT
+        toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+        ResourceAttributes['cluster_id'] AS cluster_id,
+        Attributes['deviceuuid'] AS device_uuid,
+        avg(Value) / (1024 * 1024 * 1024) AS memory_allocated_gb
+    FROM metrics.otel_metrics_gauge
+    WHERE MetricName = 'GPUDeviceMemoryAllocated'
+      AND ResourceAttributes['cluster_id'] IS NOT NULL
+      AND ResourceAttributes['cluster_id'] != ''
+      AND Attributes['deviceuuid'] IS NOT NULL
+    GROUP BY ts, cluster_id, device_uuid
+),
+-- Get shared container count (number of pods sharing this GPU)
+shared_count AS (
+    SELECT
+        toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+        ResourceAttributes['cluster_id'] AS cluster_id,
+        Attributes['deviceuuid'] AS device_uuid,
+        max(toUInt16(Value)) AS shared_containers_count
+    FROM metrics.otel_metrics_gauge
+    WHERE MetricName = 'GPUDeviceSharedNum'
+      AND ResourceAttributes['cluster_id'] IS NOT NULL
+      AND ResourceAttributes['cluster_id'] != ''
+      AND Attributes['deviceuuid'] IS NOT NULL
+    GROUP BY ts, cluster_id, device_uuid
+),
+-- Get DCGM hardware metrics (temperature, power, utilization, clocks)
+-- DCGM metrics use 'UUID' label instead of 'deviceuuid'
+dcgm_metrics AS (
+    SELECT
+        toDateTime64(toStartOfInterval(TimeUnix, INTERVAL 1 MINUTE), 3) AS ts,
+        ResourceAttributes['cluster_id'] AS cluster_id,
+        Attributes['UUID'] AS device_uuid,
+        avgIf(Value, MetricName = 'DCGM_FI_DEV_GPU_TEMP') AS temperature_celsius,
+        avgIf(Value, MetricName = 'DCGM_FI_DEV_POWER_USAGE') AS power_watts,
+        avgIf(Value, MetricName = 'DCGM_FI_DEV_SM_CLOCK') AS sm_clock_mhz,
+        avgIf(Value, MetricName = 'DCGM_FI_DEV_MEM_CLOCK') AS mem_clock_mhz,
+        avgIf(Value, MetricName = 'DCGM_FI_DEV_GPU_UTIL') AS gpu_utilization_percent
+    FROM metrics.otel_metrics_gauge
+    WHERE MetricName IN (
+        'DCGM_FI_DEV_GPU_TEMP',
+        'DCGM_FI_DEV_POWER_USAGE',
+        'DCGM_FI_DEV_SM_CLOCK',
+        'DCGM_FI_DEV_MEM_CLOCK',
+        'DCGM_FI_DEV_GPU_UTIL'
+    )
+      AND ResourceAttributes['cluster_id'] IS NOT NULL
+      AND ResourceAttributes['cluster_id'] != ''
+      AND Attributes['UUID'] IS NOT NULL
+      AND Attributes['UUID'] != ''
+    GROUP BY ts, cluster_id, device_uuid
+)
+-- Combine all HAMI metrics with DCGM hardware data into final HAMIGPUMetrics table
+SELECT
+    d.ts AS ts,
+    d.cluster_id AS cluster_id,
+    d.cluster_name AS cluster_name,
+    d.node_name AS node_name,
+    d.device_uuid AS device_uuid,
+    d.device_type AS device_type,
+    d.device_index AS device_index,
+    COALESCE(c.core_allocated_percent, 0) AS core_allocated_percent,
+    COALESCE(m.memory_allocated_gb, 0) AS memory_allocated_gb,
+    COALESCE(s.shared_containers_count, 0) AS shared_containers_count,
+    d.total_memory_gb AS total_memory_gb,
+    100.0 AS total_cores_percent,
+    -- Core utilization is same as allocation in HAMI (time-slicing model)
+    COALESCE(c.core_allocated_percent, 0) AS core_utilization_percent,
+    -- Memory utilization percentage (allocated / total * 100)
+    CASE
+        WHEN d.total_memory_gb > 0 THEN LEAST(100, (COALESCE(m.memory_allocated_gb, 0) / d.total_memory_gb) * 100)
+        ELSE 0
+    END AS memory_utilization_percent,
+    'time-slicing' AS hardware_mode,
+    -- DCGM hardware metrics (enriched from DCGM Exporter)
+    COALESCE(dcgm.temperature_celsius, 0) AS temperature_celsius,
+    COALESCE(dcgm.power_watts, 0) AS power_watts,
+    toUInt32(COALESCE(dcgm.sm_clock_mhz, 0)) AS sm_clock_mhz,
+    toUInt32(COALESCE(dcgm.mem_clock_mhz, 0)) AS mem_clock_mhz,
+    COALESCE(dcgm.gpu_utilization_percent, 0) AS gpu_utilization_percent
+FROM device_overview d
+LEFT JOIN core_allocated c ON d.ts = c.ts AND d.cluster_id = c.cluster_id AND d.device_uuid = c.device_uuid
+LEFT JOIN memory_allocated m ON d.ts = m.ts AND d.cluster_id = m.cluster_id AND d.device_uuid = m.device_uuid
+LEFT JOIN shared_count s ON d.ts = s.ts AND d.cluster_id = s.cluster_id AND d.device_uuid = s.device_uuid
+LEFT JOIN dcgm_metrics dcgm ON d.ts = dcgm.ts AND d.cluster_id = dcgm.cluster_id AND d.device_uuid = dcgm.device_uuid;
+
+-- NOTE: mv_populate_hami_slice_metrics is created in migrate_clickhouse.py
+-- via create_hami_slice_metrics_materialized_view() method to ensure proper DROP/CREATE handling
+
 -- Materialized View for Generic Cluster Metrics
 -- This stores all metrics in a generic format for custom queries
 CREATE MATERIALIZED VIEW IF NOT EXISTS metrics.mv_populate_cluster_metrics

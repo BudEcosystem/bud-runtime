@@ -181,6 +181,51 @@ class ClusterMetricsRepository:
             },
         )
 
+    async def get_node_gpu_metrics(
+        self,
+        cluster_id: str,
+    ) -> List[Tuple]:
+        """Get aggregated GPU metrics per node for a cluster.
+
+        Args:
+            cluster_id: Cluster identifier
+
+        Returns:
+            List of tuples containing per-node GPU metrics:
+            (node_name, gpu_count, avg_gpu_utilization_percent, avg_memory_utilization_percent)
+        """
+        # Join HAMIGPUMetrics with DCGM data for accurate GPU utilization
+        # Uses DCGM_FI_PROF_GR_ENGINE_ACTIVE (0-1 ratio) for utilization since
+        # DCGM_FI_DEV_GPU_UTIL doesn't work correctly in HAMI time-slicing mode
+        query = """
+        WITH dcgm_metrics AS (
+            SELECT
+                Attributes['UUID'] AS device_uuid,
+                avg(if(MetricName = 'DCGM_FI_PROF_GR_ENGINE_ACTIVE', Value * 100, NULL)) AS gpu_util
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName = 'DCGM_FI_PROF_GR_ENGINE_ACTIVE'
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 5 MINUTE
+            GROUP BY device_uuid
+        )
+        SELECT
+            h.node_name,
+            count(DISTINCT h.device_uuid) AS gpu_count,
+            COALESCE(avg(d.gpu_util), avg(h.core_utilization_percent)) AS avg_gpu_utilization_percent,
+            avg(h.memory_utilization_percent) AS avg_memory_utilization_percent
+        FROM metrics.HAMIGPUMetrics h
+        LEFT JOIN dcgm_metrics d ON h.device_uuid = d.device_uuid
+        WHERE h.cluster_id = %(cluster_id)s
+          AND h.ts >= now() - INTERVAL 5 MINUTE
+        GROUP BY h.node_name
+        ORDER BY h.node_name
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={"cluster_id": cluster_id},
+        )
+
     async def get_pod_metrics(
         self,
         cluster_id: str,
@@ -1093,3 +1138,403 @@ class ClusterMetricsRepository:
                 "limit": limit,
             },
         )
+
+    # ============ HAMI GPU Metrics methods ============
+
+    async def get_cluster_hami_gpu_devices(self, cluster_id: str) -> List[Tuple]:
+        """Get latest HAMI GPU device metrics for entire cluster.
+
+        Args:
+            cluster_id: Cluster identifier
+
+        Returns:
+            List of tuples containing HAMI GPU device metrics:
+            (device_uuid, device_index, device_type, node_name, total_memory_gb,
+             memory_allocated_gb, memory_utilization_percent, core_utilization_percent,
+             total_cores_percent, shared_containers_count, hardware_mode, last_update,
+             temperature_celsius, power_watts, gpu_utilization_percent)
+        """
+        # Query joins HAMIGPUMetrics with DCGM data for accurate real-time hardware metrics
+        # Note: DCGM_FI_PROF_GR_ENGINE_ACTIVE (0-1 ratio) is used instead of DCGM_FI_DEV_GPU_UTIL
+        # because DEV_GPU_UTIL doesn't capture time-sliced workloads correctly in HAMI mode
+        query = """
+        WITH dcgm_metrics AS (
+            SELECT
+                Attributes['UUID'] AS device_uuid,
+                avg(if(MetricName = 'DCGM_FI_PROF_GR_ENGINE_ACTIVE', Value * 100, NULL)) AS gpu_util,
+                avg(if(MetricName = 'DCGM_FI_DEV_GPU_TEMP', Value, NULL)) AS temperature,
+                avg(if(MetricName = 'DCGM_FI_DEV_POWER_USAGE', Value, NULL)) AS power
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName IN ('DCGM_FI_PROF_GR_ENGINE_ACTIVE', 'DCGM_FI_DEV_GPU_TEMP', 'DCGM_FI_DEV_POWER_USAGE')
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 5 MINUTE
+            GROUP BY device_uuid
+        )
+        SELECT
+            h.device_uuid,
+            h.device_index,
+            anyLast(h.device_type) AS device_type,
+            h.node_name,
+            anyLast(h.total_memory_gb) AS total_memory_gb,
+            anyLast(h.memory_allocated_gb) AS memory_allocated_gb,
+            anyLast(h.memory_utilization_percent) AS memory_utilization_percent,
+            anyLast(h.core_utilization_percent) AS core_utilization_percent,
+            anyLast(h.total_cores_percent) AS total_cores_percent,
+            anyLast(h.shared_containers_count) AS shared_containers_count,
+            anyLast(h.hardware_mode) AS hardware_mode,
+            max(h.ts) AS last_update,
+            -- DCGM hardware metrics (enriched at query time from otel_metrics_gauge)
+            COALESCE(any(d.temperature), 0) AS temperature_celsius,
+            COALESCE(any(d.power), 0) AS power_watts,
+            COALESCE(any(d.gpu_util), anyLast(h.core_utilization_percent)) AS gpu_utilization_percent
+        FROM metrics.HAMIGPUMetrics h
+        LEFT JOIN dcgm_metrics d
+            ON h.device_uuid = d.device_uuid
+        WHERE h.cluster_id = %(cluster_id)s
+          AND h.ts >= now() - INTERVAL 5 MINUTE
+        GROUP BY h.device_uuid, h.device_index, h.node_name
+        ORDER BY h.node_name, h.device_index
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={"cluster_id": cluster_id},
+        )
+
+    async def get_cluster_hami_gpu_slices(self, cluster_id: str) -> List[Tuple]:
+        """Get latest HAMI slice metrics for entire cluster.
+
+        Args:
+            cluster_id: Cluster identifier
+
+        Returns:
+            List of tuples containing HAMI slice metrics:
+            (pod_name, pod_namespace, container_name, device_uuid, device_index,
+             node_name, memory_limit_bytes, memory_used_bytes, core_limit_percent,
+             core_used_percent, gpu_utilization_percent, status)
+        """
+        # Query joins HAMISliceMetrics with:
+        # 1. kube_pod_status_phase for accurate pod status
+        # 2. Device_utilization_desc_of_container for per-container GPU utilization from HAMI vGPUmonitor
+        query = """
+        WITH pod_status AS (
+            SELECT
+                Attributes['pod'] AS pod_name,
+                Attributes['namespace'] AS pod_namespace,
+                argMaxIf(Attributes['phase'], TimeUnix, Value = 1) AS phase
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName = 'kube_pod_status_phase'
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 10 MINUTE
+            GROUP BY pod_name, pod_namespace
+        ),
+        container_utilization AS (
+            SELECT
+                Attributes['podname'] AS pod_name,
+                Attributes['podnamespace'] AS pod_namespace,
+                Attributes['ctrname'] AS container_name,
+                Attributes['deviceuuid'] AS device_uuid,
+                avg(Value) AS gpu_util_percent
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName = 'Device_utilization_desc_of_container'
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 5 MINUTE
+            GROUP BY pod_name, pod_namespace, container_name, device_uuid
+        )
+        SELECT
+            s.pod_name,
+            s.pod_namespace,
+            anyLast(s.container_name) AS container_name,
+            s.device_uuid,
+            s.device_index,
+            s.node_name,
+            anyLast(s.memory_limit_bytes) AS memory_limit_bytes,
+            anyLast(s.memory_used_bytes) AS memory_used_bytes,
+            anyLast(s.core_limit_percent) AS core_limit_percent,
+            anyLast(s.core_used_percent) AS core_used_percent,
+            COALESCE(any(u.gpu_util_percent), anyLast(s.gpu_utilization_percent)) AS gpu_utilization_percent,
+            lower(COALESCE(any(p.phase), 'unknown')) AS status
+        FROM metrics.HAMISliceMetrics s
+        LEFT JOIN pod_status p
+            ON s.pod_name = p.pod_name
+            AND s.pod_namespace = p.pod_namespace
+        LEFT JOIN container_utilization u
+            ON s.pod_name = u.pod_name
+            AND s.pod_namespace = u.pod_namespace
+            AND s.container_name = u.container_name
+            AND s.device_uuid = u.device_uuid
+        WHERE s.cluster_id = %(cluster_id)s
+          AND s.ts >= now() - INTERVAL 5 MINUTE
+        GROUP BY s.pod_name, s.pod_namespace, s.device_uuid, s.device_index, s.node_name
+        ORDER BY s.node_name, s.device_index, s.pod_namespace, s.pod_name
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={"cluster_id": cluster_id},
+        )
+
+    async def get_node_hami_gpu_devices(self, cluster_id: str, node_name: str) -> List[Tuple]:
+        """Get latest HAMI GPU device metrics for a specific node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node hostname
+
+        Returns:
+            List of tuples containing HAMI GPU device metrics for the node
+        """
+        # Query joins HAMIGPUMetrics with DCGM data for accurate real-time hardware metrics
+        # Note: DCGM_FI_PROF_GR_ENGINE_ACTIVE (0-1 ratio) is used instead of DCGM_FI_DEV_GPU_UTIL
+        # because DEV_GPU_UTIL doesn't capture time-sliced workloads correctly in HAMI mode
+        query = """
+        WITH dcgm_metrics AS (
+            SELECT
+                Attributes['UUID'] AS device_uuid,
+                avg(if(MetricName = 'DCGM_FI_PROF_GR_ENGINE_ACTIVE', Value * 100, NULL)) AS gpu_util,
+                avg(if(MetricName = 'DCGM_FI_DEV_GPU_TEMP', Value, NULL)) AS temperature,
+                avg(if(MetricName = 'DCGM_FI_DEV_POWER_USAGE', Value, NULL)) AS power,
+                avg(if(MetricName = 'DCGM_FI_DEV_SM_CLOCK', Value, NULL)) AS sm_clock,
+                avg(if(MetricName = 'DCGM_FI_DEV_MEM_CLOCK', Value, NULL)) AS mem_clock
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName IN ('DCGM_FI_PROF_GR_ENGINE_ACTIVE', 'DCGM_FI_DEV_GPU_TEMP',
+                                 'DCGM_FI_DEV_POWER_USAGE', 'DCGM_FI_DEV_SM_CLOCK', 'DCGM_FI_DEV_MEM_CLOCK')
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 5 MINUTE
+            GROUP BY device_uuid
+        )
+        SELECT
+            h.device_uuid,
+            h.device_index,
+            anyLast(h.device_type) AS device_type,
+            h.node_name,
+            anyLast(h.total_memory_gb) AS total_memory_gb,
+            anyLast(h.memory_allocated_gb) AS memory_allocated_gb,
+            anyLast(h.memory_utilization_percent) AS memory_utilization_percent,
+            anyLast(h.core_utilization_percent) AS core_utilization_percent,
+            anyLast(h.total_cores_percent) AS total_cores_percent,
+            anyLast(h.shared_containers_count) AS shared_containers_count,
+            anyLast(h.hardware_mode) AS hardware_mode,
+            max(h.ts) AS last_update,
+            -- DCGM hardware metrics (enriched at query time from otel_metrics_gauge)
+            COALESCE(any(d.temperature), anyLast(h.temperature_celsius)) AS temperature_celsius,
+            COALESCE(any(d.power), anyLast(h.power_watts)) AS power_watts,
+            COALESCE(toUInt32(any(d.sm_clock)), anyLast(h.sm_clock_mhz)) AS sm_clock_mhz,
+            COALESCE(toUInt32(any(d.mem_clock)), anyLast(h.mem_clock_mhz)) AS mem_clock_mhz,
+            COALESCE(any(d.gpu_util), anyLast(h.gpu_utilization_percent)) AS gpu_utilization_percent
+        FROM metrics.HAMIGPUMetrics h
+        LEFT JOIN dcgm_metrics d
+            ON h.device_uuid = d.device_uuid
+        WHERE h.cluster_id = %(cluster_id)s
+          AND h.node_name = %(node_name)s
+          AND h.ts >= now() - INTERVAL 5 MINUTE
+        GROUP BY h.device_uuid, h.device_index, h.node_name
+        ORDER BY h.device_index
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={"cluster_id": cluster_id, "node_name": node_name},
+        )
+
+    async def get_node_hami_gpu_slices(self, cluster_id: str, node_name: str) -> List[Tuple]:
+        """Get latest HAMI slice metrics for a specific node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node hostname
+
+        Returns:
+            List of tuples containing HAMI slice metrics for the node
+        """
+        # Query joins HAMISliceMetrics with:
+        # 1. kube_pod_status_phase for accurate pod status
+        # 2. Device_utilization_desc_of_container for per-container GPU utilization from HAMI vGPUmonitor
+        query = """
+        WITH pod_status AS (
+            SELECT
+                Attributes['pod'] AS pod_name,
+                Attributes['namespace'] AS pod_namespace,
+                argMaxIf(Attributes['phase'], TimeUnix, Value = 1) AS phase
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName = 'kube_pod_status_phase'
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 10 MINUTE
+            GROUP BY pod_name, pod_namespace
+        ),
+        container_utilization AS (
+            SELECT
+                Attributes['podname'] AS pod_name,
+                Attributes['podnamespace'] AS pod_namespace,
+                Attributes['ctrname'] AS container_name,
+                Attributes['deviceuuid'] AS device_uuid,
+                avg(Value) AS gpu_util_percent
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName = 'Device_utilization_desc_of_container'
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL 5 MINUTE
+            GROUP BY pod_name, pod_namespace, container_name, device_uuid
+        )
+        SELECT
+            s.pod_name,
+            s.pod_namespace,
+            anyLast(s.container_name) AS container_name,
+            s.device_uuid,
+            s.device_index,
+            s.node_name,
+            anyLast(s.memory_limit_bytes) AS memory_limit_bytes,
+            anyLast(s.memory_used_bytes) AS memory_used_bytes,
+            anyLast(s.core_limit_percent) AS core_limit_percent,
+            anyLast(s.core_used_percent) AS core_used_percent,
+            COALESCE(any(u.gpu_util_percent), anyLast(s.gpu_utilization_percent)) AS gpu_utilization_percent,
+            lower(COALESCE(any(p.phase), 'unknown')) AS status
+        FROM metrics.HAMISliceMetrics s
+        LEFT JOIN pod_status p
+            ON s.pod_name = p.pod_name
+            AND s.pod_namespace = p.pod_namespace
+        LEFT JOIN container_utilization u
+            ON s.pod_name = u.pod_name
+            AND s.pod_namespace = u.pod_namespace
+            AND s.container_name = u.container_name
+            AND s.device_uuid = u.device_uuid
+        WHERE s.cluster_id = %(cluster_id)s
+          AND s.node_name = %(node_name)s
+          AND s.ts >= now() - INTERVAL 5 MINUTE
+        GROUP BY s.pod_name, s.pod_namespace, s.device_uuid, s.device_index, s.node_name
+        ORDER BY s.device_index, s.pod_namespace, s.pod_name
+        """
+
+        return await self.client.execute_query(
+            query,
+            params={"cluster_id": cluster_id, "node_name": node_name},
+        )
+
+    async def get_node_gpu_timeseries(
+        self,
+        cluster_id: str,
+        node_name: str,
+        hours: int = 6,
+    ) -> Tuple[List[Tuple], List[Tuple]]:
+        """Get GPU timeseries data for a node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node hostname
+            hours: Number of hours to look back (1, 6, 24, or 168)
+
+        Returns:
+            Tuple of (gpu_timeseries, slice_timeseries):
+            - gpu_timeseries: List of (bucket, gpu_index, utilization, memory_pct, temp, power)
+            - slice_timeseries: List of (bucket, pod_name, pod_namespace, utilization)
+        """
+        # Determine interval based on hours
+        if hours <= 1:
+            interval = "1 MINUTE"
+        elif hours <= 6:
+            interval = "5 MINUTE"
+        elif hours <= 24:
+            interval = "15 MINUTE"
+        else:
+            interval = "1 HOUR"
+
+        # Query for GPU metrics timeseries, joining HAMIGPUMetrics with DCGM data
+        # for accurate hardware utilization, temperature, and power metrics
+        gpu_query = f"""
+        WITH hami_data AS (
+            SELECT
+                toUnixTimestamp(toStartOfInterval(ts, INTERVAL {interval})) * 1000 AS bucket,
+                device_uuid,
+                device_index AS gpu_index,
+                avg(core_utilization_percent) AS hami_utilization,
+                avg(memory_utilization_percent) AS memory_pct
+            FROM metrics.HAMIGPUMetrics
+            WHERE cluster_id = %(cluster_id)s
+              AND node_name = %(node_name)s
+              AND ts >= now() - INTERVAL %(hours)s HOUR
+            GROUP BY bucket, device_uuid, gpu_index
+        ),
+        -- DCGM_FI_PROF_GR_ENGINE_ACTIVE (0-1 ratio) used instead of DCGM_FI_DEV_GPU_UTIL
+        -- because DEV_GPU_UTIL doesn't capture time-sliced workloads correctly in HAMI mode
+        dcgm_data AS (
+            SELECT
+                toUnixTimestamp(toStartOfInterval(TimeUnix, INTERVAL {interval})) * 1000 AS bucket,
+                Attributes['UUID'] AS device_uuid,
+                avg(if(MetricName = 'DCGM_FI_PROF_GR_ENGINE_ACTIVE', Value * 100, NULL)) AS gpu_util,
+                avg(if(MetricName = 'DCGM_FI_DEV_GPU_TEMP', Value, NULL)) AS temperature,
+                avg(if(MetricName = 'DCGM_FI_DEV_POWER_USAGE', Value, NULL)) AS power
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName IN ('DCGM_FI_PROF_GR_ENGINE_ACTIVE', 'DCGM_FI_DEV_GPU_TEMP', 'DCGM_FI_DEV_POWER_USAGE')
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL %(hours)s HOUR
+            GROUP BY bucket, device_uuid
+        )
+        SELECT
+            h.bucket,
+            h.gpu_index,
+            COALESCE(d.gpu_util, h.hami_utilization) AS utilization,
+            h.memory_pct,
+            COALESCE(d.temperature, 0) AS temperature,
+            COALESCE(d.power, 0) AS power
+        FROM hami_data h
+        LEFT JOIN dcgm_data d
+            ON h.bucket = d.bucket
+            AND h.device_uuid = d.device_uuid
+        ORDER BY h.bucket, h.gpu_index
+        """
+
+        # Query for slice activity timeseries using per-container utilization from HAMI vGPUmonitor
+        slice_query = f"""
+        WITH slice_data AS (
+            SELECT
+                toUnixTimestamp(toStartOfInterval(ts, INTERVAL {interval})) * 1000 AS bucket,
+                pod_name,
+                pod_namespace,
+                container_name,
+                device_uuid,
+                avg(gpu_utilization_percent) AS hami_utilization
+            FROM metrics.HAMISliceMetrics
+            WHERE cluster_id = %(cluster_id)s
+              AND node_name = %(node_name)s
+              AND ts >= now() - INTERVAL %(hours)s HOUR
+            GROUP BY bucket, pod_name, pod_namespace, container_name, device_uuid
+        ),
+        container_util AS (
+            SELECT
+                toUnixTimestamp(toStartOfInterval(TimeUnix, INTERVAL {interval})) * 1000 AS bucket,
+                Attributes['podname'] AS pod_name,
+                Attributes['podnamespace'] AS pod_namespace,
+                Attributes['ctrname'] AS container_name,
+                Attributes['deviceuuid'] AS device_uuid,
+                avg(Value) AS gpu_util
+            FROM metrics.otel_metrics_gauge
+            WHERE MetricName = 'Device_utilization_desc_of_container'
+              AND ResourceAttributes['cluster_id'] = %(cluster_id)s
+              AND TimeUnix >= now() - INTERVAL %(hours)s HOUR
+            GROUP BY bucket, pod_name, pod_namespace, container_name, device_uuid
+        )
+        SELECT
+            s.bucket,
+            s.pod_name,
+            s.pod_namespace,
+            COALESCE(c.gpu_util, s.hami_utilization) AS utilization
+        FROM slice_data s
+        LEFT JOIN container_util c
+            ON s.bucket = c.bucket
+            AND s.pod_name = c.pod_name
+            AND s.pod_namespace = c.pod_namespace
+            AND s.container_name = c.container_name
+            AND s.device_uuid = c.device_uuid
+        ORDER BY s.bucket, s.pod_name
+        """
+
+        gpu_result = await self.client.execute_query(
+            gpu_query,
+            params={"cluster_id": cluster_id, "node_name": node_name, "hours": hours},
+        )
+
+        slice_result = await self.client.execute_query(
+            slice_query,
+            params={"cluster_id": cluster_id, "node_name": node_name, "hours": hours},
+        )
+
+        return gpu_result, slice_result
