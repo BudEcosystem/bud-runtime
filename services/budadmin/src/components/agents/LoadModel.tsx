@@ -26,6 +26,8 @@ interface ModelWrapper {
 
 const DEFAULT_MODEL_ICON = "/icons/modelRepoWhite.png";
 const CLOUD_PROVIDER_TYPES = ["hugging_face", "cloud_model"];
+const MODALITY_TEXT_INPUT = "text_input";
+const MODALITY_TEXT_OUTPUT = "text_output";
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
   const { updateSession, sessions } = useAgentStore();
@@ -75,7 +77,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
     try {
       const params: any = {
-        modality: ['text_input','text_output'],
+        modality: [MODALITY_TEXT_INPUT, MODALITY_TEXT_OUTPUT],
         page,
         limit: pageSize,
         search: Boolean(search)
