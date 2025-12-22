@@ -22,7 +22,7 @@ export default function RunEvaluationSuccess() {
     closeDrawer();
     // router.push(`/home/evaluations/experiments`);
     if(experimentId)
-      router.replace(`/home/evaluations/experiments/${experimentId}`);
+      router.replace(`/home/evaluations/experiments/${experimentId}?refresh=true`);
   };
 
   const handleClose = () => {

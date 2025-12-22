@@ -49,6 +49,8 @@ from .direct_search import DirectSearchOptimizer
 from .evolution import Evolution
 from .models import SimulationResultsCRUD, SimulationResultsSchema
 from .schemas import (
+    BenchmarkConfigRequest,
+    BenchmarkConfigResponse,
     ClusterInfo,
     ClusterMetrics,
     ClusterRecommendationRequest,
@@ -56,11 +58,16 @@ from .schemas import (
     DeploymentConfigurationRequest,
     DeploymentConfigurationResponse,
     DeviceConfiguration,
+    DeviceTypeConfiguration,
     DeviceTypeMetrics,
+    ModelMemoryInfo,
     NodeConfiguration,
+    NodeConfigurationRequest,
+    NodeConfigurationResponse,
     NodeGroupConfiguration,
     SimulationMethod,
     SimulationMetrics,
+    TPPPOption,
 )
 
 
@@ -177,9 +184,9 @@ class SimulationService:
                     device_type = device["type"]
                     available_count = device["available_count"]
 
-                    # Skip master/control-plane nodes for CPU deployments only
+                    # Skip master/control-plane nodes for CPU deployments only (if configured)
                     device_type_lower = device_type.lower()
-                    if device_type_lower in ("cpu", "cpu_high"):
+                    if app_settings.skip_master_node_for_cpu and device_type_lower in ("cpu", "cpu_high"):
                         is_master = node.get("is_master", False)
                         if is_master:
                             logger.info(f"Skipping master node {node_name} for CPU deployment")
@@ -2059,9 +2066,20 @@ class SimulationService:
             chat_template=getattr(template_result, "chat_template", None),
             supports_lora=getattr(template_result, "supports_lora", None),
             supports_pipeline_parallelism=getattr(template_result, "supports_pipeline_parallelism", None),
-            # Available CPU cores for cpu/cpu_high deployments (total - utilized)
+            # CPU cores for cpu/cpu_high deployments
+            # Shared mode: use total cores (pods burst to full capacity, K8s handles scheduling)
+            # Dedicated mode: subtract utilized cores to get truly available (min 1 core)
             cores=(
-                int(getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0))
+                (
+                    int(getattr(template_result, "cores", 0))
+                    if top_k_configs.get("hardware_mode", "dedicated") == "shared"
+                    else max(
+                        1,
+                        int(
+                            getattr(template_result, "cores", 0) - (getattr(template_result, "utilized_cores", 0) or 0)
+                        ),
+                    )
+                )
                 if template_result.device_type in ("cpu", "cpu_high") and getattr(template_result, "cores", None)
                 else None
             ),
@@ -2073,6 +2091,10 @@ class SimulationService:
         simulation_results: List[SimulationResultsSchema], target_concurrency: int = None
     ) -> DeploymentConfigurationResponse:
         """Perform optimal search for deployment configuration using node groups."""
+        if not simulation_results:
+            logger.warning("optimal_search_node_group_config called with empty simulation_results")
+            return None
+
         try:
             logger.info(f"Starting optimal_search_node_group_config with {len(simulation_results)} results")
 
@@ -2562,4 +2584,574 @@ class SimulationService:
                 message="No deployment configuration found",
                 code=400,
             )
+        )
+
+    @staticmethod
+    def get_node_configurations(request: NodeConfigurationRequest) -> NodeConfigurationResponse:
+        """Get valid TP/PP configuration options for selected nodes.
+
+        This method analyzes the selected nodes and returns available device types
+        with valid TP/PP combinations and maximum replica counts.
+
+        Args:
+            request: NodeConfigurationRequest containing cluster_id, model_id, hostnames,
+                    hardware_mode, and token configuration
+
+        Returns:
+            NodeConfigurationResponse with device configurations and model memory info
+
+        Raises:
+            ValueError: If cluster or nodes not found
+        """
+        # 1. Get cluster info from state store
+        try:
+            with DaprService() as dapr_service:
+                cluster_info_raw = dapr_service.get_state(
+                    app_settings.statestore_name, app_settings.cluster_info_state_key
+                )
+
+            if not cluster_info_raw or not cluster_info_raw.data:
+                raise ValueError("No cluster information available in state store")
+
+            cluster_info = SimulationService.validate_cluster_info(cluster_info_raw.data.decode("utf-8"))
+        except Exception as e:
+            logger.exception(f"Failed to retrieve cluster info: {e}")
+            raise ValueError(f"Failed to retrieve cluster information: {str(e)}") from e
+
+        # 2. Filter to selected cluster
+        cluster_info = [c for c in cluster_info if c["id"] == str(request.cluster_id)]
+        if not cluster_info:
+            raise ValueError(f"Cluster {request.cluster_id} not found in state store")
+
+        cluster = cluster_info[0]
+
+        # 3. Filter nodes by hostname
+        selected_nodes = []
+        for node in cluster.get("nodes", []):
+            node_name = node.get("name") or node.get("hostname")
+            if node_name in request.hostnames:
+                # Check node is active
+                node_status = node.get("status")
+                if node_status is True:
+                    selected_nodes.append(node)
+                else:
+                    logger.warning(f"Node {node_name} is not active (status={node_status}), skipping")
+
+        if not selected_nodes:
+            raise ValueError(f"No active nodes found matching hostnames: {request.hostnames}")
+
+        logger.info(f"Found {len(selected_nodes)} active nodes matching hostnames")
+
+        # 4. Create filtered cluster info for device grouping
+        filtered_cluster_info = [{"id": cluster["id"], "nodes": selected_nodes}]
+
+        # 5. Analyze topology for PP constraints
+        cluster_topology = SimulationService.analyze_cluster_topology(filtered_cluster_info)
+
+        # 6. Group devices by type using existing method
+        hardware_mode_str = (
+            request.hardware_mode.value if hasattr(request.hardware_mode, "value") else str(request.hardware_mode)
+        )
+        device_groups = SimulationService._group_devices_by_type_across_cluster(
+            filtered_cluster_info, cluster_topology, hardware_mode_str
+        )
+
+        if not device_groups:
+            raise ValueError("No available devices found on selected nodes for the specified hardware mode")
+
+        # 7. Calculate model memory requirements
+        model_memory_info = SimulationService._calculate_model_memory_for_config(
+            model_uri=request.model_uri,
+            input_tokens=request.input_tokens,
+            output_tokens=request.output_tokens,
+            device_groups=device_groups,
+        )
+
+        # 8. Calculate valid TP/PP options for each device type
+        device_configurations = []
+        for device_type, group in device_groups.items():
+            config = SimulationService._calculate_tp_pp_options_for_device(
+                device_type=device_type,
+                device_group=group,
+                model_weight_gb=model_memory_info.estimated_weight_memory_gb,
+                hardware_mode=hardware_mode_str,
+            )
+            if config:
+                device_configurations.append(config)
+
+        if not device_configurations:
+            raise ValueError("No valid configurations found for the selected nodes and hardware mode")
+
+        return NodeConfigurationResponse(
+            cluster_id=request.cluster_id,
+            model_info=model_memory_info,
+            device_configurations=device_configurations,
+            selected_nodes=request.hostnames,
+            hardware_mode=hardware_mode_str,
+        )
+
+    @staticmethod
+    def _calculate_model_memory_for_config(
+        model_uri: Optional[str],
+        input_tokens: int,
+        output_tokens: int,
+        device_groups: Dict[str, Any],
+    ) -> ModelMemoryInfo:
+        """Calculate model memory requirements for configuration options.
+
+        Args:
+            model_uri: Model URI/path for memory calculation
+            input_tokens: Expected input tokens
+            output_tokens: Expected output tokens
+            device_groups: Device groups from _group_devices_by_type_across_cluster
+
+        Returns:
+            ModelMemoryInfo with estimated memory requirements
+        """
+        estimated_weight_memory_gb = 0.0
+        min_tp_for_model = 1
+
+        if model_uri:
+            try:
+                # Try to use llm-memory-calculator for accurate estimation
+                from llm_memory_calculator import calculate_memory
+
+                seq_length = int((input_tokens + output_tokens) * 1.1)
+                memory_report = calculate_memory(
+                    model_id_or_config=model_uri,
+                    batch_size=1,
+                    seq_length=seq_length,
+                    precision="bf16",
+                    tensor_parallel=1,
+                )
+
+                if hasattr(memory_report, "total_memory_gb"):
+                    estimated_weight_memory_gb = memory_report.total_memory_gb
+                elif hasattr(memory_report, "model_weights_memory_gb"):
+                    estimated_weight_memory_gb = memory_report.model_weights_memory_gb
+                else:
+                    # Fallback: estimate from parameter count
+                    if hasattr(memory_report, "parameter_count"):
+                        # BF16: 2 bytes per parameter
+                        estimated_weight_memory_gb = (memory_report.parameter_count * 2) / (1024**3)
+
+                logger.info(f"Model memory calculated via llm-memory-calculator: {estimated_weight_memory_gb:.2f} GB")
+            except ImportError:
+                logger.warning("llm-memory-calculator not available, using fallback estimation")
+            except Exception as e:
+                logger.warning(f"Failed to calculate model memory: {e}, using fallback estimation")
+
+        # Fallback: estimate from model name if available
+        if estimated_weight_memory_gb == 0.0 and model_uri:
+            # Simple heuristic based on model name patterns
+            model_lower = model_uri.lower()
+            if "70b" in model_lower:
+                estimated_weight_memory_gb = 140.0  # ~140GB for 70B model in BF16
+            elif "40b" in model_lower or "34b" in model_lower:
+                estimated_weight_memory_gb = 80.0
+            elif "13b" in model_lower:
+                estimated_weight_memory_gb = 26.0
+            elif "7b" in model_lower or "8b" in model_lower:
+                estimated_weight_memory_gb = 16.0
+            elif "3b" in model_lower:
+                estimated_weight_memory_gb = 6.0
+            elif "1b" in model_lower:
+                estimated_weight_memory_gb = 2.0
+            else:
+                # Default to a small model estimate
+                estimated_weight_memory_gb = 10.0
+
+        # Calculate minimum TP required based on available device memory
+        if device_groups and estimated_weight_memory_gb > 0:
+            # Get maximum memory per device across all device types
+            max_device_memory = 0.0
+            for group in device_groups.values():
+                devices = group.get("devices", [])
+                if devices:
+                    device_mem = devices[0].get("mem_per_GPU_in_GB", 0)
+                    max_device_memory = max(max_device_memory, device_mem)
+
+            if max_device_memory > 0:
+                # Use 80% of device memory for model weights (leave room for KV cache)
+                usable_memory = max_device_memory * 0.8
+                min_tp_for_model = max(1, math.ceil(estimated_weight_memory_gb / usable_memory))
+                # Round up to power of 2
+                if min_tp_for_model > 1:
+                    min_tp_for_model = 2 ** math.ceil(math.log2(min_tp_for_model))
+
+        return ModelMemoryInfo(
+            model_id=uuid.uuid4(),  # Placeholder, actual model_id comes from budapp
+            model_name=None,
+            model_uri=model_uri,
+            estimated_weight_memory_gb=estimated_weight_memory_gb,
+            min_tp_for_model=min_tp_for_model,
+        )
+
+    @staticmethod
+    def _calculate_tp_pp_options_for_device(
+        device_type: str,
+        device_group: Dict[str, Any],
+        model_weight_gb: float,
+        hardware_mode: str,
+    ) -> Optional[DeviceTypeConfiguration]:
+        """Calculate valid TP/PP combinations for a device type.
+
+        Constraints:
+        - TP cannot exceed max_devices_per_node (intra-node)
+        - PP cannot exceed nodes_with_device (inter-node)
+        - TP must be power of 2
+        - PP must be >= 1
+        - Replicas = total_devices / (TP * PP)
+        - Shared mode forces TP=1, PP=1
+        - CPU devices don't support PP > 1
+
+        Args:
+            device_type: Device type (cuda, hpu, cpu, cpu_high)
+            device_group: Device group info from _group_devices_by_type_across_cluster
+            model_weight_gb: Estimated model weight in GB
+            hardware_mode: "dedicated" or "shared"
+
+        Returns:
+            DeviceTypeConfiguration or None if no valid configs
+        """
+        total_devices = device_group.get("total_devices", 0)
+        max_devices_per_node = device_group.get("max_devices_per_node", 1)
+        nodes_count = device_group.get("total_nodes_with_device", 1)
+
+        if total_devices == 0:
+            return None
+
+        # Get first device for memory info
+        devices = device_group.get("devices", [])
+        if not devices:
+            return None
+
+        first_device = devices[0]
+        memory_per_device = first_device.get("mem_per_GPU_in_GB", 0)
+        device_name = first_device.get("name", device_type)
+        device_model = first_device.get("device_model")
+
+        # Calculate minimum TP required for model
+        min_tp = 1
+        if memory_per_device > 0 and model_weight_gb > 0:
+            usable_memory = memory_per_device * 0.8
+            min_tp = max(1, math.ceil(model_weight_gb / usable_memory))
+            # Round up to power of 2
+            if min_tp > 1:
+                min_tp = 2 ** math.ceil(math.log2(min_tp))
+
+        # Determine if PP is supported
+        device_type_lower = device_type.lower()
+        supports_pp = device_type_lower not in ("cpu", "cpu_high")
+
+        # Generate valid TP/PP options
+        tp_pp_options = []
+
+        if hardware_mode == "shared":
+            # Shared mode: only TP=1, PP=1
+            if total_devices >= 1:
+                tp_pp_options.append(
+                    TPPPOption(
+                        tp_size=1,
+                        pp_size=1,
+                        max_replicas=total_devices,
+                        total_devices_needed=1,
+                        description="Single device per replica (shared mode)",
+                    )
+                )
+        else:
+            # Dedicated mode: explore TP/PP combinations
+            # Generate valid TP sizes (powers of 2)
+            valid_tps = []
+            tp = 1
+            while tp <= max_devices_per_node:
+                if tp >= min_tp:
+                    valid_tps.append(tp)
+                tp *= 2
+
+            # If no valid TPs found but min_tp fits, include it
+            if not valid_tps and min_tp <= max_devices_per_node:
+                valid_tps = [min_tp]
+
+            max_pp = nodes_count if supports_pp else 1
+
+            for tp in valid_tps:
+                for pp in range(1, max_pp + 1):
+                    devices_per_replica = tp * pp
+
+                    # Check if we have enough devices
+                    if devices_per_replica > total_devices:
+                        continue
+
+                    # Validate that PP distribution is feasible
+                    # Each PP stage needs TP devices on a single node
+                    if pp > 1 and tp > max_devices_per_node:
+                        continue
+
+                    max_replicas = total_devices // devices_per_replica
+                    if max_replicas > 0:
+                        desc = f"TP={tp}"
+                        if pp > 1:
+                            desc += f", PP={pp} across {pp} nodes"
+                        else:
+                            desc += ", PP=1"
+                        desc += f" ({devices_per_replica} device{'s' if devices_per_replica > 1 else ''}/replica)"
+
+                        tp_pp_options.append(
+                            TPPPOption(
+                                tp_size=tp,
+                                pp_size=pp,
+                                max_replicas=max_replicas,
+                                total_devices_needed=devices_per_replica,
+                                description=desc,
+                            )
+                        )
+
+        if not tp_pp_options:
+            logger.warning(f"No valid TP/PP options for device type {device_type}")
+            return None
+
+        return DeviceTypeConfiguration(
+            device_type=device_type,
+            device_name=device_name,
+            device_model=device_model,
+            total_devices=total_devices,
+            nodes_count=nodes_count,
+            max_devices_per_node=max_devices_per_node,
+            memory_per_device_gb=memory_per_device,
+            tp_pp_options=tp_pp_options,
+            min_tp_required=min_tp,
+            supports_pipeline_parallelism=supports_pp,
+        )
+
+    @staticmethod
+    def generate_benchmark_config(
+        request: BenchmarkConfigRequest,
+    ) -> Union[BenchmarkConfigResponse, ErrorResponse]:
+        """Generate deployment configuration for benchmark with user-selected parameters.
+
+        Unlike get_deployment_configs which fetches from saved simulation results,
+        this method generates configuration directly from user selections.
+
+        Args:
+            request: BenchmarkConfigRequest containing cluster_id, model_id, model_uri,
+                    hostnames, device_type, tp_size, pp_size, replicas, and token configuration.
+
+        Returns:
+            BenchmarkConfigResponse with node_groups array containing full deployment configs.
+
+        Raises:
+            ValueError: If cluster or nodes not found, or configuration is invalid.
+        """
+        # 1. Get cluster info from state store
+        try:
+            with DaprService() as dapr_service:
+                cluster_info_raw = dapr_service.get_state(
+                    app_settings.statestore_name, app_settings.cluster_info_state_key
+                )
+
+            if not cluster_info_raw or not cluster_info_raw.data:
+                raise ValueError("No cluster information available in state store")
+
+            cluster_info = SimulationService.validate_cluster_info(cluster_info_raw.data.decode("utf-8"))
+        except Exception as e:
+            logger.exception(f"Failed to retrieve cluster info: {e}")
+            raise ValueError(f"Failed to retrieve cluster information: {str(e)}") from e
+
+        # 2. Filter to selected cluster
+        cluster_info = [c for c in cluster_info if c["id"] == str(request.cluster_id)]
+        if not cluster_info:
+            raise ValueError(f"Cluster {request.cluster_id} not found in state store")
+
+        cluster = cluster_info[0]
+
+        # 3. Filter nodes by hostname and find matching device
+        selected_device = None
+        device_memory_gb = 0.0
+        device_name = request.device_type
+        device_model = None
+        raw_name = None
+        # CPU-specific fields
+        device_cores = None
+        device_physical_cores = None
+        device_utilized_cores = None
+
+        for node in cluster.get("nodes", []):
+            node_name = node.get("name") or node.get("hostname")
+            if node_name in request.hostnames:
+                # Find device matching requested type
+                # Use exact matching since user selected the exact device type from /node-configurations
+                for device in node.get("devices", []):
+                    device_stored_type = device.get("type", "").lower()
+                    if device_stored_type == request.device_type.lower():
+                        selected_device = device
+                        device_memory_gb = device.get("mem_per_GPU_in_GB", 0)
+                        device_name = device.get("name", request.device_type)
+                        device_model = device.get("device_model")
+                        raw_name = device.get("raw_name")
+                        # Extract CPU cores info for cpu/cpu_high devices
+                        if device_stored_type in ("cpu", "cpu_high"):
+                            device_cores = device.get("cores")
+                            device_physical_cores = device.get("physical_cores")
+                            device_utilized_cores = device.get("utilized_cores", 0.0)
+                        break
+                if selected_device:
+                    break
+
+        if not selected_device:
+            raise ValueError(f"No device of type {request.device_type} found on selected nodes")
+
+        # 4. Calculate model memory requirements
+        estimated_weight_memory_gb = 0.0
+        kv_cache_memory_gb = 0.0
+
+        if request.model_uri:
+            try:
+                from llm_memory_calculator import calculate_memory
+
+                seq_length = int((request.input_tokens + request.output_tokens) * 1.1)
+                memory_report = calculate_memory(
+                    model_id_or_config=request.model_uri,
+                    batch_size=request.concurrency,
+                    seq_length=seq_length,
+                    precision="bf16",
+                    tensor_parallel=request.tp_size,
+                )
+
+                if hasattr(memory_report, "weight_memory_gb"):
+                    estimated_weight_memory_gb = memory_report.weight_memory_gb
+                if hasattr(memory_report, "kv_cache_gb"):
+                    kv_cache_memory_gb = memory_report.kv_cache_gb
+
+                logger.info(
+                    f"Model memory calculated: weights={estimated_weight_memory_gb:.2f}GB, "
+                    f"kv_cache={kv_cache_memory_gb:.2f}GB"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to calculate model memory: {e}, using device memory")
+                estimated_weight_memory_gb = device_memory_gb * 0.7  # Conservative estimate
+
+        total_memory_gb = estimated_weight_memory_gb + kv_cache_memory_gb
+        if total_memory_gb < 1.0:
+            # Fallback: use 70% of device memory
+            total_memory_gb = device_memory_gb * 0.7
+        # Round up to integer for K8s resource specification compatibility
+        total_memory_gb = math.ceil(total_memory_gb)
+
+        # 5. Get engine image from BudConnect API (same as simulator/run)
+        device_type_lower = request.device_type.lower()
+        target_device = "cpu" if device_type_lower in ("cpu", "cpu_high") else device_type_lower
+
+        # Call BudConnect API to get compatible engines with image
+        image = None
+        try:
+            compatible_engines = get_compatible_engines(request.model_uri)
+            # Find engine matching our device type
+            for engine in compatible_engines:
+                if (
+                    engine.get("engine_name") == "vllm"
+                    and normalize_device_type(engine.get("device", "")) == target_device
+                ):
+                    image = engine.get("image")
+                    logger.info(f"Got image from BudConnect API: {image}")
+                    break
+        except Exception as e:
+            logger.warning(f"Failed to get compatible engines from BudConnect: {e}")
+
+        # 6. Build args and envs using full engine args (same as simulator/run)
+        engine_config = {
+            "model": request.model_uri,
+            "tensor_parallel_size": request.tp_size,
+            "pipeline_parallel_size": request.pp_size,
+            "target_device": target_device,
+        }
+
+        args_and_envs = get_minimal_engine_args_and_envs("vllm", engine_config)
+        args = args_and_envs.get("args", {})
+        envs = args_and_envs.get("envs", {})
+
+        # 7. Build labels for handler to extract concurrency
+        labels = {
+            "concurrency": str(request.concurrency),
+            "device_name": device_name,
+        }
+
+        # 8. Determine hardware mode string
+        hardware_mode_str = (
+            request.hardware_mode.value if hasattr(request.hardware_mode, "value") else str(request.hardware_mode)
+        )
+
+        # 9. Calculate CPU cores for cpu/cpu_high devices
+        available_cores = None
+        if device_type_lower in ("cpu", "cpu_high"):
+            # Priority: cores (threads) > physical_cores
+            total_cores = device_cores or device_physical_cores
+            if total_cores is not None:
+                if hardware_mode_str == "shared":
+                    # Shared mode: use total cores (each pod can burst to full capacity)
+                    # Don't subtract utilized cores - let K8s handle scheduling
+                    available_cores = int(total_cores)
+                    logger.info(
+                        f"CPU cores (shared mode): total={total_cores}, "
+                        f"setting cores={available_cores} (full capacity for bursting)"
+                    )
+                else:
+                    # Dedicated mode: subtract utilized cores to get truly available
+                    utilized = device_utilized_cores or 0.0
+                    available_cores = int(total_cores - utilized)
+                    # Ensure at least 1 core is available
+                    available_cores = max(1, available_cores)
+                    logger.info(
+                        f"CPU cores (dedicated mode): total={total_cores}, utilized={utilized:.1f}, "
+                        f"available={available_cores}"
+                    )
+            else:
+                logger.warning(
+                    f"No cores info found for {device_type_lower} device {device_name}. "
+                    "Deployment will use default core count."
+                )
+
+        # 10. Create NodeGroupConfiguration
+        config_id = str(uuid.uuid4())
+
+        node_group = NodeGroupConfiguration(
+            config_id=config_id,
+            name=device_name,
+            labels=labels,
+            type=device_type_lower,
+            tp_size=request.tp_size,
+            pp_size=request.pp_size,
+            envs=envs,
+            args=args,
+            replicas=request.replicas,
+            image=image,
+            memory=int(total_memory_gb * (1024**3)),  # Convert GB to bytes for deployment handler PVC sizing
+            weight_memory_gb=estimated_weight_memory_gb,
+            kv_cache_memory_gb=kv_cache_memory_gb,
+            hardware_mode=hardware_mode_str,
+            # Performance metrics - placeholder values for benchmarks
+            ttft=0.0,
+            throughput_per_user=0.0,
+            e2e_latency=0.0,
+            error_rate=0.0,
+            cost_per_million_tokens=0.0,
+            # Device identification
+            device_name=device_name,
+            device_model=device_model,
+            raw_name=raw_name,
+            # CPU cores for cpu/cpu_high deployments
+            cores=available_cores,
+        )
+
+        logger.info(
+            f"Generated benchmark config: device={device_type_lower}, tp={request.tp_size}, "
+            f"pp={request.pp_size}, replicas={request.replicas}, memory={total_memory_gb:.2f}GB, "
+            f"weight_memory={estimated_weight_memory_gb:.2f}GB, kv_cache={kv_cache_memory_gb:.2f}GB"
+            + (f", cores={available_cores}" if available_cores else "")
+        )
+
+        return BenchmarkConfigResponse(
+            cluster_id=request.cluster_id,
+            model_id=request.model_id,
+            node_groups=[node_group],
         )

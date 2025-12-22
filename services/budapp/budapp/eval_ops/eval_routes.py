@@ -1,8 +1,11 @@
+import csv
+import io
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Generator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -1718,9 +1721,9 @@ async def get_experiment_evaluations(
 
 @router.get(
     "/evaluations/all",
-    response_model=AllEvaluationsResponse,
     status_code=status.HTTP_200_OK,
     responses={
+        status.HTTP_200_OK: {"model": AllEvaluationsResponse},
         status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
     },
 )
@@ -1735,38 +1738,75 @@ async def get_all_evaluations(
         Optional[uuid.UUID],
         Query(description="Filter evaluations by endpoint ID (takes precedence over model_id)"),
     ] = None,
+    search: Annotated[
+        Optional[str],
+        Query(description="Search by evaluation name, dataset name, trait name, and optionally endpoint name"),
+    ] = None,
+    search_name: Annotated[
+        bool,
+        Query(alias="searchName", description="Include endpoint/deployment name in search. Default: true"),
+    ] = True,
+    export_format: Annotated[
+        Optional[str],
+        Query(description="Set to 'csv' to export as CSV file. Leave empty for JSON response."),
+    ] = None,
     page: Annotated[
         int,
         Query(ge=1, description="Page number (1-indexed)"),
     ] = 1,
     page_size: Annotated[
         int,
-        Query(ge=1, le=100, description="Number of items per page"),
+        Query(ge=1, le=100, description="Number of items per page (ignored when export_format=csv)"),
     ] = 20,
 ):
-    """Get all evaluations for the current user with optional filtering.
+    """Get all evaluations for the current user with optional filtering and export.
 
     This endpoint retrieves all evaluations across all experiments for the current user including:
     - Evaluation details with model, traits, and datasets
-    - Real-time evaluation scores from BudEval service
+    - Evaluation scores calculated from metrics
     - Runs associated with each evaluation
-
-    The scores are fetched asynchronously from the BudEval service.
 
     - **model_id**: Optional UUID to filter evaluations by model
     - **endpoint_id**: Optional UUID to filter evaluations by endpoint (takes precedence over model_id)
+    - **search**: Optional search term to filter by evaluation name, dataset name, trait name, and endpoint name
+    - **searchName**: Include endpoint/deployment name in search (default: true)
+    - **export_format**: Set to 'csv' to download results as CSV file
     - **page**: Page number for pagination (1-indexed, default: 1)
     - **page_size**: Number of items per page (default: 20, max: 100)
-    - **session**: Database session dependency
-    - **current_user**: The authenticated user requesting the evaluations
 
-    Returns an `AllEvaluationsResponse` with paginated evaluations.
+    When export_format='csv', returns a CSV file with columns:
+    Deployment Name, Model Name, Dataset Name, Trait Name, Evaluation Name, Experiment Name, Score
+
+    Returns an `AllEvaluationsResponse` with paginated evaluations (JSON) or CSV file.
     """
     try:
+        # For CSV export, fetch all records (no pagination)
+        if export_format and export_format.lower() == "csv":
+            result = await ExperimentService(session).get_all_evaluations(
+                user_id=current_user.id,
+                model_id=model_id,
+                endpoint_id=endpoint_id,
+                search=search,
+                search_name=search_name,
+                page=1,
+                page_size=10000,  # Large limit to get all records
+            )
+
+            # Return as streaming response with generator for memory efficiency
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            return StreamingResponse(
+                _generate_evaluations_csv(result["evaluations"]),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=evaluations_export_{timestamp}.csv"},
+            )
+
+        # Regular JSON response with pagination
         result = await ExperimentService(session).get_all_evaluations(
             user_id=current_user.id,
             model_id=model_id,
             endpoint_id=endpoint_id,
+            search=search,
+            search_name=search_name,
             page=page,
             page_size=page_size,
         )
@@ -1790,11 +1830,129 @@ async def get_all_evaluations(
                 "user_id": str(current_user.id),
                 "model_id": str(model_id) if model_id else None,
                 "endpoint_id": str(endpoint_id) if endpoint_id else None,
+                "search": search,
+                "search_name": search_name,
+                "export_format": export_format,
                 "page": page,
                 "page_size": page_size,
             },
         )
         raise HTTPException(status_code=500, detail=f"Failed to get all evaluations: {str(e)}") from e
+
+
+def _generate_evaluations_csv(evaluations: list) -> Generator[str, None, None]:
+    """Generate CSV content from evaluations data as a generator for memory efficiency.
+
+    Creates a CSV with columns:
+    Deployment Name, Model Name, Dataset Name, Trait Name, Evaluation Name, Experiment Name, Score
+
+    Each evaluation may generate multiple rows (one per trait/dataset combination).
+
+    Parameters:
+        evaluations: List of AllEvaluationsItem objects
+
+    Yields:
+        CSV rows as strings
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header and yield it
+    writer.writerow(
+        [
+            "Deployment Name",
+            "Model Name",
+            "Dataset Name",
+            "Trait Name",
+            "Evaluation Name",
+            "Experiment Name",
+            "Score",
+        ]
+    )
+    yield output.getvalue()
+
+    for evaluation in evaluations:
+        # Extract base evaluation info
+        evaluation_name = evaluation.evaluation_name
+        experiment_name = evaluation.experiment_name
+
+        # Get model/deployment info
+        deployment_name = ""
+        model_name = ""
+        if evaluation.model:
+            deployment_name = evaluation.model.deployment_name or ""
+            model_name = evaluation.model.name or ""
+
+        # Get overall score
+        overall_score = ""
+        if evaluation.scores and evaluation.scores.overall_accuracy is not None:
+            overall_score = str(evaluation.scores.overall_accuracy)
+
+        # If we have traits with datasets, create a row for each combination
+        if evaluation.traits:
+            for trait in evaluation.traits:
+                trait_name = trait.name
+
+                if trait.datasets:
+                    for dataset in trait.datasets:
+                        dataset_name = dataset.name
+
+                        # Try to get dataset-specific score if available
+                        dataset_score = overall_score
+                        if evaluation.scores and evaluation.scores.datasets:
+                            for ds_score in evaluation.scores.datasets:
+                                if ds_score.get("dataset_name") == dataset_name:
+                                    if ds_score.get("accuracy") is not None:
+                                        dataset_score = str(ds_score.get("accuracy"))
+                                    break
+
+                        # Clear buffer and write row
+                        output.seek(0)
+                        output.truncate(0)
+                        writer.writerow(
+                            [
+                                deployment_name,
+                                model_name,
+                                dataset_name,
+                                trait_name,
+                                evaluation_name,
+                                experiment_name,
+                                dataset_score,
+                            ]
+                        )
+                        yield output.getvalue()
+                else:
+                    # Trait without datasets - still write a row
+                    output.seek(0)
+                    output.truncate(0)
+                    writer.writerow(
+                        [
+                            deployment_name,
+                            model_name,
+                            "",  # No dataset
+                            trait_name,
+                            evaluation_name,
+                            experiment_name,
+                            overall_score,
+                        ]
+                    )
+                    yield output.getvalue()
+        else:
+            # No traits - write a single row with overall info
+            output.seek(0)
+            output.truncate(0)
+            writer.writerow(
+                [
+                    deployment_name,
+                    model_name,
+                    "",  # No dataset
+                    "",  # No trait
+                    evaluation_name,
+                    experiment_name,
+                    overall_score,
+                ]
+            )
+            yield output.getvalue()
 
 
 @router.post(

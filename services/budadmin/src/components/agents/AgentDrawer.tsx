@@ -12,6 +12,7 @@ import AgentSelector from "./AgentSelector";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { removePromptFromUrl } from "@/utils/urlUtils";
+import { hasOAuthPromptId } from "@/hooks/useOAuthCallback";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
@@ -107,10 +108,20 @@ const AgentDrawer: React.FC = () => {
     if (!isAgentDrawerOpen) return;
 
     // Check if this is an OAuth callback - don't create new session
-    const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+    // Check: localStorage flag, URL params, OR dedicated OAuth prompt ID storage
+    const isOAuthCallbackFlag = localStorage.getItem('oauth_should_open_drawer') === 'true';
+    const hasOAuthParamsInUrl = typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('code') &&
+      new URLSearchParams(window.location.search).has('state');
+    const hasSavedOAuthPromptId = hasOAuthPromptId(); // Check dedicated storage
 
-    if (isOAuthCallback) {
-      // OAuth callback - session should already exist, don't create new one
+    // Also check OAuth state which contains session data
+    const hasOAuthState = !!localStorage.getItem('oauth_connector_state');
+    // Check for saved session data (most reliable indicator of OAuth in progress)
+    const hasOAuthSessionData = !!localStorage.getItem('oauth_session_data');
+
+    if (isOAuthCallbackFlag || hasOAuthParamsInUrl || hasSavedOAuthPromptId || hasOAuthState || hasOAuthSessionData) {
+      // OAuth in progress - session should already exist or will be restored, don't create new one
       return;
     }
 
@@ -159,6 +170,17 @@ const AgentDrawer: React.FC = () => {
       return;
     }
 
+    // Don't update URL during OAuth callback - let the OAuth handler manage it
+    const hasOAuthParamsInUrl = typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('code') &&
+      new URLSearchParams(window.location.search).has('state');
+    const hasSavedOAuthPromptId = hasOAuthPromptId(); // Check dedicated storage
+
+    if (hasOAuthParamsInUrl || hasSavedOAuthPromptId) {
+      // OAuth in progress - don't update URL, let OAuth handler manage it
+      return;
+    }
+
     // Get all prompt IDs from active sessions
     const promptIds = activeSessions
       .map(session => session.promptId)
@@ -170,12 +192,6 @@ const AgentDrawer: React.FC = () => {
 
     // Only update if the URL param is different from what we want to set
     if (currentPromptParam !== newPromptParam) {
-      console.log('🔄 AgentDrawer updating URL:', {
-        currentPrompt: currentPromptParam,
-        newPrompt: newPromptParam,
-        willAddPrompt: !!newPromptParam
-      });
-
       // Build URL manually to avoid encoding commas
       // Use window.location to get the actual browser URL
       const currentPath = window.location.pathname;
@@ -208,17 +224,12 @@ const AgentDrawer: React.FC = () => {
       // Add new prompt param if exists (without encoding commas)
       if (newPromptParam) {
         queryParts.push(`prompt=${newPromptParam}`);
-        console.log('✓ Adding prompt parameter:', newPromptParam);
       }
-
-      console.log('🔧 Final query parts:', queryParts);
 
       // Build the final URL
       const newUrl = queryParts.length > 0
         ? `${currentPath}?${queryParts.join('&')}`
         : currentPath;
-
-      console.log('✓ New URL:', newUrl);
 
       // Use window.history.replaceState to update URL
       window.history.replaceState(
@@ -331,7 +342,11 @@ const AgentDrawer: React.FC = () => {
                 <div className="h-full w-full">
                   <AgentIframe
                     sessionId={activeSessions[0]?.id}
-                    promptIds={activeSessions.map(session => session.promptId).filter(Boolean) as string[]}
+                    promptIds={
+                      isEditMode
+                        ? activeSessions.map(session => session.name).filter(Boolean) as string[]
+                        : activeSessions.map(session => session.promptId).filter(Boolean) as string[]
+                    }
                     typeFormMessage={typeFormMessage}
                   />
                 </div>

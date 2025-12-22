@@ -33,7 +33,7 @@ export const AdapterStatus = () => {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to cancel the deployment process"
               description="Please note that if you cancel now, you will have to start the process again."
               cancelText="Continue Finding"

@@ -42,7 +42,7 @@ export default function SecurityScanning() {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to stop the security scanning process."
               description="We highly recommend that you continue the scanning process. However, if you cancel now, you can also perform a security scan before deployment."
               cancelText="Continue Scanning"

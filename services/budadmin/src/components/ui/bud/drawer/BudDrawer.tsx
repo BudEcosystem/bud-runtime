@@ -5,6 +5,7 @@ import { BudFormContext } from "../context/BudFormContext";
 import { useForm } from "src/hooks/useForm";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import { BudForm } from "../dataEntry/BudForm";
+import { useAddAgent } from "@/stores/useAddAgent";
 
 const BudDrawer: React.FC = () => {
   const {
@@ -15,10 +16,14 @@ const BudDrawer: React.FC = () => {
     closeDrawer,
     isFailed,
     drawerProps,
+    currentFlow,
   } = useDrawer();
   const { form, submittable, loading, setLoading, values } = useForm({
     initialData: {},
   });
+
+  // Get formResetKey from useAddAgent store to force remount of add-agent flow components
+  const { formResetKey } = useAddAgent();
 
   if (!step) {
     return null;
@@ -87,7 +92,11 @@ const BudDrawer: React.FC = () => {
               isExpandedViewOpen: Boolean(expandedStep),
             }}
           >
-            <step.component {...step?.properties} {...drawerProps} />
+            <step.component
+              key={currentFlow === 'add-agent' ? `${step.id}-${formResetKey}` : step.id}
+              {...step?.properties}
+              {...drawerProps}
+            />
           </BudFormContext.Provider>
         </div>
       )}

@@ -135,7 +135,7 @@ export default function Clusters() {
       cancelText: "Cancel",
       okText: "Delete",
       key: "delete-cluster",
-      type: "warining",
+      type: "warning",
     });
   };
 

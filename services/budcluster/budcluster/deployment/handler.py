@@ -63,9 +63,18 @@ class DeploymentHandler:
     def _get_namespace(self, endpoint_name: str):
         # Generates a unique 8-character identifier
         unique_id = uuid.uuid4().hex[:8]
-        # Clean the enpoint name by replacing non-alphanumeric characters with hyphens
+        # Clean the endpoint name by replacing non-alphanumeric characters with hyphens
         cleaned_name = re.sub(r"[^a-zA-Z0-9-]", "-", endpoint_name).lower()
-        # return "llama-test-f94b"
+        # Remove consecutive hyphens
+        cleaned_name = re.sub(r"-+", "-", cleaned_name).strip("-")
+        # Kubernetes namespace limit is 63 characters
+        # Format: bud-{cleaned_name}-{unique_id}
+        # Reserved: "bud-" (4) + "-" (1) + unique_id (8) = 13 characters
+        # Max cleaned_name length: 63 - 13 = 50 characters
+        max_name_length = 50
+        cleaned_name = cleaned_name[:max_name_length].rstrip("-")
+        if not cleaned_name:
+            cleaned_name = "benchmark"
         return f"bud-{cleaned_name}-{unique_id}"
 
     def _get_cpu_affinity(self, tp_size: int):
@@ -216,6 +225,7 @@ class DeploymentHandler:
             "volume_type": app_settings.volume_type,
             "model_name": namespace,
             "adapters": adapters,
+            "skipMasterNodeForCpu": app_settings.skip_master_node_for_cpu,
         }
 
         # Add storage class configuration if provided, otherwise fall back to default
@@ -361,11 +371,12 @@ class DeploymentHandler:
             supports_lora = node.get("supports_lora", False)
             if supports_lora:
                 # Use optimized max_loras from budsim if available, otherwise default to 5
-                max_loras = node.get("max_loras", 5)
+                # Note: node.get("max_loras", 5) doesn't work if max_loras is explicitly None
+                max_loras = node.get("max_loras") or 5
                 node["args"]["max-loras"] = max_loras
                 node["args"]["max-lora-rank"] = 256
                 node["args"]["enable-lora"] = True
-                source = "optimized by budsim" if "max_loras" in node else "default"
+                source = "optimized by budsim" if node.get("max_loras") else "default"
                 logger.info(f"LoRA enabled: max-loras={max_loras} ({source}), max-lora-rank=256")
 
             # Calculate max_model_len dynamically
@@ -389,6 +400,8 @@ class DeploymentHandler:
                 # Add reasoning-specific args based on parser type
                 node["args"]["reasoning-parser"] = reasoning_parser_type
                 # Add other reasoning parser configurations as needed
+
+            node["args"]["trust-remote-code"] = True
 
             # Update the full_node_list with the modified args
             full_node_list[_idx]["args"] = node["args"].copy()
@@ -786,6 +799,7 @@ api_key_location = "env::API_KEY"
             "volume_type": app_settings.volume_type,
             "deviceType": device_type,
             "hardwareMode": hardware_mode,
+            "skipMasterNodeForCpu": app_settings.skip_master_node_for_cpu,
         }
 
         # Add storage class configuration if provided
@@ -1033,6 +1047,87 @@ class SimulatorHandler:
         except Exception as e:
             raise Exception(f"Failed to get simulator config: {str(e)}") from e
         return node_list, metadata
+
+    async def get_benchmark_config(
+        self,
+        cluster_id: UUID,
+        model_id: UUID,
+        model_uri: str,
+        hostnames: list[str],
+        device_type: str,
+        tp_size: int,
+        pp_size: int,
+        replicas: int,
+        input_tokens: int = 1024,
+        output_tokens: int = 512,
+        concurrency: int = 10,
+        hardware_mode: str = "dedicated",
+    ):
+        """Get benchmark deployment configuration from BudSim.
+
+        This calls the /simulator/benchmark-config endpoint which generates
+        full deployment configuration from user-selected parameters.
+
+        Args:
+            cluster_id: The cluster ID
+            model_id: The model ID
+            model_uri: The model URI/path
+            hostnames: List of selected node hostnames
+            device_type: Selected device type (cuda, cpu, hpu)
+            tp_size: Tensor parallelism size
+            pp_size: Pipeline parallelism size
+            replicas: Number of replicas
+            input_tokens: Expected input token count
+            output_tokens: Expected output token count
+            concurrency: Expected concurrent requests
+            hardware_mode: Hardware mode (dedicated or shared)
+
+        Returns:
+            list: Node groups with full deployment configuration
+        """
+        request_data = {
+            "cluster_id": str(cluster_id),
+            "model_id": str(model_id),
+            "model_uri": model_uri,
+            "hostnames": hostnames,
+            "device_type": device_type,
+            "tp_size": tp_size,
+            "pp_size": pp_size,
+            "replicas": replicas,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "concurrency": concurrency,
+            "hardware_mode": hardware_mode,
+        }
+
+        logger.info(f"Getting benchmark config from budsim: {request_data}")
+        try:
+            url = (
+                f"http://localhost:{app_settings.dapr_http_port}/v1.0/invoke/budsim/method/simulator/benchmark-config"
+            )
+            async with AsyncHTTPClient() as http_client:
+                response = await http_client.send_request(
+                    "POST",
+                    url,
+                    json=request_data,
+                    follow_redirects=True,
+                )
+                response_str = response.body.decode("utf-8")
+                logger.info(f"Response from budsim benchmark-config: {response_str}")
+                if response.status_code != 200:
+                    raise Exception(f"Failed to get benchmark config: {response_str}")
+
+                response_data = json.loads(response_str)
+                node_groups = response_data.get("node_groups", [])
+
+                if not node_groups:
+                    raise Exception("No node groups returned from benchmark config endpoint")
+
+                logger.info(f"Received {len(node_groups)} node groups for benchmark")
+                return node_groups
+
+        except Exception as e:
+            raise Exception(f"Failed to get benchmark config: {str(e)}") from e
 
 
 class BudserveHandler:

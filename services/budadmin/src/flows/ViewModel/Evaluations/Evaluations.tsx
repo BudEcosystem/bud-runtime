@@ -133,7 +133,7 @@ export default function Evaluations({ model }: { model: Model }) {
 
   return (
     <div className="pt-[.45rem] relative min-h-[40vh]">
-      <div className="rounded-es-lg rounded-ee-lg pb-[.15rem]">
+      <div className="rounded-es-lg rounded-ee-lg pb-[.15rem] hidden">
         <div className="flex items-center justify-between">
           <SearchHeaderInput
             placeholder="Search Benchmarks"
@@ -178,12 +178,12 @@ export default function Evaluations({ model }: { model: Model }) {
           </div>
         </div>
       </div>
-      {model.provider_type != "disk" && model.provider_type != "url" && (
+      {/* {model.provider_type != "disk" && model.provider_type != "url" && (
         <>
           <Leaderboards model={model} leaderboardClasses="pb-[1.2rem]" />
           <div className="hR mt-[.1rem] mb-[1rem]"></div>
         </>
-      )}
+      )} */}
       {enableDevMode && <EvaluationResultsTable model={model} />}
     </div>
   );

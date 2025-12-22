@@ -116,6 +116,16 @@ const ExperimentDetailsPage = () => {
         }
     }, [experimentId]);
 
+    useEffect(() => {
+        if (experimentId && typeof experimentId === "string" && router.query.refresh == 'true') {
+            setIsMounted(true);
+            // Fetch all experiment data
+            getExperimentDetails(experimentId);
+            getExperimentRuns(experimentId);
+            getExperimentSummary(experimentId)
+        }
+    }, [router.query.refresh]);
+
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const scrollPositionRef = useRef(0);
 
@@ -224,11 +234,12 @@ const ExperimentDetailsPage = () => {
                             <PrimaryButton
                                 classNames="shadow-purple-glow"
                                 textClass="text-[0.8125rem]"
-                                onClick={() =>
+                                onClick={() =>{
+                                    router.replace(`/home/evaluations/experiments/${experimentId}?refresh=false`);
                                     openDrawerWithStep("new-evaluation", {
                                         experimentId,
                                     })
-                                }
+                                }}
                             >
                                 Run Evaluation
                             </PrimaryButton>

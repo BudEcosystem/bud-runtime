@@ -1,0 +1,193 @@
+---
+- name: Extract OpenCompass Error from Failed Job
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Get pods for job
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - "job-name={{ job_name }}"
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: pod_info
+
+    - name: Select failed pod (prefer failed/terminated pods for error extraction)
+      set_fact:
+        target_pod: >-
+          {{
+            (pod_info.resources | selectattr('status.phase', 'equalto', 'Failed') | list | first | default(none)) or
+            (pod_info.resources | selectattr('status.containerStatuses', 'defined') |
+              selectattr('status.containerStatuses.0.state.terminated', 'defined') | list | first | default(none)) or
+            (pod_info.resources | first | default(none))
+          }}
+      when: pod_info.resources | length > 0
+
+    - name: Get pod logs (last 500 lines for full error context)
+      kubernetes.core.k8s_log:
+        namespace: "{{ namespace }}"
+        name: "{{ target_pod.metadata.name }}"
+        tail_lines: 500
+        kubeconfig: "{{ kubeconfig_path | default(omit) }}"
+      register: pod_logs
+      when: pod_info.resources | length > 0 and target_pod is defined and target_pod
+
+    - name: Parse error from logs
+      shell: |
+        python3 << 'EOF'
+        import json
+        import re
+
+        logs = """{{ pod_logs.log if (pod_logs.log is defined) else '' }}"""
+
+        # Initialize error info
+        error_info = {
+            "success": False,
+            "category": "unknown",
+            "error_type": "UnknownError",
+            "error_message": "",
+            "actionable_message": "",
+            "file": None,
+            "line": None
+        }
+
+        # Pattern matching for error categorization
+        if "AssertionError" in logs:
+            error_info["error_type"] = "AssertionError"
+
+            # Dataset errors
+            if "No valid url" in logs or "does not exist" in logs or "./data/" in logs:
+                error_info["category"] = "dataset_missing"
+                # Extract dataset path from error
+                dataset_match = re.search(r'(\./data/[^\s!]+)', logs)
+                if dataset_match:
+                    dataset_path = dataset_match.group(1)
+                    error_info["actionable_message"] = f"Dataset file not found: {dataset_path}. Please download the dataset or check the path."
+                else:
+                    error_info["actionable_message"] = "Dataset file not found. Please check your dataset configuration."
+
+            # Config errors
+            elif "partition" in logs and "must be set" in logs:
+                error_info["category"] = "configuration"
+                error_info["actionable_message"] = "SLURM partition not specified. Use --partition flag when using --slurm."
+            else:
+                error_info["category"] = "configuration"
+                error_info["actionable_message"] = "Configuration validation failed. Check your settings."
+
+        # CUDA/GPU errors
+        elif "CUDA out of memory" in logs or "OutOfMemoryError" in logs:
+            error_info["category"] = "out_of_memory"
+            error_info["error_type"] = "OutOfMemoryError"
+            error_info["actionable_message"] = "Out of memory error. Try reducing batch_size or max_num_workers."
+
+        elif "CUDA" in logs or "GPU" in logs:
+            error_info["category"] = "gpu_error"
+            error_info["error_type"] = "CUDAError"
+            error_info["actionable_message"] = "GPU error detected. Check GPU availability and drivers."
+
+        # Import/dependency errors
+        elif "ModuleNotFoundError" in logs or "ImportError" in logs:
+            error_info["category"] = "dependency_missing"
+            error_info["error_type"] = "ModuleNotFoundError"
+            module_match = re.search(r"No module named ['\"]([^'\"]+)['\"]", logs)
+            if module_match:
+                module_name = module_match.group(1)
+                error_info["actionable_message"] = f"Missing required dependency: {module_name}. Install it with: pip install {module_name}"
+            else:
+                error_info["actionable_message"] = "Missing required Python module. Check your dependencies."
+
+        # API timeout errors (OpenAI/model endpoint)
+        elif "Request timed out" in logs or ("RuntimeError" in logs and "API failed" in logs):
+            error_info["category"] = "api_timeout"
+            error_info["error_type"] = "APITimeoutError"
+            # Try to extract the endpoint URL
+            url_match = re.search(r'error occurs at (https?://[^\s]+)', logs)
+            if url_match:
+                endpoint = url_match.group(1)
+                error_info["actionable_message"] = f"Model API endpoint not responding: {endpoint}. Check if the model service is running and accessible."
+            else:
+                error_info["actionable_message"] = "Model API endpoint not responding. Check if the model service is running and accessible."
+
+        # Network errors
+        elif "ConnectionError" in logs or "TimeoutError" in logs or "Connection refused" in logs:
+            error_info["category"] = "network_error"
+            error_info["error_type"] = "ConnectionError"
+            error_info["actionable_message"] = "Network error. Check API endpoint and connectivity."
+
+        # FileNotFoundError
+        elif "FileNotFoundError" in logs:
+            error_info["category"] = "file_missing"
+            error_info["error_type"] = "FileNotFoundError"
+            error_info["actionable_message"] = "Required file not found. Check file paths in your configuration."
+
+        # ValueError
+        elif "ValueError" in logs:
+            error_info["category"] = "invalid_input"
+            error_info["error_type"] = "ValueError"
+            error_info["actionable_message"] = "Invalid input or configuration value."
+
+        # Extract file and line from traceback
+        traceback_match = re.search(r'File "([^"]+)", line (\d+)', logs)
+        if traceback_match:
+            error_info["file"] = traceback_match.group(1)
+            error_info["line"] = int(traceback_match.group(2))
+
+        # Extract error message (last line or exception message)
+        error_lines = [line for line in logs.split('\n') if line.strip()]
+        if error_lines:
+            # Look for exception message (usually last non-empty line)
+            # Expanded list to catch more error types including RuntimeError
+            error_patterns = [
+                'Error:', 'Exception:', 'AssertionError:', 'ValueError:',
+                'RuntimeError:', 'TypeError:', 'KeyError:', 'IndexError:',
+                'Request timed out', 'API failed'
+            ]
+            for line in reversed(error_lines):
+                # Skip progress bar lines (contain percentage indicators)
+                if '|' in line and '%' in line and ('/' in line or 'it/s' in line):
+                    continue
+                if any(err in line for err in error_patterns):
+                    error_info["error_message"] = line.strip()[:500]
+                    break
+
+            if not error_info["error_message"]:
+                # Find last meaningful line (skip progress bars and empty-ish lines)
+                for line in reversed(error_lines):
+                    stripped = line.strip()
+                    # Skip progress bars and ANSI escape sequences
+                    if '|' in stripped and '%' in stripped:
+                        continue
+                    if len(stripped) > 10:  # Skip very short lines
+                        error_info["error_message"] = stripped[:500]
+                        break
+
+        # If no actionable message set, use error message
+        if not error_info["actionable_message"]:
+            error_info["actionable_message"] = error_info["error_message"]
+
+        with open('/tmp/job_error_{{ temp_id }}.json', 'w') as f:
+            json.dump(error_info, f)
+        EOF
+      args:
+        executable: /bin/bash
+      when: pod_info.resources | length > 0 and target_pod is defined and target_pod
+
+    - name: Handle case where pod not found
+      shell: |
+        python3 << 'EOF'
+        import json
+
+        error_info = {
+            "success": False,
+            "category": "infrastructure",
+            "error_type": "PodNotFound",
+            "error_message": "Pod for job {{ job_name }} not found",
+            "actionable_message": "Job pod was deleted or not created. Check cluster logs."
+        }
+
+        with open('/tmp/job_error_{{ temp_id }}.json', 'w') as f:
+            json.dump(error_info, f)
+        EOF
+      args:
+        executable: /bin/bash
+      when: pod_info.resources | length == 0

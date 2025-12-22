@@ -3051,6 +3051,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.LOCAL_MODEL_ONBOARDING: "Successfully cancelled model onboarding.",
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
     WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
+    WorkflowTypeEnum.MODEL_BENCHMARK: "Successfully cancelled benchmark.",
 }
 
 
@@ -3079,6 +3080,7 @@ class NotificationTypeEnum(StrEnum):
     DEPLOYMENT_DELETION_SUCCESS = auto()
     MODEL_QUANTIZATION_SUCCESS = auto()
     MODEL_BENCHMARK_SUCCESS = auto()
+    MODEL_BENCHMARK_CANCELLED = auto()
     ADAPTER_DEPLOYMENT_SUCCESS = auto()
     ADAPTER_DELETION_SUCCESS = auto()
     PROJECT_INVITATION_SUCCESS = auto()
@@ -3150,6 +3152,7 @@ class BenchmarkStatusEnum(Enum):
     SUCCESS = "success"
     FAILED = "failed"
     PROCESSING = "processing"
+    CANCELLED = "cancelled"
 
 
 class DatasetStatusEnum(Enum):

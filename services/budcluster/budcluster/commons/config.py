@@ -43,6 +43,9 @@ class AppConfig(BaseAppConfig):
     nfd_detection_timeout: int = Field(30, alias="NFD_DETECTION_TIMEOUT")
     nfd_namespace: str = Field("node-feature-discovery", alias="NFD_NAMESPACE")
 
+    # CPU optimization: skip master/control-plane nodes for CPU deployments
+    skip_master_node_for_cpu: bool = Field(True, alias="SKIP_MASTER_NODE_FOR_CPU")
+
     # Endpoint validation configuration
     max_endpoint_retry_attempts: int = Field(15, alias="MAX_ENDPOINT_RETRY_ATTEMPTS")
     endpoint_retry_interval: int = Field(20, alias="ENDPOINT_RETRY_INTERVAL")
@@ -87,6 +90,7 @@ class AppConfig(BaseAppConfig):
 
     # Bud Services
     bud_app_id: str = Field("budapp", alias="BUD_APP_ID")
+    bud_metrics_app_id: str = Field("budmetrics", alias="BUD_METRICS_APP_ID")
 
     # Deployment Status Sync Configuration
     deployment_sync_batch_size: int = Field(2, alias="DEPLOYMENT_SYNC_BATCH_SIZE")

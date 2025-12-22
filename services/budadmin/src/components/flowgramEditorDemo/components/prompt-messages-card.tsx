@@ -87,8 +87,8 @@ export const PromptMessagesCard = () => {
                 color: '#FF4D4F',
               }}
             >
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2" fill="none"/>
-              <path d="M5 5L11 11M11 5L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+              <path d="M5 5L11 11M11 5L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           )}
         </div>
@@ -125,18 +125,17 @@ export const PromptMessagesCard = () => {
       }}>
         {messages.length === 0 ? (
           <div style={{
-            padding: '12px',
-            borderRadius: '8px',
-            minHeight: '80px',
+            padding: '.8rem',
+            borderRadius: '.75rem',
             background: '#FFFFFF05',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
           }}>
             <div style={{
               fontSize: '12px',
               color: '#808080',
               background: 'transparent',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              textAlign: 'center',
             }}>
               Enter prompt messages
             </div>
@@ -196,6 +195,7 @@ export const PromptMessagesCard = () => {
                   background: 'transparent',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
+                  paddingLeft: '2px',
                 }}>
                   {message.content || <span style={{ color: '#606060' }}>No content</span>}
                 </div>

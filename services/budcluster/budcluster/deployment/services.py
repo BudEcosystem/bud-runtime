@@ -345,7 +345,7 @@ class DeploymentOpsService:
         logger.debug(f"Syncing deployment status for {deployment_key}")
 
         try:
-            # Get cluster and decrypt config
+            # Get cluster and decrypt config, also check if workers exist in DB
             with DBSession() as session:
                 db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields(
                     {"id": cluster_id}, missing_ok=True
@@ -371,14 +371,27 @@ class DeploymentOpsService:
                 platform = db_cluster.platform
                 ingress_url = db_cluster.ingress_url
 
+                # Check if workers exist in DB to determine if we need full pod check
+                worker_info_filters = {
+                    "cluster_id": cluster_id,
+                    "namespace": deployment_name,
+                }
+                existing_workers, _ = await WorkerInfoDataManager(session).get_all_workers(filters=worker_info_filters)
+                has_workers_in_db = len(existing_workers) > 0
+
+            # Determine if we need to check pods (when no workers exist in DB)
+            # This ensures workers are populated on first sync or after data loss
+            check_pods = not has_workers_in_db
+            if check_pods:
+                logger.info(f"No workers found in DB for {deployment_key}, enabling pod check to populate workers")
+
             # Get deployment status from K8s
             deployment_handler = DeploymentHandler(config=config_dict)
             try:
                 # Determine if cloud model (default to False for periodic sync)
                 cloud_model = False
-                # Optimization: check_pods=False to skip Ansible check and rely on ingress health
                 deployment_status = await deployment_handler.get_deployment_status_async(
-                    deployment_name, ingress_url, cloud_model=cloud_model, platform=platform, check_pods=False
+                    deployment_name, ingress_url, cloud_model=cloud_model, platform=platform, check_pods=check_pods
                 )
                 logger.debug(f"Deployment {deployment_key} status: {deployment_status}")
                 current_replica = deployment_status.get("replicas", {}).get("total", 0)

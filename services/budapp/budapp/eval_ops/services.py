@@ -88,6 +88,7 @@ from budapp.eval_ops.schemas import (
     Trait as TraitSchema,
 )
 from budapp.model_ops.models import Model as ModelTable
+from budapp.model_ops.models import Provider as ProviderModel
 from budapp.workflow_ops.crud import (
     WorkflowDataManager,
     WorkflowStepDataManager,
@@ -327,12 +328,14 @@ class ExperimentService:
             HTTPException(status_code=400): If experiment with same name already exists for the user.
             HTTPException(status_code=500): If database insertion fails.
         """
-        # Check for duplicate experiment name for this user
+        # Check for duplicate experiment name for this user (case-insensitive)
         # Note: name has already been validated and trimmed by Pydantic
+        # Convert name to lowercase for storage and comparison
+        normalized_name = req.name.lower()
         existing_experiment = (
             self.session.query(ExperimentModel)
             .filter(
-                ExperimentModel.name == req.name,
+                func.lower(ExperimentModel.name) == normalized_name,
                 ExperimentModel.created_by == user_id,
                 ExperimentModel.status != ExperimentStatusEnum.DELETED.value,
             )
@@ -358,8 +361,9 @@ class ExperimentService:
             tag_ids = [tag.id for tag in created_tags]
 
         # Create experiment without project_id initially
+        # Store name in lowercase for consistent storage
         ev = ExperimentModel(
-            name=req.name,
+            name=normalized_name,
             description=req.description,
             # project_id=req.project_id,  # Commented out - made optional
             created_by=user_id,
@@ -2361,15 +2365,20 @@ class ExperimentService:
         user_id: uuid.UUID,
         model_id: Optional[uuid.UUID] = None,
         endpoint_id: Optional[uuid.UUID] = None,
+        search: Optional[str] = None,
+        search_name: bool = True,
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        """Get all evaluations for a user with optional model_id and endpoint_id filters.
+        """Get all evaluations for a user with optional model_id, endpoint_id, and search filters.
 
         Parameters:
             user_id (uuid.UUID): ID of the user.
             model_id (Optional[uuid.UUID]): Optional model ID to filter evaluations.
             endpoint_id (Optional[uuid.UUID]): Optional endpoint ID to filter evaluations.
+            search (Optional[str]): Optional search term to filter by evaluation name, dataset name, trait name,
+                and optionally endpoint name.
+            search_name (bool): If True, include endpoint/deployment name in search. Default: True.
             page (int): Page number for pagination (1-indexed).
             page_size (int): Number of items per page.
 
@@ -2430,6 +2439,70 @@ class ExperimentService:
 
             query = query.filter(EvaluationModel.id.in_(evaluation_ids_with_model))
 
+        # Apply search filter if provided
+        if search:
+            search_term = f"%{search.lower()}%"
+            from sqlalchemy import or_
+
+            # Search by evaluation name
+            evaluation_name_match = EvaluationModel.name.ilike(search_term)
+
+            # Search by dataset name via runs
+            # Run -> ExpDatasetVersion -> ExpDataset
+            evaluation_ids_with_dataset_match = (
+                self.session.query(RunModel.evaluation_id)
+                .join(ExpDatasetVersion, RunModel.dataset_version_id == ExpDatasetVersion.id)
+                .join(DatasetModel, ExpDatasetVersion.dataset_id == DatasetModel.id)
+                .filter(
+                    DatasetModel.name.ilike(search_term),
+                    RunModel.evaluation_id.isnot(None),
+                )
+                .distinct()
+                .subquery()
+            )
+
+            # Search by trait name
+            # ExpTrait -> ExpTraitsDatasetPivot -> ExpDataset -> ExpDatasetVersion -> Run
+            evaluation_ids_with_trait_match = (
+                self.session.query(RunModel.evaluation_id)
+                .join(ExpDatasetVersion, RunModel.dataset_version_id == ExpDatasetVersion.id)
+                .join(DatasetModel, ExpDatasetVersion.dataset_id == DatasetModel.id)
+                .join(PivotModel, PivotModel.dataset_id == DatasetModel.id)
+                .join(TraitModel, PivotModel.trait_id == TraitModel.id)
+                .filter(
+                    TraitModel.name.ilike(search_term),
+                    RunModel.evaluation_id.isnot(None),
+                )
+                .distinct()
+                .subquery()
+            )
+
+            # Build search conditions list
+            search_conditions = [
+                evaluation_name_match,
+                EvaluationModel.id.in_(evaluation_ids_with_dataset_match),
+                EvaluationModel.id.in_(evaluation_ids_with_trait_match),
+            ]
+
+            # Optionally search by endpoint/deployment name
+            if search_name:
+                # Search by endpoint name via runs
+                # Run -> Endpoint
+                evaluation_ids_with_endpoint_name_match = (
+                    self.session.query(RunModel.evaluation_id)
+                    .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
+                    .filter(
+                        EndpointModel.name.ilike(search_term),
+                        RunModel.evaluation_id.isnot(None),
+                    )
+                    .distinct()
+                    .subquery()
+                )
+                search_conditions.append(EvaluationModel.id.in_(evaluation_ids_with_endpoint_name_match))
+
+            # Combine all search conditions with OR
+            query = query.filter(or_(*search_conditions))
+
         # Get total count
         total = query.count()
 
@@ -2437,31 +2510,39 @@ class ExperimentService:
         offset = (page - 1) * page_size
         evaluations_db = query.order_by(EvaluationModel.created_at.desc()).offset(offset).limit(page_size).all()
 
-        # Collect evaluation job IDs for batch score fetching
-        evaluation_job_ids = []
-        for eval_db in evaluations_db:
-            # Get runs for this evaluation
-            runs = (
+        # Collect all evaluation IDs for batch fetching runs and metrics
+        eval_ids = [eval_db.id for eval_db in evaluations_db]
+
+        # Batch fetch all runs for these evaluations
+        all_runs = []
+        if eval_ids:
+            all_runs = (
                 self.session.query(RunModel)
                 .filter(
-                    RunModel.evaluation_id == eval_db.id,
+                    RunModel.evaluation_id.in_(eval_ids),
                     RunModel.status != RunStatusEnum.DELETED.value,
                 )
+                .order_by(RunModel.evaluation_id, RunModel.run_index)
                 .all()
             )
-            for run in runs:
-                eval_job_id = run.config.get("evaluation_job_id") if run.config else None
-                if eval_job_id:
-                    evaluation_job_ids.append((eval_db.id, run.id, eval_job_id))
 
-        # Fetch scores from BudEval in parallel
-        scores_map = {}
-        if evaluation_job_ids:
-            from budapp.eval_ops.budeval_client import BudEvalClient
+        # Group runs by evaluation_id
+        runs_by_eval: Dict[uuid.UUID, List] = {}
+        all_run_ids = []
+        for run in all_runs:
+            if run.evaluation_id not in runs_by_eval:
+                runs_by_eval[run.evaluation_id] = []
+            runs_by_eval[run.evaluation_id].append(run)
+            all_run_ids.append(run.id)
 
-            client = BudEvalClient()
-            eval_ids = list({job_id for _, _, job_id in evaluation_job_ids})
-            scores_map = await client.fetch_scores_batch(eval_ids)
+        # Batch fetch all metrics for completed runs
+        metrics_by_run: Dict[uuid.UUID, List[MetricModel]] = {}
+        if all_run_ids:
+            all_metrics = self.session.query(MetricModel).filter(MetricModel.run_id.in_(all_run_ids)).all()
+            for metric in all_metrics:
+                if metric.run_id not in metrics_by_run:
+                    metrics_by_run[metric.run_id] = []
+                metrics_by_run[metric.run_id].append(metric)
 
         # Build response
         evaluation_results = []
@@ -2469,16 +2550,8 @@ class ExperimentService:
             # Get experiment
             experiment = self.session.get(ExperimentModel, eval_db.experiment_id)
 
-            # Get runs for this evaluation
-            runs = (
-                self.session.query(RunModel)
-                .filter(
-                    RunModel.evaluation_id == eval_db.id,
-                    RunModel.status != RunStatusEnum.DELETED.value,
-                )
-                .order_by(RunModel.run_index)
-                .all()
-            )
+            # Get runs for this evaluation from batch fetched data
+            runs = runs_by_eval.get(eval_db.id, [])
 
             # Get model details from the first run
             model_detail = None
@@ -2491,7 +2564,6 @@ class ExperimentService:
 
             # Build run items
             run_items = []
-            scores = None
             for run in runs:
                 eval_job_id = run.config.get("evaluation_job_id") if run.config else None
 
@@ -2505,32 +2577,25 @@ class ExperimentService:
                     )
                 )
 
-                # Get scores from first run with scores
-                if not scores and eval_job_id and eval_job_id in scores_map:
-                    score_data = scores_map[eval_job_id]
-                    if score_data:
-                        scores = EvaluationScore(
-                            status="completed" if score_data.get("overall_accuracy") is not None else "running",
-                            overall_accuracy=score_data.get("overall_accuracy"),
-                            datasets=score_data.get("datasets", []),
-                        )
+            # Calculate scores from ExpMetric table (similar to get_dataset_scores)
+            scores = self._calculate_evaluation_scores(eval_db, runs, metrics_by_run)
 
-                evaluation_results.append(
-                    AllEvaluationsItem(
-                        evaluation_id=eval_db.id,
-                        evaluation_name=eval_db.name,
-                        experiment_id=eval_db.experiment_id,
-                        experiment_name=experiment.name if experiment else "Unknown Experiment",
-                        model=model_detail,
-                        traits=traits_list,
-                        status=eval_db.status,
-                        scores=scores,
-                        runs=run_items,
-                        created_at=eval_db.created_at,
-                        updated_at=eval_db.modified_at,  # TimestampMixin uses modified_at, not updated_at
-                        duration_in_seconds=eval_db.duration_in_seconds,
-                    )
+            evaluation_results.append(
+                AllEvaluationsItem(
+                    evaluation_id=eval_db.id,
+                    evaluation_name=eval_db.name,
+                    experiment_id=eval_db.experiment_id,
+                    experiment_name=experiment.name if experiment else "Unknown Experiment",
+                    model=model_detail,
+                    traits=traits_list,
+                    status=eval_db.status,
+                    scores=scores,
+                    runs=run_items,
+                    created_at=eval_db.created_at,
+                    updated_at=eval_db.modified_at,  # TimestampMixin uses modified_at, not updated_at
+                    duration_in_seconds=eval_db.duration_in_seconds,
                 )
+            )
 
         return {
             "evaluations": evaluation_results,
@@ -2539,6 +2604,153 @@ class ExperimentService:
             "page_size": page_size,
             "total_pages": (total + page_size - 1) // page_size if total > 0 else 0,
         }
+
+    def _calculate_evaluation_scores(
+        self,
+        evaluation: "EvaluationModel",
+        runs: List,
+        metrics_by_run: Dict[uuid.UUID, List["MetricModel"]],
+    ) -> Optional[Any]:
+        """Calculate evaluation scores from ExpMetric table.
+
+        This method calculates scores similar to get_experiment by averaging
+        all metric values for each run and computing overall score.
+
+        Parameters:
+            evaluation: The evaluation model instance.
+            runs: List of runs for this evaluation.
+            metrics_by_run: Dictionary mapping run_id to list of metrics.
+
+        Returns:
+            EvaluationScore or None if no scores available.
+        """
+        from budapp.eval_ops.schemas import EvaluationScore
+
+        if not runs:
+            # No runs means evaluation is still pending or has no data
+            return EvaluationScore(
+                status="pending",
+                overall_accuracy=None,
+                datasets=[],
+            )
+
+        # Check if any runs are completed
+        completed_runs = [r for r in runs if r.status == RunStatusEnum.COMPLETED.value]
+        running_runs = [r for r in runs if r.status == RunStatusEnum.RUNNING.value]
+
+        # Filter out failed/cancelled/skipped runs (matching get_experiment logic)
+        excluded_statuses = {
+            RunStatusEnum.FAILED.value,
+            RunStatusEnum.CANCELLED.value,
+            RunStatusEnum.SKIPPED.value,
+        }
+
+        if not completed_runs and not running_runs:
+            # All runs are pending or excluded
+            return EvaluationScore(
+                status="pending",
+                overall_accuracy=None,
+                datasets=[],
+            )
+
+        if not completed_runs:
+            # Some runs are still running
+            return EvaluationScore(
+                status="running",
+                overall_accuracy=None,
+                datasets=[],
+            )
+
+        # Calculate scores similar to get_experiment:
+        # For each run, average ALL metric values, then average across valid runs
+        all_run_scores: List[float] = []
+        dataset_run_scores: Dict[uuid.UUID, List[float]] = {}
+        dataset_metrics_data: Dict[uuid.UUID, Dict[str, List[float]]] = {}
+
+        for run in completed_runs:
+            # Skip excluded status runs
+            if run.status in excluded_statuses:
+                continue
+
+            run_metrics = metrics_by_run.get(run.id, [])
+            dataset_version_id = run.dataset_version_id
+
+            # Initialize dataset tracking
+            if dataset_version_id not in dataset_run_scores:
+                dataset_run_scores[dataset_version_id] = []
+                dataset_metrics_data[dataset_version_id] = {}
+
+            # Calculate run score (average of all metrics) - matching get_experiment logic
+            if run_metrics:
+                total = sum(float(m.metric_value) for m in run_metrics if m.metric_value)
+                run_score = round(total / len(run_metrics), 2)
+
+                # Only include runs with score > 0 (matching get_experiment logic)
+                if run_score > 0:
+                    all_run_scores.append(run_score)
+                    dataset_run_scores[dataset_version_id].append(run_score)
+
+            # Also track individual metrics for detailed breakdown
+            for metric in run_metrics:
+                metric_name = metric.metric_name
+                if metric_name not in dataset_metrics_data[dataset_version_id]:
+                    dataset_metrics_data[dataset_version_id][metric_name] = []
+
+                if metric.metric_value and metric.metric_value > 0:
+                    dataset_metrics_data[dataset_version_id][metric_name].append(float(metric.metric_value))
+
+        # Calculate overall score (average of all run scores)
+        overall_accuracy = None
+        if all_run_scores:
+            overall_accuracy = round(sum(all_run_scores) / len(all_run_scores), 2)
+
+        # Build dataset scores list
+        datasets_scores = []
+        for dataset_version_id in dataset_run_scores:
+            # Get dataset info
+            dataset_version = self.session.get(ExpDatasetVersion, dataset_version_id)
+            dataset_name = "Unknown"
+            if dataset_version and dataset_version.dataset_id:
+                dataset = self.session.get(DatasetModel, dataset_version.dataset_id)
+                if dataset:
+                    dataset_name = dataset.name
+
+            # Calculate dataset-level score (average of run scores for this dataset)
+            dataset_score = None
+            run_scores = dataset_run_scores[dataset_version_id]
+            if run_scores:
+                dataset_score = round(sum(run_scores) / len(run_scores), 2)
+
+            # Calculate averaged metrics for this dataset
+            dataset_metrics_list = []
+            metrics_dict = dataset_metrics_data.get(dataset_version_id, {})
+            for metric_name, values in metrics_dict.items():
+                if values:
+                    avg_value = round(sum(values) / len(values), 2)
+                    dataset_metrics_list.append(
+                        {
+                            "metric_name": metric_name,
+                            "metric_value": avg_value,
+                        }
+                    )
+
+            datasets_scores.append(
+                {
+                    "dataset_id": str(dataset_version_id),
+                    "dataset_name": dataset_name,
+                    "accuracy": dataset_score,  # Now represents avg of all metrics, not just accuracy
+                    "metrics": dataset_metrics_list,
+                }
+            )
+
+        # Determine status based on run completion
+        eval_status = "completed" if len(completed_runs) == len(runs) else "running"
+
+        return EvaluationScore(
+            status=eval_status,
+            overall_accuracy=overall_accuracy,
+            datasets=datasets_scores,
+        )
 
     def get_endpoint_model_details(self, endpoint_id: uuid.UUID) -> "ModelDetail":
         """Get detailed model information from endpoint.
@@ -2839,7 +3051,7 @@ class ExperimentService:
             dataset_version_ids = [dv.id for dv in dataset_versions]
 
             # Query all completed runs for this dataset's versions
-            # Join with Endpoint, Model, and Experiment for access control and model info
+            # Join with Endpoint, Model, Provider, and Experiment for access control and model info
             runs_query = (
                 self.session.query(
                     RunModel.id.label("run_id"),
@@ -2849,10 +3061,12 @@ class ExperimentService:
                     ModelTable.id.label("model_id"),
                     ModelTable.name.label("model_name"),
                     ModelTable.icon.label("model_icon"),
+                    ProviderModel.icon.label("provider_icon"),
                     ExperimentModel.id.label("experiment_id"),
                 )
                 .join(EndpointModel, RunModel.endpoint_id == EndpointModel.id)
                 .join(ModelTable, EndpointModel.model_id == ModelTable.id)
+                .outerjoin(ProviderModel, ModelTable.provider_id == ProviderModel.id)
                 .join(ExperimentModel, RunModel.experiment_id == ExperimentModel.id)
                 .filter(
                     RunModel.dataset_version_id.in_(dataset_version_ids),
@@ -2878,6 +3092,7 @@ class ExperimentService:
                         "model_id": model_id,
                         "model_name": run_row.model_name,
                         "model_icon": run_row.model_icon,
+                        "provider_icon": run_row.provider_icon,
                         "endpoint_name": run_row.endpoint_name,
                         "run_ids": [],
                         "latest_created_at": run_row.created_at,
@@ -2941,6 +3156,7 @@ class ExperimentService:
                         "model_id": model_id,
                         "model_name": model_info["model_name"],
                         "model_icon": model_info["model_icon"],
+                        "provider_icon": model_info["provider_icon"] or model_info["model_icon"],
                         "endpoint_name": model_info["endpoint_name"],
                         "accuracy": accuracy_value,
                         "metrics": averaged_metrics,
@@ -4660,7 +4876,8 @@ class EvaluationWorkflowService:
         trait_ids = all_data.get("step_3", {}).get("trait_ids", [])
 
         # Common details for evaluation
-        evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation")
+        # Convert evaluation name to lowercase for consistent storage
+        evaluation_name = all_data.get("step_1", {}).get("name", "Evaluation").lower()
         evaluation_description = all_data.get("step_1", {}).get("description")
 
         if not endpoint_id:
@@ -4701,6 +4918,21 @@ class EvaluationWorkflowService:
                 trait_id_strings.append(str(validated_uuid))
             except (ValueError, TypeError):
                 logger.warning(f"Invalid trait ID format: {trait_id}, skipping")
+
+        # Check for duplicate evaluation name within the same experiment (case-insensitive)
+        existing_evaluation = (
+            self.session.query(Evaluation)
+            .filter(
+                func.lower(Evaluation.name) == evaluation_name,
+                Evaluation.experiment_id == experiment_id,
+            )
+            .first()
+        )
+        if existing_evaluation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"An evaluation with the name '{evaluation_name}' already exists in this experiment. Please choose a different name.",
+            )
 
         # Create Evaluation
         evaluation = Evaluation(

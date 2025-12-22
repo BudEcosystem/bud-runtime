@@ -5,8 +5,8 @@ the central OTel Collector, handling port-forwarding and metric transformation.
 """
 
 import asyncio
+import json
 import socket
-import subprocess
 import tempfile
 import time
 from contextlib import contextmanager
@@ -19,6 +19,8 @@ import yaml
 from budmicroframe.commons.logging import get_logger
 
 from ..commons.config import app_settings
+from ..commons.hami_parser import parse_prometheus_metrics
+from ..commons.metrics_config import get_dcgm_exporter_config, is_dcgm_metrics_enabled, is_hami_metrics_enabled
 from .exceptions import NamespaceNotFoundError
 
 
@@ -346,8 +348,8 @@ class OTelBridge:
                 logger.error(f"Port-forward not ready for cluster {cluster_id}")
                 process.terminate()
                 try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
+                    await asyncio.wait_for(process.wait(), timeout=5)
+                except asyncio.TimeoutError:
                     process.kill()
                 return None
 
@@ -559,6 +561,287 @@ class OTelBridge:
             error_msg = f"Failed to scrape metrics: {e}"
             logger.error(error_msg)
             return False, error_msg
+
+    async def scrape_and_forward_hami_metrics(
+        self,
+        cluster_id: str,
+        kubeconfig: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """Scrape HAMI GPU metrics from cluster and forward to OTel.
+
+        HAMI metrics come from the HAMI scheduler service directly (not Prometheus),
+        so we need a separate scraping path to forward them to OTel Collector.
+
+        Args:
+            cluster_id: Cluster to scrape from
+            kubeconfig: Decrypted kubeconfig for the cluster
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        # Check if HAMI metrics are enabled
+        if not is_hami_metrics_enabled():
+            logger.debug(f"HAMI metrics disabled, skipping for cluster {cluster_id}")
+            return True, None
+
+        if cluster_id not in self.scrape_configs:
+            return False, f"Cluster {cluster_id} not configured for scraping"
+
+        config = self.scrape_configs[cluster_id]
+
+        try:
+            # Import PrometheusClient here to avoid circular imports
+            from .prometheus_client import PrometheusClient
+
+            # Create a Prometheus client to access HAMI metrics
+            prom_client = PrometheusClient(kubeconfig=kubeconfig)
+
+            logger.info(f"Scraping HAMI metrics for cluster {cluster_id}")
+
+            # Get raw HAMI metrics from scheduler
+            hami_metrics_text = await prom_client.get_hami_metrics()
+
+            # Also get device plugin metrics (has per-container limit and usage)
+            device_plugin_metrics_text = await prom_client.get_hami_device_plugin_metrics()
+
+            if not hami_metrics_text and not device_plugin_metrics_text:
+                logger.debug(f"No HAMI metrics available for cluster {cluster_id}")
+                return True, None
+
+            # Combine metrics from both sources
+            combined_metrics_text = ""
+            if hami_metrics_text:
+                combined_metrics_text += hami_metrics_text + "\n"
+            if device_plugin_metrics_text:
+                combined_metrics_text += device_plugin_metrics_text
+
+            # Parse the Prometheus text format
+            parsed_metrics = parse_prometheus_metrics(combined_metrics_text)
+
+            if not parsed_metrics:
+                logger.debug(f"No parseable HAMI metrics for cluster {cluster_id}")
+                return True, None
+
+            # Transform to the format expected by _send_metrics_to_otel
+            # The format is: [{"metric": {"__name__": "name", ...labels}, "values": [[ts, val], ...]}, ...]
+            current_timestamp = time.time()
+            metrics_data = []
+
+            for metric_name, samples in parsed_metrics.items():
+                for sample in samples:
+                    metrics_data.append(
+                        {
+                            "metric": {
+                                "__name__": metric_name,
+                                **sample["labels"],
+                            },
+                            "values": [[current_timestamp, str(sample["value"])]],
+                        }
+                    )
+
+            if not metrics_data:
+                logger.debug(f"No HAMI metrics to forward for cluster {cluster_id}")
+                return True, None
+
+            logger.info(f"Forwarding {len(metrics_data)} HAMI metrics for cluster {cluster_id}")
+
+            # Send to OTel Collector
+            await self._send_metrics_to_otel(cluster_id, config, metrics_data)
+
+            return True, None
+
+        except Exception as e:
+            error_msg = f"Failed to scrape HAMI metrics: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    async def scrape_and_forward_dcgm_metrics(
+        self,
+        cluster_id: str,
+        kubeconfig: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """Scrape DCGM GPU metrics from cluster and forward to OTel.
+
+        DCGM Exporter provides hardware-level GPU metrics like temperature,
+        power usage, and actual GPU utilization. These complement HAMI's
+        scheduling/allocation metrics.
+
+        Args:
+            cluster_id: Cluster to scrape from
+            kubeconfig: Decrypted kubeconfig for the cluster
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        # Check if DCGM metrics are enabled
+        if not is_dcgm_metrics_enabled():
+            logger.debug(f"DCGM metrics disabled, skipping for cluster {cluster_id}")
+            return True, None
+
+        if cluster_id not in self.scrape_configs:
+            return False, f"Cluster {cluster_id} not configured for scraping"
+
+        config = self.scrape_configs[cluster_id]
+        dcgm_config = get_dcgm_exporter_config()
+
+        try:
+            # Get DCGM exporter metrics via port-forward
+            dcgm_metrics_text = await self._fetch_dcgm_metrics(
+                cluster_id,
+                kubeconfig,
+                dcgm_config["namespace"],
+                dcgm_config["service"],
+                int(dcgm_config["port"]),
+            )
+
+            if not dcgm_metrics_text:
+                logger.debug(f"No DCGM metrics available for cluster {cluster_id}")
+                return True, None
+
+            # Parse the Prometheus text format (same parser works for DCGM)
+            parsed_metrics = parse_prometheus_metrics(dcgm_metrics_text)
+
+            if not parsed_metrics:
+                logger.debug(f"No parseable DCGM metrics for cluster {cluster_id}")
+                return True, None
+
+            # Transform to the format expected by _send_metrics_to_otel
+            current_timestamp = time.time()
+            metrics_data = []
+
+            for metric_name, samples in parsed_metrics.items():
+                # Only include DCGM metrics we care about
+                if not metric_name.startswith("DCGM_"):
+                    continue
+
+                for sample in samples:
+                    metrics_data.append(
+                        {
+                            "metric": {
+                                "__name__": metric_name,
+                                **sample["labels"],
+                            },
+                            "values": [[current_timestamp, str(sample["value"])]],
+                        }
+                    )
+
+            if not metrics_data:
+                logger.debug(f"No DCGM metrics to forward for cluster {cluster_id}")
+                return True, None
+
+            logger.info(f"Forwarding {len(metrics_data)} DCGM metrics for cluster {cluster_id}")
+
+            # Send to OTel Collector
+            await self._send_metrics_to_otel(cluster_id, config, metrics_data)
+
+            return True, None
+
+        except Exception as e:
+            error_msg = f"Failed to scrape DCGM metrics: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    async def _fetch_dcgm_metrics(
+        self,
+        cluster_id: str,
+        kubeconfig: str,
+        namespace: str,
+        service: str,
+        port: int,
+    ) -> Optional[str]:
+        """Fetch metrics from DCGM Exporter via kubectl port-forward.
+
+        Args:
+            cluster_id: Cluster identifier
+            kubeconfig: Kubeconfig content
+            namespace: DCGM namespace (e.g., 'gpu-operator')
+            service: DCGM service name (e.g., 'nvidia-dcgm-exporter')
+            port: DCGM exporter port (default 9400)
+
+        Returns:
+            Raw metrics text or None if unavailable
+        """
+        with secure_kubeconfig_file(kubeconfig, cluster_id) as kubeconfig_path:
+            # First check if the DCGM service exists
+            check_cmd = ["kubectl", "--kubeconfig", kubeconfig_path]
+            if not app_settings.validate_certs:
+                check_cmd.append("--insecure-skip-tls-verify")
+            check_cmd.extend(["-n", namespace, "get", "service", service, "--request-timeout=5s"])
+
+            check_proc = await asyncio.create_subprocess_exec(
+                *check_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                _, check_stderr = await asyncio.wait_for(check_proc.communicate(), timeout=10.0)
+            except asyncio.TimeoutError:
+                logger.debug(f"DCGM service check timed out for cluster {cluster_id}")
+                return None
+
+            if check_proc.returncode != 0:
+                logger.debug(f"DCGM service not found in cluster {cluster_id}: {check_stderr.decode()}")
+                return None
+
+            # Find an available local port
+            local_port = self._find_available_port()
+
+            # Start port-forward to DCGM
+            pf_cmd = ["kubectl", "--kubeconfig", kubeconfig_path]
+            if not app_settings.validate_certs:
+                pf_cmd.append("--insecure-skip-tls-verify")
+            pf_cmd.extend(
+                [
+                    "-n",
+                    namespace,
+                    "port-forward",
+                    "--address",
+                    "127.0.0.1",
+                    f"service/{service}",
+                    f"{local_port}:{port}",
+                ]
+            )
+
+            pf_process = await asyncio.create_subprocess_exec(
+                *pf_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            try:
+                # Wait for port-forward to be ready
+                await asyncio.sleep(2)
+
+                if pf_process.returncode is not None:
+                    stderr = (await pf_process.communicate())[1].decode()
+                    logger.warning(f"DCGM port-forward failed: {stderr}")
+                    return None
+
+                # Fetch metrics from DCGM exporter
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.get(
+                            f"http://localhost:{local_port}/metrics",
+                            timeout=aiohttp.ClientTimeout(total=10),
+                        ) as response:
+                            if response.status == 200:
+                                metrics_text = await response.text()
+                                logger.debug(f"Fetched {len(metrics_text)} bytes of DCGM metrics")
+                                return metrics_text
+                            else:
+                                logger.warning(f"DCGM metrics fetch failed: status {response.status}")
+                                return None
+                    except aiohttp.ClientError as e:
+                        logger.warning(f"Failed to fetch DCGM metrics: {e}")
+                        return None
+
+            finally:
+                # Clean up port-forward
+                pf_process.terminate()
+                try:
+                    await asyncio.wait_for(pf_process.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    pf_process.kill()
 
     async def _send_metrics_to_otel(
         self,
@@ -797,3 +1080,218 @@ class OTelBridge:
                     }
                 )
         return active
+
+    async def scrape_and_forward_events(
+        self,
+        cluster_id: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """Scrape K8s node events from cluster and forward to budmetrics.
+
+        Args:
+            cluster_id: Cluster to scrape events from
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        if cluster_id not in self.scrape_configs:
+            return False, f"Cluster {cluster_id} not configured for scraping"
+
+        if cluster_id not in self.active_forwards:
+            return False, f"No active connection for cluster {cluster_id}"
+
+        config = self.scrape_configs[cluster_id]
+        info = self.active_forwards[cluster_id]
+        kubeconfig_path = info.get("kubeconfig_path")
+
+        if not kubeconfig_path:
+            return False, f"No kubeconfig available for cluster {cluster_id}"
+
+        try:
+            logger.info(f"Collecting node events for cluster {cluster_id}")
+
+            # Build kubectl command to get node events
+            cmd = [
+                "kubectl",
+                "--kubeconfig",
+                kubeconfig_path,
+            ]
+
+            if not app_settings.validate_certs:
+                cmd.append("--insecure-skip-tls-verify")
+
+            # Get events for all nodes
+            cmd.extend(
+                [
+                    "get",
+                    "events",
+                    "--all-namespaces",
+                    "--field-selector=involvedObject.kind=Node",
+                    "-o",
+                    "json",
+                ]
+            )
+
+            # Execute kubectl command
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+            except asyncio.TimeoutError:
+                process.kill()
+                return False, "kubectl get events command timed out"
+
+            if process.returncode != 0:
+                error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                logger.error(f"Failed to get events for cluster {cluster_id}: {error_msg}")
+                return False, f"kubectl failed: {error_msg}"
+
+            # Parse events JSON
+            events_data = json.loads(stdout.decode())
+            events = events_data.get("items", [])
+
+            logger.info(f"Retrieved {len(events)} node events from cluster {cluster_id}")
+
+            if not events:
+                logger.debug(f"No node events found for cluster {cluster_id}")
+                return True, None
+
+            # Transform events to our schema
+            node_events = self._transform_k8s_events(cluster_id, config, events)
+
+            # Send events to budmetrics via Dapr
+            await self._send_events_to_budmetrics(cluster_id, node_events)
+
+            return True, None
+
+        except Exception as e:
+            error_msg = f"Failed to collect events for cluster {cluster_id}: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def _transform_k8s_events(
+        self,
+        cluster_id: str,
+        config: Dict[str, Any],
+        events: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Transform K8s events to NodeEvents schema.
+
+        Args:
+            cluster_id: Cluster identifier
+            config: Cluster configuration
+            events: Raw K8s events from kubectl
+
+        Returns:
+            List of transformed event records
+        """
+        node_events = []
+        now = datetime.utcnow()
+
+        for event in events:
+            metadata = event.get("metadata", {})
+            involved_object = event.get("involvedObject", {})
+            source = event.get("source", {})
+
+            # Parse timestamps
+            first_ts = event.get("firstTimestamp")
+            last_ts = event.get("lastTimestamp") or event.get("eventTime")
+
+            # Use current time if no timestamp available
+            if not last_ts:
+                last_ts = now.isoformat()
+
+            node_events.append(
+                {
+                    "cluster_id": cluster_id,
+                    "cluster_name": config.get("cluster_name", ""),
+                    "node_name": involved_object.get("name", ""),
+                    "event_uid": metadata.get("uid", ""),
+                    "event_type": event.get("type", "Normal"),
+                    "reason": event.get("reason", ""),
+                    "message": event.get("message", ""),
+                    "source_component": source.get("component", ""),
+                    "source_host": source.get("host", ""),
+                    "first_timestamp": first_ts,
+                    "last_timestamp": last_ts,
+                    "event_count": event.get("count", 1) or 1,
+                }
+            )
+
+        return node_events
+
+    async def _send_events_to_budmetrics(
+        self,
+        cluster_id: str,
+        events: List[Dict[str, Any]],
+    ):
+        """Send events to budmetrics service via Dapr.
+
+        Args:
+            cluster_id: Cluster identifier
+            events: List of transformed event records
+        """
+        if not events:
+            logger.debug(f"No events to send for cluster {cluster_id}")
+            return
+
+        # Build Dapr endpoint for budmetrics
+        dapr_url = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/cluster-metrics/events/store"
+
+        payload = {
+            "cluster_id": cluster_id,
+            "events": events,
+        }
+
+        # Retry configuration
+        max_retries = 3
+        base_delay = 1.0
+
+        logger.info(f"Sending {len(events)} events to budmetrics for cluster {cluster_id}")
+
+        async with aiohttp.ClientSession() as session:
+            for attempt in range(max_retries):
+                try:
+                    async with session.post(
+                        dapr_url,
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=aiohttp.ClientTimeout(total=30),
+                    ) as response:
+                        if response.status == 200:
+                            logger.info(
+                                f"Successfully sent {len(events)} events to budmetrics for cluster {cluster_id}"
+                            )
+                            return
+                        elif response.status >= 500:
+                            response_text = await response.text()
+                            logger.warning(
+                                f"budmetrics server error (attempt {attempt + 1}/{max_retries}): "
+                                f"status={response.status}, response={response_text}"
+                            )
+                        else:
+                            response_text = await response.text()
+                            logger.error(
+                                f"Failed to send events to budmetrics: status={response.status}, "
+                                f"response={response_text}"
+                            )
+                            return
+
+                except aiohttp.ClientError as e:
+                    logger.warning(
+                        f"Network error sending events to budmetrics (attempt {attempt + 1}/{max_retries}): {e}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Unexpected error sending events to budmetrics (attempt {attempt + 1}/{max_retries}): {e}"
+                    )
+
+                # Exponential backoff
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2**attempt)
+                    await asyncio.sleep(delay)
+
+            logger.error(f"Failed to send events to budmetrics after {max_retries} attempts")

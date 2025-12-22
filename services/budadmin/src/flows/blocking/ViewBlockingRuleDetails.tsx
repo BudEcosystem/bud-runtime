@@ -188,7 +188,7 @@ export default function ViewBlockingRuleDetails({
         }
       },
       okText: `${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Rule`,
-      type: "warining",
+      type: "warning",
       loading: loading,
       key: "toggle-rule-status",
     });
@@ -203,7 +203,7 @@ export default function ViewBlockingRuleDetails({
       cancelText: "Cancel",
       okAction: handleDelete,
       okText: "Delete Rule",
-      type: "warining",
+      type: "warning",
       loading: loading,
       key: "delete-rule",
     });

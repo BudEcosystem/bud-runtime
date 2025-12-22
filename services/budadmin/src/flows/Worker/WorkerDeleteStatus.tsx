@@ -30,7 +30,7 @@ export default function WorkerDeleteStatus() {
         {showAlert && (
           <BudDrawerLayout>
             <BudStepAlert
-              type="warining"
+              type="warning"
               title="You're about to cancel the endpoint deletion"
               description="Please note that if you cancel now, you will have to start the process again."
               cancelText="Continue Deleting"

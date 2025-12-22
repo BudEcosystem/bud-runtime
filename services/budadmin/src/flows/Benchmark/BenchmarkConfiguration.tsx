@@ -10,14 +10,23 @@ import {
 } from "../components/SpecificationTableItem";
 import { capitalize, getFormattedToBillions } from "@/lib/utils";
 import { usePerfomanceBenchmark } from "src/stores/usePerfomanceBenchmark";
+import { Button } from "antd";
+import { EditOutlined } from "@ant-design/icons";
 
 export default function BenchmarkConfiguration() {
   const { openDrawerWithStep, openDrawer, setPreviousStep, currentFlow, step } =
     useDrawer();
-  const { stepSix, currentWorkflow, stepSeven } = usePerfomanceBenchmark();
+  const { stepSix, currentWorkflow, stepSeven, getWorkflow } = usePerfomanceBenchmark();
   const [workflowData, setWorkflowData] = useState<any>(
     currentWorkflow?.workflow_steps,
   );
+
+  // Refresh workflow data on mount
+  useEffect(() => {
+    getWorkflow().then(() => {
+      setWorkflowData(currentWorkflow?.workflow_steps);
+    });
+  }, []);
 
   let architectureArrayAdditional: SpecificationTableItemProps[] = [
     {
@@ -104,9 +113,55 @@ export default function BenchmarkConfiguration() {
     },
   ];
 
+  // Configuration options items (displayed separately with edit button)
+  const configurationItems: SpecificationTableItemProps[] = [
+    {
+      name: "Device Type",
+      value: workflowData?.selected_device_type
+        ? [workflowData.selected_device_type.toUpperCase()]
+        : [],
+      full: true,
+      icon: "/images/drawer/tag.png",
+      children: [],
+    },
+    {
+      name: "TP/PP Configuration",
+      value:
+        workflowData?.tp_size !== undefined && workflowData?.pp_size !== undefined
+          ? [`TP=${workflowData.tp_size}, PP=${workflowData.pp_size}`]
+          : [],
+      full: true,
+      icon: "/images/drawer/tag.png",
+      children: [],
+    },
+    {
+      name: "Replicas",
+      value: workflowData?.replicas ? [`${workflowData.replicas}`] : [],
+      full: true,
+      icon: "/images/drawer/tag.png",
+      children: [],
+    },
+    {
+      name: "Number of Prompts",
+      value: workflowData?.num_prompts ? [`${workflowData.num_prompts}`] : ["Default (3x concurrency)"],
+      full: true,
+      icon: "/images/drawer/tag.png",
+      children: [],
+    },
+  ];
+
+  const hasConfiguration =
+    workflowData?.selected_device_type ||
+    workflowData?.tp_size !== undefined ||
+    workflowData?.replicas;
+
   useEffect(() => {
     console.log("workflowData", workflowData);
   }, [workflowData]);
+
+  useEffect(() => {
+    setWorkflowData(currentWorkflow?.workflow_steps);
+  }, [currentWorkflow]);
 
   useEffect(() => {
     stepSix().then((result) => {
@@ -117,9 +172,8 @@ export default function BenchmarkConfiguration() {
   return (
     <BudForm
       data={{}}
-      // disableNext={!selectedModel?.id}
       onBack={async () => {
-        openDrawerWithStep("Select-Model");
+        openDrawerWithStep("Select-Configuration");
       }}
       onNext={() => {
         stepSeven().then((result) => {
@@ -152,6 +206,41 @@ export default function BenchmarkConfiguration() {
                   benchmark={true}
                 />
               ))}
+
+            {/* Configuration Options Section */}
+            {hasConfiguration && (
+              <>
+                <div className="flex items-center justify-between mt-4 mb-2">
+                  <span className="text-[#B3B3B3] text-[12px] font-medium">
+                    Deployment Configuration
+                  </span>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => openDrawerWithStep("Select-Configuration")}
+                    className="text-[#5B9FFF] hover:text-[#7BB3FF]"
+                  >
+                    Edit
+                  </Button>
+                </div>
+                {configurationItems
+                  .filter(
+                    (item) =>
+                      Array.isArray(item.value) &&
+                      item.value.length > 0 &&
+                      item.value.some(Boolean),
+                  )
+                  .map((item, index) => (
+                    <SpecificationTableItem
+                      key={`config-${index}`}
+                      item={item}
+                      tagClass="py-[.26rem] px-[.4rem]"
+                      benchmark={true}
+                    />
+                  ))}
+              </>
+            )}
           </div>
         </BudDrawerLayout>
       </BudWraperBox>

@@ -26,45 +26,7 @@ import { usePromptSchemaWorkflow } from "@/hooks/usePromptSchemaWorkflow";
 import { usePrompts } from "@/hooks/usePrompts";
 import { loadPromptForEditing } from "@/utils/promptHelpers";
 import { removePromptFromUrl } from "@/utils/urlUtils";
-
-// Schema interface for prompt config
-interface PromptSchema {
-  $defs?: {
-    Input?: { properties?: Record<string, { type?: string; title?: string; default?: string }> };
-    Output?: { properties?: Record<string, { type?: string; title?: string; default?: string }> };
-  };
-}
-
-// Helper to generate variable ID (defined outside component to avoid recreation)
-const generateVarId = () => `var_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-// Helper to parse schema properties into AgentVariable array
-const parseSchemaToVariables = (
-  schema: PromptSchema | null | undefined,
-  defKey: 'Input' | 'Output',
-  type: 'input' | 'output'
-): AgentVariable[] => {
-  try {
-    const properties = schema?.$defs?.[defKey]?.properties;
-    if (!properties || typeof properties !== 'object') return [];
-
-    const validDataTypes = ['string', 'number', 'boolean', 'object', 'array'] as const;
-    type DataType = typeof validDataTypes[number];
-
-    return Object.entries(properties).map(([name, prop]) => ({
-      id: generateVarId(),
-      name: name,
-      value: '',
-      type: type,
-      description: prop?.title || '',
-      dataType: (validDataTypes.includes(prop?.type as DataType) ? prop?.type : 'string') as DataType,
-      defaultValue: prop?.default || '',
-    }));
-  } catch (error) {
-    console.error("Failed to parse schema to variables:", error);
-    return [];
-  }
-};
+import { parseSchemaToVariables, generateVarId } from "@/utils/schemaParser";
 
 interface AgentBoxProps {
   session: AgentSession;
@@ -347,8 +309,9 @@ function AgentBoxInner({
   const [isSavingSystemPrompt, setIsSavingSystemPrompt] = useState(false);
   const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
-  const [structuredInputEnabled, setStructuredInputEnabled] = useState(false);
-  const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(false);
+  // Initialize from session for OAuth restoration, fallback to false
+  const [structuredInputEnabled, setStructuredInputEnabled] = useState(session?.structuredInputEnabled ?? false);
+  const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(session?.structuredOutputEnabled ?? false);
   const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
   const [setAsDefault, setSetAsDefault] = useState(editVersionData?.isDefault ?? false);
 
@@ -568,6 +531,22 @@ function AgentBoxInner({
 
   const handleLlmRetryLimitChange = (value: number) => {
     if (session) updateSession(session.id, { llm_retry_limit: value });
+  };
+
+  // Handler for allowMultipleCalls checkbox - syncs to session for OAuth persistence
+  const handleAllowMultipleCallsChange = (value: boolean) => {
+    if (session) updateSession(session.id, { allowMultipleCalls: value });
+  };
+
+  // Handlers for structured input/output toggles - syncs to session for OAuth persistence
+  const handleStructuredInputEnabledChange = (enabled: boolean) => {
+    setStructuredInputEnabled(enabled);
+    if (session) updateSession(session.id, { structuredInputEnabled: enabled });
+  };
+
+  const handleStructuredOutputEnabledChange = (enabled: boolean) => {
+    setStructuredOutputEnabled(enabled);
+    if (session) updateSession(session.id, { structuredOutputEnabled: enabled });
   };
 
   const handleStreamToggle = (checked: boolean) => {
@@ -953,12 +932,6 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if system prompt is not empty
-    if (!session.systemPrompt || session.systemPrompt.trim() === "") {
-      errorToast("System prompt cannot be empty");
-      return;
-    }
-
     // Check if prompt_id exists (it should be auto-generated)
     if (!session.promptId) {
       console.error("promptId is missing from session! This should not happen.");
@@ -977,15 +950,12 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: [
-          {
-            role: "system",
-            content: session.systemPrompt
-          }
-        ],
+        messages: session.systemPrompt?.trim()
+          ? [{ role: "system", content: session.systemPrompt }]
+          : [],
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
-        allow_multiple_calls: true,
+        allow_multiple_calls: session.allowMultipleCalls ?? true,
         system_prompt_role: "system"
       };
 
@@ -993,6 +963,14 @@ function AgentBoxInner({
       if (isEditVersionMode && editVersionData) {
         payload.version = editVersionData.versionNumber;
         payload.permanent = true;
+      }
+
+      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      if (isEditMode) {
+        payload.permanent = true;
+        if (session.name) {
+          payload.prompt_id = session.name;
+        }
       }
 
       // Start workflow status tracking
@@ -1011,6 +989,11 @@ function AgentBoxInner({
         if (workflowId) {
           // Store workflow_id in session for system prompt status tracking
           updateSession(session.id, { systemPromptWorkflowId: workflowId });
+        }
+
+        // If system prompt was cleared, update session to reflect cleared state
+        if (!session.systemPrompt?.trim()) {
+          updateSession(session.id, { systemPrompt: '' });
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
@@ -1068,13 +1051,12 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if there are any messages
-    if (!messages || messages.length === 0) {
-      errorToast("Prompt messages cannot be empty");
-      return;
-    }
-
     setIsSavingPromptMessages(true);
+
+    // Filter out messages with empty content once, reuse for payload and state update
+    const filteredMessages = messages
+      .filter((msg: { content?: string }) => msg.content?.trim())
+      .map((msg: { role: string; content: string }) => ({ role: msg.role, content: msg.content }));
 
     try {
       // Build the payload for prompt-config endpoint
@@ -1085,13 +1067,10 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: messages.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content
-        })),
+        messages: filteredMessages,
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
-        allow_multiple_calls: true,
+        allow_multiple_calls: session.allowMultipleCalls ?? true,
         system_prompt_role: "system"
       };
 
@@ -1099,6 +1078,14 @@ function AgentBoxInner({
       if (isEditVersionMode && editVersionData) {
         payload.version = editVersionData.versionNumber;
         payload.permanent = true;
+      }
+
+      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      if (isEditMode) {
+        payload.permanent = true;
+        if (session.name) {
+          payload.prompt_id = session.name;
+        }
       }
 
       // Start workflow status tracking
@@ -1117,6 +1104,11 @@ function AgentBoxInner({
         if (workflowId) {
           // Store workflow_id in session for prompt messages status tracking
           updateSession(session.id, { promptMessagesWorkflowId: workflowId });
+        }
+
+        // If messages were cleared (empty array sent), update session to reflect cleared state
+        if (filteredMessages.length === 0) {
+          updateSession(session.id, { promptMessages: '[]' });
         }
 
         // Manually set success status (prompt-config doesn't have workflow events)
@@ -1257,7 +1249,8 @@ function AgentBoxInner({
       onMouseLeave={() => setIsHovering(false)}
     >
       {/* Overlay for inactive boxes - prevents scroll capture by flowgram */}
-      {!isActive && (
+      {/* Only show overlay when there are multiple boxes - single box should work normally */}
+      {!isActive && totalSessions > 1 && (
         <div
           className="absolute inset-0 z-50 cursor-pointer bg-transparent"
           onClick={onActivate}
@@ -1275,9 +1268,19 @@ function AgentBoxInner({
             </span>
           </div>
           {isHovering && (
-            <PrimaryButton onClick={handleSaveClick}
-              classNames="h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] hover:!bg-[#479d5f] hover:!border-[#965CDE] group"
-              textClass="!text-[0.625rem] !font-[400] text-[#479d5f] group-hover:text-[#EEEEEE]"
+            <PrimaryButton
+              onClick={handleSaveClick}
+              disabled={!session?.selectedDeployment?.name}
+              classNames={`h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] group ${
+                !session?.selectedDeployment?.name
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:!bg-[#479d5f] hover:!border-[#965CDE]'
+              }`}
+              textClass={`!text-[0.625rem] !font-[400] ${
+                !session?.selectedDeployment?.name
+                  ? 'text-[#479d5f80]'
+                  : 'text-[#479d5f] group-hover:text-[#EEEEEE]'
+              }`}
             >
               {isAddVersionMode ? "Save Version" : isEditVersionMode ? "Save Changes" : "Save"}
             </PrimaryButton>
@@ -1478,8 +1481,8 @@ function AgentBoxInner({
             onAddOutputVariable={handleAddOutputVariable}
             onVariableChange={handleVariableChange}
             onDeleteVariable={handleDeleteVariable}
-            onStructuredInputEnabledChange={setStructuredInputEnabled}
-            onStructuredOutputEnabledChange={setStructuredOutputEnabled}
+            onStructuredInputEnabledChange={handleStructuredInputEnabledChange}
+            onStructuredOutputEnabledChange={handleStructuredOutputEnabledChange}
             structuredInputEnabled={structuredInputEnabled}
             structuredOutputEnabled={structuredOutputEnabled}
             onSystemPromptChange={handleSystemPromptChange}
@@ -1487,6 +1490,8 @@ function AgentBoxInner({
             localSystemPrompt={localSystemPrompt}
             localPromptMessages={localPromptMessages}
             onLlmRetryLimitChange={handleLlmRetryLimitChange}
+            allowMultipleCalls={session.allowMultipleCalls ?? false}
+            onAllowMultipleCallsChange={handleAllowMultipleCallsChange}
             onSavePromptSchema={handleSavePromptSchema}
             isSaving={isSaving}
             onSaveSystemPrompt={handleSaveSystemPrompt}

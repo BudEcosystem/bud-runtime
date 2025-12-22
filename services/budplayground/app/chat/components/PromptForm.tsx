@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Input, InputNumber, Checkbox, Image, message } from 'antd';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Input, InputNumber, Checkbox, Image } from 'antd';
 import { getPromptConfig } from '@/app/lib/api';
 import { useAuth } from '@/app/context/AuthContext';
 import { useChatStore } from '@/app/store/chat';
 import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
+import { Text_12_400_B3B3B3 } from '@/lib/text';
 
 interface PromptFormProps {
   promptIds?: string[];
@@ -22,11 +23,49 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
   const { endpoints, getEndPoints, isReady } = useEndPoints();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [inputSchema, setInputSchema] = useState<any>(null);
+  const [fieldOrder, setFieldOrder] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [promptVersion, setPromptVersion] = useState<string | undefined>();
   const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Storage key for persisting form data across tab switches
+  const storageKey = useMemo(() => {
+    return promptIds.length > 0 ? `promptForm_${promptIds[0]}` : null;
+  }, [promptIds]);
+
+  // Helper to get saved form data from sessionStorage
+  const getSavedFormData = useCallback((): Record<string, any> | null => {
+    if (!storageKey) return null;
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error("Failed to retrieve or parse form data from sessionStorage:", error);
+      return null;
+    }
+  }, [storageKey]);
+
+  // Helper to save form data to sessionStorage
+  const saveFormData = useCallback((data: Record<string, any>) => {
+    if (!storageKey) return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(data));
+    } catch (error) {
+      console.error("Failed to save form data to sessionStorage:", error);
+    }
+  }, [storageKey]);
+
+  // Helper to clear saved form data from sessionStorage
+  const clearSavedFormData = useCallback(() => {
+    if (!storageKey) return;
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch (error) {
+      console.error("Failed to remove form data from sessionStorage:", error);
+    }
+  }, [storageKey]);
 
   // Listen for multiple events to trigger refresh when returning to playground
   useEffect(() => {
@@ -91,14 +130,19 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
 
           // Handle JSON schema format - extract properties from $defs
           let schemaToUse: any = config.data.input_schema ?? null;
+          let requiredFields: string[] = [];
 
           // If it's a JSON schema with $defs, flatten it for the form
           // Check for both "Input" and "InputSchema" in $defs
           if (schemaToUse && schemaToUse.$defs) {
             if (schemaToUse.$defs.Input) {
-              schemaToUse = schemaToUse.$defs.Input.properties || {};
+              const inputDef = schemaToUse.$defs.Input;
+              schemaToUse = inputDef.properties || {};
+              requiredFields = inputDef.required || [];
             } else if (schemaToUse.$defs.InputSchema) {
-              schemaToUse = schemaToUse.$defs.InputSchema.properties || {};
+              const inputDef = schemaToUse.$defs.InputSchema;
+              schemaToUse = inputDef.properties || {};
+              requiredFields = inputDef.required || [];
             }
           }
 
@@ -110,27 +154,78 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             schemaToUse = null;
           }
 
+          // Determine field order: required fields first, then any remaining properties
+          if (schemaToUse && typeof schemaToUse === 'object') {
+            const allKeys = Object.keys(schemaToUse);
+            const orderedFields = [
+              ...requiredFields.filter(key => allKeys.includes(key)),
+              ...allKeys.filter(key => !requiredFields.includes(key))
+            ];
+            setFieldOrder(orderedFields);
+          } else {
+            setFieldOrder([]);
+          }
+
           setInputSchema(schemaToUse);
 
-          // Initialize form data with default values
+          // Initialize form data with default values based on type
           const initialData: Record<string, any> = {};
           if (schemaToUse && typeof schemaToUse === 'object') {
             Object.keys(schemaToUse).forEach((key: string) => {
               const field = schemaToUse[key];
-              initialData[key] = field?.default || '';
+              // Use type-appropriate default values
+              if (field?.default !== undefined) {
+                initialData[key] = field.default;
+              } else {
+                switch (field?.type) {
+                  case 'array':
+                    initialData[key] = [];
+                    break;
+                  case 'object':
+                    // Initialize as empty object for both cases
+                    // (with properties or using key-value pair UI)
+                    initialData[key] = {};
+                    break;
+                  case 'boolean':
+                    initialData[key] = false;
+                    break;
+                  case 'number':
+                  case 'integer':
+                    initialData[key] = null;
+                    break;
+                  default:
+                    initialData[key] = '';
+                }
+              }
             });
           } else {
             initialData['unstructuredSchema'] = '';
           }
-          setFormData(initialData);
+
+          // Restore saved form data from sessionStorage (preserves user input across tab switches)
+          const savedData = getSavedFormData();
+          if (savedData) {
+            // Merge saved data with initial data, only for fields that exist in current schema
+            const mergedData = { ...initialData };
+            Object.keys(savedData).forEach(key => {
+              if (key in initialData) {
+                mergedData[key] = savedData[key];
+              }
+            });
+            setFormData(mergedData);
+          } else {
+            setFormData(initialData);
+          }
         } else {
           setInputSchema(null);
+          setFieldOrder([]);
           setFormData({ unstructuredSchema: '' });
           setPromptVersion(undefined);
         }
       } catch (error) {
         console.error('Error fetching prompt config:', error);
         setInputSchema(null);
+        setFieldOrder([]);
         setFormData({ unstructuredSchema: '' });
         setPromptVersion(undefined);
         setPromptDeployment(undefined);
@@ -140,7 +235,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     };
 
     fetchPromptConfigs();
-  }, [promptIds, apiKey, accessKey, refreshTrigger]);
+  }, [promptIds, apiKey, accessKey, refreshTrigger, getSavedFormData]);
 
   // Fetch endpoints when ready and deployment name is available
   useEffect(() => {
@@ -171,12 +266,209 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
   }, [promptDeployment, endpoints, chatId, setDeployment, setDeploymentLock, getChat]);
 
   const handleChange = (fieldName: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: value
-    }));
+    setFormData(prev => {
+      const newData = { ...prev, [fieldName]: value };
+      saveFormData(newData);
+      return newData;
+    });
   };
 
+  // Get default value for a given schema type
+  const getDefaultForType = (schema: any): any => {
+    switch (schema?.type) {
+      case 'array': return [];
+      case 'object': return {};
+      case 'boolean': return false;
+      case 'number':
+      case 'integer': return null;
+      default: return '';
+    }
+  };
+
+  // Render input for array item based on item schema
+  const renderArrayItemInput = (
+    fieldName: string,
+    index: number,
+    value: any,
+    itemSchema: any
+  ) => {
+    const itemType = itemSchema?.type || 'string';
+    const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] !px-0 py-2";
+
+    const updateArrayItem = (newValue: any) => {
+      const currentArray = Array.isArray(formData[fieldName]) ? [...formData[fieldName]] : [];
+      currentArray[index] = newValue;
+      handleChange(fieldName, currentArray);
+    };
+
+    switch (itemType) {
+      case 'number':
+      case 'integer':
+        return (
+          <InputNumber
+            value={value}
+            onChange={(val) => updateArrayItem(val)}
+            placeholder={`Item ${index + 1}`}
+            controls={false}
+            className={inputClassName}
+            style={{ boxShadow: 'none', width: '100%', paddingLeft: 0 }}
+          />
+        );
+      case 'boolean':
+        return (
+          <Checkbox
+            checked={value || false}
+            onChange={(e) => updateArrayItem(e.target.checked)}
+            className="text-white"
+          />
+        );
+      case 'object':
+        // For nested objects in arrays, use JSON input for simplicity
+        return (
+          <Input
+            value={typeof value === 'object' ? JSON.stringify(value) : value || ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                updateArrayItem(parsed);
+              } catch {
+                updateArrayItem(e.target.value);
+              }
+            }}
+            placeholder={`{"key": "value"}`}
+            className={inputClassName}
+            style={{ boxShadow: 'none' }}
+          />
+        );
+      default: // string
+        return (
+          <Input
+            value={value || ''}
+            onChange={(e) => updateArrayItem(e.target.value)}
+            placeholder={`Item ${index + 1}`}
+            className={inputClassName}
+            style={{ boxShadow: 'none' }}
+          />
+        );
+    }
+  };
+
+  // Render input for object property based on property schema
+  const renderObjectPropertyInput = (
+    fieldName: string,
+    propName: string,
+    value: any,
+    propSchema: any
+  ) => {
+    const propType = propSchema?.type || 'string';
+    const inputClassName = "bg-transparent !border-b !border-b-[#333333] !rounded-[0] !border-t-0 !border-l-0 !border-r-0 rounded-none text-white placeholder-[#666666] focus:border-[#965CDE] hover:border-[#965CDE] !px-0 py-2";
+
+    const updateObjectProperty = (newValue: any) => {
+      const currentObj = typeof formData[fieldName] === 'object' && !Array.isArray(formData[fieldName])
+        ? { ...formData[fieldName] }
+        : {};
+      currentObj[propName] = newValue;
+      handleChange(fieldName, currentObj);
+    };
+
+    switch (propType) {
+      case 'number':
+      case 'integer':
+        return (
+          <InputNumber
+            value={value}
+            onChange={(val) => updateObjectProperty(val)}
+            placeholder={propSchema?.placeholder || propName}
+            controls={false}
+            className={inputClassName}
+            style={{ boxShadow: 'none', width: '100%', paddingLeft: 0 }}
+          />
+        );
+      case 'boolean':
+        return (
+          <Checkbox
+            checked={value || false}
+            onChange={(e) => updateObjectProperty(e.target.checked)}
+            className="text-white"
+          />
+        );
+      case 'array':
+        // For nested arrays in objects, use JSON input for simplicity
+        return (
+          <Input
+            value={Array.isArray(value) ? JSON.stringify(value) : value || ''}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                updateObjectProperty(parsed);
+              } catch {
+                updateObjectProperty(e.target.value);
+              }
+            }}
+            placeholder={`["item1", "item2"]`}
+            className={inputClassName}
+            style={{ boxShadow: 'none' }}
+          />
+        );
+      default: // string
+        return (
+          <Input
+            value={value || ''}
+            onChange={(e) => updateObjectProperty(e.target.value)}
+            placeholder={propSchema?.placeholder || propName}
+            className={inputClassName}
+            style={{ boxShadow: 'none' }}
+          />
+        );
+    }
+  };
+
+  // Parse string input to correct type based on schema
+  const parseValueByType = (value: any, fieldType: string): any => {
+    // If already correct type, return as-is
+    if (fieldType === 'array' && Array.isArray(value)) return value;
+    if (fieldType === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value)) return value;
+    if (fieldType === 'boolean' && typeof value === 'boolean') return value;
+    if ((fieldType === 'number' || fieldType === 'integer') && typeof value === 'number') return value;
+
+    // Parse string values
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+
+      if (fieldType === 'array' && trimmed.startsWith('[')) {
+        try {
+          // Handle both single and double quotes
+          const normalized = trimmed.replace(/'/g, '"');
+          const parsed = JSON.parse(normalized);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          console.warn('Failed to parse array:', trimmed);
+        }
+      }
+
+      if (fieldType === 'object' && trimmed.startsWith('{')) {
+        try {
+          const normalized = trimmed.replace(/'/g, '"');
+          const parsed = JSON.parse(normalized);
+          if (typeof parsed === 'object' && parsed !== null) return parsed;
+        } catch (e) {
+          console.warn('Failed to parse object:', trimmed);
+        }
+      }
+
+      if (fieldType === 'boolean') {
+        if (trimmed.toLowerCase() === 'true') return true;
+        if (trimmed.toLowerCase() === 'false') return false;
+      }
+
+      if (fieldType === 'number' || fieldType === 'integer') {
+        const num = Number(trimmed);
+        if (!isNaN(num)) return fieldType === 'integer' ? Math.floor(num) : num;
+      }
+    }
+
+    return value;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,25 +505,87 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     }
 
     // Check if it's structured or unstructured input
+    console.log('=== FORM SUBMIT DEBUG ===');
+    console.log('formData:', JSON.stringify(formData, null, 2));
+    console.log('inputSchema:', JSON.stringify(inputSchema, null, 2));
+
     if (inputSchema && Object.keys(inputSchema).length > 0) {
-      // Structured input - send variables wrapped in content object
+      // Structured input - send variables directly (no content wrapper)
       const variables: Record<string, any> = {};
       Object.keys(formData).forEach(key => {
-        if (formData[key] !== undefined && formData[key] !== '') {
-          variables[key] = formData[key];
+        const value = formData[key];
+        const fieldType = inputSchema[key]?.type;
+
+        console.log(`Processing field "${key}": value="${value}", type="${fieldType}"`);
+
+        // Handle different types appropriately
+        if (fieldType === 'array') {
+          // Arrays are stored directly, include even if empty
+          if (Array.isArray(value)) {
+            variables[key] = value;
+            console.log(`  -> Added as array:`, value);
+          } else if (typeof value === 'string' && value.trim()) {
+            // Try parsing if it's a non-empty string (fallback)
+            const parsed = parseValueByType(value, fieldType);
+            if (Array.isArray(parsed)) {
+              variables[key] = parsed;
+              console.log(`  -> Parsed and added as array:`, parsed);
+            }
+          }
+        } else if (fieldType === 'object') {
+          // Objects are stored directly (both defined properties and key-value pair UI)
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // Only include if object has at least one property
+            if (Object.keys(value).length > 0) {
+              variables[key] = value;
+              console.log(`  -> Added as object:`, value);
+            } else {
+              console.log(`  -> Skipped empty object`);
+            }
+          }
+        } else if (fieldType === 'boolean') {
+          // Include booleans (even false)
+          if (typeof value === 'boolean') {
+            variables[key] = value;
+            console.log(`  -> Added as boolean:`, value);
+          }
+        } else if (fieldType === 'number' || fieldType === 'integer') {
+          // Include numbers (even 0), but not null
+          if (typeof value === 'number') {
+            variables[key] = value;
+            console.log(`  -> Added as number:`, value);
+          } else if (value !== null && value !== '') {
+            const parsed = parseValueByType(value, fieldType);
+            if (typeof parsed === 'number') {
+              variables[key] = parsed;
+              console.log(`  -> Parsed and added as number:`, parsed);
+            }
+          }
+        } else {
+          // Strings and other types
+          if (value !== undefined && value !== null && value !== '') {
+            variables[key] = value;
+            console.log(`  -> Added as string:`, value);
+          }
         }
       });
 
+      console.log('Final variables:', JSON.stringify(variables, null, 2));
+
       if (Object.keys(variables).length > 0) {
-        // Wrap variables in content object to match schema structure
-        const wrappedVariables = { content: variables };
-        payload.prompt.variables = wrappedVariables;
-        payload.variables = wrappedVariables;
+        // Send variables directly - NO content wrapper (matches Postman format)
+        payload.prompt.variables = variables;
       }
     } else {
       // Unstructured input - send input field
       payload.input = formData['unstructuredSchema'] || '';
     }
+
+    // Clear saved form data from sessionStorage on successful submit
+    clearSavedFormData();
+
+    console.log('=== FINAL PAYLOAD ===');
+    console.log(JSON.stringify(payload, null, 2));
 
     // Pass the prompt data to parent to initiate chat
     onSubmit(payload);
@@ -263,8 +617,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             placeholder={placeholder || title || fieldName}
             min={minimum}
             max={maximum}
+            controls={false}
             className={inputClassName}
-            style={{ boxShadow: 'none', width: '100%' }}
+            type='number'
+            style={{ boxShadow: 'none', width: '100%', paddingLeft: 0 }}
           />
         );
 
@@ -275,8 +631,162 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             onChange={(e) => handleChange(fieldName, e.target.checked)}
             className="text-white"
           >
-            {title || fieldName}
+            <Text_12_400_B3B3B3>{title || fieldName}</Text_12_400_B3B3B3>
           </Checkbox>
+        );
+
+      case 'array':
+        const itemSchema = fieldSchema.items || { type: 'string' };
+        const arrayValue: any[] = Array.isArray(formData[fieldName]) ? formData[fieldName] : [];
+
+        return (
+          <div className="space-y-2">
+            {arrayValue.map((item, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div className="flex-1">
+                  {renderArrayItemInput(fieldName, index, item, itemSchema)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newArray = arrayValue.filter((_, i) => i !== index);
+                    handleChange(fieldName, newArray);
+                  }}
+                  className="text-[#666666] hover:text-red-500 p-1 transition-colors"
+                  title="Remove item"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const newItem = getDefaultForType(itemSchema);
+                handleChange(fieldName, [...arrayValue, newItem]);
+              }}
+              className="text-[#965CDE] hover:text-[#a76ce8] text-sm flex items-center gap-1 transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Add item
+            </button>
+          </div>
+        );
+
+      case 'object':
+        const properties = fieldSchema.properties || {};
+        const objectValue = typeof formData[fieldName] === 'object' && !Array.isArray(formData[fieldName])
+          ? formData[fieldName]
+          : {};
+        const propertyNames = Object.keys(properties);
+
+        if (propertyNames.length === 0) {
+          // No defined properties - use dynamic key-value pair UI
+          // Store as object with user-defined keys
+          const currentObj = typeof objectValue === 'object' && !Array.isArray(objectValue)
+            ? objectValue
+            : {};
+          const entries = Object.entries(currentObj);
+
+          const updateObjectKey = (oldKey: string, newKey: string) => {
+            const newObj: Record<string, any> = {};
+            Object.entries(currentObj).forEach(([k, v]) => {
+              if (k === oldKey) {
+                if (newKey.trim()) {
+                  newObj[newKey] = v;
+                }
+              } else {
+                newObj[k] = v;
+              }
+            });
+            handleChange(fieldName, newObj);
+          };
+
+          const updateObjectValue = (key: string, value: string) => {
+            handleChange(fieldName, { ...currentObj, [key]: value });
+          };
+
+          const removeEntry = (keyToRemove: string) => {
+            const newObj: Record<string, any> = {};
+            Object.entries(currentObj).forEach(([k, v]) => {
+              if (k !== keyToRemove) {
+                newObj[k] = v;
+              }
+            });
+            handleChange(fieldName, newObj);
+          };
+
+          const addEntry = () => {
+            // Find a unique key name
+            let newKey = 'key';
+            let counter = 1;
+            while (currentObj.hasOwnProperty(newKey)) {
+              newKey = `key${counter}`;
+              counter++;
+            }
+            handleChange(fieldName, { ...currentObj, [newKey]: '' });
+          };
+
+          return (
+            <div className="space-y-2">
+              {entries.map(([key, value], index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    value={key}
+                    onChange={(e) => updateObjectKey(key, e.target.value)}
+                    placeholder="Key"
+                    className={`${inputClassName} !w-[120px]`}
+                    style={{ boxShadow: 'none' }}
+                  />
+                  <span className="text-[#666666]">:</span>
+                  <Input
+                    value={String(value || '')}
+                    onChange={(e) => updateObjectValue(key, e.target.value)}
+                    placeholder="Value"
+                    className={`${inputClassName} flex-1`}
+                    style={{ boxShadow: 'none' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeEntry(key)}
+                    className="text-[#666666] hover:text-red-500 p-1 transition-colors"
+                    title="Remove field"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addEntry}
+                className="text-[#965CDE] hover:text-[#a76ce8] text-sm flex items-center gap-1 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Add field
+              </button>
+            </div>
+          );
+        }
+
+        return (
+          <div className="space-y-3 pl-4 border-l-2 border-[#333333]">
+            {propertyNames.map((propName) => (
+              <div key={propName} className="space-y-1">
+                <label className="text-[#B3B3B3] text-[0.75rem] block">
+                  {properties[propName]?.title || propName}
+                </label>
+                {renderObjectPropertyInput(fieldName, propName, objectValue[propName], properties[propName])}
+              </div>
+            ))}
+          </div>
         );
 
       default:
@@ -336,10 +846,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
             {inputSchema?.title || 'Please enter the following details'}
           </h2>
 
-          {/* Dynamic Fields */}
-          {inputSchema && Object.keys(inputSchema).map((fieldName) => {
+          {/* Dynamic Fields - ordered by required array */}
+          {inputSchema && fieldOrder.map((fieldName) => {
             const fieldSchema = inputSchema[fieldName];
-            if (fieldName === 'title') return null; // Skip title field
+            if (!fieldSchema || fieldName === 'title') return null; // Skip if field doesn't exist or is title
 
             return (
               <div key={fieldName} className="space-y-2">

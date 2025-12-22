@@ -39,6 +39,12 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import pkg from '@novu/notification-center/package.json';
 import { enableDevMode } from "@/components/environment";
 import AgentDrawer from "@/components/agents/AgentDrawer";
+import {
+  isOAuthCallback,
+  getOAuthPromptId,
+  getOAuthSessionData,
+} from "@/hooks/useOAuthCallback";
+import { useAgentStore } from "@/stores/useAgentStore";
 
 interface LayoutProps {
   children: ReactNode;
@@ -91,6 +97,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const router = useRouter();
   const { isDrawerOpen, showMinimizedItem } = useDrawer();
   const [isHydrated, setIsHydrated] = useState(false);
+  const oauthProcessedRef = React.useRef(false);
   const [isHovered, setIsHovered] = useState<any>();
   const pathname = usePathname();
   const { isVisible } = useOverlay();
@@ -240,6 +247,91 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
     getUser();
   }, []);
 
+  // Global OAuth callback handling - ensures OAuth works from any page
+  useEffect(() => {
+    const handleGlobalOAuthCallback = async () => {
+      // Check if this is an OAuth callback
+      const isOAuth = isOAuthCallback();
+      const savedPromptId = getOAuthPromptId();
+      const savedSessionData = getOAuthSessionData();
+
+      // Only proceed if we have OAuth indicators
+      if (!isOAuth && !savedPromptId && !savedSessionData) {
+        return;
+      }
+
+      // Prevent multiple processing
+      if (oauthProcessedRef.current) {
+        return;
+      }
+
+      // Mark as being processed
+      oauthProcessedRef.current = true;
+
+      try {
+        const {
+          setEditMode,
+          setAddVersionMode,
+          setEditVersionMode,
+          restoreSessionWithPromptId,
+          openAgentDrawer,
+        } = useAgentStore.getState();
+
+        // Restore agent mode flags if present
+        if (savedSessionData) {
+          const {
+            isEditMode,
+            editingPromptId,
+            isAddVersionMode,
+            addVersionPromptId,
+            isEditVersionMode,
+            editVersionData,
+          } = savedSessionData;
+
+          if (isEditMode && editingPromptId) {
+            setEditMode(editingPromptId);
+          }
+          if (isAddVersionMode && addVersionPromptId) {
+            setAddVersionMode(addVersionPromptId);
+          }
+          if (isEditVersionMode && editVersionData) {
+            setEditVersionMode(editVersionData);
+          }
+        }
+
+        // Restore session with prompt ID
+        if (savedPromptId) {
+          restoreSessionWithPromptId(savedPromptId, {
+            name: savedSessionData?.name || `Agent 1`,
+            modelId: savedSessionData?.modelId,
+            modelName: savedSessionData?.modelName,
+            systemPrompt: savedSessionData?.systemPrompt,
+            promptMessages: savedSessionData?.promptMessages,
+            selectedDeployment: savedSessionData?.selectedDeployment,
+          });
+        }
+
+        // Get workflow next step from saved session data
+        // CRITICAL: If we have an agent ID in URL, we're in add-agent workflow
+        // Default to "add-agent-configuration" as the next step after AgentDrawer save
+        const urlParams = new URLSearchParams(window.location.search);
+        const agentIdFromUrl = urlParams.get('agent');
+        const savedWorkflowNextStep = savedSessionData?.workflowNextStep;
+        const workflowNextStep = savedWorkflowNextStep ||
+          (agentIdFromUrl ? "add-agent-configuration" : undefined);
+
+        // Open the agent drawer after a short delay to ensure state is set
+        // CRITICAL: Pass workflowNextStep to ensure the next step is triggered after save
+        requestAnimationFrame(() => {
+          openAgentDrawer(undefined, workflowNextStep);
+        });
+      } catch (error) {
+        console.error('[Layout] Error restoring OAuth session:', error);
+      }
+    };
+
+    handleGlobalOAuthCallback();
+  }, [router.query.code, router.query.state]);
 
   // useEffect(() => {
   //   console.log("Novu Notification Center version:", pkg.version);

@@ -41,11 +41,6 @@ const LegendLineChart: React.FC<LineChartProps> = ({ data }) => {
         renderer: "canvas",
         useDirtyRect: false,
       });
-      const formatLegendText = (text: string) => {
-        return text
-          .replace(/[^a-zA-Z0-9]/g, " ")
-          .replace(/\b\w/g, (char) => char.toUpperCase());
-      };
       const option = {
         backgroundColor: "transparent",
         legend: {
@@ -63,7 +58,6 @@ const LegendLineChart: React.FC<LineChartProps> = ({ data }) => {
           itemStyle: {
             borderRadius: [5, 5, 5, 5],
           },
-          formatter: formatLegendText,
         },
         grid: {
           top: lineChartData.label2 ? "32%" : "23%",
