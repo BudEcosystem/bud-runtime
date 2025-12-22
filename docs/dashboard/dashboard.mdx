@@ -1,0 +1,174 @@
+---
+title: "Dashboard"
+description: "Dashboard module for at-a-glance platform health, model usage, and reliability signals in Bud Admin"
+---
+
+## 1. Description
+
+The Dashboard module in Bud Admin gives teams a single-pane overview of platform health, model performance, and usage across cloud and local assets. It highlights request volumes, throughput, latency, token usage, and accuracy for the top models (cloud and CPU-first local models from Hugging Face, URL, and disk sources), so you can validate Bud’s GPU-optional deployments at a glance.
+
+The page mirrors Bud’s hybrid model stance: it counts cloud endpoints alongside local checkpoints, breaks down cloud vs local model totals, and surfaces endpoint, cluster, and project readiness in one view. Each chart carries its own time-range toggle (Last 24 Hrs, Last 7 Days, Last 30 Days) so platform, MLOps, and FinOps teams can compare day-over-day, week-over-week, or month-over-month changes without leaving the overview.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. Hybrid-aware overview for cloud and local models
+
+Shows cloud and local (Hugging Face, URL, disk) model counts together with active endpoint and cluster readiness, reflecting Bud’s CPU-first, burst-to-cloud strategy.
+
+### 2. Time-aligned deltas across every metric
+
+Segmented controls on each chart expose Last 24 Hrs, Last 7 Days, or Last 30 Days windows, pairing totals with delta percentages for quick trend checks.
+
+### 3. Top-model intelligence with accuracy and tokens
+
+Highlights the top five models by usage, accuracy benchmarks (MMLU, ARC-C, GSM8K, Math, HumanEval), and input/output token mix so you can spot quality and cost shifts early.
+
+### 4. Operational posture cards
+
+Instant readiness signals for endpoints, clusters, and projects (running vs inactive counts, member totals) so you can triage where to intervene before scaling or routing changes.
+
+### 5. Navigation that mirrors downstream workflows
+
+Sidebar tabs for Projects, Models, Clusters, Playground, API Keys, Agents, Observability, and more let you jump from the overview into detail pages and take actions without losing context.
+
+## 3. Features
+
+### 3.1 Landing layout and navigation
+
+- Dashboard opens inside the unified Bud Admin layout with sidebar tabs for Projects, Models, Clusters, Dashboard, Playground, API Keys, Agents, Observability, and optional dev-only entries.
+- Carousel hero card for business highlights plus quick access to status cards and charts.
+
+### 3.2 Total Requests card
+
+- Displays last-7-day total requests with formatted values (K/M/B) and delta percentage (green up arrow for positive, red down for negative).
+- Inline sparkline shows request trajectory for the past week (daily points).
+
+### 3.3 Model totals and breakdown
+
+- Shows total models with separate chips for Cloud and Local counts, covering cloud endpoints and CPU-first local models (Hugging Face, URL, disk-based).
+
+### 3.4 Endpoint, Cluster, and Project readiness cards
+
+- Endpoints: total plus running counts.
+- Clusters: total plus inactive counts.
+- Projects: total plus member counts.
+- Cards emphasize readiness colors (green for healthy, red for issues, blue for collaboration).
+
+### 3.5 API Calls chart
+
+- Bar chart of API calls grouped by project with delta badge showing average change for the selected range.
+- Time filters: Last 24 Hrs, Last 7 Days, Last 30 Days via Segmented control.
+- Empty states show guidance when data is unavailable.
+
+### 3.6 Latency chart
+
+- Bar chart for latency by project with avg delta chip; values shown in milliseconds.
+- Time filters: Last 24 Hrs, Last 7 Days, Last 30 Days.
+
+### 3.7 Throughput chart
+
+- Bar chart for throughput (tokens/s) by project with avg delta chip.
+- Time filters: Last 24 Hrs, Last 7 Days, Last 30 Days.
+
+### 3.8 Model Usage chart
+
+- Bar chart for top five models by usage with avg delta chip.
+- Time filters: Last 24 Hrs, Last 7 Days, Last 30 Days.
+
+### 3.9 Accuracy leaderboard
+
+- Accuracy chart for the top five models across benchmarks (MMLU, ARC-C, GSM8K, Math, HumanEval).
+- Shows comparative bars for each benchmark per model; “For the top 5 models” caption clarifies scope.
+
+### 3.10 Token Metrics
+
+- Comparative bar chart for input vs output tokens across the top five models.
+- Time filters: Last 24 Hrs, Last 7 Days, Last 30 Days.
+- Delta chips highlight average changes for input and output tokens.
+
+### 3.11 Time-range filters and data scope
+
+- Segmented control maps to backend frequencies: Last 24 Hrs → daily, Last 7 Days → weekly, Last 30 Days → monthly.
+- Queries use top_k=5 and switch filter_by between project (API calls, latency, throughput) and model (usage, token metrics).
+
+### 3.12 Data loading, conversions, and empty states
+
+- Uses loaders while fetching metrics and toasts on completion.
+- Metrics are fetched via `/metrics/analytics` and normalized through the observability adapter to keep dashboard charts aligned with the Observability module.
+- Accuracy uses `/models/top-leaderboards` for benchmark values.
+- Empty charts render explanatory placeholders and imagery until data arrives.
+
+## 4. How-to Guides
+
+### 4.1 Access the Dashboard
+
+1. Log in to Bud AI Foundry with SSO or credentials.
+2. Click **Dashboard** from the left navigation.
+3. Confirm the landing view shows the carousel, total requests, models breakdown, and status cards.
+
+### 4.2 Adjust the time range per chart
+
+1. In a chart header, use the Segmented control to choose **LAST 24 HRS**, **LAST 7 DAYS**, or **LAST 30 DAYS**.
+2. The dashboard refreshes the selected chart using the matching frequency and delta window; repeat for other charts as needed.
+
+### 4.3 Review total requests trend
+
+1. Locate the **Total Requests** card in the upper grid.
+2. Read the formatted count and delta percentage for the last 7 days (week-over-week delta).
+3. Use the sparkline (daily points) to see the past week’s trajectory; open Observability for per-request detail.
+
+### 4.4 Inspect API calls by project
+
+1. Open the **API Calls** chart.
+2. Pick a time range via the Segmented control.
+3. Review bar heights per project and the Avg. delta chip to spot increases or regressions.
+
+### 4.5 Monitor latency and throughput
+
+1. Open the **Latency** and **Throughput** charts.
+2. Select a time window to update values.
+3. Use the Avg. delta chips (green/red) to decide whether to route traffic, scale clusters, or inspect Observability for slow projects.
+
+### 4.6 Track model usage and token mix
+
+1. Open **Model Usage** to see the top five models by usage for the selected window.
+2. Switch to **Token Metrics** to compare input vs output tokens for the same top models.
+3. Use the delta chips to judge cost/efficiency trends, especially for local CPU-first deployments vs cloud endpoints.
+
+### 4.7 Compare model accuracy
+
+1. Open **Accuracy** and confirm “For the top 5 models” caption.
+2. Review benchmark bars (MMLU, ARC-C, GSM8K, Math, HumanEval) per model (data from `/models/top-leaderboards`).
+3. Use insights to adjust routing weights, evaluation plans, or guardrails for cloud and local variants.
+
+### 4.8 Interpret readiness cards
+
+1. Scan **Endpoints**, **Clusters**, and **Projects** cards for totals and colored tags.
+2. Use running vs inactive counts to prioritize cluster remediation or endpoint restarts before traffic surges.
+
+### 4.9 Troubleshoot empty charts
+
+1. If a chart shows a placeholder, verify data exists for the selected time window and filters.
+2. Use Observability to confirm requests are reaching the platform; refresh the dashboard after underlying data flows.
+
+## 5. FAQ
+
+### 5.1 Which models are counted in the dashboard?
+
+Cloud endpoints and local models (Hugging Face downloads, URL-based imports, and disk-mounted checkpoints) are counted together, with chips indicating cloud vs local where applicable.
+
+### 5.2 What time windows are supported?
+
+Each chart supports Last 24 Hrs (daily), Last 7 Days (weekly), and Last 30 Days (monthly) presets; deltas compare against the previous equivalent window.
+
+### 5.3 How are the top five models chosen?
+
+Charts request top_k=5 from analytics APIs, grouping by model for usage, token metrics, and accuracy benchmarks.
+
+### 5.4 Where do latency and throughput numbers come from?
+
+Values are fetched from the `/metrics/analytics` endpoint and normalized via the observability adapter to stay consistent with the Observability module’s metrics.
+
+### 5.5 How do I jump from the dashboard to detailed analysis?
+
+Use the sidebar tabs to open Projects, Models, Clusters, Observability, or Agents. From there, drill into deployments, request traces, or routing policies and return to the dashboard for updated rollups.
