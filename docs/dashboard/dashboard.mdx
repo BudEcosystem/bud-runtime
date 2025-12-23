@@ -155,7 +155,7 @@ Sidebar tabs for Projects, Models, Clusters, Playground, API Keys, Agents, Obser
 
 ### 5.1 Which models are counted in the dashboard?
 
-Cloud endpoints and local models (Hugging Face downloads, URL-based imports, and disk-mounted checkpoints) are counted together, with chips indicating cloud vs local where applicable.
+Cloud endpoints and local models (Hugging Face downloads, URL-based imports, and disk-mounted checkpoints) are counted together.
 
 ### 5.2 What time windows are supported?
 
@@ -165,9 +165,7 @@ Each chart supports Last 24 Hrs (daily), Last 7 Days (weekly), and Last 30 Days 
 
 Charts request top_k=5 from analytics APIs, grouping by model for usage, token metrics, and accuracy benchmarks.
 
-### 5.4 Where do latency and throughput numbers come from?
-
-Values are fetched from the `/metrics/analytics` endpoint and normalized via the observability adapter to stay consistent with the Observability module’s metrics.
+### 5.
 
 ### 5.5 How do I jump from the dashboard to detailed analysis?
 
