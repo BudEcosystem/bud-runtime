@@ -118,6 +118,24 @@ class KeycloakManager:
             logger.error(f"Error updating user password: {str(e)}")
             raise
 
+    def _get_realm_token_settings(self) -> dict:
+        """Returns a dictionary of realm token/session settings.
+
+        This is used by both create_realm and sync_realm_settings to ensure
+        consistent settings across realm creation and updates.
+
+        Returns:
+            dict: Token and session settings for the realm
+        """
+        return {
+            "refreshTokenMaxReuse": 0,
+            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
+            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
+            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
+            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
+            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
+        }
+
     async def create_realm(self, realm_name: str) -> dict:
         """Create a new realm in Keycloak.
 
@@ -138,12 +156,7 @@ class KeycloakManager:
             "resetPasswordAllowed": True,
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
-            "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
-            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
-            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
-            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
-            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
-            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
+            **self._get_realm_token_settings(),
         }
 
         try:
@@ -184,16 +197,7 @@ class KeycloakManager:
             realm_name: Name of the realm to update
         """
         realm_name = realm_name.lower()
-
-        # Settings to sync - these should match create_realm settings
-        settings_to_sync = {
-            "refreshTokenMaxReuse": 0,
-            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
-            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
-            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
-            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
-            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
-        }
+        settings_to_sync = self._get_realm_token_settings()
 
         try:
             self.admin_client.update_realm(realm_name, payload=settings_to_sync)
