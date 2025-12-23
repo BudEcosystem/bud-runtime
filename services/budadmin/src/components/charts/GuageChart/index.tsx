@@ -184,7 +184,7 @@ const GuageChart: React.FC<BarChartProps> = ({ data }) => {
       </div>
       <div className="absolute flex flex-col justify-center items-center w-full px-[14%] mt-[-5.8rem]">
         <Text_26_400_EEEEEE>
-          {data.reverse ? 100 - data.percentage : data.percentage}%
+          {isNaN(data.percentage) ? 0 : (data.reverse ? 100 - data.percentage : data.percentage)}%
         </Text_26_400_EEEEEE>
         <div className="flex items-center justify-center mt-[.5rem]">
           <Tags

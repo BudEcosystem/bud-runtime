@@ -1,17 +1,19 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { Flex, Table, Tag, Tooltip, Progress, Spin } from "antd";
+import { Flex, Table, Tag, Tooltip, Progress } from "antd";
 import * as echarts from "echarts";
 import { Server, Cpu, HardDrive, Activity, Thermometer, Zap } from "lucide-react";
 import {
   Text_10_400_EEEEEE,
+  Text_10_400_757575,
   Text_12_400_757575,
   Text_12_400_EEEEEE,
   Text_13_400_tag,
   Text_14_400_EEEEEE,
   Text_14_600_EEEEEE,
   Text_16_400_EEEEEE,
+  Text_18_400_EEEEEE,
   Text_20_400_EEEEEE,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
@@ -23,7 +25,9 @@ import {
   getSliceStatusColor,
   getUtilizationColor,
 } from "src/hooks/useGPUMetrics";
+import { useCPUMetrics, getCPUUtilizationColor, getLoadColor } from "src/hooks/useCPUMetrics";
 import { GPUTimeSeriesCharts } from "@/components/charts/gpuCharts/GPUTimeSeriesCharts";
+import { CPUTimeSeriesCharts } from "@/components/charts/cpuCharts/CPUTimeSeriesCharts";
 import { Node, useCluster } from "src/hooks/useCluster";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import NoDataFount from "@/components/ui/noDataFount";
@@ -52,8 +56,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, color
         </div>
       </div>
       <div className="flex items-baseline gap-2">
-        <Text_20_400_EEEEEE style={{ color }}>{value}</Text_20_400_EEEEEE>
-        {subtitle && <Text_12_400_757575>{subtitle}</Text_12_400_757575>}
+        <Text_16_400_EEEEEE style={{ color }}>{value}</Text_16_400_EEEEEE>
+        {subtitle && <Text_10_400_757575>{subtitle}</Text_10_400_757575>}
       </div>
     </div>
   );
@@ -325,11 +329,17 @@ const NodeDetail: React.FC = () => {
     fetchNodeGPUMetrics,
     fetchNodeGPUTimeSeries,
   } = useGPUMetrics();
+  const {
+    nodeTimeSeries: cpuTimeSeries,
+    timeSeriesLoading: cpuTimeSeriesLoading,
+    fetchNodeCPUTimeSeries,
+  } = useCPUMetrics();
   const { getClusterNodeMetrics, selectedCluster, getClusterById } = useCluster();
   const [nodeMetrics, setNodeMetrics] = useState<Node | null>(null);
   const [nodeLoading, setNodeLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [selectedTimeRange, setSelectedTimeRange] = useState(6); // Default 6 hours
+  const [selectedTimeRange, setSelectedTimeRange] = useState(6); // Default 6 hours for GPU
+  const [cpuTimeRange, setCPUTimeRange] = useState(6); // Default 6 hours for CPU
 
   useEffect(() => {
     setIsMounted(true);
@@ -359,9 +369,21 @@ const NodeDetail: React.FC = () => {
     }
   }, [router.isReady, clusterId, hostname, selectedTimeRange]);
 
-  // Handler for time range changes
+  // Handler for GPU time range changes
   const handleTimeRangeChange = (hours: number) => {
     setSelectedTimeRange(hours);
+  };
+
+  // Fetch CPU timeseries data
+  useEffect(() => {
+    if (router.isReady && clusterId && hostname) {
+      fetchNodeCPUTimeSeries(clusterId as string, hostname as string, cpuTimeRange);
+    }
+  }, [router.isReady, clusterId, hostname, cpuTimeRange]);
+
+  // Handler for CPU time range changes
+  const handleCPUTimeRangeChange = (hours: number) => {
+    setCPUTimeRange(hours);
   };
 
   // Fetch node metrics from cluster
@@ -431,16 +453,8 @@ const NodeDetail: React.FC = () => {
     ...(nodeMetrics?.cpu ? [{ name: "CPU", color: "#D1B854" }] : []),
   ];
 
-  // Show loading only while fetching and no data yet
-  if ((gpuLoading || nodeLoading) && !nodeMetrics) {
-    return (
-      <DashBoardLayout>
-        <div className="flex justify-center items-center h-[400px]">
-          <Spin size="large" />
-        </div>
-      </DashBoardLayout>
-    );
-  }
+  // Note: Loading is handled by useLoaderOnLoding hook (global loader)
+  // No need for additional local Spin - it would cause double loaders
 
   return (
     <DashBoardLayout>
@@ -526,6 +540,51 @@ const NodeDetail: React.FC = () => {
             </div>
           )}
 
+          {/* CPU Summary Stats - placed right after GPU summary */}
+          {nodeMetrics?.cpu && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <StatCard
+                title="CPU Usage"
+                value={`${((nodeMetrics.cpu.current ?? 0) / (nodeMetrics.cpu.capacity ?? 1) * 100).toFixed(1)}%`}
+                subtitle={`${(nodeMetrics.cpu.current ?? 0).toFixed(1)}/${nodeMetrics.cpu.capacity ?? 0}`}
+                icon={<Cpu size={18} />}
+                color={getUtilizationColor((nodeMetrics.cpu.current ?? 0) / (nodeMetrics.cpu.capacity ?? 1) * 100)}
+              />
+              <StatCard
+                title="Load (1m)"
+                value={(cpuTimeSeries?.load_1?.[cpuTimeSeries.load_1.length - 1] ?? 0).toFixed(2)}
+                icon={<Activity size={18} />}
+                color={getLoadColor(cpuTimeSeries?.load_1?.[cpuTimeSeries.load_1.length - 1] ?? 0, nodeMetrics.cpu.capacity ?? 1)}
+              />
+              <StatCard
+                title="Load (5m)"
+                value={(cpuTimeSeries?.load_5?.[cpuTimeSeries.load_5.length - 1] ?? 0).toFixed(2)}
+                icon={<Activity size={18} />}
+                color={getLoadColor(cpuTimeSeries?.load_5?.[cpuTimeSeries.load_5.length - 1] ?? 0, nodeMetrics.cpu.capacity ?? 1)}
+              />
+              <StatCard
+                title="Load (15m)"
+                value={(cpuTimeSeries?.load_15?.[cpuTimeSeries.load_15.length - 1] ?? 0).toFixed(2)}
+                icon={<Activity size={18} />}
+                color={getLoadColor(cpuTimeSeries?.load_15?.[cpuTimeSeries.load_15.length - 1] ?? 0, nodeMetrics.cpu.capacity ?? 1)}
+              />
+              <StatCard
+                title="RAM"
+                value={`${((nodeMetrics.memory?.current ?? 0) / (nodeMetrics.memory?.capacity ?? 1) * 100).toFixed(1)}%`}
+                subtitle={`${(nodeMetrics.memory?.current ?? 0).toFixed(0)}/${(nodeMetrics.memory?.capacity ?? 0).toFixed(0)} GB`}
+                icon={<HardDrive size={18} />}
+                color={getUtilizationColor((nodeMetrics.memory?.current ?? 0) / (nodeMetrics.memory?.capacity ?? 1) * 100)}
+              />
+              <StatCard
+                title="Disk"
+                value={nodeMetrics.capacity?.disk ?? "N/A"}
+                subtitle=""
+                icon={<HardDrive size={18} />}
+                color="#965CDE"
+              />
+            </div>
+          )}
+
           {/* GPU Device Cards */}
           {nodeDevices.length > 0 ? (
             <>
@@ -554,6 +613,16 @@ const NodeDetail: React.FC = () => {
             </>
           ) : (
             <NoDataFount classNames="h-[200px]" textMessage="No GPU devices found on this node" />
+          )}
+
+          {/* CPU Time Series Charts */}
+          {nodeMetrics?.cpu && (
+            <CPUTimeSeriesCharts
+              data={cpuTimeSeries}
+              loading={cpuTimeSeriesLoading}
+              onTimeRangeChange={handleCPUTimeRangeChange}
+              selectedTimeRange={cpuTimeRange}
+            />
           )}
         </div>
       </div>

@@ -1698,11 +1698,12 @@ class ClusterService(SessionMixin):
                 return gpu_count
 
             # Create node mapping from budcluster data
-            # Use IP-based matching now that internal_ip field is available in budcluster schema
+            # Use IP-based and hostname-based matching for flexibility
             budcluster_nodes = nodes_data.get("nodes", [])
 
-            # Create IP-to-node-info mapping for reliable matching
+            # Create both IP-to-node-info and hostname-to-node-info mappings
             node_info_by_ip = {}
+            node_info_by_hostname = {}
             nodes_without_ip = []
 
             for node in budcluster_nodes:
@@ -1714,6 +1715,9 @@ class ClusterService(SessionMixin):
                     "system_info": extract_system_info(node),
                     "gpu_count": extract_gpu_count(node["hardware_info"]),
                 }
+
+                # Map by hostname (always available)
+                node_info_by_hostname[node["name"]] = node_info
 
                 internal_ip = node.get("internal_ip")
                 if internal_ip:
@@ -1734,20 +1738,20 @@ class ClusterService(SessionMixin):
 
             metrics_nodes = metrics_response.get("nodes", [])
 
-            # Match metrics to budcluster nodes using IP-based lookup
-            # This is reliable and ordering-independent
+            # Match metrics to budcluster nodes using IP or hostname lookup
+            # node_name from ClickHouse can be either IP (legacy) or hostname (with node enrichment)
             for node_metric in metrics_nodes:
-                node_ip = node_metric["node_name"]  # This is the IP address from ClickHouse
+                node_name = node_metric["node_name"]  # Can be IP or hostname from ClickHouse
 
-                # Try to get corresponding budcluster node info by IP
-                node_info = node_info_by_ip.get(node_ip)
+                # Try to get corresponding budcluster node info by IP first, then by hostname
+                node_info = node_info_by_ip.get(node_name) or node_info_by_hostname.get(node_name)
 
                 if not node_info:
-                    # Fallback to defaults if no IP match found
-                    logger.debug(f"No node info found for IP {node_ip}, using defaults")
+                    # Fallback to defaults if no match found
+                    logger.debug(f"No node info found for {node_name}, using defaults")
                     node_info = {
                         "id": "",
-                        "hostname": node_ip,
+                        "hostname": node_name,
                         "devices": [],
                         "status": "Unknown",
                         "system_info": {"os": "N/A", "kernel": "N/A", "architecture": "N/A"},
@@ -1811,7 +1815,7 @@ class ClusterService(SessionMixin):
                         "capacity": gpu_count,
                     }
 
-                nodes_status["nodes"][node_ip] = node_response
+                nodes_status["nodes"][node_name] = node_response
 
             return nodes_status
 

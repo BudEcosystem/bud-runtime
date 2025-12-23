@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import aiohttp
 import yaml
 from budmicroframe.commons.logging import get_logger
+from kubernetes import client
+from kubernetes.client import Configuration
 
 from ..commons.config import app_settings
 from ..commons.hami_parser import parse_prometheus_metrics
@@ -154,6 +156,135 @@ class OTelBridge:
             error_msg = f"Failed to setup scraping for cluster {cluster_id}: {e}"
             logger.error(error_msg)
             return False, error_msg
+
+    def _get_node_ip_mapping(self, kubeconfig: str) -> Dict[str, str]:
+        """Get mapping of node IP addresses to Kubernetes node names.
+
+        This is used to enrich metrics with the proper node name instead of
+        just the IP address from Prometheus instance label.
+
+        Args:
+            kubeconfig: Kubernetes configuration as string or dict
+
+        Returns:
+            Dict mapping IP address to node name (e.g., {"10.0.1.5": "node-1"})
+        """
+        api_client = None
+        try:
+            # Parse kubeconfig
+            if isinstance(kubeconfig, str):
+                kubeconfig_dict = yaml.safe_load(kubeconfig)
+            else:
+                kubeconfig_dict = kubeconfig
+
+            # Create API client configuration
+            config = Configuration()
+            loader = client.ApiClient(configuration=config)
+
+            # Set up from kubeconfig dict
+            contexts = kubeconfig_dict.get("contexts", [])
+            current_context = kubeconfig_dict.get("current-context", "")
+
+            # Find current context
+            context_info = next(
+                (c for c in contexts if c.get("name") == current_context),
+                contexts[0] if contexts else None,
+            )
+
+            if not context_info:
+                logger.warning("No context found in kubeconfig")
+                return {}
+
+            cluster_name = context_info.get("context", {}).get("cluster", "")
+            user_name = context_info.get("context", {}).get("user", "")
+
+            # Get cluster info
+            clusters = kubeconfig_dict.get("clusters", [])
+            cluster_info = next(
+                (c for c in clusters if c.get("name") == cluster_name),
+                None,
+            )
+
+            if not cluster_info:
+                logger.warning(f"Cluster {cluster_name} not found in kubeconfig")
+                return {}
+
+            # Get user info
+            users = kubeconfig_dict.get("users", [])
+            user_info = next(
+                (u for u in users if u.get("name") == user_name),
+                None,
+            )
+
+            # Configure the client
+            config.host = cluster_info.get("cluster", {}).get("server", "")
+            config.verify_ssl = not cluster_info.get("cluster", {}).get(
+                "insecure-skip-tls-verify", False
+            )
+
+            # Handle certificate authority
+            ca_data = cluster_info.get("cluster", {}).get("certificate-authority-data")
+            if ca_data:
+                import base64
+                import tempfile
+
+                ca_cert = base64.b64decode(ca_data)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".crt") as f:
+                    f.write(ca_cert)
+                    config.ssl_ca_cert = f.name
+
+            # Handle client certificate authentication
+            if user_info:
+                user_data = user_info.get("user", {})
+                client_cert_data = user_data.get("client-certificate-data")
+                client_key_data = user_data.get("client-key-data")
+
+                if client_cert_data and client_key_data:
+                    import base64
+                    import tempfile
+
+                    client_cert = base64.b64decode(client_cert_data)
+                    client_key = base64.b64decode(client_key_data)
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".crt") as f:
+                        f.write(client_cert)
+                        config.cert_file = f.name
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".key") as f:
+                        f.write(client_key)
+                        config.key_file = f.name
+
+                # Handle token authentication
+                token = user_data.get("token")
+                if token:
+                    config.api_key = {"authorization": f"Bearer {token}"}
+
+            api_client = client.ApiClient(configuration=config)
+            v1 = client.CoreV1Api(api_client)
+
+            # Get all nodes
+            nodes = v1.list_node()
+            ip_to_name = {}
+
+            for node in nodes.items:
+                node_name = node.metadata.name
+                if node.status and node.status.addresses:
+                    for addr in node.status.addresses:
+                        if addr.type in ("InternalIP", "ExternalIP"):
+                            ip_to_name[addr.address] = node_name
+                        elif addr.type == "Hostname":
+                            # Also map hostname to node name
+                            ip_to_name[addr.address] = node_name
+
+            logger.debug(f"Built node IP mapping with {len(ip_to_name)} entries")
+            return ip_to_name
+
+        except Exception as e:
+            logger.warning(f"Failed to get node IP mapping: {e}")
+            return {}
+        finally:
+            if api_client:
+                api_client.close()
 
     async def _start_port_forward(
         self,
@@ -472,6 +603,7 @@ class OTelBridge:
         queries: List[str],
         duration: timedelta = timedelta(minutes=5),
         step: str = "30s",
+        kubeconfig: Optional[str] = None,
     ) -> Tuple[bool, Optional[str]]:
         """Scrape metrics from cluster Prometheus and forward to OTel.
 
@@ -480,6 +612,7 @@ class OTelBridge:
             queries: List of PromQL queries to execute
             duration: Time range for queries
             step: Query resolution step
+            kubeconfig: Optional kubeconfig for node name enrichment
 
         Returns:
             Tuple of (success, error_message)
@@ -489,6 +622,13 @@ class OTelBridge:
 
         config = self.scrape_configs[cluster_id]
         endpoint = config["prometheus_endpoint"]
+
+        # Get node IP to name mapping for metric enrichment
+        node_ip_mapping = {}
+        if kubeconfig:
+            node_ip_mapping = self._get_node_ip_mapping(kubeconfig)
+            if node_ip_mapping:
+                logger.info(f"Using node IP mapping with {len(node_ip_mapping)} entries for metric enrichment")
 
         try:
             logger.info(f"Starting to scrape {len(queries)} queries from {endpoint} (parallel execution)")
@@ -552,8 +692,8 @@ class OTelBridge:
 
             logger.info(f"Scraped total of {len(metrics_data)} metric series from cluster {cluster_id}")
 
-            # Transform and send to OTel
-            await self._send_metrics_to_otel(cluster_id, config, metrics_data)
+            # Transform and send to OTel with node name enrichment
+            await self._send_metrics_to_otel(cluster_id, config, metrics_data, node_ip_mapping)
 
             return True, None
 
@@ -848,6 +988,7 @@ class OTelBridge:
         cluster_id: str,
         config: Dict[str, Any],
         metrics_data: List[Dict[str, Any]],
+        node_ip_mapping: Optional[Dict[str, str]] = None,
     ):
         """Send scraped metrics to OTel Collector via OTLP.
 
@@ -855,6 +996,7 @@ class OTelBridge:
             cluster_id: Cluster identifier
             config: Cluster configuration
             metrics_data: Raw Prometheus metrics data
+            node_ip_mapping: Optional mapping of node IPs to Kubernetes node names
         """
         if not metrics_data:
             logger.warning(f"No metrics to send for cluster {cluster_id}")
@@ -879,7 +1021,7 @@ class OTelBridge:
                                 "name": "prometheus",
                                 "version": "2.0",
                             },
-                            "metrics": self._transform_to_otlp(metrics_data),
+                            "metrics": self._transform_to_otlp(metrics_data, node_ip_mapping),
                         }
                     ],
                 }
@@ -953,20 +1095,35 @@ class OTelBridge:
                 "Metrics may be lost."
             )
 
-    def _transform_to_otlp(self, metrics_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _transform_to_otlp(
+        self,
+        metrics_data: List[Dict[str, Any]],
+        node_ip_mapping: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
         """Transform Prometheus metrics to OTLP format.
 
         Args:
             metrics_data: Prometheus query results
+            node_ip_mapping: Optional mapping of node IPs to Kubernetes node names
 
         Returns:
             List of OTLP metric records
         """
         otlp_metrics = []
+        node_ip_mapping = node_ip_mapping or {}
 
         for metric in metrics_data:
             metric_name = metric["metric"]["__name__"]
             labels = {k: v for k, v in metric["metric"].items() if k != "__name__"}
+
+            # Enrich with node name from IP mapping if available
+            # The 'instance' label in Prometheus is typically IP:port format
+            if node_ip_mapping and "instance" in labels and "node" not in labels:
+                instance = labels["instance"]
+                # Extract IP from instance (format is usually "IP:PORT")
+                ip = instance.split(":")[0] if ":" in instance else instance
+                if ip in node_ip_mapping:
+                    labels["node"] = node_ip_mapping[ip]
 
             # Convert values to OTLP gauge format
             data_points = []

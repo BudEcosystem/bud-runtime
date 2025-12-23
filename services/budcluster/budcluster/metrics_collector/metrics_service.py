@@ -224,12 +224,13 @@ class MetricsCollectionService:
                 f"Using {len(queries)} queries for cluster type '{cluster_platform}' (HAMI enabled: {len(queries) > len(base_queries)})"
             )
 
-            # Trigger initial scraping
+            # Trigger initial scraping with node name enrichment
             success, error_msg = await self.otel_bridge.scrape_and_forward_metrics(
                 cluster_id=cluster_id_str,
                 queries=queries,
                 duration=timedelta(minutes=5),
                 step="30s",
+                kubeconfig=kubeconfig,
             )
 
             if not success:

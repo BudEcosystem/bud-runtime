@@ -1252,3 +1252,67 @@ async def get_node_gpu_timeseries(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving GPU timeseries",
         ).to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}/nodes/{hostname}/metrics/cpu/timeseries",
+    response_model=None,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Successfully retrieved CPU timeseries data",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Cluster not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Get CPU timeseries data for a specific node for charts",
+)
+@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
+async def get_node_cpu_timeseries(
+    cluster_id: UUID,
+    hostname: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    hours: int = Query(default=6, ge=1, le=168, description="Number of hours to look back"),
+):
+    """Get CPU timeseries data for a specific node from budmetrics service.
+
+    Returns historical CPU metrics for charts including usage percentage
+    and load averages.
+    """
+    try:
+        # Check cluster access
+        cluster_service = ClusterService(session)
+        cluster = await cluster_service.get_cluster_details(cluster_id)
+        if not cluster:
+            return ErrorResponse(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Cluster not found",
+            ).to_http_response()
+
+        # Forward to budmetrics via Dapr service invocation
+        # Use cluster.cluster_id (budcluster ID) not cluster_id (budapp ID)
+        result = await DaprService.invoke_service(
+            app_settings.bud_metrics_app_id,
+            f"cluster-metrics/{cluster.cluster_id}/nodes/{hostname}/cpu/timeseries",
+            method="GET",
+            params={"hours": hours},
+        )
+        return result
+    except ClientException as e:
+        logger.error(f"Client error getting CPU timeseries: {e}")
+        return ErrorResponse(
+            code=e.status_code,
+            message=str(e),
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Error getting CPU timeseries: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Error retrieving CPU timeseries",
+        ).to_http_response()

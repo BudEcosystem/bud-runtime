@@ -1775,9 +1775,12 @@ class ClusterOpsService:
                 cluster.id, config_dict
             )
 
-            # Send notification if status changed
-            if cluster_status != cluster.status or not nodes_info_present or node_status_change:
-                logger.info(f"Cluster {cluster_id_str} status changed, sending notification")
+            # Send notification if status changed or if we have node_info with devices
+            # The has_node_info condition ensures gpu_count/cpu_count are updated in budapp
+            # even when there's no status change (matching workflow behavior)
+            has_node_info = node_info and "nodes" in node_info and len(node_info.get("nodes", [])) > 0
+            if cluster_status != cluster.status or not nodes_info_present or node_status_change or has_node_info:
+                logger.info(f"Cluster {cluster_id_str}: sending notification (status_changed={cluster_status != cluster.status}, has_node_info={has_node_info})")
 
                 event_name = "cluster-status-update"
                 content = NotificationContent(
