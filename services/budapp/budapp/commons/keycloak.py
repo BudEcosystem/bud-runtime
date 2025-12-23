@@ -118,6 +118,24 @@ class KeycloakManager:
             logger.error(f"Error updating user password: {str(e)}")
             raise
 
+    def _get_realm_token_settings(self) -> dict:
+        """Returns a dictionary of realm token/session settings.
+
+        This is used by both create_realm and sync_realm_settings to ensure
+        consistent settings across realm creation and updates.
+
+        Returns:
+            dict: Token and session settings for the realm
+        """
+        return {
+            "refreshTokenMaxReuse": 0,
+            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
+            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
+            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
+            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
+            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
+        }
+
     async def create_realm(self, realm_name: str) -> dict:
         """Create a new realm in Keycloak.
 
@@ -138,12 +156,7 @@ class KeycloakManager:
             "resetPasswordAllowed": True,
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
-            "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
-            "accessTokenLifespan": 1800,  # 30 minutes in seconds
-            "ssoSessionIdleTimeout": 86400,  # 24 hours in seconds
-            "ssoSessionMaxLifespan": 86400,  # 24 hours in seconds
-            "offlineSessionIdleTimeout": 2592000,  # 30 days in seconds
-            "offlineSessionMaxLifespan": 2592000,  # 30 days in seconds
+            **self._get_realm_token_settings(),
         }
 
         try:
@@ -173,6 +186,24 @@ class KeycloakManager:
 
         except Exception as e:
             logger.error(f"Failed to create realm {realm_name}: {str(e)}")
+            raise
+
+    async def sync_realm_settings(self, realm_name: str) -> None:
+        """Sync realm settings (token lifespans, session timeouts) for an existing realm.
+
+        This ensures code-defined settings are applied to existing realms on startup.
+
+        Args:
+            realm_name: Name of the realm to update
+        """
+        realm_name = realm_name.lower()
+        settings_to_sync = self._get_realm_token_settings()
+
+        try:
+            self.admin_client.update_realm(realm_name, payload=settings_to_sync)
+            logger.info(f"Realm {realm_name} settings synced successfully")
+        except Exception as e:
+            logger.error(f"Failed to sync realm settings for {realm_name}: {str(e)}")
             raise
 
     async def _create_module_resource(self, realm_admin, client_id: str, module_name: str, realm_name: str) -> str:
