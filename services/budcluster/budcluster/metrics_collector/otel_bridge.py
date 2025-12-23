@@ -215,9 +215,7 @@ class OTelBridge:
 
             # Configure the client
             config.host = cluster_info.get("cluster", {}).get("server", "")
-            config.verify_ssl = not cluster_info.get("cluster", {}).get(
-                "insecure-skip-tls-verify", False
-            )
+            config.verify_ssl = not cluster_info.get("cluster", {}).get("insecure-skip-tls-verify", False)
 
             # Handle certificate authority
             ca_data = cluster_info.get("cluster", {}).get("certificate-authority-data")
