@@ -45,7 +45,7 @@ Sidebar tabs for Projects, Models, Clusters, Playground, API Keys, Agents, Obser
 
 ### 3.3 Model totals and breakdown
 
-- Shows total models with separate chips for Cloud and Local counts, covering cloud endpoints and CPU-first local models (Hugging Face, URL, disk-based).
+- Shows total models with separate chips for Cloud and Local counts, covering cloud endpoints and local models (Hugging Face, URL, disk-based).
 
 ### 3.4 Endpoint, Cluster, and Project readiness cards
 
@@ -85,18 +85,6 @@ Sidebar tabs for Projects, Models, Clusters, Playground, API Keys, Agents, Obser
 - Comparative bar chart for input vs output tokens across the top five models.
 - Time filters: Last 24 Hrs, Last 7 Days, Last 30 Days.
 - Delta chips highlight average changes for input and output tokens.
-
-### 3.11 Time-range filters and data scope
-
-- Segmented control maps to backend frequencies: Last 24 Hrs → daily, Last 7 Days → weekly, Last 30 Days → monthly.
-- Queries use top_k=5 and switch filter_by between project (API calls, latency, throughput) and model (usage, token metrics).
-
-### 3.12 Data loading, conversions, and empty states
-
-- Uses loaders while fetching metrics and toasts on completion.
-- Metrics are fetched via `/metrics/analytics` and normalized through the observability adapter to keep dashboard charts aligned with the Observability module.
-- Accuracy uses `/models/top-leaderboards` for benchmark values.
-- Empty charts render explanatory placeholders and imagery until data arrives.
 
 ## 4. How-to Guides
 
