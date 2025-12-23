@@ -175,6 +175,33 @@ class KeycloakManager:
             logger.error(f"Failed to create realm {realm_name}: {str(e)}")
             raise
 
+    async def sync_realm_settings(self, realm_name: str) -> None:
+        """Sync realm settings (token lifespans, session timeouts) for an existing realm.
+
+        This ensures code-defined settings are applied to existing realms on startup.
+
+        Args:
+            realm_name: Name of the realm to update
+        """
+        realm_name = realm_name.lower()
+
+        # Settings to sync - these should match create_realm settings
+        settings_to_sync = {
+            "refreshTokenMaxReuse": 0,
+            "accessTokenLifespan": 1800,  # 30 minutes
+            "ssoSessionIdleTimeout": 86400,  # 24 hours
+            "ssoSessionMaxLifespan": 86400,  # 24 hours
+            "offlineSessionIdleTimeout": 2592000,  # 30 days
+            "offlineSessionMaxLifespan": 2592000,  # 30 days
+        }
+
+        try:
+            self.admin_client.update_realm(realm_name, payload=settings_to_sync)
+            logger.info(f"Realm {realm_name} settings synced successfully")
+        except Exception as e:
+            logger.error(f"Failed to sync realm settings for {realm_name}: {str(e)}")
+            raise
+
     async def _create_module_resource(self, realm_admin, client_id: str, module_name: str, realm_name: str) -> str:
         """Create a module-level resource in Keycloak Authorization.
 
