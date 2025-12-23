@@ -4,10 +4,9 @@ import { Image, Segmented } from "antd";
 
 import {
   Text_13_400_757575,
-  Text_15_600_EEEEEE,
+  Text_18_400_EEEEEE,
   Text_19_600_EEEEEE,
   Text_26_400_EEEEEE,
-  Text_38_400_EEEEEE,
 } from "@/components/ui/text";
 
 import {
@@ -17,18 +16,15 @@ import {
   MetricType,
   useCluster,
 } from "src/hooks/useCluster";
-import Tags from "src/flows/components/DrawerTags";
 import GuageChart from "@/components/charts/GuageChart";
 import BarChart from "@/components/charts/barChart";
-import LineChart from "@/components/charts/lineChart";
 import MultiSeriesLineChart from "@/components/charts/MultiSeriesLineChart";
 import { formatStorageSize, getCategories, getChartData } from "@/lib/utils";
 import { useRouter } from "next/router";
 import ComingSoon from "@/components/ui/comingSoon";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
-import CardWithBgAndTag from "@/components/ui/CardWithBgAndTag";
 import { useGPUMetrics, getUtilizationColor } from "src/hooks/useGPUMetrics";
-import { Cpu, HardDrive, Activity, Layers } from "lucide-react";
+import { Cpu, HardDrive, Activity, Layers, Server, Rocket, Database, MemoryStick } from "lucide-react";
 
 const segmentOptions = ["today", "7days", "month"];
 const segmentOptionsMap = {
@@ -63,16 +59,6 @@ interface GeneralProps {
   data: Cluster;
   isActive?: boolean;
 }
-
-type GeneralCardsProps = {
-  name: string;
-  bg: string;
-  value: string | number;
-  tag?: {
-    value: string;
-    tagColor: string;
-  };
-};
 
 const ChartUsageCard = ({
   data,
@@ -302,10 +288,10 @@ const GuageCharts = ({
         <GuageChart
           data={{
             percentage: Number(
-              metrics?.cluster_summary?.[field]?.[percentage]?.toFixed(2),
+              (metrics?.cluster_summary?.[field]?.[percentage] ?? 0).toFixed(2),
             ),
             average: Number(
-              metrics?.cluster_summary?.[field]?.[average]?.toFixed(2),
+              (metrics?.cluster_summary?.[field]?.[average] ?? 0).toFixed(2),
             ),
           }}
         />
@@ -325,7 +311,7 @@ interface GPUSummaryCardProps {
 
 const GPUSummaryCard: React.FC<GPUSummaryCardProps> = ({ title, value, subtitle, icon, color = "#965CDE" }) => {
   return (
-    <div className="bg-[#101010] rounded-lg p-4 border border-[#1F1F1F] flex flex-col gap-2 min-w-[180px] flex-1">
+    <div className="bg-[#101010] rounded-lg p-4 border border-[#1F1F1F] flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <Text_13_400_757575>{title}</Text_13_400_757575>
         <div style={{ color }} className="opacity-70">
@@ -333,7 +319,7 @@ const GPUSummaryCard: React.FC<GPUSummaryCardProps> = ({ title, value, subtitle,
         </div>
       </div>
       <div className="flex items-baseline gap-2">
-        <Text_26_400_EEEEEE style={{ color }}>{value}</Text_26_400_EEEEEE>
+        <Text_18_400_EEEEEE style={{ color }}>{value}</Text_18_400_EEEEEE>
         {subtitle && <Text_13_400_757575>{subtitle}</Text_13_400_757575>}
       </div>
     </div>
@@ -389,126 +375,6 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
       setChartRefreshKey((prev) => prev + 1);
     }
   }, [isActive, isHydrated]);
-  const GeneralCardData: GeneralCardsProps[] = data && [
-    {
-      name: "Nodes",
-      bg: "/images/cluster/bignode.png",
-      value: data?.total_nodes || 0,
-      tag: {
-        value: `${data?.available_nodes || 0} Available`,
-        tagColor: "#479D5F",
-      },
-    },
-    {
-      name: "Deployments",
-      bg: "/images/cluster/bg-deployment.png",
-      value: data?.total_endpoints_count || 0,
-      tag: {
-        value: `${data?.running_endpoints_count || 0} Running`,
-        tagColor: "#479D5F",
-      },
-    },
-    // {
-    //   name: "Workers",
-    //   bg: "/images/cluster/bg-workers.png",
-    //   value: data?.total_workers_count,
-    //   tag: {
-    //     value: `${data?.active_workers_count || 0} Active`,
-    //     tagColor: "#479D5F",
-    //   },
-    // },
-    {
-      name: "Device Types",
-      bg: "/images/cluster/bg-device.png",
-      value: data?.hardware_type?.join(", ") || "N/A",
-    },
-    {
-      name: "Disk Space",
-      bg: "/images/cluster/bg-disk.png",
-      value: formatStorageSize(
-        metrics?.cluster_summary?.storage.total_gib || 0,
-        "GB",
-      ), //
-      tag: {
-        value: `${formatStorageSize(
-          metrics?.cluster_summary?.storage?.available_gib || 0,
-          "GB",
-        )} Available`,
-        tagColor: "#4077E6",
-      },
-    }, // TODO: Change the value to actual data
-    {
-      name: "RAM",
-      bg: "/images/cluster/bg-ram.png",
-      value: formatStorageSize(
-        metrics?.cluster_summary?.memory?.total_gib || 0,
-        "GB",
-      ),
-      tag: {
-        value: `${formatStorageSize(
-          metrics?.cluster_summary?.memory?.available_gib || 0,
-          "GB",
-        )} Available`,
-        tagColor: "#4077E6",
-      },
-    },
-    {
-      name: "VRAM",
-      bg: "/images/cluster/bg-vram.png",
-      value: data?.hardware_type?.includes("GPU")
-        ? formatStorageSize(
-            metrics?.cluster_summary?.memory?.total_gib || 0,
-            "GB",
-          )
-        : "N/A",
-      ...(data?.hardware_type?.includes("GPU") && {
-        tag: {
-          value: `${formatStorageSize(
-            metrics?.cluster_summary?.memory?.available_gib || 0,
-            "GB",
-          )} Available`,
-          tagColor: "#4077E6",
-        },
-      }),
-    },
-    // { name: "TFLOPs", bg: "/images/cluster/bg-flop.png", value: "0" }, // TODO: Change the value to actual data
-
-  ];
-
-  const GeneralCards = ({ name, bg, value, tag }: GeneralCardsProps) => {
-    return (
-      <div className="relative w-[24%] rounded-[8px] px-[1.6rem] pt-[2rem] pb-[1.5rem] border-[1.5px] border-[#1c1c1c] min-h-[172px] bg-[#101010]">
-        {/* Background Image */}
-        <div className="absolute inset-0 z-0">
-          <Image
-            preview={false}
-            src={bg}
-            alt="background"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 w-full h-full flex flex-col justify-start">
-          <Text_15_600_EEEEEE>{name}</Text_15_600_EEEEEE>
-          <Text_38_400_EEEEEE className="pt-[3.2rem]">
-            {value}
-          </Text_38_400_EEEEEE>
-          {tag && (
-            <div className="flex mt-[.85rem]">
-              <Tags
-                name={tag.value}
-                color={tag.tagColor}
-                textClass="text-[0.8125rem]"
-                classNames="!py-[.2rem]"
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const GuageChartCardData: GaugeChartProps[] = [
     data?.hardware_type?.includes("CPU") && {
       title: "CPU Utilization",
@@ -570,45 +436,68 @@ const ClusterGeneral: React.FC<GeneralProps> = ({
   }, []);
   return (
     <div className="relative pb-[3rem]">
-      <div className="flex flex-wrap justify-between items-top gap-[.8rem] mt-[.5rem]">
-        {GeneralCardData?.map((item, index) => (
-          <CardWithBgAndTag key={index} {...item} />
-        ))}
+      {/* Cluster Overview Cards - 4 cards in first row */}
+      <div className="grid grid-cols-4 gap-4 mt-[.5rem]">
+        <GPUSummaryCard
+          title="Active Nodes"
+          value={data?.available_nodes || 0}
+          subtitle={`of ${data?.total_nodes || 0} total`}
+          icon={<Server size={18} />}
+          color="#479D5F"
+        />
+        <GPUSummaryCard
+          title="Active Deployments"
+          value={data?.running_endpoints_count || 0}
+          subtitle={`of ${data?.total_endpoints_count || 0} total`}
+          icon={<Rocket size={18} />}
+          color="#479D5F"
+        />
+        <GPUSummaryCard
+          title="Available Disk"
+          value={formatStorageSize(metrics?.cluster_summary?.storage?.available_gib || 0, "GB")}
+          subtitle={`of ${formatStorageSize(metrics?.cluster_summary?.storage?.total_gib || 0, "GB")} total`}
+          icon={<Database size={18} />}
+          color="#4077E6"
+        />
+        <GPUSummaryCard
+          title="Available RAM"
+          value={formatStorageSize(metrics?.cluster_summary?.memory?.available_gib || 0, "GB")}
+          subtitle={`of ${formatStorageSize(metrics?.cluster_summary?.memory?.total_gib || 0, "GB")} total`}
+          icon={<MemoryStick size={18} />}
+          color="#4077E6"
+        />
       </div>
 
-      {/* GPU Summary Section */}
+      {/* GPU Overview Section - 4 cards in second row when GPU available */}
       {data?.hardware_type?.includes("GPU") && gpuMetrics?.summary && (
-        <div className="mt-[1.55rem]">
-          <Text_19_600_EEEEEE className="mb-[1rem]">GPU Overview</Text_19_600_EEEEEE>
-          <div className="flex gap-4 flex-wrap">
-            <GPUSummaryCard
-              title="Total GPUs"
-              value={gpuMetrics.summary.total_gpus}
-              icon={<Cpu size={18} />}
-              color="#965CDE"
-            />
-            <GPUSummaryCard
-              title="GPU Memory"
-              value={`${gpuMetrics.summary.memory_utilization_percent.toFixed(1)}%`}
-              subtitle={`${gpuMetrics.summary.allocated_memory_gb.toFixed(1)} / ${gpuMetrics.summary.total_memory_gb.toFixed(1)} GB`}
-              icon={<HardDrive size={18} />}
-              color={getUtilizationColor(gpuMetrics.summary.memory_utilization_percent)}
-            />
-            <GPUSummaryCard
-              title="GPU Compute"
-              value={`${gpuMetrics.summary.avg_gpu_utilization_percent.toFixed(1)}%`}
-              subtitle="Avg utilization"
-              icon={<Activity size={18} />}
-              color={getUtilizationColor(gpuMetrics.summary.avg_gpu_utilization_percent)}
-            />
-            <GPUSummaryCard
-              title="Active Slices"
-              value={gpuMetrics.summary.active_slices}
-              subtitle={`of ${gpuMetrics.summary.total_slices} total`}
-              icon={<Layers size={18} />}
-              color="#3F8EF7"
-            />
-          </div>
+        <div className="grid grid-cols-4 gap-4 mt-4">
+          <GPUSummaryCard
+            title="Total GPUs"
+            value={gpuMetrics.summary.total_gpus}
+            icon={<Cpu size={18} />}
+            color="#965CDE"
+          />
+          <GPUSummaryCard
+            title="GPU Memory"
+            value={`${gpuMetrics.summary.memory_utilization_percent.toFixed(1)}%`}
+            subtitle={`${gpuMetrics.summary.allocated_memory_gb.toFixed(1)} / ${gpuMetrics.summary.total_memory_gb.toFixed(1)} GB`}
+            icon={<HardDrive size={18} />}
+            color={getUtilizationColor(gpuMetrics.summary.memory_utilization_percent)}
+          />
+          <GPUSummaryCard
+            title="GPU Compute"
+            value={`${gpuMetrics.summary.avg_gpu_utilization_percent.toFixed(1)}%`}
+            subtitle="Avg utilization"
+            icon={<Activity size={18} />}
+            color={getUtilizationColor(gpuMetrics.summary.avg_gpu_utilization_percent)}
+          />
+          <GPUSummaryCard
+            title="Active Slices"
+            value={gpuMetrics.summary.active_slices}
+            subtitle={`of ${gpuMetrics.summary.total_slices} total`}
+            icon={<Layers size={18} />}
+            color="#3F8EF7"
+          />
         </div>
       )}
 

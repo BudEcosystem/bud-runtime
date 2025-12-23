@@ -26,6 +26,7 @@ from .schemas import (
     ClusterMetricsQuery,
     ClusterMetricsResponse,
     ClusterResourceSummary,
+    CPUTimeSeriesResponse,
     GPUDeviceResponse,
     GPUMetricsResponse,
     GPUMetricsSummary,
@@ -1451,4 +1452,43 @@ class ClusterMetricsService:
             temperature=temperature,
             power=power,
             slice_activity=slice_activity,
+        )
+
+    async def get_node_cpu_timeseries(
+        self,
+        cluster_id: str,
+        node_name: str,
+        hours: int = 6,
+    ) -> CPUTimeSeriesResponse:
+        """Get CPU timeseries data for a node.
+
+        Args:
+            cluster_id: Cluster identifier
+            node_name: Node hostname
+            hours: Number of hours to look back
+
+        Returns:
+            CPUTimeSeriesResponse with timeseries data for charts
+        """
+        result = await self.repository.get_node_cpu_timeseries(cluster_id, node_name, hours)
+
+        timestamps = []
+        cpu_usage_percent = []
+        load_1 = []
+        load_5 = []
+        load_15 = []
+
+        for row in result:
+            timestamps.append(int(row[0]))
+            cpu_usage_percent.append(float(row[1] or 0))
+            load_1.append(float(row[2] or 0))
+            load_5.append(float(row[3] or 0))
+            load_15.append(float(row[4] or 0))
+
+        return CPUTimeSeriesResponse(
+            timestamps=timestamps,
+            cpu_usage_percent=cpu_usage_percent,
+            load_1=load_1,
+            load_5=load_5,
+            load_15=load_15,
         )

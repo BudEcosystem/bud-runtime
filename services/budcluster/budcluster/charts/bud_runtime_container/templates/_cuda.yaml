@@ -71,12 +71,15 @@
     initialDelaySeconds: 120
     periodSeconds: 30
     failureThreshold: 20
+    timeoutSeconds: 10
   readinessProbe:
     httpGet:
       path: /health
       port: {{ $.Values.containerPort }}
     initialDelaySeconds: 60
     periodSeconds: 5
+    failureThreshold: 6
+    timeoutSeconds: 10
   startupProbe:
     httpGet:
       path: /health
@@ -85,5 +88,5 @@
     failureThreshold: 200
     periodSeconds: 30
     successThreshold: 1
-    timeoutSeconds: 1
+    timeoutSeconds: 10
 {{- end }}

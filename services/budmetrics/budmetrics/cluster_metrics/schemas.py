@@ -473,3 +473,13 @@ class GPUTimeSeriesResponse(BaseModel):
     temperature: List[List[float]]  # Per GPU temperature over time
     power: List[List[float]]  # Per GPU power over time
     slice_activity: List[SliceActivityItem]  # Per slice activity over time
+
+
+class CPUTimeSeriesResponse(BaseModel):
+    """Response for CPU timeseries data for node detail charts."""
+
+    timestamps: List[int]  # Unix timestamps in milliseconds
+    cpu_usage_percent: List[float]  # CPU usage over time
+    load_1: List[float]  # 1-minute load average over time
+    load_5: List[float]  # 5-minute load average over time
+    load_15: List[float]  # 15-minute load average over time

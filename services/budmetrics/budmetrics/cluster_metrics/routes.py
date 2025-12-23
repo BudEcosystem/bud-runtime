@@ -19,6 +19,7 @@ from .schemas import (
     ClusterMetricsQuery,
     ClusterMetricsResponse,
     ClusterResourceSummary,
+    CPUTimeSeriesResponse,
     GPUMetricsResponse,
     GPUTimeSeriesResponse,
     MetricsAggregationRequest,
@@ -589,4 +590,39 @@ async def get_node_gpu_timeseries(
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve GPU timeseries: {str(e)}",
+        ) from e
+
+
+@router.get("/{cluster_id}/nodes/{hostname}/cpu/timeseries", response_model=CPUTimeSeriesResponse)
+async def get_node_cpu_timeseries(
+    cluster_id: str,
+    hostname: str,
+    hours: int = Query(default=6, ge=1, le=168),
+    service: ClusterMetricsService = Depends(get_cluster_metrics_service),
+) -> CPUTimeSeriesResponse:
+    """Get CPU timeseries data for a specific node.
+
+    Returns historical CPU metrics for charts including usage percentage
+    and load averages (1, 5, 15 minute).
+
+    Args:
+        cluster_id: Cluster identifier
+        hostname: Node hostname
+        hours: Number of hours to look back (1-168, default 6)
+        service: Injected cluster metrics service
+
+    Returns:
+        CPUTimeSeriesResponse with timeseries arrays for charts
+
+    Raises:
+        HTTPException: 500 on server error
+    """
+    try:
+        return await service.get_node_cpu_timeseries(cluster_id, hostname, hours)
+
+    except Exception as e:
+        logger.error(f"Error getting node CPU timeseries: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve CPU timeseries: {str(e)}",
         ) from e

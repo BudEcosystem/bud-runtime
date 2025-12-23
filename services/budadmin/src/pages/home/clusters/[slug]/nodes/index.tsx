@@ -179,15 +179,15 @@ const NodeRow = ({ ip, data, clusterId }: { data: Node; ip: string; clusterId: s
   const handleRowClick = () => {
     router.push(`/home/clusters/${clusterId}/nodes/${data.hostname}`);
   };
+  // Check for HPU and GPU devices
+  const hasHPU = data?.hpu && data.hpu.capacity > 0;
+  const hasGPU = data?.gpu && data.gpu.capacity > 0;
+
   const tagData = [
     { name: "CPU", color: "#D1B854", hide: !data?.cpu },
-    { name: "HPU", color: "#D1B854", hide: !data?.gpu },
-    { name: "GPU", color: "#D1B854", hide: !data?.gpu },
-    { name: ip, color: "#965CDE" },
-    // {
-    //   name: data?.events_count > 1 ? "High" : "Low",
-    //   color: data?.events_count > 1 ? "#EC7575" : "#479D5F",
-    // },
+    { name: "HPU", color: "#3F8EF7", hide: !hasHPU },
+    { name: "GPU", color: "#965CDE", hide: !hasGPU },
+    { name: ip, color: "#757575" },
   ]?.filter((item) => !item.hide);
   const chartData: SingleGuageChartData[] = [
     // {
