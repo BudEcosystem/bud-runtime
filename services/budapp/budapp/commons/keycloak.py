@@ -139,11 +139,11 @@ class KeycloakManager:
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
             "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
-            "accessTokenLifespan": 1800,  # 30 minutes in seconds
-            "ssoSessionIdleTimeout": 86400,  # 24 hours in seconds
-            "ssoSessionMaxLifespan": 86400,  # 24 hours in seconds
-            "offlineSessionIdleTimeout": 2592000,  # 30 days in seconds
-            "offlineSessionMaxLifespan": 2592000,  # 30 days in seconds
+            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
+            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
+            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
+            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
+            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
         }
 
         try:
@@ -188,11 +188,11 @@ class KeycloakManager:
         # Settings to sync - these should match create_realm settings
         settings_to_sync = {
             "refreshTokenMaxReuse": 0,
-            "accessTokenLifespan": 1800,  # 30 minutes
-            "ssoSessionIdleTimeout": 86400,  # 24 hours
-            "ssoSessionMaxLifespan": 86400,  # 24 hours
-            "offlineSessionIdleTimeout": 2592000,  # 30 days
-            "offlineSessionMaxLifespan": 2592000,  # 30 days
+            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
+            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
+            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
+            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
+            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
         }
 
         try:
