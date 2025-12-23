@@ -232,7 +232,7 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
                               handleMessageChange(message.id, 'content', e.target.value)
                             }
                             placeholder="Enter Message"
-                            style={{ color: '#EEEEEE' }}
+                            style={{ color: '#EEEEEE', resize: 'vertical' }}
                           />
                         </div>
                       </div>

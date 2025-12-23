@@ -75,6 +75,8 @@ export interface AgentSession {
   allowMultipleCalls?: boolean;
   structuredInputEnabled?: boolean;
   structuredOutputEnabled?: boolean;
+  // Per-session model settings (isolated per agent box)
+  modelSettings?: AgentSettings;
 }
 
 interface AgentStore {
@@ -127,10 +129,15 @@ interface AgentStore {
   updateVariable: (sessionId: string, variableId: string, updates: Partial<AgentVariable>) => void;
   deleteVariable: (sessionId: string, variableId: string) => void;
 
-  // Settings Management
+  // Settings Management (Global Presets)
   addSettingPreset: (preset: AgentSettings) => void;
   updateSettingPreset: (preset: AgentSettings) => void;
   setCurrentSettingPreset: (preset: AgentSettings) => void;
+
+  // Session-Specific Settings Management
+  initializeSessionSettings: (sessionId: string, preset?: AgentSettings) => void;
+  updateSessionSettings: (sessionId: string, updates: Partial<AgentSettings>) => void;
+  getSessionSettings: (sessionId: string) => AgentSettings | undefined;
 
   // UI Actions
   openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
@@ -424,6 +431,89 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       setCurrentSettingPreset: (preset) => {
         set({ currentSettingPreset: preset });
+      },
+
+      // Session-Specific Settings Management
+      initializeSessionSettings: (sessionId, preset) => {
+        const session = get().sessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // If session already has settings, don't reinitialize
+        if (session.modelSettings) return;
+
+        const defaultSettings: AgentSettings = preset || {
+          id: `settings_${sessionId}`,
+          name: "Default",
+          temperature: 0.7,
+          max_tokens: 2000,
+          top_p: 1.0,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+          stop_sequences: [],
+          seed: 0,
+          timeout: 0,
+          parallel_tool_calls: true,
+          logprobs: false,
+          logit_bias: {},
+          extra_headers: {},
+          max_completion_tokens: 0,
+          stream_options: {},
+          response_format: {},
+          tool_choice: "auto",
+          chat_template: "",
+          chat_template_kwargs: {},
+          mm_processor_kwargs: {},
+          created_at: new Date().toISOString(),
+          modified_at: new Date().toISOString(),
+          modifiedFields: new Set<string>(),
+        };
+
+        set({
+          sessions: get().sessions.map(s =>
+            s.id === sessionId
+              ? { ...s, modelSettings: defaultSettings, updatedAt: new Date() }
+              : s
+          )
+        });
+      },
+
+      updateSessionSettings: (sessionId, updates) => {
+        const session = get().sessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // Initialize settings if not present
+        if (!session.modelSettings) {
+          get().initializeSessionSettings(sessionId);
+        }
+
+        const currentSettings = get().sessions.find(s => s.id === sessionId)?.modelSettings;
+        if (!currentSettings) return;
+
+        // Track which fields are being modified
+        const modifiedFields = new Set<string>(currentSettings.modifiedFields || []);
+        Object.keys(updates).forEach(key => {
+          modifiedFields.add(key);
+        });
+
+        const updatedSettings: AgentSettings = {
+          ...currentSettings,
+          ...updates,
+          modified_at: new Date().toISOString(),
+          modifiedFields,
+        };
+
+        set({
+          sessions: get().sessions.map(s =>
+            s.id === sessionId
+              ? { ...s, modelSettings: updatedSettings, updatedAt: new Date() }
+              : s
+          )
+        });
+      },
+
+      getSessionSettings: (sessionId) => {
+        const session = get().sessions.find(s => s.id === sessionId);
+        return session?.modelSettings;
       },
 
       // UI Actions
