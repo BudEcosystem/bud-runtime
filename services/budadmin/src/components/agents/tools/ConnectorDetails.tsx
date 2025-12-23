@@ -21,7 +21,7 @@ interface Tool {
 
 interface ConnectorDetailsProps {
   connector: Connector;
-  onBack: () => void;
+  onBack: (options?: { removeConnectorFromUrl?: boolean }) => void;
   promptId?: string;
   workflowId?: string;
 }
@@ -647,8 +647,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       if (response.status === 200 || response.status === 204) {
         successToast('Connector disconnected successfully');
-        // Go back to ToolsHome
-        onBack();
+        // Go back to ToolsHome and remove connector from URL
+        onBack({ removeConnectorFromUrl: true });
       }
     } catch (error: any) {
       errorToast(error?.response?.data?.message || 'Failed to disconnect connector');
@@ -701,7 +701,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       {/* Header */}
       <div ref={headerRef} className="px-[1.125rem] py-[1.2rem] relative">
         <button
-          onClick={onBack}
+          onClick={() => onBack()}
           className="w-[1.125rem] h-[1.125rem] p-[.1rem] rounded-full flex items-center justify-center bg-[#18191B] hover:bg-[#1A1A1A] transition-colors absolute"
           style={{ transform: 'none' }}
         >

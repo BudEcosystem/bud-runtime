@@ -7,6 +7,7 @@ import { useConnectors, Connector } from '@/stores/useConnectors';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
 import { getOAuthState, isOAuthCallback, clearOAuthState } from '@/hooks/useOAuthCallback';
+import { updateQueryParams } from '@/utils/urlUtils';
 
 interface ToolsHomeProps {
   promptId?: string;
@@ -72,6 +73,17 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     // Get connector ID from URL or OAuth state
     let connectorId = searchParams.get('connector');
 
+    // Verify against actual URL - searchParams may be stale after window.history.replaceState
+    // This handles the case where connector was removed from URL (e.g., after disconnect)
+    if (typeof window !== 'undefined') {
+      const actualUrlParams = new URLSearchParams(window.location.search);
+      const actualConnectorId = actualUrlParams.get('connector');
+      if (connectorId && !actualConnectorId) {
+        // searchParams is stale, connector was removed from URL
+        connectorId = null;
+      }
+    }
+
     // If OAuth callback and we have saved connector ID, use that
     if (isOAuthReturn && oauthState?.connectorId && !connectorId) {
       connectorId = oauthState.connectorId;
@@ -120,6 +132,18 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
     // Get connector ID from URL or OAuth state
     let connectorId = searchParams.get('connector');
+
+    // Verify against actual URL - searchParams may be stale after window.history.replaceState
+    // This handles the case where connector was removed from URL (e.g., after disconnect)
+    if (typeof window !== 'undefined') {
+      const actualUrlParams = new URLSearchParams(window.location.search);
+      const actualConnectorId = actualUrlParams.get('connector');
+      if (connectorId && !actualConnectorId) {
+        // searchParams is stale, connector was removed from URL
+        connectorId = null;
+      }
+    }
+
     if (isOAuthReturn && oauthState?.connectorId && !connectorId) {
       connectorId = oauthState.connectorId;
     }
@@ -230,7 +254,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     window.history.pushState({}, '', newUrl);
   };
 
-  const handleBackToList = () => {
+  const handleBackToList = (options?: { removeConnectorFromUrl?: boolean }) => {
     // Set back navigation flag FIRST to prevent effects from re-triggering
     isBackNavigationRef.current = true;
 
@@ -248,7 +272,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     // Clear OAuth localStorage state (does not affect URL)
     clearOAuthState();
 
-    // NOTE: URL is intentionally NOT modified to preserve all existing params
+    // Remove connector from URL if explicitly requested (e.g., after disconnect)
+    // Otherwise, URL is preserved to maintain browser history for normal back navigation
+    if (options?.removeConnectorFromUrl) {
+      updateQueryParams({ connector: null }, { replaceHistory: true });
+    }
 
     // Refresh both lists when coming back
     if (promptId) {

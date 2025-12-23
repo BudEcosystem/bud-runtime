@@ -314,6 +314,7 @@ function AgentBoxInner({
   const [structuredOutputEnabled, setStructuredOutputEnabled] = useState(session?.structuredOutputEnabled ?? false);
   const [streamEnabled, setStreamEnabled] = useState(session?.settings?.stream ?? false);
   const [setAsDefault, setSetAsDefault] = useState(editVersionData?.isDefault ?? false);
+  const [isClosing, setIsClosing] = useState(false);
 
   // Memoize variable names to avoid creating new strings on every render
   const inputVariableNames = React.useMemo(
@@ -623,6 +624,9 @@ function AgentBoxInner({
   // Handler for close button with cleanup API call
   const handleCloseSession = async () => {
     if (!session) return;
+
+    // Show loading state while closing
+    setIsClosing(true);
 
     // Call cleanup API if promptId exists
     if (session.promptId) {
@@ -1256,6 +1260,16 @@ function AgentBoxInner({
           onClick={onActivate}
           title="Click to activate this agent box"
         />
+      )}
+
+      {/* Loading overlay when closing */}
+      {isClosing && (
+        <div className="absolute inset-0 z-[200] bg-[#0A0A0A]/80 flex items-center justify-center backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-[#965CDE] border-t-transparent rounded-full animate-spin" />
+            <span className="text-[#B3B3B3] text-sm">Closing...</span>
+          </div>
+        </div>
       )}
 
       {/* Navigation Bar */}
