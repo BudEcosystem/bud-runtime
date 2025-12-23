@@ -226,6 +226,33 @@ const createDefaultSession = (): AgentSession => ({
   }
 });
 
+const createDefaultModelSettings = (sessionId: string): AgentSettings => ({
+  id: `settings_${sessionId}`,
+  name: "Default",
+  temperature: 0.7,
+  max_tokens: 2000,
+  top_p: 1.0,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+  stop_sequences: [],
+  seed: 0,
+  timeout: 0,
+  parallel_tool_calls: true,
+  logprobs: false,
+  logit_bias: {},
+  extra_headers: {},
+  max_completion_tokens: 0,
+  stream_options: {},
+  response_format: {},
+  tool_choice: "auto",
+  chat_template: "",
+  chat_template_kwargs: {},
+  mm_processor_kwargs: {},
+  created_at: new Date().toISOString(),
+  modified_at: new Date().toISOString(),
+  modifiedFields: new Set<string>(),
+});
+
 export const useAgentStore = create<AgentStore>()((set, get) => ({
       // Initial State
       sessions: [],
@@ -435,79 +462,62 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       // Session-Specific Settings Management
       initializeSessionSettings: (sessionId, preset) => {
-        const session = get().sessions.find(s => s.id === sessionId);
-        if (!session) return;
+        set((state) => {
+          const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
+          if (sessionIndex === -1) return state;
 
-        // If session already has settings, don't reinitialize
-        if (session.modelSettings) return;
+          const session = state.sessions[sessionIndex];
+          // If session already has settings, don't reinitialize
+          if (session.modelSettings) return state;
 
-        const defaultSettings: AgentSettings = preset || {
-          id: `settings_${sessionId}`,
-          name: "Default",
-          temperature: 0.7,
-          max_tokens: 2000,
-          top_p: 1.0,
-          frequency_penalty: 0,
-          presence_penalty: 0,
-          stop_sequences: [],
-          seed: 0,
-          timeout: 0,
-          parallel_tool_calls: true,
-          logprobs: false,
-          logit_bias: {},
-          extra_headers: {},
-          max_completion_tokens: 0,
-          stream_options: {},
-          response_format: {},
-          tool_choice: "auto",
-          chat_template: "",
-          chat_template_kwargs: {},
-          mm_processor_kwargs: {},
-          created_at: new Date().toISOString(),
-          modified_at: new Date().toISOString(),
-          modifiedFields: new Set<string>(),
-        };
+          const defaultSettings: AgentSettings = preset || createDefaultModelSettings(sessionId);
 
-        set({
-          sessions: get().sessions.map(s =>
-            s.id === sessionId
-              ? { ...s, modelSettings: defaultSettings, updatedAt: new Date() }
-              : s
-          )
+          const sessions = [...state.sessions];
+          sessions[sessionIndex] = {
+            ...session,
+            modelSettings: defaultSettings,
+            updatedAt: new Date(),
+          };
+
+          return { sessions };
         });
       },
 
       updateSessionSettings: (sessionId, updates) => {
-        const session = get().sessions.find(s => s.id === sessionId);
-        if (!session) return;
+        set((state) => {
+          const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
+          if (sessionIndex === -1) return state;
 
-        // Initialize settings if not present
-        if (!session.modelSettings) {
-          get().initializeSessionSettings(sessionId);
-        }
+          const sessions = [...state.sessions];
+          const session = { ...sessions[sessionIndex] };
 
-        const currentSettings = get().sessions.find(s => s.id === sessionId)?.modelSettings;
-        if (!currentSettings) return;
+          // Initialize settings if not present
+          if (!session.modelSettings) {
+            session.modelSettings = createDefaultModelSettings(sessionId);
+          }
 
-        // Track which fields are being modified
-        const modifiedFields = new Set<string>(currentSettings.modifiedFields || []);
-        Object.keys(updates).forEach(key => {
-          modifiedFields.add(key);
-        });
+          const currentSettings = session.modelSettings;
 
-        const updatedSettings: AgentSettings = {
-          ...currentSettings,
-          ...updates,
-          modified_at: new Date().toISOString(),
-          modifiedFields,
-        };
+          // Track which fields are being modified
+          const modifiedFields = new Set<string>(currentSettings.modifiedFields || []);
+          Object.keys(updates).forEach(key => {
+            modifiedFields.add(key);
+          });
 
-        set({
-          sessions: get().sessions.map(s =>
-            s.id === sessionId
-              ? { ...s, modelSettings: updatedSettings, updatedAt: new Date() }
-              : s
-          )
+          const updatedSettings: AgentSettings = {
+            ...currentSettings,
+            ...updates,
+            modified_at: new Date().toISOString(),
+            modifiedFields,
+          };
+
+          sessions[sessionIndex] = {
+            ...session,
+            modelSettings: updatedSettings,
+            updatedAt: new Date(),
+          };
+
+          return { sessions };
         });
       },
 
