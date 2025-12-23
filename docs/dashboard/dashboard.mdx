@@ -101,43 +101,38 @@ Sidebar tabs for Projects, Models, Clusters, Playground, API Keys, Agents, Obser
 
 ### 4.3 Review total requests trend
 
-1. Locate the **Total Requests** card in the upper grid.
+1. Locate the Total Requests card in the upper grid.
 2. Read the formatted count and delta percentage for the last 7 days (week-over-week delta).
 3. Use the sparkline (daily points) to see the past week’s trajectory; open Observability for per-request detail.
 
 ### 4.4 Inspect API calls by project
 
-1. Open the **API Calls** chart.
+1. Open the API Calls chart.
 2. Pick a time range via the Segmented control.
 3. Review bar heights per project and the Avg. delta chip to spot increases or regressions.
 
 ### 4.5 Monitor latency and throughput
 
-1. Open the **Latency** and **Throughput** charts.
+1. Open the Latency and Throughput charts.
 2. Select a time window to update values.
 3. Use the Avg. delta chips (green/red) to decide whether to route traffic, scale clusters, or inspect Observability for slow projects.
 
 ### 4.6 Track model usage and token mix
 
-1. Open **Model Usage** to see the top five models by usage for the selected window.
-2. Switch to **Token Metrics** to compare input vs output tokens for the same top models.
-3. Use the delta chips to judge cost/efficiency trends, especially for local CPU-first deployments vs cloud endpoints.
+1. Open Model Usage to see the top five models by usage for the selected window.
+2. Switch to Token Metrics to compare input vs output tokens for the same top models.
+3. Use the delta chips to judge cost/efficiency trends, especially for local deployments vs cloud endpoints.
 
 ### 4.7 Compare model accuracy
 
-1. Open **Accuracy** and confirm “For the top 5 models” caption.
-2. Review benchmark bars (MMLU, ARC-C, GSM8K, Math, HumanEval) per model (data from `/models/top-leaderboards`).
+1. Open Accuracy and confirm “For the top 5 models” caption.
+2. Review benchmark bars (MMLU, ARC-C, GSM8K, Math, HumanEval) per model.
 3. Use insights to adjust routing weights, evaluation plans, or guardrails for cloud and local variants.
 
 ### 4.8 Interpret readiness cards
 
-1. Scan **Endpoints**, **Clusters**, and **Projects** cards for totals and colored tags.
+1. Scan Endpoints, Clusters, and Projects cards for totals and other details.
 2. Use running vs inactive counts to prioritize cluster remediation or endpoint restarts before traffic surges.
-
-### 4.9 Troubleshoot empty charts
-
-1. If a chart shows a placeholder, verify data exists for the selected time window and filters.
-2. Use Observability to confirm requests are reaching the platform; refresh the dashboard after underlying data flows.
 
 ## 5. FAQ
 
