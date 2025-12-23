@@ -172,14 +172,11 @@ class OTelBridge:
         api_client = None
         try:
             # Parse kubeconfig
-            if isinstance(kubeconfig, str):
-                kubeconfig_dict = yaml.safe_load(kubeconfig)
-            else:
-                kubeconfig_dict = kubeconfig
+            kubeconfig_dict = yaml.safe_load(kubeconfig) if isinstance(kubeconfig, str) else kubeconfig
 
             # Create API client configuration
             config = Configuration()
-            loader = client.ApiClient(configuration=config)
+            _ = client.ApiClient(configuration=config)  # Initialize API client
 
             # Set up from kubeconfig dict
             contexts = kubeconfig_dict.get("contexts", [])

@@ -179,8 +179,8 @@ const NodeRow = ({ ip, data, clusterId }: { data: Node; ip: string; clusterId: s
   const handleRowClick = () => {
     router.push(`/home/clusters/${clusterId}/nodes/${data.hostname}`);
   };
-  // Check for HPU devices in the devices array
-  const hasHPU = data?.devices?.some((d: any) => d.type === 'hpu' || d.device_config?.type === 'hpu');
+  // Check for HPU and GPU devices
+  const hasHPU = data?.hpu && data.hpu.capacity > 0;
   const hasGPU = data?.gpu && data.gpu.capacity > 0;
 
   const tagData = [

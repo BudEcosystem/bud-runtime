@@ -577,7 +577,7 @@ const NodeDetail: React.FC = () => {
               />
               <StatCard
                 title="Disk"
-                value={nodeMetrics.capacity?.disk ?? "N/A"}
+                value={nodeMetrics.capacity?.ephemeral_storage ?? "N/A"}
                 subtitle=""
                 icon={<HardDrive size={18} />}
                 color="#965CDE"

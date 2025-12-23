@@ -288,10 +288,10 @@ const GuageCharts = ({
         <GuageChart
           data={{
             percentage: Number(
-              metrics?.cluster_summary?.[field]?.[percentage]?.toFixed(2) ?? 0,
+              (metrics?.cluster_summary?.[field]?.[percentage] ?? 0).toFixed(2),
             ),
             average: Number(
-              metrics?.cluster_summary?.[field]?.[average]?.toFixed(2) ?? 0,
+              (metrics?.cluster_summary?.[field]?.[average] ?? 0).toFixed(2),
             ),
           }}
         />
