@@ -21,7 +21,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Deque, Dict, Optional
+from typing import Any, Deque, Dict, Optional
 
 import numpy as np
 import psutil
@@ -110,7 +110,7 @@ class ThrottleDetector:
         # History tracking per device
         self._device_history: Dict[str, Deque[DeviceMetrics]] = {}
         self._last_sample_time: Dict[str, float] = {}
-        self._last_io_counters: Dict[str, psutil._common.sdiskio] = {}
+        self._last_io_counters: Dict[str, Any] = {}
 
         # Baseline latency tracking
         self._baseline_latency: Dict[str, float] = {}

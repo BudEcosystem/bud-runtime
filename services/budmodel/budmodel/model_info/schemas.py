@@ -68,6 +68,18 @@ class VisionConfig(BaseModel):
     torch_dtype: Optional[str] = None
 
 
+class AudioConfig(BaseModel):
+    """Audio encoder configuration for speech/audio models."""
+
+    num_layers: Optional[int] = None
+    hidden_size: Optional[int] = None
+    num_attention_heads: Optional[int] = None
+    num_mel_bins: Optional[int] = None
+    sample_rate: Optional[int] = None
+    max_source_positions: Optional[int] = None
+    torch_dtype: Optional[str] = None
+
+
 class EmbeddingConfig(BaseModel):
     embedding_dimension: Optional[int] = None
 
@@ -85,6 +97,7 @@ class ModelArchitecture(BaseModel):
     kv_cache_size: Optional[int] = None
     text_config: Optional[LLMConfig] = None
     vision_config: Optional[VisionConfig] = None
+    audio_config: Optional[AudioConfig] = None
     embedding_config: Optional[EmbeddingConfig] = None
 
 

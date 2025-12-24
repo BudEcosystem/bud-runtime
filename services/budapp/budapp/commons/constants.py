@@ -179,10 +179,13 @@ class ModelModalityEnum(Enum):
 
     Attributes:
         LLM (str): Represents Large Language Models for text generation and processing.
+        MLLM (str): Represents Multi-Modal LLMs with vision capability.
         IMAGE (str): Represents image-related models for tasks like generation or analysis.
         EMBEDDING (str): Represents models that create vector embeddings of input data.
         TEXT_TO_SPEECH (str): Represents models that convert text to spoken audio.
         SPEECH_TO_TEXT (str): Represents models that transcribe spoken audio to text.
+        AUDIO_LLM (str): Represents audio-input LLMs (e.g., Qwen2-Audio, Ultravox).
+        OMNI (str): Represents omni-modal models with audio + vision + text (e.g., Qwen2.5-Omni).
     """
 
     LLM = "llm"
@@ -193,6 +196,11 @@ class ModelModalityEnum(Enum):
     SPEECH_TO_TEXT = "speech_to_text"
     LLM_EMBEDDING = "llm_embedding"
     MLLM_EMBEDDING = "mllm_embedding"
+    # Audio-capable LLMs
+    AUDIO_LLM = "audio_llm"
+    AUDIO_LLM_TTS = "audio_llm_tts"  # Audio LLM with TTS output
+    OMNI = "omni"
+    OMNI_TTS = "omni_tts"  # Omni model with TTS output
 
 
 class AddModelModalityEnum(Enum):
@@ -207,6 +215,8 @@ class AddModelModalityEnum(Enum):
         EMBEDDING (str): Represents models that create vector embeddings of input data.
         TEXT_TO_SPEECH (str): Represents models that convert text to spoken audio.
         SPEECH_TO_TEXT (str): Represents models that transcribe spoken audio to text.
+        AUDIO_LLM (str): Represents audio-input LLMs (e.g., Qwen2-Audio, Ultravox).
+        OMNI (str): Represents omni-modal models with audio + vision + text.
     """
 
     LLM = "llm"
@@ -215,6 +225,8 @@ class AddModelModalityEnum(Enum):
     EMBEDDING = "embedding"
     TEXT_TO_SPEECH = "text_to_speech"
     SPEECH_TO_TEXT = "speech_to_text"
+    AUDIO_LLM = "audio_llm"
+    OMNI = "omni"
 
 
 ModelSourceEnum = create_dynamic_enum(
