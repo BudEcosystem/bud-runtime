@@ -22,4 +22,6 @@ in
     flags = [ "-L" ];
     dates = "hourly";
   };
+
+  facter.reportPath = ./facter.json;
 }
