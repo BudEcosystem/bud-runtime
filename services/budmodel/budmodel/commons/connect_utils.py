@@ -312,6 +312,38 @@ class BudConnectMapper:
             elif modality.lower() in ["audio_output", "tts", "text-to-speech"]:
                 if "audio_output" not in budconnect_modality:
                     budconnect_modality.append("audio_output")
+            elif modality.lower() in ["speech_to_text", "speech-to-text", "asr"]:
+                # Speech-to-text models (e.g., Whisper): audio input, text output
+                if "audio_input" not in budconnect_modality:
+                    budconnect_modality.append("audio_input")
+                if "text_output" not in budconnect_modality:
+                    budconnect_modality.append("text_output")
+            elif modality.lower() in ["audio_llm", "audio-llm"]:
+                # Audio LLM hybrids (e.g., Qwen2-Audio): audio + text input/output
+                if "audio_input" not in budconnect_modality:
+                    budconnect_modality.append("audio_input")
+                if "text_input" not in budconnect_modality:
+                    budconnect_modality.append("text_input")
+                if "text_output" not in budconnect_modality:
+                    budconnect_modality.append("text_output")
+            elif modality.lower() == "omni":
+                # Omni models (e.g., Qwen2.5-Omni): audio + vision + text
+                if "audio_input" not in budconnect_modality:
+                    budconnect_modality.append("audio_input")
+                if "image_input" not in budconnect_modality:
+                    budconnect_modality.append("image_input")
+                if "text_input" not in budconnect_modality:
+                    budconnect_modality.append("text_input")
+                if "text_output" not in budconnect_modality:
+                    budconnect_modality.append("text_output")
+            elif modality.lower() == "mllm":
+                # Multi-modal LLM with vision: image + text input/output
+                if "image_input" not in budconnect_modality:
+                    budconnect_modality.append("image_input")
+                if "text_input" not in budconnect_modality:
+                    budconnect_modality.append("text_input")
+                if "text_output" not in budconnect_modality:
+                    budconnect_modality.append("text_output")
             else:
                 # Default to text for unknown modalities
                 logger.warning("Unknown modality '%s', defaulting to text_input/text_output", modality)
