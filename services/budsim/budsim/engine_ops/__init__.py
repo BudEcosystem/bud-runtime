@@ -22,7 +22,7 @@ from budmicroframe.commons import logging
 from transformers import AutoConfig
 
 from ..commons.config import app_settings
-from ..engine_ops import litellm, sglang, vllm
+from ..engine_ops import latentbud, litellm, sglang, vllm
 from .base import BaseEngineArgs, BaseEngineCompatibility
 from .utils import fetch_compatible_engines
 
@@ -34,12 +34,14 @@ _engine_compatibility_checks = {
     "vllm": vllm.EngineCompatibility,
     "sglang": sglang.EngineCompatibility,
     "litellm": litellm.EngineCompatibility,
+    "latentbud": latentbud.EngineCompatibility,
 }
 
 _engine_args = {
     "vllm": vllm.EngineArgs,
     "sglang": sglang.EngineArgs,
     "litellm": litellm.EngineArgs,
+    "latentbud": latentbud.EngineArgs,
 }
 
 
@@ -149,12 +151,13 @@ def get_minimal_engine_args_and_envs(engine_name: str, engine_args: Optional[Dic
 
     This function generates only the essential arguments and environment variables
     for deployment, excluding parameters that weren't optimized in heuristic mode.
-    Only includes: model, tensor-parallel-size, pipeline-parallel-size, and target_device.
+
+    For vLLM/SGLang: model, tensor-parallel-size, pipeline-parallel-size, target_device
+    For LatentBud: model-id, max-batch-tokens, batch-strategy, lengths-via-tokenize, target_device
 
     Args:
         engine_name (str): The name of the engine.
-        engine_args (Dict[str, Any], optional): The engine arguments containing
-            model, tensor_parallel_size, pipeline_parallel_size, target_device.
+        engine_args (Dict[str, Any], optional): The engine arguments.
 
     Returns:
         Dict[str, Any]: A dictionary containing minimal 'args' and 'envs'.
@@ -165,25 +168,48 @@ def get_minimal_engine_args_and_envs(engine_name: str, engine_args: Optional[Dic
     minimal_args = {}
     minimal_envs = {}
 
-    # Define mappings from internal arg names to command-line arg names
-    ARG_MAPPING = {
-        "model": "model",
-        "tensor_parallel_size": "tensor-parallel-size",
-        "pipeline_parallel_size": "pipeline-parallel-size",
-    }
+    if engine_name == "latentbud":
+        # LatentBud-specific minimal args for embedding models
+        LATENTBUD_ARG_MAPPING = {
+            "model": "model-id",
+            "max_batch_tokens": "max-batch-tokens",
+            "batch_strategy": "batch-strategy",
+            "lengths_via_tokenize": "lengths-via-tokenize",
+        }
+        for source_key, dest_key in LATENTBUD_ARG_MAPPING.items():
+            if source_key in engine_args:
+                value = engine_args[source_key]
+                # Convert boolean to string for CLI
+                if dest_key == "lengths-via-tokenize":
+                    value = "true" if value else "false"
+                minimal_args[dest_key] = value
 
-    for source_key, dest_key in ARG_MAPPING.items():
-        if source_key in engine_args:
-            minimal_args[dest_key] = engine_args[source_key]
+        # Include target device as environment variable
+        if "target_device" in engine_args:
+            minimal_envs["LATENTBUD_DEVICE"] = engine_args["target_device"]
+    else:
+        # vLLM/SGLang arg mappings
+        ARG_MAPPING = {
+            "model": "model",
+            "tensor_parallel_size": "tensor-parallel-size",
+            "pipeline_parallel_size": "pipeline-parallel-size",
+        }
+        for source_key, dest_key in ARG_MAPPING.items():
+            if source_key in engine_args:
+                minimal_args[dest_key] = engine_args[source_key]
 
-    # Include target device as environment variable
-    if engine_name == "vllm" and "target_device" in engine_args:
-        minimal_envs["VLLM_TARGET_DEVICE"] = engine_args["target_device"]
+        # Include target device as environment variable for vLLM
+        if engine_name == "vllm" and "target_device" in engine_args:
+            minimal_envs["VLLM_TARGET_DEVICE"] = engine_args["target_device"]
+
     return {"args": minimal_args, "envs": minimal_envs}
 
 
 def get_compatible_engines(
-    model_name: str, model_uri: Optional[str] = None, proprietary_only: bool = False
+    model_name: str,
+    model_uri: Optional[str] = None,
+    proprietary_only: bool = False,
+    model_endpoints: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     """Retrieve a list of compatible engines for a given model.
 
@@ -195,6 +221,7 @@ def get_compatible_engines(
         model_name (str): The name of the model for which compatible engines are being retrieved.
         model_uri (Optional[str]): The URI of the model (e.g., "mistralai/Mistral-7B-Instruct-v0.3").
         proprietary_only (bool): Whether to return only proprietary engines.
+        model_endpoints (Optional[str]): Comma-separated endpoint types (e.g., "EMBEDDING", "LLM").
 
     Returns:
         List[Dict[str, str]]: A list of dictionaries containing engine information.
@@ -202,7 +229,9 @@ def get_compatible_engines(
     try:
         config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         for arch in config.architectures:
-            compatible_engines = fetch_compatible_engines(model_architecture=arch, model_uri=model_uri)
+            compatible_engines = fetch_compatible_engines(
+                model_architecture=arch, model_uri=model_uri, model_endpoints=model_endpoints
+            )
             logger.info(f"Compatible engines for {model_name}: {compatible_engines}")
             if compatible_engines:
                 return compatible_engines

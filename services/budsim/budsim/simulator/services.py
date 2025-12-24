@@ -1131,6 +1131,7 @@ class SimulationService:
         target_name: Optional[str] = None,
         proprietary_only: bool = False,
         cluster_id: Optional[uuid.UUID] = None,
+        model_endpoints: Optional[str] = None,
     ) -> List[Dict[str, str]]:
         """Identify compatible engines for a given model and cluster configuration.
 
@@ -1147,6 +1148,7 @@ class SimulationService:
             target_name (Optional[str], optional): Target name for notifications. Defaults to None.
             proprietary_only (bool, optional): Whether to check only proprietary engines. Defaults to False.
             cluster_id (Optional[uuid.UUID], optional): Specific cluster ID to check. Defaults to None.
+            model_endpoints (Optional[str], optional): Comma-separated endpoint types (e.g., "EMBEDDING", "LLM").
 
         Returns:
             List[Dict[str, str]]: List of compatible engine configurations, each containing
@@ -1180,7 +1182,9 @@ class SimulationService:
                 target_name=target_name,
             )
 
-            compatible_engines = get_compatible_engines(pretrained_model_uri, model_uri, proprietary_only)
+            compatible_engines = get_compatible_engines(
+                pretrained_model_uri, model_uri, proprietary_only, model_endpoints
+            )
 
             if len(compatible_engines) == 0:
                 raise ValueError("No compatible engines found")
@@ -1814,6 +1818,7 @@ class SimulationService:
             request.source,
             proprietary_only=request.is_proprietary_model,
             cluster_id=request.cluster_id,
+            model_endpoints=request.model_endpoints,
         )
         topk_engine_configs = self.get_topk_engine_configs_per_cluster(
             workflow_id, request, compatible_engines, cluster_info, notification_request, cluster_id=request.cluster_id
@@ -2041,6 +2046,7 @@ class SimulationService:
             name=device_type,
             labels=labels,
             type=template_result.device_type,
+            engine_type=template_result.engine,  # Engine type for Helm chart selection
             tp_size=tp_size,
             pp_size=pp_size,
             envs=args_and_envs.get("envs", {}),

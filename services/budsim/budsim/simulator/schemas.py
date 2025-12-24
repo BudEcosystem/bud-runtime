@@ -115,6 +115,9 @@ class ClusterRecommendationRequest(CloudEventBase):
     hardware_mode: Optional[HardwareMode] = Field(
         default=HardwareMode.DEDICATED, description="Hardware utilization mode: dedicated or shared"
     )
+    model_endpoints: Optional[str] = Field(
+        None, description="Model endpoint type for engine selection (e.g., 'EMBEDDING', 'LLM', 'EMBEDDING,LLM')"
+    )
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):
@@ -250,6 +253,7 @@ class NodeGroupConfiguration(BaseModel):
     name: str  # Device group name (e.g., "A100", "V100")
     labels: Dict[str, str] = Field(default_factory=dict)  # Kubernetes labels for device matching
     type: str  # Hardware type: "cpu", "cuda", "hpu"
+    engine_type: str = "vllm"  # Engine type: "vllm", "sglang", "latentbud", "litellm"
     tp_size: int = 1  # Tensor parallelism size
     pp_size: int = 1  # Pipeline parallelism size
     envs: Dict[str, Any] = Field(default_factory=dict)
