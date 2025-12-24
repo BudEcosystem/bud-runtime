@@ -111,9 +111,9 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 
 ### 3.8 Performance benchmarks
 
-- Benchmark suites for throughput (tokens/s), latency percentiles, and memory footprint across CPU and GPU targets.
-- Compare cloud vs local vs quantized backends side-by-side to inform routing weights and autoscaling settings.
-- Publish reports to projects so app teams can select the best-fit model for their workload profile.
+- Performance Benchmark History lists each run with model, cluster, node type, vendor, status, concurrent requests, TPOT, and TTFT, plus search and filter controls.
+- Start a new benchmark from the history view using Run Another Benchmark, then track processing status alongside existing entries.
+- Use the collected TPOT/TTFT and concurrency metrics to compare how backends perform on different clusters and hardware before selecting deployment targets..
 
 ## 4. How-to Guides
 
@@ -172,7 +172,8 @@ Analytics show latency, throughput, token usage, and cost so you can pick the ri
 
 ### 4.9 Run a performance benchmark
 
-1. Open the local model detail page and select Performance tab.
+1. Open Benchmark History from the Models module.
+1. 
 2. Choose Run Performance Benchmark.
 3. Type Benchmark name, tags, description, concurrent request, eval with dataset/configuration.
 4. Choose datasets and cluster for dataset based benchmark run.
