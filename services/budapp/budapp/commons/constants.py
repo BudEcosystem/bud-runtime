@@ -775,10 +775,14 @@ class ScalingTypeEnum(StrEnum):
 class ScalingMetricEnum(StrEnum):
     """Scaling metric types."""
 
+    # LLM metrics (vLLM, SGLang)
     TIME_TO_FIRST_TOKENS_SECONDS = "bud:time_to_first_token_seconds_average"
     E2E_REQUEST_LATENCY_SECONDS = "bud:e2e_request_latency_seconds_average"
     GPU_CACHE_USAGE_PERC = "bud:gpu_cache_usage_perc_average"
     TIME_PER_OUTPUT_TOKEN_SECONDS = "bud:time_per_output_token_seconds_average"
+    # Embedding metrics (LatentBud)
+    EMBEDDING_BATCH_QUEUE_SIZE = "embedding_batch_queue_size"
+    EMBEDDING_REQUESTS_ACTIVE = "embedding_requests_active"
 
 
 class ProxyProviderEnum(StrEnum):

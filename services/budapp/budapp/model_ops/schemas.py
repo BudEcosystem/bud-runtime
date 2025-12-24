@@ -1050,6 +1050,7 @@ class DeploymentTemplateCreate(BaseModel):
 class ScalingSpecification(BaseModel):
     """Scaling specification schema."""
 
+    enabled: bool = Field(default=False)
     scalingType: ScalingTypeEnum = Field(...)
     scalingMetric: ScalingMetricEnum = Field(...)
     scalingValue: int = Field(ge=0)
