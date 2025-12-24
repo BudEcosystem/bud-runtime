@@ -64,23 +64,16 @@
         host: system:
         lib.nixosSystem {
           inherit system;
-          modules =
-            let
-              facter_report_path = ./infra/nixos/${host}/facter.json;
-            in
-            [
-              {
-                networking.hostName = lib.mkForce host;
-              }
-              self.nixosModules.common
-              nixos-facter-modules.nixosModules.facter
-              ./infra/nixos/${host}/configuration.nix
-            ]
-            ++ lib.optional (builtins.pathExists (builtins.toString facter_report_path)) [
-              {
-                facter.reportPath = ./infra/nixos/${host}/facter.json;
-              }
-            ];
+          modules = [
+            {
+              networking.hostName = lib.mkForce host;
+            }
+
+            self.nixosModules.common
+            nixos-facter-modules.nixosModules.facter
+
+            ./infra/nixos/${host}/configuration.nix
+          ];
         };
     in
     {
