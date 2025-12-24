@@ -526,11 +526,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1766139327,
-        "narHash": "sha256-Qe+ngq5pnQ9K+z0XVew129hp/YojvtZmc8mfgEhKdWk=",
+        "lastModified": 1766568344,
+        "narHash": "sha256-2C/OXAa1TtlRiJDpbag0rj1Nt8zuXbQiznKluxGt2LA=",
         "owner": "sinanmohd",
         "repo": "scid",
-        "rev": "28b48953c3bdc2d7533c0593b0d18ee92767f74d",
+        "rev": "53b010798d8013f01fcee4ebe7e35718f342d66c",
         "type": "github"
       },
       "original": {
