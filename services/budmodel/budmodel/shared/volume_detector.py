@@ -19,7 +19,7 @@
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import psutil
 from budmicroframe.commons import logging
@@ -92,11 +92,11 @@ class VolumeDetector:
 
     def __init__(self) -> None:
         """Initialize volume detector."""
-        self._partition_cache: Optional[Dict[str, psutil._common.sdiskpart]] = None
+        self._partition_cache: Optional[Dict[str, Any]] = None
         self._cache_time = 0.0
         self.cache_ttl = 30.0  # Cache partitions for 30 seconds
 
-    def _get_disk_partitions(self, force_refresh: bool = False) -> Dict[str, psutil._common.sdiskpart]:
+    def _get_disk_partitions(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Get disk partitions with caching."""
         import time
 
@@ -157,7 +157,7 @@ class VolumeDetector:
             logger.warning(f"Error detecting volume for {path}: {e}")
             return self._create_unknown_volume_info(path)
 
-    def _find_partition_for_path(self, path: str) -> Optional[psutil._common.sdiskpart]:
+    def _find_partition_for_path(self, path: str) -> Optional[Any]:
         """Find the partition that contains the given path."""
         partitions = self._get_disk_partitions()
 
@@ -173,7 +173,7 @@ class VolumeDetector:
 
         return best_match
 
-    def _classify_storage_type(self, partition: psutil._common.sdiskpart) -> StorageType:
+    def _classify_storage_type(self, partition: Any) -> StorageType:
         """Classify the storage type based on filesystem and device information."""
         fstype = partition.fstype.lower()
         device = partition.device.lower()
@@ -205,7 +205,7 @@ class VolumeDetector:
 
         return StorageType.UNKNOWN
 
-    def _get_device_name(self, partition: psutil._common.sdiskpart) -> Optional[str]:
+    def _get_device_name(self, partition: Any) -> Optional[str]:
         """Extract device name for I/O monitoring."""
         device = partition.device
 
