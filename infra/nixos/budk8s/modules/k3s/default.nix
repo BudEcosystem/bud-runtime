@@ -27,6 +27,9 @@
     ];
   };
 
+  # for checkpoint/stove8s
+  systemd.services.k3s.path = [ pkgs.criu ];
+
   services.k3s = {
     gracefulNodeShutdown.enable = true;
     enable = true;
