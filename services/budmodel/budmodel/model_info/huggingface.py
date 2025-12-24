@@ -456,7 +456,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
         # Pattern 7: Check architectures for audio keywords
         for arch in config.get("architectures", []):
             arch_lower = arch.lower()
-            if any(kw in arch_lower for kw in ["whisper", "audio", "speech", "voxtral"]):
+            if any(kw in arch_lower for kw in ["whisper", "audio", "speech", "voxtral", "omni"]):
                 audio_input = True
                 break
 
