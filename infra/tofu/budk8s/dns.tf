@@ -59,6 +59,12 @@ locals {
       ]
     ]),
   ))
+  ingress_ipv4 = merge(module.azure.ip.ingress.v4, {
+    "primary" = module.azure.ip.primary.v4
+  })
+  ingress_ipv6 = merge(module.azure.ip.ingress.v6, {
+    "primary" = module.azure.ip.primary.v6
+  })
 
   ingress_domain = "ingress.k8s.${var.zone.domain}"
 }
@@ -81,7 +87,7 @@ resource "cloudflare_dns_record" "primary_ipv6" {
 }
 
 resource "cloudflare_dns_record" "ingress_ipv4" {
-  for_each = module.azure.ip.ingress.v4
+  for_each = local.ingress_ipv4
   zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
@@ -90,7 +96,7 @@ resource "cloudflare_dns_record" "ingress_ipv4" {
   proxied  = false
 }
 resource "cloudflare_dns_record" "ingerss_ipv6" {
-  for_each = module.azure.ip.ingress.v6
+  for_each = local.ingress_ipv6
   zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
