@@ -59,15 +59,6 @@ locals {
       ]
     ]),
   ))
-  ingress_ipv4 = { for ip in toset(concat(
-    [for _, ip in module.azure.ip.ingress.v4 : ip],
-    [module.azure.ip.primary.v4]
-  )) : ip => ip }
-  ingress_ipv6 = { for ip in toset(concat(
-    [for _, ip in module.azure.ip.ingress.v6 : ip],
-    [module.azure.ip.primary.v6]
-    )) : ip => ip
-  }
 
   ingress_domain = "ingress.k8s.${var.zone.domain}"
 }
@@ -90,21 +81,21 @@ resource "cloudflare_dns_record" "primary_ipv6" {
 }
 
 resource "cloudflare_dns_record" "ingress_ipv4" {
-  for_each = local.ingress_ipv4
+  for_each = module.azure.ip.ingress.v4
   zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
   type     = "A"
-  content  = each.key
+  content  = each.value
   proxied  = false
 }
 resource "cloudflare_dns_record" "ingerss_ipv6" {
-  for_each = local.ingress_ipv6
+  for_each = module.azure.ip.ingress.v6
   zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
   type     = "AAAA"
-  content  = each.key
+  content  = each.value
   proxied  = false
 }
 resource "cloudflare_dns_record" "services" {
