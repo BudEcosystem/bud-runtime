@@ -182,6 +182,26 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
 
 /// A handler for the OpenAI-compatible inference endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "gateway_observability",
+    skip_all,
+    fields(
+        otel.name = "gateway_observability",
+        // Request fields
+        chat_inference.function_name = tracing::field::Empty,
+        chat_inference.variant_name = tracing::field::Empty,
+        chat_inference.episode_id = tracing::field::Empty,
+        chat_inference.input = tracing::field::Empty,
+        chat_inference.tags = tracing::field::Empty,
+        chat_inference.extra_body = tracing::field::Empty,
+        chat_inference.tool_params = tracing::field::Empty,
+        chat_inference.processing_time_ms = tracing::field::Empty,
+        // Response fields
+        chat_inference.id = tracing::field::Empty,
+        chat_inference.output = tracing::field::Empty,
+        chat_inference.inference_params = tracing::field::Empty,
+    )
+)]
 pub async fn inference_handler(
     State(AppStateData {
         config,
@@ -643,6 +663,13 @@ pub async fn inference_handler(
             mut result,
             write_info,
         } => {
+            // Record span attributes for observability
+            if let Some(ref wi) = write_info {
+                super::observability::record_resolved_input(&wi.resolved_input);
+                super::observability::record_metadata(&wi.metadata);
+            }
+            super::observability::record_inference_result(&result);
+
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
                 InferenceResult::Chat(chat_result) => chat_result
