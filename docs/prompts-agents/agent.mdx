@@ -1,6 +1,6 @@
 ---
 title: "Agents"
-description: "Agent module capabilities, workflows, and usage patterns in Bud AI Foundry"
+description: "Agent module capabilities, workflows, and usage patterns in Bud AI Foundry."
 ---
 
 ## 1. Description
@@ -36,61 +36,45 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 ### 3.1 Global agent catalog and discovery
 
 - Agents home lists prompt/agent cards with model icons, descriptions, tags, and timestamps for quick scanning.
-
 - Header search filters by name with debounce to refine results rapidly.
-
 - Rich filters for Type (Prompt or Agent), Category, Author, Tags, and rating range help teams segment large libraries; applied filters render as removable chips.
-
 - Grid cards include hover menus for Edit, and “See more” popovers expand longer descriptions without leaving the page.
 
 ### 3.2 Project-scoped Agents tab
 
 - Inside a project detail page, the Agents tab renders a sortable table with columns for Prompt Name, Version, Type, Status, Model Name, Modality, and Created On.
-
 - Table header offers search by name plus a Create New button (permission-gated) that jumps straight into the multi-step agent workflow for the current project.
-
 - Row actions include **Use this agent** (opens integration snippets), inline Edit (loads the agent into the drawer for updates), and Delete with confirmation safeguards.
-
 - Sorting on name, status, and created date helps teams prioritize active or recent agents.
 
 ### 3.3 Agent creation and editing workflow
 
 - Create New/Agent buttons open a guided drawer that seeds a workflow ID, lets you pick project context, choose agent type, select a backing model or deployment, and configure prompts or parameters before saving.
-
 - Structured and unstructured inputs/outputs are supported: add input and output variables (string, number, boolean, array, object) or keep the prompt freeform. Structured mode can be toggled per session to enforce schemas across runs.
-
 - OAuth-aware flows can resume sessions after connector authorization, restoring model selections, schema variables, and workflow steps automatically.
-
 - Edits reopen the drawer with existing content preloaded, so teams can adjust prompts, tags, or routing targets without rebuilding from scratch.
 
 ### 3.4 Tooling and MCP connectors
 
 - The right-rail Tools panel lists available MCP-compatible connectors (e.g., Asana, Linear, Notion, GitHub, Atlassian) with search and categories.
-
 - Connecting a tool opens a grant-type selector (client credentials or authorization code) so you can authorize MCP endpoints securely within the agent builder.
-
 - Once connected, tools can be invoked in agent workflows alongside prompts and variables, enabling end-to-end orchestration without leaving the canvas.
 
 ### 3.5 Versions tab in agent detail
 
 - Agent detail pages load a Versions tab showing the current default version plus a Previous Versions list.
-
 - **\+ Version** clones context from the base prompt and opens the drawer to configure a new version without losing lineage.
-
 - Edit on any version fetches deployment metadata when available (endpoint name mapping) so updates stay aligned with the correct backend.
-
 - Version cards surface created/updated timestamps and endpoint names to keep operational history visible.
 
 ### 3.6 Integration and reuse
 
 - “Use this agent” exposes cURL, Python, and JavaScript snippets for rapid embedding in downstream apps or routing policies.
-
 - Table navigation routes to agent detail pages for deeper auditability, including forthcoming tabs for cache, logs/traces, and settings as they roll out.
 
 ### 3.7 Permissions and safety rails
 
 - Create/Edit/Delete actions respect Bud RBAC (Project Manage or Model Manage) so only authorized users can change production agents.
-
 - Delete confirmations prevent accidental removals and ensure dependent workflows can be checked before deletion.
 
 ## 4. How-to Guides
@@ -98,71 +82,54 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 ### 4.1 Accessing the Agents module
 
 1. Log in to Bud AI Foundry.
-
 2. Open **Agents** from the sidebar to view the global catalog of agents and prompts.
-
 3. Use the search bar to filter by name or open the filter popover to narrow by Type, Category, Author, Tags, or rating range.
 
 ### 4.2 Create an agent from the global catalog
 
 1. On the Agents page, click **Agent** (plus button) in the header.
-
 2. The creation drawer starts a workflow for you; pick the project (if prompted), agent type, and backing model or deployment.
-
 3. Configure prompts and parameters, then save to add the agent to the catalog.
 
 ### 4.3 Filter and search agents
 
 1. In the Agents page header, type a name in the search box to narrow results.
-
 2. Click the filter icon to open the filter panel.
-
 3. Set Type, Category, Author, Tags, and rating min/max; applied filters appear as chips you can remove individually.
-
 4. Click **Apply** to refresh the grid; **Reset** clears all filters.
 
 ### 4.4 Create an agent inside a project
 
 1. Open a project detail page and select the **Agents** tab.
-
 2. Click **Create New** to launch the multi-step agent workflow scoped to the project.
-
 3. Complete the steps (type, model/deployment, prompt configuration) and save; the new agent appears in the table.
 
 ### 4.5 Use an existing agent
 
 1. From the project Agents tab, hover over a row and click **Use this agent**.
-
 2. Copy cURL, Python, or JavaScript snippets from the drawer to integrate the agent into applications or routes.
 
 ### 4.6 Edit an agent
 
 1. From the Agents page (global) or project Agents tab, open the row menu (Edit pencil or dropdown).
-
 2. The agent drawer preloads existing content; adjust prompts, tags, or model selections.
-
 3. Save to update the catalog entry; changes propagate to the table and detail view.
 
 ### 4.7 Delete an agent
 
 1. In the project Agents tab, hover over the agent row and click the delete icon.
-
 2. Confirm the warning; the table refreshes after successful removal.
 
 ### 4.8 View and add versions
 
 1. Click an agent row to open its detail page, then select the **Versions** tab.
-
 2. Review the **Current Version** card and **Previous Version** list for timestamps and endpoint alignment.
-
 3. Click **\+ Version** to clone the prompt into a new version; configure details in the drawer and save.
 
 ### 4.9 Edit an existing version
 
 1. In the Versions tab, click **Edit** on the desired version card.
-
 2. The drawer loads version metadata and, when available, its linked deployment.
-
 3. Update prompts or deployment references and save to keep the version synchronized.
 
 ## 5. FAQ
