@@ -129,6 +129,13 @@
             ]
           },
           {
+            "group": "Agent",
+            "icon": "robot",
+            "pages": [
+              "agent/agent"
+            ]
+          },
+          {
             "group": "Prompts & Agents",
             "icon": "wand-magic-sparkles",
             "pages": [
