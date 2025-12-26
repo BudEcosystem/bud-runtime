@@ -319,6 +319,9 @@ pub async fn inference_handler(
     // Set the gateway request on params
     params.gateway_request = gateway_request;
 
+    // Capture the current span for streaming observability
+    params.observability_span = Some(tracing::Span::current());
+
     // Get the guardrail profile if model has one configured
     let (guardrail_profile_id, model_pricing) = if let Some(model_name) = &resolved_model_name {
         let models = config.models.read().await;
@@ -1710,6 +1713,7 @@ impl Params {
             extra_headers: openai_compatible_params.tensorzero_extra_headers,
             observability_metadata: None, // Will be set in the handler
             gateway_request: None,        // Will be set in the handler
+            observability_span: None,     // Will be set in the handler
         })
     }
 }

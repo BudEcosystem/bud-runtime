@@ -117,6 +117,9 @@ pub struct Params {
     /// The original request received by the gateway from the client
     #[serde(skip)]
     pub gateway_request: Option<String>,
+    /// Span for recording observability attributes (for streaming)
+    #[serde(skip)]
+    pub observability_span: Option<tracing::Span>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -154,6 +157,7 @@ struct InferenceMetadata {
     pub extra_headers: UnfilteredInferenceExtraHeaders,
     pub observability_metadata: Option<ObservabilityMetadata>,
     pub gateway_request: Option<String>,
+    pub observability_span: Option<tracing::Span>,
 }
 
 pub type InferenceCredentials = HashMap<String, SecretString>;
@@ -659,6 +663,7 @@ pub async fn inference(
                     .gateway_request
                     .clone()
                     .or(model_used_info.gateway_request),
+                observability_span: params.observability_span.clone(),
             };
 
             // Only use batcher for async writes; sync writes need direct ClickHouse access
@@ -922,6 +927,7 @@ fn create_stream(
                 extra_headers,
                 observability_metadata,
                 gateway_request,
+                observability_span,
             } = metadata;
 
             let config = config.clone();
@@ -967,6 +973,15 @@ fn create_stream(
                         extra_body,
                         extra_headers,
                     };
+
+                    // Record observability span attributes for streaming
+                    if let Some(ref span) = observability_span {
+                        let _guard = span.enter();
+                        crate::endpoints::observability::record_resolved_input(&input);
+                        crate::endpoints::observability::record_metadata(&write_metadata);
+                        crate::endpoints::observability::record_inference_result(&inference_response);
+                    }
+
                     let config = config.clone();
 
                         let clickhouse_connection_info = clickhouse_connection_info.clone();
@@ -2271,6 +2286,7 @@ mod tests {
             extra_headers: Default::default(),
             observability_metadata: None,
             gateway_request: None,
+            observability_span: None,
         };
 
         let result = prepare_response_chunk(&inference_metadata, chunk).unwrap();
@@ -2324,6 +2340,7 @@ mod tests {
             extra_headers: Default::default(),
             observability_metadata: None,
             gateway_request: None,
+            observability_span: None,
         };
 
         let result = prepare_response_chunk(&inference_metadata, chunk).unwrap();

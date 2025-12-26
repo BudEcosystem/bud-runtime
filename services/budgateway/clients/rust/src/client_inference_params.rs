@@ -114,6 +114,7 @@ impl TryFrom<ClientInferenceParams> for Params {
             extra_headers: this.extra_headers,
             observability_metadata: None,
             gateway_request: None,
+            observability_span: None,
         })
     }
 }
@@ -162,6 +163,7 @@ fn assert_params_match(client_params: ClientInferenceParams) {
         extra_headers,
         observability_metadata: None,
         gateway_request: None,
+        observability_span: None,
     };
 }
 
