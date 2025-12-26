@@ -980,6 +980,23 @@ fn create_stream(
                         crate::endpoints::observability::record_resolved_input(&input);
                         crate::endpoints::observability::record_metadata(&write_metadata);
                         crate::endpoints::observability::record_inference_result(&inference_response);
+
+                        // Record model inference span attributes for streaming
+                        match &inference_response {
+                            InferenceResult::Chat(chat_result) => {
+                                crate::endpoints::observability::record_model_inference(
+                                    &chat_result.model_inference_results,
+                                    &chat_result.inference_id,
+                                );
+                            }
+                            InferenceResult::Json(json_result) => {
+                                crate::endpoints::observability::record_model_inference(
+                                    &json_result.model_inference_results,
+                                    &json_result.inference_id,
+                                );
+                            }
+                            _ => {}
+                        }
                     }
 
                     let config = config.clone();
