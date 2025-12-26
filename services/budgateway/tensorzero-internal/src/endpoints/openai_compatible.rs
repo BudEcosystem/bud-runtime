@@ -187,7 +187,7 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
     skip_all,
     fields(
         otel.name = "gateway_observability",
-        // Request fields
+        // ChatInference request fields
         chat_inference.function_name = tracing::field::Empty,
         chat_inference.variant_name = tracing::field::Empty,
         chat_inference.episode_id = tracing::field::Empty,
@@ -196,10 +196,31 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
         chat_inference.extra_body = tracing::field::Empty,
         chat_inference.tool_params = tracing::field::Empty,
         chat_inference.processing_time_ms = tracing::field::Empty,
-        // Response fields
+        // ChatInference response fields
         chat_inference.id = tracing::field::Empty,
         chat_inference.output = tracing::field::Empty,
         chat_inference.inference_params = tracing::field::Empty,
+        // ModelInference fields (20 fields)
+        model_inference.id = tracing::field::Empty,
+        model_inference.inference_id = tracing::field::Empty,
+        model_inference.raw_request = tracing::field::Empty,
+        model_inference.raw_response = tracing::field::Empty,
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.output_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.ttft_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.system = tracing::field::Empty,
+        model_inference.input_messages = tracing::field::Empty,
+        model_inference.output = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.finish_reason = tracing::field::Empty,
+        model_inference.gateway_request = tracing::field::Empty,
+        model_inference.gateway_response = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        model_inference.guardrail_scan_summary = tracing::field::Empty,
     )
 )]
 pub async fn inference_handler(
@@ -672,6 +693,23 @@ pub async fn inference_handler(
                 super::observability::record_metadata(&wi.metadata);
             }
             super::observability::record_inference_result(&result);
+
+            // Record model inference span attributes
+            match &result {
+                InferenceResult::Chat(chat_result) => {
+                    super::observability::record_model_inference(
+                        &chat_result.model_inference_results,
+                        &chat_result.inference_id,
+                    );
+                }
+                InferenceResult::Json(json_result) => {
+                    super::observability::record_model_inference(
+                        &json_result.model_inference_results,
+                        &json_result.inference_id,
+                    );
+                }
+                _ => {}
+            }
 
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
