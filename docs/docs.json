@@ -132,6 +132,7 @@
             "group": "Prompts & Agents",
             "icon": "wand-magic-sparkles",
             "pages": [
+              "prompts-agents/agents",
               "prompts-agents/prompt-management",
               "prompts-agents/prompt-templates",
               "prompts-agents/agent-configuration",
