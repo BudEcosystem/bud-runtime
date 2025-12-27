@@ -1,0 +1,64 @@
+services:
+  budprompt-clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: budserve-$NAMESPACE-$APP_NAME-clickhouse
+    ports:
+      - "$CLICKHOUSE_HTTP_PORT:8123"
+      - "$CLICKHOUSE_NATIVE_PORT:9000"
+    volumes:
+      - budprompt_clickhouse_data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_USER=$CLICKHOUSE_USER
+      - CLICKHOUSE_PASSWORD=$CLICKHOUSE_PASSWORD
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    healthcheck:
+      test: [ "CMD", "clickhouse-client", "--query", "SELECT 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - budprompt-network
+
+  budprompt-otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: budserve-$NAMESPACE-$APP_NAME-otel-collector
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    ports:
+      - "$OTEL_GRPC_PORT:4317"
+      - "$OTEL_HTTP_PORT:4318"
+    environment:
+      - CLICKHOUSE_USER=$CLICKHOUSE_USER
+      - CLICKHOUSE_PASSWORD=$CLICKHOUSE_PASSWORD
+      - CLICKHOUSE_DATABASE=$CLICKHOUSE_DATABASE
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    depends_on:
+      budprompt-clickhouse:
+        condition: service_healthy
+    networks:
+      - budprompt-network
+
+  budprompt-grafana:
+    image: grafana/grafana:latest
+    container_name: budserve-$NAMESPACE-$APP_NAME-grafana
+    ports:
+      - "$GRAFANA_PORT:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
+      - GF_SECURITY_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD
+    volumes:
+      - budprompt_grafana_data:/var/lib/grafana
+    depends_on:
+      budprompt-clickhouse:
+        condition: service_healthy
+    networks:
+      - budprompt-network
+
+volumes:
+  budprompt_clickhouse_data:
+  budprompt_grafana_data:
+
+networks:
+  budprompt-network:
+    name: budserve-$NAMESPACE-$APP_NAME
+    driver: bridge

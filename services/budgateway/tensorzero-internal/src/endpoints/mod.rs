@@ -11,6 +11,7 @@ pub mod feedback;
 pub mod inference;
 pub mod model_resolution;
 pub mod object_storage;
+pub mod observability;
 pub mod openai_compatible;
 pub mod status;
 

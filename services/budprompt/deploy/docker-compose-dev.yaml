@@ -1,5 +1,6 @@
 include:
   - ./docker-compose-redis.yaml
+  - ./docker-compose-otel.yaml
   - ./docker-compose-psql.yaml
 
 services:
