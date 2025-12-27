@@ -9,6 +9,8 @@ use metrics::histogram;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uaparser::{Parser, UserAgentParser};
 use uuid::Uuid;
 
@@ -27,7 +29,79 @@ pub async fn analytics_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, Error> {
-    tracing::debug!("Analytics middleware called for {} {}", method, uri.path());
+    // Create span and set parent context from incoming headers (distributed tracing)
+    let span = tracing::info_span!(
+        "gateway_analytics",
+        otel.name = "gateway_analytics",
+        // Core
+        gateway_analytics.id = tracing::field::Empty,
+        gateway_analytics.inference_id = tracing::field::Empty,
+        // Network
+        gateway_analytics.client_ip = tracing::field::Empty,
+        gateway_analytics.proxy_chain = tracing::field::Empty,
+        gateway_analytics.protocol_version = tracing::field::Empty,
+        // GeoIP
+        gateway_analytics.country_code = tracing::field::Empty,
+        gateway_analytics.country_name = tracing::field::Empty,
+        gateway_analytics.region = tracing::field::Empty,
+        gateway_analytics.city = tracing::field::Empty,
+        gateway_analytics.latitude = tracing::field::Empty,
+        gateway_analytics.longitude = tracing::field::Empty,
+        gateway_analytics.timezone = tracing::field::Empty,
+        gateway_analytics.asn = tracing::field::Empty,
+        gateway_analytics.isp = tracing::field::Empty,
+        // User Agent
+        gateway_analytics.user_agent = tracing::field::Empty,
+        gateway_analytics.device_type = tracing::field::Empty,
+        gateway_analytics.browser_name = tracing::field::Empty,
+        gateway_analytics.browser_version = tracing::field::Empty,
+        gateway_analytics.os_name = tracing::field::Empty,
+        gateway_analytics.os_version = tracing::field::Empty,
+        gateway_analytics.is_bot = tracing::field::Empty,
+        // Request
+        gateway_analytics.method = tracing::field::Empty,
+        gateway_analytics.path = tracing::field::Empty,
+        gateway_analytics.query_params = tracing::field::Empty,
+        gateway_analytics.request_headers = tracing::field::Empty,
+        gateway_analytics.body_size = tracing::field::Empty,
+        gateway_analytics.request_timestamp = tracing::field::Empty,
+        // Auth
+        gateway_analytics.api_key_id = tracing::field::Empty,
+        gateway_analytics.auth_method = tracing::field::Empty,
+        gateway_analytics.user_id = tracing::field::Empty,
+        gateway_analytics.project_id = tracing::field::Empty,
+        gateway_analytics.endpoint_id = tracing::field::Empty,
+        // Response (post-request)
+        gateway_analytics.response_timestamp = tracing::field::Empty,
+        gateway_analytics.total_duration_ms = tracing::field::Empty,
+        gateway_analytics.gateway_processing_ms = tracing::field::Empty,
+        gateway_analytics.status_code = tracing::field::Empty,
+        gateway_analytics.response_size = tracing::field::Empty,
+        gateway_analytics.response_headers = tracing::field::Empty,
+        // Model
+        gateway_analytics.model_name = tracing::field::Empty,
+        gateway_analytics.model_provider = tracing::field::Empty,
+        gateway_analytics.model_version = tracing::field::Empty,
+        gateway_analytics.routing_decision = tracing::field::Empty,
+        // Error
+        gateway_analytics.error_type = tracing::field::Empty,
+        gateway_analytics.error_message = tracing::field::Empty,
+        // Blocking
+        gateway_analytics.is_blocked = tracing::field::Empty,
+        gateway_analytics.block_reason = tracing::field::Empty,
+        gateway_analytics.block_rule_id = tracing::field::Empty,
+        // Tags
+        gateway_analytics.tags = tracing::field::Empty,
+    );
+
+    // Extract parent context from incoming traceparent/tracestate headers
+    let parent_ctx =
+        tracing_opentelemetry_instrumentation_sdk::http::extract_context(&headers);
+    span.set_parent(parent_ctx);
+
+    // Run all middleware logic inside the span
+    async move {
+        tracing::debug!("Analytics middleware called for {} {}", method, uri.path());
 
     // Get services from request extensions
     let geoip_service = request.extensions().get::<Arc<GeoIpService>>().cloned();
@@ -65,6 +139,9 @@ pub async fn analytics_middleware(
 
     // Extract selected request headers
     record.request_headers = extract_important_headers(&headers);
+
+    // Record pre-request span attributes (before processing the request)
+    record_pre_request_span_attributes(&tracing::Span::current(), &analytics.record);
 
     // Store analytics in request extensions
     let analytics_arc = Arc::new(tokio::sync::Mutex::new(analytics));
@@ -159,6 +236,9 @@ pub async fn analytics_middleware(
                 analytics.record.block_reason = reason.to_str().ok().map(|s| s.to_string());
             }
         }
+
+        // Record post-response span attributes (after all response data is captured)
+        record_post_response_span_attributes(&tracing::Span::current(), &analytics.record);
     }
 
     // Record Prometheus metrics for autoscaling
@@ -219,6 +299,161 @@ pub async fn analytics_middleware(
     }
 
     Ok(response)
+    }
+    .instrument(span)
+    .await
+}
+
+/// Records pre-request span attributes (called before next.run())
+/// Option fields are only recorded if they have a value (null otherwise)
+fn record_pre_request_span_attributes(span: &tracing::Span, record: &GatewayAnalyticsDatabaseInsert) {
+    // Core
+    span.record("gateway_analytics.id", record.id.to_string().as_str());
+
+    // Network
+    span.record("gateway_analytics.client_ip", record.client_ip.as_str());
+    if let Some(ref proxy_chain) = record.proxy_chain {
+        span.record("gateway_analytics.proxy_chain", proxy_chain.as_str());
+    }
+    span.record("gateway_analytics.protocol_version", record.protocol_version.as_str());
+
+    // GeoIP (all optional)
+    if let Some(ref country_code) = record.country_code {
+        span.record("gateway_analytics.country_code", country_code.as_str());
+    }
+    if let Some(ref country_name) = record.country_name {
+        span.record("gateway_analytics.country_name", country_name.as_str());
+    }
+    if let Some(ref region) = record.region {
+        span.record("gateway_analytics.region", region.as_str());
+    }
+    if let Some(ref city) = record.city {
+        span.record("gateway_analytics.city", city.as_str());
+    }
+    if let Some(latitude) = record.latitude {
+        span.record("gateway_analytics.latitude", latitude as f64);
+    }
+    if let Some(longitude) = record.longitude {
+        span.record("gateway_analytics.longitude", longitude as f64);
+    }
+    if let Some(ref timezone) = record.timezone {
+        span.record("gateway_analytics.timezone", timezone.as_str());
+    }
+    if let Some(asn) = record.asn {
+        span.record("gateway_analytics.asn", asn as i64);
+    }
+    if let Some(ref isp) = record.isp {
+        span.record("gateway_analytics.isp", isp.as_str());
+    }
+
+    // User Agent (most optional)
+    if let Some(ref user_agent) = record.user_agent {
+        span.record("gateway_analytics.user_agent", user_agent.as_str());
+    }
+    if let Some(ref device_type) = record.device_type {
+        span.record("gateway_analytics.device_type", device_type.as_str());
+    }
+    if let Some(ref browser_name) = record.browser_name {
+        span.record("gateway_analytics.browser_name", browser_name.as_str());
+    }
+    if let Some(ref browser_version) = record.browser_version {
+        span.record("gateway_analytics.browser_version", browser_version.as_str());
+    }
+    if let Some(ref os_name) = record.os_name {
+        span.record("gateway_analytics.os_name", os_name.as_str());
+    }
+    if let Some(ref os_version) = record.os_version {
+        span.record("gateway_analytics.os_version", os_version.as_str());
+    }
+    span.record("gateway_analytics.is_bot", record.is_bot);
+
+    // Request
+    span.record("gateway_analytics.method", record.method.as_str());
+    span.record("gateway_analytics.path", record.path.as_str());
+    if let Some(ref query_params) = record.query_params {
+        span.record("gateway_analytics.query_params", query_params.as_str());
+    }
+    if let Ok(headers_json) = serde_json::to_string(&record.request_headers) {
+        span.record("gateway_analytics.request_headers", headers_json.as_str());
+    }
+    if let Some(body_size) = record.body_size {
+        span.record("gateway_analytics.body_size", body_size as i64);
+    }
+    span.record("gateway_analytics.request_timestamp", record.request_timestamp.to_rfc3339().as_str());
+
+    // Auth (all optional)
+    if let Some(ref api_key_id) = record.api_key_id {
+        span.record("gateway_analytics.api_key_id", api_key_id.as_str());
+    }
+    if let Some(ref auth_method) = record.auth_method {
+        span.record("gateway_analytics.auth_method", auth_method.as_str());
+    }
+    if let Some(ref user_id) = record.user_id {
+        span.record("gateway_analytics.user_id", user_id.as_str());
+    }
+    if let Some(project_id) = record.project_id {
+        span.record("gateway_analytics.project_id", project_id.to_string().as_str());
+    }
+    if let Some(endpoint_id) = record.endpoint_id {
+        span.record("gateway_analytics.endpoint_id", endpoint_id.to_string().as_str());
+    }
+}
+
+/// Records post-response span attributes (called after next.run() and response processing)
+/// Option fields are only recorded if they have a value (null otherwise)
+fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAnalyticsDatabaseInsert) {
+    // Performance
+    span.record("gateway_analytics.response_timestamp", record.response_timestamp.to_rfc3339().as_str());
+    span.record("gateway_analytics.total_duration_ms", record.total_duration_ms as i64);
+    span.record("gateway_analytics.gateway_processing_ms", record.gateway_processing_ms as i64);
+
+    // Response
+    span.record("gateway_analytics.status_code", record.status_code as i64);
+    if let Some(response_size) = record.response_size {
+        span.record("gateway_analytics.response_size", response_size as i64);
+    }
+    if let Ok(headers_json) = serde_json::to_string(&record.response_headers) {
+        span.record("gateway_analytics.response_headers", headers_json.as_str());
+    }
+    if let Some(inference_id) = record.inference_id {
+        span.record("gateway_analytics.inference_id", inference_id.to_string().as_str());
+    }
+
+    // Model (all optional)
+    if let Some(ref model_name) = record.model_name {
+        span.record("gateway_analytics.model_name", model_name.as_str());
+    }
+    if let Some(ref model_provider) = record.model_provider {
+        span.record("gateway_analytics.model_provider", model_provider.as_str());
+    }
+    if let Some(ref model_version) = record.model_version {
+        span.record("gateway_analytics.model_version", model_version.as_str());
+    }
+    if let Some(ref routing_decision) = record.routing_decision {
+        span.record("gateway_analytics.routing_decision", routing_decision.as_str());
+    }
+
+    // Error (all optional)
+    if let Some(ref error_type) = record.error_type {
+        span.record("gateway_analytics.error_type", error_type.as_str());
+    }
+    if let Some(ref error_message) = record.error_message {
+        span.record("gateway_analytics.error_message", error_message.as_str());
+    }
+
+    // Blocking
+    span.record("gateway_analytics.is_blocked", record.is_blocked);
+    if let Some(ref block_reason) = record.block_reason {
+        span.record("gateway_analytics.block_reason", block_reason.as_str());
+    }
+    if let Some(ref block_rule_id) = record.block_rule_id {
+        span.record("gateway_analytics.block_rule_id", block_rule_id.as_str());
+    }
+
+    // Tags
+    if let Ok(tags_json) = serde_json::to_string(&record.tags) {
+        span.record("gateway_analytics.tags", tags_json.as_str());
+    }
 }
 
 /// Extract client IP from headers only (when ConnectInfo is not available)
