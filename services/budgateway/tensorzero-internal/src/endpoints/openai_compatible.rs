@@ -183,10 +183,10 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
 /// A handler for the OpenAI-compatible inference endpoint
 #[debug_handler(state = AppStateData)]
 #[tracing::instrument(
-    name = "gateway_observability",
+    name = "inference_handler_observability",
     skip_all,
     fields(
-        otel.name = "gateway_observability",
+        otel.name = "inference_handler_observability",
         // OpenTelemetry error status fields
         otel.status_code = tracing::field::Empty,
         otel.status_description = tracing::field::Empty,
