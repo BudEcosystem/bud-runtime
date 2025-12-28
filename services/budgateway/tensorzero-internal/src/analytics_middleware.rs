@@ -1,4 +1,5 @@
 use axum::{
+    body::Body,
     extract::Request,
     http::{HeaderMap, Method, StatusCode, Uri, Version},
     middleware::Next,
@@ -83,7 +84,9 @@ pub async fn analytics_middleware(
         gateway_analytics.model_provider = tracing::field::Empty,
         gateway_analytics.model_version = tracing::field::Empty,
         gateway_analytics.routing_decision = tracing::field::Empty,
-        // Error
+        // OpenTelemetry error status
+        otel.status_code = tracing::field::Empty,
+        // Error details (from HTTP status)
         gateway_analytics.error_type = tracing::field::Empty,
         gateway_analytics.error_message = tracing::field::Empty,
         // Blocking
@@ -166,7 +169,7 @@ pub async fn analytics_middleware(
     );
 
     // Process the request
-    let response = next.run(request).await;
+    let mut response = next.run(request).await;
 
     // Update analytics with response data
     {
@@ -225,6 +228,42 @@ pub async fn analytics_middleware(
 
         // Extract selected response headers
         analytics.record.response_headers = extract_important_headers(response.headers());
+
+        // Extract and record error information if response is an error
+        if response.status().is_client_error() || response.status().is_server_error() {
+            let span = tracing::Span::current();
+            span.record("otel.status_code", "Error");
+
+            // Error type = canonical reason (e.g., "Bad Request", "Internal Server Error")
+            let error_type = response
+                .status()
+                .canonical_reason()
+                .unwrap_or("Unknown Error");
+            span.record("gateway_analytics.error_type", error_type);
+            analytics.record.error_type = Some(error_type.to_string());
+
+            // Error message = response body JSON (extract body for error details)
+            let status = response.status();
+            let (parts, body) = response.into_parts();
+
+            // Collect body bytes (limit to 10KB for safety)
+            if let Ok(body_bytes) = axum::body::to_bytes(body, 10 * 1024).await {
+                if let Ok(body_str) = String::from_utf8(body_bytes.to_vec()) {
+                    span.record("gateway_analytics.error_message", body_str.as_str());
+                    analytics.record.error_message = Some(body_str);
+                }
+                // Reconstruct response with same body
+                response = Response::from_parts(parts, Body::from(body_bytes));
+            } else {
+                // Fallback if body extraction fails - reconstruct with empty body
+                response = Response::from_parts(parts, Body::empty());
+                span.record(
+                    "gateway_analytics.error_message",
+                    format!("HTTP {}", status.as_u16()).as_str(),
+                );
+                analytics.record.error_message = Some(format!("HTTP {}", status.as_u16()));
+            }
+        }
 
         // Check if request was blocked
         if response.status() == StatusCode::FORBIDDEN
