@@ -5,6 +5,7 @@ use tracing::Span;
 use uuid::Uuid;
 
 use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
+use crate::error::Error;
 use crate::inference::types::resolved_input::ResolvedInput;
 use crate::inference::types::{
     FinishReason, InferenceResult, Latency, ModelInferenceResponseWithMetadata,
@@ -190,4 +191,18 @@ pub fn record_model_inference(
             );
         }
     }
+}
+
+/// Records error information on the current span using OpenTelemetry conventions.
+/// Sets otel.status_code to "Error" and records error type and message.
+pub fn record_error(error: &Error) {
+    let span = Span::current();
+
+    // Set OpenTelemetry span status to Error
+    span.record("otel.status_code", "Error");
+    span.record("otel.status_description", error.to_string().as_str());
+
+    // Record structured error details using strum's AsRefStr derive
+    span.record("error.type", error.get_details().as_ref());
+    span.record("error.message", error.to_string().as_str());
 }

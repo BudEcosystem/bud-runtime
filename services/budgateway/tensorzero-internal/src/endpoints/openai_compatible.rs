@@ -187,6 +187,12 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
     skip_all,
     fields(
         otel.name = "gateway_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
         // ChatInference request fields
         chat_inference.function_name = tracing::field::Empty,
         chat_inference.variant_name = tracing::field::Empty,
@@ -240,7 +246,8 @@ pub async fn inference_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
-    if !openai_compatible_params.unknown_fields.is_empty() {
+    let result = async {
+        if !openai_compatible_params.unknown_fields.is_empty() {
         tracing::warn!(
             "Ignoring unknown fields in OpenAI-compatible request: {:?}",
             openai_compatible_params
@@ -1179,6 +1186,15 @@ pub async fn inference_handler(
             Ok(response)
         }
     }
+    }
+    .await;
+
+    // Record error on span if request failed
+    if let Err(ref error) = result {
+        super::observability::record_error(error);
+    }
+
+    result
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Default)]
