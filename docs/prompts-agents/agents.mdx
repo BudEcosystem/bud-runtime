@@ -44,7 +44,7 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 
 - Inside a project detail page, the Agents tab renders a sortable table with columns for Prompt Name, Version, Type, Status, Model Name, Modality, and Created On.
 - Table header offers search by name plus a Create New button (permission-gated) that jumps straight into the multi-step agent workflow for the current project.
-- Row actions include **Use this agent** (opens integration snippets), inline Edit (loads the agent into the drawer for updates), and Delete with confirmation safeguards.
+- Row actions include Use this agent (opens integration snippets), inline Edit (loads the agent into the drawer for updates), and Delete with confirmation safeguards.
 - Sorting on name, status, and created date helps teams prioritize active or recent agents.
 
 ### 3.3 Agent creation and editing workflow
@@ -63,7 +63,7 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 ### 3.5 Versions tab in agent detail
 
 - Agent detail pages load a Versions tab showing the current default version plus a Previous Versions list.
-- **\+ Version** clones context from the base prompt and opens the drawer to configure a new version without losing lineage.
+- \+ Version clones context from the base prompt and opens the drawer to configure a new version without losing lineage.
 - Edit on any version fetches deployment metadata when available (endpoint name mapping) so updates stay aligned with the correct backend.
 - Version cards surface created/updated timestamps and endpoint names to keep operational history visible.
 
