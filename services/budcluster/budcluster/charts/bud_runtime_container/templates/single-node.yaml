@@ -18,12 +18,14 @@ spec:
         model.aibrix.ai/name: {{ $.Values.modelName }}
         device_name: {{ .node.name }}
         concurrency: "{{ .node.concurrency }}"
+        {{- if .node.engine_type }}
+        engine_type: {{ .node.engine_type }}
+        {{- end }}
         {{- if and (eq .node.type "cpu_high") (eq .node.hardware_mode "shared") }}
         bud.studio/shared-cpu: "true"
         {{- end }}
     spec:
       nodeSelector:
-        # kubernetes.io/hostname: {{ .node.name }}
         {{- if .node.node_selector }}
         {{- range $key, $value := .node.node_selector }}
         {{ $key }}: "{{ $value }}"
@@ -54,65 +56,29 @@ spec:
       schedulerName: hami-scheduler
       {{- end }}
       containers:
-      {{- if eq .node.type "cpu_high" }}
-      {{- include "bud-runtime-container.cpu-container" (dict "Values" $.Values "device" .node) | nindent 6 }}
-      {{- else if eq .node.type "cuda" }}
-      {{- include "bud-runtime-container.cuda-container" (dict "Values" $.Values "device" .node) | nindent 6 }}
-      {{- else if eq .node.type "hpu" }}
-      {{- include "bud-runtime-container.hpu-container" (dict "Values" $.Values "device" .node) | nindent 6 }}
+      {{/*
+        Engine Selection Logic:
+        1. First check engine_type from node config (set by BudSim)
+        2. If not specified, default to vllm for backward compatibility
+
+        Supported engines:
+        - vllm: For LLM text generation models
+        - latentbud: For embedding models
+        - sglang: For LLM models (future)
+      */}}
+      {{- $engineType := .node.engine_type | default "vllm" }}
+      {{- if eq $engineType "latentbud" }}
+      {{- include "bud-runtime-container.engine-latentbud" (dict "Values" $.Values "device" .node) | nindent 6 }}
+      {{- else if eq $engineType "sglang" }}
+      {{/* Future: Add sglang engine template */}}
+      {{- include "bud-runtime-container.engine-vllm" (dict "Values" $.Values "device" .node) | nindent 6 }}
+      {{- else }}
+      {{/* Default to vLLM engine */}}
+      {{- include "bud-runtime-container.engine-vllm" (dict "Values" $.Values "device" .node) | nindent 6 }}
       {{- end }}
-      - name: bud-runtime-sidecar
-        image: budstudio/runtime-sidecar:latest
-        ports:
-          - containerPort: 9090
-            protocol: TCP
-        env: # Pass configuration via environment variables
-          - name: ENGINE_METRICS_URL
-            value: "http://localhost:8000/metrics" # Point to the vLLM container in the same pod
-          - name: LISTEN_PORT
-            value: "9090"
-          - name: SCRAPE_INTERVAL_SECONDS
-            value: "0.5"
-          - name: CALCULATION_WINDOW_SECONDS
-            value: "1"
-        livenessProbe:
-          httpGet:
-            path: /metrics
-            port: 9090
-          initialDelaySeconds: 120
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /metrics
-            port: 9090
-          initialDelaySeconds: 60
-          periodSeconds: 10
-      - name: aibrix-runtime
-        image: aibrix/runtime:v0.2.1
-        command:
-          - aibrix_runtime
-          - --port
-          - "8080"
-        env:
-          - name: INFERENCE_ENGINE
-            value: vllm
-          - name: INFERENCE_ENGINE_ENDPOINT
-            value: http://localhost:8000
-        ports:
-          - containerPort: 8080
-            protocol: TCP
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 3
-          periodSeconds: 2
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
+      {{/* Sidecar containers - engine-aware */}}
+      {{- include "bud-runtime-container.sidecar" (dict "Values" $.Values "node" .node) | nindent 6 }}
+      {{- include "bud-runtime-container.aibrix-runtime" (dict "Values" $.Values "node" .node) | nindent 6 }}
       volumes:
       - name: shm
         emptyDir:

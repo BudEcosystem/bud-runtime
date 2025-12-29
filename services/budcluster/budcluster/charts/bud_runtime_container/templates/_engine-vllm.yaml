@@ -1,0 +1,125 @@
+{{/*
+vLLM Engine Container Template
+This template defines the vLLM-specific container configuration for LLM inference.
+Used for text generation models with support for LoRA, tool calling, and reasoning.
+*/}}
+
+{{- define "bud-runtime-container.engine-vllm" }}
+- name: vllm-container
+  image: {{ .device.image }}
+  imagePullPolicy: {{ .Values.pullPolicy }}
+  ports:
+    - containerPort: {{ .Values.containerPort }}
+  volumeMounts:
+    - name: model-registry
+      mountPath: /data/models-registry
+      readOnly: false
+    - name: shm
+      mountPath: "/dev/shm"
+  {{- if eq .device.type "cuda" }}
+  resources:
+    requests:
+      nvidia.com/gpu: {{ .device.tp_size }}
+      {{- if and .device.hardware_mode (eq .device.hardware_mode "shared") }}
+      nvidia.com/gpumem: {{ .device.gpu_memory_mb }}
+      {{- end }}
+    limits:
+      nvidia.com/gpu: {{ .device.tp_size }}
+      {{- if and .device.hardware_mode (eq .device.hardware_mode "shared") }}
+      nvidia.com/gpumem: {{ .device.gpu_memory_mb }}
+      {{- end }}
+  {{- else if eq .device.type "cpu_high" }}
+  resources:
+    requests:
+      memory: "{{ .device.memory }}Gi"
+      cpu: {{ .device.core_request | default .device.core_count }}
+    limits:
+      memory: "{{ .device.memory }}Gi"
+      cpu: {{ .device.core_count }}
+  {{- else if eq .device.type "hpu" }}
+  resources:
+    requests:
+      habana.ai/gaudi: {{ .device.tp_size }}
+      memory: "{{ .device.memory }}Gi"
+      cpu: {{ .device.core_count }}
+    limits:
+      habana.ai/gaudi: {{ .device.tp_size }}
+  securityContext:
+    allowPrivilegeEscalation: true
+    runAsGroup: 0
+    runAsUser: 0
+  {{- end }}
+  {{- if .device.envs }}
+  env:
+  {{- range $key, $value := .device.envs }}
+  - name: {{ $key }}
+    value: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if gt (.device.pp_size | int) 1 }}
+  {{/* Multi-node deployment with Ray distributed backend */}}
+  command: ["/bin/bash", "-c"]
+  args:
+    - >
+      ulimit -n 65536 &&
+      apt update && apt install -y wget net-tools && pip3 install ray[default] pyarrow pandas &&
+      echo "[INFO] Starting Ray head node..." &&
+      eval "$KUBERAY_GEN_RAY_START_CMD" &
+
+      echo "[INFO] Waiting for Ray dashboard to be ready..." &&
+      until curl --max-time 5 --fail http://127.0.0.1:8265 > /dev/null 2>&1; do
+        echo "[WAITING] $(date -u +'%Y-%m-%dT%H:%M:%SZ') - Ray dashboard not ready yet...";
+        sleep 2;
+      done &&
+      echo "[SUCCESS] Ray dashboard is available!" &&
+
+      vllm serve \
+        --distributed-executor-backend ray \
+        --uvicorn-log-level warning \
+        {{- range $key, $value := .device.args }}
+        {{ $value }} \
+        {{- end }}
+  {{- else }}
+  {{/* Single-node deployment */}}
+  command:
+  - python3
+  - -m
+  - vllm.entrypoints.openai.api_server
+  {{- if .device.args }}
+  args:
+  {{- range $key, $value := .device.args }}
+  - {{ $value }}
+  {{- end }}
+  - --uvicorn-log-level
+  - warning
+  {{- end }}
+  {{- end }}
+  {{- if ne .device.type "hpu" }}
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: {{ .Values.containerPort }}
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    failureThreshold: 20
+  {{- else }}
+  livenessProbe: null
+  {{- end }}
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: {{ .Values.containerPort }}
+    initialDelaySeconds: 60
+    periodSeconds: 5
+  {{- if ne .device.type "hpu" }}
+  startupProbe:
+    httpGet:
+      path: /health
+      port: {{ .Values.containerPort }}
+      scheme: HTTP
+    failureThreshold: 200
+    periodSeconds: 30
+    successThreshold: 1
+    timeoutSeconds: 1
+  {{- end }}
+{{- end }}

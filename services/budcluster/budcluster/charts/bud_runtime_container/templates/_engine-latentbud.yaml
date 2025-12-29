@@ -1,0 +1,92 @@
+{{/*
+LatentBud Engine Container Template
+This template defines the LatentBud-specific container configuration for embedding models.
+Optimized for high-throughput embedding inference with batching support.
+*/}}
+
+{{- define "bud-runtime-container.engine-latentbud" }}
+- name: latentbud-container
+  image: {{ .device.image }}
+  imagePullPolicy: {{ .Values.pullPolicy }}
+  ports:
+    - containerPort: {{ .Values.containerPort }}
+  volumeMounts:
+    - name: model-registry
+      mountPath: /data/models-registry
+      readOnly: false
+    - name: shm
+      mountPath: "/dev/shm"
+  {{- if eq .device.type "cuda" }}
+  resources:
+    requests:
+      nvidia.com/gpu: {{ .device.tp_size | default 1 }}
+      {{- if and .device.hardware_mode (eq .device.hardware_mode "shared") }}
+      nvidia.com/gpumem: {{ .device.gpu_memory_mb }}
+      {{- end }}
+    limits:
+      nvidia.com/gpu: {{ .device.tp_size | default 1 }}
+      {{- if and .device.hardware_mode (eq .device.hardware_mode "shared") }}
+      nvidia.com/gpumem: {{ .device.gpu_memory_mb }}
+      {{- end }}
+  {{- else if eq .device.type "cpu_high" }}
+  resources:
+    requests:
+      memory: "{{ .device.memory }}Gi"
+      cpu: {{ .device.core_request | default .device.core_count }}
+    limits:
+      memory: "{{ .device.memory }}Gi"
+      cpu: {{ .device.core_count }}
+  {{- end }}
+  env:
+  - name: INFINITY_URL_PREFIX
+    value: "/v1"
+  {{- if .device.envs }}
+  {{- range $key, $value := .device.envs }}
+  - name: {{ $key }}
+    value: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{/* LatentBud uses v2 subcommand for embedding inference */}}
+  {{/*
+    LatentBud Command Format:
+    v2 --model-id=<model> --max-batch-tokens=<tokens> --lengths-via-tokenize=<bool> --batch-strategy=<strategy>
+
+    Args come from engine_processors.py LatentBudConfigProcessor which generates:
+    - model-id (model path from context)
+    - max-batch-tokens (from concurrency/batch settings)
+    - lengths-via-tokenize (tokenize for length calculation)
+    - batch-strategy (tokens or requests)
+    - port (service port)
+
+    Args are converted to list format by _prepare_args in handler.py (same as vLLM)
+  */}}
+  args:
+  - v2
+  {{- if .device.args }}
+  {{- range $key, $value := .device.args }}
+  - {{ $value }}
+  {{- end }}
+  {{- end }}
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: {{ .Values.containerPort }}
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 10
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: {{ .Values.containerPort }}
+    initialDelaySeconds: 30
+    periodSeconds: 5
+  startupProbe:
+    httpGet:
+      path: /health
+      port: {{ .Values.containerPort }}
+      scheme: HTTP
+    failureThreshold: 60
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+{{- end }}

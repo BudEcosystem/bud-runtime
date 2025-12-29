@@ -1,3 +1,6 @@
+# Bud Runtime Container Helm Chart Values
+# This chart deploys AI/ML model inference runtimes with support for multiple engines.
+
 chartName: "bud-runtime-container"
 namespace: bud-runtime # will be replaced by the deployment handler
 platform: "kubernetes"
@@ -23,6 +26,19 @@ imagePullSecrets:
 modelName: "" # will be replaced by the deployment handler
 adapters: []
 
+# Pod Autoscaler Configuration
+# The autoscaler uses engine-specific metrics for scaling decisions.
+# Metrics are collected by runtime-sidecar and exposed with bud: prefix.
+#
+# Supported vLLM/SGLang metrics (from BudApp ScalingMetricEnum):
+#   - bud:gpu_cache_usage_perc_average (default)
+#   - bud:time_to_first_token_seconds_average
+#   - bud:e2e_request_latency_seconds_average
+#   - bud:time_per_output_token_seconds_average
+#
+# Supported LatentBud metrics (for embedding models):
+#   - embedding_batch_queue_size (default)
+#   - embedding_requests_active
 podscaler:
   enabled: false
   type: "metrics" # metrics or optimizer
@@ -31,5 +47,27 @@ podscaler:
   upFluctuationTolerance: 1.5
   downFluctuationTolerance: 0.5
   window: 30s
-  targetMetric: gpu_cache_usage_perc
+  # targetMetric is set dynamically based on engine_type if not specified
+  targetMetric: bud:gpu_cache_usage_perc_average
   targetValue: 0.5
+
+# Engine Types Reference:
+# -----------------------
+# vllm (default):
+#   - For LLM text generation models
+#   - Supports: LoRA, tool calling, reasoning
+#   - Entrypoint: python -m vllm.entrypoints.openai.api_server
+#   - Metrics: bud:gpu_cache_usage_perc_average, bud:time_to_first_token_seconds_average,
+#              bud:e2e_request_latency_seconds_average, bud:time_per_output_token_seconds_average
+#
+# latentbud:
+#   - For embedding models (sentence transformers, etc.)
+#   - Optimized for high-throughput embedding inference
+#   - Entrypoint: python -m latentbud.server
+#   - Metrics: embedding_batch_queue_size, embedding_requests_active
+#
+# sglang (future):
+#   - For LLM models with SGLang runtime
+#   - Supports: LoRA, tool calling
+#   - Entrypoint: python -m sglang.launch_server
+#   - Metrics: Same as vLLM (via runtime-sidecar)
