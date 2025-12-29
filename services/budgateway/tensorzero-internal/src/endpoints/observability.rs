@@ -331,9 +331,12 @@ pub fn record_response_request(params: &crate::responses::OpenAIResponseCreatePa
         }
     }
 
-    // JSON serialized fields
+    // JSON serialized fields (check for simple strings first to avoid extra quotes)
     if let Some(ref input) = params.input {
-        if let Ok(json) = serde_json::to_string(input) {
+        // If it's a simple string, record directly without extra quotes
+        if let Some(s) = input.as_str() {
+            span.record("request.input", s);
+        } else if let Ok(json) = serde_json::to_string(input) {
             span.record("request.input", json.as_str());
         }
     }
