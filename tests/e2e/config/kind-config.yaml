@@ -1,0 +1,45 @@
+# Kind cluster configuration for E2E testing
+# Creates a single-node cluster with port mappings for service access
+#
+# Port mappings use high ports to avoid conflicts with system services
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: bud-e2e
+
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # budapp service (primary endpoint for tests)
+      - containerPort: 30082
+        hostPort: 9001
+        protocol: TCP
+      # Keycloak
+      - containerPort: 30080
+        hostPort: 9080
+        protocol: TCP
+      # PostgreSQL (for debugging)
+      - containerPort: 30432
+        hostPort: 9432
+        protocol: TCP
+      # Redis (for debugging)
+      - containerPort: 30379
+        hostPort: 9379
+        protocol: TCP
+
+networking:
+  # Use Calico for network policies (optional)
+  disableDefaultCNI: false
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"
+
+# Enable local registry for faster image loading
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5001"]
+      endpoint = ["http://kind-registry:5000"]

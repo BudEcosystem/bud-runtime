@@ -1,0 +1,410 @@
+# Helm values for E2E testing with Kind cluster
+# Minimal configuration focused on auth flow testing
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  security:
+    allowInsecureImages: true
+
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+ingress:
+  enabled: false
+  https: disabled
+  httpsEnabled: false
+  hosts:
+    root: "localhost"
+
+# =============================================================================
+# Storage (disabled for E2E - use emptyDir)
+# =============================================================================
+storage:
+  budmodelRegistry:
+    enabled: false
+    size: "1Gi"
+    className: ""
+  budmodelAddDir:
+    enabled: false
+    size: "1Gi"
+    className: ""
+  budevalDataset:
+    enabled: false
+    size: "1Gi"
+    className: ""
+  budappStaticDir:
+    enabled: false
+    size: "1Gi"
+    className: ""
+
+# =============================================================================
+# Microservices Configuration
+# =============================================================================
+microservices:
+  # RSA keys for encryption (required by common.yaml template)
+  rsaKeys:
+    privateKey: |
+      -----BEGIN ENCRYPTED PRIVATE KEY-----
+      MIIFLTBXBgkqhkiG9w0BBQ0wSjApBgkqhkiG9w0BBQwwHAQICoRYBUJ0D3cCAggA
+      MAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBCBC0aSYqNilEZTtqPKW1bZBIIE
+      0J076s74A32FuZhspy90i//jvl6HhF+PSc5xRGZBuA7b6P7gZpVPhN/0WoDM1qQN
+      dpSJw16kS2ZC9JdXNECbak/yPgjYsSqjKmt8Sis+NKA6qsW/TLa3Pp8s0+ft7niV
+      sO3XGA4r5xuakpPQm4KLJ7qDoQzcCkfpvJ7c1YZHPytJFyEoLFqdBmlKUBlZGYkS
+      D8Ye7g9WlblKA2AoGiEXIqSYO9D42YsURlsAwWutKDkaas56TMUpHjEfGOxyZudZ
+      adW+PS3j+S5AJkBY+KV5HAzJbCKL9KtC72NlNALeeNel5W1gc8qoVE7Fn+J28Iu6
+      TuPl+S5LWWoz2WM05asHGqDh/H747HpDrW/ZpILOzmL8KoPQKQQUrvlR6RZSAfLu
+      f21NINsVwdN50cjznB6nw4QB9fM6gGrlg1wAn6T/381/w7bZwcdUodp+b8x+tkQ/
+      Hfinr0AvOU9BsTPKxd1xNxs+U2aYOj7TxSkF8d0IOpAg/Kb7ngm8G2Dq8SZgcyso
+      HDvN4Hk9GbANzBmbRWc2yCXX9zFMyyEva8NfjzCcZ9jmPr1eOL9rI2hOZsV7TQsc
+      wIsQaurGxDNd0juvESN46RU/XOLp0+ATogFJMNsRq3JPzbjEiipmmQNEd/wfDQX5
+      +AIcfNp6wE8Si2ldAUqZkVLxPsAKFnATvP6uLmn/t/iwYDBHCxV9YpvQ00m87zVS
+      uK/lqBPcQBF3XfNo+yH2gwdXQ3cM07ZgyuaruBsoXWsIhK8zOqQmdMBmGTQHA7FD
+      RoqW4pnzZuUfSAUrkxRs8rofCHJx3XhN8YF/bNUl9WxtG/ZlfavdiWAvFS4lvBB6
+      o1eMU1PBbjxJ1reNEcHOE5RSiQaflmdbRYpGRC64H1xufU0g2hIqXr83w4a5l9/o
+      leZKW385QuTHMXdGDWCwznEFcVcC2Ji0ETpbue0XNxC/XhIoU3JAUQ5elo/31tg/
+      wan0NI6CIAhCCMwNhuWYUtpKiA5vYE4fuqXClutfGkVHykUPU5kVzVSjTdNwWeCA
+      jsFI5xWIgtFeMt+GAZsQLMyoJN2+ok6z5S39M0Cvs1IfTgixKrDt0TTvIC2RQa3W
+      gCl3MEdpFpd8nhekQNiUgcZovewT+G/GiOnW8XPcoAS+me6Qcaa6Lr+6wMjGiMMH
+      9FtEk8mTboo8XJih6bRA311A1E8epc51NTCC5vBWJm1MBywZ7Fl0cXReH+Mc5V+7
+      FqDvQQx/BfdqA9CRtBwO1yeNBGxjXs9MVuVvXpnHV26eSJJfkRsxRS528ybo+iWJ
+      LHlUXN8o1vQGMCTJV5yejQe7l8iTDdnGKUA5QUGD2ujRATJkdlzYVEE1lH5R1Twt
+      D/s3a0z4J8KAhVJ2dTwaahMJJDBbZi8qwe74Ak/hdx1wZgQPjCbKcc27XzlgVFvH
+      p6Sxorz0zcemLJlHjsSve7HgsG1FmyxrfggD105DjyZlWH0GOX5x9gMQc59QUAGR
+      /bd+Br3NB2ginZbWbp/t4OImFJNlQ+HYsDLLzcEK63FooVAWS7T/h+/yj5Yjdj3O
+      2DcF7lixXGafKsrT7qW/X8mMMI9DTHAevcQEkKjaQpzjbtUqr81HwzZPhgDnRmlK
+      gZ0wgvWMNYGoLnz9/PTebqHeHY/5oGh0cg85qFQC/GLZ
+      -----END ENCRYPTED PRIVATE KEY-----
+    privateKeyPassword: "e2e-key-password"
+    publicKey: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzBJt/N4xjABsJPVQoVXg
+      s8lA6RHRbHbm0Y7+Khd+IvFHhTzdmKnl1wLUT/MJswlxKY7V9/fxjrUK2wJXjN1+
+      JOrpxxNLPFyuGJwzhdyEdOWsxup5ee5cWks31e7rQUfYP2VS+D+EKF4Lss4tuLTF
+      h/2Vi20op21ImcuhfSq8GiNAJJdqNl9hv4kctY5j6DcVLGK9/3fdb4RQjRH/s0ZD
+      tUAMY40zaRJ5n+Tn4toCu11jb+pbfyEWYtnTH9u1/u0RdkehpXEMBEBwUWY2HBgt
+      93PxJel9yFP+OuWftyhYSvgL4sJHYKaBc4kbx6H/hpFTlXcsaq/sgCSXZ15FCD9w
+      wQIDAQAB
+      -----END PUBLIC KEY-----
+
+  # Frontend - disabled for API-only testing
+  budadmin:
+    enabled: false
+  budcustomer:
+    enabled: false
+  budplayground:
+    enabled: false
+
+  # Backend - only budapp needed for auth testing
+  budapp:
+    enabled: true
+    image: budstudio/budapp:nightly
+    daprid: budapp
+    service:
+      type: NodePort
+      nodePort: 30082
+    env:
+      LOG_LEVEL: DEBUG
+      APP_PORT: "9082"
+      # Rate limiting disabled for E2E testing
+      RATE_LIMIT_ENABLED: "false"
+      # JWT Configuration
+      JWT_SECRET_KEY: "e2e-test-secret-key-for-jwt-signing-minimum-32-chars"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_MINUTES: "10080"
+      PASSWORD_SALT: "e2e_password_salt"
+      # Keycloak
+      KEYCLOAK_VERIFY_SSL: "false"
+      DEFAULT_REALM_NAME: "e2e-realm"
+      DEFAULT_CLIENT_NAME: "e2e-client"
+      # CORS (must be valid URLs, not wildcards)
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:8007,http://localhost:9001"
+      # Frontend URLs
+      FRONTEND_URL: "http://localhost:3000"
+      ADMIN_FRONTEND_URL: "http://localhost:8007"
+      # Super user (required)
+      SUPER_USER_EMAIL: "admin@budtest.dev"
+      SUPER_USER_PASSWORD: "E2eAdmin123#"
+      # Grafana (required even if not used)
+      GRAFANA_USERNAME: "admin"
+      GRAFANA_PASSWORD: "admin"
+      # MCP Foundry (required even if not used)
+      MCP_FOUNDRY_API_KEY: "e2e-mcp-api-key"
+      # AES encryption key (hex format, 256-bit)
+      aes_key_hex: "df296270fd06e845efec5a94f266f904a9ce13afc56b941316fb0a3ddb4ee7c5"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Disabled services (not needed for auth testing)
+  budcluster:
+    enabled: false
+  budmetrics:
+    enabled: false
+  budmodel:
+    enabled: false
+  budsim:
+    enabled: false
+  budeval:
+    enabled: false
+  buddoc:
+    enabled: false
+  budnotify:
+    enabled: false
+  budprompt:
+    enabled: false
+  budgateway:
+    enabled: false
+    replicaCount: 0
+  askbud:
+    enabled: false
+  mcpgateway:
+    enabled: false
+    replicaCount: 0
+
+# =============================================================================
+# Infrastructure Dependencies
+# =============================================================================
+
+# PostgreSQL - required for user storage
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "e2e-postgres-password"
+    username: "budapp"
+    password: "budapp-password"
+    database: "budapp"
+  primary:
+    service:
+      type: NodePort
+      nodePorts:
+        postgresql: 30432
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: false  # Use emptyDir for E2E
+    initdb:
+      scripts:
+        init-keycloak-db.sql: |
+          CREATE USER keycloak WITH PASSWORD 'keycloak-password';
+          CREATE DATABASE keycloak OWNER keycloak;
+          GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
+
+# Valkey (Redis) - required for Dapr state store and token blacklist
+valkey:
+  enabled: true
+  auth:
+    password: "e2e-redis-password"
+  primary:
+    service:
+      type: NodePort
+      nodePorts:
+        valkey: 30379
+      ports:
+        valkey: 6379
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    persistence:
+      enabled: false  # Use emptyDir for E2E
+  master:
+    service:
+      type: NodePort
+      nodePorts:
+        redis: 30379
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    persistence:
+      enabled: false
+
+# Novu extra config (required by templates even when disabled)
+novuExtra:
+  email: "novu@e2e.local"
+  password: "novu-password"
+
+# Keycloak - required for authentication
+keycloak:
+  enabled: true
+  auth:
+    adminUser: admin
+    adminPassword: admin
+  service:
+    type: NodePort
+    nodePorts:
+      http: 30080
+  postgresql:
+    enabled: false  # Use shared PostgreSQL
+  externalDatabase:
+    host: "{{ .Release.Name }}-postgresql"
+    port: 5432
+    user: "keycloak"
+    password: "keycloak-password"
+    database: "keycloak"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Disabled dependencies (not needed for auth testing)
+clickhouse:
+  enabled: false
+  auth:
+    username: "default"
+    password: "clickhouse-password"
+
+# Disable ClickHouse auto-create DB job
+clickhouseExtra:
+  autoCreateDB: []
+
+minio:
+  enabled: false
+  # Auth values required even when disabled (referenced in templates)
+  auth:
+    rootUser: "minioadmin"
+    rootPassword: "minioadmin"
+  service:
+    ports:
+      api: 9000
+
+kafka:
+  enabled: true
+  auth:
+    clientProtocol: sasl
+    interBrokerProtocol: sasl
+    sasl:
+      jaas:
+        clientUsers:
+          - dapr
+        clientPasswords:
+          - dapr
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  controller:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+    persistence:
+      enabled: false
+  provisioning:
+    enabled: false
+
+mongodb:
+  enabled: false
+
+prometheus:
+  enabled: false
+
+prometheus-adapter:
+  enabled: false
+
+# =============================================================================
+# OpenTelemetry (disabled for E2E)
+# =============================================================================
+otelCollector:
+  enabled: false
+
+# =============================================================================
+# Novu (disabled for E2E - set replicas to 0)
+# =============================================================================
+novu:
+  api:
+    replicaCount: 0
+  worker:
+    replicaCount: 0
+  ws:
+    replicaCount: 0
+  web:
+    replicaCount: 0
+  embed:
+    replicaCount: 0
+
+# =============================================================================
+# Dapr Configuration
+# =============================================================================
+dapr:
+  enabled: true
+  scheduler:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  placement:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Dapr extra configuration (crypto keys for secrets)
+daprExtra:
+  crypto:
+    symmetricKey: "e2e-symmetric-key-32-chars-long!"
+    asymmetricKey: |
+      -----BEGIN RSA PRIVATE KEY-----
+      MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MvGj2yDryPEut5hy
+      e2e-test-asymmetric-key-placeholder
+      -----END RSA PRIVATE KEY-----
+
+# =============================================================================
+# External Services (not used - everything runs in cluster)
+# =============================================================================
+externalServices:
+  minio:
+    endpoint: ""
+    auth:
+      accessKey: ""
+      secretKey: ""
+    buckets:
+      modelRegistry: "models-registry"
+      modelInfo: "model-info"
+  postgresql:
+    databases:
+      budapp:
+        username: budapp
+        password: budapp-password
+        database: budapp
+      keycloak:
+        username: keycloak
+        password: keycloak-password
+        database: keycloak
