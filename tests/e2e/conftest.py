@@ -36,6 +36,22 @@ from tests.e2e.fixtures.auth import (
     TestUser,
 )
 
+# Import model fixtures
+from tests.e2e.fixtures.models import (
+    unique_model_name,
+    model_tags,
+    cloud_model_provider,
+    available_cloud_model,
+    created_model,
+    model_list,
+    generate_unique_model_name,
+    generate_model_tags,
+    TestModel,
+    ModelProviderType,
+    WorkflowStatus,
+    Provider,
+)
+
 
 # ============================================================================
 # Configuration Fixtures
@@ -402,6 +418,11 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.workflow)
         elif "flows" in str(item.fspath):
             item.add_marker(pytest.mark.flow)
+            # Add sub-markers for flow types
+            if "auth" in str(item.fspath):
+                item.add_marker(pytest.mark.auth)
+            elif "models" in str(item.fspath):
+                item.add_marker(pytest.mark.models)
         elif "integrations" in str(item.fspath):
             item.add_marker(pytest.mark.integration)
         elif "performance" in str(item.fspath):
