@@ -109,6 +109,44 @@ fn merge_credentials_from_headers(headers: &HeaderMap, credentials: &mut Inferen
     }
 }
 
+/// Helper function to extract ObservabilityMetadata from headers for error handler access.
+/// This duplicates the logic from the inference handler but allows access outside the async block.
+fn extract_observability_metadata_from_headers(
+    headers: &HeaderMap,
+) -> Option<super::inference::ObservabilityMetadata> {
+    let project_id = headers
+        .get("x-tensorzero-project-id")
+        .and_then(|v| v.to_str().ok())?;
+    let endpoint_id = headers
+        .get("x-tensorzero-endpoint-id")
+        .and_then(|v| v.to_str().ok())?;
+    let model_id = headers
+        .get("x-tensorzero-model-id")
+        .and_then(|v| v.to_str().ok())?;
+
+    let api_key_id = headers
+        .get("x-tensorzero-api-key-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let user_id = headers
+        .get("x-tensorzero-user-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let api_key_project_id = headers
+        .get("x-tensorzero-api-key-project-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    Some(super::inference::ObservabilityMetadata {
+        project_id: project_id.to_string(),
+        endpoint_id: endpoint_id.to_string(),
+        model_id: model_id.to_string(),
+        api_key_id,
+        user_id,
+        api_key_project_id,
+    })
+}
+
 /// Helper function to create OpenAI-compatible error response for guardrail violations
 fn create_guardrail_error_response(
     message: &str,
@@ -227,6 +265,24 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
         model_inference.gateway_response = tracing::field::Empty,
         model_inference.endpoint_type = tracing::field::Empty,
         model_inference.guardrail_scan_summary = tracing::field::Empty,
+        // ModelInferenceDetails fields (17 fields)
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.request_ip = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.response_analysis = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.request_arrival_time = tracing::field::Empty,
+        model_inference_details.request_forward_time = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
     )
 )]
 pub async fn inference_handler(
@@ -246,7 +302,14 @@ pub async fn inference_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
+    // Capture request arrival time for observability (outside async block for error handler access)
+    let request_arrival_time = chrono::Utc::now();
+
+    // Extract observability metadata from headers early for error handler access
+    let obs_metadata_for_error = extract_observability_metadata_from_headers(&headers);
+
     let result = async {
+
         if !openai_compatible_params.unknown_fields.is_empty() {
         tracing::warn!(
             "Ignoring unknown fields in OpenAI-compatible request: {:?}",
@@ -716,6 +779,30 @@ pub async fn inference_handler(
                     );
                 }
                 _ => {}
+            }
+
+            // Record ModelInferenceDetails for success
+            if let Some(ref obs_metadata) = observability_metadata {
+                let inference_id = match &result {
+                    InferenceResult::Chat(chat_result) => chat_result.inference_id,
+                    InferenceResult::Json(json_result) => json_result.inference_id,
+                    _ => uuid::Uuid::nil(),
+                };
+                let request_forward_time = chrono::Utc::now();
+                super::observability::record_model_inference_details(
+                    &inference_id,
+                    &obs_metadata.project_id,
+                    &obs_metadata.endpoint_id,
+                    &obs_metadata.model_id,
+                    true, // is_success
+                    request_arrival_time,
+                    request_forward_time,
+                    None, // cost - could be calculated from usage if pricing available
+                    obs_metadata.api_key_id.as_deref(),
+                    obs_metadata.user_id.as_deref(),
+                    obs_metadata.api_key_project_id.as_deref(),
+                    None, // no error for success
+                );
             }
 
             // Extract model latency from the result (using the first model inference result) before moving result
@@ -1192,6 +1279,32 @@ pub async fn inference_handler(
     // Record error on span if request failed
     if let Err(ref error) = result {
         super::observability::record_error(error);
+
+        // Record ModelInferenceDetails for error case
+        if let Some(ref obs_metadata) = obs_metadata_for_error {
+            let error_inference_id = uuid::Uuid::now_v7();
+            let request_forward_time = chrono::Utc::now();
+            let error_details = super::observability::ModelInferenceDetailsError {
+                error_code: error.get_details().as_ref(),
+                error_message: &error.to_string(),
+                error_type: error.get_details().as_ref(),
+                status_code: error.status_code().as_u16(),
+            };
+            super::observability::record_model_inference_details(
+                &error_inference_id,
+                &obs_metadata.project_id,
+                &obs_metadata.endpoint_id,
+                &obs_metadata.model_id,
+                false, // is_success = false
+                request_arrival_time,
+                request_forward_time,
+                None, // cost not available on error
+                obs_metadata.api_key_id.as_deref(),
+                obs_metadata.user_id.as_deref(),
+                obs_metadata.api_key_project_id.as_deref(),
+                Some(error_details),
+            );
+        }
     }
 
     result

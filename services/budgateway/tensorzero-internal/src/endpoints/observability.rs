@@ -1,5 +1,6 @@
 //! Gateway observability utilities for tracing and span management.
 
+use chrono::{DateTime, Utc};
 use tracing::Span;
 
 use uuid::Uuid;
@@ -205,4 +206,73 @@ pub fn record_error(error: &Error) {
     // Record structured error details using strum's AsRefStr derive
     span.record("error.type", error.get_details().as_ref());
     span.record("error.message", error.to_string().as_str());
+}
+
+/// Struct to hold error information for ModelInferenceDetails recording
+pub struct ModelInferenceDetailsError<'a> {
+    pub error_code: &'a str,
+    pub error_message: &'a str,
+    pub error_type: &'a str,
+    pub status_code: u16,
+}
+
+/// Records ModelInferenceDetails as span attributes (17 fields)
+#[allow(clippy::too_many_arguments)]
+pub fn record_model_inference_details(
+    inference_id: &Uuid,
+    project_id: &str,
+    endpoint_id: &str,
+    model_id: &str,
+    is_success: bool,
+    request_arrival_time: DateTime<Utc>,
+    request_forward_time: DateTime<Utc>,
+    cost: Option<f64>,
+    api_key_id: Option<&str>,
+    user_id: Option<&str>,
+    api_key_project_id: Option<&str>,
+    error_info: Option<ModelInferenceDetailsError>,
+) {
+    let span = Span::current();
+
+    // Core identification fields
+    span.record(
+        "model_inference_details.inference_id",
+        inference_id.to_string().as_str(),
+    );
+    span.record("model_inference_details.project_id", project_id);
+    span.record("model_inference_details.endpoint_id", endpoint_id);
+    span.record("model_inference_details.model_id", model_id);
+
+    // Status and timing
+    span.record("model_inference_details.is_success", is_success);
+    span.record(
+        "model_inference_details.request_arrival_time",
+        request_arrival_time.to_rfc3339().as_str(),
+    );
+    span.record(
+        "model_inference_details.request_forward_time",
+        request_forward_time.to_rfc3339().as_str(),
+    );
+
+    // Optional fields
+    if let Some(cost_val) = cost {
+        span.record("model_inference_details.cost", cost_val);
+    }
+    if let Some(api_key) = api_key_id {
+        span.record("model_inference_details.api_key_id", api_key);
+    }
+    if let Some(user) = user_id {
+        span.record("model_inference_details.user_id", user);
+    }
+    if let Some(api_key_proj) = api_key_project_id {
+        span.record("model_inference_details.api_key_project_id", api_key_proj);
+    }
+
+    // Error fields (only for failures)
+    if let Some(err) = error_info {
+        span.record("model_inference_details.error_code", err.error_code);
+        span.record("model_inference_details.error_message", err.error_message);
+        span.record("model_inference_details.error_type", err.error_type);
+        span.record("model_inference_details.status_code", err.status_code as i64);
+    }
 }

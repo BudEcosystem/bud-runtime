@@ -997,6 +997,30 @@ fn create_stream(
                             }
                             _ => {}
                         }
+
+                        // Record ModelInferenceDetails for streaming success
+                        if let Some(ref obs_metadata) = observability_metadata {
+                            let inference_id = match &inference_response {
+                                InferenceResult::Chat(chat_result) => chat_result.inference_id,
+                                InferenceResult::Json(json_result) => json_result.inference_id,
+                                _ => uuid::Uuid::nil(),
+                            };
+                            let now = chrono::Utc::now();
+                            crate::endpoints::observability::record_model_inference_details(
+                                &inference_id,
+                                &obs_metadata.project_id,
+                                &obs_metadata.endpoint_id,
+                                &obs_metadata.model_id,
+                                true, // is_success
+                                now,  // request_arrival_time (approximate)
+                                now,  // request_forward_time (approximate)
+                                None, // cost
+                                obs_metadata.api_key_id.as_deref(),
+                                obs_metadata.user_id.as_deref(),
+                                obs_metadata.api_key_project_id.as_deref(),
+                                None, // no error for success
+                            );
+                        }
                     }
 
                     let config = config.clone();
