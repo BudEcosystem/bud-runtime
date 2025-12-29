@@ -6166,9 +6166,103 @@ fn set_image_variation_field(
 
 // OpenAI-compatible Responses API handlers
 
-use crate::responses::OpenAIResponseCreateParams;
+use crate::responses::{OpenAIResponse, OpenAIResponseCreateParams, ResponseStreamEvent};
+
+/// Try to reconstruct an OpenAIResponse from a sequence of streaming events.
+/// This is used for observability to record response fields after streaming completes.
+fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Option<OpenAIResponse> {
+    // Look for response.completed event (has the full response nested under "response" key)
+    for event in events.iter().rev() {
+        if event.event == "response.completed" {
+            // The response is nested under the "response" key in the event data
+            // Event structure: {"response": {...}, "sequence_number": N, "type": "response.completed"}
+            if let Some(response_data) = event.data.get("response") {
+                if let Ok(response) =
+                    serde_json::from_value::<OpenAIResponse>(response_data.clone())
+                {
+                    return Some(response);
+                }
+            }
+        }
+    }
+
+    // Fallback: try response.done event with same nested structure
+    for event in events.iter().rev() {
+        if event.event == "response.done" {
+            if let Some(response_data) = event.data.get("response") {
+                if let Ok(response) =
+                    serde_json::from_value::<OpenAIResponse>(response_data.clone())
+                {
+                    return Some(response);
+                }
+            }
+        }
+    }
+
+    None
+}
 
 /// Handler for creating a new response (POST /v1/responses)
+#[tracing::instrument(
+    name = "response_create_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "response_create_handler_observability",
+        // Error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+
+        // REQUEST fields (24 fields)
+        request.model = tracing::field::Empty,
+        request.input = tracing::field::Empty,
+        request.instructions = tracing::field::Empty,
+        request.tools = tracing::field::Empty,
+        request.tool_choice = tracing::field::Empty,
+        request.parallel_tool_calls = tracing::field::Empty,
+        request.max_tool_calls = tracing::field::Empty,
+        request.previous_response_id = tracing::field::Empty,
+        request.temperature = tracing::field::Empty,
+        request.max_output_tokens = tracing::field::Empty,
+        request.response_format = tracing::field::Empty,
+        request.reasoning = tracing::field::Empty,
+        request.include = tracing::field::Empty,
+        request.metadata = tracing::field::Empty,
+        request.prompt = tracing::field::Empty,
+        request.prompt_id = tracing::field::Empty,
+        request.prompt_version = tracing::field::Empty,
+        request.stream = tracing::field::Empty,
+        request.stream_options = tracing::field::Empty,
+        request.store = tracing::field::Empty,
+        request.background = tracing::field::Empty,
+        request.service_tier = tracing::field::Empty,
+        request.modalities = tracing::field::Empty,
+        request.user = tracing::field::Empty,
+
+        // RESPONSE fields (20 fields)
+        response.id = tracing::field::Empty,
+        response.object = tracing::field::Empty,
+        response.created_at = tracing::field::Empty,
+        response.status = tracing::field::Empty,
+        response.background = tracing::field::Empty,
+        response.model = tracing::field::Empty,
+        response.max_output_tokens = tracing::field::Empty,
+        response.temperature = tracing::field::Empty,
+        response.parallel_tool_calls = tracing::field::Empty,
+        response.tool_choice = tracing::field::Empty,
+        response.instructions = tracing::field::Empty,
+        response.output = tracing::field::Empty,
+        response.prompt = tracing::field::Empty,
+        response.reasoning = tracing::field::Empty,
+        response.text = tracing::field::Empty,
+        response.tools = tracing::field::Empty,
+        response.usage = tracing::field::Empty,
+        response.usage.input_tokens = tracing::field::Empty,
+        response.usage.output_tokens = tracing::field::Empty,
+        response.usage.total_tokens = tracing::field::Empty,
+    )
+)]
 #[debug_handler(state = AppStateData)]
 pub async fn response_create_handler(
     State(AppStateData {
@@ -6183,15 +6277,19 @@ pub async fn response_create_handler(
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
 ) -> Result<Response<Body>, Error> {
-    if !params.unknown_fields.is_empty() {
-        tracing::warn!(
-            "Ignoring unknown fields in OpenAI-compatible response create request: {:?}",
-            params.unknown_fields.keys().collect::<Vec<_>>()
-        );
-    }
+    // Record request fields for observability
+    super::observability::record_response_request(&params);
 
-    // Resolve the model name based on authentication state (optional for prompt-based requests)
-    let model_resolution = model_resolution::resolve_model_name(
+    let result = async {
+        if !params.unknown_fields.is_empty() {
+            tracing::warn!(
+                "Ignoring unknown fields in OpenAI-compatible response create request: {:?}",
+                params.unknown_fields.keys().collect::<Vec<_>>()
+            );
+        }
+
+        // Resolve the model name based on authentication state (optional for prompt-based requests)
+        let model_resolution = model_resolution::resolve_model_name(
         params.model.as_deref(),
         &headers,
         false, // not for embedding
@@ -6269,6 +6367,10 @@ pub async fn response_create_handler(
     };
 
     if is_budprompt_with_prompt {
+        // Capture the current span BEFORE calling model methods
+        // This ensures the span stays alive until streaming completes
+        let observability_span = tracing::Span::current();
+
         // Use automatic format detection for BudPrompt with prompt parameter
         use crate::responses::ResponseResult;
 
@@ -6282,18 +6384,62 @@ pub async fn response_create_handler(
 
         match result {
             ResponseResult::Streaming(stream) => {
-                // Convert to SSE stream
-                let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-                    Ok(event) => Event::default()
-                        .event(event.event)
-                        .json_data(event.data)
-                        .map_err(|e| {
-                            Error::new(ErrorDetails::Inference {
-                                message: format!("Failed to serialize SSE event: {e}"),
-                            })
-                        }),
-                    Err(e) => Err(e),
-                });
+                // Wrap stream to capture events and record observability after completion
+                let sse_stream = async_stream::stream! {
+                    use futures::StreamExt;
+
+                    let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
+                    let mut had_streaming_error = false;
+                    futures::pin_mut!(stream);
+
+                    while let Some(result) = stream.next().await {
+                        // Buffer successful events for post-stream observability
+                        if let Ok(event) = &result {
+                            buffer.push(event.clone());
+                        }
+
+                        // Convert to SSE Event and yield
+                        match result {
+                            Ok(event) => {
+                                yield Event::default()
+                                    .event(event.event)
+                                    .json_data(event.data)
+                                    .map_err(|e| {
+                                        Error::new(ErrorDetails::Inference {
+                                            message: format!("Failed to serialize SSE event: {e}"),
+                                        })
+                                    });
+                            }
+                            Err(e) => {
+                                // Record streaming error immediately using the span
+                                let _guard = observability_span.enter();
+                                super::observability::record_error(&e);
+                                had_streaming_error = true;
+                                yield Err(e);
+                            }
+                        }
+                    }
+
+                    // AFTER stream completes: record observability using captured span
+                    let _guard = observability_span.enter();
+
+                    // Try to reconstruct response from buffered events (skip if we had an error)
+                    if !had_streaming_error {
+                        if let Some(response) = try_reconstruct_response_from_events(&buffer) {
+                            tracing::debug!(
+                                "Reconstructed response from {} stream events, id={}",
+                                buffer.len(),
+                                response.id
+                            );
+                            super::observability::record_response_result(&response);
+                        } else {
+                            tracing::warn!(
+                                "Could not reconstruct response from {} buffered stream events",
+                                buffer.len()
+                            );
+                        }
+                    }
+                };
 
                 Ok(Sse::new(sse_stream).into_response())
             }
@@ -6303,32 +6449,81 @@ pub async fn response_create_handler(
                     tracing::debug!("Response size: {} bytes", response_json.len());
                 }
 
+                // Record response fields for observability
+                super::observability::record_response_result(&response);
+
                 Ok(Json(response).into_response())
             }
         }
     } else {
         // Standard behavior: check stream parameter
         if params.stream.unwrap_or(false) {
+            // Capture the current span BEFORE calling model methods
+            // This ensures the span stays alive until streaming completes
+            let observability_span = tracing::Span::current();
+
             // Handle streaming response
             let stream = model
                 .stream_response(&params, &model_resolution.original_model_name, &clients)
                 .await?;
 
-            // Convert to SSE stream
-            let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-                Ok(event) => {
-                    // For ResponseStreamEvent, use event field as SSE event type and data field as data
-                    Event::default()
-                        .event(event.event)
-                        .json_data(event.data)
-                        .map_err(|e| {
-                            Error::new(ErrorDetails::Inference {
-                                message: format!("Failed to serialize SSE event: {e}"),
-                            })
-                        })
+            // Wrap stream to capture events and record observability after completion
+            let sse_stream = async_stream::stream! {
+                use futures::StreamExt;
+
+                let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
+                let mut had_streaming_error = false;
+                futures::pin_mut!(stream);
+
+                while let Some(result) = stream.next().await {
+                    // Buffer successful events for post-stream observability
+                    if let Ok(event) = &result {
+                        buffer.push(event.clone());
+                    }
+
+                    // Convert to SSE Event and yield
+                    match result {
+                        Ok(event) => {
+                            // For ResponseStreamEvent, use event field as SSE event type and data field as data
+                            yield Event::default()
+                                .event(event.event)
+                                .json_data(event.data)
+                                .map_err(|e| {
+                                    Error::new(ErrorDetails::Inference {
+                                        message: format!("Failed to serialize SSE event: {e}"),
+                                    })
+                                });
+                        }
+                        Err(e) => {
+                            // Record streaming error immediately using the span
+                            let _guard = observability_span.enter();
+                            super::observability::record_error(&e);
+                            had_streaming_error = true;
+                            yield Err(e);
+                        }
+                    }
                 }
-                Err(e) => Err(e),
-            });
+
+                // AFTER stream completes: record observability using captured span
+                let _guard = observability_span.enter();
+
+                // Try to reconstruct response from buffered events (skip if we had an error)
+                if !had_streaming_error {
+                    if let Some(response) = try_reconstruct_response_from_events(&buffer) {
+                        tracing::debug!(
+                            "Reconstructed response from {} stream events, id={}",
+                            buffer.len(),
+                            response.id
+                        );
+                        super::observability::record_response_result(&response);
+                    } else {
+                        tracing::warn!(
+                            "Could not reconstruct response from {} buffered stream events",
+                            buffer.len()
+                        );
+                    }
+                }
+            };
 
             Ok(Sse::new(sse_stream).into_response())
         } else {
@@ -6342,9 +6537,21 @@ pub async fn response_create_handler(
                 tracing::debug!("Response size: {} bytes", response_json.len());
             }
 
+            // Record response fields for observability
+            super::observability::record_response_result(&response);
+
             Ok(Json(response).into_response())
         }
     }
+    }
+    .await;
+
+    // Record error on span if request failed
+    if let Err(ref error) = result {
+        super::observability::record_error(error);
+    }
+
+    result
 }
 
 /// Handler for retrieving a response (GET /v1/responses/{response_id})

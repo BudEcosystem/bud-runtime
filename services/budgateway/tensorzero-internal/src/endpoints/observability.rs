@@ -276,3 +276,194 @@ pub fn record_model_inference_details(
         span.record("model_inference_details.status_code", err.status_code as i64);
     }
 }
+
+/// Records OpenAI Response API request params as span attributes
+pub fn record_response_request(params: &crate::responses::OpenAIResponseCreateParams) {
+    let span = Span::current();
+
+    // String fields
+    if let Some(ref model) = params.model {
+        span.record("request.model", model.as_str());
+    }
+    if let Some(ref previous_response_id) = params.previous_response_id {
+        span.record("request.previous_response_id", previous_response_id.as_str());
+    }
+    if let Some(ref service_tier) = params.service_tier {
+        span.record("request.service_tier", service_tier.as_str());
+    }
+    if let Some(ref user) = params.user {
+        span.record("request.user", user.as_str());
+    }
+
+    // Boolean fields
+    if let Some(parallel_tool_calls) = params.parallel_tool_calls {
+        span.record("request.parallel_tool_calls", parallel_tool_calls);
+    }
+    if let Some(stream) = params.stream {
+        span.record("request.stream", stream);
+    }
+    if let Some(store) = params.store {
+        span.record("request.store", store);
+    }
+    if let Some(background) = params.background {
+        span.record("request.background", background);
+    }
+
+    // Numeric fields
+    if let Some(max_tool_calls) = params.max_tool_calls {
+        span.record("request.max_tool_calls", max_tool_calls as i64);
+    }
+    if let Some(temperature) = params.temperature {
+        span.record("request.temperature", temperature as f64);
+    }
+    if let Some(max_output_tokens) = params.max_output_tokens {
+        span.record("request.max_output_tokens", max_output_tokens as i64);
+    }
+
+    // Prompt reference fields (extracted for convenience)
+    if let Some(ref prompt) = params.prompt {
+        span.record("request.prompt_id", prompt.id.as_str());
+        if let Some(ref version) = prompt.version {
+            span.record("request.prompt_version", version.as_str());
+        }
+        if let Ok(json) = serde_json::to_string(prompt) {
+            span.record("request.prompt", json.as_str());
+        }
+    }
+
+    // JSON serialized fields
+    if let Some(ref input) = params.input {
+        if let Ok(json) = serde_json::to_string(input) {
+            span.record("request.input", json.as_str());
+        }
+    }
+    if let Some(ref instructions) = params.instructions {
+        if let Ok(json) = serde_json::to_string(instructions) {
+            span.record("request.instructions", json.as_str());
+        }
+    }
+    if let Some(ref tools) = params.tools {
+        if let Ok(json) = serde_json::to_string(tools) {
+            span.record("request.tools", json.as_str());
+        }
+    }
+    if let Some(ref tool_choice) = params.tool_choice {
+        // If it's a simple string, record directly without extra quotes
+        if let Some(s) = tool_choice.as_str() {
+            span.record("request.tool_choice", s);
+        } else if let Ok(json) = serde_json::to_string(tool_choice) {
+            span.record("request.tool_choice", json.as_str());
+        }
+    }
+    if let Some(ref response_format) = params.response_format {
+        if let Ok(json) = serde_json::to_string(response_format) {
+            span.record("request.response_format", json.as_str());
+        }
+    }
+    if let Some(ref reasoning) = params.reasoning {
+        if let Ok(json) = serde_json::to_string(reasoning) {
+            span.record("request.reasoning", json.as_str());
+        }
+    }
+    if let Some(ref include) = params.include {
+        if let Ok(json) = serde_json::to_string(include) {
+            span.record("request.include", json.as_str());
+        }
+    }
+    if let Some(ref metadata) = params.metadata {
+        if let Ok(json) = serde_json::to_string(metadata) {
+            span.record("request.metadata", json.as_str());
+        }
+    }
+    if let Some(ref stream_options) = params.stream_options {
+        if let Ok(json) = serde_json::to_string(stream_options) {
+            span.record("request.stream_options", json.as_str());
+        }
+    }
+    if let Some(ref modalities) = params.modalities {
+        if let Ok(json) = serde_json::to_string(modalities) {
+            span.record("request.modalities", json.as_str());
+        }
+    }
+}
+
+/// Records OpenAI Response API result as span attributes
+pub fn record_response_result(response: &crate::responses::OpenAIResponse) {
+    let span = Span::current();
+
+    // Core response fields (always present)
+    span.record("response.id", response.id.as_str());
+    span.record("response.object", response.object.as_str());
+    span.record("response.created_at", response.created_at);
+    if let Ok(status_json) = serde_json::to_string(&response.status) {
+        // Remove quotes from the JSON string (e.g., "\"completed\"" -> "completed")
+        span.record("response.status", status_json.trim_matches('"'));
+    }
+    span.record("response.model", response.model.as_str());
+
+    // Optional boolean fields
+    if let Some(background) = response.background {
+        span.record("response.background", background);
+    }
+    if let Some(parallel_tool_calls) = response.parallel_tool_calls {
+        span.record("response.parallel_tool_calls", parallel_tool_calls);
+    }
+
+    // Optional numeric fields
+    if let Some(max_output_tokens) = response.max_output_tokens {
+        span.record("response.max_output_tokens", max_output_tokens as i64);
+    }
+    if let Some(temperature) = response.temperature {
+        span.record("response.temperature", temperature as f64);
+    }
+
+    // JSON serialized fields
+    if let Some(ref instructions) = response.instructions {
+        if let Ok(json) = serde_json::to_string(instructions) {
+            span.record("response.instructions", json.as_str());
+        }
+    }
+    if let Ok(json) = serde_json::to_string(&response.output) {
+        span.record("response.output", json.as_str());
+    }
+    if let Some(ref prompt) = response.prompt {
+        if let Ok(json) = serde_json::to_string(prompt) {
+            span.record("response.prompt", json.as_str());
+        }
+    }
+    if let Some(ref reasoning) = response.reasoning {
+        if let Ok(json) = serde_json::to_string(reasoning) {
+            span.record("response.reasoning", json.as_str());
+        }
+    }
+    if let Some(ref text) = response.text {
+        if let Ok(json) = serde_json::to_string(text) {
+            span.record("response.text", json.as_str());
+        }
+    }
+    if let Some(ref tool_choice) = response.tool_choice {
+        // If it's a simple string, record directly without extra quotes
+        if let Some(s) = tool_choice.as_str() {
+            span.record("response.tool_choice", s);
+        } else if let Ok(json) = serde_json::to_string(tool_choice) {
+            span.record("response.tool_choice", json.as_str());
+        }
+    }
+    if let Some(ref tools) = response.tools {
+        if let Ok(json) = serde_json::to_string(tools) {
+            span.record("response.tools", json.as_str());
+        }
+    }
+
+    // Usage fields (extracted for convenience)
+    if let Some(ref usage) = response.usage {
+        if let Ok(json) = serde_json::to_string(usage) {
+            span.record("response.usage", json.as_str());
+        }
+        span.record("response.usage.input_tokens", usage.input_tokens as i64);
+        if let Some(output_tokens) = usage.output_tokens {
+            span.record("response.usage.output_tokens", output_tokens as i64);
+        }
+        span.record("response.usage.total_tokens", usage.total_tokens as i64);
+    }
+}
