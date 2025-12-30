@@ -344,7 +344,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         ? { ...filters, ...overrideFilters }
         : filters;
 
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page: pagination.page,
         limit: pagination.limit,
       };
@@ -448,7 +448,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         ? { ...probeFilters, ...overrideFilters }
         : probeFilters;
 
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page: probePagination.page,
         limit: probePagination.limit,
       };
@@ -547,7 +547,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         ? { ...deploymentFilters, ...overrideFilters }
         : deploymentFilters;
 
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page: deploymentPagination.page,
         limit: deploymentPagination.limit,
       };
