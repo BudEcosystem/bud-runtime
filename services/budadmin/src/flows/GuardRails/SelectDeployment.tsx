@@ -91,6 +91,7 @@ export default function SelectDeployment() {
     updateWorkflow,
     workflowLoading,
     setSelectedDeployment: setSelectedDeploymentInStore,
+    isStandaloneDeployment,
   } = useGuardrails();
 
   // Reset page when search term changes
@@ -203,10 +204,8 @@ export default function SelectDeployment() {
         return; // Don't proceed without probe_selections
       }
 
-      // REQUIRED: Include is_standalone from deployment type step
-      payload.is_standalone = currentWorkflow?.is_standalone !== undefined
-        ? currentWorkflow.is_standalone
-        : false;
+      // REQUIRED: Include is_standalone from the store (set in DeploymentTypes step)
+      payload.is_standalone = isStandaloneDeployment;
 
       // REQUIRED: Include project_id from previous step
       const projectId = selectedProject?.project?.id || selectedProject?.id ||
@@ -229,11 +228,17 @@ export default function SelectDeployment() {
       console.log("endpoint_ids:", payload.endpoint_ids);
       console.log("================================");
 
-      // Update workflow with complete data
-      await updateWorkflow(payload);
+      // Update workflow with complete data and wait for response
+      const success = await updateWorkflow(payload);
 
-      // Move to probe settings
-      openDrawerWithStep("probe-settings");
+      // Only navigate to next step if API call was successful
+      if (success) {
+        // Store the selected deployment in the guardrails store
+        setSelectedDeploymentInStore(selectedDeploymentData);
+        // Move to probe settings
+        openDrawerWithStep("probe-settings");
+      }
+      // If not successful, stay on current page (error toast is shown by updateWorkflow)
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }
