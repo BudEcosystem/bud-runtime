@@ -86,16 +86,19 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 
 ### 4.2 Create agent
 
-1. On the Agents page, click + Agent in the header.
-2. The creation drawer starts a workflow for you.
-3. Select the target Project to set scope.
-4. Choose Simple Prompt (or relevant) agent type to define how the agent will run.
-5. In the prompt configuration step, select the Model/Endpoint the agent should call.
-6. Structured and unstructured inputs/outputs are supported: add input/output variables (string, number, boolean, array, object) for schema enforcement, or keep the prompt freeform for unstructured use. 
-7. Add a system prompt and prompt messages for the required roles (system, user, and assistant), and connect MCP tools if needed for downstream actions.
-8. Review, then click **Save** to publish the agent to the catalog.
-5. and backing model or deployment.
-3. Configure prompts and parameters, then save to add the agent to the catalog.
+ 1. On the Agents page, click + Agent in the header.
+ 2. The creation drawer starts a workflow for you.
+ 3. Select the target Project to set scope.
+ 4. Choose Simple Prompt (or relevant) agent type to define how the agent will run.
+ 5. In the prompt configuration step, select the Model/Endpoint the agent should call.
+ 6. Structured and unstructured inputs/outputs are supported: add input/output variables (string, number, boolean, array, object) for schema enforcement, or keep the prompt freeform for unstructured use.
+ 7. Add a system prompt and prompt messages for the required roles (system, user, and assistant), and connect MCP tools if needed for downstream actions.
+ 8. Click Run Agent to try out the configured agent. 
+ 9. Click Save and naviagte to the next step in the workflow.
+10. Provide Deployment Name, Tags, Description, Concurrency (minimum and maximum). Configure settings such as auto-scaling, caching, auto-logging, and rate limiting as required.
+ 8. Review, then click **Save** to publish the agent to the catalog.
+ 5. and backing model or deployment.
+ 3. Configure prompts and parameters, then save to add the agent to the catalog.
 
 ### 4.3 Filter and search agents
 
