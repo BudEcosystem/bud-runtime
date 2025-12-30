@@ -239,7 +239,7 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
               <Button
                 type="text"
                 className='bg-transparent border-none p-0 cursor-pointer group'
-                onClick={(event) => {
+                onClick={(event: React.MouseEvent) => {
                   event.stopPropagation();
                   confirmDelete(record)
                 }}
