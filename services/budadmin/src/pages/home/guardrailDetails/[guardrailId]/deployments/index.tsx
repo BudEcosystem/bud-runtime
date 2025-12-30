@@ -56,7 +56,7 @@ const DeploymentsTab: React.FC = () => {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchValue, guardrailId]);
+  }, [searchValue, guardrailId, fetchDeployments, setDeploymentFilters]);
 
   // Get status color and label
   const getStatusConfig = (status: string) => {
