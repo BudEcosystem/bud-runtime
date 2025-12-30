@@ -79,26 +79,21 @@ fetch('${apiUrl}', {
 export default function UseGuardrail() {
   const { drawerProps } = useDrawer();
 
-  // Get guardrail ID from the guardrail record passed via drawer props
-  const guardrailId = drawerProps?.guardrail?.id || "GUARDRAIL_PROFILE_ID";
+  // Get guardrail name from the guardrail record passed via drawer props
   const guardrailName = drawerProps?.guardrail?.name || "Guardrail";
 
   // Endpoint configuration for guardrails
   const endpointConfig = useMemo<EndpointConfig>(() => {
     return {
-      key: "/v1/guardrails/check",
-      label: "Check Content",
-      path: "/v1/guardrails/check",
+      key: "/v1/moderations",
+      label: "Moderations",
+      path: "/v1/moderations",
       payload: {
-        profile_id: guardrailId,
-        input: "Text content to be validated by the guardrail",
-        config: {
-          action: "block",
-          return_details: true
-        }
+        model: guardrailName,
+        input: "{YOUR_INPUT}"
       },
     };
-  }, [guardrailId]);
+  }, [guardrailName]);
 
   const baseUrl =
     process.env.NEXT_PUBLIC_COPY_CODE_API_BASE_URL ||
