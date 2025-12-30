@@ -45,12 +45,6 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
       .catch(() => setSubmittable(false));
   }, [form, values]);
 
-  const handleLogin = (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-    if (!submittable) return;
-    onSubmit(form.getFieldsValue());
-  };
-
   useEffect(() => {
     form.setFieldsValue({
       email: "",
@@ -85,7 +79,12 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
       </div>
 
       <Form
-        onFinish={(e) => onSubmit(e)}
+        onFinish={(e) => {
+          if (isRememberCheck) {
+            e.remember_me = true;
+          }
+          onSubmit(e);
+        }}
         feedbackIcons={({ status, errors, warnings }) => {
           // return <FeedbackIcons status={status} errors={errors} warnings={warnings} />
           return {
@@ -242,13 +241,12 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
           <label
             htmlFor="isRemember"
             className="flex items-center cursor-pointer"
-            onClick={() => setIsRememberCheck(!isRememberCheck)}
           >
             <CheckBoxInput
               id="isRemember"
               defaultCheck={false}
               checkedChange={isRememberCheck}
-              onClick={() => setIsRememberCheck(!isRememberCheck)}
+              onCheckedChange={(checked) => setIsRememberCheck(checked)}
             />
             <Text_12_400_808080 className="ml-[.45rem] tracking-[.01rem] cursor-pointer select-none">
               Remember me
@@ -258,8 +256,9 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
 
         <PrimaryButton
           type="primary"
+          htmlType="submit"
           classNames="w-[100%] mt-[1.6rem]"
-          onClick={handleLogin}
+          disabled={!submittable}
         >
           Login
         </PrimaryButton>
