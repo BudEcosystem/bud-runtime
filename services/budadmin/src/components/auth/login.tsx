@@ -45,16 +45,6 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
       .catch(() => setSubmittable(false));
   }, [form, values]);
 
-  const handleLogin = (e: { preventDefault: () => void }) => {
-    e.preventDefault();
-    if (!submittable) return;
-    const formData = form.getFieldsValue();
-    if (isRememberCheck) {
-      formData.remember_me = true;
-    }
-    onSubmit(formData);
-  };
-
   useEffect(() => {
     form.setFieldsValue({
       email: "",
@@ -266,8 +256,9 @@ const LoginPage = ({ onSubmit }: LoginPageModalProps) => {
 
         <PrimaryButton
           type="primary"
+          htmlType="submit"
           classNames="w-[100%] mt-[1.6rem]"
-          onClick={handleLogin}
+          disabled={!submittable}
         >
           Login
         </PrimaryButton>
