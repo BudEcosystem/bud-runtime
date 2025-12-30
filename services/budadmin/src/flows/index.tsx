@@ -144,6 +144,7 @@ import DeployingProbe from "./GuardRails/DeployingProbe";
 import ProbeDeploymentSuccess from "./GuardRails/ProbeDeploymentSuccess";
 import ProbeDetails from "./GuardRails/ProbeDetails";
 import ViewGuardRailDetails from "./GuardRails/ViewGuardRailDetails";
+import UseGuardrail from "./GuardRails/UseGuardrail";
 import AddAgentSelectProject from "./AddAgent";
 import AddAgentSelectModel from "./AddAgent/SelectModel";
 import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
@@ -312,6 +313,7 @@ export const StepComponents = {
   "probe-deployment-success": ProbeDeploymentSuccess,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
+  "use-guardrail": UseGuardrail,
 
   // AddAgent
   "add-agent-select-type": AddAgentSelectType,

@@ -2140,6 +2140,27 @@ const useAgent: DrawerFlowType = {
   ],
 };
 
+const useGuardrail: DrawerFlowType = {
+  title: "Use Guardrail",
+  description: "Use a guardrail in your application",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Guardrails", "Use Guardrail"],
+      id: "use-guardrail",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["use-guardrail"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Use Guardrail",
+        },
+      ],
+    },
+  ],
+};
+
 const publish: DrawerFlowType = {
   title: "Publish",
   description: "Publish deployment",
@@ -5038,6 +5059,7 @@ const flows = {
   "add-guardrail": addGuardrail,
   "probe-details": viewProbeDetails,
   "view-guardrail-details": viewGuardrailDetails,
+  "use-guardrail": useGuardrail,
   // blocking rules
   "create-blocking-rule": createBlockingRule,
   "view-blocking-rule": viewBlockingRule,

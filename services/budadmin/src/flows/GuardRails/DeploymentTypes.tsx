@@ -22,7 +22,8 @@ export default function DeploymentTypes() {
     currentWorkflow,
     selectedProvider,
     selectedProbes,
-    selectedProbe
+    selectedProbe,
+    setIsStandaloneDeployment
   } = useGuardrails();
 
   const handleBack = () => {
@@ -63,6 +64,9 @@ export default function DeploymentTypes() {
       };
 
       const mappedValues = deploymentTypeMapping[selectedType];
+
+      // Store the standalone flag in the store (persists across workflow updates)
+      setIsStandaloneDeployment(mappedValues.is_standalone);
 
       // Build the complete workflow payload
       const payload: any = {
