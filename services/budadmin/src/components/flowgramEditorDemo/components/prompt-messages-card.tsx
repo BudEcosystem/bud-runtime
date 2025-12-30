@@ -1,7 +1,6 @@
 import { Field } from '@flowgram.ai/fixed-layout-editor';
 import { useSession } from '../contexts/SessionContext';
 import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
-import { Image } from "antd";
 
 interface PromptMessage {
   id: string;
@@ -10,7 +9,7 @@ interface PromptMessage {
 }
 
 export const PromptMessagesCard = () => {
-  const { session, promptMessagesWorkflowStatus, onDeletePromptMessage } = useSession();
+  const { session, promptMessagesWorkflowStatus } = useSession();
 
   // Get prompt messages from the session, with default if empty
   const promptMessagesString = session?.promptMessages || '';
@@ -151,10 +150,10 @@ export const PromptMessagesCard = () => {
                   borderRadius: '.75rem',
                   background: '#FFFFFF05',
                 }}
-                className='group flex flex-col gap-2 cursor-default'
+                className='flex flex-col gap-2 cursor-default'
               >
-                {/* Role tag and delete button */}
-                <div className='flex justify-between items-center'>
+                {/* Role tag */}
+                <div className='flex justify-start items-center'>
                   <div
                     style={{
                       fontSize: '10px',
@@ -168,24 +167,6 @@ export const PromptMessagesCard = () => {
                   >
                     {roleDisplay.name}
                   </div>
-                  {/* Delete button - only show when there are more than 1 messages */}
-                  {messages.length > 1 && (
-                    <div
-                      className='opacity-0 group-hover:opacity-100 cursor-pointer'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeletePromptMessage?.(message.id);
-                      }}
-                    >
-                      <Image
-                        preview={false}
-                        width={'0.8125rem'}
-                        height={'0.8125rem'}
-                        alt='delete'
-                        src="/icons/deleteWhite.svg"
-                      />
-                    </div>
-                  )}
                 </div>
                 {/* Message content */}
                 <div style={{
