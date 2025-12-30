@@ -78,6 +78,7 @@ class GenAIAttributes:
     GEN_AI_RESPONSE_CREATED_AT = "gen_ai.response.created_at"
     GEN_AI_RESPONSE_OBJECT = "gen_ai.response.object"
     GEN_AI_RESPONSE_STATUS = "gen_ai.response.status"
+    GEN_AI_RESPONSE_TOP_P = "gen_ai.response.top_p"
     GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
     GEN_AI_REQUEST_STREAM = "gen_ai.request.stream"
 

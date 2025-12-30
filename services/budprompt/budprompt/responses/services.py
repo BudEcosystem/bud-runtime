@@ -135,7 +135,7 @@ class ResponsesService:
         if result.temperature is not None:
             span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_TEMPERATURE, result.temperature)
         if result.top_p is not None:
-            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_TOP_P, result.top_p)
+            span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_TOP_P, result.top_p)
         if result.max_output_tokens is not None:
             span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_MAX_TOKENS, result.max_output_tokens)
 
