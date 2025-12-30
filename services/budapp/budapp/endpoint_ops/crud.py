@@ -380,8 +380,8 @@ class EndpointDataManager(DataManagerUtils):
             explicit_conditions.append(task_conditions)
 
         if explicit_filters["modality"]:
-            # Check any of modality present in the field
-            modality_condition = Model.modality.in_(explicit_filters["modality"])
+            # Check if model has any of the requested modalities (array overlap)
+            modality_condition = Model.modality.overlap(explicit_filters["modality"])
             explicit_conditions.append(modality_condition)
 
         if explicit_filters["model_size"]:

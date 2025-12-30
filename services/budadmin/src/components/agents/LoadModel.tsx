@@ -26,6 +26,8 @@ interface ModelWrapper {
 
 const DEFAULT_MODEL_ICON = "/icons/modelRepoWhite.png";
 const CLOUD_PROVIDER_TYPES = ["hugging_face", "cloud_model"];
+const MODALITY_TEXT_INPUT = "text_input";
+const MODALITY_TEXT_OUTPUT = "text_output";
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
   const { updateSession, sessions } = useAgentStore();
@@ -56,6 +58,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
   const [totalModels, setTotalModels] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const pageSize = 10;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,9 +73,11 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
     } else {
       setIsLoading(true);
     }
+    setHasError(false);
 
     try {
       const params: any = {
+        modality: [MODALITY_TEXT_INPUT, MODALITY_TEXT_OUTPUT],
         page,
         limit: pageSize,
         search: Boolean(search)
@@ -124,7 +129,7 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       }
     } catch (error) {
       console.error("Error fetching deployments:", error);
-      errorToast("Failed to load deployments");
+      setHasError(true);
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -315,7 +320,9 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
                 <Empty
                   description={
                     <span className="text-[#808080] text-xs">
-                      {searchValue
+                      {hasError
+                        ? "Failed to load models"
+                        : searchValue
                         ? `No models found matching "${searchValue}"`
                         : "No available models"}
                     </span>

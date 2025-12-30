@@ -226,13 +226,12 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
                         {/* Message Content */}
                         <div className="flex flex-col gap-1">
                           <TextAreaInput
-                            className="!w-full !max-w-full !min-h-[3rem] !text-[#EEEEEE] !text-xs placeholder:!text-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]  placeholder:text-[#757575] placeholder:opacity-100 placeholder:text-[.75rem]"
+                            className="!w-full !max-w-full !min-h-[3rem] !text-[#EEEEEE] !text-xs placeholder:!text-[#606060] !border-[#2A2A2A] hover:!border-[#965CDE] focus:!border-[#965CDE] px-[.4rem]  placeholder:text-[#757575] placeholder:opacity-100 placeholder:text-[.75rem] resize-y"
                             value={message.content}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                               handleMessageChange(message.id, 'content', e.target.value)
                             }
                             placeholder="Enter Message"
-                            style={{ color: '#EEEEEE' }}
                           />
                         </div>
                       </div>

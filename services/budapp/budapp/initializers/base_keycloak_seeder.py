@@ -56,6 +56,9 @@ class BaseKeycloakSeeder(BaseSeeder):
                 f"::KEYCLOAK::Realm {default_realm_name} and user {app_settings.superuser_email} both exist. Syncing permissions..."
             )
 
+            # Sync realm settings (token lifespans, session timeouts) for existing realm
+            await keycloak_manager.sync_realm_settings(default_realm_name)
+
             # Get tenant client info to sync permissions
             tenant_client = await UserDataManager(session).retrieve_by_fields(
                 TenantClient,

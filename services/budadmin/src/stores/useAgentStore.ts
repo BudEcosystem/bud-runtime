@@ -71,6 +71,12 @@ export interface AgentSession {
     topP?: number;
     stream?: boolean;
   };
+  // Schema and settings flags (persisted across OAuth redirects)
+  allowMultipleCalls?: boolean;
+  structuredInputEnabled?: boolean;
+  structuredOutputEnabled?: boolean;
+  // Per-session model settings (isolated per agent box)
+  modelSettings?: AgentSettings;
 }
 
 interface AgentStore {
@@ -123,10 +129,15 @@ interface AgentStore {
   updateVariable: (sessionId: string, variableId: string, updates: Partial<AgentVariable>) => void;
   deleteVariable: (sessionId: string, variableId: string) => void;
 
-  // Settings Management
+  // Settings Management (Global Presets)
   addSettingPreset: (preset: AgentSettings) => void;
   updateSettingPreset: (preset: AgentSettings) => void;
   setCurrentSettingPreset: (preset: AgentSettings) => void;
+
+  // Session-Specific Settings Management
+  initializeSessionSettings: (sessionId: string, preset?: AgentSettings) => void;
+  updateSessionSettings: (sessionId: string, updates: Partial<AgentSettings>) => void;
+  getSessionSettings: (sessionId: string) => AgentSettings | undefined;
 
   // UI Actions
   openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
@@ -157,6 +168,10 @@ interface AgentStore {
 
   // Prompt cleanup tracking
   addDeletedPromptId: (sessionId: string, promptId: string) => void;
+
+  // OAuth Session Restoration
+  restoreSessionWithPromptId: (promptId: string, sessionData?: Partial<AgentSession>) => string;
+  getSessionByPromptId: (promptId: string) => AgentSession | undefined;
 }
 
 const generateId = () => {
@@ -209,6 +224,33 @@ const createDefaultSession = (): AgentSession => ({
     maxTokens: 2000,
     topP: 1.0
   }
+});
+
+const createDefaultModelSettings = (sessionId: string): AgentSettings => ({
+  id: `settings_${sessionId}`,
+  name: "Default",
+  temperature: 0.7,
+  max_tokens: 2000,
+  top_p: 1.0,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+  stop_sequences: [],
+  seed: 0,
+  timeout: 0,
+  parallel_tool_calls: true,
+  logprobs: false,
+  logit_bias: {},
+  extra_headers: {},
+  max_completion_tokens: 0,
+  stream_options: {},
+  response_format: {},
+  tool_choice: "auto",
+  chat_template: "",
+  chat_template_kwargs: {},
+  mm_processor_kwargs: {},
+  created_at: new Date().toISOString(),
+  modified_at: new Date().toISOString(),
+  modifiedFields: new Set<string>(),
 });
 
 export const useAgentStore = create<AgentStore>()((set, get) => ({
@@ -416,6 +458,72 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
       setCurrentSettingPreset: (preset) => {
         set({ currentSettingPreset: preset });
+      },
+
+      // Session-Specific Settings Management
+      initializeSessionSettings: (sessionId, preset) => {
+        set((state) => {
+          const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
+          if (sessionIndex === -1) return state;
+
+          const session = state.sessions[sessionIndex];
+          // If session already has settings, don't reinitialize
+          if (session.modelSettings) return state;
+
+          const defaultSettings: AgentSettings = preset || createDefaultModelSettings(sessionId);
+
+          const sessions = [...state.sessions];
+          sessions[sessionIndex] = {
+            ...session,
+            modelSettings: defaultSettings,
+            updatedAt: new Date(),
+          };
+
+          return { sessions };
+        });
+      },
+
+      updateSessionSettings: (sessionId, updates) => {
+        set((state) => {
+          const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
+          if (sessionIndex === -1) return state;
+
+          const sessions = [...state.sessions];
+          const session = { ...sessions[sessionIndex] };
+
+          // Initialize settings if not present
+          if (!session.modelSettings) {
+            session.modelSettings = createDefaultModelSettings(sessionId);
+          }
+
+          const currentSettings = session.modelSettings;
+
+          // Track which fields are being modified
+          const modifiedFields = new Set<string>(currentSettings.modifiedFields || []);
+          Object.keys(updates).forEach(key => {
+            modifiedFields.add(key);
+          });
+
+          const updatedSettings: AgentSettings = {
+            ...currentSettings,
+            ...updates,
+            modified_at: new Date().toISOString(),
+            modifiedFields,
+          };
+
+          sessions[sessionIndex] = {
+            ...session,
+            modelSettings: updatedSettings,
+            updatedAt: new Date(),
+          };
+
+          return { sessions };
+        });
+      },
+
+      getSessionSettings: (sessionId) => {
+        const session = get().sessions.find(s => s.id === sessionId);
+        return session?.modelSettings;
       },
 
       // UI Actions
@@ -641,5 +749,57 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
           isEditVersionMode: true,
           editVersionData: versionData
         });
+      },
+
+      // OAuth Session Restoration - creates or restores a session with a specific prompt ID
+      restoreSessionWithPromptId: (promptId: string, sessionData?: Partial<AgentSession>) => {
+        const existingSessions = get().sessions;
+        const activeSessionIds = get().activeSessionIds;
+
+        // Check if session with this prompt ID already exists
+        const existingSession = existingSessions.find(s => s.promptId === promptId);
+        if (existingSession) {
+          // Update existing session with new data if provided
+          if (sessionData) {
+            set({
+              sessions: existingSessions.map(s =>
+                s.id === existingSession.id
+                  ? { ...s, ...sessionData, updatedAt: new Date() }
+                  : s
+              ),
+              selectedSessionId: existingSession.id
+            });
+          }
+          return existingSession.id;
+        }
+
+        // Limit to maximum 3 active sessions
+        if (activeSessionIds.length >= 3) {
+          infoToast("Maximum of 3 agent boxes allowed");
+          return activeSessionIds[activeSessionIds.length - 1];
+        }
+
+        // Create new session with the specific prompt ID (not auto-generated)
+        const newSession: AgentSession = {
+          ...createDefaultSession(),
+          ...sessionData,
+          id: generateId(),
+          promptId: promptId, // Use the provided promptId, NOT auto-generated
+          position: existingSessions.length,
+          updatedAt: new Date(),
+        };
+
+        set({
+          sessions: [...existingSessions, newSession],
+          activeSessionIds: [...activeSessionIds, newSession.id],
+          selectedSessionId: newSession.id
+        });
+
+        return newSession.id;
+      },
+
+      // Get session by prompt ID
+      getSessionByPromptId: (promptId: string) => {
+        return get().sessions.find(s => s.promptId === promptId);
       }
     }));

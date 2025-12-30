@@ -30,12 +30,19 @@ const CheckBoxInput: React.FC<CheckBoxInputProps> = ({
   indicatorClassName,
   defaultCheck,
   checkedChange,
+  onCheckedChange,
   ...props
 }) => {
-  const [isChecked, setIsChecked] = useState(false);
+  const [internalChecked, setInternalChecked] = useState(defaultCheck ?? false);
+
+  // Use controlled value if provided, otherwise use internal state
+  const isChecked = checkedChange !== undefined ? checkedChange : internalChecked;
 
   const handleCheckedChange = (checked: boolean) => {
-    setIsChecked(checked);
+    setInternalChecked(checked);
+    if (onCheckedChange) {
+      onCheckedChange(checked);
+    }
   };
 
   return (

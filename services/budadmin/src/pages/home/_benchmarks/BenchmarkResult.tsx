@@ -170,16 +170,11 @@ const BenchmarkResult = () => {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    if (!modelClusterDetails) {
+    if (benchmarkId) {
       getBenchmarkModelClusterDetails(benchmarkId as string);
-    }
-  }, [benchmarkId, isMounted]);
-
-  useEffect(() => {
-    if (!benchmarkResult) {
       getBenchmarkResult(benchmarkId as string);
     }
-  }, [benchmarkId, isMounted]);
+  }, [benchmarkId]);
 
   // inputSizeVsTTFT =======================================================
   useEffect(() => {

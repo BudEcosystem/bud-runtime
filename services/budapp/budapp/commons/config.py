@@ -176,6 +176,16 @@ class AppConfig(BaseAppConfig):
     keycloak_admin_password: str = Field(alias="KEYCLOAK_ADMIN_PASSWORD")
     keycloak_realm_name: str = Field(alias="KEYCLOAK_REALM_NAME")
     keycloak_verify_ssl: bool = Field(True, alias="KEYCLOAK_VERIFY_SSL")
+    # Keycloak Token Settings (in seconds)
+    keycloak_access_token_lifespan: int = Field(1800, alias="KEYCLOAK_ACCESS_TOKEN_LIFESPAN")  # 30 minutes
+    keycloak_sso_session_idle_timeout: int = Field(86400, alias="KEYCLOAK_SSO_SESSION_IDLE_TIMEOUT")  # 24 hours
+    keycloak_sso_session_max_lifespan: int = Field(86400, alias="KEYCLOAK_SSO_SESSION_MAX_LIFESPAN")  # 24 hours
+    keycloak_offline_session_idle_timeout: int = Field(
+        2592000, alias="KEYCLOAK_OFFLINE_SESSION_IDLE_TIMEOUT"
+    )  # 30 days
+    keycloak_offline_session_max_lifespan: int = Field(
+        2592000, alias="KEYCLOAK_OFFLINE_SESSION_MAX_LIFESPAN"
+    )  # 30 days
     # Minio store
     minio_endpoint: str = Field("bud-store.bud.studio", alias="MINIO_ENDPOINT")
     minio_secure: bool = Field(True, alias="MINIO_SECURE")

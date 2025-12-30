@@ -46,7 +46,7 @@ export function updateQueryParams(
 }
 
 /**
- * Removes the 'prompt' parameter from the current URL
+ * Removes the 'prompt' and 'connector' parameters from the current URL
  * Used when closing agent/prompt editors to clean up the URL
  */
 export function removePromptFromUrl(): void {
@@ -57,6 +57,9 @@ export function removePromptFromUrl(): void {
 
   // Remove the prompt parameter
   urlSearchParams.delete('prompt');
+
+  // Remove the connector parameter to prevent stale tool state on next drawer open
+  urlSearchParams.delete('connector');
 
   // Build query parts for remaining parameters
   const queryParts: string[] = [];

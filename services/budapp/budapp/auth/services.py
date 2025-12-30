@@ -105,6 +105,7 @@ class AuthService(SessionMixin):
                     password=user.password,
                     realm_name=realm_name,
                     credentials=credentials,
+                    remember_me=user.remember_me,
                 )
 
                 # Fetch user details from Keycloak
@@ -322,6 +323,7 @@ class AuthService(SessionMixin):
                 password=user.password,
                 realm_name=tenant.realm_name,  # default realm name
                 credentials=credentials,
+                remember_me=user.remember_me,
             )
         except KeycloakPostError as e:
             # Handle Keycloak account setup errors (400 errors from token endpoint)

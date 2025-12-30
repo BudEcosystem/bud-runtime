@@ -122,9 +122,17 @@
             ]
           },
           {
+            "group": "Dashboard",
+            "icon": "gauge-high",
+            "pages": [
+              "dashboard/dashboard"
+            ]
+          },
+          {
             "group": "Prompts & Agents",
             "icon": "wand-magic-sparkles",
             "pages": [
+              "prompts-agents/agents",
               "prompts-agents/prompt-management",
               "prompts-agents/prompt-templates",
               "prompts-agents/agent-configuration",
@@ -135,6 +143,7 @@
             "group": "Evaluations",
             "icon": "chart-bar",
             "pages": [
+              "evaluations/evaluations",
               "evaluations/evaluation-overview",
               "evaluations/creating-evaluation-sets",
               "evaluations/running-evaluations",

@@ -74,12 +74,10 @@ async def get_leaderboard_table(
 
 @leaderboard_router.get("/models/compare")
 async def get_leaderboard_by_models(
-    model_uris: Annotated[
-        List[str] | None, Query(..., description="List of model URIs to filter by", default_factory=list)
-    ] = None,
+    model_uris: Annotated[List[str] | None, Query(description="List of model URIs to filter by")] = None,
     benchmark_fields: Annotated[
         List[str] | None,
-        Query(..., description="List of benchmark fields to filter by", default_factory=list),
+        Query(description="List of benchmark fields to filter by"),
     ] = None,
     k: Annotated[int, Query(description="Number of leaderboards to return", ge=1)] = 5,
 ) -> Response:
@@ -96,6 +94,8 @@ async def get_leaderboard_by_models(
     """
     response: Union[LeaderboardModelCompareResponse, ErrorResponse]
     try:
+        model_uris = model_uris or []
+        benchmark_fields = benchmark_fields or []
         logger.debug("Getting leaderboards for %s models", len(model_uris))
         db_results = await LeaderboardService().get_leaderboards_by_models(model_uris, benchmark_fields, k)
         return LeaderboardModelCompareResponse(
@@ -115,9 +115,7 @@ async def get_leaderboard_by_models(
 
 @leaderboard_router.get("/models-uris")
 async def get_leaderboard_by_model_uris(
-    model_uris: Annotated[
-        List[str] | None, Query(..., description="List of model URIs to filter by", default_factory=list)
-    ] = None,
+    model_uris: Annotated[List[str], Query(description="List of model URIs to filter by", default_factory=list)],
 ) -> Response:
     """Get the leaderboards for the given model URIs.
 
@@ -131,6 +129,7 @@ async def get_leaderboard_by_model_uris(
     """
     response: Union[LeaderboardModelUrisListResponse, ErrorResponse]
     try:
+        model_uris = model_uris or []
         logger.debug("Getting leaderboards for %s models", len(model_uris))
         db_results = await LeaderboardService().get_model_evals_by_uris(model_uris)
         return LeaderboardModelUrisListResponse(

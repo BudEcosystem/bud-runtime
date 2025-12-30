@@ -16,6 +16,7 @@
 
 """OpenAI Response Formatter for converting pydantic-ai responses to OpenAI format."""
 
+import json
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -111,7 +112,7 @@ class OpenAIResponseFormatter_V4:
             all_messages = pydantic_result.new_messages()
 
             # Extract output items and add structured output if present
-            output_items = await self.build_complete_output_items(all_messages, pydantic_result, tools)
+            output_items = await self.build_complete_output_items(all_messages, pydantic_result, tools, output_schema)
 
             # Build instructions from original user input (system prompt + messages)
             # NOT from pydantic-ai all_messages which contains internal retry data
@@ -311,6 +312,7 @@ class OpenAIResponseFormatter_V4:
         all_messages: List[ModelMessage],
         agent_result: AgentRunResult,
         tools: Optional[List[MCPToolConfig]] = None,
+        output_schema: Optional[Dict[str, Any]] = None,
     ) -> List[Any]:
         """Format output items from messages and add structured output if present.
 
@@ -321,6 +323,7 @@ class OpenAIResponseFormatter_V4:
             all_messages: All messages from agent execution
             agent_result: The AgentRunResult from pydantic-ai
             tools: Optional MCP tool configurations
+            output_schema: JSON schema with default values for structured output
 
         Returns:
             List of output items
@@ -329,9 +332,26 @@ class OpenAIResponseFormatter_V4:
         output_items = await self._format_output_items(all_messages, tools)
 
         # Add EITHER structured output OR final text (mutually exclusive)
-        if self._has_final_result_tool_return(agent_result, all_messages):
+        # Check for structured output: either via tool return (ToolOutput) or Pydantic model (NativeOutput)
+        has_tool_return = self._has_final_result_tool_return(agent_result, all_messages)
+        has_pydantic_output = hasattr(agent_result.output, "model_dump") if agent_result.output else False
+
+        if has_tool_return or has_pydantic_output:
             # Structured output mode: add result.output as JSON
             structured_output = agent_result.output
+
+            # Apply schema defaults to replace null values
+            if output_schema and has_pydantic_output:
+                from budprompt.executors.v4.utils import apply_schema_defaults
+
+                processed_output = apply_schema_defaults(structured_output)
+                output_text = json.dumps(processed_output)
+            else:
+                output_text = (
+                    structured_output.model_dump_json()
+                    if hasattr(structured_output, "model_dump_json")
+                    else str(structured_output)
+                )
 
             output_items.append(
                 ResponseOutputMessage(
@@ -341,11 +361,7 @@ class OpenAIResponseFormatter_V4:
                     content=[
                         ResponseOutputText(
                             type="output_text",
-                            text=(
-                                structured_output.model_dump_json()
-                                if hasattr(structured_output, "model_dump_json")
-                                else str(structured_output)
-                            ),
+                            text=output_text,
                             annotations=[],
                         )
                     ],

@@ -15,11 +15,6 @@
     "hf_hub_url": "JosephusCheung/GuanacoDataset",
     "ms_hub_url": "AI-ModelScope/GuanacoDataset"
   },
-  "ultra_chat": {
-    "display_name": "Ultra Chat",
-    "script_url": "ultra_chat",
-    "formatting": "sharegpt"
-  },
   "open_platypus": {
     "display_name": "Open Platypus",
     "hf_hub_url": "garage-bAInd/Open-Platypus",
@@ -54,14 +49,6 @@
       "response": "output"
     }
   },
-  "wikiqa": {
-    "display_name": "Wiki QA",
-    "hf_hub_url": "wiki_qa",
-    "columns": {
-      "prompt": "question",
-      "response": "answer"
-    }
-  },
   "webqa": {
     "display_name": "Web QA",
     "hf_hub_url": "suolyer/webqa",
@@ -92,23 +79,6 @@
       "user_tag": "user",
       "assistant_tag": "assistant"
     }
-  },
-  "agent_instruct": {
-    "display_name": "Agent Instruct",
-    "hf_hub_url": "THUDM/AgentInstruct",
-    "ms_hub_url": "ZhipuAI/AgentInstruct",
-    "formatting": "sharegpt"
-  },
-  "evol_instruct": {
-    "display_name": "Evol Instruct V2",
-    "hf_hub_url": "WizardLM/WizardLM_evol_instruct_V2_196k",
-    "ms_hub_url": "AI-ModelScope/WizardLM_evol_instruct_V2_196k",
-    "formatting": "sharegpt"
-  },
-  "neo_sft": {
-    "display_name": "Neo SFT Phase 2",
-    "hf_hub_url": "m-a-p/neo_sft_phase2",
-    "formatting": "sharegpt"
   },
   "magpie_ultra": {
     "display_name": "Magpie Ultra",
@@ -189,22 +159,5 @@
       "messages": "conversations",
       "images": "images"
     }
-  },
-  "wikipedia_zh": {
-    "display_name": "Wikipedia Chinese",
-    "hf_hub_url": "pleisto/wikipedia-cn-20230720-filtered",
-    "ms_hub_url": "AI-ModelScope/wikipedia-cn-20230720-filtered",
-    "columns": {
-      "prompt": "completion"
-    }
-  },
-  "starcoder_python": {
-    "display_name": "StarCoder Python",
-    "hf_hub_url": "bigcode/starcoderdata",
-    "ms_hub_url": "AI-ModelScope/starcoderdata",
-    "columns": {
-      "prompt": "content"
-    },
-    "folder": "python"
   }
 }

@@ -120,6 +120,10 @@ interface GuardrailsState {
   selectedDeployment: any | null;
   setSelectedDeployment: (deployment: any | null) => void;
 
+  // Deployment type flag (true for guardrail-endpoint, false for existing-deployment)
+  isStandaloneDeployment: boolean;
+  setIsStandaloneDeployment: (value: boolean) => void;
+
   // Workflow state
   currentWorkflow: GuardrailsWorkflow | null;
   workflowLoading: boolean;
@@ -167,6 +171,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   selectedProbes: [], // Initialize empty array for multiple probes
   selectedProject: null,
   selectedDeployment: null,
+  isStandaloneDeployment: false, // Default to existing-deployment flow
 
   // Step data management
   selectedProvider: null,
@@ -318,6 +323,11 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   // Set selected deployment
   setSelectedDeployment: (deployment: any | null) => {
     set({ selectedDeployment: deployment });
+  },
+
+  // Set standalone deployment flag
+  setIsStandaloneDeployment: (value: boolean) => {
+    set({ isStandaloneDeployment: value });
   },
 
   // Set selected provider (for step data management)
@@ -474,6 +484,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       selectedProject: null,
       selectedDeployment: null,
       selectedProvider: null,
+      isStandaloneDeployment: false,
     });
   },
 

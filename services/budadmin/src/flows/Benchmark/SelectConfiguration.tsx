@@ -23,9 +23,7 @@ function ConfigurationFormContent({
   configurationError,
   selectedConfiguration,
   hardwareMode,
-  totalDatasetSamples,
   defaultNumPrompts,
-  isConfigurationType,
   onConfigChange,
 }: {
   nodeConfigurations: any;
@@ -33,9 +31,7 @@ function ConfigurationFormContent({
   configurationError: string | null;
   selectedConfiguration: SelectedConfiguration | null;
   hardwareMode: string | null;
-  totalDatasetSamples: number;
   defaultNumPrompts: number;
-  isConfigurationType: boolean;
   onConfigChange: (config: { deviceType: string | null; tppp: TPPPOption | null; replicas: number; numPrompts?: number }) => void;
 }) {
   const { form } = useContext(BudFormContext);
@@ -48,7 +44,7 @@ function ConfigurationFormContent({
     selectedConfiguration?.replicas || 1
   );
   const [numPrompts, setNumPrompts] = useState<number | undefined>(
-    selectedConfiguration?.num_prompts || (isConfigurationType ? defaultNumPrompts : undefined)
+    selectedConfiguration?.num_prompts || defaultNumPrompts
   );
 
   // Get currently selected device config
@@ -116,13 +112,13 @@ function ConfigurationFormContent({
     onConfigChange({ deviceType: selectedDeviceType, tppp: selectedTPPP, replicas, numPrompts });
   }, [selectedDeviceType, selectedTPPP, replicas, numPrompts]);
 
-  // Set default num_prompts for configuration type
+  // Set default num_prompts (3x concurrency) for both configuration and dataset types
   useEffect(() => {
-    if (isConfigurationType && !selectedConfiguration?.num_prompts) {
+    if (!selectedConfiguration?.num_prompts) {
       setNumPrompts(defaultNumPrompts);
       form?.setFieldsValue({ num_prompts: String(defaultNumPrompts) });
     }
-  }, [isConfigurationType, defaultNumPrompts, form]);
+  }, [defaultNumPrompts, form]);
 
   // Transform device configurations to dropdown items
   const deviceTypeItems = nodeConfigurations?.device_configurations?.map((config: any) => ({
@@ -224,18 +220,8 @@ function ConfigurationFormContent({
           <TextInput
             name="num_prompts"
             label="Number of Prompts"
-            placeholder={
-              isConfigurationType
-                ? `Default: ${defaultNumPrompts} (from concurrency)`
-                : totalDatasetSamples > 0
-                  ? `Default: ${totalDatasetSamples} (from datasets)`
-                  : "Enter number of prompts"
-            }
-            infoText={
-              isConfigurationType
-                ? "Total prompts to run. Defaults to concurrency value."
-                : "Total prompts to run. If not set, defaults to sum of dataset samples."
-            }
+            placeholder={`Default: ${defaultNumPrompts} (3x concurrency)`}
+            infoText="Total prompts to run. Defaults to 3x concurrent requests."
             allowOnlyNumbers={true}
             rules={[
               { required: true, message: "Please enter number of prompts" },
@@ -265,8 +251,6 @@ export default function SelectConfiguration() {
     setRunAsSimulation,
     stepSeven,
     stepEight,
-    selectedDataset,
-    evalWith,
     stepOneData,
   } = usePerfomanceBenchmark();
 
@@ -277,17 +261,8 @@ export default function SelectConfiguration() {
     numPrompts?: number;
   }>({ deviceType: null, tppp: null, replicas: 1, numPrompts: undefined });
 
-  // Calculate total dataset samples for default placeholder
-  const totalDatasetSamples = selectedDataset.reduce(
-    (sum, dataset) => sum + (dataset.num_samples || 0),
-    0
-  );
-
-  // For configuration type, default num_prompts to concurrency
-  const isConfigurationType = evalWith !== "dataset";
-  const defaultNumPrompts = isConfigurationType
-    ? stepOneData?.concurrent_requests || 10
-    : totalDatasetSamples;
+  // Default num_prompts to 3x concurrency
+  const defaultNumPrompts = 3 * (stepOneData?.concurrent_requests || 10);
 
   // Fetch configurations on mount
   useEffect(() => {
@@ -352,9 +327,7 @@ export default function SelectConfiguration() {
             configurationError={configurationError}
             selectedConfiguration={selectedConfiguration}
             hardwareMode={hardwareMode}
-            totalDatasetSamples={totalDatasetSamples}
             defaultNumPrompts={defaultNumPrompts}
-            isConfigurationType={isConfigurationType}
             onConfigChange={setCurrentConfig}
           />
         </BudDrawerLayout>

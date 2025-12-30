@@ -2258,18 +2258,32 @@ class ObservabilityMetricsService:
         )
 
     async def get_geographic_data(self, request) -> dict:
-        """Get geographic distribution data from GatewayAnalytics table."""
+        """Get geographic distribution data from GatewayAnalytics table.
+
+        Note: Currently inference_id in GatewayAnalytics is not populated,
+        so success_rate and avg_latency_ms will be NULL until that is fixed.
+        Geographic data (country, region, city, lat/long) is directly available.
+        """
         from budmetrics.observability.schemas import (
             GeographicDataPoint,
             GeographicDataResponse,
         )
 
         # Build query based on group_by parameter
+        # Note: success_rate and avg_latency_ms require inference_id to be populated
+        # For now, we use NULL-safe expressions that return NULL when no match
+        # Success rate calculation that handles NULL inference_id (returns NULL when no match)
+        success_rate_expr = (
+            "AVG(CASE WHEN mid.is_success IS NOT NULL "
+            "THEN (CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) "
+            "ELSE NULL END) * 100 as success_rate"
+        )
+
         if request.group_by == "country":
             select_fields = [
                 "ga.country_code",
                 "COUNT(*) as request_count",
-                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                success_rate_expr,
                 "AVG(mi.response_time_ms) as avg_latency_ms",
                 "uniqExact(ga.user_id) as unique_users",
                 "any(ga.latitude) as latitude",
@@ -2282,7 +2296,7 @@ class ObservabilityMetricsService:
                 "ga.country_code",
                 "ga.region",
                 "COUNT(*) as request_count",
-                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                success_rate_expr,
                 "AVG(mi.response_time_ms) as avg_latency_ms",
                 "uniqExact(ga.user_id) as unique_users",
             ]
@@ -2294,7 +2308,7 @@ class ObservabilityMetricsService:
                 "ga.region",
                 "ga.city",
                 "COUNT(*) as request_count",
-                "AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                success_rate_expr,
                 "AVG(mi.response_time_ms) as avg_latency_ms",
                 "uniqExact(ga.user_id) as unique_users",
                 "any(ga.latitude) as latitude",
@@ -2303,37 +2317,43 @@ class ObservabilityMetricsService:
             group_by_clause = "ga.country_code, ga.region, ga.city"
             having_clause = "ga.city IS NOT NULL AND ga.city != ''"
 
-        # Build WHERE conditions
+        # Build WHERE conditions (only for GatewayAnalytics table)
         where_conditions = ["ga.timestamp >= %(from_date)s", "ga.timestamp <= %(to_date)s"]
+
+        # Build JOIN conditions for project filtering (applied in JOIN, not WHERE)
+        join_conditions = ["ga.inference_id = mid.inference_id"]
 
         params = {
             "from_date": request.from_date,
             "to_date": request.to_date or datetime.now(),
         }
 
-        # Add filters
+        # Add filters - project filters go in JOIN condition, others in WHERE
         if request.filters:
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
+                    # Move project filter to JOIN condition to preserve LEFT JOIN semantics
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        join_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        where_conditions.append("mid.project_id = %(project_id)s")
+                        join_conditions.append("mid.project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
                     # Support filtering by api_key_project_id for CLIENT users
+                    # Move to JOIN condition to preserve LEFT JOIN semantics
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        join_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        join_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
+                    # Country filter stays in WHERE clause
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
                         where_conditions.append(f"ga.country_code IN ({','.join(placeholders)})")
@@ -2343,20 +2363,21 @@ class ObservabilityMetricsService:
                         where_conditions.append("ga.country_code = %(country_code)s")
                         params["country_code"] = filter_value
 
-        # Build main query
+        # Build main query with JOIN conditions in the ON clause
+        join_clause = " AND ".join(join_conditions)
         query = f"""
         WITH total_requests AS (
             SELECT COUNT(*) as total
             FROM GatewayAnalytics ga
-            LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
+            LEFT JOIN ModelInferenceDetails mid ON {join_clause}
             LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
             WHERE {" AND ".join(where_conditions)}
         )
         SELECT
             {", ".join(select_fields)},
-            (request_count * 100.0 / (SELECT total FROM total_requests)) as percentage
+            (request_count * 100.0 / NULLIF((SELECT total FROM total_requests), 0)) as percentage
         FROM GatewayAnalytics ga
-        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
+        LEFT JOIN ModelInferenceDetails mid ON {join_clause}
         LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
         WHERE {" AND ".join(where_conditions)}
         GROUP BY {group_by_clause}
@@ -2369,11 +2390,10 @@ class ObservabilityMetricsService:
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
-        # Get total count for summary
+        # Get total count for summary (only from GatewayAnalytics, no need to join)
         total_query = f"""
         SELECT COUNT(*) as total_requests
         FROM GatewayAnalytics ga
-        LEFT JOIN ModelInferenceDetails mid ON ga.inference_id = mid.inference_id
         WHERE {" AND ".join(where_conditions)}
         """
         total_result = await self.clickhouse_client.execute_query(

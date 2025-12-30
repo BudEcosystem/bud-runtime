@@ -1,0 +1,3 @@
+namespace = "cert-manager-issuer"
+release_name = "cert-manager-issuer"
+dependencies = [ "cert-manager"]

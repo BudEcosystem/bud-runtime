@@ -66,11 +66,12 @@
           inherit system;
           modules = [
             {
-              facter.reportPath = ./infra/nixos/${host}/facter.json;
               networking.hostName = lib.mkForce host;
             }
+
             self.nixosModules.common
             nixos-facter-modules.nixosModules.facter
+
             ./infra/nixos/${host}/configuration.nix
           ];
         };
@@ -159,15 +160,23 @@
 
               budcustomer = pkgs.callPackage ./nix/packages/budcustomer.nix { };
               no_new_global_env = pkgs.callPackage ./nix/packages/no_new_global_env.nix { };
-              k8s_deploy = pkgs.callPackage ./nix/packages/k8s_deploy { };
+              k8s_deploy = pkgs.callPackage ./nix/packages/k8s_deploy {
+                scid = scid.packages.${system}.scid;
+              };
             }
           ))
           (
             forLinuxSystems (
               { system, pkgs }:
               let
-                images = (import ./nix/images/primary.nix self.nixosModules.primary) {
+                images_budk8s = (import ./nix/images/primary self.nixosModules) {
                   inherit lib;
+                  inherit system;
+                  inherit nixos-generators;
+                };
+                images_installer = (import ./nix/images/installer self.nixosModules) {
+                  inherit lib;
+                  inherit disko;
                   inherit system;
                   inherit nixos-generators;
                 };
@@ -178,7 +187,8 @@
                   budcustomer = self.packages.${system}.budcustomer;
                 };
               }
-              // images
+              // images_budk8s
+              // images_installer
             )
           );
 

@@ -14,6 +14,8 @@ interface SystemPromptSettingsProps {
   isSavingSystemPrompt?: boolean;
   llmRetryLimit?: number;
   onLlmRetryLimitChange?: (value: number) => void;
+  allowMultipleCalls?: boolean;
+  onAllowMultipleCallsChange?: (value: boolean) => void;
 }
 
 export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
@@ -23,9 +25,10 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
   onSaveSystemPrompt,
   isSavingSystemPrompt,
   llmRetryLimit = 3,
-  onLlmRetryLimitChange
+  onLlmRetryLimitChange,
+  allowMultipleCalls = false,
+  onAllowMultipleCallsChange
 }) => {
-  const [allowMultipleCalls, setAllowMultipleCalls] = React.useState(false);
   const [localRetryLimit, setLocalRetryLimit] = React.useState<number | string>(llmRetryLimit);
 
   React.useEffect(() => {
@@ -108,7 +111,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
           <div className='bg-[#FFFFFF08] px-[.725rem] py-[1rem] rounded-[.5rem]'>
             <Checkbox
               checked={allowMultipleCalls}
-              onChange={(e) => setAllowMultipleCalls(e.target.checked)}
+              onChange={(e) => onAllowMultipleCallsChange?.(e.target.checked)}
               className="AntCheckbox text-[#EEEEEE]"
             >
               <Text_12_400_EEEEEE className="text-[#EEEEEE] text-sm">Allow multiple calls</Text_12_400_EEEEEE>

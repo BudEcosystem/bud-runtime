@@ -1,0 +1,11 @@
+apiVersion: v2
+
+name: cert-manager-issuer
+description: Cert Manager Issuer Chart for Bud
+type: application
+version: 0.1.0
+
+maintainers:
+  - name: "sinanmohd"
+    email: "sinan@sinanmohd.com"
+    url: "https://www.sinanmohd.com"

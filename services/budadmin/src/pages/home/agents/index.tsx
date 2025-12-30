@@ -34,10 +34,11 @@ import { useAgentStore } from "@/stores/useAgentStore";
 import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
 import { IconOnlyRender } from "src/flows/components/BudIconRender";
 import PromptAgentTags from "src/flows/components/PromptAgentTags";
-import { useOAuthCallback, getOAuthState } from "@/hooks/useOAuthCallback";
+import { useOAuthCallback, getOAuthState, isOAuthCallback as checkIsOAuthCallback, clearOAuthState, getOAuthPromptId, hasOAuthPromptId, getOAuthSessionData } from "@/hooks/useOAuthCallback";
 import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
+import { parseSchemaToVariables } from "@/utils/schemaParser";
 
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
@@ -253,7 +254,7 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
-  const { openAgentDrawer, createSession, updateSession } = useAgentStore();
+  const { openAgentDrawer, createSession, updateSession, restoreSessionWithPromptId } = useAgentStore();
 
   // Handle OAuth callback
   // Note: We don't open the drawer here anymore. Instead, the URL parameter
@@ -368,6 +369,7 @@ export default function PromptsAgents() {
 
   // Track if we've already processed URL params to prevent duplicate processing
   const hasProcessedUrlRef = React.useRef(false);
+  const oauthProcessedRef = React.useRef(false);
 
   // Handle URL query parameters for agent workflow and prompt opening
   useEffect(() => {
@@ -388,11 +390,157 @@ export default function PromptsAgents() {
         console.warn('Malformed URL detected. Use & instead of ? to separate query parameters.');
       }
 
-      // Check if this is an OAuth callback
-      const isOAuthCallback = localStorage.getItem('oauth_should_open_drawer') === 'true';
+      // Check if this is an OAuth callback - CRITICAL: Handle OAuth callback specially
+      // Check multiple sources: URL params (code/state), OAuth state in localStorage, or dedicated prompt ID
+      const isOAuthCallbackFromUrl = checkIsOAuthCallback();
+      const oauthState = getOAuthState();
+      const savedPromptId = getOAuthPromptId(); // Get from dedicated localStorage key
+      const savedSessionData = getOAuthSessionData(); // Get from dedicated localStorage key
 
-      // If agent parameter exists, open add agent workflow and fetch workflow details
-      if (agentId && typeof agentId === 'string') {
+      // OAuth callback can be detected via URL params OR via saved localStorage state
+      // The localStorage check is important because URL params might be cleaned up before this runs
+      const isOAuthCallbackDetected = isOAuthCallbackFromUrl || !!savedPromptId || !!oauthState;
+
+      // Track whether OAuth was handled to determine if we should process agentId separately
+      let oauthHandled = false;
+
+      if (isOAuthCallbackDetected && !oauthProcessedRef.current) {
+        // Check if layout has already handled OAuth (drawer is already open or transitioning)
+        const { isAgentDrawerOpen, isTransitioningToAgentDrawer, sessions } = useAgentStore.getState();
+        if (isAgentDrawerOpen || isTransitioningToAgentDrawer || sessions.length > 0) {
+          oauthProcessedRef.current = true;
+          oauthHandled = true;
+          // Don't return here - still need to process agentId if present
+        } else {
+          // OAuth callback detected - restore session with ORIGINAL prompt ID from dedicated storage
+          oauthProcessedRef.current = true;
+
+          try {
+            showLoader();
+
+            // PRIORITY: Use prompt ID from dedicated localStorage (most reliable)
+            // This was saved right before OAuth redirect in ConnectorDetails
+            const effectivePromptId = savedPromptId || oauthState?.promptId;
+
+            if (!effectivePromptId) {
+              console.error('No prompt ID found for OAuth restoration');
+              errorToast('Failed to restore session - prompt ID not found');
+              hideLoader();
+              // Don't return - still try to process agentId if present
+            } else {
+              // Use agent ID from URL or saved OAuth state
+              const effectiveAgentId = (agentId as string) || oauthState?.agentId;
+
+              // PRIORITY: Use session data from dedicated localStorage (most reliable)
+              // This includes model selection saved right before OAuth redirect
+              const effectiveSessionData = savedSessionData || oauthState?.sessionData;
+
+              // CRITICAL: Restore session FIRST before opening any drawers
+              // This ensures the session exists with correct prompt ID before AgentDrawer renders
+              restoreSessionWithPromptId(effectivePromptId, {
+                name: effectiveSessionData?.name || `Agent 1`,
+                modelId: effectiveSessionData?.modelId,
+                modelName: effectiveSessionData?.modelName,
+                systemPrompt: effectiveSessionData?.systemPrompt,
+                promptMessages: effectiveSessionData?.promptMessages,
+                selectedDeployment: effectiveSessionData?.selectedDeployment,
+                workflowId: oauthState?.workflowId,
+                // Restore schema variables from OAuth session data
+                inputVariables: effectiveSessionData?.inputVariables,
+                outputVariables: effectiveSessionData?.outputVariables,
+                // Restore session settings from OAuth session data
+                llm_retry_limit: effectiveSessionData?.llm_retry_limit,
+                settings: effectiveSessionData?.settings,
+                // Restore schema and settings flags from OAuth session data
+                allowMultipleCalls: effectiveSessionData?.allowMultipleCalls,
+                structuredInputEnabled: effectiveSessionData?.structuredInputEnabled,
+                structuredOutputEnabled: effectiveSessionData?.structuredOutputEnabled,
+              });
+
+              // IMPORTANT: Fetch schema data from backend API to ensure input/output variables are restored
+              // This is more reliable than localStorage for complex nested objects
+              const promptName = effectiveSessionData?.name;
+              if (promptName) {
+                try {
+                  const configResponse = await AppRequest.Get(
+                    `${tempApiBaseUrl}/prompts/prompt-config/${promptName}`
+                  );
+
+                  if (configResponse?.data) {
+                    const configData = configResponse.data;
+                    const sessionUpdates: Record<string, unknown> = {};
+
+                    // Parse and update input schema variables
+                    if (configData.input_schema) {
+                      const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
+                      if (inputVars.length > 0) {
+                        sessionUpdates.inputVariables = inputVars;
+                        sessionUpdates.structuredInputEnabled = true;
+                      }
+                    }
+
+                    // Parse and update output schema variables
+                    if (configData.output_schema) {
+                      const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
+                      if (outputVars.length > 0) {
+                        sessionUpdates.outputVariables = outputVars;
+                        sessionUpdates.structuredOutputEnabled = true;
+                      }
+                    }
+
+                    // Update session with schema data if any was found
+                    if (Object.keys(sessionUpdates).length > 0) {
+                      updateSession(effectivePromptId, sessionUpdates);
+                    }
+                  }
+                } catch (error) {
+                  // Silently fail - new prompts won't have config saved yet
+                  // This is expected for new prompts that haven't been saved to backend
+                }
+              }
+
+              // Get the workflow next step from OAuth session data
+              // CRITICAL FALLBACK: If we have an agentId (workflow ID), we're in the add-agent flow.
+              // The next step after AgentDrawer should be "add-agent-configuration".
+              // We use effectiveSessionData?.workflowNextStep if available, otherwise fallback.
+              const savedWorkflowNextStep = effectiveSessionData?.workflowNextStep;
+
+              // ROBUST FALLBACK: If agentId exists (we're in add-agent workflow),
+              // default to "add-agent-configuration" as the next step
+              const workflowNextStep = savedWorkflowNextStep ||
+                (effectiveAgentId ? "add-agent-configuration" : undefined);
+
+              // IMPORTANT: We do NOT call openDrawer("add-agent") here because it would:
+              // 1. Open at step 1 (SelectAgentType), which has a useEffect that resets workflowContext
+              // 2. This would reset nextStep to null, breaking the workflow continuation
+              // Instead, we just open the AgentDrawer with the correct workflowContext.
+              // When the user saves, closeAgentDrawer will call openDrawerWithStep(nextStep)
+              // which will open the workflow drawer at the correct step.
+
+              // Open the agent drawer synchronously with the workflow context
+              // Using setTimeout with 0 to ensure state updates have settled
+              setTimeout(() => {
+                openAgentDrawer(oauthState?.workflowId, workflowNextStep);
+              }, 0);
+
+              // Mark as processed
+              hasProcessedUrlRef.current = true;
+              oauthHandled = true;
+            }
+          } catch (error) {
+            console.error('Error restoring OAuth session:', error);
+            errorToast('Failed to restore session after OAuth');
+          } finally {
+            hideLoader();
+          }
+        }
+      }
+
+      // IMPORTANT: Continue to process agentId if OAuth didn't already handle it
+      // This ensures agentId parameter is processed for non-OAuth flows or if OAuth failed
+
+      // If agent parameter exists and wasn't already handled by OAuth, open add agent workflow and fetch workflow details
+      if (agentId && typeof agentId === 'string' && !oauthHandled) {
         try {
           showLoader();
 
@@ -411,18 +559,12 @@ export default function PromptsAgents() {
               // Parse comma-separated prompt IDs
               const promptIds = promptParam.split(',').map(id => id.trim());
 
-              // Create sessions for each prompt ID (don't fetch from API)
+              // Create sessions for each prompt ID
               for (const promptId of promptIds) {
-                // Create agent session for each prompt
-                const sessionId = createSession();
-
-                if (sessionId) {
-                  // Update session with prompt ID from URL
-                  updateSession(sessionId, {
-                    promptId: promptId,
-                    name: `Agent ${promptIds.indexOf(promptId) + 1}`,
-                  });
-                }
+                // Use restoreSessionWithPromptId to preserve the exact prompt ID
+                restoreSessionWithPromptId(promptId, {
+                  name: `Agent ${promptIds.indexOf(promptId) + 1}`,
+                });
               }
 
               // Use requestAnimationFrame to ensure React has rendered the state updates
@@ -449,18 +591,12 @@ export default function PromptsAgents() {
           // Parse comma-separated prompt IDs
           const promptIds = promptParam.split(',').map(id => id.trim());
 
-          // Create sessions for each prompt ID (don't fetch from API)
+          // Create sessions for each prompt ID
           for (const promptId of promptIds) {
-            // Create agent session for each prompt
-            const sessionId = createSession();
-
-            if (sessionId) {
-              // Update session with prompt ID from URL
-              updateSession(sessionId, {
-                promptId: promptId,
-                name: `Agent ${promptIds.indexOf(promptId) + 1}`,
-              });
-            }
+            // Use restoreSessionWithPromptId to preserve the exact prompt ID
+            restoreSessionWithPromptId(promptId, {
+              name: `Agent ${promptIds.indexOf(promptId) + 1}`,
+            });
           }
 
           // Use requestAnimationFrame to ensure React has rendered the state updates
@@ -479,16 +615,31 @@ export default function PromptsAgents() {
       }
     };
 
-    // Only run if router is ready and has query params and not already processed
-    if (router.isReady && (router.query.agent || router.query.prompt) && !hasProcessedUrlRef.current) {
+    // Only run if router is ready and has query params (or OAuth callback) and not already processed
+    // Check both URL params AND localStorage for OAuth detection (URL params might be cleaned up already)
+    const hasOAuthCallbackUrl = checkIsOAuthCallback();
+    const hasOAuthCallbackLocalStorage = hasOAuthPromptId();
+    const hasOAuthCallback = hasOAuthCallbackUrl || hasOAuthCallbackLocalStorage;
+
+    console.log('[agents/index] useEffect check:', {
+      routerIsReady: router.isReady,
+      hasAgent: !!router.query.agent,
+      hasPrompt: !!router.query.prompt,
+      hasOAuthCallbackUrl,
+      hasOAuthCallbackLocalStorage,
+      hasProcessedUrlRef: hasProcessedUrlRef.current,
+    });
+
+    if (router.isReady && (router.query.agent || router.query.prompt || hasOAuthCallback) && !hasProcessedUrlRef.current) {
       handleUrlParams();
     }
   }, [router.isReady, router.query.agent, router.query.prompt]);
 
-  // Reset the processed flag when component unmounts
+  // Reset the processed flags when component unmounts
   useEffect(() => {
     return () => {
       hasProcessedUrlRef.current = false;
+      oauthProcessedRef.current = false;
     };
   }, []);
 

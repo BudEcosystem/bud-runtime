@@ -56,13 +56,23 @@ function SettingsListItem(props: SettingsListItemProps) {
 
 interface SettingsProps {
     onClose: () => void;
+    sessionId: string;
 }
 
-export default function Settings({ onClose }: SettingsProps) {
-    const { settingPresets, addSettingPreset, updateSettingPreset, currentSettingPreset, setCurrentSettingPreset } = useAgentStore();
+export default function Settings({ onClose, sessionId }: SettingsProps) {
+    const {
+        settingPresets,
+        addSettingPreset,
+        initializeSessionSettings,
+        updateSessionSettings,
+        sessions
+    } = useAgentStore();
     const [settings, setSettings] = useState<AgentSettings | null>(null);
     const [components, setComponents] = useState<SettingsListItemProps[]>([]);
     const [hasHydrated, setHasHydrated] = useState(false);
+
+    // Get current session to access its modelSettings
+    const currentSession = sessions.find(s => s.id === sessionId);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -70,10 +80,20 @@ export default function Settings({ onClose }: SettingsProps) {
         }
     }, []);
 
+    // Initialize session settings on mount and sync with session
     useEffect(() => {
-        if (settingPresets.length === 0) {
+        if (!hasHydrated || !sessionId) return;
+
+        // If session already has modelSettings, use them
+        if (currentSession?.modelSettings) {
+            setSettings({
+                ...currentSession.modelSettings,
+                modifiedFields: currentSession.modelSettings.modifiedFields || new Set<string>()
+            });
+        } else {
+            // Create default settings locally and initialize in store
             const defaultSettings: AgentSettings = {
-                id: uuidv4(),
+                id: `settings_${sessionId}`,
                 name: "Default",
                 temperature: 0.7,
                 max_tokens: 2000,
@@ -96,84 +116,67 @@ export default function Settings({ onClose }: SettingsProps) {
                 mm_processor_kwargs: {},
                 created_at: new Date().toISOString(),
                 modified_at: new Date().toISOString(),
-                modifiedFields: new Set<string>(), // Initialize with empty set
+                modifiedFields: new Set<string>(),
             };
-            addSettingPreset(defaultSettings);
             setSettings(defaultSettings);
-            setCurrentSettingPreset(defaultSettings);
-        } else {
-            // Ensure modifiedFields exists when loading from store
-            const settingsWithModifiedFields = currentSettingPreset
-                ? { ...currentSettingPreset, modifiedFields: currentSettingPreset.modifiedFields || new Set<string>() }
-                : null;
-            setSettings(settingsWithModifiedFields);
+            // Also initialize in store for persistence
+            initializeSessionSettings(sessionId);
         }
-    }, [hasHydrated, addSettingPreset, currentSettingPreset, setCurrentSettingPreset, settingPresets.length]);
+    }, [hasHydrated, sessionId, currentSession?.modelSettings, initializeSessionSettings]);
 
     const handleAddPreset = useCallback((name: string) => {
-        if (!name) return;
+        if (!name || !settings) return;
         const newPreset: AgentSettings = {
             id: uuidv4(),
             name: name,
-            temperature: settings?.temperature || 0.7,
-            max_tokens: settings?.max_tokens || 2000,
-            top_p: settings?.top_p || 1.0,
-            frequency_penalty: settings?.frequency_penalty || 0,
-            presence_penalty: settings?.presence_penalty || 0,
-            stop_sequences: settings?.stop_sequences || [],
-            seed: settings?.seed || 0,
-            timeout: settings?.timeout || 0,
-            parallel_tool_calls: settings?.parallel_tool_calls ?? true,
-            logprobs: settings?.logprobs ?? false,
-            logit_bias: settings?.logit_bias || {},
-            extra_headers: settings?.extra_headers || {},
-            max_completion_tokens: settings?.max_completion_tokens || 0,
-            stream_options: settings?.stream_options || {},
-            response_format: settings?.response_format || {},
-            tool_choice: settings?.tool_choice || "auto",
-            chat_template: settings?.chat_template || "",
-            chat_template_kwargs: settings?.chat_template_kwargs || {},
-            mm_processor_kwargs: settings?.mm_processor_kwargs || {},
+            temperature: settings.temperature || 0.7,
+            max_tokens: settings.max_tokens || 2000,
+            top_p: settings.top_p || 1.0,
+            frequency_penalty: settings.frequency_penalty || 0,
+            presence_penalty: settings.presence_penalty || 0,
+            stop_sequences: settings.stop_sequences || [],
+            seed: settings.seed || 0,
+            timeout: settings.timeout || 0,
+            parallel_tool_calls: settings.parallel_tool_calls ?? true,
+            logprobs: settings.logprobs ?? false,
+            logit_bias: settings.logit_bias || {},
+            extra_headers: settings.extra_headers || {},
+            max_completion_tokens: settings.max_completion_tokens || 0,
+            stream_options: settings.stream_options || {},
+            response_format: settings.response_format || {},
+            tool_choice: settings.tool_choice || "auto",
+            chat_template: settings.chat_template || "",
+            chat_template_kwargs: settings.chat_template_kwargs || {},
+            mm_processor_kwargs: settings.mm_processor_kwargs || {},
             created_at: new Date().toISOString(),
             modified_at: new Date().toISOString(),
-            modifiedFields: new Set<string>(settings?.modifiedFields || []), // Copy modifiedFields from current settings
+            modifiedFields: new Set<string>(settings.modifiedFields || []),
         };
+        // Add to global presets for reuse
         addSettingPreset(newPreset);
-        setSettings(newPreset);
-    }, [settings, addSettingPreset]);
+        // Also apply to current session
+        updateSessionSettings(sessionId, newPreset);
+    }, [settings, addSettingPreset, updateSessionSettings, sessionId]);
 
     const changePreset = useCallback((id: string) => {
         const preset = settingPresets.find((preset) => preset.id === id);
-        if (preset) {
-            // Ensure modifiedFields exists when loading a preset
+        if (preset && sessionId) {
+            // Apply the preset to this session's settings
             const presetWithModifiedFields = {
                 ...preset,
+                id: `settings_${sessionId}`, // Keep session-specific ID
                 modifiedFields: preset.modifiedFields || new Set<string>()
             };
-            setSettings(presetWithModifiedFields);
-            setCurrentSettingPreset(presetWithModifiedFields);
+            updateSessionSettings(sessionId, presetWithModifiedFields);
         }
-    }, [settingPresets, setCurrentSettingPreset]);
+    }, [settingPresets, updateSessionSettings, sessionId]);
 
     const handleChange = useCallback((params: Partial<AgentSettings>) => {
-        if (!settings) return;
+        if (!settings || !sessionId) return;
 
-        // Track which fields are being modified
-        const modifiedFields = new Set<string>(settings.modifiedFields || []);
-        Object.keys(params).forEach(key => {
-            modifiedFields.add(key);
-        });
-
-        const newSettings = {
-            ...settings,
-            ...params,
-            modified_at: new Date().toISOString(),
-            modifiedFields, // Include the updated set of modified fields
-        } as AgentSettings;
-        setSettings(newSettings);
-        updateSettingPreset(newSettings);
-        setCurrentSettingPreset(newSettings);
-    }, [settings, updateSettingPreset, setCurrentSettingPreset]);
+        // Update the session's settings in the store
+        updateSessionSettings(sessionId, params);
+    }, [settings, updateSessionSettings, sessionId]);
 
     const initComponents = React.useCallback(() => {
         const components = [
@@ -347,7 +350,8 @@ export default function Settings({ onClose }: SettingsProps) {
     }, [settings, settingPresets, changePreset, handleAddPreset, handleChange]);
 
     useEffect(() => {
-        if (settingPresets.length > 0) {
+        // Initialize components when settings are available (regardless of presets)
+        if (settings) {
             initComponents();
         }
     }, [settings, settingPresets.length, initComponents]);

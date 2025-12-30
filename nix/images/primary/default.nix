@@ -1,4 +1,4 @@
-primary:
+nixosModules:
 {
   system,
   nixos-generators,
@@ -12,7 +12,7 @@ let
 
       modules = [
         ./module.nix
-        primary
+        nixosModules.primary
       ];
     };
 
@@ -51,7 +51,7 @@ let
     "vmware"
   ];
 
-  attrPrefixImage = name: value: lib.attrsets.nameValuePair ("image_" + name) value;
+  attrPrefixImage = name: value: lib.attrsets.nameValuePair ("image_budk8s_" + name) value;
   images = lib.genAttrs supportedFormats imageForFormat;
 in
 lib.attrsets.mapAttrs' attrPrefixImage images

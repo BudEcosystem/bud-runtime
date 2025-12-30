@@ -23,6 +23,7 @@ export interface BudInputProps {
   suffix?: React.ReactNode;
   infoText?: string;
   type?: string;
+  maxLength?: number;
 }
 
 function TextInput(props: BudInputProps) {
@@ -72,6 +73,7 @@ function TextInput(props: BudInputProps) {
               suffix={props.suffix}
               type={props.type}
               className={inputClassName}
+              maxLength={props.maxLength}
               onKeyDown={(e: React.KeyboardEvent) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -107,6 +109,7 @@ function TextInput(props: BudInputProps) {
             suffix={props.suffix}
             type={props.type}
             className={inputClassName}
+            maxLength={props.maxLength}
             onKeyDown={(e: React.KeyboardEvent) => {
               if (e.key === "Enter") {
                 e.preventDefault();

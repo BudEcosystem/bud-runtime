@@ -1,0 +1,72 @@
+{{/*
+Runtime Sidecar Container Template
+This template defines the metrics sidecar that collects engine-specific metrics.
+The ENGINE_TYPE environment variable tells the sidecar which metrics to parse.
+*/}}
+
+{{- define "bud-runtime-container.sidecar" }}
+- name: bud-runtime-sidecar
+  image: budstudio/runtime-sidecar:latest
+  ports:
+    - containerPort: 9090
+      protocol: TCP
+  env:
+    - name: ENGINE_METRICS_URL
+      value: "http://localhost:{{ $.Values.containerPort }}/metrics"
+    - name: LISTEN_PORT
+      value: "9090"
+    - name: SCRAPE_INTERVAL_SECONDS
+      value: "0.5"
+    - name: CALCULATION_WINDOW_SECONDS
+      value: "1"
+    - name: ENGINE_TYPE
+      value: {{ .node.engine_type | default "vllm" | quote }}
+  livenessProbe:
+    httpGet:
+      path: /metrics
+      port: 9090
+    initialDelaySeconds: 120
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /metrics
+      port: 9090
+    initialDelaySeconds: 60
+    periodSeconds: 10
+{{- end }}
+
+{{/*
+AIBrix Runtime Wrapper Template
+This template defines the AIBrix runtime wrapper that provides a unified API.
+The INFERENCE_ENGINE environment variable tells it which backend to use.
+*/}}
+
+{{- define "bud-runtime-container.aibrix-runtime" }}
+- name: aibrix-runtime
+  image: aibrix/runtime:v0.2.1
+  command:
+    - aibrix_runtime
+    - --port
+    - "8080"
+  env:
+    - name: INFERENCE_ENGINE
+      # value: {{ .node.engine_type | default "vllm" | quote }} TODO: To update once aibrix supports latentbud
+      value: "vllm"
+    - name: INFERENCE_ENGINE_ENDPOINT
+      value: "http://localhost:{{ $.Values.containerPort }}"
+  ports:
+    - containerPort: 8080
+      protocol: TCP
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: 3
+    periodSeconds: 2
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+{{- end }}

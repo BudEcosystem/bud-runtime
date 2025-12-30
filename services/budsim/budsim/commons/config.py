@@ -39,6 +39,8 @@ class AppConfig(BaseAppConfig):
     vllm_hpu_image: str = Field("budecosystem/bud-runtime-hpu:latest", alias="VLLM_HPU_IMAGE")
     sglang_cuda_image: str = Field("budecosystem/bud-runtime-cuda:latest", alias="SGLANG_CUDA_IMAGE")
     litellm_image: str = Field("ghcr.io/berriai/litellm:main-latest", alias="LITELLM_IMAGE")
+    latentbud_cpu_image: str = Field("budecosystem/latentbud-cpu:latest", alias="LATENTBUD_CPU_IMAGE")
+    latentbud_cuda_image: str = Field("budecosystem/latentbud-cuda:latest", alias="LATENTBUD_CUDA_IMAGE")
     quantization_cpu_image: str = Field("budecosystem/bud-quantization-cpu:latest", alias="QUANTIZATION_CPU_IMAGE")
     quantization_cuda_image: str = Field("budecosystem/bud-quantization-cuda:latest", alias="QUANTIZATION_CUDA_IMAGE")
 
@@ -56,6 +58,9 @@ class AppConfig(BaseAppConfig):
 
     # Simulation method
     default_simulation_method: str = Field("heuristic", alias="DEFAULT_SIMULATION_METHOD")
+
+    # CPU optimization: skip master/control-plane nodes for CPU deployments
+    skip_master_node_for_cpu: bool = Field(True, alias="SKIP_MASTER_NODE_FOR_CPU")
 
     # Bud Connect
     bud_connect_url: str = Field(..., alias="BUD_CONNECT_URL")

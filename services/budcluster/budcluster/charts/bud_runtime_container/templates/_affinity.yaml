@@ -1,7 +1,9 @@
 {{/*
 CPU Node Affinity - Excludes control-plane and master nodes
+Only applied when skipMasterNodeForCpu is true (default)
 */}}
 {{- define "bud-runtime-container.cpu-node-affinity" }}
+{{- if eq ($.Values.skipMasterNodeForCpu | toString) "true" }}
 nodeAffinity:
   requiredDuringSchedulingIgnoredDuringExecution:
     nodeSelectorTerms:
@@ -10,6 +12,7 @@ nodeAffinity:
         operator: DoesNotExist
       - key: node-role.kubernetes.io/master
         operator: DoesNotExist
+{{- end }}
 {{- end }}
 
 {{/*

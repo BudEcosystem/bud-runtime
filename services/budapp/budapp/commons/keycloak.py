@@ -118,6 +118,24 @@ class KeycloakManager:
             logger.error(f"Error updating user password: {str(e)}")
             raise
 
+    def _get_realm_token_settings(self) -> dict:
+        """Returns a dictionary of realm token/session settings.
+
+        This is used by both create_realm and sync_realm_settings to ensure
+        consistent settings across realm creation and updates.
+
+        Returns:
+            dict: Token and session settings for the realm
+        """
+        return {
+            "refreshTokenMaxReuse": 0,
+            "accessTokenLifespan": app_settings.keycloak_access_token_lifespan,
+            "ssoSessionIdleTimeout": app_settings.keycloak_sso_session_idle_timeout,
+            "ssoSessionMaxLifespan": app_settings.keycloak_sso_session_max_lifespan,
+            "offlineSessionIdleTimeout": app_settings.keycloak_offline_session_idle_timeout,
+            "offlineSessionMaxLifespan": app_settings.keycloak_offline_session_max_lifespan,
+        }
+
     async def create_realm(self, realm_name: str) -> dict:
         """Create a new realm in Keycloak.
 
@@ -138,11 +156,7 @@ class KeycloakManager:
             "resetPasswordAllowed": True,
             "editUsernameAllowed": False,
             "bruteForceProtected": True,
-            "refreshTokenMaxReuse": 0,  # Allow unlimited reuse of refresh tokens
-            "ssoSessionIdleTimeout": 3600,  # 1 hour in seconds
-            "ssoSessionMaxLifespan": 3600,  # 1 hour in seconds
-            "offlineSessionIdleTimeout": 2592000,  # 30 days in seconds
-            "offlineSessionMaxLifespan": 2592000,  # 30 days in seconds
+            **self._get_realm_token_settings(),
         }
 
         try:
@@ -172,6 +186,24 @@ class KeycloakManager:
 
         except Exception as e:
             logger.error(f"Failed to create realm {realm_name}: {str(e)}")
+            raise
+
+    async def sync_realm_settings(self, realm_name: str) -> None:
+        """Sync realm settings (token lifespans, session timeouts) for an existing realm.
+
+        This ensures code-defined settings are applied to existing realms on startup.
+
+        Args:
+            realm_name: Name of the realm to update
+        """
+        realm_name = realm_name.lower()
+        settings_to_sync = self._get_realm_token_settings()
+
+        try:
+            self.admin_client.update_realm(realm_name, payload=settings_to_sync)
+            logger.info(f"Realm {realm_name} settings synced successfully")
+        except Exception as e:
+            logger.error(f"Failed to sync realm settings for {realm_name}: {str(e)}")
             raise
 
     async def _create_module_resource(self, realm_admin, client_id: str, module_name: str, realm_name: str) -> str:
@@ -1084,7 +1116,12 @@ class KeycloakManager:
             raise
 
     async def authenticate_user(
-        self, username: str, password: str, realm_name: str, credentials: TenantClientSchema
+        self,
+        username: str,
+        password: str,
+        realm_name: str,
+        credentials: TenantClientSchema,
+        remember_me: bool = False,
     ) -> dict:
         """Authenticate a user and return access & refresh tokens.
 
@@ -1093,6 +1130,7 @@ class KeycloakManager:
             password: Password of the user to authenticate
             realm_name: Name of the realm to authenticate the user in
             credentials: Contains client_id and (optional) client_secret
+            remember_me: If True, request offline_access scope for 30-day sessions
 
         Returns:
             dict: Contains access_token, refresh_token, etc.
@@ -1115,13 +1153,17 @@ class KeycloakManager:
         try:
             openid_client = self.get_keycloak_openid_client(realm_name, credentials)
 
+            # Build scope based on remember_me setting
+            base_scope = "openid profile email roles"
+            scope = f"{base_scope} offline_access" if remember_me else base_scope
+
             # Log authentication attempt details (without sensitive info)
             logger.info(
                 f"Attempting Keycloak authentication: username={username}, realm={realm_name}, "
-                f"client_id={credentials.client_named_id}"
+                f"client_id={credentials.client_named_id}, remember_me={remember_me}"
             )
 
-            token = openid_client.token(username, password, scope="openid profile email roles")
+            token = openid_client.token(username, password, scope=scope)
             logger.info(f"Successfully authenticated user {username} in realm {realm_name}")
             return token
         except KeycloakAuthenticationError as e:

@@ -312,6 +312,26 @@ class BudConnectMapper:
             elif modality.lower() in ["audio_output", "tts", "text-to-speech"]:
                 if "audio_output" not in budconnect_modality:
                     budconnect_modality.append("audio_output")
+            elif modality.lower() in ["speech_to_text", "speech-to-text", "asr"]:
+                # Speech-to-text models (e.g., Whisper): audio input, text output
+                for m in ("audio_input", "text_output"):
+                    if m not in budconnect_modality:
+                        budconnect_modality.append(m)
+            elif modality.lower() in ["audio_llm", "audio-llm"]:
+                # Audio LLM hybrids (e.g., Qwen2-Audio): audio + text input/output
+                for m in ("audio_input", "text_input", "text_output"):
+                    if m not in budconnect_modality:
+                        budconnect_modality.append(m)
+            elif modality.lower() == "omni":
+                # Omni models (e.g., Qwen2.5-Omni): audio + vision + text
+                for m in ("audio_input", "image_input", "text_input", "text_output"):
+                    if m not in budconnect_modality:
+                        budconnect_modality.append(m)
+            elif modality.lower() == "mllm":
+                # Multi-modal LLM with vision: image + text input/output
+                for m in ("image_input", "text_input", "text_output"):
+                    if m not in budconnect_modality:
+                        budconnect_modality.append(m)
             else:
                 # Default to text for unknown modalities
                 logger.warning("Unknown modality '%s', defaulting to text_input/text_output", modality)

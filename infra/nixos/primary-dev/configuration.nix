@@ -10,4 +10,6 @@
     ./modules/wireguard
     ./modules/nfs.nix
   ];
+
+  facter.reportPath = ./facter.json;
 }

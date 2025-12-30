@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  services.scid.jobs.NixOS = {
+  services.scid.settings.jobs.NixOS = {
     exec_line = lib.mkForce [
       "nixos-rebuild"
       "switch"

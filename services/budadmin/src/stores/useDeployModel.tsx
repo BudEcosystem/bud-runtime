@@ -244,6 +244,7 @@ export const useDeployModel = create<{
     e2e_latency: number[];
   };
   scalingSpecifcation: {
+    enabled: boolean;
     scalingType: string;
     scalingMetric: string;
     scalingValue: number;
@@ -414,6 +415,7 @@ export const useDeployModel = create<{
     e2e_latency: [],
   },
   scalingSpecifcation: {
+    enabled: false,
     scalingType: "metric",
     scalingMetric: "bud:time_to_first_token_seconds_average",
     scalingValue: 1,

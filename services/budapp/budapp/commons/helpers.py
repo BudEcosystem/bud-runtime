@@ -472,6 +472,28 @@ async def determine_modality_endpoints(
             "image_variation": [ModalityEnum.IMAGE_INPUT, ModalityEnum.IMAGE_OUTPUT],
             "llm_embedding": [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT],
             "mllm_embedding": [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT],
+            # Audio-capable LLMs (e.g., Qwen2-Audio, Ultravox)
+            "audio_llm": [ModalityEnum.TEXT_INPUT, ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT],
+            "audio_llm_tts": [
+                ModalityEnum.TEXT_INPUT,
+                ModalityEnum.AUDIO_INPUT,
+                ModalityEnum.TEXT_OUTPUT,
+                ModalityEnum.AUDIO_OUTPUT,
+            ],
+            # Omni-modal models (e.g., Qwen2.5-Omni, MiniCPM-o)
+            "omni": [
+                ModalityEnum.TEXT_INPUT,
+                ModalityEnum.AUDIO_INPUT,
+                ModalityEnum.IMAGE_INPUT,
+                ModalityEnum.TEXT_OUTPUT,
+            ],
+            "omni_tts": [
+                ModalityEnum.TEXT_INPUT,
+                ModalityEnum.AUDIO_INPUT,
+                ModalityEnum.IMAGE_INPUT,
+                ModalityEnum.TEXT_OUTPUT,
+                ModalityEnum.AUDIO_OUTPUT,
+            ],
         }
         if input_modality not in category_mapping:
             raise ValueError(f"Invalid modality: {input_modality}")
@@ -500,17 +522,48 @@ async def determine_modality_endpoints(
     elif modality_set == frozenset(["text_input", "image_output"]):
         endpoints = [ModelEndpointEnum.IMAGE_GENERATION]
     elif modality_set == frozenset(["audio_input", "text_output"]):
-        # Both speech_to_text and audio_translation have same modality
-        if input_modality == "audio_translation":
-            endpoints = [ModelEndpointEnum.AUDIO_TRANSLATION]
-        else:
-            endpoints = [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
+        # All audio→text models get both transcription and translation endpoints
+        endpoints = [ModelEndpointEnum.AUDIO_TRANSCRIPTION, ModelEndpointEnum.AUDIO_TRANSLATION]
     elif modality_set == frozenset(["text_input", "audio_output"]):
         endpoints = [ModelEndpointEnum.TEXT_TO_SPEECH]
     elif modality_set == frozenset(["text_input", "image_input", "image_output"]):
         endpoints = [ModelEndpointEnum.IMAGE_EDIT]
     elif modality_set == frozenset(["image_input", "image_output"]):
         endpoints = [ModelEndpointEnum.IMAGE_VARIATION]
+    # Audio-LLM models (audio input + text I/O)
+    elif modality_set == frozenset(["text_input", "audio_input", "text_output"]):
+        # Audio-capable LLMs like Qwen2-Audio, Ultravox
+        endpoints = [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+        ]
+    elif modality_set == frozenset(["text_input", "audio_input", "text_output", "audio_output"]):
+        # Audio-LLM with TTS output capability
+        endpoints = [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+            ModelEndpointEnum.TEXT_TO_SPEECH,
+        ]
+    # Omni-modal models (audio + vision + text)
+    elif modality_set == frozenset(["text_input", "audio_input", "image_input", "text_output"]):
+        # Omni models like Qwen2.5-Omni, MiniCPM-o (without TTS)
+        endpoints = [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.DOCUMENT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+        ]
+    elif modality_set == frozenset(["text_input", "audio_input", "image_input", "text_output", "audio_output"]):
+        # Full omni model with TTS output
+        endpoints = [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.DOCUMENT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+            ModelEndpointEnum.TEXT_TO_SPEECH,
+        ]
     else:
         raise ValueError(f"No endpoints defined for modality combination: {input_modality}")
 
@@ -551,6 +604,13 @@ async def determine_supported_endpoints(
     }.issubset(modality_set):
         endpoints.add(ModelEndpointEnum.AUDIO_TRANSCRIPTION)
         endpoints.add(ModelEndpointEnum.AUDIO_TRANSLATION)
+
+    # Image input with text output = MLLM/Document understanding
+    if {
+        ModalityEnum.IMAGE_INPUT.value,
+        ModalityEnum.TEXT_OUTPUT.value,
+    }.issubset(modality_set):
+        endpoints.add(ModelEndpointEnum.DOCUMENT)
 
     # Image editing requires both image input and output
     if {

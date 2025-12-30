@@ -143,7 +143,7 @@ export default function BenchmarkConfiguration() {
     },
     {
       name: "Number of Prompts",
-      value: workflowData?.num_prompts ? [`${workflowData.num_prompts}`] : ["Default (dataset samples)"],
+      value: workflowData?.num_prompts ? [`${workflowData.num_prompts}`] : ["Default (3x concurrency)"],
       full: true,
       icon: "/images/drawer/tag.png",
       children: [],

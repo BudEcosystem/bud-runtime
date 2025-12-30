@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Settings from "./Settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import { useAgentStore, AgentSession, AgentSettings } from "@/stores/useAgentStore";
+import { AgentSession, AgentSettings } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
 
@@ -12,10 +12,12 @@ interface SettingsSidebarProps {
 }
 
 export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarProps) {
-  const { currentSettingPreset } = useAgentStore();
   const [isUpdating, setIsUpdating] = useState(false);
 
   if (!isOpen) return null;
+
+  // Get settings from the session's modelSettings (session-specific)
+  const sessionSettings = session?.modelSettings;
 
   const handleUpdate = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -25,7 +27,7 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
       return;
     }
 
-    if (!currentSettingPreset) {
+    if (!sessionSettings) {
       errorToast("No settings found to update");
       return;
     }
@@ -35,17 +37,17 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
     try {
       // Build model_settings with only temperature (always) and modified fields
       const modelSettings: Partial<AgentSettings> = {
-        temperature: currentSettingPreset.temperature, // Always include temperature
+        temperature: sessionSettings.temperature, // Always include temperature
       };
 
-      // Get modified fields from the preset
-      const modifiedFields = currentSettingPreset.modifiedFields || new Set<string>();
+      // Get modified fields from the session's settings
+      const modifiedFields = sessionSettings.modifiedFields || new Set<string>();
 
       // Add only the fields that have been modified by the user
       modifiedFields.forEach((field) => {
-        if (field !== 'temperature' && field in currentSettingPreset) {
+        if (field !== 'temperature' && field in sessionSettings) {
           const key = field as keyof AgentSettings;
-          (modelSettings as any)[key] = currentSettingPreset[key];
+          (modelSettings as any)[key] = sessionSettings[key];
         }
       });
 
@@ -78,7 +80,7 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
           backgroundRepeat: 'no-repeat'
         }}
       >
-        <Settings onClose={onClose} />
+        <Settings onClose={onClose} sessionId={session?.id || ''} />
         <div style={{
         marginTop: '18px',
         paddingTop: '18px',

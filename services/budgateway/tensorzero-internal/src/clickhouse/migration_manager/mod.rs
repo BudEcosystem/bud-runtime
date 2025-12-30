@@ -33,11 +33,12 @@ use migrations::migration_0032::Migration0032;
 use migrations::migration_0033::Migration0033;
 use migrations::migration_0034::Migration0034;
 use migrations::migration_0035::Migration0035;
+use migrations::migration_0036::Migration0036;
 
 /// This must match the number of migrations returned by `make_all_migrations` - the tests
 /// will panic if they don't match.
-/// Note: We have 36 total migrations (0-35), but 7 are banned (0001, 0007, 0010, 0012, 0013, 0014, 0023)
-pub const NUM_MIGRATIONS: usize = 29;
+/// Note: We have 37 total migrations (0-36), but 7 are banned (0001, 0007, 0010, 0012, 0013, 0014, 0023)
+pub const NUM_MIGRATIONS: usize = 30;
 
 /// Constructs (but does not run) a vector of all our database migrations.
 /// This is the single source of truth for all migration - it's used during startup to migrate
@@ -88,6 +89,7 @@ pub fn make_all_migrations<'a>(
         Box::new(Migration0033 { clickhouse }),
         Box::new(Migration0034 { clickhouse }),
         Box::new(Migration0035 { clickhouse }),
+        Box::new(Migration0036 { clickhouse }),
     ];
     assert_eq!(
         migrations.len(),

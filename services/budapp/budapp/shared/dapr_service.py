@@ -435,3 +435,54 @@ class DaprService(DaprClient):
         logger.debug("Published to pubsub topic %s/%s", pubsub_name, target_topic_name)
 
         return event_id
+
+    @staticmethod
+    async def invoke_service(
+        app_id: str,
+        method_path: str,
+        method: str = "GET",
+        data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: int = 30,
+    ) -> Any:
+        """Invoke a method on another Dapr-enabled service via the Dapr sidecar.
+
+        This is a convenience method that handles the HTTP call to the Dapr sidecar
+        for service-to-service invocation.
+
+        Args:
+            app_id (str): The Dapr app ID of the target service (e.g., "budmetrics").
+            method_path (str): The method/endpoint path to invoke (e.g., "cluster-metrics/{id}/summary").
+            method (str): The HTTP method to use (GET, POST, PUT, DELETE). Defaults to "GET".
+            data (Optional[Dict[str, Any]]): JSON data to send in the request body.
+            params (Optional[Dict[str, Any]]): Query parameters to append to the URL.
+            timeout (int): Request timeout in seconds. Defaults to 30.
+
+        Returns:
+            Any: The JSON response from the target service, or the raw response if not JSON.
+
+        Raises:
+            aiohttp.ClientError: If the request fails.
+        """
+        dapr_base_url = f"http://localhost:{app_settings.dapr_http_port}"
+        url = f"{dapr_base_url}/v1.0/invoke/{app_id}/method/{method_path}"
+
+        headers = {}
+        if secrets_settings.dapr_api_token:
+            headers["dapr-api-token"] = secrets_settings.dapr_api_token
+
+        async with AsyncHTTPClient(timeout=timeout) as client:
+            response = await client.send_request(
+                method=method,
+                url=url,
+                json=data,
+                params=params,
+                headers=headers if headers else None,
+                raise_for_status=False,
+            )
+
+            # Try to parse as JSON, fall back to returning raw response
+            try:
+                return json.loads(response.body)
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                return response

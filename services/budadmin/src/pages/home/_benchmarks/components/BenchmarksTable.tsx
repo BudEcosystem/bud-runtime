@@ -304,39 +304,47 @@ const BenchmarksTable = ({ showTableTitle }: { showTableTitle?: boolean }) => {
                   ? "descend"
                   : "ascend"
                 : undefined,
-            render: (text) => (
-              <div className="w-[auto] text-nowrap h-[1.25rem]">
-                {/* <Image src={`${text}`} preview={false}
-                    style={{ height: '1.25rem', width: 'auto' }}
-                  /> */}
-                <div className="w-auto h-[1.25rem] flex items-center justify-start gap-[.7rem]">
-                  {text.toLowerCase().includes("intel") && (
-                    <Image
-                      preview={false}
-                      src="/images/icons/intel.png"
-                      alt="info"
-                      style={{ width: "auto", height: "1.25rem" }}
-                    />
-                  )}
-                  {text.toLowerCase().includes("amd") && (
-                    <Image
-                      preview={false}
-                      src="/images/icons/amd.png"
-                      alt="info"
-                      style={{ width: "auto", height: "0.59725rem" }}
-                    />
-                  )}
-                  {text.toLowerCase().includes("nvidia") && (
-                    <Image
-                      preview={false}
-                      src="/images/icons/nvdia.png"
-                      alt="info"
-                      style={{ width: "auto", height: "1.25rem" }}
-                    />
-                  )}
+            render: (text) => {
+              const lowerText = text?.toLowerCase() || "";
+              const hasKnownVendor =
+                lowerText.includes("intel") ||
+                lowerText.includes("amd") ||
+                lowerText.includes("nvidia");
+
+              return (
+                <div className="w-[auto] text-nowrap h-[1.25rem]">
+                  <div className="w-auto h-[1.25rem] flex items-center justify-start gap-[.7rem]">
+                    {lowerText.includes("intel") && (
+                      <Image
+                        preview={false}
+                        src="/images/icons/intel.png"
+                        alt="Intel"
+                        style={{ width: "auto", height: "1.25rem" }}
+                      />
+                    )}
+                    {lowerText.includes("amd") && (
+                      <Image
+                        preview={false}
+                        src="/images/icons/amd.png"
+                        alt="AMD"
+                        style={{ width: "auto", height: "0.59725rem" }}
+                      />
+                    )}
+                    {lowerText.includes("nvidia") && (
+                      <Image
+                        preview={false}
+                        src="/images/icons/nvdia.png"
+                        alt="NVIDIA"
+                        style={{ width: "auto", height: "1.25rem" }}
+                      />
+                    )}
+                    {!hasKnownVendor && text && (
+                      <Text_12_400_EEEEEE>{text}</Text_12_400_EEEEEE>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ),
+              );
+            },
             sortIcon: SortIcon,
           },
           {

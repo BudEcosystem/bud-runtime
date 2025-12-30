@@ -31,6 +31,7 @@ from ..cluster_ops import (
 from ..commons.config import app_settings, secrets_settings
 from ..commons.constants import ClusterPlatformEnum
 from ..device_mapping import ClusterDeviceValidator, DeviceMappingRegistry
+from .engine_processors import get_default_autoscale_metric, get_engine_processor, validate_autoscale_metric
 from .schemas import GetDeploymentConfigRequest, WorkerInfo
 
 
@@ -63,9 +64,18 @@ class DeploymentHandler:
     def _get_namespace(self, endpoint_name: str):
         # Generates a unique 8-character identifier
         unique_id = uuid.uuid4().hex[:8]
-        # Clean the enpoint name by replacing non-alphanumeric characters with hyphens
+        # Clean the endpoint name by replacing non-alphanumeric characters with hyphens
         cleaned_name = re.sub(r"[^a-zA-Z0-9-]", "-", endpoint_name).lower()
-        # return "llama-test-f94b"
+        # Remove consecutive hyphens
+        cleaned_name = re.sub(r"-+", "-", cleaned_name).strip("-")
+        # Kubernetes namespace limit is 63 characters
+        # Format: bud-{cleaned_name}-{unique_id}
+        # Reserved: "bud-" (4) + "-" (1) + unique_id (8) = 13 characters
+        # Max cleaned_name length: 63 - 13 = 50 characters
+        max_name_length = 50
+        cleaned_name = cleaned_name[:max_name_length].rstrip("-")
+        if not cleaned_name:
+            cleaned_name = "benchmark"
         return f"bud-{cleaned_name}-{unique_id}"
 
     def _get_cpu_affinity(self, tp_size: int):
@@ -216,6 +226,7 @@ class DeploymentHandler:
             "volume_type": app_settings.volume_type,
             "model_name": namespace,
             "adapters": adapters,
+            "skipMasterNodeForCpu": app_settings.skip_master_node_for_cpu,
         }
 
         # Add storage class configuration if provided, otherwise fall back to default
@@ -264,6 +275,18 @@ class DeploymentHandler:
 
         if not podscaler:
             podscaler = {}
+
+        # Determine engine type from first node for autoscaling metric selection
+        # All nodes in a deployment should use the same engine type
+        first_node_engine = node_list[0].get("engine_type", "vllm") if node_list else "vllm"
+        default_metric = get_default_autoscale_metric(first_node_engine)
+
+        # Validate user-provided autoscale metric against engine capabilities
+        user_metric = podscaler.get("scalingMetric") if podscaler else None
+        if user_metric:
+            validate_autoscale_metric(first_node_engine, user_metric)
+            logger.info(f"Validated autoscale metric '{user_metric}' for engine '{first_node_engine}'")
+
         values["podscaler"] = {
             "enabled": bool(podscaler and podscaler.get("enabled", False)) if podscaler else False,
             "minReplicas": podscaler.get("minReplicas", 1),
@@ -271,7 +294,7 @@ class DeploymentHandler:
             "upFluctuationTolerance": podscaler.get("scaleUpTolerance", 1.5),
             "downFluctuationTolerance": podscaler.get("scaleDownTolerance", 0.5),
             "window": podscaler.get("window", 30),
-            "targetMetric": podscaler.get("scalingMetric", "gpu_cache_usage_perc"),
+            "targetMetric": podscaler.get("scalingMetric", default_metric),
             "targetValue": podscaler.get("scalingValue", 0.5),
             "type": podscaler.get("scalingType", "metrics"),
         }
@@ -279,7 +302,18 @@ class DeploymentHandler:
         full_node_list = copy.deepcopy(node_list)
 
         for _idx, node in enumerate(node_list):
-            node["args"]["served-model-name"] = namespace
+            # Determine engine type for this node (default to vllm for backward compatibility)
+            engine_type = node.get("engine_type", "vllm")
+            logger.info(f"Processing node {_idx} with engine type: {engine_type}")
+
+            # Get the appropriate engine processor
+            try:
+                engine_processor = get_engine_processor(engine_type)
+            except ValueError as e:
+                logger.warning(f"Unknown engine type '{engine_type}', falling back to vllm: {e}")
+                engine_type = "vllm"
+                engine_processor = get_engine_processor("vllm")
+                node["engine_type"] = "vllm"
 
             # Extract concurrency from labels (where budsim actually stores it)
             node_concurrency = node.get("labels", {}).get("concurrency", "1")
@@ -312,13 +346,6 @@ class DeploymentHandler:
 
                     # Update node memory for consistency
                     node["memory"] = allocation_memory_gb
-
-                    # Set VLLM_CPU_KVCACHE_SPACE env var (ceil to ensure integer)
-                    kv_cache_memory_gb_int = math.ceil(kv_cache_memory_gb)
-                    node["envs"]["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb_int)
-                    logger.info(
-                        f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb_int} GB (ceiled from {kv_cache_memory_gb:.2f})"
-                    )
                 else:
                     logger.warning(
                         f"CPU Node {node.get('name')}: Missing detailed memory components (weight: {weight_memory_gb}, kv: {kv_cache_memory_gb}). "
@@ -342,8 +369,8 @@ class DeploymentHandler:
                     node["core_request"] = node["core_count"]
                     logger.info(f"CPU Node {node.get('name')}: Dedicated mode - core_count={node['core_count']}")
 
-            node["args"]["gpu-memory-utilization"] = 0.95
-            node["args"]["max-num-seqs"] = node_concurrency
+            # Store allocation_memory_gb for engine processor use
+            node["allocation_memory_gb"] = allocation_memory_gb
 
             # For shared hardware mode, calculate GPU memory limit in MB
             hardware_mode = node.get("hardware_mode", "dedicated")
@@ -355,58 +382,30 @@ class DeploymentHandler:
                     f"Shared mode: Setting GPU memory limit to {gpu_memory_mb}MB ({allocation_memory_gb:.2f}GB)"
                 )
 
-                node["args"]["gpu-memory-utilization"] = round(node["memory"] / allocation_memory_gb, 2)
+            # Build context for engine processor
+            engine_context = {
+                "namespace": namespace,
+                "concurrency": node_concurrency,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "enable_tool_calling": enable_tool_calling,
+                "tool_calling_parser_type": tool_calling_parser_type,
+                "enable_reasoning": enable_reasoning,
+                "reasoning_parser_type": reasoning_parser_type,
+                "chat_template": chat_template,
+                "container_port": values["container_port"],
+            }
 
-            # Enable LoRA configuration if engine supports it
-            supports_lora = node.get("supports_lora", False)
-            if supports_lora:
-                # Use optimized max_loras from budsim if available, otherwise default to 5
-                max_loras = node.get("max_loras", 5)
-                node["args"]["max-loras"] = max_loras
-                node["args"]["max-lora-rank"] = 256
-                node["args"]["enable-lora"] = True
-                source = "optimized by budsim" if "max_loras" in node else "default"
-                logger.info(f"LoRA enabled: max-loras={max_loras} ({source}), max-lora-rank=256")
-
-            # Calculate max_model_len dynamically
-            if input_tokens and output_tokens:
-                max_model_len = int((input_tokens + output_tokens) * 1.1)  # Add 10% safety margin
-                node["args"]["max-model-len"] = max_model_len
-            else:
-                node["args"]["max-model-len"] = 8192  # Default fallback
-
-            # Add parser configuration if enabled
-            if enable_tool_calling and tool_calling_parser_type:
-                node["args"]["enable-auto-tool-choice"] = True
-                node["args"]["tool-call-parser"] = tool_calling_parser_type
-                logger.info(f"Enabled tool calling with parser: {tool_calling_parser_type}")
-                # Add chat template if provided
-                if chat_template:
-                    node["args"]["chat-template"] = chat_template
-                    logger.info(f"Using chat template: {chat_template}")
-
-            if enable_reasoning and reasoning_parser_type:
-                # Add reasoning-specific args based on parser type
-                node["args"]["reasoning-parser"] = reasoning_parser_type
-                # Add other reasoning parser configurations as needed
-
-            node["args"]["trust-remote-code"] = True
+            # Use engine processor to set args and envs
+            engine_processor.process_args(node, engine_context)
+            engine_processor.process_envs(node, engine_context)
 
             # Update the full_node_list with the modified args
             full_node_list[_idx]["args"] = node["args"].copy()
 
+            # Convert args dict to list format (--key=value format) for all engines
             if isinstance(node["args"], dict):
                 node["args"] = self._prepare_args(node["args"])
-
-            # thread_bind, core_count = self._get_cpu_affinity(device["tp_size"])
-            # node["envs"]["VLLM_CPU_OMP_THREADS_BIND"] = thread_bind
-            node["envs"]["VLLM_LOGGING_LEVEL"] = "INFO"
-            # node["envs"]["VLLM_SKIP_WARMUP"] = "true"
-
-            # Enable runtime LoRA updating if supported
-            if supports_lora:
-                node["envs"]["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
-                logger.info("Enabled runtime LoRA updating")
 
             node["name"] = self._to_k8s_label(node["name"])
 
@@ -788,6 +787,7 @@ api_key_location = "env::API_KEY"
             "volume_type": app_settings.volume_type,
             "deviceType": device_type,
             "hardwareMode": hardware_mode,
+            "skipMasterNodeForCpu": app_settings.skip_master_node_for_cpu,
         }
 
         # Add storage class configuration if provided

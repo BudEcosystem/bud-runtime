@@ -4,7 +4,7 @@ description: Bud Helm chart for Kubernetes
 type: application
 icon: https://budecosystem.com/logo.svg
 version: 0.1.0
-appVersion: "0.4.7"
+appVersion: "0.4.8"
 maintainers:
   - name: "sinanmohd"
     email: "sinan@sinanmohd.com"

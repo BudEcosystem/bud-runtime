@@ -23,6 +23,7 @@ export interface GuardrailProfile {
   last_triggered_at?: string;
   trigger_count?: number;
   metadata?: Record<string, any>;
+  is_standalone?: boolean; // Indicates if guardrail can be used independently
 }
 
 export interface GuardrailFilters {
@@ -40,6 +41,26 @@ export interface PaginationState {
   total_count: number;
   total_pages: number;
   has_more: boolean;
+}
+
+// Deployment interfaces
+export interface Deployment {
+  id: string;
+  name: string;
+  endpoint_id?: string;
+  endpoint_name?: string;
+  project_id?: string;
+  project_name?: string;
+  status: string;
+  created_at: string;
+  modified_at?: string;
+}
+
+export interface DeploymentFilters {
+  search?: boolean;
+  name?: string;
+  status?: string;
+  order_by?: string;
 }
 
 // Probe interfaces
@@ -91,6 +112,12 @@ interface GuardrailStore {
   probePagination: PaginationState;
   isLoadingProbes: boolean;
 
+  // Deployment state
+  deployments: Deployment[];
+  deploymentFilters: DeploymentFilters;
+  deploymentPagination: PaginationState;
+  isLoadingDeployments: boolean;
+
   // Actions
   setFilters: (filters: Partial<GuardrailFilters>) => void;
   setPagination: (pagination: Partial<PaginationState>) => void;
@@ -98,6 +125,9 @@ interface GuardrailStore {
   setProbeFilters: (filters: Partial<ProbeFilters>) => void;
   setProbePagination: (pagination: Partial<PaginationState>) => void;
   resetProbeFilters: () => void;
+  setDeploymentFilters: (filters: Partial<DeploymentFilters>) => void;
+  setDeploymentPagination: (pagination: Partial<PaginationState>) => void;
+  resetDeploymentFilters: () => void;
 
   // API calls
   fetchGuardrails: (
@@ -113,6 +143,10 @@ interface GuardrailStore {
     page?: number,
     limit?: number
   ) => Promise<{ rules: ProbeRule[]; pagination: PaginationState }>;
+  fetchDeployments: (
+    profileId: string,
+    overrideFilters?: Partial<DeploymentFilters>
+  ) => Promise<void>;
   selectedGuardrail: GuardrailProfile | null;
 }
 
@@ -125,6 +159,13 @@ const defaultFilters: GuardrailFilters = {
 
 // Default probe filters
 const defaultProbeFilters: ProbeFilters = {
+  search: false,
+  status: "",
+  order_by: "created_at:desc",
+};
+
+// Default deployment filters
+const defaultDeploymentFilters: DeploymentFilters = {
   search: false,
   status: "",
   order_by: "created_at:desc",
@@ -220,6 +261,12 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
   probePagination: defaultPagination,
   isLoadingProbes: false,
 
+  // Deployment initial state
+  deployments: [],
+  deploymentFilters: defaultDeploymentFilters,
+  deploymentPagination: defaultPagination,
+  isLoadingDeployments: false,
+
   // Filter management
   setFilters: (filters) => {
     set((state) => ({
@@ -262,6 +309,27 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
     });
   },
 
+  // Deployment filter management
+  setDeploymentFilters: (filters) => {
+    set((state) => ({
+      deploymentFilters: { ...state.deploymentFilters, ...filters },
+      deploymentPagination: { ...state.deploymentPagination, page: 1 }, // Reset to first page when filters change
+    }));
+  },
+
+  setDeploymentPagination: (pagination) => {
+    set((state) => ({
+      deploymentPagination: { ...state.deploymentPagination, ...pagination },
+    }));
+  },
+
+  resetDeploymentFilters: () => {
+    set({
+      deploymentFilters: defaultDeploymentFilters,
+      deploymentPagination: defaultPagination,
+    });
+  },
+
   // Fetch guardrails list
   fetchGuardrails: async (
     projectId?: string,
@@ -276,7 +344,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         ? { ...filters, ...overrideFilters }
         : filters;
 
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page: pagination.page,
         limit: pagination.limit,
       };
@@ -380,7 +448,7 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
         ? { ...probeFilters, ...overrideFilters }
         : probeFilters;
 
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page: probePagination.page,
         limit: probePagination.limit,
       };
@@ -462,6 +530,64 @@ export const useGuardrails = create<GuardrailStore>((set, get) => ({
       console.error(errorMsg, error);
       // Don't show error toast for rules fetch to avoid cluttering UI
       return { rules: [], pagination: fallbackPagination };
+    }
+  },
+
+  // Fetch deployments for a guardrail profile
+  fetchDeployments: async (
+    profileId: string,
+    overrideFilters?: Partial<DeploymentFilters>
+  ) => {
+    const { deploymentFilters, deploymentPagination } = get();
+    set({ isLoadingDeployments: true });
+
+    try {
+      // Build query parameters
+      const finalFilters = overrideFilters
+        ? { ...deploymentFilters, ...overrideFilters }
+        : deploymentFilters;
+
+      const params: Record<string, string | number | boolean> = {
+        page: deploymentPagination.page,
+        limit: deploymentPagination.limit,
+      };
+
+      // Add optional filters
+      if (finalFilters.search !== undefined) {
+        params.search = finalFilters.search;
+      }
+
+      if (finalFilters.name) {
+        params.name = finalFilters.name;
+      }
+
+      if (finalFilters.status) {
+        params.status = finalFilters.status;
+      }
+
+      if (finalFilters.order_by) {
+        params.order_by = finalFilters.order_by;
+      }
+
+      const response = await AppRequest.Get(`/guardrails/profile/${profileId}/deployments`, { params });
+
+      if (response.data) {
+        const parsed = parseApiResponse<Deployment>(response.data, "deployments", deploymentPagination);
+        set({
+          deployments: parsed.items,
+          deploymentPagination: parsed.pagination,
+          isLoadingDeployments: false,
+        });
+      } else {
+        throw new Error("Invalid response structure");
+      }
+    } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch deployments";
+      message.error(errorMsg);
+      set({ isLoadingDeployments: false, deployments: [] });
     }
   },
 }));

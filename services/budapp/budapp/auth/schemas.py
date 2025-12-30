@@ -72,6 +72,10 @@ class UserLogin(BaseModel):
         UserTypeEnum.CLIENT,
         description="Type of user (admin or client). Defaults to client.",
     )
+    remember_me: bool = Field(
+        False,
+        description="If true, returns offline tokens for extended 30-day sessions.",
+    )
 
 
 class UserLoginData(BaseModel):

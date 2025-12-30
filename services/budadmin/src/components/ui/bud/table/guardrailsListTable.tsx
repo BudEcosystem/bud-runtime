@@ -7,8 +7,10 @@ import { useGuardrails, GuardrailProfile } from '@/stores/useGuardrails';
 import { Text_12_300_EEEEEE, Text_12_400_EEEEEE, Text_16_600_FFFFFF } from '../../text';
 import SearchHeaderInput from 'src/flows/components/SearchHeaderInput';
 import NoDataFount from '../../noDataFount';
-import { PrimaryButton, SecondaryButton } from '../form/Buttons';
+import { PrimaryButton, SecondaryButton, BorderlessButton } from '../form/Buttons';
 import Tags from 'src/flows/components/DrawerTags';
+import { useDrawer } from 'src/hooks/useDrawer';
+import { PermissionEnum, useUser } from 'src/stores/useUser';
 import { SortIcon } from './SortIcon';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { ClientTimestamp } from '../../ClientTimestamp';
@@ -33,6 +35,8 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { contextHolder, openConfirm } = useConfirmAction()
+  const { openDrawer } = useDrawer();
+  const { hasPermission } = useUser();
 
   const {
     guardrails,
@@ -155,7 +159,6 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      width: 300,
       render: (name: string) => (
         <Tooltip title={name}>
           <Text_12_400_EEEEEE className="truncate max-w-[280px]">
@@ -170,7 +173,6 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       title: 'Guard Types',
       dataIndex: 'guard_types',
       key: 'guard_types',
-      width: 350,
       render: (guard_types: string[]) => (
         <div className="flex flex-wrap gap-1">
           {guard_types && guard_types.length > 0 ? (
@@ -191,7 +193,6 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 120,
       render: (status: string) => {
         const config = getStatusConfig(status);
         return (
@@ -209,7 +210,6 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       title: 'Created At',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: 200,
       render: (created_at: string) => (
         <Text_12_400_EEEEEE>
           <ClientTimestamp timestamp={created_at} />
@@ -222,22 +222,35 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
       title: '',
       dataIndex: '',
       key: 'actions',
-      width: 200,
       render: (_, record) => (
-        <div className='w-[2rem] h-auto block'>
-          <Button
-            type="text"
-            className='bg-transparent border-none p-0 cursor-pointer group'
-            onClick={(event) => {
-              event.stopPropagation();
-              confirmDelete(record)
-            }}
-            aria-label="Delete guardrail"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
-              <path className="fill-[#B3B3B3] group-hover:fill-[#EEEEEE] transition-colors duration-200" fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" />
-            </svg>
-          </Button>
+        <div className='min-w-[100px]'>
+          <div className='flex flex-row items-center justify-end'>
+            <BorderlessButton
+              permission={hasPermission(PermissionEnum.ModelManage)}
+              disabled={!record.is_standalone}
+              onClick={(event: React.MouseEvent) => {
+                event.stopPropagation();
+                openDrawer("use-guardrail", { guardrail: record });
+              }}
+            >
+              Use this guardrail
+            </BorderlessButton>
+            <div className='ml-[.3rem] w-[2rem] h-auto block'>
+              <Button
+                type="text"
+                className='bg-transparent border-none p-0 cursor-pointer group'
+                onClick={(event: React.MouseEvent) => {
+                  event.stopPropagation();
+                  confirmDelete(record)
+                }}
+                aria-label="Delete guardrail"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 15" fill="none">
+                  <path className="fill-[#B3B3B3] group-hover:fill-[#EEEEEE] transition-colors duration-200" fillRule="evenodd" clipRule="evenodd" d="M5.13327 1.28906C4.85713 1.28906 4.63327 1.51292 4.63327 1.78906C4.63327 2.0652 4.85713 2.28906 5.13327 2.28906H8.8666C9.14274 2.28906 9.3666 2.0652 9.3666 1.78906C9.3666 1.51292 9.14274 1.28906 8.8666 1.28906H5.13327ZM2.7666 3.65573C2.7666 3.37959 2.99046 3.15573 3.2666 3.15573H10.7333C11.0094 3.15573 11.2333 3.37959 11.2333 3.65573C11.2333 3.93187 11.0094 4.15573 10.7333 4.15573H10.2661C10.2664 4.1668 10.2666 4.17791 10.2666 4.18906V11.5224C10.2666 12.0747 9.81889 12.5224 9.2666 12.5224H4.73327C4.18098 12.5224 3.73327 12.0747 3.73327 11.5224V4.18906C3.73327 4.17791 3.73345 4.1668 3.73381 4.15573H3.2666C2.99046 4.15573 2.7666 3.93187 2.7666 3.65573ZM9.2666 4.18906L4.73327 4.18906V11.5224L9.2666 11.5224V4.18906Z" />
+                </svg>
+              </Button>
+            </div>
+          </div>
         </div>
       ),
     },

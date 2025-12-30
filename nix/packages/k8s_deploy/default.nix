@@ -6,11 +6,10 @@
   gnugrep,
   git,
   curl,
-  tomlq,
-  yq,
   vim,
   kmod,
   pciutils,
+  scid,
 }:
 writeShellApplication {
   name = "k8s_deploy";
@@ -21,11 +20,10 @@ writeShellApplication {
     gnugrep
     git
     curl
-    tomlq
     vim
     kmod
     pciutils
-    yq
+    scid
   ];
 
   text = builtins.readFile ./script.sh;

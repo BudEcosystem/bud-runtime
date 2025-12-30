@@ -27,6 +27,7 @@ export default function SelectProject() {
     setSelectedProject: setSelectedProjectInStore,
     updateWorkflow,
     workflowLoading,
+    isStandaloneDeployment,
   } = useGuardrails();
 
   // Fetch projects on component mount and when search changes
@@ -49,15 +50,15 @@ export default function SelectProject() {
     }
 
     try {
+      // Get current state BEFORE async operations
+      const { currentWorkflow, selectedProvider } = useGuardrails.getState();
+
       // Build the complete payload
       const payload: any = {
         step_number: 4, // Project selection is step 4
         project_id: selectedProject,
         trigger_workflow: false,
       };
-
-      // Include workflow_id if available
-      const { currentWorkflow, selectedProvider } = useGuardrails.getState();
 
       if (currentWorkflow?.workflow_id) {
         payload.workflow_id = currentWorkflow.workflow_id;
@@ -76,18 +77,24 @@ export default function SelectProject() {
         payload.probe_selections = currentWorkflow.probe_selections;
       }
 
-      // Include is_standalone from deployment type step
-      if (currentWorkflow?.is_standalone !== undefined) {
-        payload.is_standalone = currentWorkflow.is_standalone;
-      }
+      // Include is_standalone from the store (set in DeploymentTypes step)
+      payload.is_standalone = isStandaloneDeployment;
 
       // Update workflow with complete data
       await updateWorkflow(payload);
 
       // Save selected project to guardrails store
       setSelectedProjectInStore(selectedProjectData);
-      // Move to deployment selection
-      openDrawerWithStep("select-deployment");
+
+      // Check if this is a standalone guardrail endpoint (skip deployment selection)
+      // Use the store flag which was set in DeploymentTypes step
+      if (isStandaloneDeployment) {
+        // Skip deployment selection for guardrail-endpoint type
+        openDrawerWithStep("probe-settings");
+      } else {
+        // Normal flow - go to deployment selection
+        openDrawerWithStep("select-deployment");
+      }
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }

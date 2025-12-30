@@ -43,6 +43,9 @@ class AppConfig(BaseAppConfig):
     nfd_detection_timeout: int = Field(30, alias="NFD_DETECTION_TIMEOUT")
     nfd_namespace: str = Field("node-feature-discovery", alias="NFD_NAMESPACE")
 
+    # CPU optimization: skip master/control-plane nodes for CPU deployments
+    skip_master_node_for_cpu: bool = Field(True, alias="SKIP_MASTER_NODE_FOR_CPU")
+
     # Endpoint validation configuration
     max_endpoint_retry_attempts: int = Field(15, alias="MAX_ENDPOINT_RETRY_ATTEMPTS")
     endpoint_retry_interval: int = Field(20, alias="ENDPOINT_RETRY_INTERVAL")

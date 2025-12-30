@@ -402,6 +402,7 @@ class SimulationWorkflows:
                 "target_name": request.source,
                 "proprietary_only": request.is_proprietary_model,
                 "cluster_id": cluster_id,
+                "model_endpoints": request.model_endpoints,
             },
             retry_policy=retry_policy,
         )

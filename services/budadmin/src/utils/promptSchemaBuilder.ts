@@ -4,6 +4,8 @@ interface PropertyDefinition {
   type: string;
   format?: string;
   title?: string;
+  description?: string;
+  default?: any;
 }
 
 interface SchemaDefinition {
@@ -28,6 +30,35 @@ const mapDataTypeToJsonSchema = (dataType?: string): string => {
   }
 };
 
+const convertDefaultValue = (value: string, dataType?: string): any => {
+  if (!value || !value.trim()) return undefined;
+  switch (dataType) {
+    case "number":
+      const num = parseFloat(value);
+      return isFinite(num) ? num : undefined;
+    case "boolean":
+      return value.toLowerCase() === "true";
+    case "array":
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    case "object":
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          ? parsed
+          : {};
+      } catch {
+        return {};
+      }
+    default:
+      return value;
+  }
+};
+
 const buildPropertiesFromVariables = (
   variables: AgentVariable[],
 ): Record<string, PropertyDefinition> => {
@@ -41,8 +72,18 @@ const buildPropertiesFromVariables = (
 
     const property: PropertyDefinition = {
       type: mapDataTypeToJsonSchema(variable.dataType),
-      title: variable.description || variable.name,
+      title: variable.name,
     };
+
+    // Add description if provided
+    if (variable.description && variable.description.trim()) {
+      property.description = variable.description;
+    }
+
+    // Add default value if provided
+    if (variable.defaultValue && variable.defaultValue.trim()) {
+      property.default = convertDefaultValue(variable.defaultValue, variable.dataType);
+    }
 
     // Add email format for email fields
     if (
@@ -62,7 +103,13 @@ const buildPropertiesFromVariables = (
 
 const buildRequiredFields = (variables: AgentVariable[]): string[] => {
   return variables
-    .filter((variable) => variable.name && variable.name.trim())
+    .filter(
+      (variable) =>
+        variable.name &&
+        variable.name.trim() &&
+        // Exclude variables with default values from required array
+        (!variable.defaultValue || !variable.defaultValue.trim())
+    )
     .map((variable) => variable.name);
 };
 

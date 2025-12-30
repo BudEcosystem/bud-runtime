@@ -20,6 +20,8 @@ import { useUser } from "src/stores/useUser";
 interface DataInterface {
   email?: string;
   password?: string;
+  user_type?: string;
+  remember_me?: boolean;
 }
 
 export default function Login() {
@@ -56,11 +58,13 @@ export default function Login() {
   const handleLogin = async (payload: DataInterface) => {
     showLoader();
     try {
-      const response: any = await AppRequest.Post("auth/login", {
+      const loginPayload: DataInterface = {
         email: payload.email,
         password: payload.password,
         user_type: "admin",
-      });
+        remember_me: payload.remember_me,
+      };
+      const response: any = await AppRequest.Post("auth/login", loginPayload);
       const data = response.data;
       if (data.success) {
         successToast(data.message);

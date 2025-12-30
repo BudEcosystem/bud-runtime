@@ -71,7 +71,8 @@ class TestDetermineModalityEndpoints:
         result = await determine_modality_endpoints("speech_to_text")
 
         assert result["modality"] == [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
-        assert result["endpoints"] == [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
+        # All audio→text models get both transcription and translation endpoints
+        assert result["endpoints"] == [ModelEndpointEnum.AUDIO_TRANSCRIPTION, ModelEndpointEnum.AUDIO_TRANSLATION]
 
     @pytest.mark.asyncio
     async def test_audio_translation_category_keyword(self):
@@ -79,7 +80,8 @@ class TestDetermineModalityEndpoints:
         result = await determine_modality_endpoints("audio_translation")
 
         assert result["modality"] == [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
-        assert result["endpoints"] == [ModelEndpointEnum.AUDIO_TRANSLATION]
+        # All audio→text models get both transcription and translation endpoints
+        assert result["endpoints"] == [ModelEndpointEnum.AUDIO_TRANSCRIPTION, ModelEndpointEnum.AUDIO_TRANSLATION]
 
     @pytest.mark.asyncio
     async def test_image_edit_category_keyword(self):
@@ -144,7 +146,8 @@ class TestDetermineModalityEndpoints:
         result = await determine_modality_endpoints("audio_input, text_output")
 
         assert result["modality"] == [ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
-        assert result["endpoints"] == [ModelEndpointEnum.AUDIO_TRANSCRIPTION]
+        # All audio→text models get both transcription and translation endpoints
+        assert result["endpoints"] == [ModelEndpointEnum.AUDIO_TRANSCRIPTION, ModelEndpointEnum.AUDIO_TRANSLATION]
 
     @pytest.mark.asyncio
     async def test_comma_separated_text_to_speech_modality(self):
@@ -194,6 +197,75 @@ class TestDetermineModalityEndpoints:
 
         assert result["modality"] == [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
         assert result["endpoints"] == [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
+
+    # Test new audio modalities
+    @pytest.mark.asyncio
+    async def test_audio_llm_category_keyword(self):
+        """Test audio_llm category keyword returns correct modality and endpoints."""
+        result = await determine_modality_endpoints("audio_llm")
+
+        assert result["modality"] == [ModalityEnum.TEXT_INPUT, ModalityEnum.AUDIO_INPUT, ModalityEnum.TEXT_OUTPUT]
+        assert result["endpoints"] == [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+        ]
+
+    @pytest.mark.asyncio
+    async def test_audio_llm_tts_category_keyword(self):
+        """Test audio_llm_tts category keyword returns correct modality and endpoints."""
+        result = await determine_modality_endpoints("audio_llm_tts")
+
+        assert result["modality"] == [
+            ModalityEnum.TEXT_INPUT,
+            ModalityEnum.AUDIO_INPUT,
+            ModalityEnum.TEXT_OUTPUT,
+            ModalityEnum.AUDIO_OUTPUT,
+        ]
+        assert result["endpoints"] == [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+            ModelEndpointEnum.TEXT_TO_SPEECH,
+        ]
+
+    @pytest.mark.asyncio
+    async def test_omni_category_keyword(self):
+        """Test omni category keyword returns correct modality and endpoints."""
+        result = await determine_modality_endpoints("omni")
+
+        assert result["modality"] == [
+            ModalityEnum.TEXT_INPUT,
+            ModalityEnum.AUDIO_INPUT,
+            ModalityEnum.IMAGE_INPUT,
+            ModalityEnum.TEXT_OUTPUT,
+        ]
+        assert result["endpoints"] == [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.DOCUMENT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+        ]
+
+    @pytest.mark.asyncio
+    async def test_omni_tts_category_keyword(self):
+        """Test omni_tts category keyword returns correct modality and endpoints."""
+        result = await determine_modality_endpoints("omni_tts")
+
+        assert result["modality"] == [
+            ModalityEnum.TEXT_INPUT,
+            ModalityEnum.AUDIO_INPUT,
+            ModalityEnum.IMAGE_INPUT,
+            ModalityEnum.TEXT_OUTPUT,
+            ModalityEnum.AUDIO_OUTPUT,
+        ]
+        assert result["endpoints"] == [
+            ModelEndpointEnum.CHAT,
+            ModelEndpointEnum.DOCUMENT,
+            ModelEndpointEnum.AUDIO_TRANSCRIPTION,
+            ModelEndpointEnum.AUDIO_TRANSLATION,
+            ModelEndpointEnum.TEXT_TO_SPEECH,
+        ]
 
     # Test error cases
     @pytest.mark.asyncio

@@ -479,8 +479,28 @@ export const usePerfomanceBenchmark = create<{
       set({ currentWorkflowId: response.data.workflow_id });
       console.log("response", response);
       return response;
-    } catch (error) {
-      console.error("Error creating model:", error);
+    } catch (error: any) {
+      console.error("Error creating benchmark:", error);
+      // Handle validation errors from API (Pydantic 422 errors)
+      let errorMessage = "Failed to create benchmark";
+      const detail = error?.response?.data?.detail;
+
+      if (detail) {
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((d: any) => d.msg || d.message).join(", ") || "Validation error";
+        } else if (typeof detail === "string") {
+          errorMessage = detail;
+        } else {
+          errorMessage = "Validation error";
+        }
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      errorToast(errorMessage);
+      return null;
     } finally {
       get().setLoading(false);
     }

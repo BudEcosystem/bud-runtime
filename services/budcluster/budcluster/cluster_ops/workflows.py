@@ -1897,7 +1897,10 @@ class UpdateClusterStatusWorkflow:
         nodes_info_present = result["nodes_info_present"]
         node_info = result["node_info"]
         node_status_change = result["node_status_change"]
-        if cluster_status != prev_status or not nodes_info_present or node_status_change:
+        # Always send notification when node_info is available to ensure resource counts are up-to-date
+        # This ensures gpu_count/cpu_count are recalculated even without status changes
+        has_node_info = node_info and "nodes" in node_info and len(node_info.get("nodes", [])) > 0
+        if cluster_status != prev_status or not nodes_info_present or node_status_change or has_node_info:
             logger.info(f"Sending cluster status notification: {cluster_status}")
             event_name = "cluster-status-update"
             event_type = "results"

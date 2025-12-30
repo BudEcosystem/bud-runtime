@@ -249,7 +249,8 @@ const handleErrorResponse = (err) => {
     // Don't show error toast for silent endpoints - let the component handle the error
     if (err.config?.url?.includes('/prompts/oauth/status') ||
         err.config?.url?.includes('/prompts/prompt-config/') ||
-        err.config?.url?.includes('/benchmark/node-configurations')) {
+        err.config?.url?.includes('/benchmark/node-configurations') ||
+        err.config?.url?.includes('/models/top-leaderboards')) {
       return Promise.reject(err);
     }
 

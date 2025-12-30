@@ -41,6 +41,7 @@ from .parser import (
     get_model_analysis,
 )
 from .schemas import (
+    AudioConfig,
     EmbeddingConfig,
     LicenseInfo,
     LLMConfig,
@@ -257,7 +258,19 @@ class HuggingFaceModelInfo(BaseModelInfo):
     def parse_transformers_config(
         cls, pretrained_model_name_or_path: str, token: Optional[str] = None
     ) -> Optional[ModelArchitecture]:
-        """Parse the transformers configuration for a Hugging Face model."""
+        """Parse the transformers configuration for a Hugging Face model.
+
+        Detects model modality based on config patterns:
+        - LLM: Text-only language models
+        - MLLM: Multi-modal models (text + image)
+        - Audio: Speech-to-text models (e.g., Whisper)
+        - Audio LLM: Audio input + text output models (e.g., Qwen2-Audio)
+        - Omni: Full multimodal (audio + vision + text, with optional audio output)
+
+        Modality suffixes:
+        - _embedding: Model has embedding capability
+        - _tts: Model has text-to-speech output capability
+        """
         from transformers import AutoConfig
 
         model_config = AutoConfig.from_pretrained(pretrained_model_name_or_path, token=token, trust_remote_code=True)
@@ -273,15 +286,52 @@ class HuggingFaceModelInfo(BaseModelInfo):
             **cls.get_llm_model_weights_info(pretrained_model_name_or_path, model_config),
         )
 
-        if config.get("vision_config"):
+        # Detect audio capabilities
+        has_audio_input, has_audio_output = cls.detect_audio_modality(config)
+
+        # Detect vision capabilities
+        has_vision = bool(config.get("vision_config"))
+
+        # Also check for vision in nested configs (Qwen2.5-Omni style)
+        if not has_vision:
+            thinker_config = config.get("thinker_config", {})
+            has_vision = bool(thinker_config.get("vision_config"))
+
+        # Determine base modality
+        if has_audio_input and has_vision:
+            # Omni model: audio + vision + text (e.g., Qwen2.5-Omni, MiniCPM-o)
+            config_info = cls.parse_mllm_model_config(config)
+            model_architecture.text_config = config_info.get("text_config")
+            model_architecture.vision_config = config_info.get("vision_config")
+            model_architecture.audio_config = cls.parse_audio_model_config(config)
+            modality = "omni"
+        elif has_audio_input:
+            # Audio model: may be pure audio (Whisper) or audio+text LLM (Qwen2-Audio)
+            model_architecture.audio_config = cls.parse_audio_model_config(config)
+
+            # Check if it's a pure speech model or audio-LLM hybrid
+            # Pure speech models (Whisper) typically have is_encoder_decoder=True
+            # and no separate text_config
+            is_pure_speech = config.get("is_encoder_decoder", False) and not config.get("text_config")
+
+            if is_pure_speech:
+                modality = "speech_to_text"
+            else:
+                # Audio-LLM hybrid (Qwen2-Audio, Ultravox, etc.)
+                model_architecture.text_config = cls.parse_llm_model_config(config)
+                modality = "audio_llm"
+        elif has_vision:
+            # Multi-modal LLM with vision
             config_info = cls.parse_mllm_model_config(config)
             model_architecture.text_config = config_info.get("text_config")
             model_architecture.vision_config = config_info.get("vision_config")
             modality = "mllm"
         else:
+            # Standard LLM
             model_architecture.text_config = cls.parse_llm_model_config(config)
             modality = "llm"
 
+        # Check for embedding capability
         filepath = cls.download_hf_repo_file(
             pretrained_model_name_or_path, filename="1_Pooling/config.json", token=token
         )
@@ -291,6 +341,10 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
             model_architecture.embedding_config = cls.parse_embedding_model_config(pooling_config)
             modality += "_embedding"
+
+        # Add TTS suffix if model has audio output capability
+        if has_audio_output:
+            modality += "_tts"
 
         return {"architecture": model_architecture, "modality": modality}
 
@@ -352,6 +406,164 @@ class HuggingFaceModelInfo(BaseModelInfo):
     def parse_embedding_model_config(pooling_config: Dict[str, Any]) -> Dict[str, Any]:
         """Parse embedding model configuration from pooling config."""
         return EmbeddingConfig(embedding_dimension=pooling_config.get("word_embedding_dimension"))
+
+    @staticmethod
+    def detect_audio_modality(config: Dict[str, Any]) -> Tuple[bool, bool]:
+        """Detect audio input and output support from model config.
+
+        Analyzes model configuration to identify audio capabilities based on
+        various config patterns found in audio-capable models like Whisper,
+        Qwen2-Audio, Ultravox, Voxtral, etc.
+
+        Args:
+            config: Model configuration dictionary
+
+        Returns:
+            Tuple of (audio_input_supported, audio_output_supported)
+        """
+        audio_input = False
+        audio_output = False
+
+        # Check for audio input indicators
+        # Pattern 1: audio_config (Qwen2-Audio, Ultravox, MiniCPM-o, AudioFlamingo3, Voxtral)
+        if config.get("audio_config"):
+            audio_input = True
+
+        # Pattern 2: audio_encoder_config (MiDashengLM)
+        if config.get("audio_encoder_config"):
+            audio_input = True
+
+        # Pattern 3: audio_processor (Phi-4-multimodal)
+        if config.get("audio_processor"):
+            audio_input = True
+
+        # Pattern 4: audio token markers (present in all audio models)
+        if config.get("audio_token_index") or config.get("audio_token_id"):
+            audio_input = True
+
+        # Pattern 5: Check encoder_config for speech/audio model types (Granite Speech)
+        encoder_config = config.get("encoder_config", {})
+        encoder_type = encoder_config.get("model_type", "").lower()
+        if "speech" in encoder_type or "audio" in encoder_type:
+            audio_input = True
+
+        # Pattern 6: Check model_type for audio keywords
+        model_type = config.get("model_type", "").lower()
+        audio_model_types = ["whisper", "audio", "speech", "voxtral", "omni"]
+        if any(kw in model_type for kw in audio_model_types):
+            audio_input = True
+
+        # Pattern 7: Check architectures for audio keywords
+        for arch in config.get("architectures", []):
+            arch_lower = arch.lower()
+            if any(kw in arch_lower for kw in ["whisper", "audio", "speech", "voxtral", "omni"]):
+                audio_input = True
+                break
+
+        # Pattern 8: Check nested thinker_config for audio (Qwen2.5-Omni style)
+        thinker_config = config.get("thinker_config", {})
+        if thinker_config.get("audio_config"):
+            audio_input = True
+
+        # Check for audio output (TTS) capability
+        # Pattern 1: tts_config (MiniCPM-o, Qwen2.5-Omni)
+        if config.get("tts_config"):
+            audio_output = True
+
+        # Pattern 2: enable_audio_output flag (Qwen2.5-Omni)
+        if config.get("enable_audio_output"):
+            audio_output = True
+
+        # Pattern 3: token2wav_config (Qwen2.5-Omni vocoder)
+        if config.get("token2wav_config"):
+            audio_output = True
+
+        # Pattern 4: talker_config (Qwen2.5-Omni)
+        if config.get("talker_config"):
+            audio_output = True
+
+        return audio_input, audio_output
+
+    @classmethod
+    def parse_audio_model_config(cls, config: Dict[str, Any]) -> AudioConfig:
+        """Parse audio model configuration from various config patterns.
+
+        Handles different audio config patterns found in models like:
+        - Whisper: root-level audio fields
+        - Qwen2-Audio: audio_config object
+        - Ultravox: audio_config with whisper-style nested config
+        - Granite Speech: encoder_config
+        - Phi-4: audio_processor
+        - MiDashengLM: audio_encoder_config
+
+        Args:
+            config: Model configuration dictionary
+
+        Returns:
+            AudioConfig with extracted audio parameters
+        """
+        audio_config = AudioConfig()
+
+        # Try to get audio config from various sources
+        _audio_config: Dict[str, Any] = {}
+
+        # Priority 1: audio_config (most common)
+        if config.get("audio_config"):
+            _audio_config = config["audio_config"]
+        # Priority 2: audio_encoder_config (MiDashengLM)
+        elif config.get("audio_encoder_config"):
+            _audio_config = config["audio_encoder_config"]
+        # Priority 3: encoder_config (Granite Speech)
+        elif config.get("encoder_config"):
+            encoder = config["encoder_config"]
+            if "speech" in encoder.get("model_type", "").lower() or "audio" in encoder.get("model_type", "").lower():
+                _audio_config = encoder
+        # Priority 4: audio_processor config (Phi-4)
+        elif config.get("audio_processor"):
+            processor = config["audio_processor"]
+            if isinstance(processor, dict) and processor.get("config"):
+                _audio_config = processor["config"]
+        # Priority 5: thinker_config.audio_config (Qwen2.5-Omni)
+        elif config.get("thinker_config", {}).get("audio_config"):
+            _audio_config = config["thinker_config"]["audio_config"]
+        # Priority 6: Root level for Whisper-style models
+        elif config.get("model_type", "").lower() == "whisper":
+            _audio_config = config
+
+        # Extract common audio parameters
+        audio_config.num_layers = (
+            _audio_config.get("encoder_layers")
+            or _audio_config.get("num_hidden_layers")
+            or _audio_config.get("num_layers")
+            or _audio_config.get("depth")
+        )
+
+        audio_config.hidden_size = (
+            _audio_config.get("hidden_size")
+            or _audio_config.get("d_model")
+            or _audio_config.get("embed_dim")
+            or _audio_config.get("attention_dim")
+        )
+
+        audio_config.num_attention_heads = (
+            _audio_config.get("encoder_attention_heads")
+            or _audio_config.get("num_attention_heads")
+            or _audio_config.get("num_heads")
+            or _audio_config.get("attention_heads")
+        )
+
+        audio_config.num_mel_bins = _audio_config.get("num_mel_bins") or _audio_config.get("n_mels")
+
+        audio_config.sample_rate = _audio_config.get("sample_rate")
+
+        audio_config.max_source_positions = _audio_config.get("max_source_positions")
+
+        torch_dtype = _audio_config.get("torch_dtype")
+        if torch_dtype is not None and not isinstance(torch_dtype, str):
+            torch_dtype = str(torch_dtype)
+        audio_config.torch_dtype = torch_dtype
+
+        return audio_config
 
     @staticmethod
     def get_llm_model_weights_info(pretrained_model_name_or_path: str, config: AutoConfig) -> Dict[str, Any]:
