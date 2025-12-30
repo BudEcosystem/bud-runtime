@@ -34,7 +34,7 @@ const DeploymentsTab: React.FC = () => {
     if (guardrailId && typeof guardrailId === 'string') {
       fetchDeployments(guardrailId);
     }
-  }, [guardrailId]);
+  }, [guardrailId, fetchDeployments]);
 
   // Handle search with debounce
   useEffect(() => {
