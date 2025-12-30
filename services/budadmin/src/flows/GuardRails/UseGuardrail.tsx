@@ -120,7 +120,7 @@ export default function UseGuardrail() {
     setSelectedText(codeSnippets[selectedCode] ?? "");
   }, [codeSnippets, selectedCode]);
 
-  const selectType = async (type: string) => {
+  const selectType = (type: string) => {
     setSelectedCode(type);
     setSelectedText(codeSnippets[type] ?? "");
   };
