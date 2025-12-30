@@ -58,7 +58,7 @@ export default function Login() {
   const handleLogin = async (payload: DataInterface) => {
     showLoader();
     try {
-      const loginPayload: any = {
+      const loginPayload: DataInterface = {
         email: payload.email,
         password: payload.password,
         user_type: "admin",
