@@ -6284,6 +6284,15 @@ pub async fn response_create_handler(
     // Record request fields for observability
     super::observability::record_response_request(&params);
 
+    // Capture prompt info for analytics headers (before params is moved into async block)
+    let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());
+    let prompt_version = params.prompt.as_ref().and_then(|p| p.version.clone());
+    // Capture project_id from incoming headers for analytics
+    let project_id = headers
+        .get("x-tensorzero-project-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
     let result = async {
         if !params.unknown_fields.is_empty() {
             tracing::warn!(
@@ -6555,7 +6564,29 @@ pub async fn response_create_handler(
         super::observability::record_error(error);
     }
 
-    result
+    // Add prompt and project headers for analytics
+    match result {
+        Ok(mut response) => {
+            if let Some(ref id) = prompt_id {
+                if let Ok(value) = axum::http::HeaderValue::from_str(id) {
+                    response.headers_mut().insert("x-tensorzero-prompt-id", value);
+                }
+            }
+            if let Some(ref version) = prompt_version {
+                if let Ok(value) = axum::http::HeaderValue::from_str(version) {
+                    response.headers_mut().insert("x-tensorzero-prompt-version", value);
+                }
+            }
+            // Add project_id header for analytics
+            if let Some(ref pid) = project_id {
+                if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
+                    response.headers_mut().insert("x-tensorzero-project-id", value);
+                }
+            }
+            Ok(response)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Handler for retrieving a response (GET /v1/responses/{response_id})

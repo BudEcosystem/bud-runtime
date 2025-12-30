@@ -95,6 +95,9 @@ pub async fn analytics_middleware(
         gateway_analytics.block_rule_id = tracing::field::Empty,
         // Tags
         gateway_analytics.tags = tracing::field::Empty,
+        // Prompt (for /v1/responses with prompt parameter)
+        gateway_analytics.prompt_id = tracing::field::Empty,
+        gateway_analytics.prompt_version = tracing::field::Empty,
     );
 
     // Extract parent context from incoming traceparent/tracestate headers
@@ -190,6 +193,36 @@ pub async fn analytics_middleware(
                     analytics.record.inference_id = Some(inference_id);
                     tracing::debug!("Captured inference_id {} for analytics", inference_id);
                 }
+            }
+        }
+
+        // Extract prompt_id from response headers if present (for /v1/responses with prompt)
+        if let Some(prompt_id_header) = response.headers().get("x-tensorzero-prompt-id") {
+            if let Ok(prompt_id_str) = prompt_id_header.to_str() {
+                let span = tracing::Span::current();
+                span.record("gateway_analytics.prompt_id", prompt_id_str);
+                tracing::debug!("Captured prompt_id {} for analytics", prompt_id_str);
+            }
+        }
+
+        // Extract prompt_version from response headers if present
+        if let Some(prompt_version_header) = response.headers().get("x-tensorzero-prompt-version") {
+            if let Ok(prompt_version_str) = prompt_version_header.to_str() {
+                let span = tracing::Span::current();
+                span.record("gateway_analytics.prompt_version", prompt_version_str);
+                tracing::debug!("Captured prompt_version {} for analytics", prompt_version_str);
+            }
+        }
+
+        // Extract project_id from response headers if present (for /v1/responses)
+        if let Some(project_id_header) = response.headers().get("x-tensorzero-project-id") {
+            if let Ok(project_id_str) = project_id_header.to_str() {
+                let span = tracing::Span::current();
+                span.record("gateway_analytics.project_id", project_id_str);
+                tracing::debug!(
+                    "Captured project_id {} for analytics from response header",
+                    project_id_str
+                );
             }
         }
 
