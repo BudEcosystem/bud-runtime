@@ -57,7 +57,6 @@ export default function Login() {
   };
   const handleLogin = async (payload: DataInterface) => {
     showLoader();
-    console.log("payload", payload);
     try {
       const loginPayload: any = {
         email: payload.email,
