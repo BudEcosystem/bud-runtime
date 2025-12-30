@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/router';
@@ -154,7 +154,7 @@ const DeploymentsTab: React.FC = () => {
   ];
 
   // Handle table change (pagination, sorting)
-  const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
+  const handleTableChange = useCallback((newPagination: any, _filters: any, sorter: any) => {
     if (typeof guardrailId !== 'string') return;
     const paginationChanged = newPagination.current !== deploymentPagination.page || newPagination.pageSize !== deploymentPagination.limit;
     const newOrderBy = sorter.field && sorter.order ? `${sorter.field}:${sorter.order === 'ascend' ? 'asc' : 'desc'}` : undefined;
@@ -173,7 +173,7 @@ const DeploymentsTab: React.FC = () => {
       });
       fetchDeployments(guardrailId);
     }
-  };
+  }, [guardrailId, deploymentPagination, deploymentFilters, fetchDeployments, setDeploymentFilters, setDeploymentPagination]);
 
   return (
     <div className="pb-[60px] pt-[.4rem] relative CommonCustomPagination">
