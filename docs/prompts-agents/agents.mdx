@@ -73,7 +73,7 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 
 ### 3.7 Permissions and safety rails
 
-- Create/Edit/Delete actions respect Bud RBAC (Project Manage or Model Manage) so only authorized users can change production agents.
+- Create/Edit/Delete actions respect Bud RBAC (Project Manage) so only authorized users can change production agents.
 - Delete confirmations prevent accidental removals and ensure dependent workflows can be checked before deletion.
 
 ## 4. How-to Guides
@@ -165,7 +165,7 @@ Edit versions from the Versions tab; Bud fetches deployment details when availab
 
 **Q5. What permissions are required to modify agents?**
 
-Create, Edit, and Delete actions require manage-level permissions (Project Manage or Model Manage) per Bud RBAC. Users without permissions can still search and view agents where allowed.
+Create, Edit, and Delete actions require manage-level permissions (Project Manage) per Bud RBAC. Users without permissions can still search and view agents where allowed.
 
 **Q6. Can I work with multiple agent versions at once?**
 
