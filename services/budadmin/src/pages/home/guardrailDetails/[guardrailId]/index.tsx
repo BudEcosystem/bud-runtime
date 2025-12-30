@@ -9,6 +9,7 @@ import {
 import { Tabs } from "antd";
 import GeneralTab from "./general";
 import ProbesTab from "./probes";
+import DeploymentsTab from "./deployments";
 import { useGuardrails } from "@/stores/useGuardrails";
 import { useLoaderOnLoding } from "src/hooks/useLoaderOnLoading";
 import BackButton from "@/components/ui/bud/drawer/BackButton";
@@ -68,19 +69,19 @@ const GuardrailDetailsPage = () => {
       key: "2",
       children: <ProbesTab />,
     },
-    // {
-    //   label: (
-    //     <div className="flex items-center gap-[0.375rem]">
-    //       {activeTab === "3" ? (
-    //         <Text_14_600_EEEEEE>History</Text_14_600_EEEEEE>
-    //       ) : (
-    //         <Text_14_600_B3B3B3>History</Text_14_600_B3B3B3>
-    //       )}
-    //     </div>
-    //   ),
-    //   key: "3",
-    //   children: <div className="p-6 text-center text-gray-400">History - Coming Soon</div>,
-    // },
+    {
+      label: (
+        <div className="flex items-center gap-[0.375rem]">
+          {activeTab === "3" ? (
+            <Text_14_600_EEEEEE>Deployments</Text_14_600_EEEEEE>
+          ) : (
+            <Text_14_600_B3B3B3>Deployments</Text_14_600_B3B3B3>
+          )}
+        </div>
+      ),
+      key: "3",
+      children: <DeploymentsTab />,
+    },
   ];
 
   return (
