@@ -21,7 +21,7 @@ export default function ProbeSettings() {
   const [profileDescription, setProfileDescription] = useState("");
 
   // Use the guardrails hook
-  const { updateWorkflow, workflowLoading, selectedProbe, selectedDeployment } =
+  const { updateWorkflow, workflowLoading, selectedProbe, selectedDeployment, isStandaloneDeployment } =
     useGuardrails();
 
   const lifecycleOptions = [
@@ -32,7 +32,15 @@ export default function ProbeSettings() {
   ];
 
   const handleBack = () => {
-    openDrawerWithStep("select-deployment");
+    // Check if this is a standalone guardrail endpoint (deployment selection was skipped)
+    // Use the store flag which was set in DeploymentTypes step
+    if (isStandaloneDeployment) {
+      // Go back to project selection (deployment was skipped)
+      openDrawerWithStep("select-project");
+    } else {
+      // Normal flow - go back to deployment selection
+      openDrawerWithStep("select-deployment");
+    }
   };
 
   const handleDeploy = async () => {
@@ -110,10 +118,8 @@ export default function ProbeSettings() {
         return;
       }
 
-      // Include is_standalone
-      payload.is_standalone = currentWorkflow?.is_standalone !== undefined
-        ? currentWorkflow.is_standalone
-        : false;
+      // Include is_standalone from the store (set in DeploymentTypes step)
+      payload.is_standalone = isStandaloneDeployment;
 
       // Include project_id
       const projectId = selectedProject?.project?.id || selectedProject?.id || currentWorkflow?.project_id;

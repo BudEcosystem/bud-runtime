@@ -73,7 +73,7 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 
 ### 3.7 Permissions and safety rails
 
-- Create/Edit/Delete actions respect Bud RBAC (Project Manage or Model Manage) so only authorized users can change production agents.
+- Create/Edit/Delete actions respect Bud RBAC (Project Manage) so only authorized users can change production agents.
 - Delete confirmations prevent accidental removals and ensure dependent workflows can be checked before deletion.
 
 ## 4. How-to Guides
@@ -93,9 +93,9 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
  5. In the prompt configuration step, select the Model/Endpoint the agent should call.
  6. Structured and unstructured inputs/outputs are supported: add input/output variables (string, number, boolean, array, object) for schema enforcement, or keep the prompt freeform for unstructured use.
  7. Add a system prompt and prompt messages for the required roles (system, user, and assistant), and connect MCP tools if needed for downstream actions.
- 8. Click Run Agent to try out the configured agent. Navigate back to prompt configuration, if any changes are required.
- 9. Click Save and naviagte to the next step in the workflow.
-10. Provide Deployment Name, Tags, Description, Concurrency (minimum and maximum). Configure settings such as auto-scaling, caching, auto-logging, and rate limiting as required.
+ 8. Click Run Agent to test the configuration; navigate back to prompt configuration if changes are required.
+ 9. Click Save and continue to the next step in the workflow.
+10. Provide Deployment Name, Tags, Description, Concurrency (minimum and maximum). Configure options like auto-scaling, caching, auto-logging, and rate limiting as needed.
  8. A success screen confirms deployment with model details and the URI; copy cURL/Python/JS snippets to invoke the newly deployed agent immediately.
 
 ### 4.3 Filter and search agents
@@ -107,37 +107,43 @@ RBAC-gated actions (create, edit, delete) honor project scopes, while audit-frie
 
 ### 4.4 Create an agent inside a project
 
-1. Open a project detail page and select the **Agents** tab.
-2. Click **Create New** to launch the multi-step agent workflow scoped to the project.
+1. Open a project detail page and select the Agents tab.
+2. Click + Create New to launch the multi-step agent workflow scoped to the project.
 3. Complete the steps (type, model/deployment, prompt configuration) and save; the new agent appears in the table.
 
 ### 4.5 Use an existing agent
 
-1. From the project Agents tab, hover over a row and click **Use this agent**.
+1. Open a project detail page and select the Agents tab.
+1. Click Use this agent for the perferred agent.
 2. Copy cURL, Python, or JavaScript snippets from the drawer to integrate the agent into applications or routes.
 
-### 4.6 Edit an agent
+### 4.6 Edit agent
 
-1. From the Agents page (global) or project Agents tab, open the row menu (Edit pencil or dropdown).
-2. The agent drawer preloads existing content; adjust prompts, tags, or model selections.
-3. Save to update the catalog entry; changes propagate to the table and detail view.
+1. From the Agents page, use the kebab menu to edit the agent.
+2. Update the existing details such as name, default version number, tags and description.
+3. Save to update the catalog entry; changes propagate to the listing and detail view.
 
-### 4.7 Delete an agent
+### 4.7 Delete agent
 
-1. In the project Agents tab, hover over the agent row and click the delete icon.
+1. Open a project detail page and select the Agents tab.
+1. Hover over the agent row and click the delete icon.
 2. Confirm the warning; the table refreshes after successful removal.
 
 ### 4.8 View and add versions
 
-1. Click an agent row to open its detail page, then select the **Versions** tab.
-2. Review the **Current Version** card and **Previous Version** list for timestamps and endpoint alignment.
-3. Click **\+ Version** to clone the prompt into a new version; configure details in the drawer and save.
+1. Open a project detail page and select the Agents tab.
+1. Click an agent row to open its detail page.
+2. Review the Current Version card and Previous Version list for timestamps and endpoint alignment.
+3. Click **\+** Version to clone the prompt into a new version; configure details in the drawer and save.
 
 ### 4.9 Edit an existing version
 
-1. In the Versions tab, click **Edit** on the desired version card.
-2. The drawer loads version metadata and, when available, its linked deployment.
+1. Open a project detail page and select the Agents tab.
+1. Click an agent row to open its detail page.
+1. Click Edit on the desired version card.
+2. Preloads existing version metadata and its linked deployment.
 3. Update prompts or deployment references and save to keep the version synchronized.
+4. Default version can be modified from the Project Agents tab as well. Hover over the preferred agent and click the Edit icon.
 
 ## 5. FAQ
 
@@ -159,7 +165,7 @@ Edit versions from the Versions tab; Bud fetches deployment details when availab
 
 **Q5. What permissions are required to modify agents?**
 
-Create, Edit, and Delete actions require manage-level permissions (Project Manage or Model Manage) per Bud RBAC. Users without permissions can still search and view agents where allowed.
+Create, Edit, and Delete actions require manage-level permissions (Project Manage) per Bud RBAC. Users without permissions can still search and view agents where allowed.
 
 **Q6. Can I work with multiple agent versions at once?**
 
