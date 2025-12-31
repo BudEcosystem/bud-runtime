@@ -350,7 +350,7 @@ export default function DeployModelBudAIScaler() {
   const model = currentWorkflow?.workflow_steps?.model || selectedModel;
   const isAudioModel =
     model?.supported_endpoints?.audio_transcription?.enabled === true ||
-    model?.supported_endpoints?.audio_translation?.enabled === true;
+    model?.supported_endpoints?.audio_speech?.enabled === true;
   const isEmbeddingModel = model?.supported_endpoints?.embedding?.enabled === true;
   const modelType: "llm" | "embedding" | "audio" = isAudioModel ? "audio" : isEmbeddingModel ? "embedding" : "llm";
 
