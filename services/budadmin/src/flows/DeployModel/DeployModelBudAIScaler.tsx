@@ -84,16 +84,16 @@ const inputClassName = "!bg-transparent !shadow-none border border-[#757575] hov
 const llmMetricItems = [
   { label: "Request in Queue", value: "bud:num_requests_waiting", type: "pod" as const, defaultValue: "5" },
   { label: "Running Requests", value: "bud:num_requests_running", type: "pod" as const, defaultValue: "10" },
-  { label: "KV Cache Usage", value: "bud:gpu_cache_usage_perc_average", type: "pod" as const, defaultValue: "0.8" },
-  { label: "TTFT", value: "bud:time_to_first_token_seconds_average", type: "pod" as const, defaultValue: "2" },
-  { label: "TPOT", value: "bud:time_per_output_token_seconds_average", type: "pod" as const, defaultValue: "0.1" },
-  { label: "E2E Latency", value: "bud:e2e_request_latency_seconds_average", type: "pod" as const, defaultValue: "10" },
+  { label: "KV Cache Usage (%)", value: "bud:gpu_cache_usage_perc_average", type: "pod" as const, defaultValue: "0.8" },
+  { label: "TTFT (s)", value: "bud:time_to_first_token_seconds_average", type: "pod" as const, defaultValue: "2" },
+  { label: "TPOT (s)", value: "bud:time_per_output_token_seconds_average", type: "pod" as const, defaultValue: "0.1" },
+  { label: "E2E Latency (s)", value: "bud:e2e_request_latency_seconds_average", type: "pod" as const, defaultValue: "10" },
 ];
 
-// Embedding metrics (LatentBud)
+// Embedding metrics (Infinity) - aggregated by runtime-sidecar
 const embeddingMetricItems = [
-  { label: "Request in Queue", value: "embedding_batch_queue_size", type: "pod" as const, defaultValue: "10" },
-  { label: "Request Latency", value: "bud:e2e_request_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+  { label: "Queue Depth", value: "bud:infinity_queue_depth", type: "pod" as const, defaultValue: "10" },
+  { label: "Embedding Latency (s)", value: "bud:infinity_embedding_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
 ];
 
 // Get metrics based on model type
@@ -346,9 +346,16 @@ export default function DeployModelBudAIScaler() {
     selectedModel,
   } = useDeployModel();
 
-  // Use LLM/vLLM metrics for all model types since vLLM is the default engine
-  // LatentBud-specific metrics (like embedding_batch_queue_size) require explicit engine selection
-  const metricItems = getMetricItems("llm");
+  // Detect model type from workflow or selected model
+  const model = currentWorkflow?.workflow_steps?.model || selectedModel;
+  const isAudioModel =
+    model?.supported_endpoints?.audio_transcription?.enabled === true ||
+    model?.supported_endpoints?.audio_translation?.enabled === true;
+  const isEmbeddingModel = model?.supported_endpoints?.embedding?.enabled === true;
+  const modelType: "llm" | "embedding" | "audio" = isAudioModel ? "audio" : isEmbeddingModel ? "embedding" : "llm";
+
+  // Get metrics based on detected model type
+  const metricItems = getMetricItems(modelType);
 
   // Update a specific field in the specification
   const updateSpec = (updates: Partial<BudAIScalerSpecification>) => {

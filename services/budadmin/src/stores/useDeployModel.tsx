@@ -296,7 +296,7 @@ const defaultBudAIScalerSpecification: BudAIScalerSpecification = {
   },
   behavior: {
     scaleUp: {
-      stabilizationWindowSeconds: 0,
+      stabilizationWindowSeconds: 30,
       policies: [
         { type: "Percent", value: 100, periodSeconds: 15 },
         { type: "Pods", value: 4, periodSeconds: 15 },

@@ -35,10 +35,12 @@ adapters: []
 #   - bud:time_to_first_token_seconds_average
 #   - bud:e2e_request_latency_seconds_average
 #   - bud:time_per_output_token_seconds_average
+#   - bud:num_requests_waiting
+#   - bud:num_requests_running
 #
-# Supported LatentBud metrics (for embedding models):
-#   - embedding_batch_queue_size (default)
-#   - embedding_requests_active
+# Supported Infinity metrics (for embedding models, aggregated by runtime-sidecar):
+#   - bud:infinity_queue_depth (default)
+#   - bud:infinity_embedding_latency_seconds_average
 podscaler:
   enabled: false
   type: "metrics" # metrics or optimizer
@@ -64,7 +66,8 @@ podscaler:
 #   - For embedding models (sentence transformers, etc.)
 #   - Optimized for high-throughput embedding inference
 #   - Entrypoint: python -m latentbud.server
-#   - Metrics: embedding_batch_queue_size, embedding_requests_active
+#   - Raw Metrics: infinity_queue_depth, infinity_embedding_latency_seconds (histogram)
+#   - Aggregated Metrics (via runtime-sidecar): bud:infinity_queue_depth, bud:infinity_embedding_latency_seconds_average
 #
 # sglang (future):
 #   - For LLM models with SGLang runtime
@@ -152,7 +155,7 @@ budaiscaler:
   # Scaling behavior (similar to HPA v2)
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 30
       policies:
         - type: "Percent"
           value: 100

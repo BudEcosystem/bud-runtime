@@ -16,9 +16,9 @@ The ENGINE_TYPE environment variable tells the sidecar which metrics to parse.
     - name: LISTEN_PORT
       value: "9090"
     - name: SCRAPE_INTERVAL_SECONDS
-      value: "0.5"
-    - name: CALCULATION_WINDOW_SECONDS
       value: "1"
+    - name: CALCULATION_WINDOW_SECONDS
+      value: "30"
     - name: ENGINE_TYPE
       value: {{ .node.engine_type | default "vllm" | quote }}
   livenessProbe:
