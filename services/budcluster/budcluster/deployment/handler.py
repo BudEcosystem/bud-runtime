@@ -158,6 +158,121 @@ class DeploymentHandler:
 
         return max_memory_bytes / (1024**3)
 
+    def _process_budaiscaler_config(
+        self,
+        budaiscaler: dict,
+        default_metric: str,
+        engine_type: str,
+    ) -> dict:
+        """Process and validate BudAIScaler configuration.
+
+        Args:
+            budaiscaler: Raw BudAIScaler configuration dict
+            default_metric: Default metric for the engine type
+            engine_type: The inference engine type (vllm, latentbud, sglang)
+
+        Returns:
+            Processed configuration dict ready for Helm values
+        """
+        # Start with core configuration
+        config = {
+            "enabled": True,
+            "minReplicas": budaiscaler.get("minReplicas", 1),
+            "maxReplicas": budaiscaler.get("maxReplicas", 10),
+            "scalingStrategy": budaiscaler.get("scalingStrategy", "BudScaler"),
+        }
+
+        # Process metrics sources - add default if none provided
+        metrics_sources = budaiscaler.get("metricsSources", [])
+        if not metrics_sources:
+            # Use default engine metric when no sources specified
+            metrics_sources = [
+                {
+                    "type": "pod",
+                    "protocolType": "http",
+                    "port": "9090",
+                    "path": "/metrics",
+                    "targetMetric": default_metric,
+                    "targetValue": "0.8",
+                }
+            ]
+        config["metricsSources"] = metrics_sources
+
+        # GPU configuration
+        gpu_config = budaiscaler.get("gpuConfig", {})
+        config["gpuConfig"] = {
+            "enabled": gpu_config.get("enabled", False),
+            "memoryThreshold": gpu_config.get("memoryThreshold", 80),
+            "computeThreshold": gpu_config.get("computeThreshold", 80),
+            "topologyAware": gpu_config.get("topologyAware", False),
+            "preferredGPUType": gpu_config.get("preferredGPUType", ""),
+            "vGPUSupport": gpu_config.get("vGPUSupport", False),
+        }
+
+        # Cost configuration
+        cost_config = budaiscaler.get("costConfig", {})
+        config["costConfig"] = {
+            "enabled": cost_config.get("enabled", False),
+            "cloudProvider": cost_config.get("cloudProvider", ""),
+            "hourlyBudgetLimit": cost_config.get("hourlyBudgetLimit", 0),
+            "dailyBudgetLimit": cost_config.get("dailyBudgetLimit", 0),
+            "spotInstancePreference": cost_config.get("spotInstancePreference", "none"),
+        }
+
+        # Prediction configuration
+        prediction_config = budaiscaler.get("predictionConfig", {})
+        config["predictionConfig"] = {
+            "enabled": prediction_config.get("enabled", False),
+            "lookAheadMinutes": prediction_config.get("lookAheadMinutes", 15),
+            "historyDays": prediction_config.get("historyDays", 7),
+            "minConfidence": prediction_config.get("minConfidence", 0.7),
+            "predictionMetrics": prediction_config.get("predictionMetrics", []),
+        }
+
+        # Schedule hints
+        config["scheduleHints"] = budaiscaler.get("scheduleHints", [])
+
+        # Multi-cluster configuration
+        multi_cluster = budaiscaler.get("multiCluster", {})
+        config["multiCluster"] = {
+            "enabled": multi_cluster.get("enabled", False),
+            "federationMode": multi_cluster.get("federationMode", "active-passive"),
+            "clusterWeights": multi_cluster.get("clusterWeights", {}),
+            "failoverThresholds": multi_cluster.get(
+                "failoverThresholds",
+                {"healthCheckFailures": 3, "latencyMs": 5000},
+            ),
+        }
+
+        # Behavior configuration
+        behavior = budaiscaler.get("behavior", {})
+        scale_up = behavior.get("scaleUp", {})
+        scale_down = behavior.get("scaleDown", {})
+
+        config["behavior"] = {
+            "scaleUp": {
+                "stabilizationWindowSeconds": scale_up.get("stabilizationWindowSeconds", 0),
+                "policies": scale_up.get(
+                    "policies",
+                    [
+                        {"type": "Percent", "value": 100, "periodSeconds": 15},
+                        {"type": "Pods", "value": 4, "periodSeconds": 15},
+                    ],
+                ),
+                "selectPolicy": scale_up.get("selectPolicy", "Max"),
+            },
+            "scaleDown": {
+                "stabilizationWindowSeconds": scale_down.get("stabilizationWindowSeconds", 300),
+                "policies": scale_down.get(
+                    "policies",
+                    [{"type": "Percent", "value": 100, "periodSeconds": 15}],
+                ),
+                "selectPolicy": scale_down.get("selectPolicy", "Min"),
+            },
+        }
+
+        return config
+
     def deploy(
         self,
         node_list: List[dict],
@@ -170,6 +285,7 @@ class DeploymentHandler:
         adapters: List[dict] = None,
         delete_on_failure: bool = True,
         podscaler: dict = None,
+        budaiscaler: dict = None,
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
         tool_calling_parser_type: Optional[str] = None,
@@ -193,7 +309,8 @@ class DeploymentHandler:
             adapters (List[dict], optional): List of model adapters to deploy. Defaults to None.
             delete_on_failure (bool, optional): Whether to delete resources on failure. Defaults to True.
             chat_template (str, optional): Chat template to use for the model. Defaults to None.
-            podscaler (dict, optional): Pod autoscaling configuration. Defaults to None.
+            podscaler (dict, optional): Legacy pod autoscaling configuration. Deprecated. Defaults to None.
+            budaiscaler (dict, optional): BudAIScaler configuration with full autoscaling features. Defaults to None.
             input_tokens (Optional[int], optional): Average input/context tokens. Defaults to None.
             output_tokens (Optional[int], optional): Average output/sequence tokens. Defaults to None.
             tool_calling_parser_type (Optional[str], optional): Parser type for tool calling. Defaults to None.
@@ -273,31 +390,48 @@ class DeploymentHandler:
 
         values["accessMode"] = access_mode
 
-        if not podscaler:
-            podscaler = {}
-
         # Determine engine type from first node for autoscaling metric selection
         # All nodes in a deployment should use the same engine type
         first_node_engine = node_list[0].get("engine_type", "vllm") if node_list else "vllm"
         default_metric = get_default_autoscale_metric(first_node_engine)
 
-        # Validate user-provided autoscale metric against engine capabilities
-        user_metric = podscaler.get("scalingMetric") if podscaler else None
-        if user_metric:
-            validate_autoscale_metric(first_node_engine, user_metric)
-            logger.info(f"Validated autoscale metric '{user_metric}' for engine '{first_node_engine}'")
+        # Process BudAIScaler configuration (takes priority over legacy podscaler)
+        if budaiscaler and budaiscaler.get("enabled", False):
+            # Validate user-provided metrics against engine capabilities
+            for metric_source in budaiscaler.get("metricsSources", []):
+                user_metric = metric_source.get("targetMetric")
+                if user_metric:
+                    validate_autoscale_metric(first_node_engine, user_metric)
+                    logger.info(f"Validated BudAIScaler metric '{user_metric}' for engine '{first_node_engine}'")
 
-        values["podscaler"] = {
-            "enabled": bool(podscaler and podscaler.get("enabled", False)) if podscaler else False,
-            "minReplicas": podscaler.get("minReplicas", 1),
-            "maxReplicas": podscaler.get("maxReplicas", 2),
-            "upFluctuationTolerance": podscaler.get("scaleUpTolerance", 1.5),
-            "downFluctuationTolerance": podscaler.get("scaleDownTolerance", 0.5),
-            "window": podscaler.get("window", 30),
-            "targetMetric": podscaler.get("scalingMetric", default_metric),
-            "targetValue": podscaler.get("scalingValue", 0.5),
-            "type": podscaler.get("scalingType", "metrics"),
-        }
+            values["budaiscaler"] = self._process_budaiscaler_config(budaiscaler, default_metric, first_node_engine)
+            # Ensure legacy podscaler is disabled when using BudAIScaler
+            values["podscaler"] = {"enabled": False}
+            logger.info(f"Using BudAIScaler with strategy: {budaiscaler.get('scalingStrategy', 'BudScaler')}")
+        else:
+            # LEGACY: Fall back to old podscaler for backward compatibility
+            values["budaiscaler"] = {"enabled": False}
+
+            if not podscaler:
+                podscaler = {}
+
+            # Validate user-provided autoscale metric against engine capabilities
+            user_metric = podscaler.get("scalingMetric") if podscaler else None
+            if user_metric:
+                validate_autoscale_metric(first_node_engine, user_metric)
+                logger.info(f"Validated legacy autoscale metric '{user_metric}' for engine '{first_node_engine}'")
+
+            values["podscaler"] = {
+                "enabled": bool(podscaler and podscaler.get("enabled", False)) if podscaler else False,
+                "minReplicas": podscaler.get("minReplicas", 1),
+                "maxReplicas": podscaler.get("maxReplicas", 2),
+                "upFluctuationTolerance": podscaler.get("scaleUpTolerance", 1.5),
+                "downFluctuationTolerance": podscaler.get("scaleDownTolerance", 0.5),
+                "window": podscaler.get("window", 30),
+                "targetMetric": podscaler.get("scalingMetric", default_metric),
+                "targetValue": podscaler.get("scalingValue", 0.5),
+                "type": podscaler.get("scalingType", "metrics"),
+            }
 
         full_node_list = copy.deepcopy(node_list)
 

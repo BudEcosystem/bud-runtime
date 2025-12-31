@@ -12,6 +12,9 @@
     nfd_release_name: node-feature-discovery
     prometheus_release_name: bud-metrics
     prometheus_chart_path: "{{ charts_dir }}/prometheus-stack"
+    # Scaler configuration
+    scaler_release_name: scaler
+    scaler_namespace: scaler-system
     # Default namespace for infrastructure components
     namespace: "{{ namespace | default('bud-system') }}"
     # Deployment control flags
@@ -438,6 +441,72 @@
       when: aibrix_needs_deployment | default(true)
       ignore_errors: true
 
+    # Scaler Deployment Section
+    - name: Check if Scaler is already deployed
+      kubernetes.core.helm_info:
+        name: "{{ scaler_release_name }}"
+        namespace: "{{ scaler_namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: scaler_helm_info
+      ignore_errors: true
+
+    - name: Determine Scaler deployment action
+      set_fact:
+        scaler_needs_deployment: >-
+          {{ scaler_helm_info.failed or
+             scaler_helm_info.status is not defined or
+             scaler_helm_info.status.status | default('') != 'deployed' or
+             force_reinstall_components or
+             update_existing_components }}
+
+    - name: Skip Scaler if already deployed and healthy
+      debug:
+        msg: "Scaler is already deployed and healthy. Skipping deployment."
+      when:
+        - not scaler_needs_deployment | default(false)
+        - skip_healthy_components
+
+    - name: Deploy Scaler from OCI registry
+      kubernetes.core.helm:
+        release_name: "{{ scaler_release_name }}"
+        chart_ref: "oci://ghcr.io/budecosystem/charts/scaler"
+        release_namespace: "{{ scaler_namespace }}"
+        create_namespace: true
+        atomic: true
+        wait: true
+        wait_timeout: "{{ helm_timeout }}"
+        force: "{{ force_reinstall_components | default(false) }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when: scaler_needs_deployment | default(true)
+
+    - name: Wait for Scaler controller to be ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ scaler_namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=scaler
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: scaler_controller
+      retries: 6
+      delay: 10
+      until: >
+        scaler_controller.resources is defined and
+        scaler_controller.resources | length > 0 and
+        scaler_controller.resources[0].status.availableReplicas is defined and
+        scaler_controller.resources[0].status.availableReplicas > 0
+      when: scaler_needs_deployment | default(true)
+      ignore_errors: true
+
+    - name: Check Scaler controller status
+      debug:
+        msg: >
+          Scaler Controller status:
+          {{ 'Ready' if (scaler_controller.resources[0].status.availableReplicas | default(0)) > 0 else 'Not Ready - check pod events for details' }}
+      when: scaler_needs_deployment | default(true)
+
     # Prometheus Stack Deployment Section
     - name: Check if Prometheus is already deployed
       kubernetes.core.helm_info:
@@ -720,6 +789,7 @@
           - GPU Operator: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
           - Intel Device Plugin: {{ 'Deployed' if has_intel_hpus | default(false) else 'Not needed' }}
           - Aibrix Components: {{ 'Deployed' if aibrix_needs_deployment | default(true) else 'Already exists' }}
+          - Scaler: {{ 'Deployed' if scaler_needs_deployment | default(true) else 'Already exists' }}
           - Prometheus Stack: {{ 'Deployed' if prometheus_needs_deployment | default(true) else 'Already exists' }}
           - DCGM Exporter: {{ 'Deployed' if (has_nvidia_gpus | default(false) and prometheus_needs_deployment | default(true)) else 'Not needed' }}
 
@@ -733,6 +803,7 @@
           - Use get_node_info.yaml to retrieve hardware information
           - NFD labels will be automatically updated every 60 seconds
           - Aibrix autoscaler and model adapters are ready for use
+          - Scaler is available for workload autoscaling
           - Hardware metrics are being collected by Prometheus for pull-based collection
 
   post_tasks:
