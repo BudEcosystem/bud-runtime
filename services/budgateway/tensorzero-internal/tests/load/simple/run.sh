@@ -2,12 +2,12 @@
 
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 
-echo 'POST http://gateway.intuixai.local/v1/embeddings' \
+echo 'POST http://localhost:3000/inference' \
 | vegeta attack \
     -header="Content-Type: application/json" \
-    -header="Authorization: Bearer bud_admin_PNYOVkPFgIeZbC4X9ABPcRrFzpbp-0yKKIxVlCRj29o" \
+    -header="Authorization: Bearer budserve_ApTuiKIpZEjMytHt3nmCJqBQGaIlqc2TfoKYFusk" \
     -body=$SCRIPT_DIR/body.json \
-    -duration=60s \
-    -rate=30 \
-    -timeout=300s \
+    -duration=30s \
+    -rate=1000 \
+    -timeout=1s \
 | vegeta report
