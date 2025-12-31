@@ -176,8 +176,16 @@ class ScalingRules(BaseModel):
 class ScalingBehavior(BaseModel):
     """Scaling behavior configuration."""
 
-    scaleUp: ScalingRules = Field(default_factory=lambda: ScalingRules(stabilizationWindowSeconds=0, selectPolicy=SelectPolicyEnum.MAX))
-    scaleDown: ScalingRules = Field(default_factory=lambda: ScalingRules(stabilizationWindowSeconds=300, selectPolicy=SelectPolicyEnum.MIN))
+    scaleUp: ScalingRules = Field(
+        default_factory=lambda: ScalingRules(
+            stabilizationWindowSeconds=0, selectPolicy=SelectPolicyEnum.MAX
+        )
+    )
+    scaleDown: ScalingRules = Field(
+        default_factory=lambda: ScalingRules(
+            stabilizationWindowSeconds=300, selectPolicy=SelectPolicyEnum.MIN
+        )
+    )
 
 
 class BudAIScalerConfig(BaseModel):

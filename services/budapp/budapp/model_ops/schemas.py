@@ -1161,19 +1161,23 @@ class BudScalerScaleConfig(BaseModel):
 class BudScalerBehavior(BaseModel):
     """Scaling behavior configuration."""
 
-    scaleUp: BudScalerScaleConfig = Field(default_factory=lambda: BudScalerScaleConfig(
-        stabilizationWindowSeconds=0,
-        policies=[
-            BudScalerScalePolicy(type="Percent", value=100, periodSeconds=15),
-            BudScalerScalePolicy(type="Pods", value=4, periodSeconds=15),
-        ],
-        selectPolicy="Max",
-    ))
-    scaleDown: BudScalerScaleConfig = Field(default_factory=lambda: BudScalerScaleConfig(
-        stabilizationWindowSeconds=300,
-        policies=[BudScalerScalePolicy(type="Percent", value=100, periodSeconds=15)],
-        selectPolicy="Min",
-    ))
+    scaleUp: BudScalerScaleConfig = Field(
+        default_factory=lambda: BudScalerScaleConfig(
+            stabilizationWindowSeconds=0,
+            policies=[
+                BudScalerScalePolicy(type="Percent", value=100, periodSeconds=15),
+                BudScalerScalePolicy(type="Pods", value=4, periodSeconds=15),
+            ],
+            selectPolicy="Max",
+        )
+    )
+    scaleDown: BudScalerScaleConfig = Field(
+        default_factory=lambda: BudScalerScaleConfig(
+            stabilizationWindowSeconds=300,
+            policies=[BudScalerScalePolicy(type="Percent", value=100, periodSeconds=15)],
+            selectPolicy="Min",
+        )
+    )
 
 
 class BudAIScalerSpecification(BaseModel):
