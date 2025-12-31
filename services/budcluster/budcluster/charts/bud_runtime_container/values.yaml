@@ -35,10 +35,12 @@ adapters: []
 #   - bud:time_to_first_token_seconds_average
 #   - bud:e2e_request_latency_seconds_average
 #   - bud:time_per_output_token_seconds_average
+#   - bud:num_requests_waiting
+#   - bud:num_requests_running
 #
-# Supported LatentBud metrics (for embedding models):
-#   - embedding_batch_queue_size (default)
-#   - embedding_requests_active
+# Supported Infinity metrics (for embedding models, aggregated by runtime-sidecar):
+#   - bud:infinity_queue_depth (default)
+#   - bud:infinity_embedding_latency_seconds_average
 podscaler:
   enabled: false
   type: "metrics" # metrics or optimizer
@@ -64,10 +66,108 @@ podscaler:
 #   - For embedding models (sentence transformers, etc.)
 #   - Optimized for high-throughput embedding inference
 #   - Entrypoint: python -m latentbud.server
-#   - Metrics: embedding_batch_queue_size, embedding_requests_active
+#   - Raw Metrics: infinity_queue_depth, infinity_embedding_latency_seconds (histogram)
+#   - Aggregated Metrics (via runtime-sidecar): bud:infinity_queue_depth, bud:infinity_embedding_latency_seconds_average
 #
 # sglang (future):
 #   - For LLM models with SGLang runtime
 #   - Supports: LoRA, tool calling
 #   - Entrypoint: python -m sglang.launch_server
 #   - Metrics: Same as vLLM (via runtime-sidecar)
+
+# BudAIScaler Configuration (New Standard - replaces podscaler for new deployments)
+# Full-featured autoscaler with GPU-awareness, cost optimization, and predictive scaling
+# Uses scaler.budecosystem.io/v1alpha1 BudAIScaler CRD
+#
+# Scaling Strategies:
+#   - HPA: Kubernetes Horizontal Pod Autoscaler wrapper
+#   - KPA: Knative Pod Autoscaling (panic/stable window)
+#   - BudScaler: Custom algorithm optimized for LLM inference
+budaiscaler:
+  enabled: false
+
+  # Core scaling settings
+  minReplicas: 1
+  maxReplicas: 10
+  scalingStrategy: "BudScaler"  # Options: HPA, KPA, BudScaler
+
+  # Metrics sources - array of metric configurations
+  # Supported types: pod, resource, prometheus, inferenceEngine, custom, external
+  metricsSources: []
+  # Example:
+  # - type: "pod"
+  #   protocolType: "http"
+  #   port: "9090"
+  #   path: "/metrics"
+  #   targetMetric: "bud:gpu_cache_usage_perc_average"
+  #   targetValue: "0.8"
+  # - type: "prometheus"
+  #   address: "http://prometheus:9090"
+  #   query: "avg(rate(requests_total[5m]))"
+  #   targetValue: "100"
+
+  # GPU-aware scaling configuration
+  gpuConfig:
+    enabled: false
+    memoryThreshold: 80        # GPU memory utilization threshold (%)
+    computeThreshold: 80       # GPU compute utilization threshold (%)
+    topologyAware: false       # Enable NUMA/NVLink-aware scheduling
+    preferredGPUType: ""       # e.g., "nvidia-a100-80gb", "nvidia-h100"
+    vGPUSupport: false         # Enable virtual GPU support (HAMI)
+
+  # Cost-aware scaling configuration
+  costConfig:
+    enabled: false
+    cloudProvider: ""          # aws, azure, gcp, on-premises
+    hourlyBudgetLimit: 0       # Max hourly spend in USD (0 = unlimited)
+    dailyBudgetLimit: 0        # Max daily spend in USD (0 = unlimited)
+    spotInstancePreference: "none"  # none, prefer, require
+
+  # Predictive scaling configuration
+  predictionConfig:
+    enabled: false
+    lookAheadMinutes: 15       # How far ahead to predict (1-60)
+    historyDays: 7             # Historical data window for predictions (1-90)
+    minConfidence: 0.7         # Minimum prediction confidence threshold (0-1)
+    predictionMetrics: []      # Metrics to use for prediction
+
+  # Schedule-based scaling hints
+  scheduleHints: []
+  # Example:
+  # - name: "business-hours"
+  #   cronExpression: "0 9 * * 1-5"
+  #   targetReplicas: 5
+  #   duration: "8h"
+  # - name: "off-hours"
+  #   cronExpression: "0 17 * * 1-5"
+  #   targetReplicas: 1
+  #   duration: "16h"
+
+  # Multi-cluster federation
+  multiCluster:
+    enabled: false
+    federationMode: "active-passive"  # active-passive, active-active, weighted
+    clusterWeights: {}         # e.g., {"cluster1": 70, "cluster2": 30}
+    failoverThresholds:
+      healthCheckFailures: 3
+      latencyMs: 5000
+
+  # Scaling behavior (similar to HPA v2)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: "Percent"
+          value: 100
+          periodSeconds: 15
+        - type: "Pods"
+          value: 4
+          periodSeconds: 15
+      selectPolicy: "Max"
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: "Percent"
+          value: 100
+          periodSeconds: 15
+      selectPolicy: "Min"

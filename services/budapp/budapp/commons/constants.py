@@ -797,6 +797,50 @@ class ScalingMetricEnum(StrEnum):
     EMBEDDING_REQUESTS_ACTIVE = "embedding_requests_active"
 
 
+class BudScalerStrategyEnum(StrEnum):
+    """BudAIScaler scaling strategy types."""
+
+    HPA = "HPA"
+    KPA = "KPA"
+    BUD_SCALER = "BudScaler"
+
+
+class BudScalerMetricSourceTypeEnum(StrEnum):
+    """BudAIScaler metric source types."""
+
+    POD = "pod"
+    RESOURCE = "resource"
+    PROMETHEUS = "prometheus"
+    INFERENCE_ENGINE = "inferenceEngine"
+    CUSTOM = "custom"
+    EXTERNAL = "external"
+
+
+class BudScalerCloudProviderEnum(StrEnum):
+    """Cloud provider types for BudAIScaler cost configuration."""
+
+    AWS = "aws"
+    AZURE = "azure"
+    GCP = "gcp"
+    ON_PREMISES = "on-premises"
+
+
+class BudScalerSpotPreferenceEnum(StrEnum):
+    """Spot instance preference for BudAIScaler cost configuration."""
+
+    NONE = "none"
+    PREFER = "prefer"
+    REQUIRE = "require"
+
+
+class BudScalerFederationModeEnum(StrEnum):
+    """Multi-cluster federation mode for BudAIScaler."""
+
+    ACTIVE_PASSIVE = "active-passive"
+    ACTIVE_ACTIVE = "active-active"
+    WEIGHTED = "weighted"
+
+
 class ProxyProviderEnum(StrEnum):
     """Proxy provider types."""
 

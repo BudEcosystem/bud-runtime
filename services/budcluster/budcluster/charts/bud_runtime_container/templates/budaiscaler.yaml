@@ -1,0 +1,151 @@
+{{- if .Values.budaiscaler.enabled }}
+apiVersion: scaler.bud.studio/v1alpha1
+kind: BudAIScaler
+metadata:
+  name: '{{ .Values.chartName }}-budscaler'
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: budaiscaler
+    app.kubernetes.io/managed-by: helm
+    model.aibrix.ai/name: {{ .Values.modelName }}
+spec:
+  # Core scaling configuration
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.modelName }}
+
+  minReplicas: {{ .Values.budaiscaler.minReplicas }}
+  maxReplicas: {{ .Values.budaiscaler.maxReplicas }}
+  scalingStrategy: {{ .Values.budaiscaler.scalingStrategy | default "BudScaler" }}
+
+  # Metrics sources configuration
+  {{- if .Values.budaiscaler.metricsSources }}
+  metricsSources:
+  {{- range .Values.budaiscaler.metricsSources }}
+    - metricSourceType: {{ .type }}
+      {{- if eq .type "pod" }}
+      protocolType: {{ .protocolType | default "http" }}
+      port: '{{ .port | default "9090" }}'
+      path: {{ .path | default "/metrics" }}
+      targetMetric: '{{ .targetMetric }}'
+      targetValue: '{{ .targetValue }}'
+      {{- else if eq .type "resource" }}
+      resourceName: {{ .resourceName }}
+      targetType: {{ .targetType | default "Utilization" }}
+      targetValue: '{{ .targetValue }}'
+      {{- else if eq .type "prometheus" }}
+      address: '{{ .address }}'
+      query: '{{ .query }}'
+      targetValue: '{{ .targetValue }}'
+      {{- else if eq .type "inferenceEngine" }}
+      engineType: {{ .engineType }}
+      targetMetric: '{{ .targetMetric }}'
+      targetValue: '{{ .targetValue }}'
+      {{- else if eq .type "custom" }}
+      metricName: '{{ .metricName }}'
+      targetValue: '{{ .targetValue }}'
+      {{- else if eq .type "external" }}
+      metricName: '{{ .metricName }}'
+      targetValue: '{{ .targetValue }}'
+      {{- end }}
+  {{- end }}
+  {{- end }}
+
+  {{- if .Values.budaiscaler.gpuConfig.enabled }}
+  # GPU-aware scaling configuration
+  gpuConfig:
+    enabled: true
+    memoryThreshold: {{ .Values.budaiscaler.gpuConfig.memoryThreshold | default 80 }}
+    computeThreshold: {{ .Values.budaiscaler.gpuConfig.computeThreshold | default 80 }}
+    topologyAware: {{ .Values.budaiscaler.gpuConfig.topologyAware | default false }}
+    {{- if .Values.budaiscaler.gpuConfig.preferredGPUType }}
+    preferredGPUType: {{ .Values.budaiscaler.gpuConfig.preferredGPUType }}
+    {{- end }}
+    vGPUSupport: {{ .Values.budaiscaler.gpuConfig.vGPUSupport | default false }}
+  {{- end }}
+
+  {{- if .Values.budaiscaler.costConfig.enabled }}
+  # Cost-aware scaling configuration
+  costConfig:
+    enabled: true
+    cloudProvider: {{ .Values.budaiscaler.costConfig.cloudProvider }}
+    {{- if .Values.budaiscaler.costConfig.hourlyBudgetLimit }}
+    hourlyBudgetLimit: "{{ .Values.budaiscaler.costConfig.hourlyBudgetLimit }}"
+    {{- end }}
+    {{- if .Values.budaiscaler.costConfig.dailyBudgetLimit }}
+    dailyBudgetLimit: "{{ .Values.budaiscaler.costConfig.dailyBudgetLimit }}"
+    {{- end }}
+    spotInstancePreference: {{ .Values.budaiscaler.costConfig.spotInstancePreference | default "none" }}
+  {{- end }}
+
+  {{- if .Values.budaiscaler.predictionConfig.enabled }}
+  # Predictive scaling configuration
+  predictionConfig:
+    enabled: true
+    lookAheadMinutes: {{ .Values.budaiscaler.predictionConfig.lookAheadMinutes | default 15 }}
+    historyDays: {{ .Values.budaiscaler.predictionConfig.historyDays | default 7 }}
+    minConfidence: {{ .Values.budaiscaler.predictionConfig.minConfidence | default 0.7 }}
+    {{- if .Values.budaiscaler.predictionConfig.predictionMetrics }}
+    predictionMetrics:
+    {{- range .Values.budaiscaler.predictionConfig.predictionMetrics }}
+      - {{ . }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.budaiscaler.scheduleHints }}
+  # Scheduled scaling hints
+  scheduleHints:
+  {{- range .Values.budaiscaler.scheduleHints }}
+    - name: {{ .name }}
+      cronExpression: '{{ .cronExpression }}'
+      targetReplicas: {{ .targetReplicas }}
+      {{- if .duration }}
+      duration: {{ .duration }}
+      {{- end }}
+  {{- end }}
+  {{- end }}
+
+  {{- if .Values.budaiscaler.multiCluster.enabled }}
+  # Multi-cluster scaling configuration
+  multiCluster:
+    enabled: true
+    federationMode: {{ .Values.budaiscaler.multiCluster.federationMode | default "active-passive" }}
+    {{- if .Values.budaiscaler.multiCluster.clusterWeights }}
+    clusterWeights:
+    {{- range $cluster, $weight := .Values.budaiscaler.multiCluster.clusterWeights }}
+      {{ $cluster }}: {{ $weight }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.budaiscaler.multiCluster.failoverThresholds }}
+    failoverThresholds:
+      {{- toYaml .Values.budaiscaler.multiCluster.failoverThresholds | nindent 6 }}
+    {{- end }}
+  {{- end }}
+
+  # Scaling behavior configuration
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.budaiscaler.behavior.scaleUp.stabilizationWindowSeconds | default 0 }}
+      {{- if .Values.budaiscaler.behavior.scaleUp.policies }}
+      policies:
+      {{- range .Values.budaiscaler.behavior.scaleUp.policies }}
+        - type: {{ .type }}
+          value: {{ .value }}
+          periodSeconds: {{ .periodSeconds }}
+      {{- end }}
+      {{- end }}
+      selectPolicy: {{ .Values.budaiscaler.behavior.scaleUp.selectPolicy | default "Max" }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.budaiscaler.behavior.scaleDown.stabilizationWindowSeconds | default 300 }}
+      {{- if .Values.budaiscaler.behavior.scaleDown.policies }}
+      policies:
+      {{- range .Values.budaiscaler.behavior.scaleDown.policies }}
+        - type: {{ .type }}
+          value: {{ .value }}
+          periodSeconds: {{ .periodSeconds }}
+      {{- end }}
+      {{- end }}
+      selectPolicy: {{ .Values.budaiscaler.behavior.scaleDown.selectPolicy | default "Min" }}
+{{- end }}

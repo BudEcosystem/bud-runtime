@@ -108,6 +108,7 @@ import { AdapterResult } from "./AddAdapter/AdapterResult";
 import AddBenchmarkCredentialSelect from "./Benchmark/AddBenchmarkCredentialSelect";
 import ChooseModality from "./AddModel/ChooseModality";
 import DeployModelAutoScale from "./DeployModel/DeployModelAutoScale";
+import DeployModelBudAIScaler from "./DeployModel/DeployModelBudAIScaler";
 import EditProfile from "./settings/EditProfile";
 import CreateRoute from "./Routes/CreateRoute";
 import SelectEndpointsForRoutes from "./Routes/SelectEndpointsForRoutes";
@@ -166,7 +167,8 @@ export const StepComponents = {
   "deploy-model-specification": DeployModelSpecification,
   "deploy-cluster-status": DeployClusterStatus,
   "deploy-model-choose-cluster": DeployModelChooseCluster,
-  "deploy-model-auto-scaling": DeployModelAutoScale,
+  "deploy-model-auto-scaling": DeployModelBudAIScaler,
+  "deploy-model-auto-scaling-legacy": DeployModelAutoScale,
   "deploy-model-status": DeployModelStatus,
   "model-source": ModelSource,
   "modality-source": ChooseModality,

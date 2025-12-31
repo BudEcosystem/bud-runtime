@@ -113,6 +113,7 @@ from .models import CloudModel, Model, ModelLicenses, PaperPublished
 from .models import ModelSecurityScanResult as ModelSecurityScanResultModel
 from .models import Provider as ProviderModel
 from .schemas import (
+    BudAIScalerSpecification,
     CreateCloudModelWorkflowRequest,
     CreateCloudModelWorkflowResponse,
     CreateCloudModelWorkflowStepData,
@@ -3123,6 +3124,7 @@ class ModelService(SessionMixin):
         trigger_workflow: bool = False,
         credential_id: Optional[UUID] = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        budaiscaler_specification: Optional[BudAIScalerSpecification] = None,
         hardware_mode: Optional[str] = None,
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
@@ -3211,6 +3213,7 @@ class ModelService(SessionMixin):
             )
 
         # Prepare workflow step data
+        logger.info(f"[DEBUG] budaiscaler_specification received: {budaiscaler_specification}")
         workflow_step_data = DeploymentWorkflowStepData(
             model_id=model_id,
             project_id=project_id,
@@ -3220,6 +3223,7 @@ class ModelService(SessionMixin):
             template_id=template_id,
             credential_id=credential_id,
             scaling_specification=scaling_specification,
+            budaiscaler_specification=budaiscaler_specification,
             hardware_mode=hardware_mode,
             enable_tool_calling=enable_tool_calling,
             enable_reasoning=enable_reasoning,
@@ -3229,6 +3233,7 @@ class ModelService(SessionMixin):
             supports_lora=supports_lora,
             supports_pipeline_parallelism=supports_pipeline_parallelism,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+        logger.info(f"[DEBUG] workflow_step_data budaiscaler: {workflow_step_data.get('budaiscaler_specification')}")
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -3343,6 +3348,7 @@ class ModelService(SessionMixin):
                     db_model.provider_type,
                     db_model.local_path,
                     workflow_hardware_mode,
+                    db_model.supported_endpoints,
                 )
                 simulator_id = bud_simulator_events.pop("workflow_id")
                 recommended_cluster_events = {
@@ -3390,6 +3396,7 @@ class ModelService(SessionMixin):
                 "deploy_config",
                 "credential_id",
                 "scaling_specification",
+                "budaiscaler_specification",
                 "enable_tool_calling",
                 "enable_reasoning",
                 "tool_calling_parser_type",
@@ -3424,7 +3431,13 @@ class ModelService(SessionMixin):
                     required_keys.append("credential_id")
                 else:
                     # Local models need cluster and simulator info
-                    required_keys.extend(["cluster_id", "simulator_id", "scaling_specification"])
+                    # Either scaling_specification (legacy) or budaiscaler_specification (new) is acceptable
+                    required_keys.extend(["cluster_id", "simulator_id"])
+                    if (
+                        "budaiscaler_specification" not in required_data
+                        and "scaling_specification" not in required_data
+                    ):
+                        required_keys.append("scaling_specification")  # Will trigger missing key error
 
             # Check if all required keys are present
             missing_keys = [key for key in required_keys if key not in required_data]
@@ -3503,6 +3516,9 @@ class ModelService(SessionMixin):
 
             else:
                 # Existing flow for local models - trigger model deployment via budcluster
+                logger.info(
+                    f"[DEBUG] required_data budaiscaler_specification: {required_data.get('budaiscaler_specification')}"
+                )
                 model_deployment_response = await self._initiate_model_deployment(
                     cluster_id=UUID(required_data["cluster_id"]),
                     endpoint_name=required_data["endpoint_name"],
@@ -3513,6 +3529,7 @@ class ModelService(SessionMixin):
                     subscriber_id=current_user_id,
                     credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
                     scaling_specification=required_data.get("scaling_specification"),
+                    budaiscaler_specification=required_data.get("budaiscaler_specification"),
                     enable_tool_calling=required_data.get("enable_tool_calling"),
                     enable_reasoning=required_data.get("enable_reasoning"),
                 )
@@ -3545,9 +3562,32 @@ class ModelService(SessionMixin):
         provider_type: ModelProviderTypeEnum,
         local_path: Optional[str] = None,
         hardware_mode: Optional[str] = "dedicated",
+        supported_endpoints: Optional[List] = None,
     ) -> Dict[str, Any]:
         """Get recommended cluster events."""
         logger.info("Getting recommended cluster events")
+
+        # Convert supported_endpoints to format expected by budsim (uppercase type names)
+        # supported_endpoints contains paths like "/v1/embeddings", budsim expects "EMBEDDING"
+        endpoint_path_to_type = {
+            "/v1/embeddings": "EMBEDDING",
+            "/v1/chat/completions": "LLM",
+            "/v1/completions": "LLM",
+            "/v1/audio/transcriptions": "AUDIO",
+            "/v1/audio/translations": "AUDIO",
+            "/v1/audio/speech": "AUDIO",
+        }
+        model_endpoints = None
+        if supported_endpoints:
+            endpoint_values = []
+            for endpoint in supported_endpoints:
+                endpoint_str = endpoint.value if hasattr(endpoint, "value") else str(endpoint)
+                # Convert path to type name
+                endpoint_type = endpoint_path_to_type.get(endpoint_str.lower(), endpoint_str.upper())
+                if endpoint_type not in endpoint_values:
+                    endpoint_values.append(endpoint_type)
+            model_endpoints = ",".join(endpoint_values) if endpoint_values else None
+            logger.info(f"[DEBUG] model_endpoints for simulation: {model_endpoints}")
 
         notification_metadata = BudNotificationMetadata(
             workflow_id=str(workflow_id),
@@ -3568,6 +3608,7 @@ class ModelService(SessionMixin):
                 source_topic=app_settings.source_topic,
                 is_proprietary_model=True,
                 hardware_mode=hardware_mode,
+                model_endpoints=model_endpoints,
             )
         else:
             # Only applicable for local model deployment
@@ -3591,6 +3632,7 @@ class ModelService(SessionMixin):
                 source_topic=app_settings.source_topic,
                 is_proprietary_model=False,
                 hardware_mode=hardware_mode,
+                model_endpoints=model_endpoints,
             )
 
         # Get recommended cluster info from Bud Simulator
@@ -3633,6 +3675,7 @@ class ModelService(SessionMixin):
         subscriber_id: UUID,
         credential_id: UUID | None = None,
         scaling_specification: Optional[ScalingSpecification] = None,
+        budaiscaler_specification: Optional[BudAIScalerSpecification] = None,
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
     ) -> Dict[str, Any]:
@@ -3732,6 +3775,7 @@ class ModelService(SessionMixin):
             source_topic=app_settings.source_topic,
             credential_id=credential_id,
             podscaler=scaling_specification,
+            budaiscaler=budaiscaler_specification,
             provider=db_model.source,
             enable_tool_calling=enable_tool_calling,
             enable_reasoning=enable_reasoning,

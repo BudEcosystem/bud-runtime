@@ -12,6 +12,9 @@
     storageclass_name: "nfs-storage-class"
     clusterrole_name: "nfs-client-provisioner-runner"
     clusterrolebinding_name: "run-nfs-client-provisioner"
+    # Scaler configuration
+    scaler_release_name: scaler
+    scaler_namespace: scaler-system
   roles:
     - create_kubeconfig
 
@@ -82,6 +85,40 @@
         kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrole hami-scheduler --ignore-not-found=true
         kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete clusterrolebinding hami-scheduler --ignore-not-found=true
       when: hami_check is succeeded
+      ignore_errors: true
+
+    # Scaler Removal
+    - name: Check if Scaler is deployed
+      kubernetes.core.helm_info:
+        name: "{{ scaler_release_name }}"
+        namespace: "{{ scaler_namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      register: scaler_check
+      ignore_errors: true
+
+    - name: Uninstall Scaler
+      kubernetes.core.helm:
+        release_name: "{{ scaler_release_name }}"
+        release_namespace: "{{ scaler_namespace }}"
+        state: absent
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+      when: scaler_check is succeeded and scaler_check.status.status | default('') == 'deployed'
+      ignore_errors: true
+
+    - name: Remove Scaler CRDs
+      shell: |
+        kubectl --kubeconfig {{ kubeconfig_path }} {% if not validate_certs %}--insecure-skip-tls-verify {% endif %}delete crd --all -l app.kubernetes.io/name=scaler --ignore-not-found=true
+      ignore_errors: true
+
+    - name: Delete scaler-system namespace
+      kubernetes.core.k8s:
+        state: absent
+        name: "{{ scaler_namespace }}"
+        kind: Namespace
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
       ignore_errors: true
 
     - name: Delete all pods in namespace
