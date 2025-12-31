@@ -3433,7 +3433,10 @@ class ModelService(SessionMixin):
                     # Local models need cluster and simulator info
                     # Either scaling_specification (legacy) or budaiscaler_specification (new) is acceptable
                     required_keys.extend(["cluster_id", "simulator_id"])
-                    if "budaiscaler_specification" not in required_data and "scaling_specification" not in required_data:
+                    if (
+                        "budaiscaler_specification" not in required_data
+                        and "scaling_specification" not in required_data
+                    ):
                         required_keys.append("scaling_specification")  # Will trigger missing key error
 
             # Check if all required keys are present
@@ -3513,7 +3516,9 @@ class ModelService(SessionMixin):
 
             else:
                 # Existing flow for local models - trigger model deployment via budcluster
-                logger.info(f"[DEBUG] required_data budaiscaler_specification: {required_data.get('budaiscaler_specification')}")
+                logger.info(
+                    f"[DEBUG] required_data budaiscaler_specification: {required_data.get('budaiscaler_specification')}"
+                )
                 model_deployment_response = await self._initiate_model_deployment(
                     cluster_id=UUID(required_data["cluster_id"]),
                     endpoint_name=required_data["endpoint_name"],
