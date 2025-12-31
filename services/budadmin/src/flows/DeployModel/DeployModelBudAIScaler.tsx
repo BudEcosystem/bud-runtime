@@ -299,7 +299,7 @@ const ScheduleHintEditor = ({
             >
               <InputNumber
                 value={hint.targetReplicas}
-                onChange={(value) => onUpdate(index, { targetReplicas: value || 1 })}
+                onChange={(value) => onUpdate(index, { targetReplicas: value ?? 1 })}
                 min={0}
                 style={{ ...inputStyle, width: "100%" }}
                 className={inputClassName}
@@ -498,7 +498,10 @@ export default function DeployModelBudAIScaler() {
                     ClassNames="mt-[.4rem] w-1/2"
                     formItemClassnames="w-full"
                     infoText="Minimum number of replicas your inference can scale down to"
-                    onChange={(e) => updateSpec({ minReplicas: parseInt(e) || 1 })}
+                    onChange={(e) => {
+                      const value = parseInt(e, 10);
+                      updateSpec({ minReplicas: !isNaN(value) ? value : 1 });
+                    }}
                   />
                   <TextInput
                     name="maxReplicas"
@@ -508,7 +511,10 @@ export default function DeployModelBudAIScaler() {
                     ClassNames="mt-[.4rem] w-1/2"
                     formItemClassnames="w-full"
                     infoText="Maximum number of replicas your inference can scale up to"
-                    onChange={(e) => updateSpec({ maxReplicas: parseInt(e) || 10 })}
+                    onChange={(e) => {
+                      const value = parseInt(e, 10);
+                      updateSpec({ maxReplicas: !isNaN(value) ? value : 10 });
+                    }}
                   />
                 </div>
               </DrawerCard>
@@ -628,11 +634,12 @@ export default function DeployModelBudAIScaler() {
                           ClassNames="mt-[.4rem] w-1/2"
                           formItemClassnames="w-full"
                           infoText="How far ahead to predict scaling needs (1-60 minutes)"
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const value = parseInt(e, 10);
                             updateSpec({
-                              predictionConfig: { ...budaiscalerSpecification.predictionConfig, lookAheadMinutes: parseInt(e) || 15 },
-                            })
-                          }
+                              predictionConfig: { ...budaiscalerSpecification.predictionConfig, lookAheadMinutes: !isNaN(value) ? value : 15 },
+                            });
+                          }}
                         />
                         <TextInput
                           name="historyDays"
@@ -642,11 +649,12 @@ export default function DeployModelBudAIScaler() {
                           ClassNames="mt-[.4rem] w-1/2"
                           formItemClassnames="w-full"
                           infoText="Historical data window for predictions (1-90 days)"
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const value = parseInt(e, 10);
                             updateSpec({
-                              predictionConfig: { ...budaiscalerSpecification.predictionConfig, historyDays: parseInt(e) || 7 },
-                            })
-                          }
+                              predictionConfig: { ...budaiscalerSpecification.predictionConfig, historyDays: !isNaN(value) ? value : 7 },
+                            });
+                          }}
                         />
                       </div>
 
