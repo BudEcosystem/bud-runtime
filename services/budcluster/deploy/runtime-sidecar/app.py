@@ -184,7 +184,8 @@ def calculate_vllm_deltas(current_metrics: dict, prev_metrics: dict) -> dict:
         },
         "time_per_output_token": {
             "sum": current_metrics["time_per_output_token"]["sum"] - prev_metrics["time_per_output_token"]["sum"],
-            "count": current_metrics["time_per_output_token"]["count"] - prev_metrics["time_per_output_token"]["count"],
+            "count": current_metrics["time_per_output_token"]["count"]
+            - prev_metrics["time_per_output_token"]["count"],
         },
         "gpu_cache_usage": current_metrics["gpu_cache_usage"],
     }
