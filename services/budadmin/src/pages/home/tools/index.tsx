@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
 import {
@@ -20,22 +20,26 @@ import ProjectTags from "src/flows/components/ProjectTags";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useTools, Tool } from "src/stores/useTools";
 
-// Available filter tags with colors
-const filterTags = [
-  { name: "Tag 1", color: "#965CDE" },
-  { name: "Tag 2", color: "#22C55E" },
-  { name: "tag 3", color: "#F59E0B" },
-  { name: "tool", color: "#3B82F6" },
-  { name: "virtual", color: "#EF4444" },
-];
-
 const Tools = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
 
   const { openDrawer } = useDrawer();
-  const { tools, getTools, setSelectedTool } = useTools();
+  const { tools, getTools, setSelectedTool, isLoading } = useTools();
+
+  // Extract unique tags from tools for filtering
+  const filterTags = useMemo(() => {
+    const tagMap = new Map<string, { name: string; color: string }>();
+    tools.forEach((tool) => {
+      tool.tags.forEach((tag) => {
+        if (!tagMap.has(tag.name)) {
+          tagMap.set(tag.name, tag);
+        }
+      });
+    });
+    return Array.from(tagMap.values());
+  }, [tools]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -111,19 +115,23 @@ const Tools = () => {
           {/* Filter Tags Row */}
           <div className="flex items-center justify-between mt-[1.5rem] mb-[1.25rem]">
             <div className="flex items-center gap-2 flex-wrap">
-              {filterTags.map((tag) => (
-                <div
-                  key={tag.name}
-                  onClick={() => handleTagFilter(tag.name)}
-                  className={`cursor-pointer transition-all rounded-[6px] ${
-                    activeFilters.has(tag.name)
-                      ? "ring-2 ring-[#965CDE] ring-offset-1 ring-offset-[#101010]"
-                      : "opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  <ProjectTags name={tag.name} color={tag.color} />
-                </div>
-              ))}
+              {filterTags.length > 0 ? (
+                filterTags.map((tag) => (
+                  <div
+                    key={tag.name}
+                    onClick={() => handleTagFilter(tag.name)}
+                    className={`cursor-pointer transition-all rounded-[6px] ${
+                      activeFilters.has(tag.name)
+                        ? "ring-2 ring-[#965CDE] ring-offset-1 ring-offset-[#101010]"
+                        : "opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <ProjectTags name={tag.name} color={tag.color} />
+                  </div>
+                ))
+              ) : (
+                <Text_12_400_6A6E76>No tags available</Text_12_400_6A6E76>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -156,8 +164,15 @@ const Tools = () => {
             </div>
           </div>
 
+          {/* Loading State */}
+          {isLoading && (
+            <Text_12_400_6A6E76 className="mt-5">
+              Loading tools...
+            </Text_12_400_6A6E76>
+          )}
+
           {/* Empty State */}
-          {!filteredTools.length && !searchTerm && activeFilters.size === 0 && (
+          {!isLoading && !filteredTools.length && !searchTerm && activeFilters.size === 0 && (
             <Text_12_400_6A6E76 className="mt-5">
               No tools have been added yet. Click the "Add Tool" button to get
               started.
@@ -213,7 +228,7 @@ const Tools = () => {
                     <div className="flex justify-between items-center pt-[1.1rem] pr-[1.5em] pl-[1.5em] pb-[1.45em] bg-[#161616]">
                       <div>
                         <Text_17_600_FFFFFF className="block px-[.2em] group-hover:text-[#FFFFFF] text[0.75rem] leading-[100%]">
-                          {tool.usage_count}
+                          {tool.executionCount || 0}
                         </Text_17_600_FFFFFF>
                         <Text_13_400_B3B3B3 className="pt-[.3rem]">
                           Usages
