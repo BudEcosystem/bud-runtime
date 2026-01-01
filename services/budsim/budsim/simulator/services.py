@@ -627,7 +627,7 @@ class SimulationService:
                 logger.info("Using DirectSearchOptimizer for heuristic mode")
                 optimizer = DirectSearchOptimizer(
                     model=pretrained_model_uri,
-                    model_uri=model_uri,  # Pass the original cloud/HF URI
+                    model_uri=model_uri,  # Pass the HuggingFace model identifier
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     max_concurrency=concurrency,
@@ -1813,7 +1813,7 @@ class SimulationService:
             request.pretrained_model_uri,
             cluster_info,
             notification_request,
-            request.model_uri,  # Pass the cloud/HF URI
+            request.model_uri,  # Pass the HuggingFace model identifier
             request.source_topic,
             request.source,
             proprietary_only=request.is_proprietary_model,

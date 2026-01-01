@@ -64,7 +64,7 @@ class DirectSearchOptimizer:
         device_config: Dict[str, Any],
         engine_name: str,
         dtype: Optional[str] = None,
-        model_uri: Optional[str] = None,  # Original cloud/HuggingFace URI
+        model_uri: Optional[str] = None,  # HuggingFace model identifier
         benchmark_predictor_models_dir: Optional[str] = None,
         error_threshold: float = 0.01,
         use_heuristic: bool = False,
@@ -77,7 +77,7 @@ class DirectSearchOptimizer:
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
-        self.model_uri = model_uri  # Store the original cloud/HF URI for reference
+        self.model_uri = model_uri  # Store the HuggingFace model identifier for reference
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.max_concurrency = max_concurrency

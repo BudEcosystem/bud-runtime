@@ -16,7 +16,7 @@ import yaml
 from budmicroframe.commons.logging import get_logger
 from kubernetes import client, config
 
-from ..commons.config import app_settings, secrets_settings
+from ..commons.config import app_settings
 from ..commons.exceptions import KubernetesException
 
 # from ..commons.utils import format_uptime
@@ -741,16 +741,13 @@ class KubernetesHandler(BaseClusterHandler):
         ingress_host, scheme = self._parse_hostname(self.ingress_url)
         return f"{scheme}://{ingress_host}"
 
-    def verify_ingress_health(self, namespace: str, cloud_model: bool = False) -> bool:
+    def verify_ingress_health(self, namespace: str) -> bool:
         """Verify the ingress health by checking if the model is available in the models list."""
         ingress_url = self.get_ingress_url(namespace)
         models_url = f"{ingress_url}/v1/models"
-        headers = {}
-        if cloud_model:
-            headers["Authorization"] = f"Bearer {secrets_settings.litellm_master_key}"
 
         try:
-            response = requests.get(models_url, headers=headers, timeout=30)
+            response = requests.get(models_url, timeout=30)
             logger.debug(f"Ingress health check response: {response.content}")
             if response.status_code == 200:
                 models_data = response.json()
@@ -774,20 +771,17 @@ class KubernetesHandler(BaseClusterHandler):
             logger.error(f"Error parsing models response for namespace {namespace}: {err}")
             return False
 
-    def identify_supported_endpoints(self, namespace: str, cloud_model: bool = False) -> Dict[str, bool]:
+    def identify_supported_endpoints(self, namespace: str) -> Dict[str, bool]:
         """Identify which endpoints are supported by checking if they return 200 status.
 
         Args:
             namespace (str): The namespace/model name to check
-            cloud_model (bool): Whether this is a cloud model requiring authentication
 
         Returns:
             Dict[str, bool]: A dictionary mapping endpoint paths to their availability status
         """
         ingress_url = self.get_ingress_url(namespace)
         headers = {}
-        if cloud_model:
-            headers["Authorization"] = f"Bearer {secrets_settings.litellm_master_key}"
 
         # Define endpoints to check
         endpoints_to_check = [
@@ -1020,13 +1014,11 @@ class KubernetesHandler(BaseClusterHandler):
 
         return replicas
 
-    def get_deployment_status(
-        self, values: dict, cloud_model: bool = False, ingress_health: bool = True, check_pods: bool = True
-    ) -> str:
+    def get_deployment_status(self, values: dict, ingress_health: bool = True, check_pods: bool = True) -> str:
         """Get the status of a deployment on the Kubernetes cluster."""
         logger.info(
             f"get_deployment_status called for {values.get('namespace', 'unknown')}: "
-            f"cloud_model={cloud_model}, ingress_health={ingress_health}, check_pods={check_pods}"
+            f"ingress_health={ingress_health}, check_pods={check_pods}"
         )
         if not self.ingress_url:
             raise KubernetesException("Ingress URL is not set")
@@ -1044,7 +1036,7 @@ class KubernetesHandler(BaseClusterHandler):
                 }
 
             # Only check ingress health
-            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            ingress_healthy = self.verify_ingress_health(values["namespace"])
             status = DeploymentStatusEnum.READY if ingress_healthy else DeploymentStatusEnum.FAILED
             logger.info(
                 f"Optimized status check for {values['namespace']}: {status} (ingress_healthy={ingress_healthy})"
@@ -1126,12 +1118,12 @@ class KubernetesHandler(BaseClusterHandler):
             logger.info(f"Attempt {retry_count + 1}/{max_retries} for {values['namespace']}")
 
             # Check ingress health (/v1/models endpoint)
-            ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            ingress_healthy = self.verify_ingress_health(values["namespace"])
             logger.debug(f"Ingress health check result: {ingress_healthy}")
 
             if ingress_healthy:
                 # Check endpoint functionality (/v1/embeddings, /v1/chat/completions)
-                endpoints_status = self.identify_supported_endpoints(values["namespace"], cloud_model)
+                endpoints_status = self.identify_supported_endpoints(values["namespace"])
                 functional_endpoints = [ep for ep, supported in endpoints_status.items() if supported]
                 logger.debug(f"Endpoint status: {endpoints_status}, functional: {functional_endpoints}")
 
@@ -1166,7 +1158,7 @@ class KubernetesHandler(BaseClusterHandler):
         # Check final ingress health state for status determination
         final_ingress_healthy = False
         try:
-            final_ingress_healthy = self.verify_ingress_health(values["namespace"], cloud_model=cloud_model)
+            final_ingress_healthy = self.verify_ingress_health(values["namespace"])
         except Exception as e:
             logger.warning(f"Final ingress health check failed: {e}")
 
@@ -1308,9 +1300,7 @@ class KubernetesHandler(BaseClusterHandler):
             node_ip=pod["status"]["hostIP"],
             cores=int(pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("cpu", 0)),
             memory=pod["spec"]["containers"][0].get("resources", {}).get("requests", {}).get("memory", 0),
-            deployment_name="litellm-container"
-            if pod["metadata"]["name"].startswith("litellm-container")
-            else "bud-runtime-container",
+            deployment_name="bud-runtime-container",
             concurrency=pod["metadata"]["labels"].get("concurrency", 100),
             reason=reason,
         )

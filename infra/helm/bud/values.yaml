@@ -247,7 +247,6 @@ microservices:
       QUANTIZATION_JOB_IMAGE: budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02
       ENGINE_CONTAINER_PORT: "8000"
       REGISTRY_SERVER: https://budimages.azurecr.io
-      LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       # Metrics collection configuration
       METRICS_COLLECTION_ENABLED: "true"
       METRICS_COLLECTION_TIMEOUT: "30"
@@ -378,7 +377,6 @@ microservices:
       GLOBAL_CONTEXT_PATH: ""
       IS_MULTI_TENANCY_ENABLED: "true"
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
-      LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
       MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
       MINIO_BUCKET: models-registry

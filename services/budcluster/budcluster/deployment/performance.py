@@ -1,11 +1,9 @@
-from typing import Dict, Literal, Optional
+from typing import Dict, Optional
 from uuid import UUID
 
 from budmicroframe.commons.logging import get_logger
 from llm_benchmark.benchmark import tools as benchmark_tools
-from llm_benchmark.benchmark.litellm_proxy.utils import compute_latency_factors
 
-from ..commons.config import secrets_settings
 from .utils import format_litellm_error_message
 
 
@@ -35,7 +33,6 @@ class DeploymentPerformance:
         target_throughput_per_user: Optional[int] = None,
         datasets: Optional[list[dict]] = None,
         error_threshold: float = 0.5,
-        provider_type: Literal["local", "cloud"] = "local",
         benchmark_id: Optional[UUID] = None,
         model_type: Optional[str] = None,
         num_prompts: Optional[int] = None,
@@ -50,7 +47,7 @@ class DeploymentPerformance:
         if model_type == "embedding":
             self.benchmark_script = "budlatent"
         else:
-            self.benchmark_script = "vllm" if provider_type == "local" else "litellm_proxy"
+            self.benchmark_script = "vllm"
         self.deployment_url = deployment_url
         self.deployment_name = deployment_name
         self.model = model
@@ -62,7 +59,6 @@ class DeploymentPerformance:
         self.output_tokens = output_tokens or 100
         self.datasets = datasets
         self.error_threshold = error_threshold
-        self.provider_type = provider_type
         self.benchmark_id = benchmark_id
         self.model_type = model_type
         self.num_prompts = num_prompts
@@ -87,25 +83,6 @@ class DeploymentPerformance:
         """
         logger.debug(f"Chosen dataset names: {self.datasets}")
         try:
-            env_values = None
-            latency_factors = None
-            if self.provider_type == "cloud":
-                litellm_master_key = secrets_settings.litellm_master_key
-                env_values = {"LITELLM_MASTER_KEY": litellm_master_key}
-                request_metadata = {
-                    "api_key": litellm_master_key,
-                    "api_base": self.deployment_url + "/v1",
-                }
-                try:
-                    latency_factors = compute_latency_factors(self.deployment_name, request_metadata, llm_api="openai")
-                    logger.info(f"Latency factors: {latency_factors}")
-                except Exception as e:
-                    print(f"Error computing latency factors: {e}")
-                    import traceback
-
-                    print(traceback.format_exc())
-                    raise e
-
             result = benchmark_tools.run_benchmark(
                 self.deployment_name,
                 self.deployment_url + "/v1",
@@ -115,8 +92,6 @@ class DeploymentPerformance:
                 self.benchmark_script,
                 tokenizer=self.model,
                 endpoint="/completions",
-                env_values=env_values,
-                latency_factors=latency_factors,
                 datasets=self.datasets,
                 benchmark_id=self.benchmark_id,
                 num_prompts=self.num_prompts,
