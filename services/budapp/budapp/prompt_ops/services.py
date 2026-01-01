@@ -386,7 +386,7 @@ class PromptService(SessionMixin):
 
     async def list_traces(
         self,
-        bud_prompt_id: UUID,
+        bud_prompt_id: str,
         project_id: UUID,
         from_date: datetime,
         to_date: datetime,

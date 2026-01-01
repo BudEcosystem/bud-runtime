@@ -1681,7 +1681,7 @@ async def get_prompt(
 
 
 @router.get(
-    "/{prompt_id}/traces",
+    "/{bud_prompt_id}/traces",
     responses={
         status.HTTP_200_OK: {
             "model": TraceListResponse,
