@@ -20,10 +20,9 @@ from uuid import UUID
 
 from budmicroframe.commons.logging import get_logger
 from fastapi import HTTPException, status
-from pydantic import ValidationError
 
 from ..commons.base_crud import SessionMixin
-from ..deployment.schemas import DeploymentCreateRequest, LocalDeploymentCreateRequest
+from ..deployment.schemas import DeploymentCreateRequest
 from .models import BenchmarkCRUD
 from .schemas import RunBenchmarkRequest
 
@@ -65,14 +64,9 @@ class BenchmarkService(SessionMixin):
         if request.credential_id:
             deployment.credential_id = request.credential_id
 
-        from ..deployment.workflows import CreateDeploymentWorkflow, CreateCloudDeploymentWorkflow  # noqa: I001
+        from ..deployment.workflows import CreateDeploymentWorkflow
 
-        try:
-            # identify whether the deployment request is for local model or cloud model
-            LocalDeploymentCreateRequest.model_validate(deployment.model_dump(mode="json", exclude_none=True))
-            response = await CreateDeploymentWorkflow().__call__(deployment)
-        except ValidationError:
-            response = await CreateCloudDeploymentWorkflow().__call__(deployment)
+        response = await CreateDeploymentWorkflow().__call__(deployment)
 
         return response
 

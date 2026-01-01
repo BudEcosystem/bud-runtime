@@ -14,8 +14,6 @@ _PLAYBOOK_MAP = {
     "UPDATE_AUTOSCALE": "update_autoscale.yaml",
     "DELETE_NAMESPACE": "delete_namespace.yaml",
     "GET_DEPLOYMENT_STATUS": "get_deployment_status.yaml",
-    "DEPLOY_CLOUD_MODEL": "deploy_litellm.yaml",
-    "DEPLOY_TENSORZERO": "deploy_tensorzero.yaml",
     "MODEL_TRANSFER": "model_transfer_playbook.yml",
     "GET_MODEL_TRANSFER_STATUS": "get_model_transfer_status.yaml",
     "IDENTIFY_PLATFORM": "identify_platform.yaml",

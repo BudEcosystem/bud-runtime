@@ -53,11 +53,11 @@ if verify_deployment_health_result["param"]["supported_endpoints"].get("/v1/embe
 - When `model_type == "embedding"`, uses `budlatent` benchmark script instead of `vllm`
 
 ```python
-# Lines 48-51
+# Lines 47-50
 if model_type == "embedding":
     self.benchmark_script = "budlatent"
 else:
-    self.benchmark_script = "vllm" if provider_type == "local" else "litellm_proxy"
+    self.benchmark_script = "vllm"
 ```
 
 #### Performance Verification

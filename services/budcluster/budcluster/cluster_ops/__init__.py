@@ -162,14 +162,13 @@ async def get_deployment_status(
     config: Dict,
     ingress_url: str,
     values: Dict,
-    cloud_model: bool = False,
     platform: Optional[ClusterPlatformEnum] = None,
     ingress_health: bool = True,
     check_pods: bool = True,
 ) -> str:
     """Get the status of a deployment on the Kubernetes cluster."""
     cluster_handler = await get_cluster_handler(config, ingress_url, platform=platform)
-    return cluster_handler.get_deployment_status(values, cloud_model, ingress_health, check_pods)
+    return cluster_handler.get_deployment_status(values, ingress_health, check_pods)
 
 
 async def delete_namespace(config: Dict, namespace: str, platform: Optional[ClusterPlatformEnum] = None) -> None:
@@ -251,13 +250,12 @@ async def get_adapter_status(config: Dict, adapter_name: str, ingress_url: str) 
 async def identify_supported_endpoints(
     config: Dict,
     namespace: str,
-    cloud_model: bool = False,
     ingress_url: Optional[str] = None,
     platform: Optional[ClusterPlatformEnum] = None,
 ) -> Dict[str, bool]:
     """Identify which endpoints are supported by checking if they return 200 status."""
     cluster_handler = await get_cluster_handler(config, ingress_url=ingress_url, platform=platform)
-    return cluster_handler.identify_supported_endpoints(namespace, cloud_model)
+    return cluster_handler.identify_supported_endpoints(namespace)
 
 
 async def update_autoscale_config(

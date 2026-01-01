@@ -288,15 +288,6 @@ class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
     default_access_mode: Optional[str] = None
 
 
-class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
-    """Request body for creating a cloud deployment."""
-
-    credential_id: UUID
-    namespace: Optional[str] = None
-    default_storage_class: Optional[str] = None  # Added for cluster settings support
-    default_access_mode: Optional[str] = None
-
-
 class DeploymentInfo(BaseModel):
     """Information about a deployment."""
 
@@ -343,7 +334,6 @@ class VerifyDeploymentHealthRequest(BaseModel):
     cluster_config: str
     namespace: str
     ingress_url: str
-    cloud_model: bool = False
     platform: Optional[ClusterPlatformEnum] = None
     ingress_health: bool = True
     add_worker: bool = False
@@ -371,7 +361,6 @@ class WorkflowRunPerformanceBenchmarkRequest(BaseModel):
     cluster_config: str
     namespace: str
     benchmark_request: RunPerformanceBenchmarkRequest
-    provider_type: Literal["local", "cloud"] = "local"
     platform: Optional[ClusterPlatformEnum] = None
     cleanup_namespace: bool = False
     benchmark_id: Optional[UUID] = None

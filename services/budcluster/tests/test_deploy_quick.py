@@ -10,7 +10,6 @@ os.environ.setdefault("REGISTRY_SERVER", "ghcr.io")
 os.environ.setdefault("REGISTRY_USERNAME", "testuser")
 os.environ.setdefault("REGISTRY_PASSWORD", "testpass")
 os.environ.setdefault("DAPR_BASE_URL", "http://localhost:3500")
-os.environ.setdefault("LITELLM_PROXY_SERVER_IMAGE", "ghcr.io/berriai/litellm:latest")
 os.environ.setdefault("PROMETHEUS_URL", "http://localhost:9090")
 
 
