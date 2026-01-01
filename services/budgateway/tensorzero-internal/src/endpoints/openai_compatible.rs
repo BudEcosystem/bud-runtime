@@ -6564,28 +6564,38 @@ pub async fn response_create_handler(
         super::observability::record_error(error);
     }
 
-    // Add prompt and project headers for analytics
+    // Helper to add analytics headers to a response
+    let add_analytics_headers = |response: &mut Response<Body>| {
+        if let Some(ref id) = prompt_id {
+            if let Ok(value) = axum::http::HeaderValue::from_str(id) {
+                response.headers_mut().insert("x-tensorzero-prompt-id", value);
+            }
+        }
+        if let Some(ref version) = prompt_version {
+            if let Ok(value) = axum::http::HeaderValue::from_str(version) {
+                response.headers_mut().insert("x-tensorzero-prompt-version", value);
+            }
+        }
+        if let Some(ref pid) = project_id {
+            if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
+                response.headers_mut().insert("x-tensorzero-project-id", value);
+            }
+        }
+    };
+
+    // Add analytics headers to both success and error responses
+    // This allows the analytics middleware to extract prompt/project info
     match result {
         Ok(mut response) => {
-            if let Some(ref id) = prompt_id {
-                if let Ok(value) = axum::http::HeaderValue::from_str(id) {
-                    response.headers_mut().insert("x-tensorzero-prompt-id", value);
-                }
-            }
-            if let Some(ref version) = prompt_version {
-                if let Ok(value) = axum::http::HeaderValue::from_str(version) {
-                    response.headers_mut().insert("x-tensorzero-prompt-version", value);
-                }
-            }
-            // Add project_id header for analytics
-            if let Some(ref pid) = project_id {
-                if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
-                    response.headers_mut().insert("x-tensorzero-project-id", value);
-                }
-            }
+            add_analytics_headers(&mut response);
             Ok(response)
         }
-        Err(e) => Err(e),
+        Err(e) => {
+            // Convert error to response and add headers so middleware can extract them
+            let mut error_response = e.into_response();
+            add_analytics_headers(&mut error_response);
+            Ok(error_response)
+        }
     }
 }
 
