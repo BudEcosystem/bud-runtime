@@ -43,6 +43,7 @@ from budmetrics.observability.schemas import (
     PerformanceMetric,
     PeriodBin,
     TimeMetric,
+    TraceDetailResponse,
     TraceEvent,
     TraceItem,
     TraceLink,
@@ -1025,6 +1026,92 @@ class ObservabilityMetricsService:
             total_count=total_count,
             offset=offset,
             limit=limit,
+        )
+
+    async def get_trace(self, trace_id: str) -> TraceDetailResponse:
+        """Get all spans for a single trace.
+
+        Queries the otel_traces table for all spans matching the trace_id.
+
+        Args:
+            trace_id: The trace ID to retrieve
+
+        Returns:
+            TraceDetailResponse with all spans for the trace
+        """
+        await self.initialize()
+
+        query = """
+        SELECT *
+        FROM otel_traces
+        WHERE TraceId = %(trace_id)s
+        ORDER BY Timestamp ASC
+        """
+
+        params = {"trace_id": trace_id}
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Transform rows to TraceItem objects
+        # Column indices based on otel_traces table:
+        # 0: Timestamp, 1: TraceId, 2: SpanId, 3: ParentSpanId, 4: TraceState,
+        # 5: SpanName, 6: SpanKind, 7: ServiceName, 8: ResourceAttributes,
+        # 9: ScopeName, 10: ScopeVersion, 11: SpanAttributes, 12: Duration,
+        # 13: StatusCode, 14: StatusMessage, 15: Events.Timestamp, 16: Events.Name,
+        # 17: Events.Attributes, 18: Links.TraceId, 19: Links.SpanId,
+        # 20: Links.TraceState, 21: Links.Attributes
+        spans = []
+        for row in results:
+            # Build events list (columns 15, 16, 17)
+            events = []
+            if row[15] and row[16]:
+                for i in range(len(row[15])):
+                    events.append(
+                        TraceEvent(
+                            timestamp=row[15][i],
+                            name=row[16][i],
+                            attributes=dict(row[17][i]) if row[17] and i < len(row[17]) else {},
+                        )
+                    )
+
+            # Build links list (columns 18, 19, 20, 21)
+            links = []
+            if row[18] and row[19]:
+                for i in range(len(row[18])):
+                    links.append(
+                        TraceLink(
+                            trace_id=row[18][i],
+                            span_id=row[19][i] if i < len(row[19]) else "",
+                            trace_state=row[20][i] if row[20] and i < len(row[20]) else "",
+                            attributes=dict(row[21][i]) if row[21] and i < len(row[21]) else {},
+                        )
+                    )
+
+            spans.append(
+                TraceItem(
+                    timestamp=row[0],
+                    trace_id=row[1],
+                    span_id=row[2],
+                    parent_span_id=row[3] or "",
+                    trace_state=row[4] or "",
+                    span_name=row[5],
+                    span_kind=row[6],
+                    service_name=row[7],
+                    resource_attributes=dict(row[8]) if row[8] else {},
+                    scope_name=row[9] or "",
+                    scope_version=row[10] or "",
+                    span_attributes=dict(row[11]) if row[11] else {},
+                    duration=row[12],
+                    status_code=row[13],
+                    status_message=row[14] or "",
+                    events=events,
+                    links=links,
+                )
+            )
+
+        return TraceDetailResponse(
+            trace_id=trace_id,
+            spans=spans,
+            total_spans=len(spans),
         )
 
     async def get_inference_details(self, inference_id: str) -> EnhancedInferenceDetailResponse:

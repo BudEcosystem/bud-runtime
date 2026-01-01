@@ -5,7 +5,7 @@ from uuid import UUID
 import orjson
 from budmicroframe.commons import logging
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Path, Query, Response
 from fastapi.responses import ORJSONResponse
 from pydantic import ValidationError
 
@@ -31,6 +31,7 @@ from budmetrics.observability.schemas import (
     ObservabilityMetricsResponse,
     TimeSeriesRequest,
     TimeSeriesResponse,
+    TraceDetailResponse,
     TraceListResponse,
     TraceResourceType,
 )
@@ -739,5 +740,31 @@ async def list_traces(
     except Exception as e:
         logger.error(f"Error listing traces: {e}")
         response = ErrorResponse(message=f"Error listing traces: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.get("/traces/{trace_id}", tags=["Traces"])
+async def get_trace(
+    trace_id: str = Path(..., description="Trace ID to retrieve"),
+) -> Response:
+    """Get all spans for a single trace.
+
+    This endpoint retrieves all spans for a given trace_id from the otel_traces table.
+    Returns spans ordered by timestamp ascending to show trace flow.
+
+    Args:
+        trace_id: The trace ID to retrieve all spans for
+
+    Returns:
+        HTTP response containing all spans for the trace.
+    """
+    response: Union[TraceDetailResponse, ErrorResponse]
+
+    try:
+        response = await service.get_trace(trace_id=trace_id)
+    except Exception as e:
+        logger.error(f"Error getting trace: {e}")
+        response = ErrorResponse(message=f"Error getting trace: {str(e)}")
 
     return response.to_http_response()

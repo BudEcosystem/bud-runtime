@@ -1205,3 +1205,12 @@ class TraceListResponse(ResponseBase):
     total_count: int
     offset: int
     limit: int
+
+
+class TraceDetailResponse(ResponseBase):
+    """Response schema for single trace with all spans."""
+
+    object: str = "trace_detail"
+    trace_id: str
+    spans: List[TraceItem]
+    total_spans: int
