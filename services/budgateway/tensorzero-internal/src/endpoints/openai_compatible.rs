@@ -6293,6 +6293,12 @@ pub async fn response_create_handler(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
+    // Capture usage tokens for analytics (will be populated inside async block)
+    // Format: (input_tokens, output_tokens, total_tokens)
+    let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_usage_clone = captured_usage.clone();
+
     let result = async {
         if !params.unknown_fields.is_empty() {
             tracing::warn!(
@@ -6465,6 +6471,13 @@ pub async fn response_create_handler(
                 // Record response fields for observability
                 super::observability::record_response_result(&response);
 
+                // Capture usage for analytics headers
+                if let Some(ref usage) = response.usage {
+                    if let Ok(mut guard) = captured_usage_clone.lock() {
+                        *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
+                    }
+                }
+
                 Ok(Json(response).into_response())
             }
         }
@@ -6553,6 +6566,13 @@ pub async fn response_create_handler(
             // Record response fields for observability
             super::observability::record_response_result(&response);
 
+            // Capture usage for analytics headers
+            if let Some(ref usage) = response.usage {
+                if let Ok(mut guard) = captured_usage_clone.lock() {
+                    *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
+                }
+            }
+
             Ok(Json(response).into_response())
         }
     }
@@ -6579,6 +6599,22 @@ pub async fn response_create_handler(
         if let Some(ref pid) = project_id {
             if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
                 response.headers_mut().insert("x-tensorzero-project-id", value);
+            }
+        }
+        // Add usage token headers if available (for /v1/responses success responses)
+        if let Ok(guard) = captured_usage.lock() {
+            if let Some((input_tokens, output_tokens, total_tokens)) = *guard {
+                if let Ok(value) = axum::http::HeaderValue::from_str(&input_tokens.to_string()) {
+                    response.headers_mut().insert("x-tensorzero-input-tokens", value);
+                }
+                if let Some(output) = output_tokens {
+                    if let Ok(value) = axum::http::HeaderValue::from_str(&output.to_string()) {
+                        response.headers_mut().insert("x-tensorzero-output-tokens", value);
+                    }
+                }
+                if let Ok(value) = axum::http::HeaderValue::from_str(&total_tokens.to_string()) {
+                    response.headers_mut().insert("x-tensorzero-total-tokens", value);
+                }
             }
         }
     };

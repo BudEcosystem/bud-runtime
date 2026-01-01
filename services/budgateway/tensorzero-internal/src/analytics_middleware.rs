@@ -85,6 +85,10 @@ pub async fn analytics_middleware(
         gateway_analytics.model_provider = tracing::field::Empty,
         gateway_analytics.model_version = tracing::field::Empty,
         gateway_analytics.routing_decision = tracing::field::Empty,
+        // Usage tokens (for /v1/responses)
+        gen_ai.usage.input_tokens = tracing::field::Empty,
+        gen_ai.usage.output_tokens = tracing::field::Empty,
+        gen_ai.usage.total_tokens = tracing::field::Empty,
         // OpenTelemetry error status
         otel.status_code = tracing::field::Empty,
         otel.status_description = tracing::field::Empty,
@@ -225,6 +229,35 @@ pub async fn analytics_middleware(
                     "Captured project_id {} for analytics from response header",
                     project_id_str
                 );
+            }
+        }
+
+        // Extract usage tokens from response headers if present (for /v1/responses)
+        if let Some(input_tokens_header) = response.headers().get("x-tensorzero-input-tokens") {
+            if let Ok(tokens_str) = input_tokens_header.to_str() {
+                if let Ok(tokens) = tokens_str.parse::<i64>() {
+                    let span = tracing::Span::current();
+                    span.record("gen_ai.usage.input_tokens", tokens);
+                    tracing::debug!("Captured input_tokens {} for analytics", tokens);
+                }
+            }
+        }
+        if let Some(output_tokens_header) = response.headers().get("x-tensorzero-output-tokens") {
+            if let Ok(tokens_str) = output_tokens_header.to_str() {
+                if let Ok(tokens) = tokens_str.parse::<i64>() {
+                    let span = tracing::Span::current();
+                    span.record("gen_ai.usage.output_tokens", tokens);
+                    tracing::debug!("Captured output_tokens {} for analytics", tokens);
+                }
+            }
+        }
+        if let Some(total_tokens_header) = response.headers().get("x-tensorzero-total-tokens") {
+            if let Ok(tokens_str) = total_tokens_header.to_str() {
+                if let Ok(tokens) = tokens_str.parse::<i64>() {
+                    let span = tracing::Span::current();
+                    span.record("gen_ai.usage.total_tokens", tokens);
+                    tracing::debug!("Captured total_tokens {} for analytics", tokens);
+                }
             }
         }
 
