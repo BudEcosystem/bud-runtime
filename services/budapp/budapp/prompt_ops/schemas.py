@@ -991,3 +991,12 @@ class TraceListResponse(PaginatedSuccessResponse):
 
     object: str = "trace_list"
     items: List[TraceItem] = []
+
+
+class TraceDetailResponse(SuccessResponse):
+    """Response schema for single trace with all spans."""
+
+    object: str = "trace_detail"
+    trace_id: str
+    spans: List[TraceItem] = []
+    total_spans: int = 0

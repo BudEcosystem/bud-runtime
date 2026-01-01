@@ -458,6 +458,60 @@ class PromptService(SessionMixin):
                     "message": "Traces retrieved successfully",
                 }
 
+    async def get_trace(
+        self,
+        bud_prompt_id: str,
+        trace_id: str,
+        project_id: UUID,
+    ) -> dict:
+        """Get all spans for a single trace.
+
+        Args:
+            bud_prompt_id: Prompt ID for validation
+            trace_id: The trace ID to retrieve
+            project_id: Project ID for validation
+
+        Returns:
+            dict: Response data with trace_id, spans, and total_spans
+
+        Raises:
+            ClientException: If prompt not found or does not belong to project
+        """
+        # Validate prompt exists and belongs to project
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"name": bud_prompt_id, "project_id": project_id, "status": PromptStatusEnum.ACTIVE},
+            missing_ok=True,
+        )
+        if not db_prompt:
+            raise ClientException(
+                message="Prompt not found or does not belong to project",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Proxy to budmetrics
+        trace_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/"
+            f"{app_settings.bud_metrics_app_id}/method/observability/traces/{trace_id}"
+        )
+
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(trace_endpoint) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to fetch trace from budmetrics: {response_data}")
+                    raise ClientException(
+                        message="Failed to fetch trace",
+                        status_code=response.status,
+                    )
+
+                return {
+                    "trace_id": response_data.get("trace_id", trace_id),
+                    "spans": response_data.get("spans", []),
+                    "total_spans": response_data.get("total_spans", 0),
+                    "message": "Trace retrieved successfully",
+                }
+
     async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:
         """Search prompt tags by name."""
         db_tags, count = await PromptDataManager(self.session).search_tags_by_name(search_term, offset, limit)
