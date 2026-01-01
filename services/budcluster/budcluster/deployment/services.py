@@ -61,6 +61,8 @@ from .schemas import (
     DeploymentRecordUpdate,
     DeploymentStatusEnum,
     DeployQuantizationRequest,
+    UpdateAutoscaleRequest,
+    UpdateAutoscaleResponse,
     WorkerData,
     WorkerInfo,
     WorkerStatusEnum,
@@ -632,8 +634,8 @@ class DeploymentService(SessionMixin):
         return response
 
     async def update_autoscale_config(
-        self, update_request: "UpdateAutoscaleRequest"
-    ) -> Union["UpdateAutoscaleResponse", ErrorResponse]:
+        self, update_request: UpdateAutoscaleRequest
+    ) -> Union[UpdateAutoscaleResponse, ErrorResponse]:
         """Update autoscale configuration for an existing deployment.
 
         Args:
@@ -644,8 +646,6 @@ class DeploymentService(SessionMixin):
             UpdateAutoscaleResponse: Success response with updated autoscale status.
             ErrorResponse: If cluster not found or update fails.
         """
-        from .schemas import UpdateAutoscaleRequest, UpdateAutoscaleResponse
-
         logger.info(
             f"Updating autoscale config for cluster {update_request.cluster_id}, "
             f"namespace {update_request.namespace}, release {update_request.release_name}"
