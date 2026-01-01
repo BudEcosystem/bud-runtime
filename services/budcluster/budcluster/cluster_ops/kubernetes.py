@@ -673,7 +673,9 @@ class KubernetesHandler(BaseClusterHandler):
             message = f"Autoscale {'enabled' if autoscale_enabled else 'disabled'} successfully"
             return "successful", message
         else:
-            raise KubernetesException(f"Failed to update autoscale configuration: {result.get('message', 'Unknown error')}")
+            raise KubernetesException(
+                f"Failed to update autoscale configuration: {result.get('message', 'Unknown error')}"
+            )
 
     def get_pod_logs_for_errors(
         self, namespace: str, pod_name: str = "model-transfer-pod", tail_lines: int = 50

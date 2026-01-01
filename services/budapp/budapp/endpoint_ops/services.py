@@ -3256,9 +3256,7 @@ class EndpointService(SessionMixin):
             "message": "Successfully retrieved publication history",
         }
 
-    async def get_autoscale_config(
-        self, endpoint_id: UUID, current_user_id: UUID
-    ) -> "AutoscaleConfigResponse":
+    async def get_autoscale_config(self, endpoint_id: UUID, current_user_id: UUID) -> "AutoscaleConfigResponse":
         """Get autoscale configuration for an endpoint.
 
         Args:
@@ -3365,8 +3363,7 @@ class EndpointService(SessionMixin):
         # Call budcluster to update autoscale configuration
         # Use bud_cluster_id directly - this is the cluster ID known to budcluster
         update_autoscale_url = (
-            f"{app_settings.dapr_base_url}/v1.0/invoke/"
-            f"{app_settings.bud_cluster_app_id}/method/deployment/autoscale"
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/autoscale"
         )
 
         payload = {
@@ -3403,9 +3400,7 @@ class EndpointService(SessionMixin):
 
         # Update deployment_config in the database with new autoscale settings
         deployment_config["budaiscaler"] = budaiscaler_dict
-        await EndpointDataManager(self.session).update_by_fields(
-            db_endpoint, {"deployment_config": deployment_config}
-        )
+        await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"deployment_config": deployment_config})
 
         logger.info(f"Autoscale config updated for endpoint {endpoint_id} by user {current_user_id}")
 

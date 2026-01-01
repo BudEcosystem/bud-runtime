@@ -712,4 +712,5 @@ class AutoscaleConfigResponse(SuccessResponse):
 # Import BudAIScalerSpecification at module level for type hints
 from budapp.model_ops.schemas import BudAIScalerSpecification  # noqa: E402
 
+
 UpdateAutoscaleRequest.model_rebuild()
