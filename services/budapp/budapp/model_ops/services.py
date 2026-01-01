@@ -139,7 +139,6 @@ from .schemas import (
     ModelSecurityScanResultCreate,
     ModelTree,
     PaperPublishedCreate,
-    ScalingSpecification,
     TopLeaderboard,
     TopLeaderboardBenchmark,
 )
@@ -3123,7 +3122,6 @@ class ModelService(SessionMixin):
         template_id: Optional[UUID] = None,
         trigger_workflow: bool = False,
         credential_id: Optional[UUID] = None,
-        scaling_specification: Optional[ScalingSpecification] = None,
         budaiscaler_specification: Optional[BudAIScalerSpecification] = None,
         hardware_mode: Optional[str] = None,
         enable_tool_calling: Optional[bool] = None,
@@ -3222,7 +3220,6 @@ class ModelService(SessionMixin):
             deploy_config=deploy_config,
             template_id=template_id,
             credential_id=credential_id,
-            scaling_specification=scaling_specification,
             budaiscaler_specification=budaiscaler_specification,
             hardware_mode=hardware_mode,
             enable_tool_calling=enable_tool_calling,
@@ -3395,7 +3392,6 @@ class ModelService(SessionMixin):
                 "simulator_id",
                 "deploy_config",
                 "credential_id",
-                "scaling_specification",
                 "budaiscaler_specification",
                 "enable_tool_calling",
                 "enable_reasoning",
@@ -3431,13 +3427,7 @@ class ModelService(SessionMixin):
                     required_keys.append("credential_id")
                 else:
                     # Local models need cluster and simulator info
-                    # Either scaling_specification (legacy) or budaiscaler_specification (new) is acceptable
                     required_keys.extend(["cluster_id", "simulator_id"])
-                    if (
-                        "budaiscaler_specification" not in required_data
-                        and "scaling_specification" not in required_data
-                    ):
-                        required_keys.append("scaling_specification")  # Will trigger missing key error
 
             # Check if all required keys are present
             missing_keys = [key for key in required_keys if key not in required_data]
@@ -3528,7 +3518,6 @@ class ModelService(SessionMixin):
                     workflow_id=db_workflow.id,
                     subscriber_id=current_user_id,
                     credential_id=UUID(required_data["credential_id"]) if "credential_id" in required_data else None,
-                    scaling_specification=required_data.get("scaling_specification"),
                     budaiscaler_specification=required_data.get("budaiscaler_specification"),
                     enable_tool_calling=required_data.get("enable_tool_calling"),
                     enable_reasoning=required_data.get("enable_reasoning"),
@@ -3674,7 +3663,6 @@ class ModelService(SessionMixin):
         workflow_id: UUID,
         subscriber_id: UUID,
         credential_id: UUID | None = None,
-        scaling_specification: Optional[ScalingSpecification] = None,
         budaiscaler_specification: Optional[BudAIScalerSpecification] = None,
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
@@ -3774,7 +3762,6 @@ class ModelService(SessionMixin):
             notification_metadata=notification_metadata,
             source_topic=app_settings.source_topic,
             credential_id=credential_id,
-            podscaler=scaling_specification,
             budaiscaler=budaiscaler_specification,
             provider=db_model.source,
             enable_tool_calling=enable_tool_calling,

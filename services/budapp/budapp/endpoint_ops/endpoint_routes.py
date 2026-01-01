@@ -42,6 +42,7 @@ from .schemas import (
     AdapterPaginatedResponse,
     AddAdapterRequest,
     AddWorkerRequest,
+    AutoscaleConfigResponse,
     DeleteWorkerRequest,
     DeploymentPricingResponse,
     DeploymentSettingsResponse,
@@ -51,6 +52,7 @@ from .schemas import (
     PricingHistoryResponse,
     PublicationHistoryResponse,
     PublishEndpointResponse,
+    UpdateAutoscaleRequest,
     UpdateDeploymentSettingsRequest,
     UpdatePricingRequest,
     UpdatePublicationStatusRequest,
@@ -995,4 +997,101 @@ async def update_deployment_settings(
         logger.exception(f"Failed to update deployment settings: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update deployment settings"
+        ).to_http_response()
+
+
+@endpoint_router.get(
+    "/{endpoint_id}/autoscale",
+    responses={
+        status.HTTP_200_OK: {
+            "model": AutoscaleConfigResponse,
+            "description": "Successfully retrieved autoscale configuration",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to get autoscale configuration",
+        },
+    },
+    description="Get autoscale configuration for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_autoscale_config(
+    endpoint_id: UUID,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[AutoscaleConfigResponse, ErrorResponse]:
+    """Get autoscale configuration for an endpoint."""
+    try:
+        autoscale_config = await EndpointService(session).get_autoscale_config(
+            endpoint_id=endpoint_id,
+            current_user_id=current_user.id,
+        )
+        return autoscale_config.to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to get autoscale config: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get autoscale config: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get autoscale configuration"
+        ).to_http_response()
+
+
+@endpoint_router.put(
+    "/{endpoint_id}/autoscale",
+    responses={
+        status.HTTP_200_OK: {
+            "model": AutoscaleConfigResponse,
+            "description": "Successfully updated autoscale configuration",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid autoscale configuration",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Endpoint not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Failed to update autoscale configuration",
+        },
+    },
+    description="Update autoscale configuration for an endpoint",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def update_autoscale_config(
+    endpoint_id: UUID,
+    request: UpdateAutoscaleRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    x_resource_type: Annotated[Optional[str], Header()] = None,
+    x_entity_id: Annotated[Optional[str], Header()] = None,
+) -> Union[AutoscaleConfigResponse, ErrorResponse]:
+    """Update autoscale configuration for an endpoint.
+
+    This endpoint allows updating the BudAIScaler configuration for a deployment
+    that has already been created. It communicates with budcluster to apply the
+    new autoscale settings via Helm upgrade.
+    """
+    try:
+        autoscale_response = await EndpointService(session).update_autoscale_config(
+            endpoint_id=endpoint_id,
+            request=request,
+            current_user_id=current_user.id,
+        )
+        return autoscale_response.to_http_response()
+    except ClientException as e:
+        logger.exception(f"Failed to update autoscale config: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update autoscale config: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update autoscale configuration"
         ).to_http_response()

@@ -26,33 +26,6 @@ imagePullSecrets:
 modelName: "" # will be replaced by the deployment handler
 adapters: []
 
-# Pod Autoscaler Configuration
-# The autoscaler uses engine-specific metrics for scaling decisions.
-# Metrics are collected by runtime-sidecar and exposed with bud: prefix.
-#
-# Supported vLLM/SGLang metrics (from BudApp ScalingMetricEnum):
-#   - bud:gpu_cache_usage_perc_average (default)
-#   - bud:time_to_first_token_seconds_average
-#   - bud:e2e_request_latency_seconds_average
-#   - bud:time_per_output_token_seconds_average
-#   - bud:num_requests_waiting
-#   - bud:num_requests_running
-#
-# Supported Infinity metrics (for embedding models, aggregated by runtime-sidecar):
-#   - bud:infinity_queue_depth (default)
-#   - bud:infinity_embedding_latency_seconds_average
-podscaler:
-  enabled: false
-  type: "metrics" # metrics or optimizer
-  minReplicas: 1
-  maxReplicas: 2
-  upFluctuationTolerance: 1.5
-  downFluctuationTolerance: 0.5
-  window: 30s
-  # targetMetric is set dynamically based on engine_type if not specified
-  targetMetric: bud:gpu_cache_usage_perc_average
-  targetValue: 0.5
-
 # Engine Types Reference:
 # -----------------------
 # vllm (default):
@@ -75,7 +48,7 @@ podscaler:
 #   - Entrypoint: python -m sglang.launch_server
 #   - Metrics: Same as vLLM (via runtime-sidecar)
 
-# BudAIScaler Configuration (New Standard - replaces podscaler for new deployments)
+# BudAIScaler Configuration
 # Full-featured autoscaler with GPU-awareness, cost optimization, and predictive scaling
 # Uses scaler.budecosystem.io/v1alpha1 BudAIScaler CRD
 #

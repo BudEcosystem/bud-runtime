@@ -253,9 +253,7 @@ class CommonDeploymentParams(BaseModel):
     concurrency: int
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
-    # Legacy podscaler - deprecated, kept for backward compatibility
-    podscaler: dict | None = None
-    # New BudAIScaler configuration
+    # BudAIScaler configuration
     budaiscaler: BudAIScalerConfig | dict | None = None
 
 
@@ -698,3 +696,22 @@ class DeleteDeploymentRecordActivityRequest(BaseModel):
     """Schema for delete deployment record activity request."""
 
     namespace: str
+
+
+class UpdateAutoscaleRequest(BaseModel):
+    """Request to update autoscale configuration for an existing deployment."""
+
+    cluster_id: UUID
+    namespace: str
+    release_name: str
+    budaiscaler: BudAIScalerConfig
+    engine_type: str = "vllm"
+
+
+class UpdateAutoscaleResponse(SuccessResponse):
+    """Response for autoscale update operation."""
+
+    namespace: str
+    release_name: str
+    autoscale_enabled: bool
+    message: str

@@ -167,7 +167,6 @@ class WorkflowService(SessionMixin):
             adapter_model_id = required_data.get("adapter_model_id")
             endpoint_name = required_data.get("endpoint_name")
             deploy_config = required_data.get("deploy_config")
-            scaling_specification = required_data.get("scaling_specification")
             simulator_id = required_data.get("simulator_id")
             template_id = required_data.get("template_id")
             endpoint_details = required_data.get("endpoint_details")
@@ -412,7 +411,6 @@ class WorkflowService(SessionMixin):
                 credential=db_credential if db_credential else None,
                 endpoint_name=endpoint_name if endpoint_name else None,
                 deploy_config=deploy_config if deploy_config else None,
-                scaling_specification=scaling_specification if scaling_specification else None,
                 simulator_id=simulator_id if simulator_id else None,
                 template_id=template_id if template_id else None,
                 endpoint_details=endpoint_details if endpoint_details else None,
@@ -579,7 +577,6 @@ class WorkflowService(SessionMixin):
                 "simulator_id",
                 "credential_id",
                 "endpoint_details",
-                "scaling_specification",
                 "tool_calling_parser_type",
                 "reasoning_parser_type",
                 "chat_template",
