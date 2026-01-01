@@ -9,6 +9,7 @@ use chrono::Utc;
 use metrics::histogram;
 use std::collections::HashMap;
 use std::sync::Arc;
+use opentelemetry::trace::Status as OtelStatus;
 use tracing::error;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -86,6 +87,7 @@ pub async fn analytics_middleware(
         gateway_analytics.routing_decision = tracing::field::Empty,
         // OpenTelemetry error status
         otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
         // Error details (from HTTP status)
         gateway_analytics.error_type = tracing::field::Empty,
         gateway_analytics.error_message = tracing::field::Empty,
@@ -265,7 +267,6 @@ pub async fn analytics_middleware(
         // Extract and record error information if response is an error
         if response.status().is_client_error() || response.status().is_server_error() {
             let span = tracing::Span::current();
-            span.record("otel.status_code", "Error");
 
             // Error type = canonical reason (e.g., "Bad Request", "Internal Server Error")
             let error_type = response
@@ -283,18 +284,46 @@ pub async fn analytics_middleware(
             if let Ok(body_bytes) = axum::body::to_bytes(body, 10 * 1024).await {
                 if let Ok(body_str) = String::from_utf8(body_bytes.to_vec()) {
                     span.record("gateway_analytics.error_message", body_str.as_str());
-                    analytics.record.error_message = Some(body_str);
+                    // Set OTEL span status with error message - this populates StatusCode and StatusMessage columns
+                    span.set_status(OtelStatus::error(body_str.clone()));
+                    analytics.record.error_message = Some(body_str.clone());
+
+                    // Create OTEL exception event via tracing::error!
+                    // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
+                    // We use a field name starting with "otel." to pass the observability.rs filter
+                    // Note: Using span.in_scope() to ensure event is attached to the analytics span
+                    span.in_scope(|| {
+                        tracing::error!(
+                            otel.exception = true,
+                            error_type = %error_type,
+                            error_message = %body_str,
+                            "Exception: {}", error_type
+                        );
+                    });
                 }
                 // Reconstruct response with same body
                 response = Response::from_parts(parts, Body::from(body_bytes));
             } else {
                 // Fallback if body extraction fails - reconstruct with empty body
                 response = Response::from_parts(parts, Body::empty());
-                span.record(
-                    "gateway_analytics.error_message",
-                    format!("HTTP {}", status.as_u16()).as_str(),
-                );
-                analytics.record.error_message = Some(format!("HTTP {}", status.as_u16()));
+                let error_msg = format!("HTTP {}", status.as_u16());
+                span.record("gateway_analytics.error_message", error_msg.as_str());
+                // Set OTEL span status with error message - this populates StatusCode and StatusMessage columns
+                span.set_status(OtelStatus::error(error_msg.clone()));
+                analytics.record.error_message = Some(error_msg.clone());
+
+                // Create OTEL exception event via tracing::error!
+                // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
+                // We use a field name starting with "otel." to pass the observability.rs filter
+                // Note: Using span.in_scope() to ensure event is attached to the analytics span
+                span.in_scope(|| {
+                    tracing::error!(
+                        otel.exception = true,
+                        error_type = %error_type,
+                        error_message = %error_msg,
+                        "Exception: {}", error_type
+                    );
+                });
             }
         }
 
