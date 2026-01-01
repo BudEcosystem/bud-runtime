@@ -1045,6 +1045,9 @@ BUD_RESET_PASSWORD_WORKFLOW = "bud-reset-password"
 # BudPrompt API key location for proxy cache
 BUD_PROMPT_API_KEY_LOCATION = "dynamic::authorization"
 
+# Helm release names for deployment
+BUD_RUNTIME_CONTAINER_RELEASE_NAME = "bud-runtime-container"
+
 
 class NotificationStatus(Enum):
     """Enumerate notification statuses."""

@@ -644,7 +644,7 @@ class DeploymentService(SessionMixin):
             UpdateAutoscaleResponse: Success response with updated autoscale status.
             ErrorResponse: If cluster not found or update fails.
         """
-        from .schemas import UpdateAutoscaleResponse
+        from .schemas import UpdateAutoscaleRequest, UpdateAutoscaleResponse
 
         logger.info(
             f"Updating autoscale config for cluster {update_request.cluster_id}, "

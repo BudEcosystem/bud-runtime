@@ -41,6 +41,7 @@ from ..commons.config import app_settings
 from ..commons.constants import (
     APP_ICONS,
     BUD_INTERNAL_WORKFLOW,
+    BUD_RUNTIME_CONTAINER_RELEASE_NAME,
     AdapterStatusEnum,
     BaseModelRelationEnum,
     BudServeWorkflowStepEventName,
@@ -3354,10 +3355,12 @@ class EndpointService(SessionMixin):
         # Convert BudAIScalerSpecification to dict for budcluster
         budaiscaler_dict = request.budaiscaler_specification.model_dump(exclude_none=True)
 
-        # Determine engine type from deployment_config
+        # Determine engine type from model source (same pattern as endpoint publication)
+        # This ensures correct metric validation for different engines (vllm, infinity, etc.)
+        engine_type = db_endpoint.model.source.lower() if db_endpoint.model.source else "vllm"
+
         # Make a copy to avoid SQLAlchemy not detecting in-place JSONB modifications
         deployment_config = dict(db_endpoint.deployment_config or {})
-        engine_type = deployment_config.get("engine_type", "vllm")
 
         # Call budcluster to update autoscale configuration
         # Use bud_cluster_id directly - this is the cluster ID known to budcluster
@@ -3369,7 +3372,7 @@ class EndpointService(SessionMixin):
         payload = {
             "cluster_id": str(db_endpoint.bud_cluster_id),
             "namespace": db_endpoint.namespace,
-            "release_name": "bud-runtime-container",  # Standard Helm release name for runtime deployments
+            "release_name": BUD_RUNTIME_CONTAINER_RELEASE_NAME,
             "budaiscaler": budaiscaler_dict,
             "engine_type": engine_type,
         }

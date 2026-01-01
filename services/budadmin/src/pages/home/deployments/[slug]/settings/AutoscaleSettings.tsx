@@ -323,6 +323,53 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
     updateConfig({ scheduleHints: hints });
   };
 
+  // Helper to update scale policy by type instead of index
+  // This avoids brittle hardcoded indices and finds/creates policies by their type
+  const updateScalePolicy = (
+    direction: "scaleUp" | "scaleDown",
+    policyType: "Percent" | "Pods",
+    field: "value" | "periodSeconds",
+    newValue: number
+  ) => {
+    const currentConfig = config.behavior?.[direction];
+    const policies = [...(currentConfig?.policies || [])];
+
+    // Find existing policy by type
+    const existingIndex = policies.findIndex((p) => p.type === policyType);
+
+    const defaultPolicy = {
+      type: policyType,
+      value: policyType === "Percent" ? 100 : 4,
+      periodSeconds: 15,
+    };
+
+    if (existingIndex >= 0) {
+      // Update existing policy
+      policies[existingIndex] = { ...policies[existingIndex], [field]: newValue };
+    } else {
+      // Create new policy with the updated field
+      policies.push({ ...defaultPolicy, [field]: newValue });
+    }
+
+    updateConfig({
+      behavior: {
+        ...config.behavior!,
+        [direction]: { ...currentConfig!, policies },
+      },
+    });
+  };
+
+  // Helper to get policy value by type (for display)
+  const getPolicyValue = (
+    direction: "scaleUp" | "scaleDown",
+    policyType: "Percent" | "Pods",
+    field: "value" | "periodSeconds",
+    defaultValue: number
+  ): number => {
+    const policy = config.behavior?.[direction]?.policies?.find((p) => p.type === policyType);
+    return policy?.[field] ?? defaultValue;
+  };
+
   // Handle save
   const handleSave = async () => {
     openConfirm({
@@ -856,17 +903,8 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                           <div>
                             <label className="block text-[#EEEEEE] text-xs mb-1">Percent Value (%)</label>
                             <InputNumber
-                              value={config.behavior?.scaleUp?.policies?.[0]?.value ?? 100}
-                              onChange={(value) => {
-                                const policies = [...(config.behavior?.scaleUp?.policies || [])];
-                                policies[0] = { ...policies[0], type: "Percent", value: value || 100 };
-                                updateConfig({
-                                  behavior: {
-                                    ...config.behavior!,
-                                    scaleUp: { ...config.behavior!.scaleUp!, policies },
-                                  },
-                                });
-                              }}
+                              value={getPolicyValue("scaleUp", "Percent", "value", 100)}
+                              onChange={(value) => updateScalePolicy("scaleUp", "Percent", "value", value || 100)}
                               min={0}
                               max={100}
                               style={{ ...inputStyle, width: "100%" }}
@@ -876,17 +914,8 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                           <div>
                             <label className="block text-[#EEEEEE] text-xs mb-1">Percent Period (sec)</label>
                             <InputNumber
-                              value={config.behavior?.scaleUp?.policies?.[0]?.periodSeconds ?? 15}
-                              onChange={(value) => {
-                                const policies = [...(config.behavior?.scaleUp?.policies || [])];
-                                policies[0] = { ...policies[0], type: "Percent", periodSeconds: value || 15 };
-                                updateConfig({
-                                  behavior: {
-                                    ...config.behavior!,
-                                    scaleUp: { ...config.behavior!.scaleUp!, policies },
-                                  },
-                                });
-                              }}
+                              value={getPolicyValue("scaleUp", "Percent", "periodSeconds", 15)}
+                              onChange={(value) => updateScalePolicy("scaleUp", "Percent", "periodSeconds", value || 15)}
                               min={1}
                               style={{ ...inputStyle, width: "100%" }}
                               className={inputClassName}
@@ -895,17 +924,8 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                           <div>
                             <label className="block text-[#EEEEEE] text-xs mb-1">Pods Value</label>
                             <InputNumber
-                              value={config.behavior?.scaleUp?.policies?.[1]?.value ?? 4}
-                              onChange={(value) => {
-                                const policies = [...(config.behavior?.scaleUp?.policies || [])];
-                                policies[1] = { ...policies[1], type: "Pods", value: value || 4 };
-                                updateConfig({
-                                  behavior: {
-                                    ...config.behavior!,
-                                    scaleUp: { ...config.behavior!.scaleUp!, policies },
-                                  },
-                                });
-                              }}
+                              value={getPolicyValue("scaleUp", "Pods", "value", 4)}
+                              onChange={(value) => updateScalePolicy("scaleUp", "Pods", "value", value || 4)}
                               min={1}
                               style={{ ...inputStyle, width: "100%" }}
                               className={inputClassName}
@@ -914,17 +934,8 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                           <div>
                             <label className="block text-[#EEEEEE] text-xs mb-1">Pods Period (sec)</label>
                             <InputNumber
-                              value={config.behavior?.scaleUp?.policies?.[1]?.periodSeconds ?? 15}
-                              onChange={(value) => {
-                                const policies = [...(config.behavior?.scaleUp?.policies || [])];
-                                policies[1] = { ...policies[1], type: "Pods", periodSeconds: value || 15 };
-                                updateConfig({
-                                  behavior: {
-                                    ...config.behavior!,
-                                    scaleUp: { ...config.behavior!.scaleUp!, policies },
-                                  },
-                                });
-                              }}
+                              value={getPolicyValue("scaleUp", "Pods", "periodSeconds", 15)}
+                              onChange={(value) => updateScalePolicy("scaleUp", "Pods", "periodSeconds", value || 15)}
                               min={1}
                               style={{ ...inputStyle, width: "100%" }}
                               className={inputClassName}
@@ -985,17 +996,8 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                           <div>
                             <label className="block text-[#EEEEEE] text-xs mb-1">Percent Value (%)</label>
                             <InputNumber
-                              value={config.behavior?.scaleDown?.policies?.[0]?.value ?? 100}
-                              onChange={(value) => {
-                                const policies = [...(config.behavior?.scaleDown?.policies || [])];
-                                policies[0] = { ...policies[0], type: "Percent", value: value || 100 };
-                                updateConfig({
-                                  behavior: {
-                                    ...config.behavior!,
-                                    scaleDown: { ...config.behavior!.scaleDown!, policies },
-                                  },
-                                });
-                              }}
+                              value={getPolicyValue("scaleDown", "Percent", "value", 100)}
+                              onChange={(value) => updateScalePolicy("scaleDown", "Percent", "value", value || 100)}
                               min={0}
                               max={100}
                               style={{ ...inputStyle, width: "100%" }}
@@ -1005,17 +1007,8 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                           <div>
                             <label className="block text-[#EEEEEE] text-xs mb-1">Percent Period (sec)</label>
                             <InputNumber
-                              value={config.behavior?.scaleDown?.policies?.[0]?.periodSeconds ?? 15}
-                              onChange={(value) => {
-                                const policies = [...(config.behavior?.scaleDown?.policies || [])];
-                                policies[0] = { ...policies[0], type: "Percent", periodSeconds: value || 15 };
-                                updateConfig({
-                                  behavior: {
-                                    ...config.behavior!,
-                                    scaleDown: { ...config.behavior!.scaleDown!, policies },
-                                  },
-                                });
-                              }}
+                              value={getPolicyValue("scaleDown", "Percent", "periodSeconds", 15)}
+                              onChange={(value) => updateScalePolicy("scaleDown", "Percent", "periodSeconds", value || 15)}
                               min={1}
                               style={{ ...inputStyle, width: "100%" }}
                               className={inputClassName}
