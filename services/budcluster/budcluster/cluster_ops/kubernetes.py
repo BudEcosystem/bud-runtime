@@ -628,6 +628,53 @@ class KubernetesHandler(BaseClusterHandler):
             raise KubernetesException("Failed to deploy runtime")
         return result["status"], self.get_ingress_url(values["namespace"])
 
+    def update_autoscale_config(self, values: dict) -> tuple[str, str]:
+        """Update autoscale configuration for an existing deployment using Helm upgrade.
+
+        This method updates the BudAIScaler configuration by running a Helm upgrade
+        that only modifies autoscale-related values while preserving other settings.
+
+        Args:
+            values: Dict containing:
+                - namespace: Kubernetes namespace of the deployment
+                - release_name: Helm release name
+                - budaiscaler: BudAIScaler configuration dict
+
+        Returns:
+            tuple: (status, message) indicating success or failure
+
+        Raises:
+            KubernetesException: If the Helm upgrade fails
+        """
+        namespace = values.get("namespace")
+        release_name = values.get("release_name")
+        budaiscaler = values.get("budaiscaler", {})
+
+        logger.info(f"Updating autoscale config for release '{release_name}' in namespace '{namespace}'")
+
+        # Prepare values for the Ansible playbook
+        extra_vars = {
+            "kubeconfig_content": self.config,
+            "namespace": namespace,
+            "release_name": release_name,
+            "budaiscaler": budaiscaler,
+            "platform": self.platform,
+        }
+
+        result = self.ansible_executor.run_playbook(
+            playbook="UPDATE_AUTOSCALE",
+            extra_vars=extra_vars,
+        )
+
+        logger.info(f"Update autoscale playbook result: {result}")
+
+        if result["status"] == "successful":
+            autoscale_enabled = budaiscaler.get("enabled", False)
+            message = f"Autoscale {'enabled' if autoscale_enabled else 'disabled'} successfully"
+            return "successful", message
+        else:
+            raise KubernetesException(f"Failed to update autoscale configuration: {result.get('message', 'Unknown error')}")
+
     def get_pod_logs_for_errors(
         self, namespace: str, pod_name: str = "model-transfer-pod", tail_lines: int = 50
     ) -> dict:

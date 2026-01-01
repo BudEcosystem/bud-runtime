@@ -27,7 +27,6 @@ from ..model_ops.schemas import (
     ModelSecurityScanResult,
     Provider,
     QuantizeModelWorkflowStepData,
-    ScalingSpecification,
 )
 from ..project_ops.schemas import ProjectResponse
 from ..prompt_ops.schemas import PromptSchemaConfig
@@ -90,7 +89,6 @@ class RetrieveWorkflowStepData(BaseModel):
     credential: ProprietaryCredentialResponse | None = None
     endpoint_name: str | None = None
     deploy_config: dict | None = None
-    scaling_specification: ScalingSpecification | None = None
     simulator_id: UUID4 | None = None
     template_id: UUID4 | None = None
     endpoint_details: dict | None = None

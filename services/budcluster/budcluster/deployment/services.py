@@ -631,6 +631,61 @@ class DeploymentService(SessionMixin):
             return ErrorResponse(message=str(e))
         return response
 
+    async def update_autoscale_config(
+        self, update_request: "UpdateAutoscaleRequest"
+    ) -> Union["UpdateAutoscaleResponse", ErrorResponse]:
+        """Update autoscale configuration for an existing deployment.
+
+        Args:
+            update_request: The autoscale update request containing cluster_id, namespace,
+                           release_name, and budaiscaler configuration.
+
+        Returns:
+            UpdateAutoscaleResponse: Success response with updated autoscale status.
+            ErrorResponse: If cluster not found or update fails.
+        """
+        from .schemas import UpdateAutoscaleResponse
+
+        logger.info(
+            f"Updating autoscale config for cluster {update_request.cluster_id}, "
+            f"namespace {update_request.namespace}, release {update_request.release_name}"
+        )
+
+        # Get cluster details
+        db_cluster = await self._get_cluster(update_request.cluster_id, missing_ok=True)
+        if db_cluster is None:
+            logger.error(f"Cluster not found for id: {update_request.cluster_id}")
+            return ErrorResponse(message="Cluster not found")
+
+        try:
+            # Convert BudAIScalerConfig to dict if needed
+            budaiscaler_dict = (
+                update_request.budaiscaler.model_dump()
+                if hasattr(update_request.budaiscaler, "model_dump")
+                else update_request.budaiscaler
+            )
+
+            # Use the deployment handler to update autoscale configuration
+            handler = DeploymentHandler(config=db_cluster.config_file_dict)
+            status, message = await handler.update_autoscale(
+                namespace=update_request.namespace,
+                release_name=update_request.release_name,
+                budaiscaler=budaiscaler_dict,
+                engine_type=update_request.engine_type,
+                platform=db_cluster.platform,
+            )
+
+            return UpdateAutoscaleResponse(
+                namespace=update_request.namespace,
+                release_name=update_request.release_name,
+                autoscale_enabled=budaiscaler_dict.get("enabled", False),
+                message=message,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error updating autoscale configuration: {e}")
+            return ErrorResponse(message=f"Failed to update autoscale configuration: {str(e)}")
+
     @staticmethod
     def get_deployment_eta(
         current_step: str, model_size: Optional[int] = None, device_type: Optional[str] = None, step_time: int = None

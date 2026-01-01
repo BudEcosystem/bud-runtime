@@ -43,9 +43,7 @@
           volumeType: "{{ volume_type }}"
           nfs:
             server: "{{ nfs_server }}"
-          # Legacy podscaler - deprecated, kept for backward compatibility
-          podscaler: "{{ podscaler | default({}) }}"
-          # New BudAIScaler configuration
+          # BudAIScaler configuration
           budaiscaler: "{{ budaiscaler | default({}) }}"
           skipMasterNodeForCpu: "{{ skipMasterNodeForCpu | default(true) }}"
       register: helm_result

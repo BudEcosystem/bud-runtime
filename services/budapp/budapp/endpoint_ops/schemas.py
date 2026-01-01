@@ -687,3 +687,29 @@ class PricingHistoryResponse(PaginatedSuccessResponse):
 
     pricing_history: List[DeploymentPricingResponse] = []
     object: str = "endpoint.pricing_history"
+
+
+# Autoscale schemas
+
+
+class UpdateAutoscaleRequest(BaseModel):
+    """Request to update BudAIScaler configuration for an existing deployment."""
+
+    budaiscaler_specification: "BudAIScalerSpecification"
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AutoscaleConfigResponse(SuccessResponse):
+    """Response with current autoscale configuration."""
+
+    endpoint_id: UUID4
+    autoscale_enabled: bool
+    budaiscaler_config: Optional[dict] = None
+    object: str = "endpoint.autoscale"
+
+
+# Import BudAIScalerSpecification at module level for type hints
+from budapp.model_ops.schemas import BudAIScalerSpecification  # noqa: E402
+
+UpdateAutoscaleRequest.model_rebuild()

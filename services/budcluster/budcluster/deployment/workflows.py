@@ -387,7 +387,6 @@ class CreateDeploymentWorkflow:
             ingress_url = deploy_engine_request_json.ingress_url
             platform = deploy_engine_request_json.platform
             add_worker = deploy_engine_request_json.add_worker
-            podscaler = deploy_engine_request_json.podscaler
             budaiscaler = getattr(deploy_engine_request_json, "budaiscaler", None)
             if add_worker:
                 with DaprService() as dapr_service:
@@ -415,7 +414,6 @@ class CreateDeploymentWorkflow:
                 ingress_url=ingress_url,
                 platform=platform,
                 add_worker=add_worker,
-                podscaler=podscaler,
                 budaiscaler=budaiscaler,
                 input_tokens=deploy_engine_request_json.input_tokens,
                 output_tokens=deploy_engine_request_json.output_tokens,

@@ -58,8 +58,6 @@ from ..commons.constants import (
     BudScalerSpotPreferenceEnum,
     BudScalerStrategyEnum,
     ModelLicenseObjectTypeEnum,
-    ScalingMetricEnum,
-    ScalingTypeEnum,
 )
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
@@ -1056,20 +1054,6 @@ class DeploymentTemplateCreate(BaseModel):
         return self
 
 
-class ScalingSpecification(BaseModel):
-    """Scaling specification schema."""
-
-    enabled: bool = Field(default=False)
-    scalingType: ScalingTypeEnum = Field(...)
-    scalingMetric: ScalingMetricEnum = Field(...)
-    scalingValue: int = Field(ge=0)
-    minReplicas: int = Field(ge=1)
-    maxReplicas: int = Field(ge=1)
-    scaleUpTolerance: float = Field(ge=0)
-    scaleDownTolerance: float = Field(ge=0)
-    window: int = Field(ge=1)
-
-
 # BudAIScaler Configuration Schemas
 
 
@@ -1210,8 +1194,7 @@ class ModelDeployStepRequest(BaseModel):
     endpoint_name: str | None = Field(None, min_length=1, max_length=100)
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
-    scaling_specification: ScalingSpecification | None = None
-    # BudAIScaler specification (new standard - replaces scaling_specification)
+    # BudAIScaler specification
     budaiscaler_specification: BudAIScalerSpecification | None = None
     # Hardware resource mode (dedicated vs shared/time-slicing)
     hardware_mode: Literal["dedicated", "shared"] | None = Field(default=None)
@@ -1286,8 +1269,7 @@ class DeploymentWorkflowStepData(BaseModel):
     template_id: UUID4 | None = None
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
-    scaling_specification: ScalingSpecification | None = None
-    # BudAIScaler specification (new standard - replaces scaling_specification)
+    # BudAIScaler specification
     budaiscaler_specification: BudAIScalerSpecification | None = None
     # Hardware resource mode (dedicated vs shared/time-slicing)
     hardware_mode: Literal["dedicated", "shared"] | None = None
@@ -1321,8 +1303,7 @@ class ModelDeploymentRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     credential_id: UUID4 | None = None
-    podscaler: ScalingSpecification | None = None
-    # BudAIScaler specification (new standard - replaces podscaler)
+    # BudAIScaler specification
     budaiscaler: BudAIScalerSpecification | None = None
     provider: str | None = None
     # User preferences for parser features

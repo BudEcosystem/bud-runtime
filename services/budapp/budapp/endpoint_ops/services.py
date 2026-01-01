@@ -3254,3 +3254,161 @@ class EndpointService(SessionMixin):
             "code": status.HTTP_200_OK,
             "message": "Successfully retrieved publication history",
         }
+
+    async def get_autoscale_config(
+        self, endpoint_id: UUID, current_user_id: UUID
+    ) -> "AutoscaleConfigResponse":
+        """Get autoscale configuration for an endpoint.
+
+        Args:
+            endpoint_id: The ID of the endpoint.
+            current_user_id: The ID of the current user.
+
+        Returns:
+            AutoscaleConfigResponse: The autoscale configuration.
+
+        Raises:
+            ClientException: If endpoint not found.
+        """
+        from .schemas import AutoscaleConfigResponse
+
+        # Retrieve the endpoint
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        if not db_endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        # Extract autoscale config from deployment_config
+        deployment_config = db_endpoint.deployment_config or {}
+        budaiscaler_config = deployment_config.get("budaiscaler", {})
+        autoscale_enabled = budaiscaler_config.get("enabled", False) if budaiscaler_config else False
+
+        return AutoscaleConfigResponse(
+            endpoint_id=endpoint_id,
+            autoscale_enabled=autoscale_enabled,
+            budaiscaler_config=budaiscaler_config if budaiscaler_config else None,
+            message="Autoscale configuration retrieved successfully",
+        )
+
+    async def update_autoscale_config(
+        self,
+        endpoint_id: UUID,
+        request: "UpdateAutoscaleRequest",
+        current_user_id: UUID,
+    ) -> "AutoscaleConfigResponse":
+        """Update autoscale configuration for an existing deployment.
+
+        Args:
+            endpoint_id: The ID of the endpoint.
+            request: The autoscale update request containing BudAIScaler specification.
+            current_user_id: The ID of the current user.
+
+        Returns:
+            AutoscaleConfigResponse: The updated autoscale configuration.
+
+        Raises:
+            ClientException: If endpoint not found, not in valid state, or update fails.
+        """
+        from .schemas import AutoscaleConfigResponse, UpdateAutoscaleRequest
+
+        # Retrieve the endpoint with cluster relationship
+        db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel,
+            {"id": endpoint_id},
+            exclude_fields={"status": EndpointStatusEnum.DELETED},
+            missing_ok=True,
+        )
+
+        if not db_endpoint:
+            raise ClientException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                message=f"Endpoint with ID {endpoint_id} not found",
+            )
+
+        # Validate endpoint is in a state that allows autoscale updates
+        if db_endpoint.status not in [
+            EndpointStatusEnum.RUNNING,
+            EndpointStatusEnum.DEPLOYING,
+        ]:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message=f"Cannot update autoscale for endpoint in {db_endpoint.status} state. "
+                "Endpoint must be in RUNNING or DEPLOYING state.",
+            )
+
+        # Validate cluster is available
+        if not db_endpoint.bud_cluster_id:
+            raise ClientException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Cannot update autoscale for endpoint without cluster assignment",
+            )
+
+        # Convert BudAIScalerSpecification to dict for budcluster
+        budaiscaler_dict = request.budaiscaler_specification.model_dump(exclude_none=True)
+
+        # Determine engine type from deployment_config
+        # Make a copy to avoid SQLAlchemy not detecting in-place JSONB modifications
+        deployment_config = dict(db_endpoint.deployment_config or {})
+        engine_type = deployment_config.get("engine_type", "vllm")
+
+        # Call budcluster to update autoscale configuration
+        # Use bud_cluster_id directly - this is the cluster ID known to budcluster
+        update_autoscale_url = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/"
+            f"{app_settings.bud_cluster_app_id}/method/deployment/autoscale"
+        )
+
+        payload = {
+            "cluster_id": str(db_endpoint.bud_cluster_id),
+            "namespace": db_endpoint.namespace,
+            "release_name": "bud-runtime-container",  # Standard Helm release name for runtime deployments
+            "budaiscaler": budaiscaler_dict,
+            "engine_type": engine_type,
+        }
+
+        logger.debug(f"Calling budcluster to update autoscale config: {payload}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.put(update_autoscale_url, json=payload) as response:
+                    response_data = await response.json()
+
+                    if response.status != 200 or response_data.get("object") == "error":
+                        error_msg = response_data.get("message", "Unknown error")
+                        logger.error(f"Failed to update autoscale config: {response.status} {response_data}")
+                        raise ClientException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            message=f"Failed to update autoscale configuration: {error_msg}",
+                        )
+
+                    logger.info(f"Successfully updated autoscale config for endpoint {endpoint_id}")
+
+        except aiohttp.ClientError as e:
+            logger.exception(f"Failed to call budcluster for autoscale update: {e}")
+            raise ClientException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                message="Failed to communicate with cluster service",
+            ) from e
+
+        # Update deployment_config in the database with new autoscale settings
+        deployment_config["budaiscaler"] = budaiscaler_dict
+        await EndpointDataManager(self.session).update_by_fields(
+            db_endpoint, {"deployment_config": deployment_config}
+        )
+
+        logger.info(f"Autoscale config updated for endpoint {endpoint_id} by user {current_user_id}")
+
+        return AutoscaleConfigResponse(
+            endpoint_id=endpoint_id,
+            autoscale_enabled=budaiscaler_dict.get("enabled", False),
+            budaiscaler_config=budaiscaler_dict,
+            message="Autoscale configuration updated successfully",
+        )

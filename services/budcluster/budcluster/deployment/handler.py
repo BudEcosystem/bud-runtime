@@ -176,7 +176,7 @@ class DeploymentHandler:
         """
         # Start with core configuration
         config = {
-            "enabled": True,
+            "enabled": budaiscaler.get("enabled", True),
             "minReplicas": budaiscaler.get("minReplicas", 1),
             "maxReplicas": budaiscaler.get("maxReplicas", 10),
             "scalingStrategy": budaiscaler.get("scalingStrategy", "BudScaler"),
@@ -284,7 +284,6 @@ class DeploymentHandler:
         add_worker: bool = False,
         adapters: List[dict] = None,
         delete_on_failure: bool = True,
-        podscaler: dict = None,
         budaiscaler: dict = None,
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
@@ -309,7 +308,6 @@ class DeploymentHandler:
             adapters (List[dict], optional): List of model adapters to deploy. Defaults to None.
             delete_on_failure (bool, optional): Whether to delete resources on failure. Defaults to True.
             chat_template (str, optional): Chat template to use for the model. Defaults to None.
-            podscaler (dict, optional): Legacy pod autoscaling configuration. Deprecated. Defaults to None.
             budaiscaler (dict, optional): BudAIScaler configuration with full autoscaling features. Defaults to None.
             input_tokens (Optional[int], optional): Average input/context tokens. Defaults to None.
             output_tokens (Optional[int], optional): Average output/sequence tokens. Defaults to None.
@@ -395,7 +393,7 @@ class DeploymentHandler:
         first_node_engine = node_list[0].get("engine_type", "vllm") if node_list else "vllm"
         default_metric = get_default_autoscale_metric(first_node_engine)
 
-        # Process BudAIScaler configuration (takes priority over legacy podscaler)
+        # Process BudAIScaler configuration
         if budaiscaler and budaiscaler.get("enabled", False):
             # Validate user-provided metrics against engine capabilities
             for metric_source in budaiscaler.get("metricsSources", []):
@@ -405,33 +403,10 @@ class DeploymentHandler:
                     logger.info(f"Validated BudAIScaler metric '{user_metric}' for engine '{first_node_engine}'")
 
             values["budaiscaler"] = self._process_budaiscaler_config(budaiscaler, default_metric, first_node_engine)
-            # Ensure legacy podscaler is disabled when using BudAIScaler
-            values["podscaler"] = {"enabled": False}
             logger.info(f"Using BudAIScaler with strategy: {budaiscaler.get('scalingStrategy', 'BudScaler')}")
         else:
-            # LEGACY: Fall back to old podscaler for backward compatibility
+            # No autoscaling configured
             values["budaiscaler"] = {"enabled": False}
-
-            if not podscaler:
-                podscaler = {}
-
-            # Validate user-provided autoscale metric against engine capabilities
-            user_metric = podscaler.get("scalingMetric") if podscaler else None
-            if user_metric:
-                validate_autoscale_metric(first_node_engine, user_metric)
-                logger.info(f"Validated legacy autoscale metric '{user_metric}' for engine '{first_node_engine}'")
-
-            values["podscaler"] = {
-                "enabled": bool(podscaler and podscaler.get("enabled", False)) if podscaler else False,
-                "minReplicas": podscaler.get("minReplicas", 1),
-                "maxReplicas": podscaler.get("maxReplicas", 2),
-                "upFluctuationTolerance": podscaler.get("scaleUpTolerance", 1.5),
-                "downFluctuationTolerance": podscaler.get("scaleDownTolerance", 0.5),
-                "window": podscaler.get("window", 30),
-                "targetMetric": podscaler.get("scalingMetric", default_metric),
-                "targetValue": podscaler.get("scalingValue", 0.5),
-                "type": podscaler.get("scalingType", "metrics"),
-            }
 
         full_node_list = copy.deepcopy(node_list)
 
@@ -1106,6 +1081,66 @@ api_key_location = "env::API_KEY"
             return asyncio.run(identify_supported_endpoints(self.config, namespace, cloud_model, ingress_url))
         except Exception as e:
             raise Exception(f"Failed to identify supported endpoints: {str(e)}") from e
+
+    async def update_autoscale(
+        self,
+        namespace: str,
+        release_name: str,
+        budaiscaler: dict,
+        engine_type: str = "vllm",
+        platform: Optional[ClusterPlatformEnum] = None,
+    ) -> tuple[str, str]:
+        """Update autoscale configuration for an existing deployment using Helm upgrade.
+
+        This method updates only the BudAIScaler configuration without affecting other
+        deployment settings. It uses Helm upgrade with the existing release values.
+
+        Args:
+            namespace: Kubernetes namespace of the deployment
+            release_name: Helm release name of the deployment
+            budaiscaler: BudAIScaler configuration dict
+            engine_type: The inference engine type (vllm, latentbud, sglang)
+            platform: Optional cluster platform type
+
+        Returns:
+            tuple: (status, message) indicating success or failure
+
+        Raises:
+            ValueError: If autoscale configuration is invalid
+            Exception: If the Helm upgrade fails
+        """
+        from ..cluster_ops import update_autoscale_config
+
+        # Get default metric for engine type
+        default_metric = get_default_autoscale_metric(engine_type)
+
+        # Validate user-provided metrics against engine capabilities
+        if budaiscaler.get("enabled", False):
+            for metric_source in budaiscaler.get("metricsSources", []):
+                user_metric = metric_source.get("targetMetric")
+                if user_metric:
+                    validate_autoscale_metric(engine_type, user_metric)
+                    logger.info(f"Validated autoscale metric '{user_metric}' for engine '{engine_type}'")
+
+        # Process BudAIScaler configuration
+        processed_config = self._process_budaiscaler_config(budaiscaler, default_metric, engine_type)
+
+        # Build minimal Helm values for autoscale update
+        values = {
+            "namespace": namespace,
+            "release_name": release_name,
+            "budaiscaler": processed_config,
+        }
+
+        logger.info(f"Updating autoscale configuration for release '{release_name}' in namespace '{namespace}'")
+        logger.debug(f"Autoscale values: {values}")
+
+        try:
+            status, message = await update_autoscale_config(self.config, values, platform)
+            return status, message
+        except Exception as e:
+            logger.exception(f"Failed to update autoscale configuration: {e}")
+            raise Exception(f"Autoscale update failed: {str(e)}") from e
 
 
 class SimulatorHandler:

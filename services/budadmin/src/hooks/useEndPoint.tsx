@@ -99,6 +99,69 @@ export type GetAdapterParams = {
   order_by?: string,
   projectId?: string
 };
+
+// Autoscale configuration types
+export interface BudAIScalerMetricSource {
+  type: 'pod' | 'resource' | 'prometheus' | 'inferenceEngine' | 'custom';
+  targetMetric?: string;
+  targetValue?: string;  // Backend expects string
+  port?: string;
+  path?: string;
+  prometheusQuery?: string;
+}
+
+export interface BudAIScalerScheduleHint {
+  name: string;  // Required field
+  cronExpression: string;
+  targetReplicas: number;
+  duration?: string;
+}
+
+export interface BudAIScalerPredictionConfig {
+  enabled: boolean;
+  lookAheadMinutes?: number;
+  historyDays?: number;
+  minConfidence?: number;
+}
+
+export interface BudAIScalerScalePolicy {
+  type: 'Percent' | 'Pods';
+  value: number;
+  periodSeconds: number;
+}
+
+export interface BudAIScalerScaleConfig {
+  stabilizationWindowSeconds: number;
+  policies: BudAIScalerScalePolicy[];
+  selectPolicy: 'Max' | 'Min' | 'Disabled';
+}
+
+export interface BudAIScalerBehavior {
+  scaleUp?: BudAIScalerScaleConfig;
+  scaleDown?: BudAIScalerScaleConfig;
+}
+
+export interface BudAIScalerConfig {
+  enabled: boolean;
+  minReplicas: number;
+  maxReplicas: number;
+  scalingStrategy: 'HPA' | 'KPA' | 'BudScaler';
+  metricsSources?: BudAIScalerMetricSource[];
+  scheduleHints?: BudAIScalerScheduleHint[];
+  predictionConfig?: BudAIScalerPredictionConfig;
+  behavior?: BudAIScalerBehavior;
+}
+
+export interface AutoscaleConfigResponse {
+  endpoint_id: string;
+  autoscale_enabled: boolean;
+  budaiscaler_config: BudAIScalerConfig | null;
+  object: string;
+}
+
+export interface UpdateAutoscaleRequest {
+  budaiscaler_specification: BudAIScalerConfig;
+}
 export const useEndPoints = create<{
   endPoints: IEndPoint[];
   pageSource: string;
@@ -142,6 +205,8 @@ createEndPoint: (data: any) => Promise<any>;
   updateTokenPricing: (endpointId: string, pricing: any, projectId?: string) => Promise<any>;
   publishEndpoint: (endpointId: string, publishData: any) => Promise<any>;
   updateEndpointPricing: (endpointId: string, pricingData: any, projectId?: string) => Promise<any>;
+  getAutoscaleConfig: (endpointId: string, projectId?: string) => Promise<AutoscaleConfigResponse>;
+  updateAutoscaleConfig: (endpointId: string, config: UpdateAutoscaleRequest, projectId?: string) => Promise<AutoscaleConfigResponse>;
 }>((set, get) => ({
   pageSource: "",
   clusterDetails: undefined,
@@ -524,6 +589,48 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
       return response.data;
     } catch (error) {
       console.error("Error updating endpoint pricing:", error);
+      throw error;
+    }
+  },
+
+  getAutoscaleConfig: async (endpointId: string, projectId?: string): Promise<AutoscaleConfigResponse> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/autoscale`;
+      const response: any = await AppRequest.Get(url, {
+        headers: projectId ? {
+          "x-resource-type": "project",
+          "x-entity-id": projectId,
+        } : {}
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching autoscale config:", error);
+      // Return default config if not found
+      if (error?.response?.status === 404) {
+        return {
+          endpoint_id: endpointId,
+          autoscale_enabled: false,
+          budaiscaler_config: null,
+          object: "endpoint.autoscale"
+        };
+      }
+      throw error;
+    }
+  },
+
+  updateAutoscaleConfig: async (endpointId: string, config: UpdateAutoscaleRequest, projectId?: string): Promise<AutoscaleConfigResponse> => {
+    try {
+      const url = `${tempApiBaseUrl}/endpoints/${endpointId}/autoscale`;
+      const response: any = await AppRequest.Put(url, config, {
+        headers: projectId ? {
+          "x-resource-type": "project",
+          "x-entity-id": projectId,
+        } : {}
+      });
+      successToast(response.message || "Autoscale configuration updated successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Error updating autoscale config:", error);
       throw error;
     }
   }

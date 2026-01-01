@@ -11,6 +11,7 @@ _PLAYBOOK_MAP = {
     "GET_NODE_INFO": "get_node_info.yaml",
     "GET_NODE_STATUS": "get_node_status.yaml",
     "DEPLOY_RUNTIME": "deploy_runtime.yaml",
+    "UPDATE_AUTOSCALE": "update_autoscale.yaml",
     "DELETE_NAMESPACE": "delete_namespace.yaml",
     "GET_DEPLOYMENT_STATUS": "get_deployment_status.yaml",
     "DEPLOY_CLOUD_MODEL": "deploy_litellm.yaml",

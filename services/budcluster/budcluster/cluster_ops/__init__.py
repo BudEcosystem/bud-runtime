@@ -260,6 +260,28 @@ async def identify_supported_endpoints(
     return cluster_handler.identify_supported_endpoints(namespace, cloud_model)
 
 
+async def update_autoscale_config(
+    config: Dict,
+    values: Dict,
+    platform: Optional[ClusterPlatformEnum] = None,
+) -> tuple[str, str]:
+    """Update autoscale configuration for an existing deployment.
+
+    This function updates the BudAIScaler configuration using Helm upgrade
+    without affecting other deployment settings.
+
+    Args:
+        config: Kubernetes configuration dict
+        values: Dict containing namespace, release_name, budaiscaler config
+        platform: Optional cluster platform type
+
+    Returns:
+        tuple: (status, message) indicating success or failure
+    """
+    cluster_handler = await get_cluster_handler(config, platform=platform)
+    return cluster_handler.update_autoscale_config(values)
+
+
 __all__ = [
     "determine_cluster_platform",
     "get_cluster_hostname",
@@ -280,4 +302,5 @@ __all__ = [
     "get_quantization_status",
     "get_adapter_status",
     "identify_supported_endpoints",
+    "update_autoscale_config",
 ]
