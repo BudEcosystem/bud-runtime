@@ -1,8 +1,9 @@
 //! Gateway observability utilities for tracing and span management.
 
 use chrono::{DateTime, Utc};
+use opentelemetry::trace::Status as OtelStatus;
 use tracing::Span;
-
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
@@ -195,17 +196,30 @@ pub fn record_model_inference(
 }
 
 /// Records error information on the current span using OpenTelemetry conventions.
-/// Sets otel.status_code to "Error" and records error type and message.
+/// Sets OTEL span status to Error with message, records error details, and emits exception event.
 pub fn record_error(error: &Error) {
     let span = Span::current();
 
-    // Set OpenTelemetry span status to Error
-    span.record("otel.status_code", "Error");
-    span.record("otel.status_description", error.to_string().as_str());
+    let error_type = error.get_details().as_ref();
+    let error_message = error.to_string();
 
-    // Record structured error details using strum's AsRefStr derive
-    span.record("error.type", error.get_details().as_ref());
-    span.record("error.message", error.to_string().as_str());
+    // Set OTEL span status with error message - populates StatusCode and StatusMessage columns
+    span.set_status(OtelStatus::error(error_message.clone()));
+
+    // Record structured error details as span attributes
+    span.record("error.type", error_type);
+    span.record("error.message", error_message.as_str());
+
+    // Create OTEL exception event via tracing::error!
+    // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
+    span.in_scope(|| {
+        tracing::error!(
+            otel.exception = true,
+            error_type = %error_type,
+            error_message = %error_message,
+            "Exception: {}", error_type
+        );
+    });
 }
 
 /// Struct to hold error information for ModelInferenceDetails recording
