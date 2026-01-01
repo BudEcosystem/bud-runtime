@@ -1,5 +1,6 @@
 import ipaddress
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
@@ -1141,3 +1142,66 @@ class LatencyDistributionResponse(ResponseBase):
     total_requests: int
     date_range: Dict[str, datetime]
     bucket_definitions: List[Dict[str, Union[int, str]]]  # The bucket ranges used
+
+
+# ============================================
+# OTel Traces Schemas
+# ============================================
+
+
+class TraceResourceType(str, Enum):
+    """Enum for trace resource types used in filtering."""
+
+    PROMPT = "prompt"
+    # Future resource types can be added here
+
+
+class TraceEvent(BaseModel):
+    """Schema for span events (otel_traces columns 16-18 combined)."""
+
+    timestamp: datetime
+    name: str
+    attributes: Dict[str, str]
+
+
+class TraceLink(BaseModel):
+    """Schema for span links (otel_traces columns 19-22 combined)."""
+
+    trace_id: str
+    span_id: str
+    trace_state: str
+    attributes: Dict[str, str]
+
+
+class TraceItem(BaseModel):
+    """Schema for a single trace/span item with all 22 otel_traces columns."""
+
+    timestamp: datetime
+    trace_id: str
+    span_id: str
+    parent_span_id: str
+    trace_state: str
+    span_name: str
+    span_kind: str
+    service_name: str
+    resource_attributes: Dict[str, str]
+    scope_name: str
+    scope_version: str
+    span_attributes: Dict[str, str]
+    duration: int  # nanoseconds
+    status_code: str
+    status_message: str
+    events: List[TraceEvent]
+    links: List[TraceLink]
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+
+class TraceListResponse(ResponseBase):
+    """Response schema for listing traces."""
+
+    object: str = "trace_list"
+    items: List[TraceItem]
+    total_count: int
+    offset: int
+    limit: int

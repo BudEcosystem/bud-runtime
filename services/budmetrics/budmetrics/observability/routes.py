@@ -31,6 +31,8 @@ from budmetrics.observability.schemas import (
     ObservabilityMetricsResponse,
     TimeSeriesRequest,
     TimeSeriesResponse,
+    TraceListResponse,
+    TraceResourceType,
 )
 from budmetrics.observability.services import ObservabilityMetricsService
 
@@ -684,5 +686,58 @@ async def get_metrics_sync(request: MetricsSyncRequest) -> Response:
     except Exception as e:
         logger.error(f"Error getting metrics sync: {e}")
         response = ErrorResponse(message=f"Error getting metrics sync: {str(e)}")
+
+    return response.to_http_response()
+
+
+# OTel Traces Routes
+@observability_router.get("/traces", tags=["Traces"])
+async def list_traces(
+    resource_type: TraceResourceType = Query(..., description="Resource type to filter by"),
+    resource_id: str = Query(..., description="Resource ID to filter traces"),
+    project_id: UUID = Query(..., description="Project ID to filter traces"),
+    from_date: datetime = Query(..., description="Start date for filtering"),
+    to_date: datetime = Query(..., description="End date for filtering"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    limit: int = Query(50, ge=1, le=1000, description="Number of results to return"),
+) -> Response:
+    """List OTel traces filtered by resource type/id and project_id.
+
+    This endpoint retrieves traces from the otel_traces table with support for:
+    - Filtering by resource_type and resource_id (from SpanAttributes)
+    - Filtering by project_id
+    - Date range filtering
+    - Pagination (offset/limit)
+
+    Returns root spans (gateway_analytics) matching the filter criteria with
+    full trace details including all 22 columns from the otel_traces table.
+
+    Args:
+        resource_type: Type of resource to filter by (e.g., 'prompt')
+        resource_id: ID of the resource to filter traces
+        project_id: Project ID to filter traces (from SpanAttributes['gateway_analytics.project_id'])
+        from_date: Start date for filtering
+        to_date: End date for filtering
+        offset: Pagination offset (default: 0)
+        limit: Number of results to return (default: 50, max: 1000)
+
+    Returns:
+        HTTP response containing paginated trace list with all span details.
+    """
+    response: Union[TraceListResponse, ErrorResponse]
+
+    try:
+        response = await service.list_traces(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            project_id=project_id,
+            from_date=from_date,
+            to_date=to_date,
+            offset=offset,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.error(f"Error listing traces: {e}")
+        response = ErrorResponse(message=f"Error listing traces: {str(e)}")
 
     return response.to_http_response()
