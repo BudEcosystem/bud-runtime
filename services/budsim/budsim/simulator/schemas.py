@@ -99,7 +99,9 @@ class ClusterRecommendationRequest(CloudEventBase):
     """Request schema for cluster recommendations."""
 
     pretrained_model_uri: str
-    model_uri: Optional[str] = Field(None, description="HuggingFace model identifier for memory calculation and engine compatibility")
+    model_uri: Optional[str] = Field(
+        None, description="HuggingFace model identifier for memory calculation and engine compatibility"
+    )
     is_proprietary_model: bool
     input_tokens: int
     output_tokens: int

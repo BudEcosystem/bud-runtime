@@ -379,7 +379,8 @@ class BenchmarkService(SessionMixin):
             benchmark_id = db_benchmark.id
 
         # Exclude provider_type from payload - budcluster doesn't use it
-        budcluster_request = {k: v for k, v in request.items() if k != "provider_type"}
+        budcluster_request = request.copy()
+        budcluster_request.pop("provider_type", None)
         run_benchmark_payload = {
             "benchmark_id": str(benchmark_id),
             **budcluster_request,
