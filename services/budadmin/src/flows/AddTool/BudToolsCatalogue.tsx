@@ -2,102 +2,83 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import React, { useState, useContext, useCallback } from "react";
+import React, { useState, useContext, useCallback, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import ProviderCardWithCheckBox from "src/flows/components/ProviderCardWithCheckBox";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
+import { useAddTool, CatalogueServer } from "@/stores/useAddTool";
+import { Spin } from "antd";
+import { Text_12_400_B3B3B3 } from "@/components/ui/text";
 
-interface BudTool {
+interface CatalogueServerDisplay {
   id: string;
   name: string;
   description: string;
   icon: string;
   iconLocal: boolean;
   status: "active" | "inactive";
+  toolsCount?: number;
 }
-
-// Mock data for Bud Tools catalogue
-const budToolsList: BudTool[] = [
-  {
-    id: "tool-1",
-    name: "Tool 1",
-    description:
-      "Bud supports over 1000 Native, MCP, API for everything from Search, Code, 3rd party integrations et",
-    icon: "/images/drawer/brain.png",
-    iconLocal: true,
-    status: "active",
-  },
-  {
-    id: "tool-2",
-    name: "Tool 2",
-    description:
-      "Bud supports over 1000 Native, MCP, API for everything from Search, Code, 3rd party integrations et",
-    icon: "/images/drawer/embedding.png",
-    iconLocal: true,
-    status: "active",
-  },
-  {
-    id: "tool-3",
-    name: "Tool 2",
-    description:
-      "Bud supports over 1000 Native, MCP, API for everything from Search, Code, 3rd party integrations et",
-    icon: "/images/drawer/url-2.png",
-    iconLocal: true,
-    status: "active",
-  },
-  {
-    id: "tool-4",
-    name: "Tool 3",
-    description:
-      "Bud supports over 1000 Native, MCP, API for everything from Search, Code, 3rd party integrations es",
-    icon: "/images/drawer/disk-2.png",
-    iconLocal: true,
-    status: "active",
-  },
-];
 
 export default function BudToolsCatalogue() {
   const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
   const { isExpandedViewOpen } = useContext(BudFormContext);
-  const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // Filter tools based on search
-  const filteredTools = budToolsList.filter(
-    (tool) =>
-      tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tool.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const {
+    catalogueServers,
+    selectedCatalogueServerIds,
+    isLoading,
+    error,
+    fetchCatalogueServers,
+    toggleCatalogueServer,
+    updateWorkflowStep,
+  } = useAddTool();
+
+  // Fetch catalogue servers on mount
+  useEffect(() => {
+    fetchCatalogueServers();
+  }, [fetchCatalogueServers]);
+
+  // Transform catalogue servers to display format
+  const displayServers: CatalogueServerDisplay[] = catalogueServers.map((server) => ({
+    id: server.id,
+    name: server.name,
+    description: server.description || "MCP Server from Bud Catalogue",
+    icon: server.icon || "/images/drawer/brain.png",
+    iconLocal: !server.icon,
+    status: "active" as const,
+    toolsCount: server.toolsCount,
+  }));
+
+  // Filter servers based on search
+  const filteredServers = displayServers.filter(
+    (server) =>
+      server.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      server.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Callback to update selected tools from expanded view
-  const handleToolsSelected = useCallback((toolId: string, subToolIds: string[]) => {
-    setSelectedTools((prev) => {
-      const newSet = new Set(prev);
-      if (subToolIds.length > 0) {
-        newSet.add(toolId);
-      } else {
-        newSet.delete(toolId);
-      }
-      return newSet;
-    });
-  }, []);
+  // Callback to update selected servers from expanded view
+  const handleServersSelected = useCallback((serverId: string, subToolIds: string[]) => {
+    toggleCatalogueServer(serverId);
+  }, [toggleCatalogueServer]);
 
-  const handleToolClick = (tool: BudTool) => {
-    // Open expanded view with tool details
-    openDrawerWithExpandedStep("tool-details-expanded", {
-      tool: {
-        id: tool.id,
-        name: tool.name,
-        description: tool.description,
-        icon: tool.icon,
-      },
-      onToolsSelected: handleToolsSelected,
-    });
+  const handleServerClick = (server: CatalogueServerDisplay) => {
+    // Toggle selection for now, can open expanded view later if needed
+    toggleCatalogueServer(server.id);
   };
 
-  const handleNext = () => {
-    console.log("Selected tools:", Array.from(selectedTools));
-    openDrawerWithStep("creating-tool-status");
+  const handleNext = async () => {
+    try {
+      // Update workflow with selected catalogue servers
+      // Catalogue flow skips progress step, goes directly to success
+      const result = await updateWorkflowStep(2, true);
+      if (result) {
+        openDrawerWithStep("tool-creation-success");
+      }
+    } catch (error) {
+      console.error("Failed to register catalogue servers:", error);
+    }
   };
 
   const handleBack = () => {
@@ -111,13 +92,14 @@ export default function BudToolsCatalogue() {
       onNext={handleNext}
       onBack={handleBack}
       backText="Back"
-      disableNext={selectedTools.size === 0 || isExpandedViewOpen}
+      disableNext={selectedCatalogueServerIds.length === 0 || isExpandedViewOpen || isLoading}
+      drawerLoading={isLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title="Bud Tools"
-            description="Bud have a repository of over 1000+ pre-built tools"
+            title="Bud Tools Catalogue"
+            description="Select MCP servers from Bud's repository of 1000+ pre-built tools"
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
@@ -128,7 +110,7 @@ export default function BudToolsCatalogue() {
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Search servers..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full bg-transparent border border-[#3F3F3F] rounded-[6px] px-3 py-2 text-[#EEEEEE] text-[0.875rem] placeholder-[#757575] focus:outline-none focus:border-[#757575]"
@@ -166,17 +148,44 @@ export default function BudToolsCatalogue() {
             </div>
           </div>
 
-          {/* Tools List */}
+          {/* Servers List */}
           <div className="max-h-[400px] overflow-y-auto">
-            {filteredTools.map((tool) => (
-              <ProviderCardWithCheckBox
-                key={tool.id}
-                data={tool}
-                selected={selectedTools.has(tool.id)}
-                handleClick={() => handleToolClick(tool)}
-              />
-            ))}
+            {isLoading && catalogueServers.length === 0 ? (
+              <div className="flex justify-center items-center py-8">
+                <Spin size="default" />
+              </div>
+            ) : error ? (
+              <div className="px-[1.4rem] py-4">
+                <Text_12_400_B3B3B3 className="text-red-400">
+                  Failed to load catalogue: {error}
+                </Text_12_400_B3B3B3>
+              </div>
+            ) : filteredServers.length === 0 ? (
+              <div className="px-[1.4rem] py-4">
+                <Text_12_400_B3B3B3>
+                  {searchTerm ? "No servers match your search" : "No servers available"}
+                </Text_12_400_B3B3B3>
+              </div>
+            ) : (
+              filteredServers.map((server) => (
+                <ProviderCardWithCheckBox
+                  key={server.id}
+                  data={server}
+                  selected={selectedCatalogueServerIds.includes(server.id)}
+                  handleClick={() => handleServerClick(server)}
+                />
+              ))
+            )}
           </div>
+
+          {/* Selection Summary */}
+          {selectedCatalogueServerIds.length > 0 && (
+            <div className="px-[1.4rem] py-2 border-t border-[#1F1F1F]">
+              <Text_12_400_B3B3B3>
+                {selectedCatalogueServerIds.length} server{selectedCatalogueServerIds.length > 1 ? "s" : ""} selected
+              </Text_12_400_B3B3B3>
+            </div>
+          )}
         </BudDrawerLayout>
       </BudWraperBox>
     </BudForm>

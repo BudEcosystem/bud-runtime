@@ -2,10 +2,11 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import ProviderCardWithCheckBox from "src/flows/components/ProviderCardWithCheckBox";
 import { Text_14_400_EEEEEE } from "@/components/ui/text";
+import { useAddTool, ToolSourceType } from "@/stores/useAddTool";
 
 interface ToolSourceOption {
   id: string;
@@ -15,6 +16,7 @@ interface ToolSourceOption {
   iconLocal: boolean;
   status: "active" | "inactive";
   nextStep?: string;
+  sourceType: ToolSourceType;
 }
 
 const budCateloge: ToolSourceOption[] = [
@@ -27,6 +29,7 @@ const budCateloge: ToolSourceOption[] = [
     iconLocal: true,
     status: "active",
     nextStep: "bud-tools-catalogue",
+    sourceType: ToolSourceType.BUD_CATALOGUE,
   }
 ];
 
@@ -40,6 +43,7 @@ const toolSourceOptions: ToolSourceOption[] = [
     iconLocal: true,
     status: "active",
     nextStep: "openapi-specification",
+    sourceType: ToolSourceType.OPENAPI_URL,
   },
   {
     id: "from-documentation",
@@ -50,26 +54,7 @@ const toolSourceOptions: ToolSourceOption[] = [
     iconLocal: true,
     status: "active",
     nextStep: "openapi-specification",
-  },
-  {
-    id: "native-functions",
-    name: "Create Native Functions",
-    description:
-      "You can create these functions by copy pasting the SDK/API functions",
-    icon: "/images/drawer/brain.png",
-    iconLocal: true,
-    status: "active",
-    nextStep: "openapi-specification",
-  },
-  {
-    id: "natural-language",
-    name: "Create with Natural Language",
-    description:
-      "Our intelligent tool creator guided/allow you to describe any tool through natural language, based on the description it can be built automatically. No coding.",
-    icon: "/images/drawer/embedding.png",
-    iconLocal: true,
-    status: "active",
-    nextStep: "openapi-specification",
+    sourceType: ToolSourceType.API_DOCS_URL,
   },
 ];
 
@@ -77,16 +62,34 @@ export default function SelectToolSource() {
   const { openDrawerWithStep } = useDrawer();
   const [selectedSource, setSelectedSource] = useState<string>("");
 
-  const getNextStep = (): string | undefined => {
+  const {
+    setSourceType,
+    createWorkflow,
+    reset,
+    isLoading,
+  } = useAddTool();
+
+  // Reset store when component mounts (new flow)
+  useEffect(() => {
+    reset();
+  }, [reset]);
+
+  const getSelectedOption = (): ToolSourceOption | undefined => {
     const allOptions = [...budCateloge, ...toolSourceOptions];
-    const selected = allOptions.find((opt) => opt.id === selectedSource);
-    return selected?.nextStep;
+    return allOptions.find((opt) => opt.id === selectedSource);
   };
 
-  const handleNext = () => {
-    const nextStep = getNextStep();
-    if (nextStep) {
-      openDrawerWithStep(nextStep);
+  const handleNext = async () => {
+    const selected = getSelectedOption();
+    if (!selected) return;
+
+    // Set source type in store
+    setSourceType(selected.sourceType);
+
+    // Create workflow
+    const workflow = await createWorkflow();
+    if (workflow && selected.nextStep) {
+      openDrawerWithStep(selected.nextStep);
     }
   };
 
@@ -95,7 +98,8 @@ export default function SelectToolSource() {
       data={{}}
       nextText="Next"
       onNext={handleNext}
-      disableNext={!selectedSource}
+      disableNext={!selectedSource || isLoading}
+      drawerLoading={isLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>

@@ -608,6 +608,7 @@ class WorkflowTypeEnum(StrEnum):
     GUARDRAIL_DEPLOYMENT = auto()
     PROMPT_CREATION = auto()
     PROMPT_SCHEMA_CREATION = auto()
+    TOOL_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -691,6 +692,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     EVALUATION_EVENTS = "evaluation_events"
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
+    TOOL_CREATION_EVENTS = "tool_creation_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -1119,6 +1121,7 @@ APP_ICONS = {
         "deployment_mono": "icons/general/deployment_mono.png",
         "default_url_model": "icons/general/default_url_model.png",
         "default_disk_model": "icons/general/default_disk_model.png",
+        "tools": "icons/general/tools.png",
     },
     "providers": {"default_hugging_face_model": "icons/providers/huggingface.png"},
 }
@@ -3095,6 +3098,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
     WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
     WorkflowTypeEnum.MODEL_BENCHMARK: "Successfully cancelled benchmark.",
+    WorkflowTypeEnum.TOOL_CREATION: "Successfully cancelled tool creation.",
 }
 
 

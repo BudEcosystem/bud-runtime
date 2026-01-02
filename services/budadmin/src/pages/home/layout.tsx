@@ -202,7 +202,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       route: "/tools",
       iconSvg: true,
       customSvg: "tools",
-      cmd: "0",
+      cmd: "11",
     },
   ]
 
