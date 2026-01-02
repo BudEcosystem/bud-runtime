@@ -21,10 +21,15 @@ from typing import Any, Dict, List, Optional, Union
 
 from budmicroframe.commons import logging
 from fastapi.responses import StreamingResponse
-from openai.types.responses import ResponseInputItem
+from openai.types.responses import Response, ResponseInputItem
+from opentelemetry import context, trace
+from opentelemetry.context import Context
+from opentelemetry.trace import Status, StatusCode
 from pydantic import ValidationError
 
+from budprompt.commons.constants import ErrorAttributes, GenAIAttributes
 from budprompt.commons.exceptions import ClientException, OpenAIResponseException
+from budprompt.shared.otel import otel_manager
 from budprompt.shared.redis_service import RedisService
 
 from ..prompt.openai_response_formatter import extract_validation_error_details
@@ -47,11 +52,117 @@ class ResponsesService:
         """Initialize the ResponsesService."""
         self.redis_service = RedisService()
 
+    async def _create_streaming_generator(self, result, span, context_token):
+        """Wrap streaming generator to manage span lifecycle and capture response attributes.
+
+        The span stays open during streaming and closes when the generator
+        is exhausted or encounters an error. Parses SSE chunks to extract
+        the final response from 'response.completed' event for OTEL attributes.
+
+        Args:
+            result: The async generator from prompt execution
+            span: The OpenTelemetry span to manage
+            context_token: The context token from context.attach()
+
+        Yields:
+            Chunks from the original generator
+        """
+        final_response_dict = None
+
+        try:
+            async for chunk in result:
+                # Parse SSE chunk to check for response.completed event
+                if isinstance(chunk, str) and "response.completed" in chunk:
+                    # Extract the response object from the data line
+                    lines = chunk.strip().split("\n")
+                    for line in lines:
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])  # Remove "data: " prefix
+                                if data.get("type") == "response.completed":
+                                    final_response_dict = data.get("response")
+                                    break
+                            except json.JSONDecodeError:
+                                pass
+                yield chunk
+        except Exception as e:
+            span.record_exception(e)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, type(e).__name__)
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            raise
+        finally:
+            # Set response attributes by converting dict to Pydantic model
+            if final_response_dict:
+                try:
+                    response_obj = Response.model_validate(final_response_dict)
+                    self._set_response_attributes(span, response_obj)
+                except Exception as e:
+                    logger.warning("Failed to set streaming response attributes: %s", e)
+
+            # Context token may have been created in a different async context
+            # (request coroutine vs streaming generator), so handle gracefully
+            try:  # noqa: SIM105
+                context.detach(context_token)
+            except ValueError:
+                pass  # Token was created in different context, ignore
+            span.end()
+
+    def _set_response_attributes(self, span, result) -> None:
+        """Set OpenTelemetry span attributes from OpenAI response.
+
+        Args:
+            span: The OpenTelemetry span to set attributes on
+            result: The OpenAI Response object
+        """
+        # Required response attributes
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_ID, result.id)
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_CREATED_AT, result.created_at)
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_MODEL, result.model)
+        span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_OBJECT, result.object)
+
+        # Optional response attributes
+        if result.status:
+            span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_STATUS, result.status)
+        if result.instructions:
+            span.set_attribute(
+                GenAIAttributes.GEN_AI_SYSTEM_INSTRUCTIONS,
+                result.instructions
+                if isinstance(result.instructions, str)
+                else json.dumps([item.model_dump() for item in result.instructions]),
+            )
+
+        # Sampling parameters
+        if result.temperature is not None:
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_TEMPERATURE, result.temperature)
+        if result.top_p is not None:
+            span.set_attribute(GenAIAttributes.GEN_AI_RESPONSE_TOP_P, result.top_p)
+        if result.max_output_tokens is not None:
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_MAX_TOKENS, result.max_output_tokens)
+
+        # OpenAI-specific
+        if result.service_tier:
+            span.set_attribute(GenAIAttributes.GEN_AI_OPENAI_RESPONSE_SERVICE_TIER, result.service_tier)
+        if result.text:
+            span.set_attribute(GenAIAttributes.GEN_AI_OUTPUT_TYPE, result.text.model_dump_json())
+
+        # Usage attributes
+        if result.usage:
+            span.set_attribute(GenAIAttributes.GEN_AI_USAGE_INPUT_TOKENS, result.usage.input_tokens)
+            span.set_attribute(GenAIAttributes.GEN_AI_USAGE_OUTPUT_TOKENS, result.usage.output_tokens)
+            span.set_attribute(GenAIAttributes.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
+
+        # Output content
+        if result.output:
+            span.set_attribute(
+                GenAIAttributes.GEN_AI_OUTPUT_MESSAGES, json.dumps([item.model_dump() for item in result.output])
+            )
+
     async def execute_prompt(
         self,
         prompt_params: BudResponsePrompt,
         input: Optional[Union[str, List[ResponseInputItem]]] = None,
         api_key: Optional[str] = None,
+        trace_context: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Execute prompt using template from Redis.
 
@@ -59,6 +170,8 @@ class ResponsesService:
             prompt_params: Prompt parameters including id, version, and variables
             input: Optional input text for the prompt
             api_key: Optional API key for authorization
+            trace_context: Optional OpenTelemetry context extracted from incoming request headers
+                          for distributed tracing (parent span from upstream services like budgateway)
 
         Returns:
             Dictionary containing the execution result
@@ -66,6 +179,39 @@ class ResponsesService:
         Raises:
             OpenAIResponseException: OpenAI-compatible exception with status code and error details
         """
+        tracer = otel_manager.get_tracer(__name__)
+
+        # NOTE: Use manual span management to support streaming
+        # For streaming, we need the span to stay open until streaming completes
+
+        # Use passed trace context if available (extracted from request headers)
+        # This enables proper parent-child span relationships in distributed tracing
+        parent_ctx = trace_context if trace_context else context.get_current()
+
+        # Start span as child of parent context for proper distributed tracing
+        span = tracer.start_span("invoke_agent budprompt", context=parent_ctx)
+
+        # Set span as current context so child spans (Pydantic AI) attach to it
+        ctx = trace.set_span_in_context(span)
+        context_token = context.attach(ctx)
+
+        # Set attributes using semantic conventions
+        span.set_attribute(GenAIAttributes.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_attribute(GenAIAttributes.GEN_AI_PROMPT_ID, prompt_params.id)
+        span.set_attribute(GenAIAttributes.GEN_AI_PROMPT_VERSION, prompt_params.version or "default")
+        span.set_attribute(
+            GenAIAttributes.GEN_AI_PROMPT_VARIABLES,
+            json.dumps(prompt_params.variables) if prompt_params.variables else "{}",
+        )
+        if input:
+            span.set_attribute(
+                GenAIAttributes.GEN_AI_INPUT_MESSAGES,
+                input if isinstance(input, str) else json.dumps([item.model_dump() for item in input]),
+            )
+
+        # Track if streaming (span cleanup handled by generator)
+        is_streaming = False
+
         try:
             # Extract parameters
             prompt_id = prompt_params.id
@@ -114,6 +260,9 @@ class ResponsesService:
             prompt_execute_data = PromptExecuteData.model_validate(config_data)
             logger.debug("Config data for prompt: %s: %s", prompt_id, prompt_execute_data)
 
+            # Set stream attribute
+            span.set_attribute(GenAIAttributes.GEN_AI_REQUEST_STREAM, prompt_execute_data.stream or False)
+
             variables = prompt_params.variables
 
             result = await PromptExecutorService().execute_prompt(
@@ -127,9 +276,12 @@ class ResponsesService:
             logger.debug("Successfully executed prompt: %s", prompt_id)
 
             if prompt_execute_data.stream:
+                # For streaming: wrap generator to manage span lifecycle
+                # Span will close when streaming completes (in _create_streaming_generator)
+                is_streaming = True
                 logger.debug("Streaming response requested")
                 return StreamingResponse(
-                    result,
+                    self._create_streaming_generator(result, span, context_token),
                     media_type="text/event-stream",
                     headers={
                         "Cache-Control": "no-cache",
@@ -138,9 +290,13 @@ class ResponsesService:
                     },
                 )
             else:
-                # Add prompt info to non-streaming OpenAI-formatted response
                 logger.debug("Non Streaming response requested")
-                result = result.model_copy(
+
+                # Set response attributes for non-streaming
+                self._set_response_attributes(span, result)
+
+                # Add prompt info to non-streaming OpenAI-formatted response
+                return result.model_copy(
                     update={
                         "prompt": BudResponsePrompt(
                             id=prompt_id,
@@ -149,9 +305,11 @@ class ResponsesService:
                         )
                     }
                 )
-                return result
 
         except ValidationError as e:
+            span.record_exception(e)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, "ValidationError")
+            span.set_status(Status(StatusCode.ERROR, "Validation error"))
             logger.exception("Validation error during response creation")
             message, param, code = extract_validation_error_details(e)
             raise OpenAIResponseException(
@@ -162,6 +320,9 @@ class ResponsesService:
             ) from e
 
         except ClientException as e:
+            span.record_exception(e)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, "ClientException")
+            span.set_status(Status(StatusCode.ERROR, e.message))
             logger.error("Client error during response creation: %s", e.message)
             # Extract param and code from ClientException params if available
             param = None
@@ -180,14 +341,30 @@ class ResponsesService:
                 code=code,
             ) from e
 
-        except OpenAIResponseException:
+        except OpenAIResponseException as e:
+            span.record_exception(e)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, "OpenAIResponseException")
+            span.set_status(Status(StatusCode.ERROR, e.message))
             # Re-raise OpenAIResponseException as-is (from our own code above)
             raise
 
         except Exception as e:
+            span.record_exception(e)
+            span.set_attribute(ErrorAttributes.ERROR_TYPE, type(e).__name__)
+            span.set_status(Status(StatusCode.ERROR, str(e)))
             logger.error("Unexpected error during prompt execution: %s", str(e))
             raise OpenAIResponseException(
                 status_code=500,
                 message="An unexpected error occurred during prompt execution",
                 code="internal_error",
             ) from e
+
+        finally:
+            # Only cleanup here for non-streaming requests
+            # For streaming, cleanup happens in _create_streaming_generator
+            if not is_streaming:
+                try:  # noqa: SIM105
+                    context.detach(context_token)
+                except ValueError:
+                    pass  # Token was created in different context, ignore
+                span.end()

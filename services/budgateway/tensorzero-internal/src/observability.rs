@@ -163,9 +163,15 @@ impl<S: Clone + Send + Sync + 'static> RouterExt<S> for Router<S> {
                 "otel.name",
                 format!("{method} {}", route.unwrap_or_default()).trim(),
             );
-            span.set_parent(
-                tracing_opentelemetry_instrumentation_sdk::http::extract_context(req.headers()),
-            );
+
+            // Only set parent from headers if no active span exists (analytics disabled)
+            // When analytics is enabled, Span::current() is the analytics span
+            let current = tracing::Span::current();
+            if current.is_none() {
+                span.set_parent(
+                    tracing_opentelemetry_instrumentation_sdk::http::extract_context(req.headers()),
+                );
+            }
             span
         }
         self.layer(TraceLayer::new_for_http().make_span_with(make_span))
