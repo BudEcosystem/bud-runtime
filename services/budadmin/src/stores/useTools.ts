@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { McpFoundryRequest } from "src/pages/api/mcpFoundryRequests";
+import { AppRequest } from "src/pages/api/requests";
 
 // API response interface from MCP Foundry
 export interface McpToolResponse {
@@ -158,7 +158,13 @@ interface ToolsState {
   tools: Tool[];
   selectedTool: Tool | null;
   isLoading: boolean;
+  isLoadingMore: boolean;
   error: string | null;
+
+  // Pagination state
+  currentPage: number;
+  hasMore: boolean;
+  totalCount: number;
 
   // Actions
   setTools: (tools: Tool[]) => void;
@@ -169,26 +175,48 @@ interface ToolsState {
     tags?: string;
     team_id?: string;
     visibility?: string;
+    page?: number;
+    limit?: number;
+    append?: boolean;
   }) => Promise<void>;
+  loadMore: () => Promise<void>;
+  resetPagination: () => void;
   getTool: (id: string) => Promise<Tool | null>;
 }
+
+const DEFAULT_PAGE_SIZE = 30;
 
 export const useTools = create<ToolsState>((set, get) => ({
   tools: [],
   selectedTool: null,
   isLoading: false,
+  isLoadingMore: false,
   error: null,
+  currentPage: 1,
+  hasMore: true,
+  totalCount: 0,
 
   setTools: (tools) => set({ tools }),
 
   setSelectedTool: (tool) => set({ selectedTool: tool }),
 
   getTools: async (params) => {
-    set({ isLoading: true, error: null });
+    const isAppend = params?.append ?? false;
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+
+    set({
+      isLoading: !isAppend,
+      isLoadingMore: isAppend,
+      error: null,
+    });
+
     try {
-      const response = await McpFoundryRequest.Get("/tools/", {
+      const response = await AppRequest.Get("/tools", {
         params: {
           include_inactive: params?.include_inactive ?? false,
+          page,
+          limit,
           ...(params?.cursor && { cursor: params.cursor }),
           ...(params?.tags && { tags: params.tags }),
           ...(params?.team_id && { team_id: params.team_id }),
@@ -196,15 +224,64 @@ export const useTools = create<ToolsState>((set, get) => ({
         },
       });
 
-      const apiTools: McpToolResponse[] = response.data || [];
+      // Handle AppRequest returning false on error
+      if (!response || !response.data) {
+        set({ error: "Failed to fetch tools" });
+        return;
+      }
+
+      // Response from budapp proxy: { tools: [...], total_record, page, limit, ... }
+      const apiTools: McpToolResponse[] = response.data?.tools || response.data || [];
+      const totalRecord = response.data?.total_record || 0;
       const tools = apiTools.map(transformApiToTool);
-      set({ tools });
+
+      // Determine if there are more pages
+      const hasMore = tools.length === limit;
+
+      if (isAppend) {
+        // Append to existing tools
+        const existingTools = get().tools;
+        set({
+          tools: [...existingTools, ...tools],
+          currentPage: page,
+          hasMore,
+          totalCount: totalRecord,
+        });
+      } else {
+        // Replace tools
+        set({
+          tools,
+          currentPage: page,
+          hasMore,
+          totalCount: totalRecord,
+        });
+      }
     } catch (error: any) {
       console.error("Error fetching tools:", error);
       set({ error: error?.message || "Failed to fetch tools" });
     } finally {
-      set({ isLoading: false });
+      set({ isLoading: false, isLoadingMore: false });
     }
+  },
+
+  loadMore: async () => {
+    const { currentPage, hasMore, isLoadingMore } = get();
+    if (!hasMore || isLoadingMore) return;
+
+    await get().getTools({
+      page: currentPage + 1,
+      limit: DEFAULT_PAGE_SIZE,
+      append: true,
+    });
+  },
+
+  resetPagination: () => {
+    set({
+      tools: [],
+      currentPage: 1,
+      hasMore: true,
+      totalCount: 0,
+    });
   },
 
   getTool: async (id: string) => {
@@ -218,9 +295,10 @@ export const useTools = create<ToolsState>((set, get) => ({
         return existingTool;
       }
 
-      // If not found, fetch from API
-      const response = await McpFoundryRequest.Get(`/tools/${id}`);
-      const apiTool: McpToolResponse = response.data;
+      // If not found, fetch from API via budapp proxy
+      const response = await AppRequest.Get(`/tools/${id}`);
+      // Response from budapp proxy: { tool: {...}, code, message }
+      const apiTool: McpToolResponse = response.data?.tool || response.data;
       const tool = transformApiToTool(apiTool);
       set({ selectedTool: tool });
       return tool;

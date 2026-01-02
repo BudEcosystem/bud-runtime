@@ -5017,10 +5017,31 @@ const viewTool: DrawerFlowType = {
   ],
 };
 
+const viewVirtualServer: DrawerFlowType = {
+  title: "Virtual Server",
+  description: "View virtual server details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Tools", "Virtual Server"],
+      id: "view-virtual-server-details",
+      step: 1,
+      component: StepComponents["view-virtual-server-details"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Virtual Server",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const addTool: DrawerFlowType = {
   title: "Add Tool",
   description: "Add a new tool",
-  totalSteps: 3,
+  totalSteps: 5,
   steps: [
     {
       navigation: () => ["Tools", "Add Tool"],
@@ -5035,6 +5056,14 @@ const addTool: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Configure",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Create",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
         },
       ],
       confirmClose: true,
@@ -5053,6 +5082,10 @@ const addTool: DrawerFlowType = {
           status: FormProgressStatus.inProgress,
           title: "Select Tools",
         },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
       ],
       confirmClose: true,
     },
@@ -5069,6 +5102,14 @@ const addTool: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "Configure",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Create",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
         },
       ],
       confirmClose: true,
@@ -5090,6 +5131,64 @@ const addTool: DrawerFlowType = {
         {
           status: FormProgressStatus.inProgress,
           title: "Creating",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Tools", "Add Tool", "Success"],
+      id: "tool-creation-success",
+      step: 4,
+      component: StepComponents["tool-creation-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Source",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Create",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
+        },
+      ],
+      confirmClose: false,
+    },
+    {
+      navigation: () => ["Tools", "Add Tool", "Virtual Server"],
+      id: "create-virtual-server",
+      step: 5,
+      component: StepComponents["create-virtual-server"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Source",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Configure",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Create",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Success",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Virtual Server",
         },
       ],
       confirmClose: false,
@@ -5190,6 +5289,7 @@ const flows = {
   "edit-agent": editAgent,
   // tools
   "view-tool": viewTool,
+  "view-virtual-server": viewVirtualServer,
   "add-tool": addTool,
   "tool-details-expanded": toolDetailsExpanded,
 };

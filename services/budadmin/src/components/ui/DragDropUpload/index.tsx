@@ -12,6 +12,7 @@ interface DragDropUploadProps {
   title?: string;
   description?: string;
   className?: string;
+  selectedFile?: File | null; // Optional external file state
 }
 
 export default function DragDropUpload({
@@ -21,9 +22,16 @@ export default function DragDropUpload({
   title = "Drag and drop your OpenAPI file here, or click to browse",
   description,
   className = "",
+  selectedFile: externalSelectedFile,
 }: DragDropUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [internalSelectedFile, setInternalSelectedFile] = useState<File | null>(null);
+
+  // Use external file if provided, otherwise use internal state
+  const selectedFile = externalSelectedFile !== undefined ? externalSelectedFile : internalSelectedFile;
+  const setSelectedFile = (file: File | null) => {
+    setInternalSelectedFile(file);
+  };
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
