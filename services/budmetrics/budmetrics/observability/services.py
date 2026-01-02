@@ -935,7 +935,7 @@ class ObservabilityMetricsService:
         # Note: resource_attr_key is safe because it's validated against whitelist
         count_query = f"""
         SELECT count() as total_count
-        FROM otel_traces
+        FROM metrics.otel_traces
         WHERE Timestamp >= %(from_date)s
           AND Timestamp <= %(to_date)s
           AND ParentSpanId = ''
@@ -951,7 +951,7 @@ class ObservabilityMetricsService:
         # Note: resource_attr_key is safe because it's validated against whitelist
         data_query = f"""
         SELECT *
-        FROM otel_traces
+        FROM metrics.otel_traces
         WHERE Timestamp >= %(from_date)s
           AND Timestamp <= %(to_date)s
           AND ParentSpanId = ''
@@ -1043,7 +1043,7 @@ class ObservabilityMetricsService:
 
         query = """
         SELECT *
-        FROM otel_traces
+        FROM metrics.otel_traces
         WHERE TraceId = %(trace_id)s
         ORDER BY Timestamp ASC
         """
