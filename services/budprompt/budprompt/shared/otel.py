@@ -109,6 +109,11 @@ class OTelManager:
             return
 
         endpoint = app_settings.otel_exporter_endpoint
+        if not endpoint:
+            logger.warning(
+                "OpenTelemetry is enabled but OTEL_EXPORTER_OTLP_ENDPOINT is not configured. Skipping OTEL setup."
+            )
+            return
 
         # Configure W3C TraceContext propagator for extracting traceparent headers
         # This enables distributed tracing context propagation from upstream services
