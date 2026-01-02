@@ -159,7 +159,8 @@ microservices:
   budgateway:
     enabled: true
     image: budstudio/budgateway:0.4.8
-    env: {}
+    env:
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration for budgateway
@@ -331,6 +332,8 @@ microservices:
       REDIS_PORT: "6379"
       REDIS_DB_INDEX: "10"
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
+      OTEL_SDK_DISABLED: "false"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     nodeSelector: {}
     affinity: {}
   global:
