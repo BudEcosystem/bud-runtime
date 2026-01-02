@@ -160,7 +160,7 @@ microservices:
     enabled: true
     image: budstudio/budgateway:0.4.8
     env:
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4317"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration for budgateway
