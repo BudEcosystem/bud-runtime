@@ -19,6 +19,7 @@ data:
     geoip_db_path = "/app/geo/GeoLite2-City.mmdb"
 
     [gateway.observability]
+    enabled = true
     async_writes = true
 
     [gateway.observability.kafka]

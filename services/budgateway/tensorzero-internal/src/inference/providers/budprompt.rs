@@ -11,6 +11,7 @@ use reqwest::StatusCode;
 use reqwest_eventsource::{Event, RequestBuilderExt};
 use secrecy::{ExposeSecret, SecretString};
 use std::time::Instant;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use url::Url;
 
 use super::helpers::handle_reqwest_error;
@@ -562,6 +563,7 @@ impl ResponseProvider for BudPromptProvider {
 
     /// Execute response with automatic format detection based on Content-Type header
     /// BudPrompt determines streaming based on internal prompt config, not the stream parameter
+    #[tracing::instrument(skip_all, fields(otel.name = "budprompt_execute_response"))]
     async fn execute_response_with_detection(
         &self,
         request: &OpenAIResponseCreateParams,
@@ -582,6 +584,21 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         } else if let Some(static_key) = self.credentials.get_static_api_key() {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
+        }
+
+        // Inject OpenTelemetry trace context for distributed tracing
+        let context = tracing::Span::current().context();
+        let mut http_headers = http::HeaderMap::new();
+        tracing_opentelemetry_instrumentation_sdk::http::inject_context(&context, &mut http_headers);
+        if let Some(traceparent) = http_headers.get("traceparent") {
+            if let Ok(value) = traceparent.to_str() {
+                request_builder = request_builder.header("traceparent", value);
+            }
+        }
+        if let Some(tracestate) = http_headers.get("tracestate") {
+            if let Ok(value) = tracestate.to_str() {
+                request_builder = request_builder.header("tracestate", value);
+            }
         }
 
         // Send request WITHOUT modifying the stream parameter
