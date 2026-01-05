@@ -36,7 +36,6 @@ def test_endpoint_validation_with_no_functional_endpoints():
         cluster_config='{"test": "config"}',
         namespace="test-namespace",
         ingress_url="http://test.example.com",
-        cloud_model=False,
         platform=ClusterPlatformEnum.KUBERNETES,
         add_worker=False,
     )
@@ -101,7 +100,6 @@ def test_endpoint_validation_with_functional_endpoints():
         cluster_config='{"test": "config"}',
         namespace="test-namespace",
         ingress_url="http://test.example.com",
-        cloud_model=False,
         platform=ClusterPlatformEnum.KUBERNETES,
         add_worker=False,
     )
@@ -167,7 +165,6 @@ def test_endpoint_validation_with_add_worker_true():
         cluster_config='{"test": "config"}',
         namespace="test-namespace",
         ingress_url="http://test.example.com",
-        cloud_model=False,
         platform=ClusterPlatformEnum.KUBERNETES,
         add_worker=True,  # This is the key difference
     )

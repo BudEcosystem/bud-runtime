@@ -378,9 +378,12 @@ class BenchmarkService(SessionMixin):
             logger.debug(f"Benchmark created with id {db_benchmark.id}")
             benchmark_id = db_benchmark.id
 
+        # Exclude provider_type from payload - budcluster doesn't use it
+        budcluster_request = request.copy()
+        budcluster_request.pop("provider_type", None)
         run_benchmark_payload = {
             "benchmark_id": str(benchmark_id),
-            **request,
+            **budcluster_request,
             "notification_metadata": {
                 "name": BUD_INTERNAL_WORKFLOW,
                 "subscriber_ids": str(current_user_id),

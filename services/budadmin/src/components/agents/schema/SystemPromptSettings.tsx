@@ -50,8 +50,6 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({
     if (isNaN(numValue)) {
       numValue = 3; // Default to 3 if empty or invalid
     }
-
-    // Enforce min/max limits
     const clampedValue = Math.min(Math.max(numValue, 3), 10);
 
     // Update both local and parent state

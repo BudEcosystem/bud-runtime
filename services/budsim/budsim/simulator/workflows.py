@@ -395,7 +395,7 @@ class SimulationWorkflows:
             input={
                 "workflow_id": workflow_id,
                 "pretrained_model_uri": request.pretrained_model_uri,
-                "model_uri": request.model_uri,  # Pass the cloud/HF URI
+                "model_uri": request.model_uri,  # Pass the HuggingFace model identifier
                 "cluster_info": cluster_info,
                 "notification_request": notification_request_dict,
                 "target_topic_name": request.source_topic,

@@ -16,6 +16,7 @@
 
 """API routes for the prompt ops module."""
 
+from datetime import datetime
 from typing import Annotated, List, Optional, Union
 from uuid import UUID
 
@@ -77,6 +78,8 @@ from .schemas import (
     ToolFilter,
     ToolListResponse,
     ToolResponse,
+    TraceDetailResponse,
+    TraceListResponse,
 )
 from .services import PromptService, PromptVersionService, PromptWorkflowService
 
@@ -1675,4 +1678,98 @@ async def get_prompt(
         logger.exception(f"Failed to retrieve prompt: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to retrieve prompt"
+        ).to_http_response()
+
+
+@router.get(
+    "/{bud_prompt_id}/traces",
+    responses={
+        status.HTTP_200_OK: {
+            "model": TraceListResponse,
+            "description": "Successfully retrieved traces",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="List OTel traces for a specific prompt",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def list_prompt_traces(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    bud_prompt_id: str,
+    project_id: UUID = Query(..., description="Project ID to validate prompt ownership"),
+    from_date: datetime = Query(..., description="Start date for filtering traces"),
+    to_date: datetime = Query(..., description="End date for filtering traces"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    limit: int = Query(50, ge=1, le=1000, description="Number of results per page"),
+) -> Union[TraceListResponse, ErrorResponse]:
+    """List OTel traces for a prompt."""
+    try:
+        result = await PromptService(session).list_traces(
+            bud_prompt_id=bud_prompt_id,
+            project_id=project_id,
+            from_date=from_date,
+            to_date=to_date,
+            page=page,
+            limit=limit,
+        )
+        return TraceListResponse(**result).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to list traces: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list traces: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list traces"
+        ).to_http_response()
+
+
+@router.get(
+    "/{bud_prompt_id}/traces/{trace_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": TraceDetailResponse,
+            "description": "Successfully retrieved trace",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt or trace not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Server error",
+        },
+    },
+    description="Get all spans for a single trace",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_prompt_trace(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    bud_prompt_id: str,
+    trace_id: str,
+    project_id: UUID = Query(..., description="Project ID to validate prompt ownership"),
+) -> Union[TraceDetailResponse, ErrorResponse]:
+    """Get all spans for a single trace."""
+    try:
+        result = await PromptService(session).get_trace(
+            bud_prompt_id=bud_prompt_id,
+            trace_id=trace_id,
+            project_id=project_id,
+        )
+        return TraceDetailResponse(**result).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to get trace: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get trace: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get trace"
         ).to_http_response()

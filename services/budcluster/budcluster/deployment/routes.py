@@ -33,6 +33,8 @@ from .schemas import (
     DeleteWorkerRequest,
     DeploymentCreateRequest,
     DeployQuantizationRequest,
+    UpdateAutoscaleRequest,
+    UpdateAutoscaleResponse,
     WorkerDetailResponse,
     WorkerInfo,
     WorkerInfoFilter,
@@ -505,4 +507,54 @@ async def deploy_adapter(
         response = await AdapterService(session).deploy_adapter(add_adapter_request)
     except Exception as e:
         response = ErrorResponse(message=str(e))
+    return response.to_http_response()
+
+
+@deployment_router.put(
+    "/autoscale",
+    responses={
+        status.HTTP_200_OK: {
+            "model": UpdateAutoscaleResponse,
+            "description": "Autoscale configuration updated successfully",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Cluster or deployment not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Update autoscale configuration for an existing deployment",
+    tags=["Autoscaling"],
+)
+async def update_autoscale(
+    update_request: UpdateAutoscaleRequest,
+    session: Session = Depends(get_session),  # noqa: B008
+):
+    """Update autoscale configuration for an existing deployment.
+
+    This endpoint allows updating the BudAIScaler configuration for a deployment
+    that has already been created. It uses Helm upgrade to apply the new autoscale
+    settings without affecting other deployment configurations.
+
+    Args:
+        update_request: The autoscale update request containing cluster_id, namespace,
+                       release_name, and budaiscaler configuration.
+        session: Database session.
+
+    Returns:
+        UpdateAutoscaleResponse: Success response with updated autoscale status.
+        ErrorResponse: If cluster not found or update fails.
+    """
+    try:
+        response = await DeploymentService(session).update_autoscale_config(update_request)
+    except Exception as e:
+        logger.exception(f"Failed to update autoscale configuration: {e}")
+        response = ErrorResponse(
+            message=f"Failed to update autoscale configuration: {str(e)}",
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
     return response.to_http_response()

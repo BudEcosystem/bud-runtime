@@ -55,13 +55,6 @@ class AppConfig(BaseAppConfig):
     notify_service_topic: Optional[str] = Field(None, alias="NOTIFY_SERVICE_TOPIC")
     dapr_base_url: AnyHttpUrl = Field(alias="DAPR_BASE_URL")
 
-    # Litellm
-    litellm_proxy_server_image: str = Field(..., alias="LITELLM_PROXY_SERVER_IMAGE")
-    litellm_server_port: int = Field(4000, alias="LITELLM_SERVER_PORT")
-
-    # Tensorzero
-    tensorzero_image: str = Field("budstudio/budproxy:nightly", alias="TENSORZERO_IMAGE")
-
     # Model registry volume
     volume_type: str = Field("local", alias="VOLUME_TYPE")
     model_registry_path: str = Field("/data/models-registry/", alias="MODEL_REGISTRY_PATH")
@@ -106,11 +99,6 @@ class SecretsConfig(BaseSecretsConfig):
     name: str = __version__.split("@")[0]
     version: str = __version__.split("@")[-1]
 
-    litellm_master_key: Optional[str] = Field(
-        None,
-        alias="LITELLM_PROXY_MASTER_KEY",
-        json_schema_extra=enable_periodic_sync_from_store(is_global=True),
-    )
     minio_access_key: Optional[str] = Field(
         None,
         alias="MINIO_ACCESS_KEY",

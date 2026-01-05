@@ -28,6 +28,7 @@ from fastapi import FastAPI
 from .commons.config import app_settings, secrets_settings
 from .prompt.routes import prompt_router
 from .responses.routes import responses_router
+from .shared.otel import otel_manager
 
 
 logger = logging.get_logger(__name__)
@@ -48,6 +49,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Yields:
         None: Yields control back to the context where the lifespan management is performed.
     """
+    # Initialize OpenTelemetry for Pydantic AI instrumentation
+    otel_manager.configure()
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     yield
@@ -58,6 +62,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.exception("Failed to cleanup config & store sync.")
 
     DaprWorkflow().shutdown_workflow_runtime()
+
+    # Shutdown OpenTelemetry
+    otel_manager.shutdown()
 
 
 app = configure_app(app_settings, secrets_settings, lifespan=lifespan)

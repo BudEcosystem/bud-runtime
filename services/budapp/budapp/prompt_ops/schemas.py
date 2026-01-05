@@ -943,3 +943,60 @@ class DisconnectConnectorResponse(SuccessResponse):
     prompt_id: str = Field(..., description="Prompt ID")
     connector_id: str = Field(..., description="Disconnected connector ID")
     deleted_gateway_id: str = Field(..., description="Deleted gateway ID")
+
+
+class TraceEvent(BaseModel):
+    """Schema for span events."""
+
+    timestamp: datetime
+    name: str
+    attributes: Dict[str, str]
+
+
+class TraceLink(BaseModel):
+    """Schema for span links."""
+
+    trace_id: str
+    span_id: str
+    trace_state: str
+    attributes: Dict[str, str]
+
+
+class TraceItem(BaseModel):
+    """Schema for a single trace/span item."""
+
+    timestamp: datetime
+    trace_id: str
+    span_id: str
+    parent_span_id: str
+    trace_state: str
+    span_name: str
+    span_kind: str
+    service_name: str
+    resource_attributes: Dict[str, str]
+    scope_name: str
+    scope_version: str
+    span_attributes: Dict[str, str]
+    duration: int  # nanoseconds
+    status_code: str
+    status_message: str
+    events: List[TraceEvent]
+    links: List[TraceLink]
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+
+class TraceListResponse(PaginatedSuccessResponse):
+    """Response schema for listing traces."""
+
+    object: str = "trace_list"
+    items: List[TraceItem] = []
+
+
+class TraceDetailResponse(SuccessResponse):
+    """Response schema for single trace with all spans."""
+
+    object: str = "trace_detail"
+    trace_id: str
+    spans: List[TraceItem] = []
+    total_spans: int = 0

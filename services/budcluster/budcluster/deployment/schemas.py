@@ -49,6 +49,161 @@ class WorkerStatusEnum(str, Enum):
     DELETING = "Deleting"
 
 
+# BudAIScaler Enums
+class ScalingStrategyEnum(str, Enum):
+    """Scaling strategy types for BudAIScaler."""
+
+    HPA = "HPA"
+    KPA = "KPA"
+    BUD_SCALER = "BudScaler"
+
+
+class MetricSourceTypeEnum(str, Enum):
+    """Metric source types for BudAIScaler."""
+
+    POD = "pod"
+    RESOURCE = "resource"
+    PROMETHEUS = "prometheus"
+    INFERENCE_ENGINE = "inferenceEngine"
+    CUSTOM = "custom"
+    EXTERNAL = "external"
+
+
+class SpotInstancePreferenceEnum(str, Enum):
+    """Spot instance preference options."""
+
+    NONE = "none"
+    PREFER = "prefer"
+    REQUIRE = "require"
+
+
+class FederationModeEnum(str, Enum):
+    """Multi-cluster federation modes."""
+
+    ACTIVE_PASSIVE = "active-passive"
+    ACTIVE_ACTIVE = "active-active"
+    WEIGHTED = "weighted"
+
+
+class ScalingPolicyTypeEnum(str, Enum):
+    """Scaling policy types."""
+
+    PODS = "Pods"
+    PERCENT = "Percent"
+
+
+class SelectPolicyEnum(str, Enum):
+    """Policy selection strategy."""
+
+    MAX = "Max"
+    MIN = "Min"
+    DISABLED = "Disabled"
+
+
+# BudAIScaler Configuration Schemas
+class GPUConfig(BaseModel):
+    """GPU-aware scaling configuration."""
+
+    enabled: bool = False
+    memoryThreshold: int = Field(default=80, ge=0, le=100)
+    computeThreshold: int = Field(default=80, ge=0, le=100)
+    topologyAware: bool = False
+    preferredGPUType: Optional[str] = None
+    vGPUSupport: bool = False
+
+
+class CostConfig(BaseModel):
+    """Cost-aware scaling configuration."""
+
+    enabled: bool = False
+    cloudProvider: Optional[str] = None  # aws, azure, gcp, on-premises
+    hourlyBudgetLimit: Optional[float] = None
+    dailyBudgetLimit: Optional[float] = None
+    spotInstancePreference: SpotInstancePreferenceEnum = SpotInstancePreferenceEnum.NONE
+
+
+class PredictionConfig(BaseModel):
+    """Predictive scaling configuration."""
+
+    enabled: bool = False
+    lookAheadMinutes: int = Field(default=15, ge=1, le=1440)
+    historyDays: int = Field(default=7, ge=1, le=365)
+    minConfidence: float = Field(default=0.7, ge=0.0, le=1.0)
+    predictionMetrics: List[str] = Field(default_factory=list)
+
+
+class ScheduleHint(BaseModel):
+    """Schedule-based scaling hint."""
+
+    name: str
+    cronExpression: str
+    targetReplicas: int = Field(ge=0)
+    duration: Optional[str] = None  # e.g., "8h", "30m"
+
+
+class FailoverThresholds(BaseModel):
+    """Multi-cluster failover thresholds."""
+
+    healthCheckFailures: int = Field(default=3, ge=1)
+    latencyMs: int = Field(default=5000, ge=100)
+
+
+class MultiClusterConfig(BaseModel):
+    """Multi-cluster federation configuration."""
+
+    enabled: bool = False
+    federationMode: FederationModeEnum = FederationModeEnum.ACTIVE_PASSIVE
+    clusterWeights: Dict[str, int] = Field(default_factory=dict)
+    failoverThresholds: Optional[FailoverThresholds] = None
+
+
+class ScalingPolicy(BaseModel):
+    """Individual scaling policy."""
+
+    type: ScalingPolicyTypeEnum
+    value: int = Field(ge=1)
+    periodSeconds: int = Field(ge=1, le=1800)
+
+
+class ScalingRules(BaseModel):
+    """Scaling rules for up or down direction."""
+
+    stabilizationWindowSeconds: int = Field(default=0, ge=0, le=3600)
+    policies: List[ScalingPolicy] = Field(default_factory=list)
+    selectPolicy: SelectPolicyEnum = SelectPolicyEnum.MAX
+
+
+class ScalingBehavior(BaseModel):
+    """Scaling behavior configuration."""
+
+    scaleUp: ScalingRules = Field(
+        default_factory=lambda: ScalingRules(stabilizationWindowSeconds=0, selectPolicy=SelectPolicyEnum.MAX)
+    )
+    scaleDown: ScalingRules = Field(
+        default_factory=lambda: ScalingRules(stabilizationWindowSeconds=300, selectPolicy=SelectPolicyEnum.MIN)
+    )
+
+
+class BudAIScalerConfig(BaseModel):
+    """Complete BudAIScaler configuration schema."""
+
+    enabled: bool = False
+    minReplicas: int = Field(default=1, ge=0)
+    maxReplicas: int = Field(default=10, ge=1)
+    scalingStrategy: ScalingStrategyEnum = ScalingStrategyEnum.BUD_SCALER
+
+    # Metrics sources - flexible dict list for polymorphic handling
+    metricsSources: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Feature configurations
+    gpuConfig: GPUConfig = Field(default_factory=GPUConfig)
+    costConfig: CostConfig = Field(default_factory=CostConfig)
+    predictionConfig: PredictionConfig = Field(default_factory=PredictionConfig)
+    scheduleHints: List[ScheduleHint] = Field(default_factory=list)
+    multiCluster: MultiClusterConfig = Field(default_factory=MultiClusterConfig)
+    behavior: ScalingBehavior = Field(default_factory=ScalingBehavior)
+
+
 class TransferModelRequest(BaseModel):
     """Request body for transferring a model."""
 
@@ -98,7 +253,8 @@ class CommonDeploymentParams(BaseModel):
     concurrency: int
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
-    podscaler: dict | None = None
+    # BudAIScaler configuration
+    budaiscaler: BudAIScalerConfig | dict | None = None
 
 
 class DeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
@@ -128,15 +284,6 @@ class LocalDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBe
     credential_id: Optional[UUID] = None
     namespace: Optional[str] = None
     provider: Optional[str] = None
-    default_storage_class: Optional[str] = None  # Added for cluster settings support
-    default_access_mode: Optional[str] = None
-
-
-class CloudDeploymentCreateRequest(CloudEventBase, CommonDeploymentParams, RunBenchmarkParams):
-    """Request body for creating a cloud deployment."""
-
-    credential_id: UUID
-    namespace: Optional[str] = None
     default_storage_class: Optional[str] = None  # Added for cluster settings support
     default_access_mode: Optional[str] = None
 
@@ -187,7 +334,6 @@ class VerifyDeploymentHealthRequest(BaseModel):
     cluster_config: str
     namespace: str
     ingress_url: str
-    cloud_model: bool = False
     platform: Optional[ClusterPlatformEnum] = None
     ingress_health: bool = True
     add_worker: bool = False
@@ -215,7 +361,6 @@ class WorkflowRunPerformanceBenchmarkRequest(BaseModel):
     cluster_config: str
     namespace: str
     benchmark_request: RunPerformanceBenchmarkRequest
-    provider_type: Literal["local", "cloud"] = "local"
     platform: Optional[ClusterPlatformEnum] = None
     cleanup_namespace: bool = False
     benchmark_id: Optional[UUID] = None
@@ -540,3 +685,22 @@ class DeleteDeploymentRecordActivityRequest(BaseModel):
     """Schema for delete deployment record activity request."""
 
     namespace: str
+
+
+class UpdateAutoscaleRequest(BaseModel):
+    """Request to update autoscale configuration for an existing deployment."""
+
+    cluster_id: UUID
+    namespace: str
+    release_name: str
+    budaiscaler: BudAIScalerConfig
+    engine_type: str = "vllm"
+
+
+class UpdateAutoscaleResponse(SuccessResponse):
+    """Response for autoscale update operation."""
+
+    namespace: str
+    release_name: str
+    autoscale_enabled: bool
+    message: str

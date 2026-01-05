@@ -19,9 +19,10 @@
 from typing import Any, Dict, Union
 
 from budmicroframe.commons import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from opentelemetry.propagate import extract
 
 from budprompt.commons.exceptions import OpenAIResponseException
 
@@ -56,6 +57,7 @@ responses_router = APIRouter(
     },
 )
 async def create_response(
+    http_request: Request,
     request: ResponseCreateRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
 ) -> Union[OpenAIResponse, OpenAIResponsesError, Dict[str, Any]]:
@@ -66,6 +68,7 @@ async def create_response(
     the provided variables.
 
     Args:
+        http_request: The FastAPI request object for accessing headers
         request: The prompt request containing id, variables, and optional version
         credentials: Optional bearer token credentials for API authentication
 
@@ -75,6 +78,11 @@ async def create_response(
     """
     logger.debug("Received response creation request: %s", request.model_dump(mode="json"))
 
+    # Extract trace context from incoming request headers for distributed tracing
+    # This enables parent-child span relationships with upstream services (e.g., budgateway)
+    carrier = dict(http_request.headers)
+    trace_context = extract(carrier)
+
     # Extract bearer token from credentials if present
     api_key = credentials.credentials if credentials else None
 
@@ -82,11 +90,12 @@ async def create_response(
     service = ResponsesService()
 
     try:
-        # Execute the prompt with optional authorization
+        # Execute the prompt with optional authorization and trace context
         result = await service.execute_prompt(
             prompt_params=request.prompt,
             input=request.input,
             api_key=api_key,
+            trace_context=trace_context,
         )
         return result
 

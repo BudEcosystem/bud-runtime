@@ -30,7 +30,7 @@ def test_get_node_status(config: dict):
 
 def test_get_deployment_status(config: dict, namespace: str, ingress_url: Optional[str] = None):
     kubernetes_cluster_handler = KubernetesHandler(config, ingress_url)
-    status = kubernetes_cluster_handler.get_deployment_status({"namespace": namespace}, cloud_model=True)
+    status = kubernetes_cluster_handler.get_deployment_status({"namespace": namespace})
     print(status)
 
 def test_get_pod_status(config: dict, namespace: str, pod_name: str):
@@ -58,5 +58,5 @@ if __name__ == "__main__":
     # print(node_status)
     namespace = "bud-shef-49db673e"
     # test_get_deployment_status(config, namespace, ingress_url)
-    pod_name = "litellm-container-77894d8586-7vz9v"
+    pod_name = "bud-runtime-container-77894d8586-7vz9v"
     test_get_pod_status(config, namespace, pod_name)

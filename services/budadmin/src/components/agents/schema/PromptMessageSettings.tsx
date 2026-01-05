@@ -9,7 +9,7 @@ import { TextAreaInput } from "../../ui/input";
 
 interface PromptMessage {
   id: string;
-  role: 'system' | 'user' | 'assistant';
+  role: 'user' | 'assistant';
   content: string;
 }
 
@@ -39,7 +39,7 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
     }
     return [{
       id: `msg_${Date.now()}`,
-      role: 'system',
+      role: 'user',
       content: ''
     }];
   });
@@ -53,7 +53,7 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
       if (!promptMessages || promptMessages === '[]' || promptMessages === '') {
         const defaultMessage: PromptMessage = {
           id: `msg_${Date.now()}`,
-          role: 'system',
+          role: 'user',
           content: ''
         };
         setMessages([defaultMessage]);
@@ -67,7 +67,7 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
         if (parsedMessages.length === 0) {
           const defaultMessage: PromptMessage = {
             id: `msg_${Date.now()}`,
-            role: 'system',
+            role: 'user',
             content: ''
           };
           setMessages([defaultMessage]);
@@ -180,7 +180,6 @@ export const PromptMessageSettings: React.FC<PromptMessageSettingsProps> = ({
                       onChange={(value) => handleMessageChange(message.id, 'role', value)}
                       placeholder="Select role"
                       options={[
-                        { value: 'system', label: 'System' },
                         { value: 'user', label: 'User' },
                         { value: 'assistant', label: 'Assistant' }
                       ]}

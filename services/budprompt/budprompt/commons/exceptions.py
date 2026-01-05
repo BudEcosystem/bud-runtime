@@ -19,8 +19,6 @@
 from http import HTTPStatus
 from typing import Any, Dict, Optional
 
-from budmicroframe.commons.exceptions import ClientException as BudMicroframeClientException
-
 
 class BaseException(Exception):
     """Base exception class for BudPrompt."""
@@ -93,13 +91,27 @@ class RedisException(BaseException):
     pass
 
 
-class ClientException(BudMicroframeClientException):
+class ClientException(Exception):
+    """A custom exception class for client-related errors.
+
+    This exception can be raised when client requests fail or encounter issues.
+
+    Attributes:
+        message (str): A human-readable string describing the error.
+        status_code (int): HTTP status code for the error.
+        params (dict): Optional additional parameters.
+    """
+
     def __init__(self, message: str, status_code: int = 400, params: Optional[Dict[str, Any]] = None):
         """Initialize the ClientException with a message."""
         self.message = message
         self.status_code = status_code
         self.params = params
-        super().__init__(self.message, self.status_code)
+        super().__init__(self.message)
+
+    def __str__(self):
+        """Return just the message (no class name prefix for cleaner OTEL traces)."""
+        return self.message
 
 
 class OpenAIResponseException(Exception):

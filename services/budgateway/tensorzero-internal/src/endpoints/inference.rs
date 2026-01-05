@@ -117,6 +117,9 @@ pub struct Params {
     /// The original request received by the gateway from the client
     #[serde(skip)]
     pub gateway_request: Option<String>,
+    /// Span for recording observability attributes (for streaming)
+    #[serde(skip)]
+    pub observability_span: Option<tracing::Span>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -154,6 +157,7 @@ struct InferenceMetadata {
     pub extra_headers: UnfilteredInferenceExtraHeaders,
     pub observability_metadata: Option<ObservabilityMetadata>,
     pub gateway_request: Option<String>,
+    pub observability_span: Option<tracing::Span>,
 }
 
 pub type InferenceCredentials = HashMap<String, SecretString>;
@@ -659,6 +663,7 @@ pub async fn inference(
                     .gateway_request
                     .clone()
                     .or(model_used_info.gateway_request),
+                observability_span: params.observability_span.clone(),
             };
 
             // Only use batcher for async writes; sync writes need direct ClickHouse access
@@ -922,6 +927,7 @@ fn create_stream(
                 extra_headers,
                 observability_metadata,
                 gateway_request,
+                observability_span,
             } = metadata;
 
             let config = config.clone();
@@ -967,6 +973,56 @@ fn create_stream(
                         extra_body,
                         extra_headers,
                     };
+
+                    // Record observability span attributes for streaming
+                    if let Some(ref span) = observability_span {
+                        let _guard = span.enter();
+                        crate::endpoints::observability::record_resolved_input(&input);
+                        crate::endpoints::observability::record_metadata(&write_metadata);
+                        crate::endpoints::observability::record_inference_result(&inference_response);
+
+                        // Record model inference span attributes for streaming
+                        match &inference_response {
+                            InferenceResult::Chat(chat_result) => {
+                                crate::endpoints::observability::record_model_inference(
+                                    &chat_result.model_inference_results,
+                                    &chat_result.inference_id,
+                                );
+                            }
+                            InferenceResult::Json(json_result) => {
+                                crate::endpoints::observability::record_model_inference(
+                                    &json_result.model_inference_results,
+                                    &json_result.inference_id,
+                                );
+                            }
+                            _ => {}
+                        }
+
+                        // Record ModelInferenceDetails for streaming success
+                        if let Some(ref obs_metadata) = observability_metadata {
+                            let inference_id = match &inference_response {
+                                InferenceResult::Chat(chat_result) => chat_result.inference_id,
+                                InferenceResult::Json(json_result) => json_result.inference_id,
+                                _ => uuid::Uuid::nil(),
+                            };
+                            let now = chrono::Utc::now();
+                            crate::endpoints::observability::record_model_inference_details(
+                                &inference_id,
+                                &obs_metadata.project_id,
+                                &obs_metadata.endpoint_id,
+                                &obs_metadata.model_id,
+                                true, // is_success
+                                now,  // request_arrival_time (approximate)
+                                now,  // request_forward_time (approximate)
+                                None, // cost
+                                obs_metadata.api_key_id.as_deref(),
+                                obs_metadata.user_id.as_deref(),
+                                obs_metadata.api_key_project_id.as_deref(),
+                                None, // no error for success
+                            );
+                        }
+                    }
+
                     let config = config.clone();
 
                         let clickhouse_connection_info = clickhouse_connection_info.clone();
@@ -2271,6 +2327,7 @@ mod tests {
             extra_headers: Default::default(),
             observability_metadata: None,
             gateway_request: None,
+            observability_span: None,
         };
 
         let result = prepare_response_chunk(&inference_metadata, chunk).unwrap();
@@ -2324,6 +2381,7 @@ mod tests {
             extra_headers: Default::default(),
             observability_metadata: None,
             gateway_request: None,
+            observability_span: None,
         };
 
         let result = prepare_response_chunk(&inference_metadata, chunk).unwrap();

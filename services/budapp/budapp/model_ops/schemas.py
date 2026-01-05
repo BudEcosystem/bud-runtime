@@ -51,7 +51,14 @@ from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Ta
 from budapp.user_ops.schemas import UserInfo
 
 from ..commons.config import app_settings
-from ..commons.constants import ModelLicenseObjectTypeEnum, ScalingMetricEnum, ScalingTypeEnum
+from ..commons.constants import (
+    BudScalerCloudProviderEnum,
+    BudScalerFederationModeEnum,
+    BudScalerMetricSourceTypeEnum,
+    BudScalerSpotPreferenceEnum,
+    BudScalerStrategyEnum,
+    ModelLicenseObjectTypeEnum,
+)
 from ..commons.helpers import validate_icon
 from ..commons.schemas import BudNotificationMetadata
 from ..shared.minio_store import ModelStore
@@ -1047,18 +1054,130 @@ class DeploymentTemplateCreate(BaseModel):
         return self
 
 
-class ScalingSpecification(BaseModel):
-    """Scaling specification schema."""
+# BudAIScaler Configuration Schemas
+
+
+class BudScalerMetricSource(BaseModel):
+    """Metric source configuration for BudAIScaler."""
+
+    type: BudScalerMetricSourceTypeEnum = Field(...)
+    protocolType: str | None = Field(default="http")
+    port: str | None = Field(default="9090")
+    path: str | None = Field(default="/metrics")
+    targetMetric: str | None = None
+    targetValue: str | None = None
+    address: str | None = None  # For prometheus type
+    query: str | None = None  # For prometheus type
+
+
+class BudScalerGPUConfig(BaseModel):
+    """GPU-aware scaling configuration."""
 
     enabled: bool = Field(default=False)
-    scalingType: ScalingTypeEnum = Field(...)
-    scalingMetric: ScalingMetricEnum = Field(...)
-    scalingValue: int = Field(ge=0)
-    minReplicas: int = Field(ge=1)
-    maxReplicas: int = Field(ge=1)
-    scaleUpTolerance: float = Field(ge=0)
-    scaleDownTolerance: float = Field(ge=0)
-    window: int = Field(ge=1)
+    memoryThreshold: int = Field(default=80, ge=0, le=100)
+    computeThreshold: int = Field(default=80, ge=0, le=100)
+    topologyAware: bool = Field(default=False)
+    preferredGPUType: str | None = Field(default=None)
+    vGPUSupport: bool = Field(default=False)
+
+
+class BudScalerCostConfig(BaseModel):
+    """Cost-aware scaling configuration."""
+
+    enabled: bool = Field(default=False)
+    cloudProvider: BudScalerCloudProviderEnum | None = Field(default=None)
+    hourlyBudgetLimit: float = Field(default=0, ge=0)
+    dailyBudgetLimit: float = Field(default=0, ge=0)
+    spotInstancePreference: BudScalerSpotPreferenceEnum = Field(default=BudScalerSpotPreferenceEnum.NONE)
+
+
+class BudScalerPredictionConfig(BaseModel):
+    """Predictive scaling configuration."""
+
+    enabled: bool = Field(default=False)
+    lookAheadMinutes: int = Field(default=15, ge=1, le=60)
+    historyDays: int = Field(default=7, ge=1, le=90)
+    minConfidence: float = Field(default=0.7, ge=0, le=1)
+    predictionMetrics: List[str] = Field(default_factory=list)
+
+
+class BudScalerScheduleHint(BaseModel):
+    """Schedule-based scaling hint."""
+
+    name: str = Field(...)
+    cronExpression: str = Field(...)
+    targetReplicas: int = Field(..., ge=0)
+    duration: str | None = Field(default=None)
+
+
+class BudScalerFailoverThreshold(BaseModel):
+    """Failover threshold configuration."""
+
+    healthCheckFailures: int = Field(default=3, ge=1)
+    latencyMs: int = Field(default=5000, ge=100)
+
+
+class BudScalerMultiClusterConfig(BaseModel):
+    """Multi-cluster federation configuration."""
+
+    enabled: bool = Field(default=False)
+    federationMode: BudScalerFederationModeEnum = Field(default=BudScalerFederationModeEnum.ACTIVE_PASSIVE)
+    clusterWeights: Dict[str, int] = Field(default_factory=dict)
+    failoverThresholds: BudScalerFailoverThreshold = Field(default_factory=BudScalerFailoverThreshold)
+
+
+class BudScalerScalePolicy(BaseModel):
+    """Scaling policy for scale up/down."""
+
+    type: str = Field(default="Percent")  # Percent or Pods
+    value: int = Field(default=100, ge=0)
+    periodSeconds: int = Field(default=15, ge=1)
+
+
+class BudScalerScaleConfig(BaseModel):
+    """Scale up/down configuration."""
+
+    stabilizationWindowSeconds: int = Field(default=0, ge=0)
+    policies: List[BudScalerScalePolicy] = Field(default_factory=list)
+    selectPolicy: str = Field(default="Max")  # Max, Min, Disabled
+
+
+class BudScalerBehavior(BaseModel):
+    """Scaling behavior configuration."""
+
+    scaleUp: BudScalerScaleConfig = Field(
+        default_factory=lambda: BudScalerScaleConfig(
+            stabilizationWindowSeconds=0,
+            policies=[
+                BudScalerScalePolicy(type="Percent", value=100, periodSeconds=15),
+                BudScalerScalePolicy(type="Pods", value=4, periodSeconds=15),
+            ],
+            selectPolicy="Max",
+        )
+    )
+    scaleDown: BudScalerScaleConfig = Field(
+        default_factory=lambda: BudScalerScaleConfig(
+            stabilizationWindowSeconds=300,
+            policies=[BudScalerScalePolicy(type="Percent", value=100, periodSeconds=15)],
+            selectPolicy="Min",
+        )
+    )
+
+
+class BudAIScalerSpecification(BaseModel):
+    """BudAIScaler specification schema for new autoscaling standard."""
+
+    enabled: bool = Field(default=False)
+    minReplicas: int = Field(default=1, ge=0)
+    maxReplicas: int = Field(default=10, ge=1)
+    scalingStrategy: BudScalerStrategyEnum = Field(default=BudScalerStrategyEnum.BUD_SCALER)
+    metricsSources: List[BudScalerMetricSource] = Field(default_factory=list)
+    gpuConfig: BudScalerGPUConfig = Field(default_factory=BudScalerGPUConfig)
+    costConfig: BudScalerCostConfig = Field(default_factory=BudScalerCostConfig)
+    predictionConfig: BudScalerPredictionConfig = Field(default_factory=BudScalerPredictionConfig)
+    scheduleHints: List[BudScalerScheduleHint] = Field(default_factory=list)
+    multiCluster: BudScalerMultiClusterConfig = Field(default_factory=BudScalerMultiClusterConfig)
+    behavior: BudScalerBehavior = Field(default_factory=BudScalerBehavior)
 
 
 class ModelDeployStepRequest(BaseModel):
@@ -1075,7 +1194,8 @@ class ModelDeployStepRequest(BaseModel):
     endpoint_name: str | None = Field(None, min_length=1, max_length=100)
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
-    scaling_specification: ScalingSpecification | None = None
+    # BudAIScaler specification
+    budaiscaler_specification: BudAIScalerSpecification | None = None
     # Hardware resource mode (dedicated vs shared/time-slicing)
     hardware_mode: Literal["dedicated", "shared"] | None = Field(default=None)
     # Parser configuration options
@@ -1149,7 +1269,8 @@ class DeploymentWorkflowStepData(BaseModel):
     template_id: UUID4 | None = None
     deploy_config: DeploymentTemplateCreate | None = None
     credential_id: UUID4 | None = None
-    scaling_specification: ScalingSpecification | None = None
+    # BudAIScaler specification
+    budaiscaler_specification: BudAIScalerSpecification | None = None
     # Hardware resource mode (dedicated vs shared/time-slicing)
     hardware_mode: Literal["dedicated", "shared"] | None = None
     enable_tool_calling: bool | None = None
@@ -1182,7 +1303,8 @@ class ModelDeploymentRequest(BaseModel):
     notification_metadata: BudNotificationMetadata
     source_topic: str
     credential_id: UUID4 | None = None
-    podscaler: ScalingSpecification | None = None
+    # BudAIScaler specification
+    budaiscaler: BudAIScalerSpecification | None = None
     provider: str | None = None
     # User preferences for parser features
     enable_tool_calling: bool | None = None

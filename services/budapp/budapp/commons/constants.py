@@ -608,6 +608,7 @@ class WorkflowTypeEnum(StrEnum):
     GUARDRAIL_DEPLOYMENT = auto()
     PROMPT_CREATION = auto()
     PROMPT_SCHEMA_CREATION = auto()
+    TOOL_CREATION = auto()
 
 
 class NotificationType(Enum):
@@ -691,6 +692,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     EVALUATION_EVENTS = "evaluation_events"
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
+    TOOL_CREATION_EVENTS = "tool_creation_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -777,24 +779,48 @@ class AdapterStatusEnum(StrEnum):
     PENDING = auto()
 
 
-class ScalingTypeEnum(StrEnum):
-    """Scaling type types."""
+class BudScalerStrategyEnum(StrEnum):
+    """BudAIScaler scaling strategy types."""
 
-    METRIC = auto()
-    OPTIMIZER = auto()
+    HPA = "HPA"
+    KPA = "KPA"
+    BUD_SCALER = "BudScaler"
 
 
-class ScalingMetricEnum(StrEnum):
-    """Scaling metric types."""
+class BudScalerMetricSourceTypeEnum(StrEnum):
+    """BudAIScaler metric source types."""
 
-    # LLM metrics (vLLM, SGLang)
-    TIME_TO_FIRST_TOKENS_SECONDS = "bud:time_to_first_token_seconds_average"
-    E2E_REQUEST_LATENCY_SECONDS = "bud:e2e_request_latency_seconds_average"
-    GPU_CACHE_USAGE_PERC = "bud:gpu_cache_usage_perc_average"
-    TIME_PER_OUTPUT_TOKEN_SECONDS = "bud:time_per_output_token_seconds_average"
-    # Embedding metrics (LatentBud)
-    EMBEDDING_BATCH_QUEUE_SIZE = "embedding_batch_queue_size"
-    EMBEDDING_REQUESTS_ACTIVE = "embedding_requests_active"
+    POD = "pod"
+    RESOURCE = "resource"
+    PROMETHEUS = "prometheus"
+    INFERENCE_ENGINE = "inferenceEngine"
+    CUSTOM = "custom"
+    EXTERNAL = "external"
+
+
+class BudScalerCloudProviderEnum(StrEnum):
+    """Cloud provider types for BudAIScaler cost configuration."""
+
+    AWS = "aws"
+    AZURE = "azure"
+    GCP = "gcp"
+    ON_PREMISES = "on-premises"
+
+
+class BudScalerSpotPreferenceEnum(StrEnum):
+    """Spot instance preference for BudAIScaler cost configuration."""
+
+    NONE = "none"
+    PREFER = "prefer"
+    REQUIRE = "require"
+
+
+class BudScalerFederationModeEnum(StrEnum):
+    """Multi-cluster federation mode for BudAIScaler."""
+
+    ACTIVE_PASSIVE = "active-passive"
+    ACTIVE_ACTIVE = "active-active"
+    WEIGHTED = "weighted"
 
 
 class ProxyProviderEnum(StrEnum):
@@ -1021,6 +1047,9 @@ BUD_RESET_PASSWORD_WORKFLOW = "bud-reset-password"
 # BudPrompt API key location for proxy cache
 BUD_PROMPT_API_KEY_LOCATION = "dynamic::authorization"
 
+# Helm release names for deployment
+BUD_RUNTIME_CONTAINER_RELEASE_NAME = "bud-runtime-container"
+
 
 class NotificationStatus(Enum):
     """Enumerate notification statuses."""
@@ -1092,6 +1121,7 @@ APP_ICONS = {
         "deployment_mono": "icons/general/deployment_mono.png",
         "default_url_model": "icons/general/default_url_model.png",
         "default_disk_model": "icons/general/default_disk_model.png",
+        "tools": "icons/general/tools.png",
     },
     "providers": {"default_hugging_face_model": "icons/providers/huggingface.png"},
 }
@@ -3068,6 +3098,7 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
     WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
     WorkflowTypeEnum.MODEL_BENCHMARK: "Successfully cancelled benchmark.",
+    WorkflowTypeEnum.TOOL_CREATION: "Successfully cancelled tool creation.",
 }
 
 

@@ -104,7 +104,7 @@ impl From<ErrorDetails> for Error {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, strum::AsRefStr)]
 pub enum ErrorDetails {
     AllVariantsFailed {
         errors: HashMap<String, Error>,

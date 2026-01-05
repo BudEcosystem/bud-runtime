@@ -91,8 +91,8 @@ python scripts/initialize_db.py
 
 **charts/**: Helm charts for Kubernetes deployments
 - `bud_runtime_container`: Model serving runtime
-- `node_info_collector`: Hardware detection daemon
-- `litellm_container`: LLM proxy server
+- `nfd`: Node Feature Discovery for hardware detection
+- `prometheus-stack`: Metrics collection
 
 **playbooks/**: Ansible automation
 - Deploy/delete runtimes and components

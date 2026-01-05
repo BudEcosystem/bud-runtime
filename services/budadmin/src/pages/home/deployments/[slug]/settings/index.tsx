@@ -20,6 +20,7 @@ import TextInput from "src/flows/components/TextInput";
 import { BudDropdownMenu } from "@/components/ui/dropDown";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useConfirmAction } from "src/hooks/useConfirmAction";
+import AutoscaleSettings from "./AutoscaleSettings";
 
 const capitalize = (str: string) =>
   str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
@@ -756,6 +757,12 @@ const DeploymentSettings: React.FC = () => {
           </div>
         </Form>
       </BudFormContext.Provider>
+
+      {/* Autoscaling Section - Outside the form as it has its own save logic */}
+      <AutoscaleSettings
+        deploymentId={deploymentId as string}
+        projectId={projectId as string}
+      />
     </div>
   );
 };

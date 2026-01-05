@@ -159,7 +159,8 @@ microservices:
   budgateway:
     enabled: true
     image: budstudio/budgateway:0.4.8
-    env: {}
+    env:
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4317"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration for budgateway
@@ -247,7 +248,6 @@ microservices:
       QUANTIZATION_JOB_IMAGE: budimages.azurecr.io/budecosystem/bud-quantization-cpu:0.02
       ENGINE_CONTAINER_PORT: "8000"
       REGISTRY_SERVER: https://budimages.azurecr.io
-      LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       # Metrics collection configuration
       METRICS_COLLECTION_ENABLED: "true"
       METRICS_COLLECTION_TIMEOUT: "30"
@@ -332,6 +332,8 @@ microservices:
       REDIS_PORT: "6379"
       REDIS_DB_INDEX: "10"
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
+      OTEL_SDK_DISABLED: "false"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     nodeSelector: {}
     affinity: {}
   global:
@@ -378,7 +380,6 @@ microservices:
       GLOBAL_CONTEXT_PATH: ""
       IS_MULTI_TENANCY_ENABLED: "true"
       IS_TOPIC_NOTIFICATION_ENABLED: "true"
-      LITELLM_PROXY_SERVER_IMAGE: ghcr.io/berriai/litellm:main-latest
       LOG_LEVEL: INFO
       MINIO_ACCESS_KEY: "{{ .Values.minio.auth.rootUser }}"
       MINIO_BUCKET: models-registry

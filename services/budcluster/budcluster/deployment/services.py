@@ -61,6 +61,8 @@ from .schemas import (
     DeploymentRecordUpdate,
     DeploymentStatusEnum,
     DeployQuantizationRequest,
+    UpdateAutoscaleRequest,
+    UpdateAutoscaleResponse,
     WorkerData,
     WorkerInfo,
     WorkerStatusEnum,
@@ -72,9 +74,7 @@ logger = get_logger(__name__)
 
 class DeploymentOpsService:
     @classmethod
-    async def update_deployment_status(
-        cls, cluster_id: UUID, deployment_name: str, cloud_model: bool = False, workflow_id: str = None
-    ):
+    async def update_deployment_status(cls, cluster_id: UUID, deployment_name: str, workflow_id: str = None):
         """Update the status of a deployment."""
         # get deployment from budapp
         with DBSession() as session:
@@ -86,7 +86,7 @@ class DeploymentOpsService:
             # if deployment exists, get deployment status
         # if deployment does not exist, return None
         status = DeploymentHandler(config=db_cluster.config_file_dict).get_deployment_status(
-            deployment_name, db_cluster.ingress_url, cloud_model=cloud_model
+            deployment_name, db_cluster.ingress_url
         )
         status["deployment_name"] = deployment_name
         # if deployment status is not same as current status
@@ -388,10 +388,8 @@ class DeploymentOpsService:
             # Get deployment status from K8s
             deployment_handler = DeploymentHandler(config=config_dict)
             try:
-                # Determine if cloud model (default to False for periodic sync)
-                cloud_model = False
                 deployment_status = await deployment_handler.get_deployment_status_async(
-                    deployment_name, ingress_url, cloud_model=cloud_model, platform=platform, check_pods=check_pods
+                    deployment_name, ingress_url, platform=platform, check_pods=check_pods
                 )
                 logger.debug(f"Deployment {deployment_key} status: {deployment_status}")
                 current_replica = deployment_status.get("replicas", {}).get("total", 0)
@@ -518,41 +516,6 @@ class DeploymentService(SessionMixin):
             {"id": cluster_id}, missing_ok=missing_ok
         )
 
-    def _is_cloud_deployment(self, deployment: DeploymentCreateRequest) -> bool:
-        """Determine if deployment is for cloud model based on provider and credential_id.
-
-        Args:
-            deployment: The deployment request object
-
-        Returns:
-            bool: True if this is a cloud deployment, False for local deployment
-        """
-        # Cloud deployment indicators:
-        # 1. Provider is explicitly a cloud provider (not HUGGING_FACE, URL, DISK)
-        # 2. Credential ID is required and provided for cloud models
-
-        cloud_providers = {"OPENAI", "ANTHROPIC", "AZURE_OPENAI", "BEDROCK", "COHERE", "GROQ"}
-        local_providers = {"HUGGING_FACE", "URL", "DISK"}
-
-        if deployment.provider:
-            provider_upper = deployment.provider.upper()
-            if provider_upper in cloud_providers:
-                logger.debug(f"Detected cloud provider: {deployment.provider}")
-                return True
-            elif provider_upper in local_providers:
-                logger.debug(f"Detected local provider: {deployment.provider}")
-                return False
-
-        # Fallback: If credential_id is provided and required, it's likely a cloud deployment
-        # But for local models (especially HuggingFace), credential_id can be None
-        if deployment.credential_id is not None:
-            logger.debug("Credential ID provided - checking if cloud deployment")
-            # Additional validation could be added here to check if credential is for cloud service
-            return deployment.provider not in local_providers if deployment.provider else True
-
-        logger.debug("No cloud provider detected and no credential_id - treating as local deployment")
-        return False
-
     async def create_deployment(
         self, deployment: DeploymentCreateRequest
     ) -> Union[WorkflowMetadataResponse, ErrorResponse]:
@@ -571,16 +534,7 @@ class DeploymentService(SessionMixin):
             logger.error(f"Cluster not found for id: {deployment.cluster_id}")
             raise Exception("Cluster not found")
 
-        from .workflows import CreateDeploymentWorkflow, CreateCloudDeploymentWorkflow  # noqa: I001
-
-        # Determine deployment type based on provider and credential_id
-        is_cloud_deployment = self._is_cloud_deployment(deployment)
-
-        logger.info(
-            f"Deployment type detection - Provider: {deployment.provider}, "
-            f"Credential ID: {deployment.credential_id}, "
-            f"Cloud deployment: {is_cloud_deployment}"
-        )
+        from .workflows import CreateDeploymentWorkflow
 
         # Create sanitized version for logging - exclude sensitive fields
         sanitized_fields = {
@@ -596,12 +550,7 @@ class DeploymentService(SessionMixin):
         }
         logger.info(f"Deployment request (sanitized): {sanitized_fields}")
 
-        if is_cloud_deployment:
-            logger.info("Routing to cloud deployment workflow")
-            response = await CreateCloudDeploymentWorkflow().__call__(deployment)
-        else:
-            logger.info("Routing to local deployment workflow")
-            response = await CreateDeploymentWorkflow().__call__(deployment)
+        response = await CreateDeploymentWorkflow().__call__(deployment)
 
         return response
 
@@ -630,6 +579,59 @@ class DeploymentService(SessionMixin):
             # Return ErrorResponse instead of raising it since it's not an Exception
             return ErrorResponse(message=str(e))
         return response
+
+    async def update_autoscale_config(
+        self, update_request: UpdateAutoscaleRequest
+    ) -> Union[UpdateAutoscaleResponse, ErrorResponse]:
+        """Update autoscale configuration for an existing deployment.
+
+        Args:
+            update_request: The autoscale update request containing cluster_id, namespace,
+                           release_name, and budaiscaler configuration.
+
+        Returns:
+            UpdateAutoscaleResponse: Success response with updated autoscale status.
+            ErrorResponse: If cluster not found or update fails.
+        """
+        logger.info(
+            f"Updating autoscale config for cluster {update_request.cluster_id}, "
+            f"namespace {update_request.namespace}, release {update_request.release_name}"
+        )
+
+        # Get cluster details
+        db_cluster = await self._get_cluster(update_request.cluster_id, missing_ok=True)
+        if db_cluster is None:
+            logger.error(f"Cluster not found for id: {update_request.cluster_id}")
+            return ErrorResponse(message="Cluster not found")
+
+        try:
+            # Convert BudAIScalerConfig to dict if needed
+            budaiscaler_dict = (
+                update_request.budaiscaler.model_dump()
+                if hasattr(update_request.budaiscaler, "model_dump")
+                else update_request.budaiscaler
+            )
+
+            # Use the deployment handler to update autoscale configuration
+            handler = DeploymentHandler(config=db_cluster.config_file_dict)
+            status, message = await handler.update_autoscale(
+                namespace=update_request.namespace,
+                release_name=update_request.release_name,
+                budaiscaler=budaiscaler_dict,
+                engine_type=update_request.engine_type,
+                platform=db_cluster.platform,
+            )
+
+            return UpdateAutoscaleResponse(
+                namespace=update_request.namespace,
+                release_name=update_request.release_name,
+                autoscale_enabled=budaiscaler_dict.get("enabled", False),
+                message=message,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error updating autoscale configuration: {e}")
+            return ErrorResponse(message=f"Failed to update autoscale configuration: {str(e)}")
 
     @staticmethod
     def get_deployment_eta(

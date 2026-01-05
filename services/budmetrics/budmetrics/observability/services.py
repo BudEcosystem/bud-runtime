@@ -43,6 +43,12 @@ from budmetrics.observability.schemas import (
     PerformanceMetric,
     PeriodBin,
     TimeMetric,
+    TraceDetailResponse,
+    TraceEvent,
+    TraceItem,
+    TraceLink,
+    TraceListResponse,
+    TraceResourceType,
     UserUsageItem,
 )
 
@@ -880,6 +886,232 @@ class ObservabilityMetricsService:
             offset=request.offset,
             limit=request.limit,
             has_more=has_more,
+        )
+
+    async def list_traces(
+        self,
+        resource_type: TraceResourceType,
+        resource_id: str,
+        project_id: UUID,
+        from_date: datetime,
+        to_date: datetime,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> TraceListResponse:
+        """List OTel traces filtered by resource type/id and project_id.
+
+        Queries the otel_traces table for root spans (gateway_analytics)
+        that match the specified resource and project.
+
+        Args:
+            resource_type: Type of resource to filter by (TraceResourceType enum)
+            resource_id: ID of the resource to filter by
+            project_id: Project ID to filter by
+            from_date: Start date for filtering
+            to_date: End date for filtering
+            offset: Pagination offset
+            limit: Number of results to return
+
+        Returns:
+            TraceListResponse with paginated trace data
+        """
+        await self.initialize()
+
+        # Build the attribute key dynamically (e.g., 'gateway_analytics.prompt_id')
+        # resource_type.value is safe because it comes from the TraceResourceType enum
+        resource_attr_key = f"gateway_analytics.{resource_type.value}_id"
+
+        # Build params dict
+        params = {
+            "resource_id": resource_id,
+            "project_id": str(project_id),
+            "from_date": from_date,
+            "to_date": to_date,
+            "offset": offset,
+            "limit": limit,
+        }
+
+        # Count query for pagination
+        # Note: resource_attr_key is safe because it's validated against whitelist
+        count_query = f"""
+        SELECT count() as total_count
+        FROM otel_traces
+        WHERE Timestamp >= %(from_date)s
+          AND Timestamp <= %(to_date)s
+          AND ParentSpanId = ''
+          AND SpanName = 'gateway_analytics'
+          AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
+          AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
+        """  # nosec B608
+
+        count_result = await self.clickhouse_client.execute_query(count_query, params)
+        total_count = count_result[0][0] if count_result else 0
+
+        # Data query
+        # Note: resource_attr_key is safe because it's validated against whitelist
+        data_query = f"""
+        SELECT *
+        FROM otel_traces
+        WHERE Timestamp >= %(from_date)s
+          AND Timestamp <= %(to_date)s
+          AND ParentSpanId = ''
+          AND SpanName = 'gateway_analytics'
+          AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
+          AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
+        ORDER BY Timestamp DESC
+        LIMIT %(limit)s OFFSET %(offset)s
+        """  # nosec B608
+
+        results = await self.clickhouse_client.execute_query(data_query, params)
+
+        # Transform rows to TraceItem objects
+        # Column indices based on otel_traces table:
+        # 0: Timestamp, 1: TraceId, 2: SpanId, 3: ParentSpanId, 4: TraceState,
+        # 5: SpanName, 6: SpanKind, 7: ServiceName, 8: ResourceAttributes,
+        # 9: ScopeName, 10: ScopeVersion, 11: SpanAttributes, 12: Duration,
+        # 13: StatusCode, 14: StatusMessage, 15: Events.Timestamp, 16: Events.Name,
+        # 17: Events.Attributes, 18: Links.TraceId, 19: Links.SpanId,
+        # 20: Links.TraceState, 21: Links.Attributes
+        items = []
+        for row in results:
+            # Build events list (columns 15, 16, 17)
+            events = []
+            if row[15] and row[16]:
+                for i in range(len(row[15])):
+                    events.append(
+                        TraceEvent(
+                            timestamp=row[15][i],
+                            name=row[16][i],
+                            attributes=dict(row[17][i]) if row[17] and i < len(row[17]) else {},
+                        )
+                    )
+
+            # Build links list (columns 18, 19, 20, 21)
+            links = []
+            if row[18] and row[19]:
+                for i in range(len(row[18])):
+                    links.append(
+                        TraceLink(
+                            trace_id=row[18][i],
+                            span_id=row[19][i] if i < len(row[19]) else "",
+                            trace_state=row[20][i] if row[20] and i < len(row[20]) else "",
+                            attributes=dict(row[21][i]) if row[21] and i < len(row[21]) else {},
+                        )
+                    )
+
+            items.append(
+                TraceItem(
+                    timestamp=row[0],
+                    trace_id=row[1],
+                    span_id=row[2],
+                    parent_span_id=row[3] or "",
+                    trace_state=row[4] or "",
+                    span_name=row[5],
+                    span_kind=row[6],
+                    service_name=row[7],
+                    resource_attributes=dict(row[8]) if row[8] else {},
+                    scope_name=row[9] or "",
+                    scope_version=row[10] or "",
+                    span_attributes=dict(row[11]) if row[11] else {},
+                    duration=row[12],
+                    status_code=row[13],
+                    status_message=row[14] or "",
+                    events=events,
+                    links=links,
+                )
+            )
+
+        return TraceListResponse(
+            items=items,
+            total_count=total_count,
+            offset=offset,
+            limit=limit,
+        )
+
+    async def get_trace(self, trace_id: str) -> TraceDetailResponse:
+        """Get all spans for a single trace.
+
+        Queries the otel_traces table for all spans matching the trace_id.
+
+        Args:
+            trace_id: The trace ID to retrieve
+
+        Returns:
+            TraceDetailResponse with all spans for the trace
+        """
+        await self.initialize()
+
+        query = """
+        SELECT *
+        FROM otel_traces
+        WHERE TraceId = %(trace_id)s
+        ORDER BY Timestamp ASC
+        """
+
+        params = {"trace_id": trace_id}
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Transform rows to TraceItem objects
+        # Column indices based on otel_traces table:
+        # 0: Timestamp, 1: TraceId, 2: SpanId, 3: ParentSpanId, 4: TraceState,
+        # 5: SpanName, 6: SpanKind, 7: ServiceName, 8: ResourceAttributes,
+        # 9: ScopeName, 10: ScopeVersion, 11: SpanAttributes, 12: Duration,
+        # 13: StatusCode, 14: StatusMessage, 15: Events.Timestamp, 16: Events.Name,
+        # 17: Events.Attributes, 18: Links.TraceId, 19: Links.SpanId,
+        # 20: Links.TraceState, 21: Links.Attributes
+        spans = []
+        for row in results:
+            # Build events list (columns 15, 16, 17)
+            events = []
+            if row[15] and row[16]:
+                for i in range(len(row[15])):
+                    events.append(
+                        TraceEvent(
+                            timestamp=row[15][i],
+                            name=row[16][i],
+                            attributes=dict(row[17][i]) if row[17] and i < len(row[17]) else {},
+                        )
+                    )
+
+            # Build links list (columns 18, 19, 20, 21)
+            links = []
+            if row[18] and row[19]:
+                for i in range(len(row[18])):
+                    links.append(
+                        TraceLink(
+                            trace_id=row[18][i],
+                            span_id=row[19][i] if i < len(row[19]) else "",
+                            trace_state=row[20][i] if row[20] and i < len(row[20]) else "",
+                            attributes=dict(row[21][i]) if row[21] and i < len(row[21]) else {},
+                        )
+                    )
+
+            spans.append(
+                TraceItem(
+                    timestamp=row[0],
+                    trace_id=row[1],
+                    span_id=row[2],
+                    parent_span_id=row[3] or "",
+                    trace_state=row[4] or "",
+                    span_name=row[5],
+                    span_kind=row[6],
+                    service_name=row[7],
+                    resource_attributes=dict(row[8]) if row[8] else {},
+                    scope_name=row[9] or "",
+                    scope_version=row[10] or "",
+                    span_attributes=dict(row[11]) if row[11] else {},
+                    duration=row[12],
+                    status_code=row[13],
+                    status_message=row[14] or "",
+                    events=events,
+                    links=links,
+                )
+            )
+
+        return TraceDetailResponse(
+            trace_id=trace_id,
+            spans=spans,
+            total_spans=len(spans),
         )
 
     async def get_inference_details(self, inference_id: str) -> EnhancedInferenceDetailResponse:

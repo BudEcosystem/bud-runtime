@@ -601,6 +601,10 @@ class RecommendedClusterRequest(BaseModel):
     source_topic: str
     is_proprietary_model: bool
     hardware_mode: Optional[str] = Field(default="dedicated", description="Hardware mode: dedicated or shared")
+    model_endpoints: Optional[str] = Field(
+        default=None,
+        description="Comma-separated model endpoint types (e.g., 'EMBEDDING', 'LLM') for engine selection",
+    )
 
 
 class GrafanaDashboardResponse(SuccessResponse):

@@ -2,67 +2,142 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Switch } from "antd";
+import { Switch, message } from "antd";
 import { Text_12_400_B3B3B3, Text_14_400_EEEEEE } from "@/components/ui/text";
 import DragDropUpload from "@/components/ui/DragDropUpload";
+import { useAddTool, ToolSourceType } from "@/stores/useAddTool";
 
-type TabType = "openapi-file" | "openapi-url" | "api-docs";
+type TabType = "openapi-file" | "openapi-url" | "api-docs-file" | "api-docs-url";
 
-const tabs: { id: TabType; label: string }[] = [
-  { id: "openapi-file", label: "OpenAPI File" },
-  { id: "openapi-url", label: "OpenAPI URL" },
-  { id: "api-docs", label: "API Docs" },
-];
+// Check if initial source type from step 1 is documentation-based
+const isDocumentationSource = (sourceType: ToolSourceType | null): boolean => {
+  return sourceType === ToolSourceType.API_DOCS_URL || sourceType === ToolSourceType.API_DOCS_FILE;
+};
+
+// Check if initial source type from step 1 is OpenAPI-based
+const isOpenAPISource = (sourceType: ToolSourceType | null): boolean => {
+  return sourceType === ToolSourceType.OPENAPI_URL || sourceType === ToolSourceType.OPENAPI_FILE;
+};
 
 export default function OpenAPISpecification() {
   const { openDrawerWithStep } = useDrawer();
-  const [activeTab, setActiveTab] = useState<TabType>("openapi-file");
-  const [enhanceWithAI, setEnhanceWithAI] = useState(true);
-  const [openAPIUrl, setOpenAPIUrl] = useState("");
-  const [apiDocsUrl, setApiDocsUrl] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [apiDocsFile, setApiDocsFile] = useState<File | null>(null);
 
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
+  const {
+    sourceType,
+    openApiUrl,
+    apiDocsUrl,
+    enhanceWithAi,
+    uploadedFile,
+    isLoading,
+    error,
+    setSourceType,
+    setOpenApiUrl,
+    setApiDocsUrl,
+    setEnhanceWithAi,
+    setUploadedFile,
+    updateWorkflowStep,
+    uploadFileAndCreate,
+  } = useAddTool();
+
+  // Determine which mode we're in based on step 1 selection
+  const isDocMode = isDocumentationSource(sourceType);
+  const isOpenAPIMode = isOpenAPISource(sourceType);
+
+  // Get available tabs based on step 1 selection
+  const availableTabs = useMemo(() => {
+    if (isDocMode) {
+      return [
+        { id: "api-docs-file" as TabType, label: "API Docs File" },
+        { id: "api-docs-url" as TabType, label: "API Docs URL" },
+      ];
+    }
+    // Default: OpenAPI mode
+    return [
+      { id: "openapi-file" as TabType, label: "OpenAPI File" },
+      { id: "openapi-url" as TabType, label: "OpenAPI URL" },
+    ];
+  }, [isDocMode]);
+
+  // Initialize active tab based on source type
+  const initialTab = useMemo((): TabType => {
+    if (isDocMode) {
+      return sourceType === ToolSourceType.API_DOCS_FILE ? "api-docs-file" : "api-docs-url";
+    }
+    return sourceType === ToolSourceType.OPENAPI_FILE ? "openapi-file" : "openapi-url";
+  }, [sourceType, isDocMode]);
+
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+
+  // Handle tab change - just updates local tab state, doesn't trigger API
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
   };
 
-  const handleApiDocsFileSelect = (file: File) => {
-    setApiDocsFile(file);
+  const handleFileSelect = (file: File) => {
+    setUploadedFile(file);
   };
 
   const isNextDisabled = () => {
+    if (isLoading) return true;
+
     switch (activeTab) {
       case "openapi-file":
-        return !selectedFile;
+      case "api-docs-file":
+        return !uploadedFile;
       case "openapi-url":
-        return !openAPIUrl.trim();
-      case "api-docs":
-        return !apiDocsFile && !apiDocsUrl.trim();
+        return !openApiUrl.trim();
+      case "api-docs-url":
+        return !apiDocsUrl.trim();
       default:
         return true;
     }
   };
 
-  const handleNext = () => {
-    console.log("Active tab:", activeTab);
-    console.log("Enhance with AI:", enhanceWithAI);
-    if (activeTab === "openapi-file") {
-      console.log("Selected file:", selectedFile);
-    } else if (activeTab === "openapi-url") {
-      console.log("OpenAPI URL:", openAPIUrl);
-    } else {
-      console.log("API Docs file:", apiDocsFile);
-      console.log("API Docs URL:", apiDocsUrl);
+  const handleNext = async () => {
+    try {
+      let result;
+
+      if (activeTab === "openapi-file") {
+        // OpenAPI File upload flow
+        setSourceType(ToolSourceType.OPENAPI_FILE);
+        result = await uploadFileAndCreate();
+      } else if (activeTab === "openapi-url") {
+        // OpenAPI URL flow
+        setSourceType(ToolSourceType.OPENAPI_URL);
+        result = await updateWorkflowStep(2, true);
+      } else if (activeTab === "api-docs-file") {
+        // API Docs File upload flow
+        setSourceType(ToolSourceType.API_DOCS_FILE);
+        result = await uploadFileAndCreate();
+      } else if (activeTab === "api-docs-url") {
+        // API Docs URL flow
+        setSourceType(ToolSourceType.API_DOCS_URL);
+        result = await updateWorkflowStep(2, true);
+      }
+
+      // Only navigate to next step if API call succeeded
+      if (result) {
+        openDrawerWithStep("creating-tool-status");
+      }
+    } catch (err: any) {
+      console.error("Failed to start tool creation:", err);
+      // Show error message to user
+      const errorMessage = err?.response?.data?.message || err?.message || "Failed to start tool creation";
+      message.error(errorMessage);
     }
-    openDrawerWithStep("creating-tool-status");
   };
 
   const handleBack = () => {
     openDrawerWithStep("select-tool-source");
   };
+
+  // Get title and description based on mode
+  const getTitle = () => isDocMode ? "API Documentation" : "OpenAPI Specification";
+  const getDescription = () => isDocMode
+    ? "Create MCP compatible tools using API documentation. Provide a documentation file or URL."
+    : "Create MCP compatible tools using OpenAPI Specification. Provide an OpenAPI 3.0+ file or URL.";
 
   return (
     <BudForm
@@ -72,23 +147,24 @@ export default function OpenAPISpecification() {
       onBack={handleBack}
       backText="Back"
       disableNext={isNextDisabled()}
+      drawerLoading={isLoading}
     >
       <BudWraperBox>
         <BudDrawerLayout>
           <DrawerTitleCard
-            title="Open API Specification"
-            description="Create MCP compatible tools using Open API Specification. You will be required to copy and paste Open API spec or Swagger."
+            title={getTitle()}
+            description={getDescription()}
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          {/* Tabs */}
+          {/* Tabs - dynamically generated based on step 1 selection */}
           <div className="px-[1.4rem] pt-[1.5rem]">
             <div className="flex border border-[#3F3F3F] rounded-[6px] overflow-hidden">
-              {tabs.map((tab) => (
+              {availableTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`flex-1 py-[0.6rem] px-[1rem] text-[0.75rem] transition-all ${
                     activeTab === tab.id
                       ? "bg-[#1F1F1F] text-[#EEEEEE] border-r border-[#3F3F3F]"
@@ -110,6 +186,7 @@ export default function OpenAPISpecification() {
                   onFileSelect={handleFileSelect}
                   accept=".json,.yaml,.yml"
                   title="Drag and drop your OpenAPI file here, or click to browse"
+                  selectedFile={uploadedFile}
                 />
               </div>
             )}
@@ -123,32 +200,30 @@ export default function OpenAPISpecification() {
                 <input
                   type="text"
                   placeholder="https://api.example.com/openapi.json"
-                  value={openAPIUrl}
-                  onChange={(e) => setOpenAPIUrl(e.target.value)}
+                  value={openApiUrl}
+                  onChange={(e) => setOpenApiUrl(e.target.value)}
                   className="w-full bg-transparent border border-[#3F3F3F] rounded-[6px] px-3 py-2 text-[#EEEEEE] text-[0.875rem] placeholder-[#757575] focus:outline-none focus:border-[#757575]"
                 />
               </div>
             )}
 
-            {/* API Docs Tab */}
-            {activeTab === "api-docs" && (
+            {/* API Docs File Tab */}
+            {activeTab === "api-docs-file" && (
               <div>
                 <DragDropUpload
-                  onFileSelect={handleApiDocsFileSelect}
+                  onFileSelect={handleFileSelect}
                   accept=".json,.yaml,.yml,.md,.txt"
-                  title="Drag and drop your OpenAPI file here, or click to browse"
+                  title="Drag and drop your API documentation file here, or click to browse"
+                  selectedFile={uploadedFile}
                 />
+              </div>
+            )}
 
-                {/* OR Divider */}
-                <div className="flex items-center my-[1.5rem]">
-                  <div className="flex-1 border-t border-[#3F3F3F]"></div>
-                  <Text_12_400_B3B3B3 className="px-4">OR</Text_12_400_B3B3B3>
-                  <div className="flex-1 border-t border-[#3F3F3F]"></div>
-                </div>
-
-                {/* API Docs URL */}
+            {/* API Docs URL Tab */}
+            {activeTab === "api-docs-url" && (
+              <div>
                 <Text_14_400_EEEEEE className="mb-[0.5rem]">
-                  API Docs URL
+                  API Documentation URL
                 </Text_14_400_EEEEEE>
                 <input
                   type="text"
@@ -177,8 +252,8 @@ export default function OpenAPISpecification() {
                   <path d="M2 12l10 5 10-5" />
                 </svg>
                 <Switch
-                  checked={enhanceWithAI}
-                  onChange={setEnhanceWithAI}
+                  checked={enhanceWithAi}
+                  onChange={setEnhanceWithAi}
                   size="small"
                 />
                 <Text_14_400_EEEEEE>Enhance with AI</Text_14_400_EEEEEE>

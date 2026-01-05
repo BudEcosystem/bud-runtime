@@ -193,6 +193,8 @@ class VLLMConfigProcessor(EngineConfigProcessor):
             "bud:time_to_first_token_seconds_average",
             "bud:e2e_request_latency_seconds_average",
             "bud:time_per_output_token_seconds_average",
+            "bud:num_requests_waiting",
+            "bud:num_requests_running",
         ]
 
     def supports_lora(self) -> bool:
@@ -266,11 +268,14 @@ class LatentBudConfigProcessor(EngineConfigProcessor):
 
     def get_default_autoscale_metric(self) -> str:
         """Return the default LatentBud autoscaling metric."""
-        return "embedding_batch_queue_size"
+        return "bud:infinity_queue_depth"
 
     def get_supported_autoscale_metrics(self) -> List[str]:
         """Return list of supported LatentBud autoscaling metrics."""
-        return ["embedding_batch_queue_size", "embedding_requests_active"]
+        return [
+            "bud:infinity_queue_depth",
+            "bud:infinity_embedding_latency_seconds_average",
+        ]
 
     def supports_lora(self) -> bool:
         """Return False as LatentBud does not support LoRA adapters."""
@@ -328,6 +333,8 @@ class SGLangConfigProcessor(EngineConfigProcessor):
             "bud:time_to_first_token_seconds_average",
             "bud:e2e_request_latency_seconds_average",
             "bud:time_per_output_token_seconds_average",
+            "bud:num_requests_waiting",
+            "bud:num_requests_running",
         ]
 
     def supports_lora(self) -> bool:

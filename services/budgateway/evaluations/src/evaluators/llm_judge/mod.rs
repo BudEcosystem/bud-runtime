@@ -116,6 +116,7 @@ pub async fn run_llm_judge_evaluator(
         extra_headers: Default::default(),
         observability_metadata: None,
         gateway_request: None,
+        observability_span: None,
     };
     let result = clients.tensorzero_client.inference(params).await?;
     let response = match result {

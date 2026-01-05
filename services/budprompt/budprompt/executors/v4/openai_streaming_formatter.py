@@ -238,7 +238,9 @@ class OpenAIStreamingFormatter_V4:
             >>> # Returns: "event: response.output_text.delta\ndata: {...}\n\n"
         """
         # Serialize the Pydantic model to dict
-        event_dict = event.model_dump(mode="json", exclude_none=True)
+        # NOTE: by_alias=True is critical for OpenAI SDK types with aliased fields
+        # (e.g., ResponseFormatTextJSONSchemaConfig.schema_ -> "schema")
+        event_dict = event.model_dump(mode="json", exclude_none=True, by_alias=True)
 
         # NOTE: Post-process: Convert response.created_at from float to int
         # This is necessary because Pydantic serializes nested Response objects using

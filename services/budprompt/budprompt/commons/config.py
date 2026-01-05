@@ -63,6 +63,10 @@ class AppConfig(BaseAppConfig):
     # Redis TTL Configuration
     prompt_config_redis_ttl: int = Field(default=86400, alias="PROMPT_CONFIG_REDIS_TTL")
 
+    # OpenTelemetry Configuration (standard OTEL env vars)
+    otel_sdk_disabled: bool = Field(default=True, alias="OTEL_SDK_DISABLED")
+    otel_exporter_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
+
     @property
     def redis_url(self) -> str:
         """Construct the complete Redis URL from individual components.

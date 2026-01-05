@@ -172,6 +172,148 @@ type AdapterWorkflow = {
   adapterId: string;
 };
 
+// BudAIScaler Types
+export type BudScalerMetricSource = {
+  type: "pod" | "resource" | "prometheus" | "inferenceEngine" | "custom" | "external";
+  protocolType?: string;
+  port?: string;
+  path?: string;
+  targetMetric?: string;
+  targetValue?: string;
+  address?: string;
+  query?: string;
+};
+
+export type BudScalerGPUConfig = {
+  enabled: boolean;
+  memoryThreshold: number;
+  computeThreshold: number;
+  topologyAware: boolean;
+  preferredGPUType?: string;
+  vGPUSupport: boolean;
+};
+
+export type BudScalerCostConfig = {
+  enabled: boolean;
+  cloudProvider?: "aws" | "azure" | "gcp" | "on-premises";
+  hourlyBudgetLimit: number;
+  dailyBudgetLimit: number;
+  spotInstancePreference: "none" | "prefer" | "require";
+};
+
+export type BudScalerPredictionConfig = {
+  enabled: boolean;
+  lookAheadMinutes: number;
+  historyDays: number;
+  minConfidence: number;
+  predictionMetrics: string[];
+};
+
+export type BudScalerScheduleHint = {
+  name: string;
+  cronExpression: string;
+  targetReplicas: number;
+  duration?: string;
+};
+
+export type BudScalerMultiClusterConfig = {
+  enabled: boolean;
+  federationMode: "active-passive" | "active-active" | "weighted";
+  clusterWeights: Record<string, number>;
+  failoverThresholds: {
+    healthCheckFailures: number;
+    latencyMs: number;
+  };
+};
+
+export type BudScalerScalePolicy = {
+  type: "Percent" | "Pods";
+  value: number;
+  periodSeconds: number;
+};
+
+export type BudScalerScaleConfig = {
+  stabilizationWindowSeconds: number;
+  policies: BudScalerScalePolicy[];
+  selectPolicy: "Max" | "Min" | "Disabled";
+};
+
+export type BudScalerBehavior = {
+  scaleUp: BudScalerScaleConfig;
+  scaleDown: BudScalerScaleConfig;
+};
+
+export type BudAIScalerSpecification = {
+  enabled: boolean;
+  minReplicas: number;
+  maxReplicas: number;
+  scalingStrategy: "HPA" | "KPA" | "BudScaler";
+  metricsSources: BudScalerMetricSource[];
+  gpuConfig: BudScalerGPUConfig;
+  costConfig: BudScalerCostConfig;
+  predictionConfig: BudScalerPredictionConfig;
+  scheduleHints: BudScalerScheduleHint[];
+  multiCluster: BudScalerMultiClusterConfig;
+  behavior: BudScalerBehavior;
+};
+
+// Default BudAIScaler specification
+const defaultBudAIScalerSpecification: BudAIScalerSpecification = {
+  enabled: false,
+  minReplicas: 1,
+  maxReplicas: 10,
+  scalingStrategy: "BudScaler",
+  metricsSources: [],
+  gpuConfig: {
+    enabled: false,
+    memoryThreshold: 80,
+    computeThreshold: 80,
+    topologyAware: false,
+    vGPUSupport: false,
+  },
+  costConfig: {
+    enabled: false,
+    hourlyBudgetLimit: 0,
+    dailyBudgetLimit: 0,
+    spotInstancePreference: "none",
+  },
+  predictionConfig: {
+    enabled: false,
+    lookAheadMinutes: 15,
+    historyDays: 7,
+    minConfidence: 0.7,
+    predictionMetrics: [],
+  },
+  scheduleHints: [],
+  multiCluster: {
+    enabled: false,
+    federationMode: "active-passive",
+    clusterWeights: {},
+    failoverThresholds: {
+      healthCheckFailures: 3,
+      latencyMs: 5000,
+    },
+  },
+  behavior: {
+    scaleUp: {
+      stabilizationWindowSeconds: 30,
+      policies: [
+        { type: "Percent", value: 100, periodSeconds: 15 },
+        { type: "Pods", value: 4, periodSeconds: 15 },
+      ],
+      selectPolicy: "Max",
+    },
+    scaleDown: {
+      stabilizationWindowSeconds: 300,
+      policies: [
+        { type: "Percent", value: 100, periodSeconds: 15 },
+        { type: "Pods", value: 4, periodSeconds: 15 },
+      ],
+      selectPolicy: "Min",
+    },
+  },
+};
+
 /**
  * Helper function to update workflow step data
  * Centralizes the common pattern of updating workflow steps
@@ -254,6 +396,8 @@ export const useDeployModel = create<{
     scaleDownTolerance: number;
     window: number;
   };
+  // BudAIScaler specification (new standard autoscaler)
+  budaiscalerSpecification: BudAIScalerSpecification;
   deploymentConfiguration: {
     enable_tool_calling: boolean;
     enable_reasoning: boolean;
@@ -278,6 +422,7 @@ export const useDeployModel = create<{
   setSelectedProvider: (provider: Provider) => void;
   setDeploymentSpecification: (spec: any) => void;
   setScalingSpecification: (spec: any) => void;
+  setBudAIScalerSpecification: (spec: Partial<BudAIScalerSpecification>) => void;
   setDeploymentConfiguration: (config: any) => void;
   setCloudModelDetails: (details: any) => void;
   setSelectedTemplate: (template: IDeploymentTemplate) => void;
@@ -298,6 +443,7 @@ export const useDeployModel = create<{
   updateDeploymentSpecification: () => Promise<any>;
   updateDeploymentSpecificationAndDeploy: () => Promise<any>;
   updateScalingSpecification: () => Promise<any>;
+  updateBudAIScalerSpecification: () => Promise<any>;
   updateCluster: () => Promise<any>;
   createCloudModelWorkflow: () => any;
   updateProviderType: () => any;
@@ -425,6 +571,7 @@ export const useDeployModel = create<{
     scaleDownTolerance: 0.5,
     window: 60,
   },
+  budaiscalerSpecification: { ...defaultBudAIScalerSpecification },
   deploymentConfiguration: {
     enable_tool_calling: false,
     enable_reasoning: false,
@@ -444,6 +591,14 @@ export const useDeployModel = create<{
   },
   setScalingSpecification: (spec: any) => {
     set({ scalingSpecifcation: spec });
+  },
+  setBudAIScalerSpecification: (spec: Partial<BudAIScalerSpecification>) => {
+    set((state) => ({
+      budaiscalerSpecification: {
+        ...state.budaiscalerSpecification,
+        ...spec,
+      },
+    }));
   },
   setDeploymentConfiguration: (config: any) => {
     // Merge incoming partial config with existing deploymentConfiguration
@@ -519,6 +674,7 @@ export const useDeployModel = create<{
         supports_lora: false,
         supports_pipeline_parallelism: false,
       },
+      budaiscalerSpecification: { ...defaultBudAIScalerSpecification },
       deploymentCluster: {},
       status: {},
       selectedProvider: null,
@@ -1090,6 +1246,39 @@ export const useDeployModel = create<{
       return response;
     } catch (error) {
       console.error("Error creating model:", error);
+    } finally {
+      get().endRequest();
+    }
+  },
+
+  updateBudAIScalerSpecification: async () => {
+    const workflowId = get().currentWorkflow?.workflow_id;
+    const budaiscalerSpecification = get().budaiscalerSpecification;
+    const projectId = useProjects.getState().selectedProject?.id;
+    if (!workflowId) {
+      errorToast("Please create a workflow");
+      return;
+    }
+    try {
+      const response: any = await AppRequest.Post(
+        `${tempApiBaseUrl}/models/deploy-workflow`,
+        {
+          step_number: 8,
+          trigger_workflow: true,
+          workflow_id: workflowId,
+          budaiscaler_specification: budaiscalerSpecification,
+        },
+        {
+          headers: {
+            "x-resource-type": "project",
+            "x-entity-id": projectId,
+          },
+        },
+      );
+      get().getWorkflowCloud();
+      return response;
+    } catch (error) {
+      console.error("Error updating BudAIScaler specification:", error);
     } finally {
       get().endRequest();
     }

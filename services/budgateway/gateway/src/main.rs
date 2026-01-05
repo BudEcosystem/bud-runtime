@@ -362,6 +362,10 @@ async fn main() {
         AuthenticationInfo::Disabled => openai_routes,
     };
 
+    // Enable OpenTelemetry tracing for OpenAI-compatible routes
+    // This extracts incoming traceparent headers for distributed tracing
+    let openai_routes = openai_routes.apply_otel_http_trace_layer();
+
     // Routes that don't require authentication
     let public_routes = Router::new()
         .route("/inference", post(endpoints::inference::inference_handler))

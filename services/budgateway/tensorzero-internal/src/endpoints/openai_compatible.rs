@@ -109,6 +109,44 @@ fn merge_credentials_from_headers(headers: &HeaderMap, credentials: &mut Inferen
     }
 }
 
+/// Helper function to extract ObservabilityMetadata from headers for error handler access.
+/// This duplicates the logic from the inference handler but allows access outside the async block.
+fn extract_observability_metadata_from_headers(
+    headers: &HeaderMap,
+) -> Option<super::inference::ObservabilityMetadata> {
+    let project_id = headers
+        .get("x-tensorzero-project-id")
+        .and_then(|v| v.to_str().ok())?;
+    let endpoint_id = headers
+        .get("x-tensorzero-endpoint-id")
+        .and_then(|v| v.to_str().ok())?;
+    let model_id = headers
+        .get("x-tensorzero-model-id")
+        .and_then(|v| v.to_str().ok())?;
+
+    let api_key_id = headers
+        .get("x-tensorzero-api-key-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let user_id = headers
+        .get("x-tensorzero-user-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let api_key_project_id = headers
+        .get("x-tensorzero-api-key-project-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    Some(super::inference::ObservabilityMetadata {
+        project_id: project_id.to_string(),
+        endpoint_id: endpoint_id.to_string(),
+        model_id: model_id.to_string(),
+        api_key_id,
+        user_id,
+        api_key_project_id,
+    })
+}
+
 /// Helper function to create OpenAI-compatible error response for guardrail violations
 fn create_guardrail_error_response(
     message: &str,
@@ -182,6 +220,71 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
 
 /// A handler for the OpenAI-compatible inference endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "inference_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "inference_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ChatInference request fields
+        chat_inference.function_name = tracing::field::Empty,
+        chat_inference.variant_name = tracing::field::Empty,
+        chat_inference.episode_id = tracing::field::Empty,
+        chat_inference.input = tracing::field::Empty,
+        chat_inference.tags = tracing::field::Empty,
+        chat_inference.extra_body = tracing::field::Empty,
+        chat_inference.tool_params = tracing::field::Empty,
+        chat_inference.processing_time_ms = tracing::field::Empty,
+        // ChatInference response fields
+        chat_inference.id = tracing::field::Empty,
+        chat_inference.output = tracing::field::Empty,
+        chat_inference.inference_params = tracing::field::Empty,
+        // ModelInference fields (20 fields)
+        model_inference.id = tracing::field::Empty,
+        model_inference.inference_id = tracing::field::Empty,
+        model_inference.raw_request = tracing::field::Empty,
+        model_inference.raw_response = tracing::field::Empty,
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.output_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.ttft_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.system = tracing::field::Empty,
+        model_inference.input_messages = tracing::field::Empty,
+        model_inference.output = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.finish_reason = tracing::field::Empty,
+        model_inference.gateway_request = tracing::field::Empty,
+        model_inference.gateway_response = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        model_inference.guardrail_scan_summary = tracing::field::Empty,
+        // ModelInferenceDetails fields (17 fields)
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.request_ip = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.response_analysis = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.request_arrival_time = tracing::field::Empty,
+        model_inference_details.request_forward_time = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn inference_handler(
     State(AppStateData {
         config,
@@ -199,7 +302,15 @@ pub async fn inference_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleParams>,
 ) -> Result<Response<Body>, Error> {
-    if !openai_compatible_params.unknown_fields.is_empty() {
+    // Capture request arrival time for observability (outside async block for error handler access)
+    let request_arrival_time = chrono::Utc::now();
+
+    // Extract observability metadata from headers early for error handler access
+    let obs_metadata_for_error = extract_observability_metadata_from_headers(&headers);
+
+    let result = async {
+
+        if !openai_compatible_params.unknown_fields.is_empty() {
         tracing::warn!(
             "Ignoring unknown fields in OpenAI-compatible request: {:?}",
             openai_compatible_params
@@ -298,6 +409,9 @@ pub async fn inference_handler(
 
     // Set the gateway request on params
     params.gateway_request = gateway_request;
+
+    // Capture the current span for streaming observability
+    params.observability_span = Some(tracing::Span::current());
 
     // Get the guardrail profile if model has one configured
     let (guardrail_profile_id, model_pricing) = if let Some(model_name) = &resolved_model_name {
@@ -643,6 +757,54 @@ pub async fn inference_handler(
             mut result,
             write_info,
         } => {
+            // Record span attributes for observability
+            if let Some(ref wi) = write_info {
+                super::observability::record_resolved_input(&wi.resolved_input);
+                super::observability::record_metadata(&wi.metadata);
+            }
+            super::observability::record_inference_result(&result);
+
+            // Record model inference span attributes
+            match &result {
+                InferenceResult::Chat(chat_result) => {
+                    super::observability::record_model_inference(
+                        &chat_result.model_inference_results,
+                        &chat_result.inference_id,
+                    );
+                }
+                InferenceResult::Json(json_result) => {
+                    super::observability::record_model_inference(
+                        &json_result.model_inference_results,
+                        &json_result.inference_id,
+                    );
+                }
+                _ => {}
+            }
+
+            // Record ModelInferenceDetails for success
+            if let Some(ref obs_metadata) = observability_metadata {
+                let inference_id = match &result {
+                    InferenceResult::Chat(chat_result) => chat_result.inference_id,
+                    InferenceResult::Json(json_result) => json_result.inference_id,
+                    _ => uuid::Uuid::nil(),
+                };
+                let request_forward_time = chrono::Utc::now();
+                super::observability::record_model_inference_details(
+                    &inference_id,
+                    &obs_metadata.project_id,
+                    &obs_metadata.endpoint_id,
+                    &obs_metadata.model_id,
+                    true, // is_success
+                    request_arrival_time,
+                    request_forward_time,
+                    None, // cost - could be calculated from usage if pricing available
+                    obs_metadata.api_key_id.as_deref(),
+                    obs_metadata.user_id.as_deref(),
+                    obs_metadata.api_key_project_id.as_deref(),
+                    None, // no error for success
+                );
+            }
+
             // Extract model latency from the result (using the first model inference result) before moving result
             let model_latency_ms = match &result {
                 InferenceResult::Chat(chat_result) => chat_result
@@ -1111,6 +1273,41 @@ pub async fn inference_handler(
             Ok(response)
         }
     }
+    }
+    .await;
+
+    // Record error on span if request failed
+    if let Err(ref error) = result {
+        super::observability::record_error(error);
+
+        // Record ModelInferenceDetails for error case
+        if let Some(ref obs_metadata) = obs_metadata_for_error {
+            let error_inference_id = uuid::Uuid::now_v7();
+            let request_forward_time = chrono::Utc::now();
+            let error_details = super::observability::ModelInferenceDetailsError {
+                error_code: error.get_details().as_ref(),
+                error_message: &error.to_string(),
+                error_type: error.get_details().as_ref(),
+                status_code: error.status_code().as_u16(),
+            };
+            super::observability::record_model_inference_details(
+                &error_inference_id,
+                &obs_metadata.project_id,
+                &obs_metadata.endpoint_id,
+                &obs_metadata.model_id,
+                false, // is_success = false
+                request_arrival_time,
+                request_forward_time,
+                None, // cost not available on error
+                obs_metadata.api_key_id.as_deref(),
+                obs_metadata.user_id.as_deref(),
+                obs_metadata.api_key_project_id.as_deref(),
+                Some(error_details),
+            );
+        }
+    }
+
+    result
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Default)]
@@ -1683,6 +1880,7 @@ impl Params {
             extra_headers: openai_compatible_params.tensorzero_extra_headers,
             observability_metadata: None, // Will be set in the handler
             gateway_request: None,        // Will be set in the handler
+            observability_span: None,     // Will be set in the handler
         })
     }
 }
@@ -5968,9 +6166,107 @@ fn set_image_variation_field(
 
 // OpenAI-compatible Responses API handlers
 
-use crate::responses::OpenAIResponseCreateParams;
+use crate::responses::{OpenAIResponse, OpenAIResponseCreateParams, ResponseStreamEvent};
+
+/// Try to reconstruct an OpenAIResponse from a sequence of streaming events.
+/// This is used for observability to record response fields after streaming completes.
+fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Option<OpenAIResponse> {
+    // Look for response.completed event (has the full response nested under "response" key)
+    for event in events.iter().rev() {
+        if event.event == "response.completed" {
+            // The response is nested under the "response" key in the event data
+            // Event structure: {"response": {...}, "sequence_number": N, "type": "response.completed"}
+            if let Some(response_data) = event.data.get("response") {
+                if let Ok(response) =
+                    serde_json::from_value::<OpenAIResponse>(response_data.clone())
+                {
+                    return Some(response);
+                }
+            }
+        }
+    }
+
+    // Fallback: try response.done event with same nested structure
+    for event in events.iter().rev() {
+        if event.event == "response.done" {
+            if let Some(response_data) = event.data.get("response") {
+                if let Ok(response) =
+                    serde_json::from_value::<OpenAIResponse>(response_data.clone())
+                {
+                    return Some(response);
+                }
+            }
+        }
+    }
+
+    None
+}
 
 /// Handler for creating a new response (POST /v1/responses)
+#[tracing::instrument(
+    name = "response_create_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "response_create_handler_observability",
+        // Error status fields (4)
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+
+        // REQUEST fields (26 fields) - GenAI semantic convention
+        gen_ai.operation.name = tracing::field::Empty,
+        gen_ai.request.model = tracing::field::Empty,
+        gen_ai.input.messages = tracing::field::Empty,
+        gen_ai.request.instructions = tracing::field::Empty,
+        gen_ai.request.tools = tracing::field::Empty,
+        gen_ai.request.tool_choice = tracing::field::Empty,
+        gen_ai.request.parallel_tool_calls = tracing::field::Empty,
+        gen_ai.request.max_tool_calls = tracing::field::Empty,
+        gen_ai.request.previous_response_id = tracing::field::Empty,
+        gen_ai.request.temperature = tracing::field::Empty,
+        gen_ai.request.max_tokens = tracing::field::Empty,
+        gen_ai.request.response_format = tracing::field::Empty,
+        gen_ai.request.reasoning = tracing::field::Empty,
+        gen_ai.request.include = tracing::field::Empty,
+        gen_ai.request.metadata = tracing::field::Empty,
+        gen_ai.prompt = tracing::field::Empty,
+        gen_ai.prompt.id = tracing::field::Empty,
+        gen_ai.prompt.version = tracing::field::Empty,
+        gen_ai.prompt.variables = tracing::field::Empty,
+        gen_ai.request.stream = tracing::field::Empty,
+        gen_ai.request.stream_options = tracing::field::Empty,
+        gen_ai.request.store = tracing::field::Empty,
+        gen_ai.request.background = tracing::field::Empty,
+        gen_ai.request.service_tier = tracing::field::Empty,
+        gen_ai.request.modalities = tracing::field::Empty,
+        gen_ai.request.user = tracing::field::Empty,
+
+        // RESPONSE fields (22 fields) - GenAI semantic convention
+        gen_ai.response.id = tracing::field::Empty,
+        gen_ai.response.object = tracing::field::Empty,
+        gen_ai.response.created_at = tracing::field::Empty,
+        gen_ai.response.status = tracing::field::Empty,
+        gen_ai.response.background = tracing::field::Empty,
+        gen_ai.response.model = tracing::field::Empty,
+        gen_ai.response.max_output_tokens = tracing::field::Empty,
+        gen_ai.response.temperature = tracing::field::Empty,
+        gen_ai.response.parallel_tool_calls = tracing::field::Empty,
+        gen_ai.response.tool_choice = tracing::field::Empty,
+        gen_ai.system.instructions = tracing::field::Empty,
+        gen_ai.output.messages = tracing::field::Empty,
+        gen_ai.response.prompt = tracing::field::Empty,
+        gen_ai.response.reasoning = tracing::field::Empty,
+        gen_ai.output.type = tracing::field::Empty,
+        gen_ai.response.tools = tracing::field::Empty,
+        gen_ai.usage = tracing::field::Empty,
+        gen_ai.usage.input_tokens = tracing::field::Empty,
+        gen_ai.usage.output_tokens = tracing::field::Empty,
+        gen_ai.usage.total_tokens = tracing::field::Empty,
+        gen_ai.openai.response.service_tier = tracing::field::Empty,
+        gen_ai.response.top_p = tracing::field::Empty,
+    )
+)]
 #[debug_handler(state = AppStateData)]
 pub async fn response_create_handler(
     State(AppStateData {
@@ -5985,15 +6281,34 @@ pub async fn response_create_handler(
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
 ) -> Result<Response<Body>, Error> {
-    if !params.unknown_fields.is_empty() {
-        tracing::warn!(
-            "Ignoring unknown fields in OpenAI-compatible response create request: {:?}",
-            params.unknown_fields.keys().collect::<Vec<_>>()
-        );
-    }
+    // Record request fields for observability
+    super::observability::record_response_request(&params);
 
-    // Resolve the model name based on authentication state (optional for prompt-based requests)
-    let model_resolution = model_resolution::resolve_model_name(
+    // Capture prompt info for analytics headers (before params is moved into async block)
+    let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());
+    let prompt_version = params.prompt.as_ref().and_then(|p| p.version.clone());
+    // Capture project_id from incoming headers for analytics
+    let project_id = headers
+        .get("x-tensorzero-project-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // Capture usage tokens for analytics (will be populated inside async block)
+    // Format: (input_tokens, output_tokens, total_tokens)
+    let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_usage_clone = captured_usage.clone();
+
+    let result = async {
+        if !params.unknown_fields.is_empty() {
+            tracing::warn!(
+                "Ignoring unknown fields in OpenAI-compatible response create request: {:?}",
+                params.unknown_fields.keys().collect::<Vec<_>>()
+            );
+        }
+
+        // Resolve the model name based on authentication state (optional for prompt-based requests)
+        let model_resolution = model_resolution::resolve_model_name(
         params.model.as_deref(),
         &headers,
         false, // not for embedding
@@ -6071,6 +6386,10 @@ pub async fn response_create_handler(
     };
 
     if is_budprompt_with_prompt {
+        // Capture the current span BEFORE calling model methods
+        // This ensures the span stays alive until streaming completes
+        let observability_span = tracing::Span::current();
+
         // Use automatic format detection for BudPrompt with prompt parameter
         use crate::responses::ResponseResult;
 
@@ -6084,18 +6403,62 @@ pub async fn response_create_handler(
 
         match result {
             ResponseResult::Streaming(stream) => {
-                // Convert to SSE stream
-                let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-                    Ok(event) => Event::default()
-                        .event(event.event)
-                        .json_data(event.data)
-                        .map_err(|e| {
-                            Error::new(ErrorDetails::Inference {
-                                message: format!("Failed to serialize SSE event: {e}"),
-                            })
-                        }),
-                    Err(e) => Err(e),
-                });
+                // Wrap stream to capture events and record observability after completion
+                let sse_stream = async_stream::stream! {
+                    use futures::StreamExt;
+
+                    let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
+                    let mut had_streaming_error = false;
+                    futures::pin_mut!(stream);
+
+                    while let Some(result) = stream.next().await {
+                        // Buffer successful events for post-stream observability
+                        if let Ok(event) = &result {
+                            buffer.push(event.clone());
+                        }
+
+                        // Convert to SSE Event and yield
+                        match result {
+                            Ok(event) => {
+                                yield Event::default()
+                                    .event(event.event)
+                                    .json_data(event.data)
+                                    .map_err(|e| {
+                                        Error::new(ErrorDetails::Inference {
+                                            message: format!("Failed to serialize SSE event: {e}"),
+                                        })
+                                    });
+                            }
+                            Err(e) => {
+                                // Record streaming error immediately using the span
+                                let _guard = observability_span.enter();
+                                super::observability::record_error(&e);
+                                had_streaming_error = true;
+                                yield Err(e);
+                            }
+                        }
+                    }
+
+                    // AFTER stream completes: record observability using captured span
+                    let _guard = observability_span.enter();
+
+                    // Try to reconstruct response from buffered events (skip if we had an error)
+                    if !had_streaming_error {
+                        if let Some(response) = try_reconstruct_response_from_events(&buffer) {
+                            tracing::debug!(
+                                "Reconstructed response from {} stream events, id={}",
+                                buffer.len(),
+                                response.id
+                            );
+                            super::observability::record_response_result(&response);
+                        } else {
+                            tracing::warn!(
+                                "Could not reconstruct response from {} buffered stream events",
+                                buffer.len()
+                            );
+                        }
+                    }
+                };
 
                 Ok(Sse::new(sse_stream).into_response())
             }
@@ -6105,32 +6468,88 @@ pub async fn response_create_handler(
                     tracing::debug!("Response size: {} bytes", response_json.len());
                 }
 
+                // Record response fields for observability
+                super::observability::record_response_result(&response);
+
+                // Capture usage for analytics headers
+                if let Some(ref usage) = response.usage {
+                    if let Ok(mut guard) = captured_usage_clone.lock() {
+                        *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
+                    }
+                }
+
                 Ok(Json(response).into_response())
             }
         }
     } else {
         // Standard behavior: check stream parameter
         if params.stream.unwrap_or(false) {
+            // Capture the current span BEFORE calling model methods
+            // This ensures the span stays alive until streaming completes
+            let observability_span = tracing::Span::current();
+
             // Handle streaming response
             let stream = model
                 .stream_response(&params, &model_resolution.original_model_name, &clients)
                 .await?;
 
-            // Convert to SSE stream
-            let sse_stream = tokio_stream::StreamExt::map(stream, |result| match result {
-                Ok(event) => {
-                    // For ResponseStreamEvent, use event field as SSE event type and data field as data
-                    Event::default()
-                        .event(event.event)
-                        .json_data(event.data)
-                        .map_err(|e| {
-                            Error::new(ErrorDetails::Inference {
-                                message: format!("Failed to serialize SSE event: {e}"),
-                            })
-                        })
+            // Wrap stream to capture events and record observability after completion
+            let sse_stream = async_stream::stream! {
+                use futures::StreamExt;
+
+                let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
+                let mut had_streaming_error = false;
+                futures::pin_mut!(stream);
+
+                while let Some(result) = stream.next().await {
+                    // Buffer successful events for post-stream observability
+                    if let Ok(event) = &result {
+                        buffer.push(event.clone());
+                    }
+
+                    // Convert to SSE Event and yield
+                    match result {
+                        Ok(event) => {
+                            // For ResponseStreamEvent, use event field as SSE event type and data field as data
+                            yield Event::default()
+                                .event(event.event)
+                                .json_data(event.data)
+                                .map_err(|e| {
+                                    Error::new(ErrorDetails::Inference {
+                                        message: format!("Failed to serialize SSE event: {e}"),
+                                    })
+                                });
+                        }
+                        Err(e) => {
+                            // Record streaming error immediately using the span
+                            let _guard = observability_span.enter();
+                            super::observability::record_error(&e);
+                            had_streaming_error = true;
+                            yield Err(e);
+                        }
+                    }
                 }
-                Err(e) => Err(e),
-            });
+
+                // AFTER stream completes: record observability using captured span
+                let _guard = observability_span.enter();
+
+                // Try to reconstruct response from buffered events (skip if we had an error)
+                if !had_streaming_error {
+                    if let Some(response) = try_reconstruct_response_from_events(&buffer) {
+                        tracing::debug!(
+                            "Reconstructed response from {} stream events, id={}",
+                            buffer.len(),
+                            response.id
+                        );
+                        super::observability::record_response_result(&response);
+                    } else {
+                        tracing::warn!(
+                            "Could not reconstruct response from {} buffered stream events",
+                            buffer.len()
+                        );
+                    }
+                }
+            };
 
             Ok(Sse::new(sse_stream).into_response())
         } else {
@@ -6144,7 +6563,74 @@ pub async fn response_create_handler(
                 tracing::debug!("Response size: {} bytes", response_json.len());
             }
 
+            // Record response fields for observability
+            super::observability::record_response_result(&response);
+
+            // Capture usage for analytics headers
+            if let Some(ref usage) = response.usage {
+                if let Ok(mut guard) = captured_usage_clone.lock() {
+                    *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
+                }
+            }
+
             Ok(Json(response).into_response())
+        }
+    }
+    }
+    .await;
+
+    // Record error on span if request failed
+    if let Err(ref error) = result {
+        super::observability::record_error(error);
+    }
+
+    // Helper to add analytics headers to a response
+    let add_analytics_headers = |response: &mut Response<Body>| {
+        if let Some(ref id) = prompt_id {
+            if let Ok(value) = axum::http::HeaderValue::from_str(id) {
+                response.headers_mut().insert("x-tensorzero-prompt-id", value);
+            }
+        }
+        if let Some(ref version) = prompt_version {
+            if let Ok(value) = axum::http::HeaderValue::from_str(version) {
+                response.headers_mut().insert("x-tensorzero-prompt-version", value);
+            }
+        }
+        if let Some(ref pid) = project_id {
+            if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
+                response.headers_mut().insert("x-tensorzero-project-id", value);
+            }
+        }
+        // Add usage token headers if available (for /v1/responses success responses)
+        if let Ok(guard) = captured_usage.lock() {
+            if let Some((input_tokens, output_tokens, total_tokens)) = *guard {
+                if let Ok(value) = axum::http::HeaderValue::from_str(&input_tokens.to_string()) {
+                    response.headers_mut().insert("x-tensorzero-input-tokens", value);
+                }
+                if let Some(output) = output_tokens {
+                    if let Ok(value) = axum::http::HeaderValue::from_str(&output.to_string()) {
+                        response.headers_mut().insert("x-tensorzero-output-tokens", value);
+                    }
+                }
+                if let Ok(value) = axum::http::HeaderValue::from_str(&total_tokens.to_string()) {
+                    response.headers_mut().insert("x-tensorzero-total-tokens", value);
+                }
+            }
+        }
+    };
+
+    // Add analytics headers to both success and error responses
+    // This allows the analytics middleware to extract prompt/project info
+    match result {
+        Ok(mut response) => {
+            add_analytics_headers(&mut response);
+            Ok(response)
+        }
+        Err(e) => {
+            // Convert error to response and add headers so middleware can extract them
+            let mut error_response = e.into_response();
+            add_analytics_headers(&mut error_response);
+            Ok(error_response)
         }
     }
 }

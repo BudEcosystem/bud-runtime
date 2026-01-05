@@ -38,6 +38,8 @@ data:
     [object_storage]
     type = "disabled"
 
+    [gateway.export.otlp.traces]
+    enabled = true
 
 ---
 apiVersion: apps/v1

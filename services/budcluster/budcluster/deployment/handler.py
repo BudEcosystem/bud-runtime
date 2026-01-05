@@ -158,6 +158,121 @@ class DeploymentHandler:
 
         return max_memory_bytes / (1024**3)
 
+    def _process_budaiscaler_config(
+        self,
+        budaiscaler: dict,
+        default_metric: str,
+        engine_type: str,
+    ) -> dict:
+        """Process and validate BudAIScaler configuration.
+
+        Args:
+            budaiscaler: Raw BudAIScaler configuration dict
+            default_metric: Default metric for the engine type
+            engine_type: The inference engine type (vllm, latentbud, sglang)
+
+        Returns:
+            Processed configuration dict ready for Helm values
+        """
+        # Start with core configuration
+        config = {
+            "enabled": budaiscaler.get("enabled", True),
+            "minReplicas": budaiscaler.get("minReplicas", 1),
+            "maxReplicas": budaiscaler.get("maxReplicas", 10),
+            "scalingStrategy": budaiscaler.get("scalingStrategy", "BudScaler"),
+        }
+
+        # Process metrics sources - add default if none provided
+        metrics_sources = budaiscaler.get("metricsSources", [])
+        if not metrics_sources:
+            # Use default engine metric when no sources specified
+            metrics_sources = [
+                {
+                    "type": "pod",
+                    "protocolType": "http",
+                    "port": "9090",
+                    "path": "/metrics",
+                    "targetMetric": default_metric,
+                    "targetValue": "0.8",
+                }
+            ]
+        config["metricsSources"] = metrics_sources
+
+        # GPU configuration
+        gpu_config = budaiscaler.get("gpuConfig", {})
+        config["gpuConfig"] = {
+            "enabled": gpu_config.get("enabled", False),
+            "memoryThreshold": gpu_config.get("memoryThreshold", 80),
+            "computeThreshold": gpu_config.get("computeThreshold", 80),
+            "topologyAware": gpu_config.get("topologyAware", False),
+            "preferredGPUType": gpu_config.get("preferredGPUType", ""),
+            "vGPUSupport": gpu_config.get("vGPUSupport", False),
+        }
+
+        # Cost configuration
+        cost_config = budaiscaler.get("costConfig", {})
+        config["costConfig"] = {
+            "enabled": cost_config.get("enabled", False),
+            "cloudProvider": cost_config.get("cloudProvider", ""),
+            "hourlyBudgetLimit": cost_config.get("hourlyBudgetLimit", 0),
+            "dailyBudgetLimit": cost_config.get("dailyBudgetLimit", 0),
+            "spotInstancePreference": cost_config.get("spotInstancePreference", "none"),
+        }
+
+        # Prediction configuration
+        prediction_config = budaiscaler.get("predictionConfig", {})
+        config["predictionConfig"] = {
+            "enabled": prediction_config.get("enabled", False),
+            "lookAheadMinutes": prediction_config.get("lookAheadMinutes", 15),
+            "historyDays": prediction_config.get("historyDays", 7),
+            "minConfidence": prediction_config.get("minConfidence", 0.7),
+            "predictionMetrics": prediction_config.get("predictionMetrics", []),
+        }
+
+        # Schedule hints
+        config["scheduleHints"] = budaiscaler.get("scheduleHints", [])
+
+        # Multi-cluster configuration
+        multi_cluster = budaiscaler.get("multiCluster", {})
+        config["multiCluster"] = {
+            "enabled": multi_cluster.get("enabled", False),
+            "federationMode": multi_cluster.get("federationMode", "active-passive"),
+            "clusterWeights": multi_cluster.get("clusterWeights", {}),
+            "failoverThresholds": multi_cluster.get(
+                "failoverThresholds",
+                {"healthCheckFailures": 3, "latencyMs": 5000},
+            ),
+        }
+
+        # Behavior configuration
+        behavior = budaiscaler.get("behavior", {})
+        scale_up = behavior.get("scaleUp", {})
+        scale_down = behavior.get("scaleDown", {})
+
+        config["behavior"] = {
+            "scaleUp": {
+                "stabilizationWindowSeconds": scale_up.get("stabilizationWindowSeconds", 0),
+                "policies": scale_up.get(
+                    "policies",
+                    [
+                        {"type": "Percent", "value": 100, "periodSeconds": 15},
+                        {"type": "Pods", "value": 4, "periodSeconds": 15},
+                    ],
+                ),
+                "selectPolicy": scale_up.get("selectPolicy", "Max"),
+            },
+            "scaleDown": {
+                "stabilizationWindowSeconds": scale_down.get("stabilizationWindowSeconds", 300),
+                "policies": scale_down.get(
+                    "policies",
+                    [{"type": "Percent", "value": 100, "periodSeconds": 15}],
+                ),
+                "selectPolicy": scale_down.get("selectPolicy", "Min"),
+            },
+        }
+
+        return config
+
     def deploy(
         self,
         node_list: List[dict],
@@ -169,7 +284,7 @@ class DeploymentHandler:
         add_worker: bool = False,
         adapters: List[dict] = None,
         delete_on_failure: bool = True,
-        podscaler: dict = None,
+        budaiscaler: dict = None,
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
         tool_calling_parser_type: Optional[str] = None,
@@ -193,7 +308,7 @@ class DeploymentHandler:
             adapters (List[dict], optional): List of model adapters to deploy. Defaults to None.
             delete_on_failure (bool, optional): Whether to delete resources on failure. Defaults to True.
             chat_template (str, optional): Chat template to use for the model. Defaults to None.
-            podscaler (dict, optional): Pod autoscaling configuration. Defaults to None.
+            budaiscaler (dict, optional): BudAIScaler configuration with full autoscaling features. Defaults to None.
             input_tokens (Optional[int], optional): Average input/context tokens. Defaults to None.
             output_tokens (Optional[int], optional): Average output/sequence tokens. Defaults to None.
             tool_calling_parser_type (Optional[str], optional): Parser type for tool calling. Defaults to None.
@@ -273,31 +388,25 @@ class DeploymentHandler:
 
         values["accessMode"] = access_mode
 
-        if not podscaler:
-            podscaler = {}
-
         # Determine engine type from first node for autoscaling metric selection
         # All nodes in a deployment should use the same engine type
         first_node_engine = node_list[0].get("engine_type", "vllm") if node_list else "vllm"
         default_metric = get_default_autoscale_metric(first_node_engine)
 
-        # Validate user-provided autoscale metric against engine capabilities
-        user_metric = podscaler.get("scalingMetric") if podscaler else None
-        if user_metric:
-            validate_autoscale_metric(first_node_engine, user_metric)
-            logger.info(f"Validated autoscale metric '{user_metric}' for engine '{first_node_engine}'")
+        # Process BudAIScaler configuration
+        if budaiscaler and budaiscaler.get("enabled", False):
+            # Validate user-provided metrics against engine capabilities
+            for metric_source in budaiscaler.get("metricsSources", []):
+                user_metric = metric_source.get("targetMetric")
+                if user_metric:
+                    validate_autoscale_metric(first_node_engine, user_metric)
+                    logger.info(f"Validated BudAIScaler metric '{user_metric}' for engine '{first_node_engine}'")
 
-        values["podscaler"] = {
-            "enabled": bool(podscaler and podscaler.get("enabled", False)) if podscaler else False,
-            "minReplicas": podscaler.get("minReplicas", 1),
-            "maxReplicas": podscaler.get("maxReplicas", 2),
-            "upFluctuationTolerance": podscaler.get("scaleUpTolerance", 1.5),
-            "downFluctuationTolerance": podscaler.get("scaleDownTolerance", 0.5),
-            "window": podscaler.get("window", 30),
-            "targetMetric": podscaler.get("scalingMetric", default_metric),
-            "targetValue": podscaler.get("scalingValue", 0.5),
-            "type": podscaler.get("scalingType", "metrics"),
-        }
+            values["budaiscaler"] = self._process_budaiscaler_config(budaiscaler, default_metric, first_node_engine)
+            logger.info(f"Using BudAIScaler with strategy: {budaiscaler.get('scalingStrategy', 'BudScaler')}")
+        else:
+            # No autoscaling configured
+            values["budaiscaler"] = {"enabled": False}
 
         full_node_list = copy.deepcopy(node_list)
 
@@ -473,241 +582,6 @@ class DeploymentHandler:
         except Exception as e:
             raise Exception(f"Deployment failed: {str(e)}") from e
 
-    def cloud_model_deploy(
-        self,
-        node_list: List[dict],
-        endpoint_name: str,
-        model: str,
-        credential_id: UUID,
-        ingress_url: str,
-        platform: Optional[ClusterPlatformEnum] = None,
-        namespace: str = None,
-        add_worker: bool = False,
-        use_tensorzero: bool = False,
-        provider: str = None,
-        default_storage_class: Optional[str] = None,
-        default_access_mode: Optional[str] = None,
-    ):
-        """Deploy cloud model nodes using Helm.
-
-        Args:
-            node_list (List[dict]): List of nodes to be deployed.
-            endpoint_name (str): Name of the endpoint for the deployment.
-            credential_id (UUID): Unique identifier for the cloud provider credentials.
-            use_tensorzero (bool): Whether to use TensorZero instead of LiteLLM.
-
-        Returns:
-            tuple: A tuple containing (deployment_status, namespace).
-
-        Raises:
-            ValueError: If the device configuration is missing required keys.
-            Exception: If the deployment fails.
-        """
-        if use_tensorzero:
-            return self.tensorzero_deploy(
-                node_list=node_list,
-                endpoint_name=endpoint_name,
-                model=model,
-                credential_id=credential_id,
-                ingress_url=ingress_url,
-                platform=platform,
-                namespace=namespace,
-                add_worker=add_worker,
-                provider=provider,
-            )
-        values = {
-            "namespace": namespace or self._get_namespace(endpoint_name),
-            "nodes": [],
-            "service_type": "ClusterIP",
-            "pull_policy": "IfNotPresent",
-            "container_port": app_settings.litellm_server_port,
-            # TODO: uncomment when ingress issue is resolved
-            # currently if we don't send ingress_host, default value from values.yaml will be used
-            "ingress_host": ingress_url,
-        }
-
-        # Add storage class configuration if provided, otherwise fall back to default
-        if default_storage_class:
-            values["storageClass"] = default_storage_class
-            logger.info(f"Using custom storage class for cloud deployment: {default_storage_class}")
-        else:
-            # Check if there's an app setting default, otherwise let Helm chart handle it
-            if hasattr(app_settings, "default_storage_class") and app_settings.default_storage_class:
-                values["storageClass"] = app_settings.default_storage_class
-                logger.info(
-                    f"Using app default storage class for cloud deployment: {app_settings.default_storage_class}"
-                )
-            else:
-                logger.info("No storage class specified for cloud deployment, using Helm chart default")
-
-        access_mode = default_access_mode or "ReadWriteOnce"
-
-        if default_access_mode:
-            logger.info(f"Using provided access mode for cloud deployment: {default_access_mode}")
-        else:
-            # Determine access mode based on storage class capabilities
-            try:
-                from ..cluster_ops.kubernetes import KubernetesHandler
-
-                k8s_handler = KubernetesHandler(self.config)
-                storage_classes = k8s_handler.get_storage_classes()
-
-                # Find the storage class we're using
-                target_storage_class = values.get("storageClass")
-                if target_storage_class and target_storage_class != "default":
-                    for sc in storage_classes:
-                        if sc["name"] == target_storage_class:
-                            access_mode = sc["recommended_access_mode"]
-                            logger.info(
-                                "Using access mode %s for cloud deployment storage class %s",
-                                access_mode,
-                                target_storage_class,
-                            )
-                            break
-                else:
-                    # Use default storage class
-                    for sc in storage_classes:
-                        if sc["default"]:
-                            access_mode = sc["recommended_access_mode"]
-                            logger.info(
-                                "Using access mode %s for cloud deployment default storage class %s",
-                                access_mode,
-                                sc["name"],
-                            )
-                            break
-            except Exception as e:
-                logger.warning(
-                    "Could not determine optimal access mode for cloud deployment, using %s: %s",
-                    access_mode,
-                    e,
-                )
-
-        values["accessMode"] = access_mode
-        values["model_name"] = values["namespace"]
-
-        # TODO: to be stored and fetched from dapr secret-store
-        proprietary_credential = asyncio.run(BudserveHandler().get_credential_details(credential_id))
-
-        values["proxy_config"] = {
-            "model_list": [
-                {
-                    "model_name": values["namespace"],
-                    "litellm_params": {
-                        "model": model,
-                        "drop_params": True,
-                        **proprietary_credential["other_provider_creds"],
-                    },
-                }
-            ],
-            "general_settings": {"master_key": secrets_settings.litellm_master_key},
-        }
-
-        for node in node_list:
-            node_values = {"name": node["name"], "devices": []}
-            for device in node["devices"]:
-                if not all(key in device for key in ("image", "replica", "memory", "num_cpus", "concurrency")):
-                    raise ValueError(f"Device configuration is missing required keys: {device}")
-                device["core_count"] = device["num_cpus"]
-                device["name"] = self._to_k8s_label(device["name"])
-                node_values["devices"].append(device)
-            values["nodes"].append(node_values)
-        try:
-            logger.info(f"Values for cloud model deployment: {values}")
-            number_of_nodes = len(values["nodes"])
-            status, deployment_url = asyncio.run(deploy_runtime(self.config, values, "DEPLOY_CLOUD_MODEL", platform))
-            return status, values["namespace"], deployment_url, number_of_nodes, node_list
-
-        except Exception as e:
-            raise Exception(f"Deployment failed: {str(e)}") from e
-
-    def tensorzero_deploy(
-        self,
-        node_list: List[dict],
-        endpoint_name: str,
-        model: str,
-        credential_id: UUID,
-        ingress_url: str,
-        platform: Optional[ClusterPlatformEnum] = None,
-        namespace: str = None,
-        add_worker: bool = False,
-        provider: str = None,
-    ):
-        """Deploy cloud model using TensorZero gateway.
-
-        Args:
-            node_list (List[dict]): List of nodes to be deployed.
-            endpoint_name (str): Name of the endpoint for the deployment.
-            model (str): Model name to deploy.
-            credential_id (UUID): Unique identifier for the cloud provider credentials.
-            ingress_url (str): Ingress URL for the deployment.
-            platform (Optional[ClusterPlatformEnum]): Platform type.
-            namespace (str): Kubernetes namespace.
-            add_worker (bool): Whether to add a worker.
-
-        Returns:
-            tuple: A tuple containing (deployment_status, namespace, deployment_url, number_of_nodes, node_list).
-
-        Raises:
-            ValueError: If the device configuration is missing required keys.
-            Exception: If the deployment fails.
-        """
-        if namespace is None:
-            namespace = self._get_namespace(endpoint_name)
-        values = {
-            "namespace": namespace,
-            "modelName": namespace,
-            "gateway": {
-                "image": {
-                    "repository": app_settings.tensorzero_image.rsplit(":", 1)[0]
-                    if ":" in app_settings.tensorzero_image
-                    else app_settings.tensorzero_image,
-                    "tag": app_settings.tensorzero_image.rsplit(":", 1)[1]
-                    if ":" in app_settings.tensorzero_image
-                    else "latest",
-                },
-                "service": {
-                    "port": 3000,  # TensorZero default port
-                },
-            },
-            "ingress_host": ingress_url,
-        }
-
-        # Get credentials
-        proprietary_credential = asyncio.run(BudserveHandler().get_credential_details(credential_id))
-
-        # Configure TensorZero config map
-        provider_type = provider or "openai"  # Default to OpenAI compatible
-        api_key = proprietary_credential["other_provider_creds"].get("api_key", "")
-
-        # Build the tensorzero.toml configuration
-        toml_config = f"""[gateway]
-bind_address = "0.0.0.0:3000"
-
-[gateway.authentication]
-enabled = false
-
-[models."{namespace}"]
-routing = ["{provider_type}"]
-
-[models."{namespace}".providers.{provider_type}]
-type = "{provider_type}"
-model_name = "{model}"
-api_key_location = "env::API_KEY"
-"""
-
-        values["configMap"] = {"data": {"tensorzero.toml": toml_config}}
-
-        # Add credentials to Kubernetes secret
-        values["credentials"] = {"api_key": api_key}
-
-        try:
-            logger.info(f"Values for TensorZero deployment: {values}")
-            status, deployment_url = asyncio.run(deploy_runtime(self.config, values, "DEPLOY_TENSORZERO", platform))
-            return status, values["namespace"], deployment_url, 1, node_list
-
-        except Exception as e:
-            raise Exception(f"TensorZero deployment failed: {str(e)}") from e
-
     # TODO: Update this to use proper PVC with shared storage
     def transfer_model(
         self,
@@ -872,29 +746,25 @@ api_key_location = "env::API_KEY"
         self,
         namespace: str,
         ingress_url: str,
-        cloud_model: bool = False,
         platform: Optional[ClusterPlatformEnum] = None,
         ingress_health: bool = True,
     ):
         """Get the status of a deployment by namespace."""
         return asyncio.run(
-            get_deployment_status(
-                self.config, ingress_url, {"namespace": namespace}, cloud_model, platform, ingress_health
-            )
+            get_deployment_status(self.config, ingress_url, {"namespace": namespace}, platform, ingress_health)
         )
 
     async def get_deployment_status_async(
         self,
         namespace: str,
         ingress_url: str,
-        cloud_model: bool = False,
         platform: Optional[ClusterPlatformEnum] = None,
         ingress_health: bool = True,
         check_pods: bool = True,
     ):
         """Get the status of a deployment by namespace asynchronously."""
         return await get_deployment_status(
-            self.config, ingress_url, {"namespace": namespace}, cloud_model, platform, ingress_health, check_pods
+            self.config, ingress_url, {"namespace": namespace}, platform, ingress_health, check_pods
         )
 
     async def get_pod_status(self, namespace: str, pod_name: str, platform: Optional[ClusterPlatformEnum] = None):
@@ -966,12 +836,72 @@ api_key_location = "env::API_KEY"
         except Exception as e:
             raise Exception(f"Failed to get adapter status: {str(e)}") from e
 
-    def identify_supported_endpoints(self, namespace: str, cloud_model: bool = False, ingress_url: str = None):
+    def identify_supported_endpoints(self, namespace: str, ingress_url: str = None):
         """Identify which endpoints are supported by checking if they return 200 status."""
         try:
-            return asyncio.run(identify_supported_endpoints(self.config, namespace, cloud_model, ingress_url))
+            return asyncio.run(identify_supported_endpoints(self.config, namespace, ingress_url))
         except Exception as e:
             raise Exception(f"Failed to identify supported endpoints: {str(e)}") from e
+
+    async def update_autoscale(
+        self,
+        namespace: str,
+        release_name: str,
+        budaiscaler: dict,
+        engine_type: str = "vllm",
+        platform: Optional[ClusterPlatformEnum] = None,
+    ) -> tuple[str, str]:
+        """Update autoscale configuration for an existing deployment using Helm upgrade.
+
+        This method updates only the BudAIScaler configuration without affecting other
+        deployment settings. It uses Helm upgrade with the existing release values.
+
+        Args:
+            namespace: Kubernetes namespace of the deployment
+            release_name: Helm release name of the deployment
+            budaiscaler: BudAIScaler configuration dict
+            engine_type: The inference engine type (vllm, latentbud, sglang)
+            platform: Optional cluster platform type
+
+        Returns:
+            tuple: (status, message) indicating success or failure
+
+        Raises:
+            ValueError: If autoscale configuration is invalid
+            Exception: If the Helm upgrade fails
+        """
+        from ..cluster_ops import update_autoscale_config
+
+        # Get default metric for engine type
+        default_metric = get_default_autoscale_metric(engine_type)
+
+        # Validate user-provided metrics against engine capabilities
+        if budaiscaler.get("enabled", False):
+            for metric_source in budaiscaler.get("metricsSources", []):
+                user_metric = metric_source.get("targetMetric")
+                if user_metric:
+                    validate_autoscale_metric(engine_type, user_metric)
+                    logger.info(f"Validated autoscale metric '{user_metric}' for engine '{engine_type}'")
+
+        # Process BudAIScaler configuration
+        processed_config = self._process_budaiscaler_config(budaiscaler, default_metric, engine_type)
+
+        # Build minimal Helm values for autoscale update
+        values = {
+            "namespace": namespace,
+            "release_name": release_name,
+            "budaiscaler": processed_config,
+        }
+
+        logger.info(f"Updating autoscale configuration for release '{release_name}' in namespace '{namespace}'")
+        logger.debug(f"Autoscale values: {values}")
+
+        try:
+            status, message = await update_autoscale_config(self.config, values, platform)
+            return status, message
+        except Exception as e:
+            logger.exception(f"Failed to update autoscale configuration: {e}")
+            raise Exception(f"Autoscale update failed: {str(e)}") from e
 
 
 class SimulatorHandler:
@@ -1116,23 +1046,3 @@ class SimulatorHandler:
 
         except Exception as e:
             raise Exception(f"Failed to get benchmark config: {str(e)}") from e
-
-
-class BudserveHandler:
-    """BudserveHandler is responsible for interacting with the bud-serve service."""
-
-    async def get_credential_details(self, credential_id: UUID):
-        """Get the details of a credential by credential id."""
-        async with AsyncHTTPClient() as http_client:
-            response = await http_client.send_request(
-                "GET",
-                f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_app_id}/method/proprietary/credentials/{credential_id}/details",
-                follow_redirects=True,
-            )
-            response_str = response.body.decode("utf-8")
-            if response.status_code != 200:
-                raise Exception(f"Failed to get credential details: {response_str}")
-            response_data = json.loads(response_str)
-            if response_data["success"]:
-                return response_data["result"]
-            raise Exception(response_data["message"])

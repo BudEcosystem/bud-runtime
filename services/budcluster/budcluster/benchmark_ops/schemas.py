@@ -34,7 +34,6 @@ class RunBenchmarkRequest(CloudEventBase):
     nodes: Optional[list[dict[str, Any]]]
     model_id: UUID
     model: str
-    provider_type: str
     user_confirmation: bool
     run_as_simulation: bool
     credential_id: Optional[UUID] = None

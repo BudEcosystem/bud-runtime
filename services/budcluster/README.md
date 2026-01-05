@@ -49,8 +49,8 @@ budcluster/
 │   └── common/            # Shared utilities
 ├── charts/                # Helm charts
 │   ├── bud_runtime_container/    # Model serving runtime
-│   ├── node_info_collector/      # Hardware detection
-│   └── litellm_container/        # LLM proxy server
+│   ├── nfd/                      # Node Feature Discovery
+│   └── prometheus-stack/         # Metrics collection
 ├── playbooks/             # Ansible automation
 │   ├── deploy_runtime.yml
 │   ├── delete_runtime.yml
