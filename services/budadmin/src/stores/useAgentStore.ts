@@ -52,6 +52,7 @@ export interface AgentSession {
   systemPromptWorkflowId?: string;
   promptMessagesWorkflowId?: string;
   promptId?: string;
+  // TODO: selectedConnectorId is reserved for future use - will replace URL-based connector state management
   selectedConnectorId?: string; // Selected connector for this session's tools drawer
   selectedDeployment?: {
     id: string;
@@ -174,7 +175,7 @@ interface AgentStore {
   restoreSessionWithPromptId: (promptId: string, sessionData?: Partial<AgentSession>) => string;
   getSessionByPromptId: (promptId: string) => AgentSession | undefined;
 
-  // Connector Management (per-session)
+  // TODO: Connector Management (per-session) - reserved for future use to replace URL-based connector state
   setSessionConnectorId: (sessionId: string, connectorId: string | null) => void;
   getSessionConnectorId: (sessionId: string) => string | undefined;
 }
