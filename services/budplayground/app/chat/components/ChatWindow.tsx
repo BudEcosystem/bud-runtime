@@ -419,6 +419,30 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     append(message)
   }
 
+  // Helper to send a user message - saves to store and appends to chat
+  const sendUserMessage = (userMessageContent: string) => {
+    const messageId = uuidv4();
+
+    // Save user message to store IMMEDIATELY (before API call)
+    // This ensures the message persists even if user switches tabs mid-request
+    const userSavedMessage: SavedMessage = {
+      id: messageId,
+      content: userMessageContent,
+      createdAt: new Date(),
+      role: 'user',
+      feedback: "",
+    };
+    addMessage(chat.id, userSavedMessage);
+
+    // Append the message to trigger the chat
+    // Use our generated ID so useChat and store have matching IDs
+    append({
+      id: messageId,
+      role: 'user',
+      content: userMessageContent,
+    });
+  };
+
   const handlePromptFormSubmit = (data: any) => {
     // Set the prompt data for the chat body (includes full data with variables for first message)
     setPromptData(data);
@@ -447,32 +471,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         .join('\n');
     }
 
-    // Generate our own message ID so we can save immediately and pass to append
-    const messageId = uuidv4();
+    sendUserMessage(userMessage);
 
-    // Save user message to store IMMEDIATELY (before API call)
-    // This ensures the message persists even if user switches tabs mid-request
-    const userSavedMessage: SavedMessage = {
-      id: messageId,
-      content: userMessage,
-      createdAt: new Date(),
-      role: 'user',
-      feedback: "",
-    };
-    addMessage(chat.id, userSavedMessage);
-
-    // Append the message to trigger the chat with prompt context
-    // Use our generated ID so useChat and store have matching IDs
-    append({
-      id: messageId,
-      role: 'user',
-      content: userMessage,
-    });
-
-    // Note: promptData will be updated in handleFinish after the first message completes
-    // to only include prompt ID context for subsequent messages
-
-    // Close the form
+    // Close the form (promptData will be updated in handleFinish for subsequent messages)
     setShowPromptForm(false);
   };
 
@@ -484,30 +485,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       setPromptData(data);
     }
 
-    // Create user message from the input
+    // Create and send user message from the input
     const userMessage = data.input || '';
-
-    // Generate our own message ID so we can save immediately and pass to append
-    const messageId = uuidv4();
-
-    // Save user message to store IMMEDIATELY (before API call)
-    // This ensures the message persists even if user switches tabs mid-request
-    const userSavedMessage: SavedMessage = {
-      id: messageId,
-      content: userMessage,
-      createdAt: new Date(),
-      role: 'user',
-      feedback: "",
-    };
-    addMessage(chat.id, userSavedMessage);
-
-    // Append the message to trigger the chat with prompt context
-    // Use our generated ID so useChat and store have matching IDs
-    append({
-      id: messageId,
-      role: 'user',
-      content: userMessage,
-    });
+    sendUserMessage(userMessage);
 
     // Clear the input field after sending
     setInput('');
