@@ -336,12 +336,32 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
     updateChat(updatedChat);
 
-    const promptMessage: SavedMessage = {
-      id: lastMessageRef.current,
-      content: promptRef.current || input,
-      createdAt: new Date(),
-      role: 'user',
-      feedback: "",
+    // Find the most recent user message directly from the messages array
+    // We iterate from the end to find it - this is timing-safe and doesn't depend on
+    // lastMessageRef being updated by useEffect (which runs after render)
+    let userMsg: Message | undefined;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        userMsg = messages[i];
+        break;
+      }
+    }
+
+    // Check if this user message was already saved (by handlePromptFormSubmit or handleUnstructuredPromptSubmit)
+    // This prevents duplicate messages while still supporting regular chat (NormalEditor + handleSubmit)
+    const userMessageId = userMsg?.id || lastMessageRef.current;
+    const userMessageAlreadySaved = msgHistory.some(m => m.id === userMessageId);
+
+    // Only save user message if not already in store (regular chat flow needs this)
+    if (!userMessageAlreadySaved) {
+      const promptMessage: SavedMessage = {
+        id: userMessageId,
+        content: userMsg?.content || promptRef.current || input,
+        createdAt: new Date(),
+        role: 'user',
+        feedback: "",
+      }
+      addMessage(chat.id, promptMessage);
     }
 
     // Extract outputItems from the message's data or annotations
@@ -362,12 +382,12 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       }
     }
 
+    // Always save assistant message
     const responseMessage: SavedMessage = {
       ...message,
       feedback: "",
       responseItems: outputItems,  // Store output items for conversation history
     }
-    addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
 
     // After the first prompt message completes, update promptData to only include prompt ID context
@@ -434,8 +454,24 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         .join('\n');
     }
 
+    // Generate our own message ID so we can save immediately and pass to append
+    const messageId = uuidv4();
+
+    // Save user message to store IMMEDIATELY (before API call)
+    // This ensures the message persists even if user switches tabs mid-request
+    const userSavedMessage: SavedMessage = {
+      id: messageId,
+      content: userMessage,
+      createdAt: new Date(),
+      role: 'user',
+      feedback: "",
+    };
+    addMessage(chat.id, userSavedMessage);
+
     // Append the message to trigger the chat with prompt context
+    // Use our generated ID so useChat and store have matching IDs
     append({
+      id: messageId,
       role: 'user',
       content: userMessage,
     });
@@ -458,8 +494,24 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     // Create user message from the input
     const userMessage = data.input || '';
 
+    // Generate our own message ID so we can save immediately and pass to append
+    const messageId = uuidv4();
+
+    // Save user message to store IMMEDIATELY (before API call)
+    // This ensures the message persists even if user switches tabs mid-request
+    const userSavedMessage: SavedMessage = {
+      id: messageId,
+      content: userMessage,
+      createdAt: new Date(),
+      role: 'user',
+      feedback: "",
+    };
+    addMessage(chat.id, userSavedMessage);
+
     // Append the message to trigger the chat with prompt context
+    // Use our generated ID so useChat and store have matching IDs
     append({
+      id: messageId,
       role: 'user',
       content: userMessage,
     });
