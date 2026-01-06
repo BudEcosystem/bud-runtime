@@ -11,7 +11,7 @@ import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
-import { removePromptFromUrl } from "@/utils/urlUtils";
+import { removePromptFromUrl, cleanupConnectorParams } from "@/utils/urlUtils";
 import { hasOAuthPromptId } from "@/hooks/useOAuthCallback";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
@@ -184,7 +184,11 @@ const AgentDrawer: React.FC = () => {
     // Get all prompt IDs from active sessions
     const promptIds = activeSessions
       .map(session => session.promptId)
-      .filter(Boolean); // Remove undefined/null values
+      .filter(Boolean) as string[]; // Remove undefined/null values
+
+    // Clean up connector params to match the number of active sessions
+    // This trims the connector array to match the prompt IDs array length
+    cleanupConnectorParams(activeSessions.length);
 
     // Get current prompt param from URL
     const currentPromptParam = router.query.prompt;
@@ -207,8 +211,8 @@ const AgentDrawer: React.FC = () => {
       // Add all existing query params except 'prompt'
       urlSearchParams.forEach((value, key) => {
         if (key !== 'prompt' && value) {
-          // Don't encode agent parameter
-          if (key === 'agent') {
+          // Don't encode agent or connector parameters (they use commas)
+          if (key === 'agent' || key === 'connector') {
             queryParts.push(`${key}=${value}`);
           } else {
             queryParts.push(`${key}=${encodeURIComponent(value)}`);
