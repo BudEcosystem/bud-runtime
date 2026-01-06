@@ -336,12 +336,25 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
     updateChat(updatedChat);
 
-    const promptMessage: SavedMessage = {
-      id: lastMessageRef.current,
-      content: promptRef.current || input,
-      createdAt: new Date(),
-      role: 'user',
-      feedback: "",
+    // Find the most recent user message directly from the messages array
+    // This is timing-safe and doesn't depend on lastMessageRef being updated by useEffect
+    const userMsg = messages.findLast((m: Message) => m.role === 'user');
+
+    // Check if this user message was already saved (by handlePromptFormSubmit or handleUnstructuredPromptSubmit)
+    // This prevents duplicate messages while still supporting regular chat (NormalEditor + handleSubmit)
+    const userMessageId = userMsg?.id || lastMessageRef.current;
+    const userMessageAlreadySaved = msgHistory.some(m => m.id === userMessageId);
+
+    // Only save user message if not already in store (regular chat flow needs this)
+    if (!userMessageAlreadySaved) {
+      const promptMessage: SavedMessage = {
+        id: userMessageId,
+        content: userMsg?.content || promptRef.current || input,
+        createdAt: new Date(),
+        role: 'user',
+        feedback: "",
+      }
+      addMessage(chat.id, promptMessage);
     }
 
     // Extract outputItems from the message's data or annotations
@@ -362,12 +375,12 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       }
     }
 
+    // Always save assistant message
     const responseMessage: SavedMessage = {
       ...message,
       feedback: "",
       responseItems: outputItems,  // Store output items for conversation history
     }
-    addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
 
     // After the first prompt message completes, update promptData to only include prompt ID context
@@ -406,6 +419,30 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     append(message)
   }
 
+  // Helper to send a user message - saves to store and appends to chat
+  const sendUserMessage = (userMessageContent: string) => {
+    const messageId = uuidv4();
+
+    // Save user message to store IMMEDIATELY (before API call)
+    // This ensures the message persists even if user switches tabs mid-request
+    const userSavedMessage: SavedMessage = {
+      id: messageId,
+      content: userMessageContent,
+      createdAt: new Date(),
+      role: 'user',
+      feedback: "",
+    };
+    addMessage(chat.id, userSavedMessage);
+
+    // Append the message to trigger the chat
+    // Use our generated ID so useChat and store have matching IDs
+    append({
+      id: messageId,
+      role: 'user',
+      content: userMessageContent,
+    });
+  };
+
   const handlePromptFormSubmit = (data: any) => {
     // Set the prompt data for the chat body (includes full data with variables for first message)
     setPromptData(data);
@@ -434,16 +471,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         .join('\n');
     }
 
-    // Append the message to trigger the chat with prompt context
-    append({
-      role: 'user',
-      content: userMessage,
-    });
+    sendUserMessage(userMessage);
 
-    // Note: promptData will be updated in handleFinish after the first message completes
-    // to only include prompt ID context for subsequent messages
-
-    // Close the form
+    // Close the form (promptData will be updated in handleFinish for subsequent messages)
     setShowPromptForm(false);
   };
 
@@ -455,14 +485,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       setPromptData(data);
     }
 
-    // Create user message from the input
+    // Create and send user message from the input
     const userMessage = data.input || '';
-
-    // Append the message to trigger the chat with prompt context
-    append({
-      role: 'user',
-      content: userMessage,
-    });
+    sendUserMessage(userMessage);
 
     // Clear the input field after sending
     setInput('');
