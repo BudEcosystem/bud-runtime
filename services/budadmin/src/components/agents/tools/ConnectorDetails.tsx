@@ -11,7 +11,7 @@ import { ConnectorService } from 'src/services/connectorService';
 import { CredentialConfigStep } from './CredentialConfigStep';
 import { ToolSelectionStep } from './ToolSelectionStep';
 import { useAgentStore } from '@/stores/useAgentStore';
-import { OAuthState, OAuthSessionData, clearOAuthUrlState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
+import { OAuthState, OAuthSessionData, clearOAuthState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl } from '@/utils/urlUtils';
 
 interface Tool {
@@ -72,12 +72,6 @@ const getOAuthState = (): OAuthState | null => {
   } catch (error) {
     return null;
   }
-};
-
-const clearOAuthState = () => {
-  // Use clearOAuthUrlState which only clears URL-related state
-  // This preserves session data (selectedDeployment, etc.) for restoration in agents/index.tsx
-  clearOAuthUrlState();
 };
 
 // Helper to identify redirect URI fields
