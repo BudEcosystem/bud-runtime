@@ -105,7 +105,7 @@ export default function NavBar({ chatId, onToggleLeftSidebar, onToggleRightSideb
             {isStructuredPrompt === true && (
               <button
                 className="flex items-center w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] justify-center cursor-pointer"
-                onClick={() => onShowPromptForm?.()}
+                onClick={onShowPromptForm}
               >
                 <div className="w-[1.125rem] h-[1.125rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]">
                   <Tooltip title="Start again">
