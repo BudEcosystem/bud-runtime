@@ -91,7 +91,7 @@ export default function NavBar({ chatId, onToggleLeftSidebar, onToggleRightSideb
           </div>
         </button>
       ) : (
-        <div></div>
+        <div className="w-[95px]" />
       )}
       <div
         style={{
