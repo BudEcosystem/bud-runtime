@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { copyToClipboard } from "../../../../utils/clipboard";
 
 
 export function CopyText(props: { text: string }) {
-
+    const textRef = useRef(props.text);
     const [copied, setCopied] = useState(false);
 
+    // Keep ref in sync with props
+    useEffect(() => {
+        textRef.current = props.text;
+    }, [props.text]);
+
     const handleCopy = async () => {
-        await copyToClipboard(props.text, {
+        const textToCopy = textRef.current || props.text;
+        await copyToClipboard(textToCopy, {
             onSuccess: () => setCopied(true),
             onError: (error: Error) => console.error('Failed to copy:', error),
         });
