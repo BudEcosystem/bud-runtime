@@ -28,7 +28,14 @@
   };
 
   # for checkpoint/stove8s
+  programs.criu.enable = true;
   systemd.services.k3s.path = [ pkgs.criu ];
+  boot.kernel.sysctl."kernel.io_uring_disabled" = 2;
+  environment.etc."criu/runc.conf".text = ''
+    tcp-established
+    link-remap
+    timeout=3600
+  '';
 
   services.k3s = {
     gracefulNodeShutdown.enable = true;
