@@ -16,7 +16,7 @@ Bud AI Foundry is a control panel for GenAI deployments, designed to maximize in
 | budsim | Performance simulation: XGBoost + genetic algorithms for deployment optimization | PostgreSQL |
 | budmodel | Model registry: metadata, licensing, leaderboard data | PostgreSQL |
 | budmetrics | Observability: inference tracking, time-series analytics | ClickHouse |
-| budnotify | Pub/sub messaging via Kafka | Redis |
+| budnotify | Notifications via Novu wrapper | MongoDB |
 | ask-bud | AI assistant for cluster/performance analysis | PostgreSQL |
 | budeval | Model evaluation and benchmarking | PostgreSQL |
 
@@ -113,7 +113,7 @@ python scripts/migrate_clickhouse.py
 ```bash
 helm install bud infra/helm/bud/      # Deploy Helm chart
 helm dependency update infra/helm/bud/ # Update dependencies
-cd infra/tofu && tofu plan && tofu apply  # Terraform
+cd infra/tofu && tofu plan && tofu apply  # OpenTofu
 ```
 
 ## Architecture
