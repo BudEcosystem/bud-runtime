@@ -52,6 +52,7 @@ export interface AgentSession {
   systemPromptWorkflowId?: string;
   promptMessagesWorkflowId?: string;
   promptId?: string;
+  selectedConnectorId?: string; // Selected connector for this session's tools drawer
   selectedDeployment?: {
     id: string;
     name: string;
@@ -172,6 +173,10 @@ interface AgentStore {
   // OAuth Session Restoration
   restoreSessionWithPromptId: (promptId: string, sessionData?: Partial<AgentSession>) => string;
   getSessionByPromptId: (promptId: string) => AgentSession | undefined;
+
+  // Connector Management (per-session)
+  setSessionConnectorId: (sessionId: string, connectorId: string | null) => void;
+  getSessionConnectorId: (sessionId: string) => string | undefined;
 }
 
 const generateId = () => {
@@ -801,5 +806,21 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       // Get session by prompt ID
       getSessionByPromptId: (promptId: string) => {
         return get().sessions.find(s => s.promptId === promptId);
+      },
+
+      // Connector Management (per-session)
+      setSessionConnectorId: (sessionId: string, connectorId: string | null) => {
+        set({
+          sessions: get().sessions.map(session =>
+            session.id === sessionId
+              ? { ...session, selectedConnectorId: connectorId || undefined, updatedAt: new Date() }
+              : session
+          )
+        });
+      },
+
+      getSessionConnectorId: (sessionId: string) => {
+        const session = get().sessions.find(s => s.id === sessionId);
+        return session?.selectedConnectorId;
       }
     }));

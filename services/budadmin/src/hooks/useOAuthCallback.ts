@@ -75,6 +75,8 @@ export interface OAuthState {
   step: 1 | 2;
   timestamp: number;
   sessionData?: OAuthSessionData; // Session data to restore after OAuth
+  sessionIndex?: number; // Position of session in active sessions array for URL management
+  totalSessions?: number; // Total number of active sessions for URL management
 }
 
 export const useOAuthCallback = (onOAuthCallback?: (state: OAuthState) => void) => {
