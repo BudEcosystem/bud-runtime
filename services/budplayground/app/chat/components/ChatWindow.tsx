@@ -337,15 +337,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     updateChat(updatedChat);
 
     // Find the most recent user message directly from the messages array
-    // We iterate from the end to find it - this is timing-safe and doesn't depend on
-    // lastMessageRef being updated by useEffect (which runs after render)
-    let userMsg: Message | undefined;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        userMsg = messages[i];
-        break;
-      }
-    }
+    // This is timing-safe and doesn't depend on lastMessageRef being updated by useEffect
+    const userMsg = messages.findLast((m: Message) => m.role === 'user');
 
     // Check if this user message was already saved (by handlePromptFormSubmit or handleUnstructuredPromptSubmit)
     // This prevents duplicate messages while still supporting regular chat (NormalEditor + handleSubmit)
