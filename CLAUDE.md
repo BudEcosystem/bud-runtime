@@ -4,470 +4,185 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Bud-stack is a comprehensive multi-service platform for AI/ML model deployment and cluster management. It consists of seven main services:
+Bud AI Foundry is a control panel for GenAI deployments, designed to maximize infrastructure performance. The platform manages AI/ML model deployment, cluster lifecycle, and infrastructure optimization across multi-cloud environments.
 
-### Backend Services (Python/FastAPI)
-- **budapp**: Main application service handling user management, projects, models, endpoints, and AI/ML workflow orchestration with Keycloak authentication
-- **budcluster**: Cluster lifecycle management service that provisions and manages Kubernetes/OpenShift clusters across multiple clouds (AWS EKS, Azure AKS, on-premises) using Terraform and Ansible
-- **budsim**: Performance simulation service that uses ML models and genetic algorithms to optimize LLM deployment configurations across CPU/CUDA/HPU hardware
-- **budmodel**: Model registry and leaderboard service managing model metadata, licensing, and performance metrics from various AI benchmarks
-- **budmetrics**: Observability service built on ClickHouse for analytics and time-series metrics collection, including AI inference request/response tracking
-- **budnotify**: Notification service for pub/sub messaging across the platform
-- **ask-bud**: AI assistant service providing cluster and performance analysis capabilities
-- **budgateway**: Rust-based high-performance API gateway service for model inference routing and load balancing
+### Services
 
-### Frontend Service (TypeScript/Next.js)
-- **budadmin**: Next.js 14 dashboard application for managing AI/ML model deployments and infrastructure with real-time updates via Socket.io
+**Backend Services (Python/FastAPI)**
+| Service | Purpose | Database |
+|---------|---------|----------|
+| budapp | Main API: users, projects, models, endpoints, Keycloak auth | PostgreSQL |
+| budcluster | Cluster lifecycle: AWS EKS, Azure AKS, on-premises via Terraform/Ansible | PostgreSQL |
+| budsim | Performance simulation: XGBoost + genetic algorithms for deployment optimization | PostgreSQL |
+| budmodel | Model registry: metadata, licensing, leaderboard data | PostgreSQL |
+| budmetrics | Observability: inference tracking, time-series analytics | ClickHouse |
+| budnotify | Pub/sub messaging via Kafka | Redis |
+| ask-bud | AI assistant for cluster/performance analysis | PostgreSQL |
+| budeval | Model evaluation and benchmarking | PostgreSQL |
 
-The platform uses Dapr for distributed runtime capabilities, Terraform/Ansible for infrastructure automation, and Helm for Kubernetes deployments.
+**Rust Service**
+| Service | Purpose |
+|---------|---------|
+| budgateway | High-performance API gateway for model inference routing (forked from TensorZero) |
 
-## Repository Structure
+**Frontend Services (TypeScript/Next.js)**
+| Service | Purpose | Port |
+|---------|---------|------|
+| budadmin | Main dashboard for deployments and infrastructure | 8007 |
+| budplayground | Interactive AI model testing interface | - |
+| budCustomer | Customer-facing portal | - |
 
-```
-bud-stack/
-├── services/
-│   ├── budapp/              # Main application service (users, projects, models, endpoints)
-│   ├── budcluster/          # Cluster management service (AWS EKS, Azure AKS, on-premises)
-│   ├── budsim/              # Performance simulation service (ML optimization)
-│   ├── budmodel/            # Model registry and leaderboard service
-│   ├── budmetrics/          # Observability service (ClickHouse analytics)
-│   ├── budnotify/           # Notification service (pub/sub messaging)
-│   ├── ask-bud/             # AI assistant service
-│   ├── budgateway/          # Rust API gateway service (high-performance inference routing)
-│   ├── budadmin/            # Next.js 14 frontend dashboard
-│   ├── budeval/             # Evaluation service (AI model benchmarking)
-│   └── budplayground/       # Interactive playground interface
-├── infra/
-│   ├── terraform/           # Infrastructure as code (multi-cloud)
-│   └── helm/               # Main Helm chart with dependencies
-└── nix/                    # Nix development environment
-```
+**Infrastructure**
+- `infra/helm/` - Main Helm chart with all dependencies
+- `infra/tofu/` - Terraform/OpenTofu modules for multi-cloud
 
-## Development Environment Setup
+## Quick Start
 
-### Nix Shell (Recommended)
+### Development Environment
 ```bash
-# Enter development shell with all tools
+# Nix shell (recommended) - includes Python 3.11, Node 20, Rust, Dapr tooling
 nix develop
 
-# Or use specific shell
-nix develop .#bud
-```
-
-### Individual Services
-Each service has its own development setup:
-
-```bash
-# Backend Python services (FastAPI with Dapr) - use --build flag for first run
-cd services/budapp && ./deploy/start_dev.sh
-cd services/budcluster && ./deploy/start_dev.sh --build
-cd services/budsim && ./deploy/start_dev.sh --build
-cd services/budmodel && ./deploy/start_dev.sh
-cd services/budmetrics && ./deploy/start_dev.sh
-cd services/budnotify && ./deploy/start_dev.sh
-cd services/ask-bud && ./deploy/start_dev.sh
-
-# Frontend dashboard (Next.js 14)
-cd services/budadmin && npm install && npm run dev  # Starts on http://localhost:8007
-
-# Rust gateway service
-cd services/budgateway && cargo run
-
-# Stop services
-cd services/<service_name> && ./deploy/stop_dev.sh  # For Python services
-```
-
-## Common Development Commands
-
-### Code Quality (Run from service directories)
-
-#### Python Services (budapp, budcluster, budsim, budmodel, budmetrics, budnotify, ask-bud)
-```bash
-# Linting and formatting
-ruff check . --fix
-ruff format .
-
-# Type checking
-mypy <service_name>/  # e.g., mypy budapp/
-
-# Run all tests
-pytest
-
-# Run specific test
-pytest tests/test_specific.py::test_function
-
-# Run tests with Dapr (required for most services)
-pytest --dapr-http-port 3510 --dapr-api-token <YOUR_DAPR_API_TOKEN>
-
-# Install pre-commit hooks for code quality
+# Install pre-commit hooks after cloning
 ./scripts/install_hooks.sh
 ```
 
-#### Frontend Service (budadmin)
+### Running Services
 ```bash
-# Development server (runs on port 8007)
-npm run dev
+# Python services - use --build for first run
+cd services/<service_name> && ./deploy/start_dev.sh --build
+./deploy/stop_dev.sh  # to stop
 
-# Linting and building
-npm run lint
-npm run build
+# Frontend
+cd services/budadmin && npm install && npm run dev
 
-# Production server
-npm run start
+# Rust gateway
+cd services/budgateway && cargo run
 ```
 
-#### Rust Service (budgateway)
+### Key Ports
+- budapp API: 9081 (docs at /docs)
+- budadmin: 8007
+
+## Development Commands
+
+### Python Services
 ```bash
-# Format code
-cargo fmt
-
-# Lint code
-cargo clippy
-
-# Run tests
-cargo test
-
-# Build project
-cargo build --release
+ruff check . --fix && ruff format .  # Lint and format
+mypy <service_name>/                 # Type check
+pytest                               # Run tests
+pytest tests/test_file.py::test_fn   # Run specific test
+pytest --dapr-http-port 3510 --dapr-api-token <TOKEN>  # With Dapr
 ```
 
-### Database Operations
+### Frontend Services
 ```bash
-# Run migrations (from service directory with PostgreSQL)
+npm run dev        # Development server
+npm run lint       # Lint
+npm run typecheck  # Type check
+npm run build      # Production build
+```
+
+### Rust Service (budgateway)
+```bash
+cargo fmt                  # Format
+cargo clippy --all-targets --all-features -- -D warnings  # Lint
+cargo test --workspace     # Test
+cargo build --release      # Build
+```
+
+### Pre-commit
+```bash
+pre-commit run --all-files  # Run all hooks manually (CI mirrors this)
+```
+
+### Database Migrations
+```bash
+# PostgreSQL (most services)
 alembic upgrade head
-
-# Service-specific migrations
-alembic -c ./budapp/alembic.ini upgrade head      # budapp
-alembic upgrade head                              # budcluster, budsim, budmodel
-
-# For budmetrics (ClickHouse)
-cd services/budmetrics && python scripts/migrate_clickhouse.py
-
-# Create new migration
 alembic revision --autogenerate -m "description"
-alembic -c ./budapp/alembic.ini revision --autogenerate -m "description"  # budapp specific
+
+# budapp specific
+alembic -c ./budapp/alembic.ini upgrade head
+
+# ClickHouse (budmetrics)
+python scripts/migrate_clickhouse.py
 ```
 
-### Infrastructure Operations
+### Infrastructure
 ```bash
-# Deploy main Helm chart with dependencies
-helm install bud infra/helm/bud/
-
-# Update Helm dependencies
-helm dependency update infra/helm/bud/
-
-# Apply Terraform (from infra/terraform/)
-tofu plan
-tofu apply
-
-# Nix development tools
-nix develop  # Enter development shell with k3d, kubectl, helm, opentofu, azure-cli
+helm install bud infra/helm/bud/      # Deploy Helm chart
+helm dependency update infra/helm/bud/ # Update dependencies
+cd infra/tofu && tofu plan && tofu apply  # Terraform
 ```
 
-## Architecture Overview
+## Architecture
 
 ### Service Communication
-- **Dapr Sidecar Pattern**: All backend services run with Dapr sidecars for service mesh capabilities
-- **State Management**: Redis/Valkey for pub/sub and state store across all services
-- **Configuration**: Environment-based config via `.env` files and Dapr components with periodic sync
-- **Service Discovery**: Dapr service invocation for inter-service communication
-- **Frontend API**: budadmin communicates with budapp via REST API with automatic token refresh
+- **Dapr Sidecar Pattern**: All Python services run with Dapr for service mesh
+- **State Store**: Redis/Valkey for pub/sub and state across services
+- **Workflows**: Dapr workflows for long-running operations (simulations, provisioning)
+- **Inter-service**: Dapr service invocation with retry/circuit breaking
 
-### Data Flow
-1. **User Management**: budapp handles authentication via Keycloak, projects, and user workflows
-2. **Model Registry**: budmodel manages AI/ML model metadata, licensing, and leaderboard data
-3. **Model Management**: budapp manages model deployments, datasets, and endpoints
-4. **Cluster Registration**: budcluster registers new clusters and provisions infrastructure via Terraform/Ansible
-5. **Performance Optimization**: budsim analyzes optimal deployment configurations using ML and genetic algorithms
-6. **Model Deployment**: budcluster deploys models to clusters based on optimization results
-7. **Observability**: budmetrics collects time-series data in ClickHouse for analytics
-8. **Notifications**: budnotify handles pub/sub messaging across services
-9. **AI Assistance**: ask-bud provides intelligent cluster and performance analysis
+### Code Patterns (consistent across Python services)
+```
+<service>/
+├── routes.py      # FastAPI endpoints (*_routes.py in budapp)
+├── services.py    # Business logic
+├── crud.py        # Database operations
+├── models.py      # SQLAlchemy models
+├── schemas.py     # Pydantic schemas
+└── workflows.py   # Dapr workflows
+```
 
-### Key Technologies
-- **Python 3.10+** with FastAPI and budmicroframe for REST APIs
-- **Rust** for high-performance gateway service (budgateway)
-- **SQLAlchemy + Alembic** for PostgreSQL ORM and migrations
-- **ClickHouse** for time-series analytics (budmetrics)
-- **Pydantic** for data validation and serialization
-- **Dapr** for distributed runtime (pub/sub, state, workflows, service mesh)
-- **Next.js 14 + TypeScript** for frontend dashboard with Zustand state management
-- **Kubernetes/Helm** for container orchestration
-- **Terraform/OpenTofu** for multi-cloud infrastructure provisioning
-- **Ansible** for configuration management and cluster operations
-- **Keycloak** for authentication and multi-tenant support
-- **MinIO** for object storage (models/datasets)
-- **XGBoost + DEAP** for ML-based performance optimization (budsim)
+### Frontend Pattern (budadmin)
+```
+src/
+├── pages/         # Next.js pages
+├── components/    # Reusable UI components
+├── flows/         # Multi-step workflows
+├── stores/        # Zustand state stores
+├── hooks/         # Custom React hooks
+└── pages/api/requests.ts  # Centralized API client
+```
 
-### Frontend Architecture (budadmin)
-- **Framework**: Next.js 14 with React 18 and TypeScript
-- **State Management**: Zustand stores for client-side state
-- **UI Components**: Tailwind CSS + Ant Design + Radix UI
-- **Authentication**: JWT tokens with automatic refresh
-- **API Communication**: Custom axios wrapper with error handling
-- **Real-time Updates**: Socket.io integration
-- **Key Features**: Model management, cluster operations, benchmarking, project organization
+### Naming Conventions
+- **Python**: snake_case modules, PascalCase Pydantic models, 119-char line limit
+- **TypeScript**: PascalCase React components, colocated styles
+- **Rust**: kebab-case module directories, CamelCase types
 
-## Security & Configuration
+## Configuration
 
-### Crypto Keys (budcluster only)
-Required for cluster credential encryption in budcluster service:
+### Environment Setup
+Each service needs `.env` (copy from `.env.sample`):
+- **budcluster**: Also requires crypto keys for credential encryption:
 ```bash
-cd services/budcluster
 mkdir -p crypto-keys
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out crypto-keys/rsa-private-key.pem
 openssl rand -out crypto-keys/symmetric-key-256 32
 chmod 644 crypto-keys/rsa-private-key.pem crypto-keys/symmetric-key-256
 ```
 
-### Environment Variables
-Each service requires `.env` file (copy from `.env.sample`):
-- **budapp**: Database, Redis, Keycloak, MinIO, Dapr, authentication configuration
-- **budcluster**: Database, Redis, Dapr, cloud provider credentials, crypto keys
-- **budsim**: Database, Redis, Dapr, ML model cache configuration
-- **budmodel**: Database, Redis, Dapr, Hugging Face API tokens
-- **budmetrics**: ClickHouse, Redis, Dapr configuration
-- **budnotify**: Redis, Dapr, notification provider credentials
-- **ask-bud**: Database, Redis, Dapr, AI model configuration
-- **budgateway**: Redis, gateway configuration, model routing settings
-- **budadmin**: `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_NOVU_*`, authentication keys
+### Key Dependencies (Helm chart)
+PostgreSQL, Valkey/Redis, ClickHouse, Dapr, MinIO, Keycloak, MongoDB, Kafka, LGTM stack (Grafana, Loki, Tempo, Mimir)
 
-## Development Guidelines
+## Testing Guidelines
 
-### Code Standards
-- Follow **Conventional Commits** for commit messages (feat, fix, docs, etc.)
-- Use **Ruff** for linting/formatting with Google docstring convention
-- Maintain **MyPy** type annotations for all functions
-- Write tests for new functionality using **pytest** with asyncio support
+### Python Testing Pitfalls
 
-### Service Patterns (consistent across all services)
-
-#### Python Backend Services (budapp, budcluster, budsim, budmodel, budmetrics, budnotify, ask-bud)
-- **API Layer**: Routes in `*_routes.py` (budapp) or `routes.py` (other services)
-- **Business Logic**: Services in `services.py`
-- **Data Access**: CRUD operations in `crud.py`
-- **Database Models**: SQLAlchemy models in `models.py`
-- **Data Validation**: Pydantic schemas in `schemas.py`
-- **Workflows**: Long-running Dapr workflows in `workflows.py`
-- **Configuration**: Using budmicroframe for consistent config management
-
-#### Rust Gateway Service (budgateway)
-- **Configuration**: TOML-based configuration in `config/`
-- **Route Handlers**: HTTP route handling in `gateway/src/`
-- **Model Integration**: Provider proxy patterns for various AI model APIs
-- **Load Balancing**: High-performance request routing and load balancing
-
-#### Frontend Service (budadmin)
-- **Pages**: Next.js pages in `/src/pages/`
-- **Components**: Reusable UI components in `/src/components/`
-- **Flows**: Multi-step workflows in `/src/flows/`
-- **State**: Zustand stores in `/src/stores/`
-- **Hooks**: Custom React hooks in `/src/hooks/`
-- **API Layer**: Centralized API client in `/src/pages/api/requests.ts`
-
-### Pre-commit Hooks
-All services use pre-commit hooks for code quality:
-```bash
-./scripts/install_hooks.sh  # Run from service directory
-```
-
-## Infrastructure Management
-
-### Helm Dependencies
-Main chart (`infra/helm/bud/`) includes:
-- **PostgreSQL**: Primary database for budapp, budcluster, budsim, budmodel, ask-bud
-- **Valkey/Redis**: State store and pub/sub for all services
-- **ClickHouse**: Analytics database for budmetrics
-- **Dapr**: Service mesh and workflow orchestration for all backend services
-- **MinIO**: Object storage for models and datasets (budapp)
-- **Keycloak**: Authentication and multi-tenant support (budapp)
-- **MongoDB**: Document storage for specific use cases
-- **Kafka**: Event streaming for high-throughput scenarios
-- **LGTM Stack**: Grafana, Loki, Tempo, Mimir for observability
-
-### Cloud Providers
-- **Azure**: Primary cloud with AKS clusters via Terraform modules
-- **AWS**: EKS support via Terraform modules
-- **On-premises**: OpenShift support via Ansible playbooks
-
-### Deployment Workflow
-1. **Infrastructure Provisioning**: Terraform/Ansible automation via budcluster
-2. **Cluster Registration**: Validation and credential encryption via budcluster
-3. **Model Registration**: Metadata and licensing via budmodel
-4. **Service Deployment**: Helm charts orchestration via budcluster
-5. **Performance Optimization**: ML-based analysis via budsim
-6. **Model Deployment**: Orchestration via budcluster + budapp coordination
-7. **Observability**: Metrics collection via budmetrics + notification via budnotify
-8. **AI Assistance**: Intelligent analysis and recommendations via ask-bud
-
-## Troubleshooting
-
-### Common Issues
-- **Missing Dapr API Token**: Required for tests, check `.env` file in each service
-- **Database Connection**: Ensure PostgreSQL is running via docker-compose for each service
-- **ClickHouse Connection**: budmetrics requires ClickHouse, check docker-compose-clickhouse.yaml
-- **Crypto Keys Missing**: Run key generation commands for budcluster service
-- **Port Conflicts**: Each service uses different ports (check respective docker-compose files)
-- **Frontend API Connection**: Ensure `NEXT_PUBLIC_BASE_URL` points to correct budapp backend
-- **Service Dependencies**: Some services depend on others (e.g., budapp needs budmodel, budmetrics)
-- **Nix Environment**: Use `nix develop` for consistent tooling across development
-
-### Development Tools
-Available in Nix shell:
-- `kubectl`, `helm` for Kubernetes operations and chart management
-- `k3d` for local cluster testing and development
-- `opentofu` for Terraform operations (OpenTofu as Terraform alternative)
-- `azure-cli` for Azure management and AKS operations
-- `sops` for secret encryption and GitOps workflows
-- `openssl` for crypto key generation (budcluster)
-- `yaml-language-server` for YAML validation and linting
-
-
-Note: Make sure to update CLAUDE.md if you come across anything new related to architecture, testing, development etc which might be helpful for future development process.
-
-### Claude dev guidelines
-
-- Use sub agents when ever required
-- Use proactively stack-keeper agent to plan the development task and distribute to respective agents.
-
-## Service-Specific Development Notes
-
-### BudSim (Performance Simulation Service)
-
-The budsim service has two distinct optimization methods:
-- **Evolution Algorithm (ML-based)**: Uses genetic algorithms with XGBoost regressors to optimize all engine parameters
-- **DirectSearch/Heuristic**: Uses memory-based calculations to optimize only parallelism (TP/PP) parameters
-
-Key architecture patterns:
-- Optimization methods are selected via `simulation_method` parameter (REGRESSOR vs HEURISTIC)
-- Engine configurations use minimal args for heuristic mode (only essential parameters)
-- Evolution mode includes all optimized parameters in deployment configs
-- Use `_is_heuristic_config()` to detect which method generated a configuration
-
-Important: When working with deployment configurations, ensure heuristic-based configs only include optimized parameters, not engine defaults.
-
-### Dynamic Max Model Length Configuration (January 2025)
-
-The budcluster service now dynamically calculates the `--max-model-len` parameter based on user-specified token requirements:
-- Calculates as `(input_tokens + output_tokens) * 1.1` for a 10% safety margin
-- Falls back to default (8192) when tokens are not provided
-- Ensures optimal resource allocation for different model context sizes
-- Supports large context models (up to 200k+ tokens based on schema limits)
-
-### Service Communication Patterns
-
-- **Dapr Workflows**: Long-running processes use Dapr workflows (budsim simulations, cluster provisioning)
-- **Pub/Sub**: Real-time notifications via Kafka with budnotify service
-- **State Management**: Redis/Valkey for cross-service state sharing
-- **Service Invocation**: Dapr service-to-service calls with automatic retry/circuit breaking
-
-### Database Patterns
-
-- **PostgreSQL**: Primary storage for most services with Alembic migrations
-- **ClickHouse**: Time-series analytics in budmetrics with custom query optimizations
-- **Redis**: Pub/sub, caching, and Dapr state store
-- **Row-level Security**: Implemented in budapp for multi-tenant data isolation
-
-### Common Development Patterns
-
-#### Error Handling and Validation
-- Use Pydantic schemas for request/response validation across all services
-- Implement proper exception handling with structured error responses
-- Log errors with context (workflow_id, user_id, cluster_id) for debugging
-
-#### Configuration Management
-- Environment variables via `.env` files with `.env.sample` templates
-- Dapr configuration for runtime settings with periodic sync
-- Use `app_settings` from budmicroframe for centralized config access
-
-#### Testing Approaches
-- Unit tests with pytest and asyncio support
-- Mock Dapr components for isolated testing
-- Integration tests require Dapr sidecar with API tokens
-- Use `--dapr-http-port` and `--dapr-api-token` for pytest
-
-#### Performance Considerations
-- ClickHouse queries use composite indexes for time-series data
-- Implement pagination for large result sets
-- Use background tasks for long-running operations (workflows)
-- Cache frequently accessed data in Redis
-
-## Recent Feature Additions
-
-### Inference Request/Prompt Listing (January 2025)
-
-A comprehensive feature for viewing and analyzing AI model inference requests has been added across three services:
-
-#### BudMetrics Changes
-- Added new API endpoints for inference data retrieval:
-  - `POST /observability/inferences/list` - List inferences with pagination and filtering
-  - `GET /observability/inferences/{inference_id}` - Get complete inference details
-  - `GET /observability/inferences/{inference_id}/feedback` - Get all feedback for an inference
-- Implemented efficient ClickHouse queries joining ModelInference, ChatInference, and ModelInferenceDetails tables
-- Added comprehensive schemas for request/response handling
-
-#### BudApp Changes
-- Added proxy endpoints with access control:
-  - `POST /metrics/inferences/list` - Proxy to budmetrics with project access validation
-  - `GET /metrics/inferences/{inference_id}` - Proxy with access control
-  - `GET /metrics/inferences/{inference_id}/feedback` - Proxy with access control
-- Implemented response enrichment to add entity names (project, endpoint, model display names)
-- Added row-level security to ensure users can only see their project's data
-
-#### BudAdmin Changes
-- Added new "Inferences" tab to project details page
-- Created comprehensive UI components:
-  - `InferenceListView` - Main list view with data table, pagination, and sorting
-  - `InferenceDetailModal` - Detailed view with tabs for overview, messages, performance, raw data, and feedback
-  - `InferenceFilters` - Advanced filtering with date ranges, token counts, and latency filters
-- Added Zustand store (`useInferences`) for state management
-- Implemented CSV and JSON export functionality
-- Added interactive features like copy-to-clipboard and file downloads
-
-#### Key Features
-- View individual AI inference requests with full prompt/response details
-- Filter by date range, success status, token counts, and latency
-- Sort by timestamp, tokens, latency, or cost
-- View performance metrics including response time, token usage, and costs
-- Access user feedback including ratings, boolean metrics, and comments
-- Export data for external analysis
-- Row-level access control ensuring data privacy
-
-#### Testing
-- Unit tests added for budmetrics endpoints (`tests/test_inference_endpoints.py`)
-- Unit tests added for budapp proxy routes (`tests/test_metric_proxy_endpoints.py`)
-- End-to-end test script created (`test_inference_feature.py`)
-- Manual testing guide provided (`manual_test_inferences.md`)
-
-#### API Documentation
-Complete API documentation available in `docs/api/inference-endpoints.md` covering:
-- Authentication requirements
-- Request/response formats
-- Error handling
-- Rate limiting
-- Best practices
-
-- Don't save any keys as plain text in DBs. Always use encryption. Security is of high priority.
-
-## Testing Best Practices (IMPORTANT)
-
-### Common Testing Pitfalls to Avoid
-
-1. **SQLAlchemy Modern API**: Don't mock `session.query()` - instead mock `execute_scalar`, `scalars_all`, and `scalar_one_or_none` from DataManagerUtils
-2. **CRUD Methods**: Pass individual parameters to CRUD methods, not Pydantic schema objects
-3. **Mock Completeness**: When mocking for Pydantic validation, include ALL required fields
-4. **JSON Format**: Use compact JSON format (no spaces) - `{"a":1}` not `{"a": 1}`
-5. **Boolean Serialization**: Use JSON format - `"true"`/`"false"` not `"True"`/`"False"`
-6. **Return Structure**: Always verify actual implementation for correct field names
-
-### Example of Correct Test Patterns
-
+**SQLAlchemy Mocking** - Mock DataManagerUtils methods, not `session.query()`:
 ```python
-# Correct SQLAlchemy mocking
+# Correct
 data_manager.execute_scalar = Mock(return_value=5)
 data_manager.scalars_all = Mock(return_value=[])
 
-# Correct CRUD usage
+# Wrong - won't work with modern SQLAlchemy
+mock_session.query = Mock(return_value=mock_query)
+```
+
+**CRUD Methods** - Pass individual parameters, not schema objects:
+```python
+# Correct
 data_manager.create_audit_record(
     action=AuditActionEnum.CREATE,
     resource_type=AuditResourceTypeEnum.PROJECT,
@@ -476,10 +191,58 @@ data_manager.create_audit_record(
     details={"key": "value"}
 )
 
-# Complete mock for Pydantic
-record = Mock(spec=Model)
-record.id = uuid4()
-record.field1 = "value"
-record.field2 = 123
-# ... include ALL required fields
+# Wrong
+data_manager.create_audit_record(AuditRecordCreate(...))
 ```
+
+**Pydantic Mocks** - Include ALL required fields when mocking for validation.
+
+**Serialization** - Use compact JSON (`{"a":1}` not `{"a": 1}`) and lowercase booleans (`"true"` not `"True"`).
+
+See `services/budapp/TESTING_GUIDELINES.md` for detailed examples.
+
+## Service-Specific Notes
+
+### BudSim Optimization Methods
+- **REGRESSOR**: ML-based genetic algorithm optimizing all engine parameters
+- **HEURISTIC**: Memory-based calculations optimizing only TP/PP parameters
+- Select via `simulation_method` parameter; use `_is_heuristic_config()` to detect method
+
+### BudCluster
+- **Max Model Length**: Dynamically calculated as `(input_tokens + output_tokens) * 1.1`
+- **NFD**: Node Feature Discovery for hardware detection (timeout: `NFD_DETECTION_TIMEOUT`)
+- **HAMI**: GPU time-slicing auto-installed during cluster onboarding when NVIDIA GPUs detected
+
+### BudGateway
+- Forked from TensorZero
+- TOML-based configuration in `config/`
+- Provider proxy patterns for AI model APIs
+
+## Commit Guidelines
+
+Follow Conventional Commits: `feat(budadmin): ...`, `fix(budmodel): ...`
+
+PRs must include:
+- Scope and linked issues
+- Migration steps if applicable
+- Testing block with commands run
+- Secret/IAM/Dapr updates called out explicitly
+
+## Claude Code Usage
+
+- Use subagents proactively for complex tasks
+- Use **stack-keeper** agent to plan and distribute tasks across services
+- Each service has its own CLAUDE.md with service-specific guidance
+- Security is high priority: never store keys as plain text
+
+### Planning & Research
+
+When planning any non-trivial task, conduct extensive web-based research before implementation:
+- **SOTA papers**: Search for state-of-the-art approaches and recent publications
+- **Best practices**: Look up industry standards and recommended patterns
+- **Documentation**: Check official docs for libraries, frameworks, and APIs involved
+- **GitHub discussions**: Search for relevant issues, discussions, and solutions
+- **GitHub code**: Find reference implementations and real-world examples
+- **Articles/blogs**: Look for tutorials and experience reports from practitioners
+
+This research phase should inform the implementation plan and help avoid reinventing solutions or missing established patterns.
