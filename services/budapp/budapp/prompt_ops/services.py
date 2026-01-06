@@ -18,6 +18,7 @@
 
 import json
 from ast import Dict
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
@@ -382,6 +383,134 @@ class PromptService(SessionMixin):
             raise ClientException(message="Prompt not found", status_code=status.HTTP_404_NOT_FOUND)
 
         return PromptResponse.model_validate(db_prompt)
+
+    async def list_traces(
+        self,
+        bud_prompt_id: str,
+        project_id: UUID,
+        from_date: datetime,
+        to_date: datetime,
+        page: int = 1,
+        limit: int = 50,
+    ) -> dict:
+        """List OTel traces for a prompt with validation.
+
+        Args:
+            prompt_id: UUID of the prompt
+            project_id: UUID of the project to validate prompt ownership
+            from_date: Start date for filtering traces
+            to_date: End date for filtering traces
+            page: Page number (1-indexed)
+            limit: Number of results per page
+
+        Returns:
+            dict: Response data with items, page, limit, and total_record
+
+        Raises:
+            ClientException: If prompt not found or does not belong to project
+        """
+        # Validate prompt exists and belongs to project
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"name": bud_prompt_id, "project_id": project_id, "status": PromptStatusEnum.ACTIVE},
+            missing_ok=True,
+        )
+        if not db_prompt:
+            raise ClientException(
+                message="Prompt not found or does not belong to project",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Calculate offset from page (page is 1-indexed)
+        offset = (page - 1) * limit
+
+        # Proxy to budmetrics
+        traces_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/traces"
+        )
+
+        params = {
+            "resource_type": "prompt",
+            "resource_id": str(bud_prompt_id),
+            "project_id": str(project_id),
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "offset": offset,
+            "limit": limit,
+        }
+
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(traces_endpoint, params=params) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to fetch traces from budmetrics: {response_data}")
+                    raise ClientException(
+                        message="Failed to fetch traces",
+                        status_code=response.status,
+                    )
+
+                # Map budmetrics response to PaginatedSuccessResponse format
+                return {
+                    "items": response_data.get("items", []),
+                    "page": page,
+                    "limit": limit,
+                    "total_record": response_data.get("total_count", 0),
+                    "message": "Traces retrieved successfully",
+                }
+
+    async def get_trace(
+        self,
+        bud_prompt_id: str,
+        trace_id: str,
+        project_id: UUID,
+    ) -> dict:
+        """Get all spans for a single trace.
+
+        Args:
+            bud_prompt_id: Prompt ID for validation
+            trace_id: The trace ID to retrieve
+            project_id: Project ID for validation
+
+        Returns:
+            dict: Response data with trace_id, spans, and total_spans
+
+        Raises:
+            ClientException: If prompt not found or does not belong to project
+        """
+        # Validate prompt exists and belongs to project
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={"name": bud_prompt_id, "project_id": project_id, "status": PromptStatusEnum.ACTIVE},
+            missing_ok=True,
+        )
+        if not db_prompt:
+            raise ClientException(
+                message="Prompt not found or does not belong to project",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Proxy to budmetrics
+        trace_endpoint = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/"
+            f"{app_settings.bud_metrics_app_id}/method/observability/traces/{trace_id}"
+        )
+
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(trace_endpoint) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"Failed to fetch trace from budmetrics: {response_data}")
+                    raise ClientException(
+                        message="Failed to fetch trace",
+                        status_code=response.status,
+                    )
+
+                return {
+                    "trace_id": response_data.get("trace_id", trace_id),
+                    "spans": response_data.get("spans", []),
+                    "total_spans": response_data.get("total_spans", 0),
+                    "message": "Trace retrieved successfully",
+                }
 
     async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:
         """Search prompt tags by name."""

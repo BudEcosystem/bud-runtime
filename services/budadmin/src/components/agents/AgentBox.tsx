@@ -954,9 +954,7 @@ function AgentBoxInner({
         deployment_name: session.selectedDeployment.name,
         // model_settings: getDefaultModelSettings(session),
         stream: getStreamSetting(),
-        messages: session.systemPrompt?.trim()
-          ? [{ role: "system", content: session.systemPrompt }]
-          : [],
+        system_prompt: session.systemPrompt?.trim() || "",
         llm_retry_limit: session.llm_retry_limit ?? 3,
         enable_tools: true,
         allow_multiple_calls: session.allowMultipleCalls ?? true,
