@@ -336,12 +336,25 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     }
     updateChat(updatedChat);
 
-    const promptMessage: SavedMessage = {
-      id: lastMessageRef.current,
-      content: promptRef.current || input,
-      createdAt: new Date(),
-      role: 'user',
-      feedback: "",
+    // Find the most recent user message directly from the messages array
+    // This is timing-safe and doesn't depend on lastMessageRef being updated by useEffect
+    const userMsg = messages.findLast((m: Message) => m.role === 'user');
+
+    // Check if this user message was already saved (by handlePromptFormSubmit or handleUnstructuredPromptSubmit)
+    // This prevents duplicate messages while still supporting regular chat (NormalEditor + handleSubmit)
+    const userMessageId = userMsg?.id || lastMessageRef.current;
+    const userMessageAlreadySaved = msgHistory.some(m => m.id === userMessageId);
+
+    // Only save user message if not already in store (regular chat flow needs this)
+    if (!userMessageAlreadySaved) {
+      const promptMessage: SavedMessage = {
+        id: userMessageId,
+        content: userMsg?.content || promptRef.current || input,
+        createdAt: new Date(),
+        role: 'user',
+        feedback: "",
+      }
+      addMessage(chat.id, promptMessage);
     }
 
     // Extract outputItems from the message's data or annotations
@@ -362,12 +375,12 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       }
     }
 
+    // Always save assistant message
     const responseMessage: SavedMessage = {
       ...message,
       feedback: "",
       responseItems: outputItems,  // Store output items for conversation history
     }
-    addMessage(chat.id, promptMessage);
     addMessage(chat.id, responseMessage);
 
     // After the first prompt message completes, update promptData to only include prompt ID context
@@ -406,6 +419,30 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
     append(message)
   }
 
+  // Helper to send a user message - saves to store and appends to chat
+  const sendUserMessage = (userMessageContent: string) => {
+    const messageId = uuidv4();
+
+    // Save user message to store IMMEDIATELY (before API call)
+    // This ensures the message persists even if user switches tabs mid-request
+    const userSavedMessage: SavedMessage = {
+      id: messageId,
+      content: userMessageContent,
+      createdAt: new Date(),
+      role: 'user',
+      feedback: "",
+    };
+    addMessage(chat.id, userSavedMessage);
+
+    // Append the message to trigger the chat
+    // Use our generated ID so useChat and store have matching IDs
+    append({
+      id: messageId,
+      role: 'user',
+      content: userMessageContent,
+    });
+  };
+
   const handlePromptFormSubmit = (data: any) => {
     // Set the prompt data for the chat body (includes full data with variables for first message)
     setPromptData(data);
@@ -434,16 +471,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         .join('\n');
     }
 
-    // Append the message to trigger the chat with prompt context
-    append({
-      role: 'user',
-      content: userMessage,
-    });
+    sendUserMessage(userMessage);
 
-    // Note: promptData will be updated in handleFinish after the first message completes
-    // to only include prompt ID context for subsequent messages
-
-    // Close the form
+    // Close the form (promptData will be updated in handleFinish for subsequent messages)
     setShowPromptForm(false);
   };
 
@@ -455,14 +485,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       setPromptData(data);
     }
 
-    // Create user message from the input
+    // Create and send user message from the input
     const userMessage = data.input || '';
-
-    // Append the message to trigger the chat with prompt context
-    append({
-      role: 'user',
-      content: userMessage,
-    });
+    sendUserMessage(userMessage);
 
     // Clear the input field after sending
     setInput('');
@@ -480,58 +505,60 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
   return (
     <Layout className={`chat-container relative ${isSingleChat ? 'single-chat' : ''}`}>
-      <Sider
-        width="280px"
-        className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-250px] ease-in-out ${toggleLeft ? "visible ml-[0]" : "invisible ml-[-280px]"
-          }`}
-      // style={{ display: toggleLeft ? "block" : "none" }}
-      >
-        <div className="leftBg w-full h-full min-w-[200px]">
-          <div className="absolute z-0 top-0 left-0 bottom-0 right-0 w-full h-full">
-            <div className="absolute top-0 left-0 bottom-0 right-0 opacity-5 bg-gradient-to-b from-[#965CDE] via-[#101010] to-[#965CDE] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div>
-            {/* <div className="absolute top-0 right-0 w-[200px] h-[200px] blur-xl opacity-7 bg-gradient-to-b from-[#A737EC] to-[#A737EC] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div> */}
-          </div>
-          <div className="relative z-10 flex flex-row justify-between py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
-            <div
-              className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
-              onClick={onToggleLeftSidebar}
-            >
-              <Image
-                preview={false}
-                src="icons/minimize.svg"
-                alt="bud"
-                width={".75rem"}
-                height={".75rem"}
-              />
-              <span className="Lato-Regular text-[#EEE] text-[1rem] font-[400]">
-                Chats
-              </span>
+      {promptIds.length === 0 && (
+        <Sider
+          width="280px"
+          className={`leftSider rounded-l-[1rem] border-[1px] border-[#1F1F1F] border-r-[0px] overflow-hidden ml-[-250px] ease-in-out ${toggleLeft ? "visible ml-[0]" : "invisible ml-[-280px]"
+            }`}
+        // style={{ display: toggleLeft ? "block" : "none" }}
+        >
+          <div className="leftBg w-full h-full min-w-[200px]">
+            <div className="absolute z-0 top-0 left-0 bottom-0 right-0 w-full h-full">
+              <div className="absolute top-0 left-0 bottom-0 right-0 opacity-5 bg-gradient-to-b from-[#965CDE] via-[#101010] to-[#965CDE] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div>
+              {/* <div className="absolute top-0 right-0 w-[200px] h-[200px] blur-xl opacity-7 bg-gradient-to-b from-[#A737EC] to-[#A737EC] overflow-y-auto pb-[5rem] pt-[1rem] px-[1rem]"></div> */}
             </div>
-            <button className="group flex items-center flex-row gap-[.4rem] h-[1.375rem] text-[#B3B3B3] text-[300] text-[.625rem] font-[400] p-[.35rem] bg-[#FFFFFF08] rounded-[0.375rem] border-[1px] border-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] cursor-pointer" onClick={createNewChat}>
-
-              <div className="w-[1rem] h-[1rem] transform scale-[.6] mr-[-.2rem]  flex justify-center items-center cursor-pointer group text-[#B3B3B3] group-hover:text-[#FFFFFF]">
-                <Tooltip title="Create a new chat">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    fill="none"
-                  >
-                    <path
-                      fill="currentColor"
-                      d="M9 2a.757.757 0 0 0-.757.757v5.486H2.757a.757.757 0 0 0 0 1.514h5.486v5.486a.757.757 0 0 0 1.514 0V9.757h5.486a.757.757 0 0 0 0-1.514H9.757V2.757A.757.757 0 0 0 9 2Z"
-                    />
-                  </svg>
-                </Tooltip>
+            <div className="relative z-10 flex flex-row justify-between py-[1rem] px-[1.5rem] bg-[#101010] border-b-[1px] border-[#1F1F1F] h-[3.625rem]">
+              <div
+                className="flex flex-row items-center gap-[.85rem] p-[.5rem] bg-[#101010] cursor-pointer"
+                onClick={onToggleLeftSidebar}
+              >
+                <Image
+                  preview={false}
+                  src="icons/minimize.svg"
+                  alt="bud"
+                  width={".75rem"}
+                  height={".75rem"}
+                />
+                <span className="Lato-Regular text-[#EEE] text-[1rem] font-[400]">
+                  Chats
+                </span>
               </div>
-              New Chat
-            </button>
+              <button className="group flex items-center flex-row gap-[.4rem] h-[1.375rem] text-[#B3B3B3] text-[300] text-[.625rem] font-[400] p-[.35rem] bg-[#FFFFFF08] rounded-[0.375rem] border-[1px] border-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] cursor-pointer" onClick={createNewChat}>
+
+                <div className="w-[1rem] h-[1rem] transform scale-[.6] mr-[-.2rem]  flex justify-center items-center cursor-pointer group text-[#B3B3B3] group-hover:text-[#FFFFFF]">
+                  <Tooltip title="Create a new chat">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      fill="none"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M9 2a.757.757 0 0 0-.757.757v5.486H2.757a.757.757 0 0 0 0 1.514h5.486v5.486a.757.757 0 0 0 1.514 0V9.757h5.486a.757.757 0 0 0 0-1.514H9.757V2.757A.757.757 0 0 0 9 2Z"
+                      />
+                    </svg>
+                  </Tooltip>
+                </div>
+                New Chat
+              </button>
+            </div>
+            <div className="h-[calc(100vh-3.625rem)]">
+              <HistoryList chatId={chat.id} />
+            </div>
           </div>
-          <div className="h-[calc(100vh-3.625rem)]">
-            <HistoryList chatId={chat.id} />
-          </div>
-        </div>
-      </Sider>
+        </Sider>
+      )}
       <Layout
         className={`centerLayout relative border-[1px] border-[#1F1F1F] ${!toggleLeft && "!rounded-l-[0.875rem] overflow-hidden"
           } ${!toggleRight && "!rounded-r-[0.875rem] overflow-hidden"}`}
@@ -552,6 +579,8 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
               onToggleLeftSidebar={() => setToggleLeft(!toggleLeft)}
               onToggleRightSidebar={() => setToggleRight(!toggleRight)}
               isSingleChat={isSingleChat}
+              isStructuredPrompt={isStructuredPrompt}
+              onShowPromptForm={() => setShowPromptForm(true)}
             />
           )}
         </Header>
