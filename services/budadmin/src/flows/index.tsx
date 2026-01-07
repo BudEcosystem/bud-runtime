@@ -153,6 +153,15 @@ import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
 import AddAgentSuccess from "./AddAgent/AgentSuccess";
 import AddAgentSelectType from "./AddAgent/SelectAgentType";
 import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
+import ViewToolDetails from "./ViewTool/ViewToolDetails";
+import ViewVirtualServerDetails from "./ViewVirtualServer/ViewVirtualServerDetails";
+import SelectToolSource from "./AddTool/SelectToolSource";
+import BudToolsCatalogue from "./AddTool/BudToolsCatalogue";
+import OpenAPISpecification from "./AddTool/OpenAPISpecification";
+import ToolDetailsExpanded from "./AddTool/ToolDetailsExpanded";
+import CreatingToolStatus from "./AddTool/CreatingToolStatus";
+import ToolCreationSuccess from "./AddTool/ToolCreationSuccess";
+import CreateVirtualServer from "./AddTool/CreateVirtualServer";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -325,6 +334,16 @@ export const StepComponents = {
   "add-agent-deployment-warning": AddAgentDeploymentWarning,
   "add-agent-success": AddAgentSuccess,
   "edit-agent-drawer": AgentEditDrawer,
+  // Tools
+  "view-tool-details": ViewToolDetails,
+  "view-virtual-server-details": ViewVirtualServerDetails,
+  "select-tool-source": SelectToolSource,
+  "bud-tools-catalogue": BudToolsCatalogue,
+  "openapi-specification": OpenAPISpecification,
+  "tool-details-expanded": ToolDetailsExpanded,
+  "creating-tool-status": CreatingToolStatus,
+  "tool-creation-success": ToolCreationSuccess,
+  "create-virtual-server": CreateVirtualServer,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;
