@@ -2,12 +2,19 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { parseConnectorParam } from '@/utils/urlUtils';
 
 interface ToolsContextType {
   isOpen: boolean;
   openTools: () => void;
   closeTools: () => void;
   toggleTools: () => void;
+}
+
+interface ToolsProviderProps {
+  children: React.ReactNode;
+  promptId?: string; // Optional promptId for session-scoped behavior
+  sessionIndex?: number; // Position of this session in active sessions array
 }
 
 const ToolsContext = createContext<ToolsContextType>({
@@ -17,17 +24,23 @@ const ToolsContext = createContext<ToolsContextType>({
   toggleTools: () => {},
 });
 
-export const ToolsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ToolsProvider: React.FC<ToolsProviderProps> = ({ children, promptId, sessionIndex = 0 }) => {
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Auto-open sidebar if connector parameter is in URL
+  // Auto-open sidebar if THIS session's connector is in URL (using positional index)
   useEffect(() => {
-    const connectorId = searchParams?.get('connector');
-    if (connectorId) {
-      setIsOpen(true);
+    const connectorParam = searchParams?.get('connector');
+    if (connectorParam && sessionIndex >= 0) {
+      // Parse positional array format: connectorId1,connectorId2,connectorId3
+      const connectors = parseConnectorParam(connectorParam);
+      // Check if there's a connector at this session's position
+      const connectorId = connectors[sessionIndex];
+      if (connectorId && connectorId.length > 0) {
+        setIsOpen(true);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, sessionIndex]);
 
   const openTools = useCallback(() => {
     setIsOpen(true);

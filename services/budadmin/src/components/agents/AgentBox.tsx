@@ -1522,6 +1522,8 @@ function AgentBoxInner({
             onClose={closeTools}
             promptId={session?.promptId}
             workflowId={session?.workflowId}
+            sessionIndex={index}
+            totalSessions={totalSessions}
           />
 
           {/* Model Settings Sidebar */}
@@ -1540,7 +1542,7 @@ function AgentBoxInner({
 function AgentBox(props: AgentBoxProps) {
   return (
     <SettingsProvider>
-      <ToolsProvider>
+      <ToolsProvider promptId={props.session?.promptId} sessionIndex={props.index}>
         <ModelSettingsProvider>
           <AgentBoxInner {...props} />
         </ModelSettingsProvider>

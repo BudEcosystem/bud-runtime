@@ -68,9 +68,7 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
     <div className="w-[100%]">
       {!isEditing && <div className="flex flex-row items-center justify-end gap-[.5rem] break-words">
       <div className="flex items-center justify-end gap-[.5rem] ">
-        <button>
-          <CopyText text={displayContent} />
-        </button>
+        <CopyText text={displayContent} />
         <button>
           <div className="w-[1rem] h-[1rem] flex justify-center items-center cursor-pointer group text-[#B3B3B3] hover:text-[#FFFFFF]" onClick={()=> setIsEditing(true)}>
             <svg

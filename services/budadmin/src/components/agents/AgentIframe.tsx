@@ -83,6 +83,7 @@ const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], ty
         src={iframeUrl}
         style={{ width: "100%", height: "100%", border: "none" }}
         title="AgentPlayground"
+        allow="clipboard-write; clipboard-read"
         allowFullScreen={false}
       />
     </div>

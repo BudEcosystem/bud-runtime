@@ -86,3 +86,153 @@ export function removePromptFromUrl(): void {
     newUrl
   );
 }
+
+/**
+ * Parses the connector URL parameter into an array of connector IDs
+ * Format: "connA,connB,connC" -> ["connA", "connB", "connC"]
+ * Positional: index maps to session index in the active sessions array
+ * @param param - The connector URL parameter value
+ * @returns An array of connector IDs (empty strings for positions without connectors)
+ */
+export function parseConnectorParam(param: string): string[] {
+  if (!param) return [];
+  return param.split(',');
+}
+
+/**
+ * Builds a connector URL parameter string from an array
+ * @param connectors - Array of connector IDs (empty strings for positions without connectors)
+ * @returns The connector parameter string
+ */
+export function buildConnectorParam(connectors: string[]): string {
+  // Trim trailing empty strings
+  let lastNonEmpty = connectors.length - 1;
+  while (lastNonEmpty >= 0 && !connectors[lastNonEmpty]) {
+    lastNonEmpty--;
+  }
+  if (lastNonEmpty < 0) return '';
+  return connectors.slice(0, lastNonEmpty + 1).join(',');
+}
+
+/**
+ * Updates the connector for a specific position in the URL
+ * @param position - The session index (position) to update
+ * @param connectorId - The connector ID to set, or null/empty to clear
+ * @param totalPositions - Total number of active sessions
+ */
+export function updateConnectorInUrl(position: number, connectorId: string | null, totalPositions: number): void {
+  if (typeof window === 'undefined' || position < 0) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const currentParam = params.get('connector') || '';
+  const connectors = parseConnectorParam(currentParam);
+
+  // Ensure array is large enough
+  while (connectors.length < totalPositions) {
+    connectors.push('');
+  }
+
+  // Update the position
+  connectors[position] = connectorId || '';
+
+  const newParam = buildConnectorParam(connectors);
+
+  // Skip if nothing changed
+  if (newParam === currentParam) return;
+
+  // Build URL manually to avoid encoding commas
+  const queryParts: string[] = [];
+  params.forEach((value, key) => {
+    if (key !== 'connector' && value) {
+      // Don't encode agent or prompt parameters
+      if (key === 'agent' || key === 'prompt') {
+        queryParts.push(`${key}=${value}`);
+      } else {
+        queryParts.push(`${key}=${encodeURIComponent(value)}`);
+      }
+    }
+  });
+
+  // Add connector param without encoding commas
+  if (newParam) {
+    queryParts.push(`connector=${newParam}`);
+  }
+
+  const newUrl = queryParts.length > 0
+    ? `${window.location.pathname}?${queryParts.join('&')}`
+    : window.location.pathname;
+
+  // Only update if URL actually changed
+  if (newUrl !== window.location.pathname + window.location.search) {
+    window.history.pushState({}, '', newUrl);
+  }
+}
+
+/**
+ * Gets the connector ID for a specific position from the URL
+ * @param position - The session index (position) to get connector for
+ * @returns The connector ID or null if not found/empty
+ */
+export function getConnectorFromUrlByPosition(position: number): string | null {
+  if (typeof window === 'undefined' || position < 0) return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const connectorParam = params.get('connector') || '';
+  const connectors = parseConnectorParam(connectorParam);
+  const connectorId = connectors[position];
+  return connectorId && connectorId.length > 0 ? connectorId : null;
+}
+
+/**
+ * Cleans up connector array to match the number of active sessions
+ * @param totalSessions - Total number of active sessions to keep
+ */
+export function cleanupConnectorParams(totalSessions: number): void {
+  if (typeof window === 'undefined') return;
+
+  const params = new URLSearchParams(window.location.search);
+  const currentParam = params.get('connector') || '';
+
+  if (!currentParam) return;
+
+  const connectors = parseConnectorParam(currentParam);
+
+  // Only keep connectors up to the number of sessions
+  const trimmedConnectors = connectors.slice(0, totalSessions);
+
+  const newParam = buildConnectorParam(trimmedConnectors);
+
+  // Only update URL if the param actually changed
+  if (newParam === currentParam) return;
+
+  // Build URL manually to avoid encoding commas
+  const queryParts: string[] = [];
+  params.forEach((value, key) => {
+    if (key !== 'connector' && value) {
+      // Don't encode agent or prompt parameters
+      if (key === 'agent' || key === 'prompt') {
+        queryParts.push(`${key}=${value}`);
+      } else {
+        queryParts.push(`${key}=${encodeURIComponent(value)}`);
+      }
+    }
+  });
+
+  // Add connector param without encoding commas
+  if (newParam) {
+    queryParts.push(`connector=${newParam}`);
+  }
+
+  const newUrl = queryParts.length > 0
+    ? `${window.location.pathname}?${queryParts.join('&')}`
+    : window.location.pathname;
+
+  // Only update if URL actually changed
+  if (newUrl !== window.location.pathname + window.location.search) {
+    window.history.replaceState(
+      { ...window.history.state },
+      '',
+      newUrl
+    );
+  }
+}

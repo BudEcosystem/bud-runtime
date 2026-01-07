@@ -2,22 +2,20 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Input, Spin, Empty } from 'antd';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useConnectors, Connector } from '@/stores/useConnectors';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
 import { getOAuthState, isOAuthCallback, clearOAuthState } from '@/hooks/useOAuthCallback';
-import { updateQueryParams } from '@/utils/urlUtils';
+import { updateConnectorInUrl, getConnectorFromUrlByPosition } from '@/utils/urlUtils';
 
 interface ToolsHomeProps {
   promptId?: string;
   workflowId?: string;
+  sessionIndex?: number; // Position of this session in active sessions array
+  totalSessions?: number; // Total number of active sessions
 }
 
-export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
+export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
   const {
     connectors,
     connectedTools,
@@ -29,10 +27,23 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     fetchConnectedTools,
     fetchUnregisteredTools,
     fetchConnectorDetails,
-    selectedConnectorDetails,
-    isLoadingDetails,
-    clearSelectedConnectorDetails,
+    clearConnectorDetailsForPromptId,
   } = useConnectors();
+
+  // Use proper Zustand selectors for stable references
+  const selectedConnectorDetails = useConnectors(
+    useCallback(
+      (state) => promptId ? state.connectorDetailsByPromptId[promptId] || null : null,
+      [promptId]
+    )
+  );
+
+  const isLoadingDetails = useConnectors(
+    useCallback(
+      (state) => promptId ? state.loadingDetailsByPromptId[promptId] || false : false,
+      [promptId]
+    )
+  );
 
   const [connectedExpanded, setConnectedExpanded] = useState(true);
   const [toolListExpanded, setToolListExpanded] = useState(true);
@@ -46,23 +57,28 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
   const isInitialMount = useRef(true);
   const hasRestoredFromUrl = useRef(false);
   const hasSetConnectorFromUrl = useRef(false);
-  const lastConnectorIdRef = useRef<string | null>(null);
+  const fetchedConnectorRef = useRef<string | null>(null); // Track which connector we've fetched
   const isBackNavigationRef = useRef(false);
+  const hasFetchedListsRef = useRef<string | null>(null); // Track if we've fetched lists for this promptId
 
-  // Initial load - Fetch both connected and unregistered tools
+  // Initial load - Fetch both connected and unregistered tools (ONCE per promptId)
   useEffect(() => {
-    if (promptId) {
-      // Fetch connected tools (is_registered: true)
-      fetchConnectedTools({ page: 1, prompt_id: promptId });
-      // Fetch unregistered tools (is_registered: false)
-      fetchUnregisteredTools({ page: 1, prompt_id: promptId });
+    if (!promptId || hasFetchedListsRef.current === promptId) {
+      return;
     }
-  }, [promptId, fetchConnectedTools, fetchUnregisteredTools]);
+    hasFetchedListsRef.current = promptId;
+    // Fetch connected tools (is_registered: true)
+    fetchConnectedTools({ page: 1, prompt_id: promptId });
+    // Fetch unregistered tools (is_registered: false)
+    fetchUnregisteredTools({ page: 1, prompt_id: promptId });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptId]); // Only depend on promptId, NOT on functions
 
   // Restore connector state from URL on initial load (or from OAuth state)
+  // This effect runs ONCE on mount to restore connector from URL
   useEffect(() => {
-    // Skip if user explicitly navigated back
-    if (isBackNavigationRef.current) {
+    // Skip if user explicitly navigated back or no promptId
+    if (isBackNavigationRef.current || !promptId) {
       return;
     }
 
@@ -70,59 +86,36 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     const oauthState = getOAuthState();
     const isOAuthReturn = isOAuthCallback();
 
-    // Get connector ID from URL or OAuth state
-    let connectorId = searchParams.get('connector');
+    // Get connector ID for THIS session from URL using positional lookup
+    let connectorId = getConnectorFromUrlByPosition(sessionIndex);
 
-    // Verify against actual URL - searchParams may be stale after window.history.replaceState
-    // This handles the case where connector was removed from URL (e.g., after disconnect)
-    if (typeof window !== 'undefined') {
-      const actualUrlParams = new URLSearchParams(window.location.search);
-      const actualConnectorId = actualUrlParams.get('connector');
-      if (connectorId && !actualConnectorId) {
-        // searchParams is stale, connector was removed from URL
-        connectorId = null;
-      }
-    }
-
-    // If OAuth callback and we have saved connector ID, use that
-    if (isOAuthReturn && oauthState?.connectorId && !connectorId) {
+    // If OAuth callback and we have saved connector ID for this promptId, use that
+    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId && !connectorId) {
       connectorId = oauthState.connectorId;
     }
 
-    // Reset refs when connector ID changes
-    if (connectorId !== lastConnectorIdRef.current) {
-      hasRestoredFromUrl.current = false;
-      hasSetConnectorFromUrl.current = false;
-      lastConnectorIdRef.current = connectorId;
-    }
-
-    // Prevent duplicate restoration or unnecessary calls
-    if (!connectorId || hasRestoredFromUrl.current) {
+    // Prevent duplicate fetch - use ref to track what we've already fetched
+    if (!connectorId || fetchedConnectorRef.current === connectorId) {
       return;
     }
 
-    // Don't fetch if already loading
-    if (isLoadingDetails) {
-      return;
-    }
-
-    // Don't fetch if we already have the details for this connector
-    if (selectedConnectorDetails && selectedConnectorDetails.id === connectorId) {
-      hasRestoredFromUrl.current = true;
-      return;
-    }
-
-    // Fetch connector details from API (only once)
+    // Mark as fetched BEFORE making the call to prevent re-entry
+    fetchedConnectorRef.current = connectorId;
     hasRestoredFromUrl.current = true;
-    fetchConnectorDetails(connectorId).catch(() => {
+
+    // Fetch connector details from API with session scope
+    fetchConnectorDetails(connectorId, promptId).catch(() => {
+      // Reset on error so we can retry
+      fetchedConnectorRef.current = null;
       hasRestoredFromUrl.current = false;
     });
-  }, [searchParams, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptId, sessionIndex]); // Only depend on identity props, NOT on loading state or functions
 
   // Set selected connector when details are fetched
   useEffect(() => {
-    // Skip if user explicitly navigated back
-    if (isBackNavigationRef.current) {
+    // Skip if user explicitly navigated back or no promptId
+    if (isBackNavigationRef.current || !promptId) {
       return;
     }
 
@@ -130,21 +123,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     const oauthState = getOAuthState();
     const isOAuthReturn = isOAuthCallback();
 
-    // Get connector ID from URL or OAuth state
-    let connectorId = searchParams.get('connector');
+    // Get connector ID for THIS session from URL using positional lookup
+    let connectorId = getConnectorFromUrlByPosition(sessionIndex);
 
-    // Verify against actual URL - searchParams may be stale after window.history.replaceState
-    // This handles the case where connector was removed from URL (e.g., after disconnect)
-    if (typeof window !== 'undefined') {
-      const actualUrlParams = new URLSearchParams(window.location.search);
-      const actualConnectorId = actualUrlParams.get('connector');
-      if (connectorId && !actualConnectorId) {
-        // searchParams is stale, connector was removed from URL
-        connectorId = null;
-      }
-    }
-
-    if (isOAuthReturn && oauthState?.connectorId && !connectorId) {
+    // If OAuth callback and we have saved connector ID for this promptId, use that
+    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId && !connectorId) {
       connectorId = oauthState.connectorId;
     }
 
@@ -168,7 +151,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
       isFromConnectedSection: isConnected
     } as Connector);
     setViewMode('details');
-  }, [selectedConnectorDetails, searchParams, connectedTools]);
+  }, [selectedConnectorDetails, promptId, sessionIndex, connectedTools]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -245,13 +228,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     setSelectedConnector({ ...connector, isFromConnectedSection: isConnected } as Connector);
     setViewMode('details');
 
-    // Add connector ID to URL parameters while preserving all existing parameters
-    const params = new URLSearchParams(window.location.search);
-    params.set('connector', connector.id);
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-
-    // Use window.history.pushState to avoid Next.js router interference
-    window.history.pushState({}, '', newUrl);
+    // Add connector ID to URL using positional format (index matches prompt IDs position)
+    updateConnectorInUrl(sessionIndex, connector.id, totalSessions);
   };
 
   const handleBackToList = (options?: { removeConnectorFromUrl?: boolean }) => {
@@ -264,18 +242,20 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     // Reset all URL restoration flags
     hasRestoredFromUrl.current = false;
     hasSetConnectorFromUrl.current = false;
-    lastConnectorIdRef.current = null;
+    fetchedConnectorRef.current = null;
 
-    // Clear connector details from store to prevent effects from restoring
-    clearSelectedConnectorDetails();
+    // Clear session-scoped connector details from store
+    if (promptId) {
+      clearConnectorDetailsForPromptId(promptId);
+    }
 
     // Clear OAuth localStorage state (does not affect URL)
     clearOAuthState();
 
     // Remove connector from URL if explicitly requested (e.g., after disconnect)
-    // Otherwise, URL is preserved to maintain browser history for normal back navigation
+    // Uses positional URL update (only removes this session's connector position)
     if (options?.removeConnectorFromUrl) {
-      updateQueryParams({ connector: null }, { replaceHistory: true });
+      updateConnectorInUrl(sessionIndex, null, totalSessions);
     }
 
     // Refresh both lists when coming back
@@ -290,8 +270,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
     });
   };
 
-  // Show loading state when fetching connector from URL
-  if (isLoadingDetails && searchParams.get('connector')) {
+  // Show loading state when fetching connector from URL (positional check)
+  if (isLoadingDetails && getConnectorFromUrlByPosition(sessionIndex)) {
     return (
       <div className="flex flex-col h-full text-white">
         <div className="px-[.857rem] py-4 border-b border-[#1F1F1F]">
@@ -306,7 +286,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId }) =>
 
   // Render details view
   if (viewMode === 'details' && selectedConnector) {
-    return <ConnectorDetails connector={selectedConnector} onBack={handleBackToList} promptId={promptId} workflowId={workflowId} />;
+    return <ConnectorDetails connector={selectedConnector} onBack={handleBackToList} promptId={promptId} workflowId={workflowId} sessionIndex={sessionIndex} totalSessions={totalSessions} />;
   }
 
   // Render list view

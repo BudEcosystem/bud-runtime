@@ -2,6 +2,12 @@ import { create } from "zustand";
 import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 
+// Module-level tracking to prevent duplicate fetches (survives component remounts)
+const inFlightFetches = new Set<string>();
+const completedFetches = new Set<string>();
+const inFlightListFetches = new Set<string>();
+const completedListFetches = new Set<string>();
+
 // Types based on API response
 export interface Connector {
   id: string;
@@ -57,6 +63,7 @@ interface ConnectorsStore {
   connectors: Connector[];
   connectedTools: Connector[];
   selectedConnectorDetails: Connector | null;
+  connectorDetailsByPromptId: Record<string, Connector | null>; // Session-scoped connector details
   totalCount: number;
   currentPage: number;
   pageSize: number;
@@ -66,6 +73,7 @@ interface ConnectorsStore {
   isLoading: boolean;
   isLoadingMore: boolean;
   isLoadingDetails: boolean;
+  loadingDetailsByPromptId: Record<string, boolean>; // Session-scoped loading states
 
   // Filter state
   searchQuery: string;
@@ -73,9 +81,14 @@ interface ConnectorsStore {
   // Public Actions - Used by Tools components
   fetchConnectedTools: (params?: ConnectorsListParams) => Promise<void>;
   fetchUnregisteredTools: (params?: ConnectorsListParams) => Promise<void>;
-  fetchConnectorDetails: (connectorId: string) => Promise<void>;
+  fetchConnectorDetails: (connectorId: string, promptId?: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
   clearSelectedConnectorDetails: () => void;
+
+  // Session-scoped connector details actions
+  getConnectorDetailsForPromptId: (promptId: string) => Connector | null;
+  clearConnectorDetailsForPromptId: (promptId: string) => void;
+  isLoadingDetailsForPromptId: (promptId: string) => boolean;
 }
 
 export const useConnectors = create<ConnectorsStore>((set, get) => {
@@ -85,6 +98,17 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     isRegistered: boolean,
     updateTarget: 'connectedTools' | 'connectors'
   ) => {
+    // Create a unique key for this fetch (only guard page 1 fetches, allow pagination)
+    const fetchKey = `${updateTarget}:${params?.prompt_id || 'global'}:${isRegistered}:page${params?.page || 1}`;
+
+    // Only guard against duplicate initial fetches (page 1), allow pagination
+    if (params?.page === 1 || !params?.page) {
+      if (inFlightListFetches.has(fetchKey) || completedListFetches.has(fetchKey)) {
+        return;
+      }
+      inFlightListFetches.add(fetchKey);
+    }
+
     const state = get();
 
     // Set loading state based on pagination
@@ -151,6 +175,11 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
             isLoadingMore: false,
           });
         }
+
+        // Mark as completed for page 1 fetches
+        if (params?.page === 1 || !params?.page) {
+          completedListFetches.add(fetchKey);
+        }
       }
     } catch (error) {
       console.error(`Error fetching ${isRegistered ? 'connected' : 'unregistered'} tools:`, error);
@@ -158,6 +187,11 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
         isLoading: false,
         isLoadingMore: false
       });
+    } finally {
+      // Always remove from in-flight for page 1 fetches
+      if (params?.page === 1 || !params?.page) {
+        inFlightListFetches.delete(fetchKey);
+      }
     }
   };
 
@@ -166,6 +200,7 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     connectors: [],
     connectedTools: [],
     selectedConnectorDetails: null,
+    connectorDetailsByPromptId: {},
     totalCount: 0,
     currentPage: 1,
     pageSize: 10,
@@ -173,6 +208,7 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     isLoading: false,
     isLoadingMore: false,
     isLoadingDetails: false,
+    loadingDetailsByPromptId: {},
     searchQuery: "",
 
     // Public wrapper: Fetch connected tools (is_registered: true)
@@ -185,24 +221,89 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
       await fetchConnectors(params, false, 'connectors');
     },
 
-    // Fetch connector details
-    fetchConnectorDetails: async (connectorId: string) => {
-      set({ isLoadingDetails: true });
+    // Fetch connector details (supports both global and session-scoped storage)
+    fetchConnectorDetails: async (connectorId: string, promptId?: string) => {
+      // Create a unique key for this fetch
+      const fetchKey = promptId ? `${promptId}:${connectorId}` : connectorId;
+
+      // Guard 1: Skip if this exact fetch is already in flight or completed (module-level)
+      if (inFlightFetches.has(fetchKey) || completedFetches.has(fetchKey)) {
+        return;
+      }
+
+      const state = get();
+
+      // Guard 2: Skip if already loading for this promptId (state-level)
+      if (promptId && state.loadingDetailsByPromptId[promptId]) {
+        return;
+      }
+
+      // Guard 3: Skip if we already have data for this connector+promptId (state-level)
+      if (promptId && state.connectorDetailsByPromptId[promptId]?.id === connectorId) {
+        completedFetches.add(fetchKey); // Mark as completed since we have data
+        return;
+      }
+
+      // Mark as in-flight IMMEDIATELY (before any async operations)
+      inFlightFetches.add(fetchKey);
+
+      // Set loading state
+      if (promptId) {
+        set({
+          loadingDetailsByPromptId: {
+            ...state.loadingDetailsByPromptId,
+            [promptId]: true,
+          },
+        });
+      } else {
+        set({ isLoadingDetails: true });
+      }
 
       try {
         const response = await AppRequest.Get(`${tempApiBaseUrl}/prompts/connectors/${connectorId}`);
 
         if (response.data && response.data.connector) {
+          if (promptId) {
+            // Store in session-scoped map
+            set({
+              connectorDetailsByPromptId: {
+                ...get().connectorDetailsByPromptId,
+                [promptId]: response.data.connector,
+              },
+              loadingDetailsByPromptId: {
+                ...get().loadingDetailsByPromptId,
+                [promptId]: false,
+              },
+            });
+          } else {
+            // Legacy: store in global state for backward compatibility
+            set({
+              selectedConnectorDetails: response.data.connector,
+              isLoadingDetails: false,
+            });
+          }
+        }
+
+        // Mark as completed (prevents future duplicate fetches)
+        completedFetches.add(fetchKey);
+      } catch (error) {
+        console.error("Error fetching connector details:", error);
+        if (promptId) {
           set({
-            selectedConnectorDetails: response.data.connector,
+            loadingDetailsByPromptId: {
+              ...get().loadingDetailsByPromptId,
+              [promptId]: false,
+            },
+          });
+        } else {
+          set({
             isLoadingDetails: false,
           });
         }
-      } catch (error) {
-        console.error("Error fetching connector details:", error);
-        set({
-          isLoadingDetails: false,
-        });
+        // On error, don't mark as completed so it can be retried
+      } finally {
+        // Always remove from in-flight
+        inFlightFetches.delete(fetchKey);
       }
     },
 
@@ -214,6 +315,29 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     // Clear selected connector details (used when navigating back)
     clearSelectedConnectorDetails: () => {
       set({ selectedConnectorDetails: null });
+    },
+
+    // Session-scoped connector details actions
+    getConnectorDetailsForPromptId: (promptId: string) => {
+      return get().connectorDetailsByPromptId[promptId] || null;
+    },
+
+    clearConnectorDetailsForPromptId: (promptId: string) => {
+      const current = get().connectorDetailsByPromptId;
+      const connector = current[promptId];
+
+      // Clear from completedFetches so user can re-fetch this connector
+      if (connector?.id) {
+        const fetchKey = `${promptId}:${connector.id}`;
+        completedFetches.delete(fetchKey);
+      }
+
+      const { [promptId]: _, ...rest } = current;
+      set({ connectorDetailsByPromptId: rest });
+    },
+
+    isLoadingDetailsForPromptId: (promptId: string) => {
+      return get().loadingDetailsByPromptId[promptId] || false;
     },
   };
 });

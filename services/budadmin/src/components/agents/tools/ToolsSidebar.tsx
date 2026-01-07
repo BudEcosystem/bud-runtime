@@ -8,6 +8,8 @@ interface ToolsSidebarProps {
   onClose?: () => void;
   promptId?: string;
   workflowId?: string;
+  sessionIndex?: number; // Position of this session in active sessions array
+  totalSessions?: number; // Total number of active sessions
 }
 
 export const ToolsSidebar: React.FC<ToolsSidebarProps> = ({
@@ -15,6 +17,8 @@ export const ToolsSidebar: React.FC<ToolsSidebarProps> = ({
   onClose,
   promptId,
   workflowId,
+  sessionIndex = 0,
+  totalSessions = 1,
 }) => {
   if (!isOpen) return null;
 
@@ -32,7 +36,7 @@ export const ToolsSidebar: React.FC<ToolsSidebarProps> = ({
           backgroundRepeat: 'no-repeat'
         }}
       >
-        <ToolsHome promptId={promptId} workflowId={workflowId} />
+        <ToolsHome promptId={promptId} workflowId={workflowId} sessionIndex={sessionIndex} totalSessions={totalSessions} />
       </div>
     </div>
   );

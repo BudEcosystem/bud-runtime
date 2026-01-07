@@ -3,7 +3,6 @@ import { copyToClipboard } from "../../../../utils/clipboard";
 
 
 export function CopyText(props: { text: string }) {
-
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {

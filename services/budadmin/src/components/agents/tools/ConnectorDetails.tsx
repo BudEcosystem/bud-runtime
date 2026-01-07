@@ -11,7 +11,8 @@ import { ConnectorService } from 'src/services/connectorService';
 import { CredentialConfigStep } from './CredentialConfigStep';
 import { ToolSelectionStep } from './ToolSelectionStep';
 import { useAgentStore } from '@/stores/useAgentStore';
-import { OAuthState, OAuthSessionData, clearOAuthUrlState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
+import { OAuthState, OAuthSessionData, clearOAuthState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
+import { updateConnectorInUrl } from '@/utils/urlUtils';
 
 interface Tool {
   id: string;
@@ -24,6 +25,8 @@ interface ConnectorDetailsProps {
   onBack: (options?: { removeConnectorFromUrl?: boolean }) => void;
   promptId?: string;
   workflowId?: string;
+  sessionIndex?: number; // Position of this session in active sessions array
+  totalSessions?: number; // Total number of active sessions
 }
 
 /**
@@ -71,12 +74,6 @@ const getOAuthState = (): OAuthState | null => {
   }
 };
 
-const clearOAuthState = () => {
-  // Use clearOAuthUrlState which only clears URL-related state
-  // This preserves session data (selectedDeployment, etc.) for restoration in agents/index.tsx
-  clearOAuthUrlState();
-};
-
 // Helper to identify redirect URI fields
 const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
 const isRedirectUriField = (fieldName: string) =>
@@ -87,6 +84,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   onBack,
   promptId,
   workflowId,
+  sessionIndex = 0,
+  totalSessions = 1,
 }) => {
   const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
   const { getSessionByPromptId } = useAgentStore();
@@ -271,8 +270,14 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.delete('code');
         urlParams.delete('state');
-        // Keep 'connector' param so back navigation works properly
 
+        // Update connector URL using positional format (matches prompt IDs order)
+        // This ensures the connector is properly mapped to the correct session position
+        if (savedState.connectorId && savedState.sessionIndex !== undefined) {
+          updateConnectorInUrl(savedState.sessionIndex, savedState.connectorId, savedState.totalSessions ?? 1);
+        }
+
+        // Clean URL from OAuth params
         const cleanUrl = urlParams.toString()
           ? `${window.location.pathname}?${urlParams.toString()}`
           : window.location.pathname;
@@ -554,6 +559,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 step: 1,
                 timestamp: Date.now(),
                 sessionData: sessionData,
+                sessionIndex: sessionIndex,
+                totalSessions: totalSessions,
               });
 
               // Redirect to OAuth provider
