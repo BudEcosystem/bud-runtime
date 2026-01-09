@@ -935,7 +935,7 @@ class ObservabilityMetricsService:
         # Subquery to find matching TraceIds (used by both modes for flatten, count for non-flatten)
         trace_id_subquery = f"""
             SELECT DISTINCT TraceId
-            FROM default_v4.otel_traces
+            FROM metrics.otel_traces
             WHERE Timestamp >= %(from_date)s
               AND Timestamp <= %(to_date)s
               AND ParentSpanId = ''
@@ -948,7 +948,7 @@ class ObservabilityMetricsService:
             # Flatten mode: return all spans for matching traces
             count_query = f"""
             SELECT count() as total_count
-            FROM default_v4.otel_traces
+            FROM metrics.otel_traces
             WHERE TraceId IN ({trace_id_subquery})
             """  # nosec B608
 
@@ -958,7 +958,7 @@ class ObservabilityMetricsService:
             # Data query: all spans for matching traces, sorted by timestamp
             data_query = f"""
             SELECT *
-            FROM default_v4.otel_traces
+            FROM metrics.otel_traces
             WHERE TraceId IN ({trace_id_subquery})
             ORDER BY Timestamp DESC
             LIMIT %(limit)s OFFSET %(offset)s
@@ -1019,7 +1019,7 @@ class ObservabilityMetricsService:
             # Default mode: return only root spans with child count
             count_query = f"""
             SELECT count() as total_count
-            FROM default_v4.otel_traces
+            FROM metrics.otel_traces
             WHERE Timestamp >= %(from_date)s
               AND Timestamp <= %(to_date)s
               AND ParentSpanId = ''
@@ -1036,10 +1036,10 @@ class ObservabilityMetricsService:
             SELECT
                 t.*,
                 COALESCE(counts.span_count, 1) - 1 as child_span_count
-            FROM default_v4.otel_traces t
+            FROM metrics.otel_traces t
             LEFT JOIN (
                 SELECT TraceId, count() as span_count
-                FROM default_v4.otel_traces
+                FROM metrics.otel_traces
                 GROUP BY TraceId
             ) as counts ON t.TraceId = counts.TraceId
             WHERE t.Timestamp >= %(from_date)s
@@ -1126,7 +1126,7 @@ class ObservabilityMetricsService:
 
         query = """
         SELECT *
-        FROM default_v4.otel_traces
+        FROM metrics.otel_traces
         WHERE TraceId = %(trace_id)s
         ORDER BY Timestamp ASC
         """
