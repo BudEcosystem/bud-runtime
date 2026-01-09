@@ -439,7 +439,7 @@ class PromptService(SessionMixin):
             "to_date": to_date.isoformat(),
             "offset": offset,
             "limit": limit,
-            "flatten": flatten,
+            "flatten": str(flatten).lower(),
         }
 
         async with aiohttp.ClientSession() as http_session:
