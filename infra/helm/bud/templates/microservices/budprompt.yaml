@@ -42,6 +42,10 @@ spec:
         ports:
         - containerPort: 3015
         env:
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
           # - name: BUD_GATEWAY_BASE_URL
             # value: {{ include "bud.ingress.url.budgateway" $ }}
           - name: PSQL_HOST

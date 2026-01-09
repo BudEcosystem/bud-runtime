@@ -87,6 +87,10 @@ spec:
           ports:
             - containerPort: 3000
           env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             - name: TENSORZERO_REDIS_URL
               value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2"
             - name: TENSORZERO_CLICKHOUSE_URL
