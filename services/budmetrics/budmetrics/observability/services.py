@@ -1040,6 +1040,7 @@ class ObservabilityMetricsService:
             LEFT JOIN (
                 SELECT TraceId, count() as span_count
                 FROM metrics.otel_traces
+                WHERE TraceId IN ({trace_id_subquery})
                 GROUP BY TraceId
             ) as counts ON t.TraceId = counts.TraceId
             WHERE t.Timestamp >= %(from_date)s
