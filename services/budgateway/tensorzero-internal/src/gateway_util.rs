@@ -683,6 +683,7 @@ mod tests {
             analytics: AnalyticsConfig {
                 enabled: false,
                 geoip_db_path: None,
+                otel_only: false, // Use legacy direct writes
             },
             blocking: BlockingConfig { enabled: false },
         };
@@ -744,6 +745,7 @@ mod tests {
             analytics: AnalyticsConfig {
                 enabled: false,
                 geoip_db_path: None,
+                otel_only: false,
             },
             blocking: BlockingConfig { enabled: false },
         };
@@ -774,6 +776,7 @@ mod tests {
             analytics: AnalyticsConfig {
                 enabled: false,
                 geoip_db_path: None,
+                otel_only: false,
             },
             blocking: BlockingConfig { enabled: false },
         };
@@ -972,6 +975,7 @@ mod tests {
             analytics: AnalyticsConfig {
                 enabled: false,
                 geoip_db_path: None,
+                otel_only: false,
             },
             blocking: BlockingConfig { enabled: false },
         };

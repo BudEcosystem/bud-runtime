@@ -281,6 +281,11 @@ pub struct AnalyticsConfig {
     #[serde(default)]
     pub enabled: bool,
     pub geoip_db_path: Option<std::path::PathBuf>,
+    /// When enabled, skip direct ClickHouse writes and rely only on OTel spans.
+    /// The OTel collector will process spans into InferenceFact and rollup tables
+    /// via materialized views. This reduces duplicate writes and improves performance.
+    #[serde(default)]
+    pub otel_only: bool,
 }
 
 #[derive(Debug, Default, Deserialize, PartialEq)]

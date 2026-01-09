@@ -1038,11 +1038,19 @@ class ClickHouseMigration:
             "metrics.HAMISliceMetrics",
             "metrics.NodeEvents",
         ]
+        # OTel Analytics tables (flat + rollup architecture)
+        otel_analytics_tables = [
+            "InferenceFact",
+            "InferenceMetrics5m",
+            "InferenceMetrics1h",
+            "InferenceMetrics1d",
+            "GeoAnalytics1h",
+        ]
 
         if self.include_model_inference:
             budproxy_tables.append("ModelInference")
 
-        all_tables = budproxy_tables + metrics_tables
+        all_tables = budproxy_tables + metrics_tables + otel_analytics_tables
 
         for table in all_tables:
             try:
@@ -1093,6 +1101,993 @@ class ClickHouseMigration:
 
         except Exception as e:
             logger.warning(f"Could not update api_key_project_id (may not be critical): {e}")
+
+    # =============================================================================
+    # OTel Analytics Tables (Flat + Rollup Architecture)
+    # =============================================================================
+    # These tables form the new analytics architecture that processes OTel traces
+    # into denormalized flat tables and pre-aggregated rollup tables for
+    # sub-100ms query performance at scale.
+    # =============================================================================
+
+    def _get_inference_fact_ttl_days(self, default: int = 30) -> int:
+        """Get TTL in days for InferenceFact from environment variable."""
+        try:
+            return int(os.getenv("CLICKHOUSE_TTL_INFERENCE_FACT", default))
+        except ValueError:
+            logger.warning(f"Invalid CLICKHOUSE_TTL_INFERENCE_FACT value, using default: {default} days")
+            return default
+
+    def _get_inference_metrics_5m_ttl_days(self, default: int = 90) -> int:
+        """Get TTL in days for InferenceMetrics5m from environment variable."""
+        try:
+            return int(os.getenv("CLICKHOUSE_TTL_INFERENCE_METRICS_5M", default))
+        except ValueError:
+            logger.warning(f"Invalid CLICKHOUSE_TTL_INFERENCE_METRICS_5M value, using default: {default} days")
+            return default
+
+    def _get_inference_metrics_1h_ttl_days(self, default: int = 365) -> int:
+        """Get TTL in days for InferenceMetrics1h from environment variable."""
+        try:
+            return int(os.getenv("CLICKHOUSE_TTL_INFERENCE_METRICS_1H", default))
+        except ValueError:
+            logger.warning(f"Invalid CLICKHOUSE_TTL_INFERENCE_METRICS_1H value, using default: {default} days")
+            return default
+
+    def _get_inference_metrics_1d_ttl_days(self, default: int = 1095) -> int:
+        """Get TTL in days for InferenceMetrics1d (3 years) from environment variable."""
+        try:
+            return int(os.getenv("CLICKHOUSE_TTL_INFERENCE_METRICS_1D", default))
+        except ValueError:
+            logger.warning(f"Invalid CLICKHOUSE_TTL_INFERENCE_METRICS_1D value, using default: {default} days")
+            return default
+
+    def _get_geo_analytics_ttl_days(self, default: int = 365) -> int:
+        """Get TTL in days for GeoAnalytics1h from environment variable."""
+        try:
+            return int(os.getenv("CLICKHOUSE_TTL_GEO_ANALYTICS", default))
+        except ValueError:
+            logger.warning(f"Invalid CLICKHOUSE_TTL_GEO_ANALYTICS value, using default: {default} days")
+            return default
+
+    async def create_inference_fact_table(self):
+        """Create InferenceFact denormalized flat table for analytics.
+
+        This table combines all OTel span data into a single denormalized table,
+        eliminating JOINs for analytics queries. It serves as the source of truth
+        for detailed inference data and feeds the rollup tables via materialized views.
+
+        Key design decisions:
+        - Daily partitioning for efficient TTL and query pruning
+        - Order by (project_id, endpoint_id, model_id, timestamp) for common query patterns
+        - LowCardinality for categorical strings (model_name, provider, etc.)
+        - Compression codecs: Delta+ZSTD for timestamps, Gorilla+ZSTD for metrics
+        - Data skipping indexes for fast filtering
+        - Projections for common query patterns
+        """
+        logger.info("Creating InferenceFact table...")
+
+        ttl_days = self._get_inference_fact_ttl_days()
+        query = f"""
+        CREATE TABLE IF NOT EXISTS InferenceFact
+        (
+            -- Primary Keys & Identifiers
+            id UUID CODEC(ZSTD(1)),
+            trace_id String CODEC(ZSTD(1)),
+            span_id String CODEC(ZSTD(1)),
+            inference_id UUID CODEC(ZSTD(1)),
+            episode_id Nullable(UUID) CODEC(ZSTD(1)),
+
+            -- Timestamps (critical for partitioning/ordering)
+            timestamp DateTime64(3) CODEC(Delta, ZSTD(1)),
+            request_arrival_time Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+            request_forward_time Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+            response_timestamp Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+
+            -- Project/Endpoint Context (denormalized for fast filtering)
+            project_id UUID CODEC(ZSTD(1)),
+            endpoint_id UUID CODEC(ZSTD(1)),
+            model_id UUID CODEC(ZSTD(1)),
+            api_key_id Nullable(UUID) CODEC(ZSTD(1)),
+            api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+            user_id Nullable(String) CODEC(ZSTD(1)),
+
+            -- Model Information (LowCardinality for dictionary encoding)
+            model_name LowCardinality(String),
+            model_provider LowCardinality(String),
+            model_version LowCardinality(Nullable(String)),
+            function_name LowCardinality(Nullable(String)),
+            variant_name LowCardinality(Nullable(String)),
+            endpoint_type LowCardinality(String) DEFAULT 'chat',
+
+            -- Performance Metrics (Delta for time-series integers, ZSTD for compression)
+            response_time_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            ttft_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            gateway_processing_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            total_duration_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            processing_time_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+
+            -- Token Usage
+            input_tokens Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            output_tokens Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            total_tokens Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+
+            -- Cost
+            cost Nullable(Float64) CODEC(Gorilla, ZSTD(1)),
+
+            -- Status & Success
+            is_success Bool DEFAULT true,
+            status_code Nullable(UInt16) CODEC(ZSTD(1)),
+            finish_reason LowCardinality(Nullable(String)),
+            cached Bool DEFAULT false,
+
+            -- Error Information
+            error_type Nullable(String) CODEC(ZSTD(1)),
+            error_code Nullable(String) CODEC(ZSTD(1)),
+            error_message Nullable(String) CODEC(ZSTD(3)),
+
+            -- Geographic Data (from gateway_analytics)
+            client_ip Nullable(IPv4),
+            country_code LowCardinality(Nullable(String)),
+            region Nullable(String) CODEC(ZSTD(1)),
+            city Nullable(String) CODEC(ZSTD(1)),
+            latitude Nullable(Float32),
+            longitude Nullable(Float32),
+            timezone LowCardinality(Nullable(String)),
+            asn Nullable(UInt32),
+            isp Nullable(String) CODEC(ZSTD(1)),
+
+            -- Client Metadata
+            user_agent Nullable(String) CODEC(ZSTD(3)),
+            device_type LowCardinality(Nullable(String)),
+            browser_name LowCardinality(Nullable(String)),
+            os_name LowCardinality(Nullable(String)),
+            is_bot Bool DEFAULT false,
+
+            -- Request Context
+            method LowCardinality(String) DEFAULT 'POST',
+            path Nullable(String) CODEC(ZSTD(1)),
+            body_size Nullable(UInt32),
+            response_size Nullable(UInt32),
+
+            -- Blocking Information
+            is_blocked Bool DEFAULT false,
+            block_reason Nullable(String) CODEC(ZSTD(1)),
+            block_rule_id Nullable(String) CODEC(ZSTD(1)),
+
+            -- Routing
+            routing_decision LowCardinality(Nullable(String)),
+
+            -- Large Text Fields (stored separately for efficiency)
+            system_prompt Nullable(String) CODEC(ZSTD(3)),
+            input_messages Nullable(String) CODEC(ZSTD(3)),
+            output Nullable(String) CODEC(ZSTD(3)),
+            raw_request Nullable(String) CODEC(ZSTD(3)),
+            raw_response Nullable(String) CODEC(ZSTD(3)),
+
+            -- Metadata (JSON stored as String)
+            tags Nullable(String) CODEC(ZSTD(1)),
+            inference_params Nullable(String) CODEC(ZSTD(1)),
+            extra_body Nullable(String) CODEC(ZSTD(1)),
+            response_analysis Nullable(String) CODEC(ZSTD(1)),
+            guardrail_scan_summary Nullable(String) CODEC(ZSTD(1)),
+
+            -- Gateway Request/Response (from ModelInference)
+            gateway_request Nullable(String) CODEC(ZSTD(3)),
+            gateway_response Nullable(String) CODEC(ZSTD(3)),
+
+            -- Network/Protocol (from GatewayAnalytics)
+            proxy_chain Nullable(String) CODEC(ZSTD(1)),
+            protocol_version LowCardinality(String) DEFAULT 'HTTP/1.1',
+
+            -- Additional Geo (from GatewayAnalytics)
+            country_name Nullable(String) CODEC(ZSTD(1)),
+
+            -- Additional Client Info (from GatewayAnalytics)
+            browser_version Nullable(String) CODEC(ZSTD(1)),
+            os_version Nullable(String) CODEC(ZSTD(1)),
+
+            -- Request Details (from GatewayAnalytics)
+            query_params Nullable(String) CODEC(ZSTD(1)),
+            request_headers Nullable(String) CODEC(ZSTD(3)),
+            response_headers Nullable(String) CODEC(ZSTD(3)),
+
+            -- Auth (from GatewayAnalytics)
+            auth_method LowCardinality(Nullable(String)),
+
+            -- Tool Params (from ChatInference)
+            tool_params Nullable(String) CODEC(ZSTD(1))
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMMDD(timestamp)
+        ORDER BY (project_id, endpoint_id, model_id, timestamp, inference_id)
+        TTL toDateTime(timestamp) + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192, allow_nullable_key = 1
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("InferenceFact table created successfully")
+
+            # Create data skipping indexes for fast filtering
+            indexes = [
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_model_name (model_name) TYPE set(100) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_model_provider (model_provider) TYPE set(50) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_status_code (status_code) TYPE set(30) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(200) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_is_success (is_success) TYPE minmax GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_is_blocked (is_blocked) TYPE minmax GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_user_id (user_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_api_key_project (api_key_project_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_inference_id (inference_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_trace_id (trace_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+            logger.info("InferenceFact indexes created successfully")
+
+        except Exception as e:
+            logger.error(f"Error creating InferenceFact table: {e}")
+            raise
+
+    async def create_inference_metrics_5m_table(self):
+        """Create InferenceMetrics5m rollup table for 5-minute aggregations.
+
+        This table stores pre-aggregated metrics at 5-minute intervals for fast
+        /timeseries API queries with 1m-30m intervals. It uses AggregatingMergeTree
+        for efficient incremental aggregation.
+
+        Key features:
+        - quantilesTDigest for accurate percentile calculations across time buckets
+        - uniqState for approximate unique user counts (HyperLogLog)
+        - Grouped by project, endpoint, model for common filter patterns
+        """
+        logger.info("Creating InferenceMetrics5m table...")
+
+        ttl_days = self._get_inference_metrics_5m_ttl_days()
+        query = f"""
+        CREATE TABLE IF NOT EXISTS InferenceMetrics5m
+        (
+            -- Time bucket (5-minute intervals)
+            ts DateTime CODEC(Delta, ZSTD(1)),
+
+            -- Grouping dimensions
+            project_id UUID CODEC(ZSTD(1)),
+            endpoint_id UUID CODEC(ZSTD(1)),
+            model_id UUID CODEC(ZSTD(1)),
+            model_name LowCardinality(String),
+            model_provider LowCardinality(String),
+            api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+
+            -- Count metrics (Delta for sequential integer compression)
+            request_count UInt64 CODEC(Delta, ZSTD(1)),
+            success_count UInt64 CODEC(Delta, ZSTD(1)),
+            error_count UInt64 CODEC(Delta, ZSTD(1)),
+            cached_count UInt64 CODEC(Delta, ZSTD(1)),
+            blocked_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Token metrics (sum for throughput)
+            input_tokens_sum UInt64 CODEC(Delta, ZSTD(1)),
+            output_tokens_sum UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Latency metrics (for percentile approximation)
+            response_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            response_time_count UInt64 CODEC(Delta, ZSTD(1)),
+            response_time_min Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            response_time_max Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            ttft_sum UInt64 CODEC(Delta, ZSTD(1)),
+            ttft_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Queuing time metrics (for weighted average)
+            queuing_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            queuing_time_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Percentile sketches (T-Digest for accurate percentiles)
+            response_time_quantiles AggregateFunction(quantilesTDigest(0.5, 0.95, 0.99), UInt32),
+            ttft_quantiles AggregateFunction(quantilesTDigest(0.5, 0.95, 0.99), UInt32),
+
+            -- Cost (Gorilla is valid for Float64)
+            cost_sum Float64 CODEC(Gorilla, ZSTD(1)),
+
+            -- Unique counts (HyperLogLog for cardinality)
+            unique_users AggregateFunction(uniq, String)
+        )
+        ENGINE = AggregatingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (project_id, endpoint_id, model_id, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("InferenceMetrics5m table created successfully")
+
+            # Create indexes for common query patterns
+            indexes = [
+                "ALTER TABLE InferenceMetrics5m ADD INDEX IF NOT EXISTS idx_model_name (model_name) TYPE set(100) GRANULARITY 4",
+                "ALTER TABLE InferenceMetrics5m ADD INDEX IF NOT EXISTS idx_api_key_project (api_key_project_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating InferenceMetrics5m table: {e}")
+            raise
+
+    async def create_inference_metrics_1h_table(self):
+        """Create InferenceMetrics1h rollup table for hourly aggregations.
+
+        This table stores pre-aggregated metrics at hourly intervals for
+        /timeseries API queries with 1h-1w intervals and /aggregated API.
+        It uses AggregatingMergeTree and merges from the 5m rollup table.
+
+        Note: Uses quantilesTDigestMerge for combining T-Digest states from 5m table.
+        """
+        logger.info("Creating InferenceMetrics1h table...")
+
+        ttl_days = self._get_inference_metrics_1h_ttl_days()
+        query = f"""
+        CREATE TABLE IF NOT EXISTS InferenceMetrics1h
+        (
+            -- Time bucket (hourly intervals)
+            ts DateTime CODEC(Delta, ZSTD(1)),
+
+            -- Grouping (less granular than 5m - no endpoint_id)
+            project_id UUID CODEC(ZSTD(1)),
+            model_id UUID CODEC(ZSTD(1)),
+            model_name LowCardinality(String),
+            model_provider LowCardinality(String),
+            api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+
+            -- Aggregated counts (Delta for sequential integer compression)
+            request_count UInt64 CODEC(Delta, ZSTD(1)),
+            success_count UInt64 CODEC(Delta, ZSTD(1)),
+            error_count UInt64 CODEC(Delta, ZSTD(1)),
+            cached_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Token sums
+            input_tokens_sum UInt64 CODEC(Delta, ZSTD(1)),
+            output_tokens_sum UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Latency sum and count for computing true average
+            response_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            response_time_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- TTFT sum and count for computing true average
+            ttft_sum UInt64 CODEC(Delta, ZSTD(1)),
+            ttft_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Queuing time metrics (for weighted average)
+            queuing_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            queuing_time_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Latency and TTFT quantiles (merged from 5m)
+            response_time_quantiles AggregateFunction(quantilesTDigest(0.5, 0.95, 0.99), UInt32),
+            ttft_quantiles AggregateFunction(quantilesTDigest(0.5, 0.95, 0.99), UInt32),
+
+            -- Cost (Gorilla is valid for Float64)
+            cost_sum Float64 CODEC(Gorilla, ZSTD(1)),
+
+            -- Cardinality
+            unique_users AggregateFunction(uniq, String)
+        )
+        ENGINE = AggregatingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (project_id, model_id, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("InferenceMetrics1h table created successfully")
+
+            # Create indexes
+            indexes = [
+                "ALTER TABLE InferenceMetrics1h ADD INDEX IF NOT EXISTS idx_model_name (model_name) TYPE set(100) GRANULARITY 4",
+                "ALTER TABLE InferenceMetrics1h ADD INDEX IF NOT EXISTS idx_api_key_project (api_key_project_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating InferenceMetrics1h table: {e}")
+            raise
+
+    async def create_inference_metrics_1d_table(self):
+        """Create InferenceMetrics1d rollup table for daily aggregations.
+
+        This table stores pre-aggregated metrics at daily intervals for
+        long-term trend analysis (up to 3 years). Uses SummingMergeTree
+        with explicit column list to ensure only summable columns are summed.
+
+        Note: response_time_sum and response_time_count are stored to allow
+        calculating weighted averages at query time. unique_users stores
+        the daily finalized count (approximate for multi-day queries).
+        """
+        logger.info("Creating InferenceMetrics1d table...")
+
+        ttl_days = self._get_inference_metrics_1d_ttl_days()
+        query = f"""
+        CREATE TABLE IF NOT EXISTS InferenceMetrics1d
+        (
+            -- Time bucket (daily)
+            ts Date CODEC(Delta, ZSTD(1)),
+
+            -- Minimal grouping for long-term storage
+            project_id UUID CODEC(ZSTD(1)),
+            model_name LowCardinality(String),
+
+            -- Aggregated counts (summable, Delta for integer compression)
+            request_count UInt64 CODEC(Delta, ZSTD(1)),
+            success_count UInt64 CODEC(Delta, ZSTD(1)),
+            error_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Token sums (summable)
+            input_tokens_sum UInt64 CODEC(Delta, ZSTD(1)),
+            output_tokens_sum UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Cost (summable, Gorilla valid for Float64)
+            cost_sum Float64 CODEC(Gorilla, ZSTD(1)),
+
+            -- Latency metrics (for weighted average calculation at query time)
+            response_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            response_time_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- TTFT metrics (for weighted average calculation at query time)
+            ttft_sum UInt64 CODEC(Delta, ZSTD(1)),
+            ttft_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Queuing time metrics (for weighted average calculation at query time)
+            queuing_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            queuing_time_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Pre-computed p95 (finalized value from hourly data)
+            -- Note: This is an approximation when querying multiple days
+            response_time_p95 Float32 CODEC(Gorilla, ZSTD(1)),
+            ttft_p95 Float32 CODEC(Gorilla, ZSTD(1)),
+
+            -- Unique users (daily finalized count, approximate for multi-day)
+            unique_users UInt64 CODEC(Delta, ZSTD(1))
+        )
+        ENGINE = SummingMergeTree((
+            request_count, success_count, error_count,
+            input_tokens_sum, output_tokens_sum, cost_sum,
+            response_time_sum, response_time_count,
+            ttft_sum, ttft_count,
+            queuing_time_sum, queuing_time_count
+        ))
+        PARTITION BY toYear(ts)
+        ORDER BY (project_id, model_name, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("InferenceMetrics1d table created successfully")
+
+        except Exception as e:
+            logger.error(f"Error creating InferenceMetrics1d table: {e}")
+            raise
+
+    async def create_geo_analytics_1h_table(self):
+        """Create GeoAnalytics1h rollup table for geographic data aggregations.
+
+        This table stores pre-aggregated geographic metrics at hourly intervals
+        for the /geography API with fast queries on location-based data.
+        """
+        logger.info("Creating GeoAnalytics1h table...")
+
+        ttl_days = self._get_geo_analytics_ttl_days()
+        query = f"""
+        CREATE TABLE IF NOT EXISTS GeoAnalytics1h
+        (
+            -- Time bucket (hourly)
+            ts DateTime CODEC(Delta, ZSTD(1)),
+
+            -- Project context
+            project_id UUID CODEC(ZSTD(1)),
+            api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+
+            -- Geo dimensions
+            country_code LowCardinality(String),
+            region Nullable(String) CODEC(ZSTD(1)),
+            city Nullable(String) CODEC(ZSTD(1)),
+
+            -- Representative coordinates (avg)
+            latitude_avg Float32 CODEC(Gorilla, ZSTD(1)),
+            longitude_avg Float32 CODEC(Gorilla, ZSTD(1)),
+
+            -- Metrics (Delta for integers, Gorilla for floats)
+            request_count UInt64 CODEC(Delta, ZSTD(1)),
+            success_count UInt64 CODEC(Delta, ZSTD(1)),
+            response_time_sum UInt64 CODEC(Delta, ZSTD(1)),
+            response_time_avg Float32 CODEC(Gorilla, ZSTD(1)),
+
+            -- Unique users per location
+            unique_users AggregateFunction(uniq, String)
+        )
+        ENGINE = AggregatingMergeTree()
+        PARTITION BY toYYYYMM(ts)
+        ORDER BY (project_id, country_code, ts)
+        TTL ts + INTERVAL {ttl_days} DAY
+        SETTINGS index_granularity = 8192
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("GeoAnalytics1h table created successfully")
+
+            # Create indexes
+            indexes = [
+                "ALTER TABLE GeoAnalytics1h ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(200) GRANULARITY 4",
+                "ALTER TABLE GeoAnalytics1h ADD INDEX IF NOT EXISTS idx_api_key_project (api_key_project_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+        except Exception as e:
+            logger.error(f"Error creating GeoAnalytics1h table: {e}")
+            raise
+
+    # =============================================================================
+    # Materialized Views for OTel Analytics Pipeline
+    # =============================================================================
+
+    async def create_mv_otel_to_inference_fact(self):
+        """Create materialized view to transform otel_traces into InferenceFact.
+
+        This MV extracts span attributes from the OTel traces table and populates
+        the denormalized InferenceFact table in real-time as new traces arrive.
+
+        The span attribute naming follows the convention: table_name.column_name
+        (e.g., model_inference_details.project_id, gateway_analytics.client_ip)
+        """
+        logger.info("Creating MV: otel_traces → InferenceFact...")
+
+        # First, drop existing view if it exists (to allow updates)
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_otel_to_inference_fact")
+        except Exception as e:
+            logger.warning(f"Could not drop existing mv_otel_to_inference_fact: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_otel_to_inference_fact
+        TO InferenceFact
+        AS
+        SELECT
+            -- Generate unique ID
+            generateUUIDv4() AS id,
+            TraceId AS trace_id,
+            SpanId AS span_id,
+
+            -- Inference identifiers
+            toUUIDOrNull(nullIf(SpanAttributes['model_inference_details.inference_id'], '')) AS inference_id,
+            toUUIDOrNull(nullIf(SpanAttributes['chat_inference.episode_id'], '')) AS episode_id,
+
+            -- Timestamps
+            Timestamp AS timestamp,
+            parseDateTime64BestEffortOrNull(SpanAttributes['model_inference_details.request_arrival_time']) AS request_arrival_time,
+            parseDateTime64BestEffortOrNull(SpanAttributes['model_inference_details.request_forward_time']) AS request_forward_time,
+            parseDateTime64BestEffortOrNull(SpanAttributes['gateway_analytics.response_timestamp']) AS response_timestamp,
+
+            -- Project context
+            toUUIDOrNull(nullIf(SpanAttributes['model_inference_details.project_id'], '')) AS project_id,
+            toUUIDOrNull(nullIf(SpanAttributes['model_inference_details.endpoint_id'], '')) AS endpoint_id,
+            toUUIDOrNull(nullIf(SpanAttributes['model_inference_details.model_id'], '')) AS model_id,
+            toUUIDOrNull(nullIf(SpanAttributes['model_inference_details.api_key_id'], '')) AS api_key_id,
+            toUUIDOrNull(nullIf(SpanAttributes['model_inference_details.api_key_project_id'], '')) AS api_key_project_id,
+            nullIf(SpanAttributes['model_inference_details.user_id'], '') AS user_id,
+
+            -- Model info
+            SpanAttributes['model_inference.model_name'] AS model_name,
+            SpanAttributes['model_inference.model_provider_name'] AS model_provider,
+            nullIf(SpanAttributes['gateway_analytics.model_version'], '') AS model_version,
+            nullIf(SpanAttributes['chat_inference.function_name'], '') AS function_name,
+            nullIf(SpanAttributes['chat_inference.variant_name'], '') AS variant_name,
+            if(SpanAttributes['model_inference.endpoint_type'] = '', 'chat', SpanAttributes['model_inference.endpoint_type']) AS endpoint_type,
+
+            -- Performance
+            toUInt32OrNull(SpanAttributes['model_inference.response_time_ms']) AS response_time_ms,
+            toUInt32OrNull(SpanAttributes['model_inference.ttft_ms']) AS ttft_ms,
+            toUInt32OrNull(SpanAttributes['gateway_analytics.gateway_processing_ms']) AS gateway_processing_ms,
+            toUInt32OrNull(SpanAttributes['gateway_analytics.total_duration_ms']) AS total_duration_ms,
+            toUInt32OrNull(SpanAttributes['chat_inference.processing_time_ms']) AS processing_time_ms,
+
+            -- Tokens
+            toUInt32OrNull(SpanAttributes['model_inference.input_tokens']) AS input_tokens,
+            toUInt32OrNull(SpanAttributes['model_inference.output_tokens']) AS output_tokens,
+            toUInt32OrNull(SpanAttributes['gen_ai.usage.total_tokens']) AS total_tokens,
+
+            -- Cost
+            toFloat64OrNull(SpanAttributes['model_inference_details.cost']) AS cost,
+
+            -- Status
+            SpanAttributes['model_inference_details.is_success'] = 'true' AS is_success,
+            toUInt16OrNull(SpanAttributes['gateway_analytics.status_code']) AS status_code,
+            nullIf(SpanAttributes['model_inference.finish_reason'], '') AS finish_reason,
+            SpanAttributes['model_inference.cached'] = 'true' AS cached,
+
+            -- Errors
+            nullIf(SpanAttributes['model_inference_details.error_type'], '') AS error_type,
+            nullIf(SpanAttributes['model_inference_details.error_code'], '') AS error_code,
+            nullIf(SpanAttributes['model_inference_details.error_message'], '') AS error_message,
+
+            -- Geographic
+            toIPv4OrNull(SpanAttributes['gateway_analytics.client_ip']) AS client_ip,
+            nullIf(SpanAttributes['gateway_analytics.country_code'], '') AS country_code,
+            nullIf(SpanAttributes['gateway_analytics.region'], '') AS region,
+            nullIf(SpanAttributes['gateway_analytics.city'], '') AS city,
+            toFloat32OrNull(SpanAttributes['gateway_analytics.latitude']) AS latitude,
+            toFloat32OrNull(SpanAttributes['gateway_analytics.longitude']) AS longitude,
+            nullIf(SpanAttributes['gateway_analytics.timezone'], '') AS timezone,
+            toUInt32OrNull(SpanAttributes['gateway_analytics.asn']) AS asn,
+            nullIf(SpanAttributes['gateway_analytics.isp'], '') AS isp,
+
+            -- Client
+            nullIf(SpanAttributes['gateway_analytics.user_agent'], '') AS user_agent,
+            nullIf(SpanAttributes['gateway_analytics.device_type'], '') AS device_type,
+            nullIf(SpanAttributes['gateway_analytics.browser_name'], '') AS browser_name,
+            nullIf(SpanAttributes['gateway_analytics.os_name'], '') AS os_name,
+            SpanAttributes['gateway_analytics.is_bot'] = 'true' AS is_bot,
+
+            -- Request
+            if(SpanAttributes['gateway_analytics.method'] = '', 'POST', SpanAttributes['gateway_analytics.method']) AS method,
+            nullIf(SpanAttributes['gateway_analytics.path'], '') AS path,
+            toUInt32OrNull(SpanAttributes['gateway_analytics.body_size']) AS body_size,
+            toUInt32OrNull(SpanAttributes['gateway_analytics.response_size']) AS response_size,
+
+            -- Blocking
+            SpanAttributes['gateway_analytics.is_blocked'] = 'true' AS is_blocked,
+            nullIf(SpanAttributes['gateway_analytics.block_reason'], '') AS block_reason,
+            nullIf(SpanAttributes['gateway_analytics.block_rule_id'], '') AS block_rule_id,
+
+            -- Routing
+            nullIf(SpanAttributes['gateway_analytics.routing_decision'], '') AS routing_decision,
+
+            -- Content
+            nullIf(SpanAttributes['model_inference.system'], '') AS system_prompt,
+            nullIf(SpanAttributes['model_inference.input_messages'], '') AS input_messages,
+            nullIf(SpanAttributes['model_inference.output'], '') AS output,
+            nullIf(SpanAttributes['model_inference.raw_request'], '') AS raw_request,
+            nullIf(SpanAttributes['model_inference.raw_response'], '') AS raw_response,
+
+            -- Metadata
+            nullIf(SpanAttributes['chat_inference.tags'], '') AS tags,
+            nullIf(SpanAttributes['chat_inference.inference_params'], '') AS inference_params,
+            nullIf(SpanAttributes['chat_inference.extra_body'], '') AS extra_body,
+            nullIf(SpanAttributes['model_inference_details.response_analysis'], '') AS response_analysis,
+            nullIf(SpanAttributes['model_inference.guardrail_scan_summary'], '') AS guardrail_scan_summary,
+
+            -- Gateway Request/Response (from ModelInference)
+            nullIf(SpanAttributes['model_inference.gateway_request'], '') AS gateway_request,
+            nullIf(SpanAttributes['model_inference.gateway_response'], '') AS gateway_response,
+
+            -- Network/Protocol (from GatewayAnalytics)
+            nullIf(SpanAttributes['gateway_analytics.proxy_chain'], '') AS proxy_chain,
+            if(SpanAttributes['gateway_analytics.protocol_version'] = '', 'HTTP/1.1', SpanAttributes['gateway_analytics.protocol_version']) AS protocol_version,
+
+            -- Additional Geo (from GatewayAnalytics)
+            nullIf(SpanAttributes['gateway_analytics.country_name'], '') AS country_name,
+
+            -- Additional Client Info (from GatewayAnalytics)
+            nullIf(SpanAttributes['gateway_analytics.browser_version'], '') AS browser_version,
+            nullIf(SpanAttributes['gateway_analytics.os_version'], '') AS os_version,
+
+            -- Request Details (from GatewayAnalytics)
+            nullIf(SpanAttributes['gateway_analytics.query_params'], '') AS query_params,
+            nullIf(SpanAttributes['gateway_analytics.request_headers'], '') AS request_headers,
+            nullIf(SpanAttributes['gateway_analytics.response_headers'], '') AS response_headers,
+
+            -- Auth (from GatewayAnalytics)
+            nullIf(SpanAttributes['gateway_analytics.auth_method'], '') AS auth_method,
+
+            -- Tool Params (from ChatInference)
+            nullIf(SpanAttributes['chat_inference.tool_params'], '') AS tool_params
+
+        FROM otel_traces
+        WHERE SpanName = 'inference_handler_observability'
+          AND SpanAttributes['model_inference_details.inference_id'] != ''
+          AND SpanAttributes['model_inference_details.project_id'] != ''
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("✓ Created mv_otel_to_inference_fact materialized view")
+        except Exception as e:
+            logger.error(f"Error creating mv_otel_to_inference_fact: {e}")
+            raise
+
+    async def create_mv_inference_5m_rollup(self):
+        """Create materialized view to aggregate InferenceFact into 5-minute rollups.
+
+        This MV aggregates the flat InferenceFact table into InferenceMetrics5m
+        with 5-minute time buckets for efficient time-series queries.
+        """
+        logger.info("Creating MV: InferenceFact → InferenceMetrics5m...")
+
+        # First, drop existing view if it exists
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_5m_rollup")
+        except Exception as e:
+            logger.warning(f"Could not drop existing mv_inference_5m_rollup: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_5m_rollup
+        TO InferenceMetrics5m
+        AS
+        SELECT
+            toStartOfFiveMinutes(timestamp) AS ts,
+            project_id,
+            endpoint_id,
+            model_id,
+            model_name,
+            model_provider,
+            api_key_project_id,
+
+            count() AS request_count,
+            countIf(is_success = true) AS success_count,
+            countIf(is_success = false) AS error_count,
+            countIf(cached = true) AS cached_count,
+            countIf(is_blocked = true) AS blocked_count,
+
+            sum(ifNull(input_tokens, 0)) AS input_tokens_sum,
+            sum(ifNull(output_tokens, 0)) AS output_tokens_sum,
+
+            sum(ifNull(response_time_ms, 0)) AS response_time_sum,
+            countIf(response_time_ms IS NOT NULL) AS response_time_count,
+            min(response_time_ms) AS response_time_min,
+            max(response_time_ms) AS response_time_max,
+            sum(ifNull(ttft_ms, 0)) AS ttft_sum,
+            countIf(ttft_ms IS NOT NULL AND ttft_ms > 0) AS ttft_count,
+
+            sumIf(toUnixTimestamp64Milli(request_forward_time) - toUnixTimestamp64Milli(request_arrival_time), request_forward_time IS NOT NULL AND request_arrival_time IS NOT NULL) AS queuing_time_sum,
+            countIf(request_forward_time IS NOT NULL AND request_arrival_time IS NOT NULL) AS queuing_time_count,
+
+            quantilesTDigestState(0.5, 0.95, 0.99)(ifNull(response_time_ms, 0)) AS response_time_quantiles,
+            quantilesTDigestState(0.5, 0.95, 0.99)(ifNull(ttft_ms, 0)) AS ttft_quantiles,
+
+            sum(ifNull(cost, 0)) AS cost_sum,
+
+            uniqState(ifNull(user_id, '')) AS unique_users
+
+        FROM InferenceFact
+        WHERE project_id IS NOT NULL
+        GROUP BY ts, project_id, endpoint_id, model_id, model_name, model_provider, api_key_project_id
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("✓ Created mv_inference_5m_rollup materialized view")
+        except Exception as e:
+            logger.error(f"Error creating mv_inference_5m_rollup: {e}")
+            raise
+
+    async def create_mv_inference_1h_rollup(self):
+        """Create materialized view to aggregate 5m rollups into hourly rollups.
+
+        This MV merges the 5-minute aggregations into InferenceMetrics1h
+        with hourly time buckets. Uses quantilesTDigestMergeState to combine
+        T-Digest states from the 5m table.
+        """
+        logger.info("Creating MV: InferenceMetrics5m → InferenceMetrics1h...")
+
+        # First, drop existing view if it exists
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_1h_rollup")
+        except Exception as e:
+            logger.warning(f"Could not drop existing mv_inference_1h_rollup: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_1h_rollup
+        TO InferenceMetrics1h
+        AS
+        SELECT
+            toStartOfHour(ts) AS ts,
+            project_id,
+            model_id,
+            model_name,
+            model_provider,
+            api_key_project_id,
+
+            sum(request_count) AS request_count,
+            sum(success_count) AS success_count,
+            sum(error_count) AS error_count,
+            sum(cached_count) AS cached_count,
+
+            sum(input_tokens_sum) AS input_tokens_sum,
+            sum(output_tokens_sum) AS output_tokens_sum,
+
+            sum(response_time_sum) AS response_time_sum,
+            sum(response_time_count) AS response_time_count,
+
+            sum(ttft_sum) AS ttft_sum,
+            sum(ttft_count) AS ttft_count,
+
+            sum(queuing_time_sum) AS queuing_time_sum,
+            sum(queuing_time_count) AS queuing_time_count,
+
+            quantilesTDigestMergeState(0.5, 0.95, 0.99)(response_time_quantiles) AS response_time_quantiles,
+            quantilesTDigestMergeState(0.5, 0.95, 0.99)(ttft_quantiles) AS ttft_quantiles,
+
+            sum(cost_sum) AS cost_sum,
+
+            uniqMergeState(unique_users) AS unique_users
+
+        FROM InferenceMetrics5m
+        GROUP BY ts, project_id, model_id, model_name, model_provider, api_key_project_id
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("✓ Created mv_inference_1h_rollup materialized view")
+        except Exception as e:
+            logger.error(f"Error creating mv_inference_1h_rollup: {e}")
+            raise
+
+    async def create_mv_inference_1d_rollup(self):
+        """Create materialized view to aggregate 1h rollups into daily rollups.
+
+        This MV aggregates the hourly data into InferenceMetrics1d with daily
+        time buckets for long-term trend analysis.
+
+        Note: Uses quantilesTDigestMerge to finalize p95 values from hourly states.
+        unique_users is finalized per day (approximate for multi-day queries).
+        """
+        logger.info("Creating MV: InferenceMetrics1h → InferenceMetrics1d...")
+
+        # First, drop existing view if it exists
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_1d_rollup")
+        except Exception as e:
+            logger.warning(f"Could not drop existing mv_inference_1d_rollup: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_1d_rollup
+        TO InferenceMetrics1d
+        AS
+        SELECT
+            toDate(ts) AS ts,
+            project_id,
+            model_name,
+
+            sum(InferenceMetrics1h.request_count) AS request_count,
+            sum(InferenceMetrics1h.success_count) AS success_count,
+            sum(InferenceMetrics1h.error_count) AS error_count,
+
+            sum(InferenceMetrics1h.input_tokens_sum) AS input_tokens_sum,
+            sum(InferenceMetrics1h.output_tokens_sum) AS output_tokens_sum,
+
+            sum(InferenceMetrics1h.cost_sum) AS cost_sum,
+
+            -- Latency metrics (aggregated from 1h table)
+            sum(InferenceMetrics1h.response_time_sum) AS response_time_sum,
+            sum(InferenceMetrics1h.response_time_count) AS response_time_count,
+
+            -- TTFT metrics (aggregated from 1h table)
+            sum(InferenceMetrics1h.ttft_sum) AS ttft_sum,
+            sum(InferenceMetrics1h.ttft_count) AS ttft_count,
+
+            -- Queuing time metrics (aggregated from 1h table)
+            sum(InferenceMetrics1h.queuing_time_sum) AS queuing_time_sum,
+            sum(InferenceMetrics1h.queuing_time_count) AS queuing_time_count,
+
+            -- p95 values (merged from 1h quantiles)
+            quantilesTDigestMerge(0.95)(response_time_quantiles)[1] AS response_time_p95,
+            quantilesTDigestMerge(0.95)(ttft_quantiles)[1] AS ttft_p95,
+
+            -- Finalize unique users count per day (approximate for multi-day)
+            uniqMerge(unique_users) AS unique_users
+
+        FROM InferenceMetrics1h
+        GROUP BY ts, project_id, model_name
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("✓ Created mv_inference_1d_rollup materialized view")
+        except Exception as e:
+            logger.error(f"Error creating mv_inference_1d_rollup: {e}")
+            raise
+
+    async def create_mv_geo_analytics_1h(self):
+        """Create materialized view for geographic analytics rollup.
+
+        This MV aggregates InferenceFact into GeoAnalytics1h with hourly
+        geographic data for the /geography API.
+        """
+        logger.info("Creating MV: InferenceFact → GeoAnalytics1h...")
+
+        # First, drop existing view if it exists
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_geo_analytics_1h")
+        except Exception as e:
+            logger.warning(f"Could not drop existing mv_geo_analytics_1h: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_geo_analytics_1h
+        TO GeoAnalytics1h
+        AS
+        SELECT
+            toStartOfHour(timestamp) AS ts,
+            project_id,
+            api_key_project_id,
+            country_code,
+            region,
+            city,
+            avg(latitude) AS latitude_avg,
+            avg(longitude) AS longitude_avg,
+            count() AS request_count,
+            countIf(is_success = true) AS success_count,
+            sum(ifNull(response_time_ms, 0)) AS response_time_sum,
+            avg(ifNull(response_time_ms, 0)) AS response_time_avg,
+            uniqState(ifNull(user_id, '')) AS unique_users
+
+        FROM InferenceFact
+        WHERE country_code IS NOT NULL AND country_code != ''
+          AND project_id IS NOT NULL
+        GROUP BY ts, project_id, api_key_project_id, country_code, region, city
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("✓ Created mv_geo_analytics_1h materialized view")
+        except Exception as e:
+            logger.error(f"Error creating mv_geo_analytics_1h: {e}")
+            raise
+
+    async def setup_otel_analytics_pipeline(self):
+        """Set up the complete OTel analytics pipeline.
+
+        Creates all flat tables, rollup tables, and materialized views
+        for the new analytics architecture.
+        """
+        logger.info("Setting up OTel Analytics Pipeline...")
+
+        # Create flat table
+        await self.create_inference_fact_table()
+
+        # Create rollup tables
+        await self.create_inference_metrics_5m_table()
+        await self.create_inference_metrics_1h_table()
+        await self.create_inference_metrics_1d_table()
+        await self.create_geo_analytics_1h_table()
+
+        # Create materialized views (order matters - base tables must exist first)
+        await self.create_mv_otel_to_inference_fact()
+        await self.create_mv_inference_5m_rollup()
+        await self.create_mv_inference_1h_rollup()
+        await self.create_mv_inference_1d_rollup()  # New: 1h → 1d rollup
+        await self.create_mv_geo_analytics_1h()
+
+        logger.info("✓ OTel Analytics Pipeline setup completed successfully")
+
+    # =============================================================================
+    # End of OTel Analytics Tables
+    # =============================================================================
 
     async def add_error_tracking_columns(self):
         """Add error tracking columns to ModelInferenceDetails table for failed inference tracking.
@@ -1477,6 +2472,525 @@ class ClickHouseMigration:
             logger.error(f"Error adding network columns to NodeMetrics: {e}")
             raise
 
+    async def migrate_inference_metrics_1h_response_time_sum(self):
+        """Add response_time_sum column to InferenceMetrics1h for true average latency calculation.
+
+        This migration adds the response_time_sum column which enables computing true
+        average latency (sum/count) instead of using p50 as an approximation.
+
+        Also recreates the MV to include the new column from InferenceMetrics5m.
+        """
+        logger.info("Adding response_time_sum column to InferenceMetrics1h...")
+
+        try:
+            # Check if table exists
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceMetrics1h")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceMetrics1h table does not exist yet. Skipping column migration.")
+                return
+
+            # Check if column already exists
+            columns_result = await self.client.execute_query("DESCRIBE TABLE InferenceMetrics1h")
+            existing_columns = {row[0] for row in columns_result}
+
+            if "response_time_sum" in existing_columns:
+                logger.info("✓ response_time_sum column already exists in InferenceMetrics1h")
+                return
+
+            # Add the column
+            alter_query = """
+            ALTER TABLE InferenceMetrics1h
+            ADD COLUMN IF NOT EXISTS response_time_sum UInt64 DEFAULT 0
+            """
+            await self.client.execute_query(alter_query)
+            logger.info("✓ Added response_time_sum column to InferenceMetrics1h")
+
+            # Recreate the MV to include the new column
+            logger.info("Recreating mv_inference_1h_rollup to include response_time_sum...")
+
+            # Drop and recreate the MV
+            try:
+                await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_1h_rollup")
+            except Exception as e:
+                logger.warning(f"Could not drop existing mv_inference_1h_rollup: {e}")
+
+            # Create MV with response_time_sum
+            mv_query = """
+            CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_1h_rollup
+            TO InferenceMetrics1h
+            AS
+            SELECT
+                toStartOfHour(ts) AS ts,
+                project_id,
+                model_id,
+                model_name,
+                model_provider,
+                api_key_project_id,
+
+                sum(request_count) AS request_count,
+                sum(success_count) AS success_count,
+                sum(error_count) AS error_count,
+                sum(cached_count) AS cached_count,
+
+                sum(input_tokens_sum) AS input_tokens_sum,
+                sum(output_tokens_sum) AS output_tokens_sum,
+
+                sum(response_time_sum) AS response_time_sum,
+
+                quantilesTDigestMergeState(0.5, 0.95, 0.99)(response_time_quantiles) AS response_time_quantiles,
+                quantilesTDigestMergeState(0.5, 0.95, 0.99)(ttft_quantiles) AS ttft_quantiles,
+
+                sum(cost_sum) AS cost_sum,
+
+                uniqMergeState(unique_users) AS unique_users
+
+            FROM InferenceMetrics5m
+            GROUP BY ts, project_id, model_id, model_name, model_provider, api_key_project_id
+            """
+            await self.client.execute_query(mv_query)
+            logger.info("✓ Recreated mv_inference_1h_rollup with response_time_sum")
+
+        except Exception as e:
+            logger.error(f"Error adding response_time_sum to InferenceMetrics1h: {e}")
+            raise
+
+    async def migrate_response_time_count(self):
+        """Add response_time_count column to 5m and 1h tables for accurate average latency.
+
+        This migration adds the response_time_count column which tracks the count of
+        non-NULL latency values, enabling proper average calculation that matches
+        SQL avg() behavior (ignoring NULLs).
+
+        Without this, dividing response_time_sum by request_count gives wrong results
+        when some requests have NULL latency values.
+        """
+        logger.info("Adding response_time_count column to InferenceMetrics5m and InferenceMetrics1h...")
+
+        try:
+            # Check if InferenceMetrics5m table exists
+            table_5m_exists = await self.client.execute_query("EXISTS TABLE InferenceMetrics5m")
+            if not table_5m_exists or not table_5m_exists[0][0]:
+                logger.info("InferenceMetrics5m table does not exist yet. Skipping column migration.")
+                return
+
+            # Check if column already exists in 5m table
+            columns_5m = await self.client.execute_query("DESCRIBE TABLE InferenceMetrics5m")
+            existing_5m_columns = {row[0] for row in columns_5m}
+
+            if "response_time_count" not in existing_5m_columns:
+                # Add column to InferenceMetrics5m
+                await self.client.execute_query("""
+                    ALTER TABLE InferenceMetrics5m
+                    ADD COLUMN IF NOT EXISTS response_time_count UInt64 DEFAULT 0
+                """)
+                logger.info("✓ Added response_time_count column to InferenceMetrics5m")
+
+                # Recreate mv_inference_5m_rollup with countIf()
+                logger.info("Recreating mv_inference_5m_rollup to include response_time_count...")
+                try:
+                    await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_5m_rollup")
+                except Exception as e:
+                    logger.warning(f"Could not drop existing mv_inference_5m_rollup: {e}")
+
+                mv_5m_query = """
+                CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_5m_rollup
+                TO InferenceMetrics5m
+                AS
+                SELECT
+                    toStartOfFiveMinutes(timestamp) AS ts,
+                    project_id,
+                    endpoint_id,
+                    model_id,
+                    model_name,
+                    model_provider,
+                    api_key_project_id,
+
+                    count() AS request_count,
+                    countIf(is_success = true) AS success_count,
+                    countIf(is_success = false) AS error_count,
+                    countIf(cached = true) AS cached_count,
+                    countIf(is_blocked = true) AS blocked_count,
+
+                    sum(ifNull(input_tokens, 0)) AS input_tokens_sum,
+                    sum(ifNull(output_tokens, 0)) AS output_tokens_sum,
+
+                    sum(ifNull(response_time_ms, 0)) AS response_time_sum,
+                    countIf(response_time_ms IS NOT NULL) AS response_time_count,
+                    min(response_time_ms) AS response_time_min,
+                    max(response_time_ms) AS response_time_max,
+                    sum(ifNull(ttft_ms, 0)) AS ttft_sum,
+
+                    quantilesTDigestState(0.5, 0.95, 0.99)(ifNull(response_time_ms, 0)) AS response_time_quantiles,
+                    quantilesTDigestState(0.5, 0.95, 0.99)(ifNull(ttft_ms, 0)) AS ttft_quantiles,
+
+                    sum(ifNull(cost, 0)) AS cost_sum,
+
+                    uniqState(ifNull(user_id, '')) AS unique_users
+
+                FROM InferenceFact
+                WHERE project_id IS NOT NULL
+                GROUP BY ts, project_id, endpoint_id, model_id, model_name, model_provider, api_key_project_id
+                """
+                await self.client.execute_query(mv_5m_query)
+                logger.info("✓ Recreated mv_inference_5m_rollup with response_time_count")
+            else:
+                logger.info("✓ response_time_count column already exists in InferenceMetrics5m")
+
+            # Check if InferenceMetrics1h table exists
+            table_1h_exists = await self.client.execute_query("EXISTS TABLE InferenceMetrics1h")
+            if not table_1h_exists or not table_1h_exists[0][0]:
+                logger.info("InferenceMetrics1h table does not exist yet. Skipping column migration.")
+                return
+
+            # Check if column already exists in 1h table
+            columns_1h = await self.client.execute_query("DESCRIBE TABLE InferenceMetrics1h")
+            existing_1h_columns = {row[0] for row in columns_1h}
+
+            if "response_time_count" not in existing_1h_columns:
+                # Add column to InferenceMetrics1h
+                await self.client.execute_query("""
+                    ALTER TABLE InferenceMetrics1h
+                    ADD COLUMN IF NOT EXISTS response_time_count UInt64 DEFAULT 0
+                """)
+                logger.info("✓ Added response_time_count column to InferenceMetrics1h")
+
+                # Recreate mv_inference_1h_rollup with sum(response_time_count)
+                logger.info("Recreating mv_inference_1h_rollup to include response_time_count...")
+                try:
+                    await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_1h_rollup")
+                except Exception as e:
+                    logger.warning(f"Could not drop existing mv_inference_1h_rollup: {e}")
+
+                mv_1h_query = """
+                CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_1h_rollup
+                TO InferenceMetrics1h
+                AS
+                SELECT
+                    toStartOfHour(ts) AS ts,
+                    project_id,
+                    model_id,
+                    model_name,
+                    model_provider,
+                    api_key_project_id,
+
+                    sum(request_count) AS request_count,
+                    sum(success_count) AS success_count,
+                    sum(error_count) AS error_count,
+                    sum(cached_count) AS cached_count,
+
+                    sum(input_tokens_sum) AS input_tokens_sum,
+                    sum(output_tokens_sum) AS output_tokens_sum,
+
+                    sum(response_time_sum) AS response_time_sum,
+                    sum(response_time_count) AS response_time_count,
+
+                    quantilesTDigestMergeState(0.5, 0.95, 0.99)(response_time_quantiles) AS response_time_quantiles,
+                    quantilesTDigestMergeState(0.5, 0.95, 0.99)(ttft_quantiles) AS ttft_quantiles,
+
+                    sum(cost_sum) AS cost_sum,
+
+                    uniqMergeState(unique_users) AS unique_users
+
+                FROM InferenceMetrics5m
+                GROUP BY ts, project_id, model_id, model_name, model_provider, api_key_project_id
+                """
+                await self.client.execute_query(mv_1h_query)
+                logger.info("✓ Recreated mv_inference_1h_rollup with response_time_count")
+            else:
+                logger.info("✓ response_time_count column already exists in InferenceMetrics1h")
+
+        except Exception as e:
+            logger.error(f"Error adding response_time_count columns: {e}")
+            raise
+
+    async def migrate_ttft_columns(self):
+        """Add ttft_sum and ttft_count columns to rollup tables for accurate TTFT metrics.
+
+        This migration adds:
+        - ttft_count to InferenceMetrics5m (count of non-NULL TTFT values)
+        - ttft_sum, ttft_count to InferenceMetrics1h
+        - ttft_sum, ttft_count, ttft_p95, response_time_p95, unique_users to InferenceMetrics1d
+
+        This enables proper average TTFT calculation that matches SQL avg() behavior
+        (ignoring NULLs in the denominator).
+        """
+        logger.info("Adding TTFT columns to rollup tables...")
+
+        try:
+            # Step 1: Add ttft_count to InferenceMetrics5m
+            table_5m_exists = await self.client.execute_query("EXISTS TABLE InferenceMetrics5m")
+            if table_5m_exists and table_5m_exists[0][0]:
+                columns_5m = await self.client.execute_query("DESCRIBE TABLE InferenceMetrics5m")
+                existing_5m_columns = {row[0] for row in columns_5m}
+
+                if "ttft_count" not in existing_5m_columns:
+                    await self.client.execute_query("""
+                        ALTER TABLE InferenceMetrics5m
+                        ADD COLUMN IF NOT EXISTS ttft_count UInt64 DEFAULT 0
+                    """)
+                    logger.info("✓ Added ttft_count column to InferenceMetrics5m")
+
+                    # Recreate mv_inference_5m_rollup with ttft_count
+                    logger.info("Recreating mv_inference_5m_rollup to include ttft_count...")
+                    try:
+                        await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_5m_rollup")
+                    except Exception as e:
+                        logger.warning(f"Could not drop existing mv_inference_5m_rollup: {e}")
+
+                    mv_5m_query = """
+                    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_5m_rollup
+                    TO InferenceMetrics5m
+                    AS
+                    SELECT
+                        toStartOfFiveMinutes(timestamp) AS ts,
+                        project_id,
+                        endpoint_id,
+                        model_id,
+                        model_name,
+                        model_provider,
+                        api_key_project_id,
+
+                        count() AS request_count,
+                        countIf(is_success = true) AS success_count,
+                        countIf(is_success = false) AS error_count,
+                        countIf(cached = true) AS cached_count,
+                        countIf(is_blocked = true) AS blocked_count,
+
+                        sum(ifNull(input_tokens, 0)) AS input_tokens_sum,
+                        sum(ifNull(output_tokens, 0)) AS output_tokens_sum,
+
+                        sum(ifNull(response_time_ms, 0)) AS response_time_sum,
+                        countIf(response_time_ms IS NOT NULL) AS response_time_count,
+                        min(response_time_ms) AS response_time_min,
+                        max(response_time_ms) AS response_time_max,
+                        sum(ifNull(ttft_ms, 0)) AS ttft_sum,
+                        countIf(ttft_ms IS NOT NULL AND ttft_ms > 0) AS ttft_count,
+
+                        quantilesTDigestState(0.5, 0.95, 0.99)(ifNull(response_time_ms, 0)) AS response_time_quantiles,
+                        quantilesTDigestState(0.5, 0.95, 0.99)(ifNull(ttft_ms, 0)) AS ttft_quantiles,
+
+                        sum(ifNull(cost, 0)) AS cost_sum,
+
+                        uniqState(ifNull(user_id, '')) AS unique_users
+
+                    FROM InferenceFact
+                    WHERE project_id IS NOT NULL
+                    GROUP BY ts, project_id, endpoint_id, model_id, model_name, model_provider, api_key_project_id
+                    """
+                    await self.client.execute_query(mv_5m_query)
+                    logger.info("✓ Recreated mv_inference_5m_rollup with ttft_count")
+                else:
+                    logger.info("✓ ttft_count column already exists in InferenceMetrics5m")
+
+            # Step 2: Add ttft_sum and ttft_count to InferenceMetrics1h
+            table_1h_exists = await self.client.execute_query("EXISTS TABLE InferenceMetrics1h")
+            if table_1h_exists and table_1h_exists[0][0]:
+                columns_1h = await self.client.execute_query("DESCRIBE TABLE InferenceMetrics1h")
+                existing_1h_columns = {row[0] for row in columns_1h}
+
+                columns_to_add_1h = []
+                if "ttft_sum" not in existing_1h_columns:
+                    columns_to_add_1h.append("ttft_sum UInt64 DEFAULT 0")
+                if "ttft_count" not in existing_1h_columns:
+                    columns_to_add_1h.append("ttft_count UInt64 DEFAULT 0")
+
+                if columns_to_add_1h:
+                    for col in columns_to_add_1h:
+                        await self.client.execute_query(f"ALTER TABLE InferenceMetrics1h ADD COLUMN IF NOT EXISTS {col}")
+                    logger.info(f"✓ Added columns to InferenceMetrics1h: {columns_to_add_1h}")
+
+                    # Recreate mv_inference_1h_rollup with ttft columns
+                    logger.info("Recreating mv_inference_1h_rollup to include ttft_sum and ttft_count...")
+                    try:
+                        await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_1h_rollup")
+                    except Exception as e:
+                        logger.warning(f"Could not drop existing mv_inference_1h_rollup: {e}")
+
+                    mv_1h_query = """
+                    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_1h_rollup
+                    TO InferenceMetrics1h
+                    AS
+                    SELECT
+                        toStartOfHour(ts) AS ts,
+                        project_id,
+                        model_id,
+                        model_name,
+                        model_provider,
+                        api_key_project_id,
+
+                        sum(request_count) AS request_count,
+                        sum(success_count) AS success_count,
+                        sum(error_count) AS error_count,
+                        sum(cached_count) AS cached_count,
+
+                        sum(input_tokens_sum) AS input_tokens_sum,
+                        sum(output_tokens_sum) AS output_tokens_sum,
+
+                        sum(response_time_sum) AS response_time_sum,
+                        sum(response_time_count) AS response_time_count,
+
+                        sum(ttft_sum) AS ttft_sum,
+                        sum(ttft_count) AS ttft_count,
+
+                        quantilesTDigestMergeState(0.5, 0.95, 0.99)(response_time_quantiles) AS response_time_quantiles,
+                        quantilesTDigestMergeState(0.5, 0.95, 0.99)(ttft_quantiles) AS ttft_quantiles,
+
+                        sum(cost_sum) AS cost_sum,
+
+                        uniqMergeState(unique_users) AS unique_users
+
+                    FROM InferenceMetrics5m
+                    GROUP BY ts, project_id, model_id, model_name, model_provider, api_key_project_id
+                    """
+                    await self.client.execute_query(mv_1h_query)
+                    logger.info("✓ Recreated mv_inference_1h_rollup with ttft columns")
+                else:
+                    logger.info("✓ ttft_sum and ttft_count columns already exist in InferenceMetrics1h")
+
+            # Step 3: Add ttft_sum, ttft_count, ttft_p95, response_time_p95, unique_users to InferenceMetrics1d
+            table_1d_exists = await self.client.execute_query("EXISTS TABLE InferenceMetrics1d")
+            if table_1d_exists and table_1d_exists[0][0]:
+                columns_1d = await self.client.execute_query("DESCRIBE TABLE InferenceMetrics1d")
+                existing_1d_columns = {row[0] for row in columns_1d}
+
+                columns_to_add_1d = []
+                if "ttft_sum" not in existing_1d_columns:
+                    columns_to_add_1d.append("ttft_sum UInt64 DEFAULT 0")
+                if "ttft_count" not in existing_1d_columns:
+                    columns_to_add_1d.append("ttft_count UInt64 DEFAULT 0")
+                if "ttft_p95" not in existing_1d_columns:
+                    columns_to_add_1d.append("ttft_p95 Float32 DEFAULT 0")
+                if "response_time_p95" not in existing_1d_columns:
+                    columns_to_add_1d.append("response_time_p95 Float32 DEFAULT 0")
+                if "unique_users" not in existing_1d_columns:
+                    columns_to_add_1d.append("unique_users UInt64 DEFAULT 0")
+
+                if columns_to_add_1d:
+                    for col in columns_to_add_1d:
+                        await self.client.execute_query(f"ALTER TABLE InferenceMetrics1d ADD COLUMN IF NOT EXISTS {col}")
+                    logger.info(f"✓ Added columns to InferenceMetrics1d: {columns_to_add_1d}")
+
+                    # Recreate mv_inference_1d_rollup with ttft columns
+                    logger.info("Recreating mv_inference_1d_rollup to include ttft columns...")
+                    try:
+                        await self.client.execute_query("DROP VIEW IF EXISTS mv_inference_1d_rollup")
+                    except Exception as e:
+                        logger.warning(f"Could not drop existing mv_inference_1d_rollup: {e}")
+
+                    mv_1d_query = """
+                    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_1d_rollup
+                    TO InferenceMetrics1d
+                    AS
+                    SELECT
+                        toDate(ts) AS ts,
+                        project_id,
+                        model_name,
+
+                        sum(InferenceMetrics1h.request_count) AS request_count,
+                        sum(InferenceMetrics1h.success_count) AS success_count,
+                        sum(InferenceMetrics1h.error_count) AS error_count,
+
+                        sum(InferenceMetrics1h.input_tokens_sum) AS input_tokens_sum,
+                        sum(InferenceMetrics1h.output_tokens_sum) AS output_tokens_sum,
+
+                        sum(InferenceMetrics1h.cost_sum) AS cost_sum,
+
+                        sum(InferenceMetrics1h.response_time_sum) AS response_time_sum,
+                        sum(InferenceMetrics1h.response_time_count) AS response_time_count,
+
+                        sum(InferenceMetrics1h.ttft_sum) AS ttft_sum,
+                        sum(InferenceMetrics1h.ttft_count) AS ttft_count,
+
+                        sum(InferenceMetrics1h.queuing_time_sum) AS queuing_time_sum,
+                        sum(InferenceMetrics1h.queuing_time_count) AS queuing_time_count,
+
+                        quantilesTDigestMerge(0.95)(response_time_quantiles)[1] AS response_time_p95,
+                        quantilesTDigestMerge(0.95)(ttft_quantiles)[1] AS ttft_p95,
+
+                        uniqMerge(unique_users) AS unique_users
+
+                    FROM InferenceMetrics1h
+                    GROUP BY ts, project_id, model_name
+                    """
+                    await self.client.execute_query(mv_1d_query)
+                    logger.info("✓ Recreated mv_inference_1d_rollup with ttft columns")
+                else:
+                    logger.info("✓ ttft columns already exist in InferenceMetrics1d")
+
+        except Exception as e:
+            logger.error(f"Error adding TTFT columns: {e}")
+            raise
+
+    async def add_missing_columns_to_inference_fact(self):
+        """Add missing columns to InferenceFact table for complete OTel data coverage.
+
+        These 12 columns were missing from the original InferenceFact schema:
+        - gateway_request, gateway_response (from ModelInference)
+        - proxy_chain, protocol_version, country_name, browser_version, os_version,
+          query_params, request_headers, response_headers, auth_method (from GatewayAnalytics)
+        - tool_params (from ChatInference)
+        """
+        logger.info("Adding missing columns to InferenceFact...")
+
+        # Check if table exists
+        try:
+            result = await self.client.execute_query(
+                "SELECT count() FROM system.tables WHERE database = currentDatabase() AND name = 'InferenceFact'"
+            )
+            if not result or result[0][0] == 0:
+                logger.info("InferenceFact table does not exist, skipping column addition")
+                return
+        except Exception as e:
+            logger.warning(f"Could not check InferenceFact existence: {e}")
+            return
+
+        # Get current columns
+        try:
+            columns_result = await self.client.execute_query("DESCRIBE TABLE InferenceFact")
+            current_columns = {row[0] for row in columns_result}
+        except Exception as e:
+            logger.warning(f"Could not describe InferenceFact: {e}")
+            return
+
+        # Columns to add (only if they don't exist)
+        columns_to_add = [
+            ("gateway_request", "Nullable(String) CODEC(ZSTD(3))"),
+            ("gateway_response", "Nullable(String) CODEC(ZSTD(3))"),
+            ("proxy_chain", "Nullable(String) CODEC(ZSTD(1))"),
+            ("protocol_version", "LowCardinality(String) DEFAULT 'HTTP/1.1'"),
+            ("country_name", "Nullable(String) CODEC(ZSTD(1))"),
+            ("browser_version", "Nullable(String) CODEC(ZSTD(1))"),
+            ("os_version", "Nullable(String) CODEC(ZSTD(1))"),
+            ("query_params", "Nullable(String) CODEC(ZSTD(1))"),
+            ("request_headers", "Nullable(String) CODEC(ZSTD(3))"),
+            ("response_headers", "Nullable(String) CODEC(ZSTD(3))"),
+            ("auth_method", "LowCardinality(Nullable(String))"),
+            ("tool_params", "Nullable(String) CODEC(ZSTD(1))"),
+        ]
+
+        added_count = 0
+        for col_name, col_type in columns_to_add:
+            if col_name not in current_columns:
+                try:
+                    await self.client.execute_query(
+                        f"ALTER TABLE InferenceFact ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                    )
+                    logger.info(f"✓ Added column {col_name} to InferenceFact")
+                    added_count += 1
+                except Exception as e:
+                    logger.warning(f"Could not add column {col_name}: {e}")
+
+        if added_count > 0:
+            # Recreate MV to include new columns
+            logger.info("Recreating mv_otel_to_inference_fact with new columns...")
+            try:
+                await self.client.execute_query("DROP VIEW IF EXISTS mv_otel_to_inference_fact")
+            except Exception as e:
+                logger.warning(f"Could not drop existing mv_otel_to_inference_fact: {e}")
+            await self.create_mv_otel_to_inference_fact()
+        else:
+            logger.info("✓ All missing columns already exist in InferenceFact")
+
     async def run_migration(self):
         """Run the complete migration process."""
         try:
@@ -1501,6 +3015,11 @@ class ClickHouseMigration:
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration
             await self.update_api_key_project_id()  # Update api_key_project_id where null
             await self.add_error_tracking_columns()  # Add error tracking columns for failed inferences
+            await self.migrate_inference_metrics_1h_response_time_sum()  # Add response_time_sum column first
+            await self.migrate_response_time_count()  # Add response_time_count for accurate avg latency
+            await self.migrate_ttft_columns()  # Add TTFT columns to rollup tables for accurate TTFT metrics
+            await self.add_missing_columns_to_inference_fact()  # Add missing columns BEFORE setup_otel_analytics_pipeline
+            await self.setup_otel_analytics_pipeline()  # Set up OTel analytics flat + rollup tables
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 
