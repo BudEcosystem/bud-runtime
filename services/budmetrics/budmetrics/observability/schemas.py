@@ -1193,6 +1193,7 @@ class TraceItem(BaseModel):
     status_message: str
     events: List[TraceEvent]
     links: List[TraceLink]
+    child_span_count: int = 0  # Number of child spans for this trace
 
     model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
