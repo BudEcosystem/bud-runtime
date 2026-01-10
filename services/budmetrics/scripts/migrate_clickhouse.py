@@ -1027,6 +1027,7 @@ class ClickHouseMigration:
             "ModerationInference",
             "GatewayAnalytics",
             "GatewayBlockingEvents",
+            "InferenceFact",
         ]
         # Cluster metrics tables in metrics database
         metrics_tables = [
@@ -1093,6 +1094,361 @@ class ClickHouseMigration:
 
         except Exception as e:
             logger.warning(f"Could not update api_key_project_id (may not be critical): {e}")
+
+    async def create_inference_fact_table(self):
+        """Create InferenceFact table - denormalized flat table from OTel traces.
+
+        This table combines data from all span attributes into a single denormalized table:
+        - model_inference_details.* (from inference_handler_observability span)
+        - model_inference.* (from inference_handler_observability span)
+        - chat_inference.* (from inference_handler_observability span)
+        - gateway_analytics.* (from gateway_analytics span, via LEFT JOIN on TraceId)
+
+        This enables fast query performance without JOINs at query time.
+        """
+        logger.info("Creating InferenceFact table...")
+
+        query = """
+        CREATE TABLE IF NOT EXISTS InferenceFact
+        (
+            -- ===== OTel TRACE IDENTIFIERS =====
+            id UUID DEFAULT generateUUIDv4() CODEC(ZSTD(1)),
+            trace_id String CODEC(ZSTD(1)),
+            span_id String CODEC(ZSTD(1)),
+
+            -- ===== CORE IDENTIFIERS (from model_inference_details.*) =====
+            inference_id UUID CODEC(ZSTD(1)),
+            project_id UUID CODEC(ZSTD(1)),
+            endpoint_id UUID CODEC(ZSTD(1)),
+            model_id UUID CODEC(ZSTD(1)),
+            api_key_id Nullable(UUID) CODEC(ZSTD(1)),
+            api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+            user_id Nullable(String) CODEC(ZSTD(1)),
+
+            -- ===== TIMESTAMPS =====
+            timestamp DateTime64(3) CODEC(Delta, ZSTD(1)),
+            request_arrival_time Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+            request_forward_time Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+
+            -- ===== STATUS & COST (from model_inference_details.*) =====
+            is_success Bool DEFAULT true,
+            cost Nullable(Float64) CODEC(Gorilla, ZSTD(1)),
+            status_code Nullable(UInt16) CODEC(ZSTD(1)),
+            request_ip Nullable(IPv4) CODEC(ZSTD(1)),
+            response_analysis Nullable(String) CODEC(ZSTD(1)),
+
+            -- ===== ERROR TRACKING (from model_inference_details.*) =====
+            error_code Nullable(String) CODEC(ZSTD(1)),
+            error_message Nullable(String) CODEC(ZSTD(3)),
+            error_type Nullable(String) CODEC(ZSTD(1)),
+
+            -- ===== MODEL INFO (from model_inference.*) =====
+            model_inference_id Nullable(UUID) CODEC(ZSTD(1)),
+            model_name LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+            model_provider LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+            endpoint_type LowCardinality(String) DEFAULT 'chat' CODEC(ZSTD(1)),
+
+            -- ===== PERFORMANCE METRICS (from model_inference.*) =====
+            input_tokens Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            output_tokens Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            response_time_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            ttft_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            cached Bool DEFAULT false,
+            finish_reason Nullable(Enum8('stop' = 1, 'length' = 2, 'tool_call' = 3, 'content_filter' = 4, 'unknown' = 5)),
+
+            -- ===== CONTENT (from model_inference.*) =====
+            system_prompt Nullable(String) CODEC(ZSTD(3)),
+            input_messages Nullable(String) CODEC(ZSTD(3)),
+            output Nullable(String) CODEC(ZSTD(3)),
+            raw_request Nullable(String) CODEC(ZSTD(3)),
+            raw_response Nullable(String) CODEC(ZSTD(3)),
+            gateway_request Nullable(String) CODEC(ZSTD(3)),
+            gateway_response Nullable(String) CODEC(ZSTD(3)),
+            guardrail_scan_summary Nullable(String) CODEC(ZSTD(1)),
+            model_inference_timestamp Nullable(UInt64) CODEC(ZSTD(1)),
+
+            -- ===== CHAT INFERENCE (from chat_inference.*) =====
+            chat_inference_id Nullable(UUID) CODEC(ZSTD(1)),
+            episode_id Nullable(UUID) CODEC(ZSTD(1)),
+            function_name LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            variant_name LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            processing_time_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            chat_input Nullable(String) CODEC(ZSTD(3)),
+            chat_output Nullable(String) CODEC(ZSTD(3)),
+            tags Nullable(String) CODEC(ZSTD(1)),
+            inference_params Nullable(String) CODEC(ZSTD(1)),
+            extra_body Nullable(String) CODEC(ZSTD(1)),
+            tool_params Nullable(String) CODEC(ZSTD(1)),
+
+            -- ===== GATEWAY ANALYTICS (from gateway_analytics.* span) =====
+            -- Geographic
+            country_code LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            country_name Nullable(String) CODEC(ZSTD(1)),
+            region Nullable(String) CODEC(ZSTD(1)),
+            city Nullable(String) CODEC(ZSTD(1)),
+            latitude Nullable(Float32) CODEC(Gorilla, ZSTD(1)),
+            longitude Nullable(Float32) CODEC(Gorilla, ZSTD(1)),
+            timezone Nullable(String) CODEC(ZSTD(1)),
+            asn Nullable(UInt32) CODEC(ZSTD(1)),
+            isp Nullable(String) CODEC(ZSTD(1)),
+
+            -- Client metadata
+            client_ip Nullable(IPv4) CODEC(ZSTD(1)),
+            user_agent Nullable(String) CODEC(ZSTD(3)),
+            device_type LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            browser_name LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            browser_version Nullable(String) CODEC(ZSTD(1)),
+            os_name LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            os_version Nullable(String) CODEC(ZSTD(1)),
+            is_bot Nullable(Bool) CODEC(ZSTD(1)),
+
+            -- Request context
+            method LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            path Nullable(String) CODEC(ZSTD(1)),
+            query_params Nullable(String) CODEC(ZSTD(1)),
+            body_size Nullable(UInt32) CODEC(ZSTD(1)),
+            response_size Nullable(UInt32) CODEC(ZSTD(1)),
+            protocol_version Nullable(String) CODEC(ZSTD(1)),
+
+            -- Performance
+            gateway_processing_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            total_duration_ms Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+
+            -- Routing & blocking
+            model_version Nullable(String) CODEC(ZSTD(1)),
+            routing_decision LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            is_blocked Nullable(Bool) CODEC(ZSTD(1)),
+            block_reason Nullable(String) CODEC(ZSTD(1)),
+            block_rule_id Nullable(String) CODEC(ZSTD(1)),
+            proxy_chain Nullable(String) CODEC(ZSTD(1)),
+
+            -- Headers & timestamps
+            request_headers Nullable(String) CODEC(ZSTD(3)),
+            response_headers Nullable(String) CODEC(ZSTD(3)),
+            request_timestamp Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+            response_timestamp Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+            gateway_tags Nullable(String) CODEC(ZSTD(1)),
+
+            -- ===== MATERIALIZED COLUMNS =====
+            date Date MATERIALIZED toDate(timestamp),
+            hour DateTime MATERIALIZED toStartOfHour(timestamp)
+        )
+        ENGINE = MergeTree()
+        PARTITION BY toYYYYMMDD(timestamp)
+        ORDER BY (project_id, endpoint_id, model_id, timestamp, inference_id)
+        TTL toDateTime(timestamp) + INTERVAL 30 DAY
+        SETTINGS index_granularity = 8192, allow_nullable_key = 1
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("InferenceFact table created successfully")
+
+            # Create data-skipping indexes
+            indexes = [
+                # Core identifiers
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_inference_id (inference_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_episode_id (episode_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_api_key_project (api_key_project_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_user_id (user_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                # Model info
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_model_name (model_name) TYPE set(100) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_model_provider (model_provider) TYPE set(50) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_endpoint_type (endpoint_type) TYPE set(10) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_function_name (function_name) TYPE set(100) GRANULARITY 4",
+                # Status flags
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_is_success (is_success) TYPE minmax GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_cached (cached) TYPE minmax GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_status_code (status_code) TYPE set(20) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_finish_reason (finish_reason) TYPE set(10) GRANULARITY 4",
+                # Gateway analytics - geographic
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(300) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_city (city) TYPE bloom_filter(0.01) GRANULARITY 4",
+                # Gateway analytics - client
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_device_type (device_type) TYPE set(20) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_is_bot (is_bot) TYPE minmax GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_client_ip (client_ip) TYPE bloom_filter(0.01) GRANULARITY 8",
+                # Gateway analytics - routing
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_is_blocked (is_blocked) TYPE minmax GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_routing_decision (routing_decision) TYPE set(20) GRANULARITY 4",
+                # Error tracking
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_error_type (error_type) TYPE set(50) GRANULARITY 4",
+            ]
+
+            for index_query in indexes:
+                try:
+                    await self.client.execute_query(index_query)
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        logger.warning(f"Index creation warning: {e}")
+
+            logger.info("InferenceFact indexes created successfully")
+
+        except Exception as e:
+            logger.error(f"Error creating InferenceFact table: {e}")
+            raise
+
+    async def create_mv_otel_to_inference_fact(self):
+        """Create Materialized View to transform otel_traces to InferenceFact.
+
+        This MV extracts span attributes from two span types using LEFT JOIN on TraceId:
+        - inference_handler_observability span: model_inference_details.*, model_inference.*, chat_inference.*
+        - gateway_analytics span: gateway_analytics.*
+
+        The LEFT JOIN ensures inference data is captured even if gateway span is missing.
+        """
+        logger.info("Creating mv_otel_to_inference_fact materialized view...")
+
+        # First drop existing view if it exists to ensure clean state
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_otel_to_inference_fact")
+            logger.info("Dropped existing mv_otel_to_inference_fact (if any)")
+        except Exception as e:
+            logger.warning(f"Could not drop existing view: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_otel_to_inference_fact TO InferenceFact AS
+        SELECT
+            -- ===== OTel TRACE IDENTIFIERS =====
+            generateUUIDv4() AS id,
+            i.TraceId AS trace_id,
+            i.SpanId AS span_id,
+
+            -- ===== CORE IDENTIFIERS (from model_inference_details.*) =====
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.inference_id'], '')) AS inference_id,
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.project_id'], '')) AS project_id,
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.endpoint_id'], '')) AS endpoint_id,
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.model_id'], '')) AS model_id,
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.api_key_id'], '')) AS api_key_id,
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.api_key_project_id'], '')) AS api_key_project_id,
+            nullIf(i.SpanAttributes['model_inference_details.user_id'], '') AS user_id,
+
+            -- ===== TIMESTAMPS =====
+            toDateTime64(i.Timestamp, 3) AS timestamp,
+            parseDateTime64BestEffortOrNull(i.SpanAttributes['model_inference_details.request_arrival_time']) AS request_arrival_time,
+            parseDateTime64BestEffortOrNull(i.SpanAttributes['model_inference_details.request_forward_time']) AS request_forward_time,
+
+            -- ===== STATUS & COST (from model_inference_details.*) =====
+            i.SpanAttributes['model_inference_details.is_success'] = 'true' AS is_success,
+            toFloat64OrNull(i.SpanAttributes['model_inference_details.cost']) AS cost,
+            toUInt16OrNull(i.SpanAttributes['model_inference_details.status_code']) AS status_code,
+            toIPv4OrNull(i.SpanAttributes['model_inference_details.request_ip']) AS request_ip,
+            nullIf(i.SpanAttributes['model_inference_details.response_analysis'], '') AS response_analysis,
+
+            -- ===== ERROR TRACKING (from model_inference_details.*) =====
+            nullIf(i.SpanAttributes['model_inference_details.error_code'], '') AS error_code,
+            nullIf(i.SpanAttributes['model_inference_details.error_message'], '') AS error_message,
+            nullIf(i.SpanAttributes['model_inference_details.error_type'], '') AS error_type,
+
+            -- ===== MODEL INFO (from model_inference.*) =====
+            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference.id'], '')) AS model_inference_id,
+            i.SpanAttributes['model_inference.model_name'] AS model_name,
+            i.SpanAttributes['model_inference.model_provider_name'] AS model_provider,
+            if(i.SpanAttributes['model_inference.endpoint_type'] != '', i.SpanAttributes['model_inference.endpoint_type'], 'chat') AS endpoint_type,
+
+            -- ===== PERFORMANCE METRICS (from model_inference.*) =====
+            toUInt32OrNull(i.SpanAttributes['model_inference.input_tokens']) AS input_tokens,
+            toUInt32OrNull(i.SpanAttributes['model_inference.output_tokens']) AS output_tokens,
+            toUInt32OrNull(i.SpanAttributes['model_inference.response_time_ms']) AS response_time_ms,
+            toUInt32OrNull(i.SpanAttributes['model_inference.ttft_ms']) AS ttft_ms,
+            i.SpanAttributes['model_inference.cached'] = 'true' AS cached,
+            multiIf(
+                i.SpanAttributes['model_inference.finish_reason'] = 'stop', toNullable(CAST(1, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                i.SpanAttributes['model_inference.finish_reason'] = 'length', toNullable(CAST(2, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                i.SpanAttributes['model_inference.finish_reason'] = 'tool_call', toNullable(CAST(3, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                i.SpanAttributes['model_inference.finish_reason'] = 'content_filter', toNullable(CAST(4, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                i.SpanAttributes['model_inference.finish_reason'] != '', toNullable(CAST(5, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                NULL
+            ) AS finish_reason,
+
+            -- ===== CONTENT (from model_inference.*) =====
+            nullIf(i.SpanAttributes['model_inference.system'], '') AS system_prompt,
+            nullIf(i.SpanAttributes['model_inference.input_messages'], '') AS input_messages,
+            nullIf(i.SpanAttributes['model_inference.output'], '') AS output,
+            nullIf(i.SpanAttributes['model_inference.raw_request'], '') AS raw_request,
+            nullIf(i.SpanAttributes['model_inference.raw_response'], '') AS raw_response,
+            nullIf(i.SpanAttributes['model_inference.gateway_request'], '') AS gateway_request,
+            nullIf(i.SpanAttributes['model_inference.gateway_response'], '') AS gateway_response,
+            nullIf(i.SpanAttributes['model_inference.guardrail_scan_summary'], '') AS guardrail_scan_summary,
+            toUInt64OrNull(i.SpanAttributes['model_inference.timestamp']) AS model_inference_timestamp,
+
+            -- ===== CHAT INFERENCE (from chat_inference.*) =====
+            toUUIDOrNull(nullIf(i.SpanAttributes['chat_inference.id'], '')) AS chat_inference_id,
+            toUUIDOrNull(nullIf(i.SpanAttributes['chat_inference.episode_id'], '')) AS episode_id,
+            nullIf(i.SpanAttributes['chat_inference.function_name'], '') AS function_name,
+            nullIf(i.SpanAttributes['chat_inference.variant_name'], '') AS variant_name,
+            toUInt32OrNull(i.SpanAttributes['chat_inference.processing_time_ms']) AS processing_time_ms,
+            nullIf(i.SpanAttributes['chat_inference.input'], '') AS chat_input,
+            nullIf(i.SpanAttributes['chat_inference.output'], '') AS chat_output,
+            nullIf(i.SpanAttributes['chat_inference.tags'], '') AS tags,
+            nullIf(i.SpanAttributes['chat_inference.inference_params'], '') AS inference_params,
+            nullIf(i.SpanAttributes['chat_inference.extra_body'], '') AS extra_body,
+            nullIf(i.SpanAttributes['chat_inference.tool_params'], '') AS tool_params,
+
+            -- ===== GATEWAY ANALYTICS (from gateway_analytics.* span via LEFT JOIN) =====
+            -- Geographic
+            nullIf(g.SpanAttributes['gateway_analytics.country_code'], '') AS country_code,
+            nullIf(g.SpanAttributes['gateway_analytics.country_name'], '') AS country_name,
+            nullIf(g.SpanAttributes['gateway_analytics.region'], '') AS region,
+            nullIf(g.SpanAttributes['gateway_analytics.city'], '') AS city,
+            toFloat32OrNull(g.SpanAttributes['gateway_analytics.latitude']) AS latitude,
+            toFloat32OrNull(g.SpanAttributes['gateway_analytics.longitude']) AS longitude,
+            nullIf(g.SpanAttributes['gateway_analytics.timezone'], '') AS timezone,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.asn']) AS asn,
+            nullIf(g.SpanAttributes['gateway_analytics.isp'], '') AS isp,
+
+            -- Client metadata
+            toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip']) AS client_ip,
+            nullIf(g.SpanAttributes['gateway_analytics.user_agent'], '') AS user_agent,
+            nullIf(g.SpanAttributes['gateway_analytics.device_type'], '') AS device_type,
+            nullIf(g.SpanAttributes['gateway_analytics.browser_name'], '') AS browser_name,
+            nullIf(g.SpanAttributes['gateway_analytics.browser_version'], '') AS browser_version,
+            nullIf(g.SpanAttributes['gateway_analytics.os_name'], '') AS os_name,
+            nullIf(g.SpanAttributes['gateway_analytics.os_version'], '') AS os_version,
+            g.SpanAttributes['gateway_analytics.is_bot'] = 'true' AS is_bot,
+
+            -- Request context
+            nullIf(g.SpanAttributes['gateway_analytics.method'], '') AS method,
+            nullIf(g.SpanAttributes['gateway_analytics.path'], '') AS path,
+            nullIf(g.SpanAttributes['gateway_analytics.query_params'], '') AS query_params,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.body_size']) AS body_size,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.response_size']) AS response_size,
+            nullIf(g.SpanAttributes['gateway_analytics.protocol_version'], '') AS protocol_version,
+
+            -- Performance
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.gateway_processing_ms']) AS gateway_processing_ms,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.total_duration_ms']) AS total_duration_ms,
+
+            -- Routing & blocking
+            nullIf(g.SpanAttributes['gateway_analytics.model_version'], '') AS model_version,
+            nullIf(g.SpanAttributes['gateway_analytics.routing_decision'], '') AS routing_decision,
+            g.SpanAttributes['gateway_analytics.is_blocked'] = 'true' AS is_blocked,
+            nullIf(g.SpanAttributes['gateway_analytics.block_reason'], '') AS block_reason,
+            nullIf(g.SpanAttributes['gateway_analytics.block_rule_id'], '') AS block_rule_id,
+            nullIf(g.SpanAttributes['gateway_analytics.proxy_chain'], '') AS proxy_chain,
+
+            -- Headers & timestamps
+            nullIf(g.SpanAttributes['gateway_analytics.request_headers'], '') AS request_headers,
+            nullIf(g.SpanAttributes['gateway_analytics.response_headers'], '') AS response_headers,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp']) AS request_timestamp,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.response_timestamp']) AS response_timestamp,
+            nullIf(g.SpanAttributes['gateway_analytics.tags'], '') AS gateway_tags
+
+        FROM otel_traces i
+        LEFT JOIN otel_traces g
+            ON i.TraceId = g.TraceId
+            AND g.SpanName = 'gateway_analytics'
+        WHERE i.SpanName = 'inference_handler_observability'
+          AND i.SpanAttributes['model_inference_details.inference_id'] != ''
+          AND i.SpanAttributes['model_inference_details.project_id'] != ''
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("mv_otel_to_inference_fact materialized view created successfully")
+        except Exception as e:
+            logger.error(f"Error creating mv_otel_to_inference_fact: {e}")
+            raise
 
     async def add_error_tracking_columns(self):
         """Add error tracking columns to ModelInferenceDetails table for failed inference tracking.
@@ -1167,6 +1523,134 @@ class ClickHouseMigration:
                     logger.warning(f"Index creation warning for {index_name}: {e}")
 
         logger.info("Error tracking columns migration completed successfully")
+
+    async def add_gateway_columns_to_inference_fact(self):
+        """Add gateway analytics columns and error columns to existing InferenceFact table.
+
+        This migration adds columns for:
+        - Error tracking: error_code, error_message, error_type
+        - Geographic: country_code, country_name, region, city, latitude, longitude, timezone, asn, isp
+        - Client metadata: client_ip, user_agent, device_type, browser_name, browser_version, os_name, os_version, is_bot
+        - Request context: method, path, query_params, body_size, response_size, protocol_version
+        - Performance: gateway_processing_ms, total_duration_ms
+        - Routing: model_version, routing_decision, is_blocked, block_reason, block_rule_id, proxy_chain
+        - Headers: request_headers, response_headers, request_timestamp, response_timestamp, gateway_tags
+        """
+        logger.info("Adding gateway analytics columns to InferenceFact table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceFact")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceFact table does not exist. Skipping gateway columns migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if InferenceFact table exists: {e}")
+            return
+
+        # Define the columns to add with their types and codecs
+        columns_to_add = [
+            # Error tracking
+            ("error_code", "Nullable(String) CODEC(ZSTD(1))"),
+            ("error_message", "Nullable(String) CODEC(ZSTD(3))"),
+            ("error_type", "Nullable(String) CODEC(ZSTD(1))"),
+            # Geographic
+            ("country_code", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("country_name", "Nullable(String) CODEC(ZSTD(1))"),
+            ("region", "Nullable(String) CODEC(ZSTD(1))"),
+            ("city", "Nullable(String) CODEC(ZSTD(1))"),
+            ("latitude", "Nullable(Float32) CODEC(Gorilla, ZSTD(1))"),
+            ("longitude", "Nullable(Float32) CODEC(Gorilla, ZSTD(1))"),
+            ("timezone", "Nullable(String) CODEC(ZSTD(1))"),
+            ("asn", "Nullable(UInt32) CODEC(ZSTD(1))"),
+            ("isp", "Nullable(String) CODEC(ZSTD(1))"),
+            # Client metadata
+            ("client_ip", "Nullable(IPv4) CODEC(ZSTD(1))"),
+            ("user_agent", "Nullable(String) CODEC(ZSTD(3))"),
+            ("device_type", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("browser_name", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("browser_version", "Nullable(String) CODEC(ZSTD(1))"),
+            ("os_name", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("os_version", "Nullable(String) CODEC(ZSTD(1))"),
+            ("is_bot", "Nullable(Bool) CODEC(ZSTD(1))"),
+            # Request context
+            ("method", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("path", "Nullable(String) CODEC(ZSTD(1))"),
+            ("query_params", "Nullable(String) CODEC(ZSTD(1))"),
+            ("body_size", "Nullable(UInt32) CODEC(ZSTD(1))"),
+            ("response_size", "Nullable(UInt32) CODEC(ZSTD(1))"),
+            ("protocol_version", "Nullable(String) CODEC(ZSTD(1))"),
+            # Performance
+            ("gateway_processing_ms", "Nullable(UInt32) CODEC(Delta, ZSTD(1))"),
+            ("total_duration_ms", "Nullable(UInt32) CODEC(Delta, ZSTD(1))"),
+            # Routing & blocking
+            ("model_version", "Nullable(String) CODEC(ZSTD(1))"),
+            ("routing_decision", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("is_blocked", "Nullable(Bool) CODEC(ZSTD(1))"),
+            ("block_reason", "Nullable(String) CODEC(ZSTD(1))"),
+            ("block_rule_id", "Nullable(String) CODEC(ZSTD(1))"),
+            ("proxy_chain", "Nullable(String) CODEC(ZSTD(1))"),
+            # Headers & timestamps
+            ("request_headers", "Nullable(String) CODEC(ZSTD(3))"),
+            ("response_headers", "Nullable(String) CODEC(ZSTD(3))"),
+            ("request_timestamp", "Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1))"),
+            ("response_timestamp", "Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1))"),
+            ("gateway_tags", "Nullable(String) CODEC(ZSTD(1))"),
+        ]
+
+        # Add each column
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = 'InferenceFact'
+                  AND database = currentDatabase()
+                  AND name = '{column_name}'
+                """  # nosec B608
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    # Add the column
+                    alter_query = f"""
+                    ALTER TABLE InferenceFact
+                    ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column {column_name} to InferenceFact table")
+                else:
+                    logger.debug(f"Column {column_name} already exists in InferenceFact table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.debug(f"Column {column_name} already exists")
+                else:
+                    logger.error(f"Error adding column {column_name}: {e}")
+
+        # Add indexes for new columns
+        indexes = [
+            ("idx_country_code", "country_code", "set(300)", 4),
+            ("idx_city", "city", "bloom_filter(0.01)", 4),
+            ("idx_device_type", "device_type", "set(20)", 4),
+            ("idx_is_bot", "is_bot", "minmax", 4),
+            ("idx_client_ip", "client_ip", "bloom_filter(0.01)", 8),
+            ("idx_is_blocked", "is_blocked", "minmax", 4),
+            ("idx_routing_decision", "routing_decision", "set(20)", 4),
+            ("idx_error_type", "error_type", "set(50)", 4),
+        ]
+
+        for index_name, column, index_type, granularity in indexes:
+            index_query = f"ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS {index_name} ({column}) TYPE {index_type} GRANULARITY {granularity}"
+            try:
+                await self.client.execute_query(index_query)
+                logger.debug(f"Index {index_name} created or already exists")
+            except Exception as e:
+                if "already exists" not in str(e).lower():
+                    logger.warning(f"Index creation warning for {index_name}: {e}")
+
+        logger.info("Gateway analytics columns migration to InferenceFact completed successfully")
 
     async def setup_cluster_metrics_materialized_views(self):
         """Set up materialized views for cluster metrics.
@@ -1501,6 +1985,9 @@ class ClickHouseMigration:
             await self.add_auth_metadata_columns()  # Add auth metadata columns migration
             await self.update_api_key_project_id()  # Update api_key_project_id where null
             await self.add_error_tracking_columns()  # Add error tracking columns for failed inferences
+            await self.create_inference_fact_table()  # Create InferenceFact denormalized table
+            await self.add_gateway_columns_to_inference_fact()  # Add gateway analytics columns to existing InferenceFact
+            await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 
