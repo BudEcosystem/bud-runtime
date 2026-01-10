@@ -5,12 +5,18 @@ into ClickHouse for testing the otel_traces to InferenceFact pipeline.
 """
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 DATA_FILE = Path(__file__).parent / "data" / "otel_traces_sample.json"
+DEFAULT_DATABASE = os.getenv("CLICKHOUSE_DB_NAME", "default_v4")
 
 
 def load_trace_data() -> dict[str, list[dict]]:
@@ -84,7 +90,7 @@ def span_to_values(span: dict[str, Any]) -> str:
     )
 
 
-def generate_insert_sql(spans: list[dict], database: str = "default_v3") -> str:
+def generate_insert_sql(spans: list[dict], database: str = DEFAULT_DATABASE) -> str:
     """Generate INSERT SQL for spans."""
     columns = (
         "Timestamp, TraceId, SpanId, ParentSpanId, TraceState, SpanName, "
@@ -100,7 +106,7 @@ def generate_insert_sql(spans: list[dict], database: str = "default_v3") -> str:
 
 def seed_otel_traces(
     data_keys: list[str] | None = None,
-    database: str = "default_v3",
+    database: str = DEFAULT_DATABASE,
     container: str = "otel-clickhouse",
 ) -> dict:
     """Seed otel_traces table with data from JSON fixture.
@@ -174,7 +180,7 @@ def seed_otel_traces(
 
 
 def verify_seeded_data(
-    database: str = "default_v3",
+    database: str = DEFAULT_DATABASE,
     container: str = "otel-clickhouse"
 ) -> dict:
     """Verify that seeded data was processed by MaterializedViews."""
@@ -199,7 +205,7 @@ def verify_seeded_data(
 
 
 def clear_tables(
-    database: str = "default_v3",
+    database: str = DEFAULT_DATABASE,
     container: str = "otel-clickhouse"
 ) -> dict:
     """Clear all data from otel_traces and derived tables."""
@@ -237,7 +243,7 @@ if __name__ == "__main__":
         default=None,
         help="Data keys to insert (e.g., data_1 data_2). Default: all"
     )
-    parser.add_argument("--database", default="default_v3", help="ClickHouse database")
+    parser.add_argument("--database", default=DEFAULT_DATABASE, help="ClickHouse database")
     parser.add_argument("--container", default="otel-clickhouse", help="Docker container")
     parser.add_argument("--verify", action="store_true", help="Verify after seeding")
     parser.add_argument("--clear", action="store_true", help="Clear tables before seeding")
