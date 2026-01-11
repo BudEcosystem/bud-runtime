@@ -1,0 +1,41 @@
+# k3d cluster configuration for E2E testing
+# k3s is lighter than Kind and works better in constrained environments
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: bud-e2e
+servers: 1
+agents: 0
+image: rancher/k3s:v1.31.5-k3s1
+ports:
+  # budapp service
+  - port: 9001:30082
+    nodeFilters:
+      - loadbalancer
+  # Keycloak
+  - port: 9080:30080
+    nodeFilters:
+      - loadbalancer
+  # PostgreSQL (for debugging)
+  - port: 9432:30432
+    nodeFilters:
+      - loadbalancer
+  # Redis (for debugging)
+  - port: 9379:30379
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
+    timeout: "120s"
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

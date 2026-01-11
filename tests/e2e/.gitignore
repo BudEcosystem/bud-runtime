@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Environment
+.env.e2e
+.env
+.env.local
+*.env
+
+# Test Reports
+reports/
+*.log
+test-results/
+allure-results/
+coverage.xml
+*.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Kubernetes/Helm (generated during tests)
+*.kubeconfig
+kubeconfig
+
+# Keep sample files
+!.env.e2e.sample

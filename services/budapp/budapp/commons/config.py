@@ -99,6 +99,9 @@ class AppConfig(BaseAppConfig):
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
 
+    # Rate Limiting
+    rate_limit_enabled: bool = Field(True, alias="RATE_LIMIT_ENABLED")
+
     # Superuser
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
