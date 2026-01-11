@@ -1028,6 +1028,9 @@ class ClickHouseMigration:
             "GatewayAnalytics",
             "GatewayBlockingEvents",
             "InferenceFact",
+            "InferenceMetrics5m",
+            "InferenceMetrics1h",
+            "InferenceMetrics1d",
         ]
         # Cluster metrics tables in metrics database
         metrics_tables = [
@@ -1449,6 +1452,335 @@ class ClickHouseMigration:
         except Exception as e:
             logger.error(f"Error creating mv_otel_to_inference_fact: {e}")
             raise
+
+    async def create_inference_metrics_rollup_tables(self):
+        """Create InferenceMetrics rollup tables for time-series aggregation.
+
+        Creates three rollup tables with different granularities:
+        - InferenceMetrics5m: 5-minute granularity, 30 day TTL (real-time dashboards)
+        - InferenceMetrics1h: 1-hour granularity, 30 day TTL (daily/weekly analytics)
+        - InferenceMetrics1d: 1-day granularity, 60 day TTL (monthly trends, billing)
+
+        UUID handling strategy:
+        - Dimension UUIDs (keep): project_id, endpoint_id, model_id, api_key_project_id
+        - Count-Only UUIDs (aggregate): user_id, inference_id, episode_id, api_key_id
+        - Drop UUIDs: id, model_inference_id, chat_inference_id
+        """
+        logger.info("Creating InferenceMetrics rollup tables...")
+
+        # Common table structure (shared across all granularities)
+        common_columns = """
+            -- Time bucket (granularity varies by table)
+            time_bucket DateTime,
+
+            -- Dimension UUIDs (for filtering)
+            project_id UUID CODEC(ZSTD(1)),
+            endpoint_id UUID CODEC(ZSTD(1)),
+            model_id UUID CODEC(ZSTD(1)),
+            api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+
+            -- String dimensions (for grouping)
+            model_name LowCardinality(String) CODEC(ZSTD(1)),
+            model_provider LowCardinality(String) CODEC(ZSTD(1)),
+            endpoint_type LowCardinality(String) DEFAULT 'chat' CODEC(ZSTD(1)),
+            is_success Bool,
+            country_code LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+
+            -- Counts
+            request_count UInt64 CODEC(Delta, ZSTD(1)),
+            success_count UInt64 CODEC(Delta, ZSTD(1)),
+            error_count UInt64 CODEC(Delta, ZSTD(1)),
+            cached_count UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Token metrics
+            total_input_tokens UInt64 CODEC(Delta, ZSTD(1)),
+            total_output_tokens UInt64 CODEC(Delta, ZSTD(1)),
+
+            -- Cost metrics
+            total_cost Float64 CODEC(Gorilla, ZSTD(1)),
+
+            -- Latency metrics (for average/min/max calculation)
+            sum_response_time_ms UInt64 CODEC(Delta, ZSTD(1)),
+            sum_ttft_ms UInt64 CODEC(Delta, ZSTD(1)),
+            min_response_time_ms Nullable(UInt32) CODEC(ZSTD(1)),
+            max_response_time_ms Nullable(UInt32) CODEC(ZSTD(1)),
+
+            -- Unique counts (using AggregateFunction for rollup compatibility)
+            unique_users AggregateFunction(uniq, Nullable(String)),
+            unique_inferences AggregateFunction(uniq, UUID),
+            unique_episodes AggregateFunction(uniq, Nullable(UUID)),
+            unique_api_keys AggregateFunction(uniq, Nullable(UUID))
+        """
+
+        # InferenceMetrics5m - 5-minute granularity, 30 day TTL
+        query_5m = f"""
+        CREATE TABLE IF NOT EXISTS InferenceMetrics5m
+        (
+            {common_columns}
+        )
+        ENGINE = SummingMergeTree(
+            (request_count, success_count, error_count, cached_count,
+             total_input_tokens, total_output_tokens, total_cost,
+             sum_response_time_ms, sum_ttft_ms)
+        )
+        PARTITION BY toYYYYMM(time_bucket)
+        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 30 DAY
+        SETTINGS index_granularity = 8192, allow_nullable_key = 1
+        """
+
+        # InferenceMetrics1h - 1-hour granularity, 30 day TTL
+        query_1h = f"""
+        CREATE TABLE IF NOT EXISTS InferenceMetrics1h
+        (
+            {common_columns}
+        )
+        ENGINE = SummingMergeTree(
+            (request_count, success_count, error_count, cached_count,
+             total_input_tokens, total_output_tokens, total_cost,
+             sum_response_time_ms, sum_ttft_ms)
+        )
+        PARTITION BY toYYYYMM(time_bucket)
+        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 30 DAY
+        SETTINGS index_granularity = 8192, allow_nullable_key = 1
+        """
+
+        # InferenceMetrics1d - 1-day granularity, 60 day TTL
+        query_1d = f"""
+        CREATE TABLE IF NOT EXISTS InferenceMetrics1d
+        (
+            {common_columns}
+        )
+        ENGINE = SummingMergeTree(
+            (request_count, success_count, error_count, cached_count,
+             total_input_tokens, total_output_tokens, total_cost,
+             sum_response_time_ms, sum_ttft_ms)
+        )
+        PARTITION BY toYYYYMM(time_bucket)
+        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 60 DAY
+        SETTINGS index_granularity = 8192, allow_nullable_key = 1
+        """
+
+        tables = [
+            ("InferenceMetrics5m", query_5m),
+            ("InferenceMetrics1h", query_1h),
+            ("InferenceMetrics1d", query_1d),
+        ]
+
+        for table_name, query in tables:
+            try:
+                await self.client.execute_query(query)
+                logger.info(f"{table_name} table created successfully")
+
+                # Add indexes for each table
+                indexes = [
+                    f"ALTER TABLE {table_name} ADD INDEX IF NOT EXISTS idx_time_bucket (time_bucket) TYPE minmax GRANULARITY 1",
+                    f"ALTER TABLE {table_name} ADD INDEX IF NOT EXISTS idx_model_name (model_name) TYPE set(100) GRANULARITY 4",
+                    f"ALTER TABLE {table_name} ADD INDEX IF NOT EXISTS idx_model_provider (model_provider) TYPE set(50) GRANULARITY 4",
+                    f"ALTER TABLE {table_name} ADD INDEX IF NOT EXISTS idx_endpoint_type (endpoint_type) TYPE set(10) GRANULARITY 4",
+                    f"ALTER TABLE {table_name} ADD INDEX IF NOT EXISTS idx_country_code (country_code) TYPE set(300) GRANULARITY 4",
+                ]
+
+                for index_query in indexes:
+                    try:
+                        await self.client.execute_query(index_query)
+                    except Exception as e:
+                        if "already exists" not in str(e):
+                            logger.warning(f"Index creation warning: {e}")
+
+            except Exception as e:
+                logger.error(f"Error creating {table_name} table: {e}")
+                raise
+
+        logger.info("All InferenceMetrics rollup tables created successfully")
+
+    async def create_inference_metrics_materialized_views(self):
+        """Create Materialized Views for cascading rollup aggregation.
+
+        Creates three MVs for the cascading rollup:
+        - mv_inference_to_5m: InferenceFact → InferenceMetrics5m
+        - mv_5m_to_1h: InferenceMetrics5m → InferenceMetrics1h
+        - mv_1h_to_1d: InferenceMetrics1h → InferenceMetrics1d
+
+        Uses AggregateFunction with uniqState/uniqMerge for accurate unique counts.
+        """
+        logger.info("Creating InferenceMetrics materialized views...")
+
+        # MV: InferenceFact → InferenceMetrics5m
+        mv_inference_to_5m = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inference_to_5m TO InferenceMetrics5m AS
+        SELECT
+            toStartOfFiveMinutes(timestamp) AS time_bucket,
+
+            -- Dimension UUIDs
+            project_id,
+            endpoint_id,
+            model_id,
+            api_key_project_id,
+
+            -- String dimensions
+            model_name,
+            model_provider,
+            endpoint_type,
+            is_success,
+            country_code,
+
+            -- Counts
+            count() AS request_count,
+            countIf(is_success) AS success_count,
+            countIf(NOT is_success) AS error_count,
+            countIf(cached) AS cached_count,
+
+            -- Token metrics
+            sum(ifNull(input_tokens, 0)) AS total_input_tokens,
+            sum(ifNull(output_tokens, 0)) AS total_output_tokens,
+
+            -- Cost
+            sum(ifNull(cost, 0)) AS total_cost,
+
+            -- Latency
+            sum(ifNull(response_time_ms, 0)) AS sum_response_time_ms,
+            sum(ifNull(ttft_ms, 0)) AS sum_ttft_ms,
+            min(response_time_ms) AS min_response_time_ms,
+            max(response_time_ms) AS max_response_time_ms,
+
+            -- Unique counts (using uniqState for accurate counts across rollups)
+            uniqState(user_id) AS unique_users,
+            uniqState(inference_id) AS unique_inferences,
+            uniqState(episode_id) AS unique_episodes,
+            uniqState(api_key_id) AS unique_api_keys
+
+        FROM InferenceFact
+        GROUP BY
+            time_bucket,
+            project_id, endpoint_id, model_id, api_key_project_id,
+            model_name, model_provider, endpoint_type, is_success, country_code
+        """
+
+        # MV: InferenceMetrics5m → InferenceMetrics1h
+        mv_5m_to_1h = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_5m_to_1h TO InferenceMetrics1h AS
+        SELECT
+            toStartOfHour(time_bucket) AS time_bucket,
+
+            -- Dimension UUIDs
+            project_id,
+            endpoint_id,
+            model_id,
+            api_key_project_id,
+
+            -- String dimensions
+            model_name,
+            model_provider,
+            endpoint_type,
+            is_success,
+            country_code,
+
+            -- Counts (summed)
+            sum(request_count) AS request_count,
+            sum(success_count) AS success_count,
+            sum(error_count) AS error_count,
+            sum(cached_count) AS cached_count,
+
+            -- Token metrics
+            sum(total_input_tokens) AS total_input_tokens,
+            sum(total_output_tokens) AS total_output_tokens,
+
+            -- Cost
+            sum(total_cost) AS total_cost,
+
+            -- Latency
+            sum(sum_response_time_ms) AS sum_response_time_ms,
+            sum(sum_ttft_ms) AS sum_ttft_ms,
+            min(min_response_time_ms) AS min_response_time_ms,
+            max(max_response_time_ms) AS max_response_time_ms,
+
+            -- Unique counts (merge states)
+            uniqMergeState(unique_users) AS unique_users,
+            uniqMergeState(unique_inferences) AS unique_inferences,
+            uniqMergeState(unique_episodes) AS unique_episodes,
+            uniqMergeState(unique_api_keys) AS unique_api_keys
+
+        FROM InferenceMetrics5m
+        GROUP BY
+            time_bucket,
+            project_id, endpoint_id, model_id, api_key_project_id,
+            model_name, model_provider, endpoint_type, is_success, country_code
+        """
+
+        # MV: InferenceMetrics1h → InferenceMetrics1d
+        mv_1h_to_1d = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_1h_to_1d TO InferenceMetrics1d AS
+        SELECT
+            toStartOfDay(time_bucket) AS time_bucket,
+
+            -- Dimension UUIDs
+            project_id,
+            endpoint_id,
+            model_id,
+            api_key_project_id,
+
+            -- String dimensions
+            model_name,
+            model_provider,
+            endpoint_type,
+            is_success,
+            country_code,
+
+            -- Counts (summed)
+            sum(request_count) AS request_count,
+            sum(success_count) AS success_count,
+            sum(error_count) AS error_count,
+            sum(cached_count) AS cached_count,
+
+            -- Token metrics
+            sum(total_input_tokens) AS total_input_tokens,
+            sum(total_output_tokens) AS total_output_tokens,
+
+            -- Cost
+            sum(total_cost) AS total_cost,
+
+            -- Latency
+            sum(sum_response_time_ms) AS sum_response_time_ms,
+            sum(sum_ttft_ms) AS sum_ttft_ms,
+            min(min_response_time_ms) AS min_response_time_ms,
+            max(max_response_time_ms) AS max_response_time_ms,
+
+            -- Unique counts (merge states)
+            uniqMergeState(unique_users) AS unique_users,
+            uniqMergeState(unique_inferences) AS unique_inferences,
+            uniqMergeState(unique_episodes) AS unique_episodes,
+            uniqMergeState(unique_api_keys) AS unique_api_keys
+
+        FROM InferenceMetrics1h
+        GROUP BY
+            time_bucket,
+            project_id, endpoint_id, model_id, api_key_project_id,
+            model_name, model_provider, endpoint_type, is_success, country_code
+        """
+
+        views = [
+            ("mv_inference_to_5m", mv_inference_to_5m),
+            ("mv_5m_to_1h", mv_5m_to_1h),
+            ("mv_1h_to_1d", mv_1h_to_1d),
+        ]
+
+        for view_name, query in views:
+            try:
+                # Drop existing view to ensure clean state (optional, remove if incremental updates preferred)
+                # await self.client.execute_query(f"DROP VIEW IF EXISTS {view_name}")
+                await self.client.execute_query(query)
+                logger.info(f"{view_name} materialized view created successfully")
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.info(f"{view_name} materialized view already exists")
+                else:
+                    logger.error(f"Error creating {view_name}: {e}")
+                    raise
+
+        logger.info("All InferenceMetrics materialized views created successfully")
 
     async def add_error_tracking_columns(self):
         """Add error tracking columns to ModelInferenceDetails table for failed inference tracking.
@@ -1986,8 +2318,12 @@ class ClickHouseMigration:
             await self.update_api_key_project_id()  # Update api_key_project_id where null
             await self.add_error_tracking_columns()  # Add error tracking columns for failed inferences
             await self.create_inference_fact_table()  # Create InferenceFact denormalized table
-            await self.add_gateway_columns_to_inference_fact()  # Add gateway analytics columns to existing InferenceFact
+            await (
+                self.add_gateway_columns_to_inference_fact()
+            )  # Add gateway analytics columns to existing InferenceFact
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
+            await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
+            await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 
