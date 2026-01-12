@@ -730,15 +730,16 @@ class ObservabilityMetricsService:
         params = {}
 
         # Always filter by date range
-        where_conditions.append("inf.timestamp >= %(from_date)s")
+        # Note: Using 'ifact' alias instead of 'inf' to avoid conflict with ClickHouse's infinity constant
+        where_conditions.append("ifact.timestamp >= %(from_date)s")
         params["from_date"] = request.from_date
 
         if request.to_date:
-            where_conditions.append("inf.timestamp <= %(to_date)s")
+            where_conditions.append("ifact.timestamp <= %(to_date)s")
             params["to_date"] = request.to_date
 
         if request.project_id:
-            where_conditions.append("inf.project_id = %(project_id)s")
+            where_conditions.append("ifact.project_id = %(project_id)s")
             params["project_id"] = str(request.project_id)
 
         # Support filtering by api_key_project_id (for CLIENT users)
@@ -746,49 +747,49 @@ class ObservabilityMetricsService:
             api_key_project_ids = request.filters["api_key_project_id"]
             if isinstance(api_key_project_ids, list):
                 placeholders = [f"%(api_key_project_{i})s" for i in range(len(api_key_project_ids))]
-                where_conditions.append(f"inf.api_key_project_id IN ({','.join(placeholders)})")
+                where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
                 for i, val in enumerate(api_key_project_ids):
                     params[f"api_key_project_{i}"] = str(val)
             else:
-                where_conditions.append("inf.api_key_project_id = %(api_key_project_id)s")
+                where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
                 params["api_key_project_id"] = str(api_key_project_ids)
 
         if request.endpoint_id:
-            where_conditions.append("inf.endpoint_id = %(endpoint_id)s")
+            where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
             params["endpoint_id"] = str(request.endpoint_id)
 
         if request.model_id:
-            where_conditions.append("inf.model_id = %(model_id)s")
+            where_conditions.append("ifact.model_id = %(model_id)s")
             params["model_id"] = str(request.model_id)
 
         if request.is_success is not None:
-            where_conditions.append("inf.is_success = %(is_success)s")
+            where_conditions.append("ifact.is_success = %(is_success)s")
             params["is_success"] = 1 if request.is_success else 0
 
         if request.min_tokens is not None:
-            where_conditions.append("(inf.input_tokens + inf.output_tokens) >= %(min_tokens)s")
+            where_conditions.append("(ifact.input_tokens + ifact.output_tokens) >= %(min_tokens)s")
             params["min_tokens"] = request.min_tokens
 
         if request.max_tokens is not None:
-            where_conditions.append("(inf.input_tokens + inf.output_tokens) <= %(max_tokens)s")
+            where_conditions.append("(ifact.input_tokens + ifact.output_tokens) <= %(max_tokens)s")
             params["max_tokens"] = request.max_tokens
 
         if request.max_latency_ms is not None:
-            where_conditions.append("inf.response_time_ms <= %(max_latency_ms)s")
+            where_conditions.append("ifact.response_time_ms <= %(max_latency_ms)s")
             params["max_latency_ms"] = request.max_latency_ms
 
         if request.endpoint_type:
-            where_conditions.append("inf.endpoint_type = %(endpoint_type)s")
+            where_conditions.append("ifact.endpoint_type = %(endpoint_type)s")
             params["endpoint_type"] = request.endpoint_type
 
         where_clause = " AND ".join(where_conditions)
 
         # Build ORDER BY clause - validate sort_by to prevent injection
         sort_column_map = {
-            "timestamp": "inf.timestamp",
-            "tokens": "(inf.input_tokens + inf.output_tokens)",
-            "latency": "inf.response_time_ms",
-            "cost": "inf.cost",
+            "timestamp": "ifact.timestamp",
+            "tokens": "(ifact.input_tokens + ifact.output_tokens)",
+            "latency": "ifact.response_time_ms",
+            "cost": "ifact.cost",
         }
 
         # Validate sort_by is in allowed columns
@@ -804,7 +805,7 @@ class ObservabilityMetricsService:
         # Count total records from InferenceFact (denormalized, no JOIN needed)
         count_query = f"""
         SELECT count() as total_count
-        FROM InferenceFact inf
+        FROM InferenceFact ifact
         WHERE {where_clause}
         """  # nosec B608
 
@@ -817,46 +818,46 @@ class ObservabilityMetricsService:
         # Note: LEFT JOINs kept for modality-specific tables (embedding, audio, image, moderation)
         list_query = f"""
         SELECT
-            inf.inference_id,
-            inf.timestamp,
-            inf.model_name,
+            ifact.inference_id,
+            ifact.timestamp,
+            ifact.model_name,
             CASE
-                WHEN inf.endpoint_type = 'chat' THEN toValidUTF8(substring(inf.input_messages, 1, 100))
-                WHEN inf.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
-                WHEN inf.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
-                WHEN inf.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
-                WHEN inf.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
-                ELSE toValidUTF8(substring(inf.input_messages, 1, 100))
+                WHEN ifact.endpoint_type = 'chat' THEN toValidUTF8(substring(ifact.input_messages, 1, 100))
+                WHEN ifact.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
+                WHEN ifact.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
+                WHEN ifact.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
+                WHEN ifact.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
+                ELSE toValidUTF8(substring(ifact.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN inf.endpoint_type = 'chat' THEN toValidUTF8(substring(inf.output, 1, 100))
-                WHEN inf.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
-                WHEN inf.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
-                WHEN inf.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
-                WHEN inf.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
-                ELSE toValidUTF8(substring(inf.output, 1, 100))
+                WHEN ifact.endpoint_type = 'chat' THEN toValidUTF8(substring(ifact.output, 1, 100))
+                WHEN ifact.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
+                WHEN ifact.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
+                WHEN ifact.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
+                WHEN ifact.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
+                ELSE toValidUTF8(substring(ifact.output, 1, 100))
             END as response_preview,
-            inf.input_tokens,
-            inf.output_tokens,
-            inf.input_tokens + inf.output_tokens as total_tokens,
-            inf.response_time_ms,
-            inf.cost,
-            inf.is_success,
-            inf.cached,
-            inf.project_id,
-            inf.api_key_project_id,
-            inf.endpoint_id,
-            inf.model_id,
-            coalesce(inf.endpoint_type, 'chat') as endpoint_type,
-            inf.error_code,
-            inf.error_message,
-            inf.error_type,
-            inf.status_code
-        FROM InferenceFact inf
-        LEFT JOIN EmbeddingInference ei ON inf.inference_id = ei.id AND inf.endpoint_type = 'embedding'
-        LEFT JOIN AudioInference ai ON inf.inference_id = ai.id AND inf.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
-        LEFT JOIN ImageInference ii ON inf.inference_id = ii.id AND inf.endpoint_type = 'image_generation'
-        LEFT JOIN ModerationInference modi ON inf.inference_id = modi.id AND inf.endpoint_type = 'moderation'
+            ifact.input_tokens,
+            ifact.output_tokens,
+            ifact.input_tokens + ifact.output_tokens as total_tokens,
+            ifact.response_time_ms,
+            ifact.cost,
+            ifact.is_success,
+            ifact.cached,
+            ifact.project_id,
+            ifact.api_key_project_id,
+            ifact.endpoint_id,
+            ifact.model_id,
+            coalesce(ifact.endpoint_type, 'chat') as endpoint_type,
+            ifact.error_code,
+            ifact.error_message,
+            ifact.error_type,
+            ifact.status_code
+        FROM InferenceFact ifact
+        LEFT JOIN EmbeddingInference ei ON ifact.inference_id = ei.id AND ifact.endpoint_type = 'embedding'
+        LEFT JOIN AudioInference ai ON ifact.inference_id = ai.id AND ifact.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
+        LEFT JOIN ImageInference ii ON ifact.inference_id = ii.id AND ifact.endpoint_type = 'image_generation'
+        LEFT JOIN ModerationInference modi ON ifact.inference_id = modi.id AND ifact.endpoint_type = 'moderation'
         WHERE {where_clause}
         ORDER BY {order_by}
         LIMIT %(limit)s OFFSET %(offset)s
