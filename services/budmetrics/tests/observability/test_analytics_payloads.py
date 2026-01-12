@@ -1353,4 +1353,346 @@ class TestFrequencyInterval:
         print(f"\n[float_interval] Float value correctly rejected")
 
 
+class TestFilters:
+    """Tests for filters parameter handling.
+
+    Note: The seeded data has 6 total records:
+    - 5 records with: project_id=a1, model_id=a2, endpoint_id=a4
+    - 1 record with: project_id=a4, model_id=a3, endpoint_id=a5
+
+    So filtering by TEST_PROJECT_ID, TEST_MODEL_ID, or TEST_ENDPOINT_ID
+    should return 5 records, not 6.
+    """
+
+    # Constants for filter tests
+    NONEXISTENT_UUID = "00000000-0000-0000-0000-000000000000"
+    # 5 out of 6 records match the primary test UUIDs (project_id=a1, model_id=a2, endpoint_id=a4)
+    FILTERED_RECORD_COUNT = 5
+
+    def _get_filter_payload(self, filters: dict = None) -> dict:
+        """Create base request payload with optional filters."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "day",
+            "fill_time_gaps": False,
+        }
+        if filters is not None:
+            payload["filters"] = filters
+        return payload
+
+    def _sum_request_counts(self, data: dict) -> int:
+        """Helper to sum request counts from response data."""
+        total = 0
+        for item in data.get("items", []):
+            for metrics_item in item.get("items") or []:
+                rc = metrics_item.get("data", {}).get("request_count", {})
+                total += rc.get("count", 0)
+        return total
+
+    # ==================== Basic Validation Tests ====================
+
+    def test_filters_default_is_none(self, sync_client, seeded_data):
+        """Test that filters defaults to None (returns all data) when not specified."""
+        payload = self._get_filter_payload()  # No filters
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Should return all data ({seeded_data['total_count']}), got {total}"
+        print(f"\n[filters_default] No filters returns all {total} records")
+
+    def test_filters_null_accepted(self, sync_client, seeded_data):
+        """Test that explicit null value for filters is accepted."""
+        payload = self._get_filter_payload()
+        payload["filters"] = None
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Null filters should be accepted, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"]
+        print(f"\n[filters_null] Null value accepted, returns {total} records")
+
+    def test_filters_empty_object_accepted(self, sync_client, seeded_data):
+        """Test that empty filters object is accepted (no filtering applied)."""
+        payload = self._get_filter_payload(filters={})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Empty filters should be accepted, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"]
+        print(f"\n[filters_empty] Empty object accepted, returns {total} records")
+
+    def test_filters_empty_array_rejected(self, sync_client):
+        """Test validation error for empty filter array."""
+        payload = self._get_filter_payload(filters={"project": []})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Empty filter array should be rejected, got {response.status_code}"
+        print(f"\n[filters_empty_array] Empty array correctly rejected")
+
+    def test_filters_invalid_key_rejected(self, sync_client):
+        """Test validation error for invalid filter key."""
+        payload = self._get_filter_payload(filters={"user": str(TEST_PROJECT_ID)})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Invalid key 'user' should be rejected, got {response.status_code}"
+        print(f"\n[filters_invalid_key] Invalid key 'user' correctly rejected")
+
+    def test_filters_invalid_uuid_format(self, sync_client):
+        """Test validation error for invalid UUID format."""
+        payload = self._get_filter_payload(filters={"project": "not-a-valid-uuid"})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Invalid UUID format should be rejected, got {response.status_code}"
+        print(f"\n[filters_invalid_uuid] Invalid UUID format correctly rejected")
+
+    def test_filters_invalid_value_type(self, sync_client):
+        """Test validation error for invalid value type (integer instead of UUID)."""
+        payload = self._get_filter_payload(filters={"project": 12345})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Integer value should be rejected, got {response.status_code}"
+        print(f"\n[filters_invalid_type] Integer value correctly rejected")
+
+    # ==================== Single UUID Filter Tests ====================
+
+    def test_filter_by_project_single_uuid(self, sync_client, seeded_data):
+        """Test filtering by single project UUID."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Project filter should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records for test project, got {total}"
+        print(f"\n[filter_project] Project filter returns {total} records")
+
+    def test_filter_by_model_single_uuid(self, sync_client, seeded_data):
+        """Test filtering by single model UUID."""
+        payload = self._get_filter_payload(filters={"model": str(TEST_MODEL_ID)})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Model filter should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records for test model, got {total}"
+        print(f"\n[filter_model] Model filter returns {total} records")
+
+    def test_filter_by_endpoint_single_uuid(self, sync_client, seeded_data):
+        """Test filtering by single endpoint UUID."""
+        payload = self._get_filter_payload(filters={"endpoint": str(TEST_ENDPOINT_ID)})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Endpoint filter should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records for test endpoint, got {total}"
+        print(f"\n[filter_endpoint] Endpoint filter returns {total} records")
+
+    def test_filter_by_nonexistent_uuid(self, sync_client, seeded_data):
+        """Test filtering by non-existent UUID returns empty results."""
+        payload = self._get_filter_payload(filters={"project": self.NONEXISTENT_UUID})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Non-existent filter should work, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == 0, f"Non-existent UUID should return 0 records, got {total}"
+        print(f"\n[filter_nonexistent] Non-existent UUID returns 0 records")
+
+    # ==================== UUID Array Filter Tests ====================
+
+    def test_filter_by_project_array(self, sync_client, seeded_data):
+        """Test filtering by project UUID array with single element."""
+        payload = self._get_filter_payload(filters={"project": [str(TEST_PROJECT_ID)]})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Project array filter should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filter_project_array] Project array filter returns {total} records")
+
+    def test_filter_by_model_array(self, sync_client, seeded_data):
+        """Test filtering by model UUID array with single element."""
+        payload = self._get_filter_payload(filters={"model": [str(TEST_MODEL_ID)]})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Model array filter should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filter_model_array] Model array filter returns {total} records")
+
+    def test_filter_by_multiple_uuids(self, sync_client, seeded_data):
+        """Test filtering with multiple UUIDs in array (uses IN clause)."""
+        # Include both a valid and non-existent UUID
+        payload = self._get_filter_payload(filters={
+            "project": [str(TEST_PROJECT_ID), self.NONEXISTENT_UUID]
+        })
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Multiple UUIDs should work, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} for matching UUID, got {total}"
+        print(f"\n[filter_multiple_uuids] Multiple UUIDs (IN clause) returns {total} records")
+
+    def test_filter_mixed_single_and_array(self, sync_client, seeded_data):
+        """Test filtering with mixed single UUID and array formats."""
+        payload = self._get_filter_payload(filters={
+            "project": str(TEST_PROJECT_ID),  # Single UUID
+            "model": [str(TEST_MODEL_ID)],  # Array with one UUID
+        })
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Mixed format should work, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filter_mixed] Mixed single/array format returns {total} records")
+
+    # ==================== Combined Filters (AND logic) ====================
+
+    def test_filter_project_and_model(self, sync_client, seeded_data):
+        """Test filtering by project AND model (AND logic)."""
+        payload = self._get_filter_payload(filters={
+            "project": str(TEST_PROJECT_ID),
+            "model": str(TEST_MODEL_ID),
+        })
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Combined filters should work, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Combined filters (AND) should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filter_combined_2] Project AND model filter returns {total} records")
+
+    def test_filter_all_three(self, sync_client, seeded_data):
+        """Test filtering by all three filter types (project, model, endpoint)."""
+        payload = self._get_filter_payload(filters={
+            "project": str(TEST_PROJECT_ID),
+            "model": str(TEST_MODEL_ID),
+            "endpoint": str(TEST_ENDPOINT_ID),
+        })
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"All three filters should work, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"All three filters should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filter_combined_3] All three filters returns {total} records")
+
+    def test_filter_with_no_matching_data(self, sync_client, seeded_data):
+        """Test combined filters with no matching data returns empty results."""
+        payload = self._get_filter_payload(filters={
+            "project": self.NONEXISTENT_UUID,
+            "model": self.NONEXISTENT_UUID,
+        })
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Non-matching filters should work, got {response.status_code}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == 0, f"Non-matching combined filters should return 0 records, got {total}"
+        print(f"\n[filter_no_match] Non-matching combined filters returns 0 records")
+
+    # ==================== Parameter Interactions ====================
+
+    def test_filters_with_topk_rejected(self, sync_client):
+        """Test that filters cannot be used together with topk parameter."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        payload["topk"] = 5
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"filters+topk should be rejected, got {response.status_code}"
+        print(f"\n[filters_topk] Filters + topk correctly rejected")
+
+    def test_filters_with_group_by(self, sync_client, seeded_data):
+        """Test filters work correctly with group_by parameter."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        payload["group_by"] = ["model"]
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Filters + group_by should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filters_group_by] Filters + group_by returns {total} records")
+
+    def test_filters_with_frequency_interval(self, sync_client, seeded_data):
+        """Test filters work correctly with custom frequency_interval."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        payload["frequency_unit"] = "hour"
+        payload["frequency_interval"] = 2
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Filters + interval should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filters_interval] Filters + frequency_interval returns {total} records")
+
+    def test_filters_with_fill_time_gaps(self, sync_client, seeded_data):
+        """Test filters work correctly with fill_time_gaps."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        payload["fill_time_gaps"] = True
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Filters + fill_time_gaps should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filters_fill_gaps] Filters + fill_time_gaps returns {total} records")
+
+    def test_filters_with_return_delta(self, sync_client, seeded_data):
+        """Test filters work correctly with return_delta."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        payload["return_delta"] = True
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Filters + return_delta should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
+        print(f"\n[filters_delta] Filters + return_delta returns {total} records")
+
+    # ==================== Edge Cases ====================
+
+    def test_filter_key_case_sensitivity(self, sync_client):
+        """Test that filter keys are case-sensitive (uppercase rejected)."""
+        payload = self._get_filter_payload(filters={"PROJECT": str(TEST_PROJECT_ID)})
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Uppercase key 'PROJECT' should be rejected, got {response.status_code}"
+        print(f"\n[filter_case] Uppercase key 'PROJECT' correctly rejected")
+
+    def test_filter_data_accuracy(self, sync_client):
+        """Test that filtered data count matches expected total."""
+        payload = self._get_filter_payload(filters={
+            "project": str(TEST_PROJECT_ID),
+            "model": str(TEST_MODEL_ID),
+            "endpoint": str(TEST_ENDPOINT_ID),
+        })
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == self.FILTERED_RECORD_COUNT, \
+            f"Filtered count ({total}) should match expected ({self.FILTERED_RECORD_COUNT})"
+        print(f"\n[filter_accuracy] Filtered data accuracy verified: {total} records")
+
+    @pytest.mark.parametrize("frequency_unit", ["hour", "day", "week", "month", "quarter", "year"])
+    def test_filter_with_all_frequency_units(self, sync_client, seeded_data, frequency_unit):
+        """Test filters work with all frequency_unit values."""
+        payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
+        payload["frequency_unit"] = frequency_unit
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, \
+            f"Filter + {frequency_unit} should work, got {response.status_code}: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[filter_{frequency_unit}] Filter + {frequency_unit} works")
+
+
 #  pytest tests/observability/test_analytics_payloads.py -v -s
