@@ -115,22 +115,22 @@ Bud Sentinel protects the model supply chain by verifying model assets before th
 
 All models are ingested in a sandbox and scanned. Suspicious files are blocked and quarantined, while verified assets are promoted to secure storage and registry access.
 
-**Q1. Is Bud Sentinel included by default?**
+**Q3. Is Bud Sentinel included by default?**
 
 Bud Sentinel is a proprietary service that requires a separate license. The container image is gated and needs valid credentials before it can be pulled.
 
-**Q2. How often does Bud Sentinel refresh probes and rules?**
+**Q4. How often does Bud Sentinel refresh probes and rules?**
 
 Bud Sentinel probes and rules automatically sync on a scheduled cadence (every 7 days), so new detection capabilities appear without manual action.
 
-**Q3. What happens if I select PII probes?**
+**Q5. What happens if I select PII probes?**
 
 Bud Sentinel adds a PII rule configuration step where you can enable or disable specific PII detection rules before deploying.
 
-**Q4. Can I select multiple probes in one guardrail profile?**
+**Q6. Can I select multiple probes in one guardrail profile?**
 
 Yes. Bud Sentinel allows multi‑select across probes, and each probe is carried into the deployment workflow.
 
-**Q5. What model formats does Bud Sentinel support for secure evaluation?**
+**Q7. What model formats does Bud Sentinel support for secure evaluation?**
 
 Bud Sentinel supports common formats such as H5, Pickle, safetensors, and TensorFlow SavedModel to keep model ingestion secure across ML workflows.
