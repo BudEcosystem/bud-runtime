@@ -344,6 +344,14 @@ class ObservabilityMetricsService:
     # Pre-compile zero UUID for faster comparison
     _ZERO_UUID = UUID("00000000-0000-0000-0000-000000000000")
 
+    # Mapping from API group_by field names to database column names
+    _GROUP_BY_TO_COLUMN = {
+        "model": "model_id",
+        "project": "project_id",
+        "endpoint": "endpoint_id",
+        "user_project": "api_key_project_id",
+    }
+
     @profile_sync("result_processing")
     def _process_query_results(
         self,
@@ -371,11 +379,13 @@ class ObservabilityMetricsService:
                 percent_field_map[base] = field
 
         # Pre-compute group field indices
+        # Map API field names (model, project, etc.) to column names (model_id, project_id, etc.)
         group_field_indices = {}
         if group_by:
             for group_field in group_by:
-                if group_field in field_index:
-                    group_field_indices[group_field] = field_index[group_field]
+                col_name = self._GROUP_BY_TO_COLUMN.get(group_field, group_field)
+                if col_name in field_index:
+                    group_field_indices[group_field] = field_index[col_name]
 
         # Get metric processors (create once and cache)
         if self._metric_processors is None:

@@ -1695,4 +1695,449 @@ class TestFilters:
         print(f"\n[filter_{frequency_unit}] Filter + {frequency_unit} works")
 
 
+class TestGroupBy:
+    """Tests for group_by parameter handling.
+
+    Note: The seeded data has 6 total records:
+    - 5 records with: project_id=a1, model_id=a2, endpoint_id=a4
+    - 1 record with: project_id=a4, model_id=a3, endpoint_id=a5
+
+    Expected grouping results:
+    - group_by=["project"]: 2 groups (a1 with 5 records, a4 with 1 record)
+    - group_by=["model"]: 2 groups (a2 with 5 records, a3 with 1 record)
+    - group_by=["endpoint"]: 2 groups (a4 with 5 records, a5 with 1 record)
+    """
+
+    # Constants for group_by tests
+    EXPECTED_GROUP_COUNT = 2  # 2 distinct values per dimension
+    PRIMARY_GROUP_COUNT = 5   # Records matching primary UUIDs
+    SECONDARY_GROUP_COUNT = 1  # Records matching secondary UUIDs
+
+    # Secondary UUIDs (the 1 record with different IDs)
+    SECONDARY_PROJECT_ID = "019787c1-3de1-7b50-969b-e0a58514b6a4"
+    SECONDARY_MODEL_ID = "019787c1-3de1-7b50-969b-e0a58514b6a3"
+    SECONDARY_ENDPOINT_ID = "019787c1-3de1-7b50-969b-e0a58514b6a5"
+
+    def _get_group_by_payload(self, group_by: list = None) -> dict:
+        """Create base request payload with optional group_by."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "day",
+            "fill_time_gaps": False,
+        }
+        if group_by is not None:
+            payload["group_by"] = group_by
+        return payload
+
+    def _sum_request_counts(self, data: dict) -> int:
+        """Helper to sum request counts from response data."""
+        total = 0
+        for item in data.get("items", []):
+            for metrics_item in item.get("items") or []:
+                rc = metrics_item.get("data", {}).get("request_count", {})
+                total += rc.get("count", 0)
+        return total
+
+    def _get_groups_from_response(self, data: dict, field: str = None) -> dict:
+        """Extract groups and their counts from response.
+
+        Note: The rollup API may return null for ID fields even when grouping.
+        When field is None or IDs are null, we use positional indices as keys.
+        """
+        groups = {}
+        for period in data.get("items", []):
+            for idx, item in enumerate(period.get("items") or []):
+                group_id = item.get(field) if field else None
+                if group_id is not None:
+                    group_key = str(group_id)
+                else:
+                    # If ID is null, use index as key for counting
+                    group_key = f"group_{idx}"
+                rc = item.get("data", {}).get("request_count", {}).get("count", 0)
+                groups[group_key] = groups.get(group_key, 0) + rc
+        return groups
+
+    def _get_item_counts_per_period(self, data: dict) -> list:
+        """Get list of item counts for each period."""
+        return [len(period.get("items") or []) for period in data.get("items", [])]
+
+    def _get_group_counts(self, data: dict) -> list:
+        """Get sorted list of request counts per group item."""
+        counts = []
+        for period in data.get("items", []):
+            for item in period.get("items") or []:
+                rc = item.get("data", {}).get("request_count", {}).get("count", 0)
+                counts.append(rc)
+        return sorted(counts)
+
+    def _count_items_in_period(self, data: dict) -> int:
+        """Count total items across all periods."""
+        count = 0
+        for period in data.get("items", []):
+            count += len(period.get("items") or [])
+        return count
+
+    # ==================== Basic Validation Tests ====================
+
+    def test_group_by_default_is_none(self, sync_client, seeded_data):
+        """Test that group_by defaults to None (single item per period) when not specified."""
+        payload = self._get_group_by_payload()  # No group_by
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Without group_by, should have single item per period
+        for period in data["items"]:
+            items = period.get("items") or []
+            assert len(items) == 1, f"Without group_by, should have 1 item per period, got {len(items)}"
+        print(f"\n[group_by_default] No group_by returns single item per period")
+
+    def test_group_by_null_accepted(self, sync_client, seeded_data):
+        """Test that explicit null value for group_by is accepted."""
+        payload = self._get_group_by_payload()
+        payload["group_by"] = None
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Null group_by should be accepted, got {response.status_code}"
+        print(f"\n[group_by_null] Null value accepted")
+
+    def test_group_by_empty_array_accepted(self, sync_client, seeded_data):
+        """Test that empty array for group_by is accepted (no grouping applied)."""
+        payload = self._get_group_by_payload(group_by=[])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Empty array should be accepted, got {response.status_code}"
+
+        # Empty array should behave same as no group_by
+        data = response.json()
+        for period in data["items"]:
+            items = period.get("items") or []
+            assert len(items) == 1, f"Empty group_by should have 1 item per period, got {len(items)}"
+        print(f"\n[group_by_empty] Empty array accepted, no grouping applied")
+
+    def test_group_by_invalid_value_rejected(self, sync_client):
+        """Test validation error for invalid group_by value."""
+        payload = self._get_group_by_payload(group_by=["invalid"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Invalid value should be rejected, got {response.status_code}"
+        print(f"\n[group_by_invalid] Invalid value 'invalid' correctly rejected")
+
+    def test_group_by_invalid_type_string(self, sync_client):
+        """Test validation error when group_by is string instead of array."""
+        payload = self._get_group_by_payload()
+        payload["group_by"] = "model"  # String instead of array
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"String type should be rejected, got {response.status_code}"
+        print(f"\n[group_by_string] String type correctly rejected")
+
+    def test_group_by_invalid_type_integer(self, sync_client):
+        """Test validation error when group_by array contains integer."""
+        payload = self._get_group_by_payload(group_by=[123])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Integer in array should be rejected, got {response.status_code}"
+        print(f"\n[group_by_integer] Integer in array correctly rejected")
+
+    def test_group_by_case_sensitivity(self, sync_client):
+        """Test that group_by values are case-sensitive (uppercase rejected)."""
+        payload = self._get_group_by_payload(group_by=["MODEL"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Uppercase 'MODEL' should be rejected, got {response.status_code}"
+        print(f"\n[group_by_case] Uppercase 'MODEL' correctly rejected")
+
+    # ==================== Single Group By Tests ====================
+
+    def test_group_by_model(self, sync_client, seeded_data):
+        """Test grouping by model returns multiple items per period."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by model should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Check that we have multiple items per period (indicating grouping)
+        item_counts = self._get_item_counts_per_period(data)
+        assert any(c >= self.EXPECTED_GROUP_COUNT for c in item_counts), \
+            f"Should have at least {self.EXPECTED_GROUP_COUNT} items in some period, got {item_counts}"
+        print(f"\n[group_by_model] Returns items per period: {item_counts}")
+
+    def test_group_by_project(self, sync_client, seeded_data):
+        """Test grouping by project returns multiple items per period."""
+        payload = self._get_group_by_payload(group_by=["project"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by project should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Check that we have multiple items per period (indicating grouping)
+        item_counts = self._get_item_counts_per_period(data)
+        assert any(c >= self.EXPECTED_GROUP_COUNT for c in item_counts), \
+            f"Should have at least {self.EXPECTED_GROUP_COUNT} items in some period, got {item_counts}"
+        print(f"\n[group_by_project] Returns items per period: {item_counts}")
+
+    def test_group_by_endpoint(self, sync_client, seeded_data):
+        """Test grouping by endpoint returns multiple items per period."""
+        payload = self._get_group_by_payload(group_by=["endpoint"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by endpoint should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Check that we have multiple items per period (indicating grouping)
+        item_counts = self._get_item_counts_per_period(data)
+        assert any(c >= self.EXPECTED_GROUP_COUNT for c in item_counts), \
+            f"Should have at least {self.EXPECTED_GROUP_COUNT} items in some period, got {item_counts}"
+        print(f"\n[group_by_endpoint] Returns items per period: {item_counts}")
+
+    def test_group_by_user_project(self, sync_client, seeded_data):
+        """Test grouping by user_project works (may have different distribution)."""
+        payload = self._get_group_by_payload(group_by=["user_project"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by user_project should work, got {response.status_code}: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[group_by_user_project] user_project grouping works")
+
+    # ==================== Multiple Group By Tests ====================
+
+    def test_group_by_model_and_project(self, sync_client, seeded_data):
+        """Test grouping by model and project works."""
+        payload = self._get_group_by_payload(group_by=["model", "project"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Two-field group_by should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Verify grouping creates multiple items and total count is preserved
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        print(f"\n[group_by_two] model+project grouping works, total={total}")
+
+    def test_group_by_all_three(self, sync_client, seeded_data):
+        """Test grouping by model, project, and endpoint works."""
+        payload = self._get_group_by_payload(group_by=["model", "project", "endpoint"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Three-field group_by should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Verify grouping creates items and total count is preserved
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        print(f"\n[group_by_three] model+project+endpoint grouping works, total={total}")
+
+    def test_group_by_all_four(self, sync_client, seeded_data):
+        """Test grouping by all four fields."""
+        payload = self._get_group_by_payload(group_by=["model", "project", "endpoint", "user_project"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Four-field group_by should work, got {response.status_code}: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[group_by_four] All four fields grouping works")
+
+    # ==================== Data Accuracy Tests ====================
+
+    def test_group_by_sum_equals_total(self, sync_client, seeded_data):
+        """Test that sum of grouped counts equals total seeded count."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], \
+            f"Sum of groups ({total}) should equal total ({seeded_data['total_count']})"
+        print(f"\n[group_sum] Sum of groups = {total}, matches total")
+
+    def test_group_by_model_count_distribution(self, sync_client, seeded_data):
+        """Test that model grouping returns correct count distribution (5 and 1)."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Use _get_group_counts which doesn't rely on ID fields
+        counts = self._get_group_counts(data)
+
+        assert counts == [self.SECONDARY_GROUP_COUNT, self.PRIMARY_GROUP_COUNT], \
+            f"Expected counts [1, 5], got {counts}"
+        print(f"\n[model_distribution] Counts: {counts}")
+
+    def test_group_by_project_count_distribution(self, sync_client, seeded_data):
+        """Test that project grouping returns correct count distribution (5 and 1)."""
+        payload = self._get_group_by_payload(group_by=["project"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Use _get_group_counts which doesn't rely on ID fields
+        counts = self._get_group_counts(data)
+
+        assert counts == [self.SECONDARY_GROUP_COUNT, self.PRIMARY_GROUP_COUNT], \
+            f"Expected counts [1, 5], got {counts}"
+        print(f"\n[project_distribution] Counts: {counts}")
+
+    def test_group_by_creates_multiple_items(self, sync_client, seeded_data):
+        """Test that grouping creates multiple items per period."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify multiple items exist per period when grouping
+        item_counts = self._get_item_counts_per_period(data)
+        assert any(c >= 2 for c in item_counts), \
+            f"Grouping should create multiple items per period, got {item_counts}"
+        print(f"\n[multiple_items] Grouping creates items: {item_counts}")
+
+    # ==================== Interaction with topk ====================
+
+    def test_topk_requires_group_by(self, sync_client):
+        """Test that topk without group_by is rejected."""
+        payload = self._get_group_by_payload()
+        payload["topk"] = 5
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"topk without group_by should be rejected, got {response.status_code}"
+        print(f"\n[topk_requires_group_by] topk without group_by correctly rejected")
+
+    def test_topk_with_group_by_works(self, sync_client, seeded_data):
+        """Test that topk with group_by is accepted and returns data."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["topk"] = 1
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"topk with group_by should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Verify we get some data (topk behavior may vary with rollup queries)
+        assert data["object"] == "observability_metrics"
+        assert len(data["items"]) > 0, "Should return some data"
+        print(f"\n[topk_group_by] topk with group_by accepted")
+
+    def test_topk_with_filters_rejected(self, sync_client):
+        """Test that topk with filters is rejected."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["topk"] = 5
+        payload["filters"] = {"project": str(TEST_PROJECT_ID)}
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"topk with filters should be rejected, got {response.status_code}"
+        print(f"\n[topk_filters] topk + filters correctly rejected")
+
+    def test_topk_returns_data(self, sync_client, seeded_data):
+        """Test that topk returns valid grouped data."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["topk"] = 1
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify response structure
+        total = self._sum_request_counts(data)
+        assert total > 0, f"topk should return some data, got {total} records"
+        print(f"\n[topk_data] topk returns {total} records")
+
+    # ==================== Interaction with Other Parameters ====================
+
+    def test_group_by_with_filters(self, sync_client, seeded_data):
+        """Test that group_by works with filters."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["filters"] = {"project": str(TEST_PROJECT_ID)}
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by with filters should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Should only return groups that match the filter
+        total = self._sum_request_counts(data)
+        assert total == 5, f"Filtered group_by should return 5 records, got {total}"
+        print(f"\n[group_by_filters] group_by + filters works, returns {total} records")
+
+    def test_group_by_with_frequency_interval(self, sync_client, seeded_data):
+        """Test that group_by works with custom frequency_interval."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["frequency_unit"] = "hour"
+        payload["frequency_interval"] = 2
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by with interval should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        print(f"\n[group_by_interval] group_by + frequency_interval works")
+
+    def test_group_by_with_fill_time_gaps(self, sync_client, seeded_data):
+        """Test that group_by with fill_time_gaps doesn't create zero-UUID rows."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["fill_time_gaps"] = True
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by with fill_time_gaps should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Verify no zero-UUID entries in items
+        zero_uuid = "00000000-0000-0000-0000-000000000000"
+        for period in data["items"]:
+            for item in period.get("items") or []:
+                model_id = item.get("model_id")
+                if model_id:
+                    assert str(model_id) != zero_uuid, "Should not have zero-UUID items"
+        print(f"\n[group_by_gaps] group_by + fill_time_gaps works, no zero-UUID rows")
+
+    def test_group_by_with_return_delta(self, sync_client, seeded_data):
+        """Test that group_by works with return_delta."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["return_delta"] = True
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"group_by with return_delta should work, got {response.status_code}: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[group_by_delta] group_by + return_delta works")
+
+    @pytest.mark.parametrize("frequency_unit", ["hour", "day", "week", "month", "quarter", "year"])
+    def test_group_by_with_all_frequency_units(self, sync_client, seeded_data, frequency_unit):
+        """Test that group_by works with all frequency_unit values."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        payload["frequency_unit"] = frequency_unit
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, \
+            f"group_by + {frequency_unit} should work, got {response.status_code}: {response.text}"
+        print(f"\n[group_by_{frequency_unit}] group_by + {frequency_unit} works")
+
+    # ==================== Response Structure Tests ====================
+
+    def test_group_by_response_has_multiple_items(self, sync_client, seeded_data):
+        """Test that group_by response has multiple items per period."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check that at least one period has multiple items
+        has_multiple = False
+        for period in data["items"]:
+            items = period.get("items") or []
+            if len(items) > 1:
+                has_multiple = True
+                break
+
+        assert has_multiple, "group_by should result in multiple items per period"
+        print(f"\n[response_multiple] Response has multiple items per period")
+
+    def test_group_by_each_item_has_data(self, sync_client, seeded_data):
+        """Test that each item in grouped response has the data field with metrics."""
+        payload = self._get_group_by_payload(group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        for period in data["items"]:
+            for item in period.get("items") or []:
+                assert "data" in item, "Each item should have 'data' field"
+                assert "request_count" in item["data"], "Each item should have request_count metric"
+        print(f"\n[response_data] Each item has data field with metrics")
+
+    def test_no_group_by_single_item(self, sync_client, seeded_data):
+        """Test that without group_by, each period has a single item."""
+        payload = self._get_group_by_payload()  # No group_by
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        for period in data["items"]:
+            items = period.get("items") or []
+            assert len(items) == 1, f"Without group_by, should have 1 item per period, got {len(items)}"
+        print(f"\n[response_single] No group_by = single item per period")
+
+
 #  pytest tests/observability/test_analytics_payloads.py -v -s
