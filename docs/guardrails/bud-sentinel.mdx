@@ -107,6 +107,14 @@ Bud Sentinel is recommended as the default guardrail provider with high accuracy
 
 ## 5. FAQ
 
+**Q1. What problems does Bud Sentinel solve?**
+
+Bud Sentinel protects the model supply chain by verifying model assets before they reach production and by monitoring runtime behavior for suspicious activity.
+
+**Q2. How does Bud Sentinel handle untrusted models?**
+
+All models are ingested in a sandbox and scanned. Suspicious files are blocked and quarantined, while verified assets are promoted to secure storage and registry access.
+
 **Q1. Is Bud Sentinel included by default?**
 
 Bud Sentinel is a proprietary service that requires a separate license. The container image is gated and needs valid credentials before it can be pulled.
