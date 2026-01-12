@@ -2616,4 +2616,353 @@ class TestReturnDelta:
         print(f"\n[delta_multi_metrics] All metrics have delta fields")
 
 
+class TestFillTimeGaps:
+    """Tests for fill_time_gaps parameter handling."""
+
+    # ==================== Helper Methods ====================
+
+    def _get_fill_gaps_payload(
+        self,
+        metrics: list[str] = None,
+        frequency_unit: str = "hour",
+        fill_time_gaps: bool = None,
+        return_delta: bool = False,
+        group_by: list[str] = None,
+    ) -> dict:
+        """Create a payload for fill_time_gaps testing."""
+        payload = {
+            "metrics": metrics or ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": frequency_unit,
+            "return_delta": return_delta,
+        }
+        if fill_time_gaps is not None:
+            payload["fill_time_gaps"] = fill_time_gaps
+        if group_by:
+            payload["group_by"] = group_by
+        return payload
+
+    # ==================== Default Behavior Tests ====================
+
+    def test_fill_time_gaps_default_is_true(self, sync_client, seeded_data):
+        """Test that fill_time_gaps defaults to True."""
+        # Omit fill_time_gaps from payload
+        payload = self._get_fill_gaps_payload()
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # With default fill_time_gaps=True, gaps between data should be filled
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Should have at least 1 period"
+        print(f"\n[default_true] Default fill_time_gaps returns {len(periods)} periods")
+
+    def test_fill_time_gaps_explicit_true(self, sync_client, seeded_data):
+        """Test that explicit fill_time_gaps=True fills gaps between data points."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Should have periods with gaps filled"
+        print(f"\n[explicit_true] fill_time_gaps=True returns {len(periods)} periods")
+
+    def test_fill_time_gaps_explicit_false(self, sync_client, seeded_data):
+        """Test that fill_time_gaps=False returns only periods with actual data."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=False)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        # With fill_time_gaps=False, should only have periods with actual data (non-zero count)
+        for period in periods:
+            count = period.get("count", 0)
+            # All returned periods should have actual data
+            assert count > 0, f"With fill_time_gaps=False, all periods should have data: {period}"
+        print(f"\n[explicit_false] fill_time_gaps=False returns {len(periods)} periods (all with data)")
+
+    # ==================== Comparison Tests ====================
+
+    def test_fill_gaps_true_vs_false_period_count(self, sync_client, seeded_data):
+        """Test that fill_time_gaps=True returns more or equal periods than False."""
+        payload_true = self._get_fill_gaps_payload(fill_time_gaps=True)
+        payload_false = self._get_fill_gaps_payload(fill_time_gaps=False)
+
+        response_true = sync_client.post("/observability/analytics", json=payload_true)
+        response_false = sync_client.post("/observability/analytics", json=payload_false)
+
+        assert response_true.status_code == 200
+        assert response_false.status_code == 200
+
+        periods_true = get_all_period_metrics(response_true.json(), "request_count")
+        periods_false = get_all_period_metrics(response_false.json(), "request_count")
+
+        # fill_time_gaps=True should have >= periods than False
+        assert len(periods_true) >= len(periods_false), \
+            f"True ({len(periods_true)}) should have >= periods than False ({len(periods_false)})"
+        print(f"\n[true_vs_false] True={len(periods_true)} periods, False={len(periods_false)} periods")
+
+    def test_fill_gaps_false_subset_of_true(self, sync_client, seeded_data):
+        """Test that periods from fill_time_gaps=False are a subset of True."""
+        payload_true = self._get_fill_gaps_payload(fill_time_gaps=True)
+        payload_false = self._get_fill_gaps_payload(fill_time_gaps=False)
+
+        response_true = sync_client.post("/observability/analytics", json=payload_true)
+        response_false = sync_client.post("/observability/analytics", json=payload_false)
+
+        assert response_true.status_code == 200
+        assert response_false.status_code == 200
+
+        periods_true = get_all_period_metrics(response_true.json(), "request_count")
+        periods_false = get_all_period_metrics(response_false.json(), "request_count")
+
+        # Get time periods from both
+        times_true = {p["time_period"] for p in periods_true}
+        times_false = {p["time_period"] for p in periods_false}
+
+        # All periods from False should exist in True
+        assert times_false.issubset(times_true), \
+            f"False periods should be subset of True. Missing: {times_false - times_true}"
+        print(f"\n[subset] False periods ({len(times_false)}) are subset of True ({len(times_true)})")
+
+    # ==================== Zero Count Tests ====================
+
+    def test_fill_gaps_true_has_zero_count_periods(self, sync_client, seeded_data):
+        """Test that fill_time_gaps=True includes periods with count=0."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        zero_count_periods = [p for p in periods if p.get("count") == 0]
+
+        # Should have some zero-count periods (filled gaps)
+        print(f"\n[zero_count_true] {len(zero_count_periods)} periods with count=0 out of {len(periods)}")
+
+    def test_fill_gaps_false_no_zero_count_periods(self, sync_client, seeded_data):
+        """Test that fill_time_gaps=False has no periods with count=0."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=False)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        zero_count_periods = [p for p in periods if p.get("count") == 0]
+
+        assert len(zero_count_periods) == 0, \
+            f"fill_time_gaps=False should have no zero-count periods: {zero_count_periods}"
+        print(f"\n[zero_count_false] No zero-count periods (as expected)")
+
+    # ==================== Frequency Unit Tests ====================
+
+    def test_fill_gaps_with_hour_frequency(self, sync_client, seeded_data):
+        """Test fill_time_gaps with hourly frequency."""
+        payload_true = self._get_fill_gaps_payload(frequency_unit="hour", fill_time_gaps=True)
+        payload_false = self._get_fill_gaps_payload(frequency_unit="hour", fill_time_gaps=False)
+
+        response_true = sync_client.post("/observability/analytics", json=payload_true)
+        response_false = sync_client.post("/observability/analytics", json=payload_false)
+
+        assert response_true.status_code == 200
+        assert response_false.status_code == 200
+
+        periods_true = len(get_all_period_metrics(response_true.json(), "request_count"))
+        periods_false = len(get_all_period_metrics(response_false.json(), "request_count"))
+
+        print(f"\n[hour_freq] Hourly: True={periods_true}, False={periods_false}")
+
+    def test_fill_gaps_with_day_frequency(self, sync_client, seeded_data):
+        """Test fill_time_gaps with daily frequency."""
+        payload_true = self._get_fill_gaps_payload(frequency_unit="day", fill_time_gaps=True)
+        payload_false = self._get_fill_gaps_payload(frequency_unit="day", fill_time_gaps=False)
+
+        response_true = sync_client.post("/observability/analytics", json=payload_true)
+        response_false = sync_client.post("/observability/analytics", json=payload_false)
+
+        assert response_true.status_code == 200
+        assert response_false.status_code == 200
+
+        periods_true = len(get_all_period_metrics(response_true.json(), "request_count"))
+        periods_false = len(get_all_period_metrics(response_false.json(), "request_count"))
+
+        # For single-day data, both should return 1 period
+        print(f"\n[day_freq] Daily: True={periods_true}, False={periods_false}")
+
+    def test_fill_gaps_with_week_frequency(self, sync_client, seeded_data):
+        """Test fill_time_gaps with weekly frequency."""
+        payload_true = self._get_fill_gaps_payload(frequency_unit="week", fill_time_gaps=True)
+        payload_false = self._get_fill_gaps_payload(frequency_unit="week", fill_time_gaps=False)
+
+        response_true = sync_client.post("/observability/analytics", json=payload_true)
+        response_false = sync_client.post("/observability/analytics", json=payload_false)
+
+        assert response_true.status_code == 200
+        assert response_false.status_code == 200
+
+        periods_true = len(get_all_period_metrics(response_true.json(), "request_count"))
+        periods_false = len(get_all_period_metrics(response_false.json(), "request_count"))
+
+        print(f"\n[week_freq] Weekly: True={periods_true}, False={periods_false}")
+
+    # ==================== Metric Type Tests ====================
+
+    def test_fill_gaps_rollup_metric_request_count(self, sync_client, seeded_data):
+        """Test fill_time_gaps with rollup metric (request_count)."""
+        payload = self._get_fill_gaps_payload(metrics=["request_count"], fill_time_gaps=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Should return periods for request_count"
+        print(f"\n[rollup_request_count] {len(periods)} periods returned")
+
+    def test_fill_gaps_rollup_metric_input_token(self, sync_client, seeded_data):
+        """Test fill_time_gaps with rollup metric (input_token)."""
+        payload = self._get_fill_gaps_payload(metrics=["input_token"], fill_time_gaps=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "input_token")
+        assert len(periods) >= 1, "Should return periods for input_token"
+        print(f"\n[rollup_input_token] {len(periods)} periods returned")
+
+    def test_fill_gaps_raw_metric_latency(self, sync_client, seeded_data):
+        """Test fill_time_gaps with raw data metric (latency)."""
+        payload = self._get_fill_gaps_payload(metrics=["latency"], fill_time_gaps=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "latency")
+        assert len(periods) >= 1, "Should return periods for latency"
+        print(f"\n[raw_latency] {len(periods)} periods returned")
+
+    def test_fill_gaps_raw_metric_throughput(self, sync_client, seeded_data):
+        """Test fill_time_gaps with raw data metric (throughput)."""
+        payload = self._get_fill_gaps_payload(metrics=["throughput"], fill_time_gaps=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "throughput")
+        assert len(periods) >= 1, "Should return periods for throughput"
+        print(f"\n[raw_throughput] {len(periods)} periods returned")
+
+    # ==================== Interaction Tests ====================
+
+    def test_fill_gaps_with_return_delta_true(self, sync_client, seeded_data):
+        """Test fill_time_gaps=True combined with return_delta=True."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=True, return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Should return periods"
+
+        # Verify delta fields are present
+        if len(periods) >= 2:
+            second = periods[1]
+            assert "delta" in second, "Delta field should be present"
+        print(f"\n[fill_gaps_delta] fill_time_gaps=True + return_delta=True works")
+
+    def test_fill_gaps_with_return_delta_false(self, sync_client, seeded_data):
+        """Test fill_time_gaps=True combined with return_delta=False."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=True, return_delta=False)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Should return periods"
+
+        # Delta should be None when return_delta=False
+        for period in periods:
+            assert period.get("delta") is None, "Delta should be None when return_delta=False"
+        print(f"\n[fill_gaps_no_delta] fill_time_gaps=True + return_delta=False works")
+
+    def test_fill_gaps_false_with_return_delta(self, sync_client, seeded_data):
+        """Test fill_time_gaps=False combined with return_delta=True."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=False, return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        # Should only have periods with actual data
+        for period in periods:
+            assert period.get("count", 0) > 0, "All periods should have data"
+        print(f"\n[no_fill_delta] fill_time_gaps=False + return_delta=True: {len(periods)} periods")
+
+    # ==================== Group By Tests ====================
+
+    def test_fill_gaps_with_group_by_model(self, sync_client, seeded_data):
+        """Test fill_time_gaps with group_by=['model']."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=True, group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Failed: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[fill_gaps_group_model] fill_time_gaps + group_by=['model'] works")
+
+    def test_fill_gaps_with_group_by_project(self, sync_client, seeded_data):
+        """Test fill_time_gaps with group_by=['project']."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=True, group_by=["project"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Failed: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[fill_gaps_group_project] fill_time_gaps + group_by=['project'] works")
+
+    def test_fill_gaps_false_with_group_by(self, sync_client, seeded_data):
+        """Test fill_time_gaps=False with group_by."""
+        payload = self._get_fill_gaps_payload(fill_time_gaps=False, group_by=["model"])
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Failed: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[no_fill_group] fill_time_gaps=False + group_by works")
+
+    # ==================== Multiple Metrics Tests ====================
+
+    def test_fill_gaps_multiple_metrics(self, sync_client, seeded_data):
+        """Test fill_time_gaps with multiple metrics."""
+        payload = self._get_fill_gaps_payload(
+            metrics=["request_count", "input_token", "latency"],
+            fill_time_gaps=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify all metrics are returned
+        for metric_key in ["request_count", "input_token", "latency"]:
+            periods = get_all_period_metrics(data, metric_key)
+            assert len(periods) >= 1, f"Should have periods for {metric_key}"
+            print(f"  {metric_key}: {len(periods)} periods")
+        print(f"\n[fill_gaps_multi] Multiple metrics with fill_time_gaps=True works")
+
+    def test_fill_gaps_false_multiple_metrics(self, sync_client, seeded_data):
+        """Test fill_time_gaps=False with multiple metrics."""
+        payload = self._get_fill_gaps_payload(
+            metrics=["request_count", "input_token"],
+            fill_time_gaps=False
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify metrics are returned without gaps
+        for metric_key in ["request_count", "input_token"]:
+            periods = get_all_period_metrics(data, metric_key)
+            assert len(periods) >= 1, f"Should have periods for {metric_key}"
+        print(f"\n[no_fill_multi] Multiple metrics with fill_time_gaps=False works")
+
+
 #  pytest tests/observability/test_analytics_payloads.py -v -s
