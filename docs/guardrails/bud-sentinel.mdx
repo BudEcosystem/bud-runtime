@@ -45,37 +45,39 @@ Bud Sentinel is recommended as the default guardrail provider with high accuracy
 
 ## 3. Features
 
-### 3.1 Bud Sentinel provider selection
+### ### 3.1 Secure model ingestion pipeline
 
-- Select Bud Sentinel from the Guardrails provider step to create a guardrail workflow.
-- Bud Sentinel is recommended by default for best accuracy and minimal latency.
-- Providers are fetched from the moderation capability list so Sentinel stays available alongside other providers.
+- Downloads and preprocesses models inside a locked‑down sandbox.
 
-### 3.2 Bud Sentinel probe catalog
+- Performs deep scanning across weights, scripts, binaries, and metadata.
 
-- Search probes by name, description, or tags.
-- Filter quickly by categories such as PII, Bias, or All.
-- Probes are grouped by tags (or provider type) to make large catalogs easier to scan.
-- “See More” opens an expanded drawer with probe details before selection.
-- Multiple probes can be selected and carried forward into the workflow.
+- Blocks and quarantines suspicious artifacts before they enter shared storage.
 
-### 3.3 PII rule configuration
+### 3.2 Protected model registry and object storage
 
-- When a PII probe is selected, Bud Sentinel unlocks a rule‑level configuration step.
-- Rules are grouped by probe and selectable individually to enable/disable rule enforcement.
-- UI icons identify rule types (email, phone, passport, credit card, etc.) to speed selection.
+- Validated assets are promoted to secure object storage after passing checks.
 
-### 3.4 Deployment workflow integration
+- Registry gating prevents untrusted models from reaching downstream consumers.
 
-- Bud Sentinel probes feed directly into deployment types (Guardrail Endpoint or Add to Existing Deployment).
-- Selected probes and rules are saved into a workflow payload for deployment.
-- Bud Sentinel settings persist into project‑level guardrail views for easy governance.
+### 3.3 Runtime trust monitoring
 
-### 3.5 Secure evaluation and runtime trust
+- Continuous monitoring during inference detects suspicious file reads, privileged access attempts, or unexpected network connections.
 
-- Models are evaluated inside isolated sandboxes without network or filesystem access.
-- Verified artifacts are stored in gated object storage, while suspicious packages are quarantined.
-- Runtime monitoring detects unusual activity during inference and supports incident forensics.
+- Centralized logs enable audit trails and forensic review when anomalies appear.
+
+### 3.4 Bud Sentinel probe catalog in Guardrails
+
+- Select Bud Sentinel as a provider and browse its probe catalog from the Guardrails workflow.
+
+- Search and filter probes by category (PII, Bias, All) and tags.
+
+- Open a “See more” drawer to review probe details before deployment.
+
+### 3.5 Deployment‑ready guardrail configuration
+
+- Selected Bud Sentinel probes carry into the deployment flow for projects and endpoints.
+
+- PII probes trigger additional configuration steps before deployment.
 
 ## 4. How-to Guides
 
