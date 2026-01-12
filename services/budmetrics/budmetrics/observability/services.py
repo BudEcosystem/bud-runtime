@@ -2109,15 +2109,15 @@ class ObservabilityMetricsService:
         return f"""
             SELECT
                 path,
-                http_method,
+                method,
                 count(*) as count,
                 avg(response_time_ms) as avg_response_time,
                 sum(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) / count(*) * 100 as error_rate
-            FROM bud.ModelInferenceDetails
+            FROM InferenceFact
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
-            GROUP BY path, http_method
+            GROUP BY path, method
             ORDER BY count DESC
             LIMIT {limit}
         """
