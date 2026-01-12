@@ -298,12 +298,15 @@ class QueryBuilder:
         "output_token",
         "cache",
         "throughput",
-        "latency",  # avg only - p95/p99 need raw data
-        "ttft",  # avg only - p95/p99 need raw data
     }
 
-    # Metrics that always require raw data (InferenceFact)
-    REQUIRES_RAW_DATA_METRICS = {"queuing_time", "concurrent_requests"}
+    # Metrics that always require raw data (InferenceFact) for percentiles or timestamps
+    REQUIRES_RAW_DATA_METRICS = {
+        "queuing_time",
+        "concurrent_requests",
+        "latency",  # Requires raw data for p95/p99 percentiles
+        "ttft",  # Requires raw data for p95/p99 percentiles
+    }
 
     def __init__(self, performance_metrics: Optional[PerformanceMetrics] = None):
         """Initialize TimeSeriesHelper with optional performance metrics."""

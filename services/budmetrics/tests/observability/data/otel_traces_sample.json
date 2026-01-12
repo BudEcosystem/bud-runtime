@@ -727,7 +727,7 @@
     ],
     "data_3": [
         {
-            "Timestamp": "2026-01-07 08:17:13.121932683",
+            "Timestamp": "2026-01-07 07:17:13.121932683",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "4e2df5b5dbeb1f65",
             "ParentSpanId": "dcbb1843d1c22638",
@@ -770,7 +770,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:13.153960405",
+            "Timestamp": "2026-01-07 07:17:13.153960405",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "f481c76ed35d22d1",
             "ParentSpanId": "a357751df3f086c9",
@@ -810,7 +810,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:12.960002156",
+            "Timestamp": "2026-01-07 07:17:12.960002156",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "dcbb1843d1c22638",
             "ParentSpanId": "",
@@ -842,9 +842,9 @@
                 "gateway_analytics.path": "\/v1\/chat\/completions",
                 "gateway_analytics.protocol_version": "HTTP\/1.1",
                 "gateway_analytics.request_headers": "{\"content-type\":\"application\/json\",\"accept\":\"*\/*\"}",
-                "gateway_analytics.request_timestamp": "2026-01-07T08:17:12.963853+00:00",
+                "gateway_analytics.request_timestamp": "2026-01-07T07:17:12.963853+00:00",
                 "gateway_analytics.response_headers": "{\"content-type\":\"application\/json\"}",
-                "gateway_analytics.response_timestamp": "2026-01-07T08:17:15.300583956+00:00",
+                "gateway_analytics.response_timestamp": "2026-01-07T07:17:15.300583956+00:00",
                 "gateway_analytics.status_code": "200",
                 "gateway_analytics.tags": "{}",
                 "gateway_analytics.total_duration_ms": "2336",
@@ -866,7 +866,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:13.145562023",
+            "Timestamp": "2026-01-07 07:17:13.145562023",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "a357751df3f086c9",
             "ParentSpanId": "4e2df5b5dbeb1f65",
@@ -919,8 +919,8 @@
                 "model_inference_details.is_success": "true",
                 "model_inference_details.model_id": "019787c1-3de1-7b50-969b-e0a58514b6a3",
                 "model_inference_details.project_id": "019787c1-3de1-7b50-969b-e0a58514b6a4",
-                "model_inference_details.request_arrival_time": "2026-01-07T08:17:13.145651862+00:00",
-                "model_inference_details.request_forward_time": "2026-01-07T08:17:15.296798706+00:00",
+                "model_inference_details.request_arrival_time": "2026-01-07T07:17:13.145651862+00:00",
+                "model_inference_details.request_forward_time": "2026-01-07T07:17:15.296798706+00:00",
                 "thread.id": "8",
                 "thread.name": "tokio-runtime-worker"
             },
@@ -936,7 +936,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:13.162729984",
+            "Timestamp": "2026-01-07 07:17:13.162729984",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "02c6a61ec7d3485c",
             "ParentSpanId": "2293bb3373cdb91a",
@@ -973,7 +973,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:13.162814833",
+            "Timestamp": "2026-01-07 07:17:13.162814833",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "7306a2b2d51142c9",
             "ParentSpanId": "02c6a61ec7d3485c",
@@ -1010,7 +1010,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:13.165283835",
+            "Timestamp": "2026-01-07 07:17:13.165283835",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "1a35d8fc354f0a45",
             "ParentSpanId": "7306a2b2d51142c9",
@@ -1050,7 +1050,7 @@
             "Links.Attributes": []
         },
         {
-            "Timestamp": "2026-01-07 08:17:13.161431849",
+            "Timestamp": "2026-01-07 07:17:13.161431849",
             "TraceId": "eabbcee5ecd7bde08b51580b32136a16",
             "SpanId": "2293bb3373cdb91a",
             "ParentSpanId": "f481c76ed35d22d1",
