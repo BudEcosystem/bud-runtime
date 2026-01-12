@@ -5,7 +5,7 @@ description: "Secure Evaluation and Runtime Trust for model supply chains."
 
 ## 1. Description
 
-Bud Sentinel is Bud’s proprietary guardrail provider and security layer that brings secure evaluation and runtime trust to the Bud platform. In Bud Admin, Bud Sentinel powers the guardrails workflow with a curated catalog of probes (over 300+), low-latency enforcement (under 10 ms), and a guided experience to select probes, configure rules, and deploy guardrails to projects and endpoints. Bud Sentinel is licensed separately and syncs probes automatically, so newly released detection capabilities appear in the catalog without manual updates.
+Bud Sentinel is Bud’s proprietary guardrail provider and security layer that brings secure evaluation and runtime trust to the Bud platform. In Bud AI Foundry, Bud Sentinel powers the guardrails workflow with a curated catalog of probes (over 300+), low-latency enforcement (under 10 ms), and a guided experience to select probes, configure rules, and deploy guardrails to projects and endpoints. Bud Sentinel is licensed separately and syncs probes automatically, so newly released detection capabilities appear in the catalog without manual updates.
 
 Bud Sentinel focuses on a zero-trust model lifecycle: models are evaluated in isolated sandboxes, scanned for malicious artifacts, and monitored during inference. This lets teams adopt open models while keeping model artifacts and runtime environments continuously protected.
 
@@ -40,45 +40,33 @@ Bud Sentinel probes and rules sync on a scheduled cadence, ensuring detection co
 ### 3.1 Bud Sentinel provider selection
 
 - Select Bud Sentinel from the Guardrails provider step to create a guardrail workflow.
-
 - Bud Sentinel is recommended by default for best accuracy and minimal latency.
-
 - Providers are fetched from the moderation capability list so Sentinel stays available alongside other providers.
 
 ### 3.2 Bud Sentinel probe catalog
 
 - Search probes by name, description, or tags.
-
 - Filter quickly by categories such as PII, Bias, or All.
-
 - Probes are grouped by tags (or provider type) to make large catalogs easier to scan.
-
 - “See More” opens an expanded drawer with probe details before selection.
-
 - Multiple probes can be selected and carried forward into the workflow.
 
 ### 3.3 PII rule configuration
 
 - When a PII probe is selected, Bud Sentinel unlocks a rule‑level configuration step.
-
 - Rules are grouped by probe and selectable individually to enable/disable rule enforcement.
-
 - UI icons identify rule types (email, phone, passport, credit card, etc.) to speed selection.
 
 ### 3.4 Deployment workflow integration
 
 - Bud Sentinel probes feed directly into deployment types (Guardrail Endpoint or Add to Existing Deployment).
-
 - Selected probes and rules are saved into a workflow payload for deployment.
-
 - Bud Sentinel settings persist into project‑level guardrail views for easy governance.
 
 ### 3.5 Secure evaluation and runtime trust
 
 - Models are evaluated inside isolated sandboxes without network or filesystem access.
-
 - Verified artifacts are stored in gated object storage, while suspicious packages are quarantined.
-
 - Runtime monitoring detects unusual activity during inference and supports incident forensics.
 
 ## 4. How-to Guides
@@ -86,39 +74,28 @@ Bud Sentinel probes and rules sync on a scheduled cadence, ensuring detection co
 ### 4.1 Select Bud Sentinel as your provider
 
 1. Log in to Bud AI Foundry dashboard using SSO or your credentials.
-
 2. Click on Guard Rails menu from the side menu.
-
 3. Click +Add Guardrail to open the provider selection drawer.
-
 4. Choose Bud Sentinel from the Bud provider list, then click Next.
 
 ### 4.2 Search and filter Bud Sentinel probes
 
 1. In the Probes List step, use the search bar to filter by name or tag.
-
 2. Click PII, Bias, or All to focus the list.
-
 3. Expand a probe with See More to preview its details.
-
 4. Select one or more probes and click Next.
 
 ### 4.3 Configure PII rules (optional)
 
 1. If you selected a PII probe, the PII Detection Config step appears.
-
 2. Search for specific rule keywords (email, phone, passport, etc.).
-
 3. Select the rules you want enabled, then click Next to continue.
 
 ### 4.4 Deploy Bud Sentinel guardrails
 
 1. Choose a deployment type: Guardrail Endpoint or Add to Existing Deployment.
-
 2. Pick the destination project (and deployment if applicable).
-
 3. Name the guardrail profile, set guard types, and choose the severity threshold.
-
 4. Click Deploy to activate Bud Sentinel guardrails.
 
 ## 5. FAQ
