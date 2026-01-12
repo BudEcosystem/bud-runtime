@@ -45,38 +45,31 @@ Bud Sentinel is recommended as the default guardrail provider with high accuracy
 
 ## 3. Features
 
-### ### 3.1 Secure model ingestion pipeline
+### 3.1 Secure model ingestion pipeline
 
 - Downloads and preprocesses models inside a locked‑down sandbox.
-
 - Performs deep scanning across weights, scripts, binaries, and metadata.
-
 - Blocks and quarantines suspicious artifacts before they enter shared storage.
 
 ### 3.2 Protected model registry and object storage
 
 - Validated assets are promoted to secure object storage after passing checks.
-
 - Registry gating prevents untrusted models from reaching downstream consumers.
 
 ### 3.3 Runtime trust monitoring
 
 - Continuous monitoring during inference detects suspicious file reads, privileged access attempts, or unexpected network connections.
-
 - Centralized logs enable audit trails and forensic review when anomalies appear.
 
 ### 3.4 Bud Sentinel probe catalog in Guardrails
 
 - Select Bud Sentinel as a provider and browse its probe catalog from the Guardrails workflow.
-
 - Search and filter probes by category (PII, Bias, All) and tags.
-
 - Open a “See more” drawer to review probe details before deployment.
 
 ### 3.5 Deployment‑ready guardrail configuration
 
 - Selected Bud Sentinel probes carry into the deployment flow for projects and endpoints.
-
 - PII probes trigger additional configuration steps before deployment.
 
 ## 4. How-to Guides
