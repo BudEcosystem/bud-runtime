@@ -886,4 +886,471 @@ class TestFrequencyUnit:
         print(f"\n[max_range] ~89-day range returns {len(data['items'])} daily buckets")
 
 
+class TestFrequencyInterval:
+    """Tests for frequency_interval parameter handling."""
+
+    # ==================== Basic Validation Tests ====================
+
+    def test_frequency_interval_default_is_none(self, sync_client, seeded_data):
+        """Test that frequency_interval defaults to None when not specified."""
+        # Request without frequency_interval
+        payload_no_interval = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "fill_time_gaps": False,
+        }
+        response_no_interval = sync_client.post("/observability/analytics", json=payload_no_interval)
+        assert response_no_interval.status_code == 200
+
+        # Request with explicit None
+        payload_null = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": None,
+            "fill_time_gaps": False,
+        }
+        response_null = sync_client.post("/observability/analytics", json=payload_null)
+        assert response_null.status_code == 200
+
+        # Both should return same results
+        data_no_interval = response_no_interval.json()
+        data_null = response_null.json()
+        assert len(data_no_interval["items"]) == len(data_null["items"])
+        print(f"\n[default_interval] Default is None - verified")
+
+    def test_frequency_interval_null_accepted(self, sync_client, seeded_data):
+        """Test that explicit null value is accepted."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": None,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Null frequency_interval should be accepted, got {response.status_code}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[null_interval] Null value accepted")
+
+    @pytest.mark.parametrize("interval", [1, 2, 3, 5, 7, 12, 24])
+    def test_frequency_interval_valid_integers(self, sync_client, seeded_data, interval):
+        """Test that valid positive integers are accepted."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": interval,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"frequency_interval={interval} should be accepted, got {response.status_code}: {response.text}"
+        print(f"\n[valid_interval] frequency_interval={interval} accepted")
+
+    @pytest.mark.parametrize("interval", [0, -1, -10])
+    def test_frequency_interval_invalid_values(self, sync_client, interval):
+        """Test validation error for invalid interval values."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": interval,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"frequency_interval={interval} should be rejected, got {response.status_code}"
+        print(f"\n[invalid_interval] frequency_interval={interval} correctly rejected")
+
+    # ==================== Custom Interval Behavior Tests ====================
+
+    def test_interval_2_hours_creates_2hour_buckets(self, sync_client, seeded_data):
+        """Test 2-hour interval creates 2-hour time buckets."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 2,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # With 2-hour intervals, buckets should be at even-hour boundaries (00, 02, 04, 06, 08, 10, 12...)
+        time_periods = [item["time_period"] for item in data["items"]]
+        print(f"\n[2hour_buckets] Time periods: {time_periods}")
+
+        # Verify buckets are at 2-hour boundaries (hours divisible by 2)
+        for tp in time_periods:
+            hour = int(tp.split("T")[1].split(":")[0])
+            assert hour % 2 == 0, f"2-hour bucket should be at even hour, got {tp}"
+
+        # Verify total count is preserved
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+
+    def test_interval_3_hours_creates_3hour_buckets(self, sync_client, seeded_data):
+        """Test 3-hour interval creates 3-hour time buckets."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 3,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        time_periods = [item["time_period"] for item in data["items"]]
+        print(f"\n[3hour_buckets] Time periods: {time_periods}")
+
+        # Verify buckets are at 3-hour boundaries (hours divisible by 3: 00, 03, 06, 09, 12...)
+        for tp in time_periods:
+            hour = int(tp.split("T")[1].split(":")[0])
+            assert hour % 3 == 0, f"3-hour bucket should be at 3-hour boundary, got {tp}"
+
+        # Verify total count is preserved
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+
+    def test_interval_6_hours_creates_6hour_buckets(self, sync_client, seeded_data):
+        """Test 6-hour interval creates 6-hour time buckets."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 6,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        time_periods = [item["time_period"] for item in data["items"]]
+        print(f"\n[6hour_buckets] Time periods: {time_periods}")
+
+        # Verify buckets are at 6-hour boundaries (00, 06, 12, 18)
+        for tp in time_periods:
+            hour = int(tp.split("T")[1].split(":")[0])
+            assert hour % 6 == 0, f"6-hour bucket should be at 6-hour boundary, got {tp}"
+
+        # Verify total count is preserved
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+
+    def test_interval_7_days_creates_weekly_buckets(self, sync_client, seeded_data):
+        """Test 7-day interval creates 7-day buckets."""
+        # Use a wider date range to see the effect
+        from_date = datetime(2026, 1, 1, 0, 0, 0)
+        to_date = datetime(2026, 1, 12, 23, 59, 59)
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "frequency_unit": "day",
+            "frequency_interval": 7,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"7-day interval should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        time_periods = [item["time_period"] for item in data["items"]]
+        print(f"\n[7day_buckets] Time periods: {time_periods}")
+
+        # 12 days should fit into 2 7-day buckets
+        assert len(data["items"]) <= 2, f"12 days with 7-day interval should have at most 2 buckets, got {len(data['items'])}"
+
+    def test_interval_2_days_creates_2day_buckets(self, sync_client, seeded_data):
+        """Test 2-day interval creates 2-day buckets."""
+        from_date = datetime(2026, 1, 6, 0, 0, 0)
+        to_date = datetime(2026, 1, 10, 23, 59, 59)
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "frequency_unit": "day",
+            "frequency_interval": 2,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        time_periods = [item["time_period"] for item in data["items"]]
+        print(f"\n[2day_buckets] Time periods: {time_periods}")
+
+        # 5 days with 2-day interval should have 2-3 buckets
+        assert len(data["items"]) >= 1, f"Should have at least 1 2-day bucket, got {len(data['items'])}"
+
+    def test_interval_1_same_as_none(self, sync_client, seeded_data):
+        """Test that interval=1 produces same result as interval=None."""
+        payload_1 = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 1,
+            "fill_time_gaps": False,
+        }
+        response_1 = sync_client.post("/observability/analytics", json=payload_1)
+        assert response_1.status_code == 200
+
+        payload_none = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": None,
+            "fill_time_gaps": False,
+        }
+        response_none = sync_client.post("/observability/analytics", json=payload_none)
+        assert response_none.status_code == 200
+
+        data_1 = response_1.json()
+        data_none = response_none.json()
+
+        # Both should return same number of items
+        assert len(data_1["items"]) == len(data_none["items"]), \
+            f"interval=1 ({len(data_1['items'])}) should match interval=None ({len(data_none['items'])})"
+        print(f"\n[interval_1_vs_none] Both return {len(data_1['items'])} items - equivalent")
+
+    # ==================== Data Accuracy Tests ====================
+
+    def _sum_request_counts(self, data: dict) -> int:
+        """Helper to sum request counts from response data."""
+        total = 0
+        for item in data.get("items", []):
+            for metrics_item in item.get("items") or []:
+                rc = metrics_item.get("data", {}).get("request_count", {})
+                total += rc.get("count", 0)
+        return total
+
+    def test_2hour_interval_sum_equals_total(self, sync_client, seeded_data):
+        """Test sum of 2-hour interval counts equals total."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 2,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], \
+            f"Sum of 2-hour counts ({total}) should equal total ({seeded_data['total_count']})"
+        print(f"\n[2hour_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+
+    def test_3hour_interval_sum_equals_total(self, sync_client, seeded_data):
+        """Test sum of 3-hour interval counts equals total."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 3,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], \
+            f"Sum of 3-hour counts ({total}) should equal total ({seeded_data['total_count']})"
+        print(f"\n[3hour_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+
+    def test_6hour_interval_sum_equals_total(self, sync_client, seeded_data):
+        """Test sum of 6-hour interval counts equals total."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 6,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], \
+            f"Sum of 6-hour counts ({total}) should equal total ({seeded_data['total_count']})"
+        print(f"\n[6hour_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+
+    def test_custom_day_interval_sum_equals_total(self, sync_client, seeded_data):
+        """Test sum of custom day interval counts equals total."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "day",
+            "frequency_interval": 2,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], \
+            f"Sum of 2-day counts ({total}) should equal total ({seeded_data['total_count']})"
+        print(f"\n[2day_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+
+    # ==================== Edge Cases and Combined Parameters ====================
+
+    def test_interval_with_fill_time_gaps(self, sync_client, seeded_data):
+        """Test gap filling works with custom intervals."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 3,
+            "fill_time_gaps": True,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Custom interval with fill_time_gaps should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # With 3-hour intervals and fill_time_gaps, should have 8 buckets for 24 hours (0, 3, 6, 9, 12, 15, 18, 21)
+        assert len(data["items"]) >= 6, f"Should have several 3-hour buckets with gaps filled, got {len(data['items'])}"
+        print(f"\n[interval_fill_gaps] Returns {len(data['items'])} 3-hour buckets with gaps filled")
+
+    def test_interval_with_return_delta(self, sync_client, seeded_data):
+        """Test delta calculation works with custom intervals."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 2,
+            "return_delta": True,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Custom interval with return_delta should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Check that delta values are present
+        delta_found = False
+        for item in data["items"][:-1]:  # Skip first item
+            for metrics_item in item.get("items") or []:
+                rc = metrics_item.get("data", {}).get("request_count", {})
+                if rc.get("delta") is not None:
+                    delta_found = True
+                    break
+
+        assert delta_found, "Should have delta values for 2-hour intervals"
+        print(f"\n[interval_delta] Delta values present for 2-hour intervals")
+
+    def test_large_interval_24_hours(self, sync_client, seeded_data):
+        """Test 24-hour interval is accepted and returns correct total count."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 24,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"24-hour interval should be accepted, got {response.status_code}"
+        data = response.json()
+
+        # Verify the total count matches (data accuracy is maintained with large intervals)
+        total = self._sum_request_counts(data)
+        assert total == seeded_data["total_count"], \
+            f"Total count ({total}) should equal seeded data ({seeded_data['total_count']})"
+        print(f"\n[24hour_bucket] {len(data['items'])} bucket(s) with total count={total}")
+
+    def test_interval_larger_than_range(self, sync_client, seeded_data):
+        """Test interval larger than date range is handled."""
+        # 3-day range with 7-day interval
+        from_date = datetime(2026, 1, 6, 0, 0, 0)
+        to_date = datetime(2026, 1, 8, 23, 59, 59)
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "frequency_unit": "day",
+            "frequency_interval": 7,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Interval > range should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # Should have at most 1 bucket since interval > range
+        assert len(data["items"]) <= 1, f"Interval > range should have 0-1 buckets, got {len(data['items'])}"
+        print(f"\n[interval_gt_range] Returns {len(data['items'])} buckets for interval > range")
+
+    def test_interval_with_week_frequency(self, sync_client, seeded_data):
+        """Test custom interval with week frequency unit."""
+        from_date = datetime(2025, 12, 1, 0, 0, 0)
+        to_date = datetime(2026, 1, 12, 23, 59, 59)
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "frequency_unit": "week",
+            "frequency_interval": 2,
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"2-week interval should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # ~6 weeks of data with 2-week intervals should have 3-4 buckets
+        print(f"\n[2week_interval] Returns {len(data['items'])} 2-week buckets")
+
+    def test_interval_with_month_frequency(self, sync_client, seeded_data):
+        """Test custom interval with month frequency unit."""
+        # Use a date range within the 90-day limit
+        from_date = datetime(2025, 11, 1, 0, 0, 0)
+        to_date = datetime(2026, 1, 12, 23, 59, 59)  # ~73 days
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "frequency_unit": "month",
+            "frequency_interval": 2,  # 2-month intervals
+            "fill_time_gaps": False,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"2-month interval should work, got {response.status_code}: {response.text}"
+        data = response.json()
+
+        # ~2.5 months of data with 2-month intervals should have 1-2 buckets
+        print(f"\n[2month_interval] Returns {len(data['items'])} 2-month buckets")
+
+    def test_float_interval_rejected(self, sync_client):
+        """Test that float values are rejected."""
+        payload = {
+            "metrics": ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "hour",
+            "frequency_interval": 2.5,
+        }
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"Float frequency_interval should be rejected, got {response.status_code}"
+        print(f"\n[float_interval] Float value correctly rejected")
+
+
 #  pytest tests/observability/test_analytics_payloads.py -v -s

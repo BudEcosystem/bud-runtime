@@ -430,8 +430,8 @@ class QueryBuilder:
         # Select appropriate rollup table
         table = self._select_rollup_table(from_date, to_date, frequency_unit)
 
-        # Build time bucket expression based on frequency
-        time_bucket_expr = self._get_rollup_time_bucket_expr(frequency_unit)
+        # Build time bucket expression based on frequency and interval
+        time_bucket_expr = self._get_rollup_time_bucket_expr(frequency_unit, frequency_interval, from_date)
 
         # Build field order list
         field_order = ["time_bucket"]
@@ -528,8 +528,45 @@ class QueryBuilder:
 
         return query, field_order
 
-    def _get_rollup_time_bucket_expr(self, frequency_unit: str) -> str:
-        """Get ClickHouse time bucket expression for rollup queries."""
+    def _get_rollup_time_bucket_expr(
+        self,
+        frequency_unit: str,
+        frequency_interval: Optional[int] = None,
+        from_date: Optional[datetime] = None,
+    ) -> str:
+        """Get ClickHouse time bucket expression for rollup queries.
+
+        Args:
+            frequency_unit: Time bucket unit (hour, day, week, etc.)
+            frequency_interval: Custom interval multiplier (e.g., 2 for 2-hour buckets)
+            from_date: Start date for custom interval alignment
+
+        Returns:
+            ClickHouse expression for time bucketing
+        """
+        # If frequency_interval is provided and > 1, use custom interval formula
+        if frequency_interval is not None and frequency_interval > 1 and from_date is not None:
+            # Calculate interval in seconds
+            unit_seconds = {
+                "hour": 3600,
+                "day": 86400,
+                "week": 604800,
+                "month": 2592000,  # Approximate (30 days)
+                "quarter": 7776000,  # Approximate (90 days)
+                "year": 31536000,  # Approximate (365 days)
+            }
+            interval_seconds = frequency_interval * unit_seconds.get(frequency_unit, 86400)
+            from_timestamp = f"toUnixTimestamp('{from_date.strftime('%Y-%m-%d %H:%M:%S')}')"
+
+            # Formula: from_date + floor((timestamp - from_date) / interval) * interval
+            return (
+                f"toDateTime("
+                f"{from_timestamp} + "
+                f"floor((toUnixTimestamp(time_bucket) - {from_timestamp}) / {interval_seconds}) * {interval_seconds}"
+                f")"
+            )
+
+        # Standard functions for single-unit intervals
         time_bucket_map = {
             "hour": "toStartOfHour(time_bucket)",
             "day": "toStartOfDay(time_bucket)",
