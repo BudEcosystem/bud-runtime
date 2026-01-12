@@ -155,6 +155,7 @@
             "group": "Guardrails",
             "icon": "shield-halved",
             "pages": [
+              "guardrails/bud-sentinel",
               "guardrails/guardrails",
               "guardrails/what-are-guardrails",
               "guardrails/setting-up-guardrails",
