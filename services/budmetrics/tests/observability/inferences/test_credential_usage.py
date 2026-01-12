@@ -9,10 +9,7 @@ Run with: pytest tests/observability/inferences/test_credential_usage.py -v -s
 """
 
 import asyncio
-import subprocess
-import sys
 from datetime import datetime
-from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -86,27 +83,13 @@ async def _fetch_credential_ground_truth():
 
 
 @pytest.fixture(scope="session")
-def seeded_credential_data():
-    """Seed test data and return ground truth from InferenceFact."""
-    # 1. Clear and seed data
-    seeder_path = Path(__file__).parent.parent / "seed_otel_traces.py"
-    result = subprocess.run(
-        [sys.executable, str(seeder_path), "--clear", "--verify"],
-        capture_output=True,
-        text=True,
-        cwd=str(seeder_path.parent.parent.parent),
-    )
-    if result.returncode != 0:
-        pytest.skip(f"Failed to seed test data: {result.stderr}")
-
-    # 2. Query InferenceFact for ground truth values
+def credential_ground_truth(seed_test_data):
+    """Fetch ground truth from InferenceFact (seeding done by shared fixture)."""
     loop = asyncio.new_event_loop()
     try:
-        ground_truth = loop.run_until_complete(_fetch_credential_ground_truth())
+        return loop.run_until_complete(_fetch_credential_ground_truth())
     finally:
         loop.close()
-
-    return ground_truth
 
 
 def get_base_payload(**kwargs) -> dict:
@@ -116,10 +99,11 @@ def get_base_payload(**kwargs) -> dict:
     return payload
 
 
+@pytest.mark.usefixtures("seed_test_data")
 class TestBasicRequests:
     """Basic request tests for /observability/credential-usage."""
 
-    def test_basic_request_with_since(self, sync_client, seeded_credential_data):
+    def test_basic_request_with_since(self, sync_client):
         """Test minimal request with only since parameter."""
         payload = get_base_payload()
         response = sync_client.post("/observability/credential-usage", json=payload)
@@ -130,7 +114,7 @@ class TestBasicRequests:
         assert isinstance(data["credentials"], list)
         print(f"\n[basic_since] Got {len(data['credentials'])} credentials")
 
-    def test_response_structure(self, sync_client, seeded_credential_data):
+    def test_response_structure(self, sync_client):
         """Test that response has all expected fields."""
         payload = get_base_payload()
         response = sync_client.post("/observability/credential-usage", json=payload)
@@ -157,10 +141,11 @@ class TestBasicRequests:
         print("\n[response_structure] All expected fields present")
 
 
+@pytest.mark.usefixtures("seed_test_data")
 class TestFilters:
     """Filter tests for credential_ids parameter."""
 
-    def test_filter_by_single_credential(self, sync_client, seeded_credential_data):
+    def test_filter_by_single_credential(self, sync_client):
         """Test filtering by a single credential_id."""
         payload = get_base_payload(credential_ids=[str(TEST_CREDENTIAL_ID)])
         response = sync_client.post("/observability/credential-usage", json=payload)
@@ -176,7 +161,7 @@ class TestFilters:
             assert cred["credential_id"] == str(TEST_CREDENTIAL_ID)
         print(f"\n[filter_single] Got {len(data['credentials'])} credential(s)")
 
-    def test_filter_by_multiple_credentials(self, sync_client, seeded_credential_data):
+    def test_filter_by_multiple_credentials(self, sync_client):
         """Test filtering by multiple credential_ids."""
         # Use test credential and a nonexistent one
         payload = get_base_payload(
@@ -200,7 +185,7 @@ class TestFilters:
             ]
         print(f"\n[filter_multiple] Got {len(data['credentials'])} credential(s)")
 
-    def test_filter_by_nonexistent_credential(self, sync_client, seeded_credential_data):
+    def test_filter_by_nonexistent_credential(self, sync_client):
         """Test filtering by a credential_id that doesn't exist in data."""
         payload = get_base_payload(credential_ids=[str(TEST_NONEXISTENT_CREDENTIAL_ID)])
         response = sync_client.post("/observability/credential-usage", json=payload)
@@ -243,14 +228,14 @@ class TestValidation:
 class TestDataAccuracy:
     """Data accuracy tests comparing API response with DB."""
 
-    def test_credential_count_matches_db(self, sync_client, seeded_credential_data):
+    def test_credential_count_matches_db(self, sync_client, credential_ground_truth):
         """Test that returned credential count matches ground truth."""
         payload = get_base_payload()
         response = sync_client.post("/observability/credential-usage", json=payload)
         assert response.status_code == 200
         data = response.json()
 
-        expected_count = seeded_credential_data["total_credentials"]
+        expected_count = credential_ground_truth["total_credentials"]
         actual_count = len(data["credentials"])
 
         # API should return same or fewer credentials (due to date filtering)
@@ -258,9 +243,9 @@ class TestDataAccuracy:
             f"Credential count mismatch: API={actual_count}, DB={expected_count}"
         print(f"\n[accuracy] Credential count matches: {actual_count}")
 
-    def test_request_count_matches_db(self, sync_client, seeded_credential_data):
+    def test_request_count_matches_db(self, sync_client, credential_ground_truth):
         """Test that request_count for specific credential matches DB."""
-        if not seeded_credential_data["test_credential"]:
+        if not credential_ground_truth["test_credential"]:
             pytest.skip("Test credential not found in seeded data")
 
         payload = get_base_payload(credential_ids=[str(TEST_CREDENTIAL_ID)])
@@ -270,14 +255,15 @@ class TestDataAccuracy:
 
         if data["credentials"]:
             api_count = data["credentials"][0]["request_count"]
-            db_count = seeded_credential_data["test_credential"]["request_count"]
+            db_count = credential_ground_truth["test_credential"]["request_count"]
             assert api_count == db_count, \
                 f"Request count mismatch: API={api_count}, DB={db_count}"
             print(f"\n[accuracy] Request count matches: {api_count}")
         else:
             pytest.skip("Credential not returned by API")
 
-    def test_query_window_returned(self, sync_client, seeded_credential_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_query_window_returned(self, sync_client):
         """Test that query_window is correctly returned."""
         payload = get_base_payload()
         response = sync_client.post("/observability/credential-usage", json=payload)
@@ -293,7 +279,7 @@ class TestDataAccuracy:
         assert TEST_FROM_DATE.isoformat() in response_since or \
             response_since.startswith("2026-01-07"), \
             f"Query window 'since' mismatch: {response_since}"
-        print(f"\n[accuracy] Query window returned correctly")
+        print("\n[accuracy] Query window returned correctly")
 
 
 # pytest tests/observability/inferences/test_credential_usage.py -v -s

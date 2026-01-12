@@ -9,10 +9,7 @@ Run with: pytest tests/observability/test_analytics_payloads.py -v -s
 """
 
 import asyncio
-import subprocess
-import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -100,27 +97,13 @@ async def _fetch_ground_truth_async():
 
 
 @pytest.fixture(scope="session")
-def seeded_data():
-    """Seed test data and return ground truth from InferenceFact."""
-    # 1. Clear and seed data
-    seeder_path = Path(__file__).parent.parent / "seed_otel_traces.py"
-    result = subprocess.run(
-        [sys.executable, str(seeder_path), "--clear", "--verify"],
-        capture_output=True,
-        text=True,
-        cwd=str(seeder_path.parent.parent.parent),
-    )
-    if result.returncode != 0:
-        pytest.skip(f"Failed to seed test data: {result.stderr}")
-
-    # 2. Query InferenceFact for ground truth values using a fresh event loop
+def analytics_ground_truth(seed_test_data):
+    """Fetch ground truth from InferenceFact (seeding done by shared fixture)."""
     loop = asyncio.new_event_loop()
     try:
-        ground_truth = loop.run_until_complete(_fetch_ground_truth_async())
+        return loop.run_until_complete(_fetch_ground_truth_async())
     finally:
         loop.close()
-
-    return ground_truth
 
 
 def extract_metric_value(response_json: dict, metric_key: str):
@@ -186,7 +169,7 @@ def get_all_period_metrics(response_json: dict, metric_key: str) -> list[dict]:
 class TestIndividualMetrics:
     """Tests for each individual metric type."""
 
-    def test_request_count_metric(self, sync_client, seeded_data):
+    def test_request_count_metric(self, sync_client, analytics_ground_truth):
         """Test request_count metric returns CountMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -201,10 +184,10 @@ class TestIndividualMetrics:
         assert metric is not None, "request_count metric not found in response"
         assert "count" in metric, "CountMetric should have 'count' field"
 
-        print(f"\n[request_count] API: {metric['count']}, Ground truth: {seeded_data['total_count']}")
-        assert metric["count"] == seeded_data["total_count"]
+        print(f"\n[request_count] API: {metric['count']}, Ground truth: {analytics_ground_truth['total_count']}")
+        assert metric["count"] == analytics_ground_truth["total_count"]
 
-    def test_success_request_metric(self, sync_client, seeded_data):
+    def test_success_request_metric(self, sync_client, analytics_ground_truth):
         """Test success_request metric returns CountMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -219,10 +202,10 @@ class TestIndividualMetrics:
         assert metric is not None, "success_request metric not found in response"
         assert "count" in metric, "CountMetric should have 'count' field"
 
-        print(f"\n[success_request] API: {metric['count']}, Ground truth: {seeded_data['success_count']}")
-        assert metric["count"] == seeded_data["success_count"]
+        print(f"\n[success_request] API: {metric['count']}, Ground truth: {analytics_ground_truth['success_count']}")
+        assert metric["count"] == analytics_ground_truth["success_count"]
 
-    def test_failure_request_metric(self, sync_client, seeded_data):
+    def test_failure_request_metric(self, sync_client, analytics_ground_truth):
         """Test failure_request metric returns CountMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -237,10 +220,10 @@ class TestIndividualMetrics:
         assert metric is not None, "failure_request metric not found in response"
         assert "count" in metric, "CountMetric should have 'count' field"
 
-        print(f"\n[failure_request] API: {metric['count']}, Ground truth: {seeded_data['failure_count']}")
-        assert metric["count"] == seeded_data["failure_count"]
+        print(f"\n[failure_request] API: {metric['count']}, Ground truth: {analytics_ground_truth['failure_count']}")
+        assert metric["count"] == analytics_ground_truth["failure_count"]
 
-    def test_latency_metric(self, sync_client, seeded_data):
+    def test_latency_metric(self, sync_client, analytics_ground_truth):
         """Test latency metric returns PerformanceMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -255,10 +238,10 @@ class TestIndividualMetrics:
         assert metric is not None, "latency metric not found in response"
         assert "avg" in metric, "PerformanceMetric should have 'avg' field"
 
-        print(f"\n[latency] API avg: {metric['avg']}, Ground truth avg: {seeded_data['avg_latency']}")
+        print(f"\n[latency] API avg: {metric['avg']}, Ground truth avg: {analytics_ground_truth['avg_latency']}")
         # Note: API may use p50 from rollup tables, ground truth uses avg()
 
-    def test_ttft_metric(self, sync_client, seeded_data):
+    def test_ttft_metric(self, sync_client, analytics_ground_truth):
         """Test ttft (time to first token) metric returns PerformanceMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -273,9 +256,9 @@ class TestIndividualMetrics:
         assert metric is not None, "ttft metric not found in response"
         assert "avg" in metric, "PerformanceMetric should have 'avg' field"
 
-        print(f"\n[ttft] API avg: {metric['avg']}, Ground truth avg: {seeded_data['avg_ttft']}")
+        print(f"\n[ttft] API avg: {metric['avg']}, Ground truth avg: {analytics_ground_truth['avg_ttft']}")
 
-    def test_throughput_metric(self, sync_client, seeded_data):
+    def test_throughput_metric(self, sync_client, analytics_ground_truth):
         """Test throughput metric returns PerformanceMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -290,10 +273,10 @@ class TestIndividualMetrics:
         assert metric is not None, "throughput metric not found in response"
         assert "avg" in metric, "PerformanceMetric should have 'avg' field"
 
-        print(f"\n[throughput] API avg: {metric['avg']}, Ground truth avg: {seeded_data['avg_throughput']}")
-        assert abs(metric["avg"] - seeded_data["avg_throughput"]) < 0.01  # Allow small floating point diff
+        print(f"\n[throughput] API avg: {metric['avg']}, Ground truth avg: {analytics_ground_truth['avg_throughput']}")
+        assert abs(metric["avg"] - analytics_ground_truth["avg_throughput"]) < 0.01  # Allow small floating point diff
 
-    def test_input_token_metric(self, sync_client, seeded_data):
+    def test_input_token_metric(self, sync_client, analytics_ground_truth):
         """Test input_token metric returns CountMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -308,10 +291,10 @@ class TestIndividualMetrics:
         assert metric is not None, "input_token metric not found in response"
         assert "count" in metric, "CountMetric should have 'count' field"
 
-        print(f"\n[input_token] API: {metric['count']}, Ground truth: {seeded_data['input_tokens']}")
-        assert metric["count"] == seeded_data["input_tokens"]
+        print(f"\n[input_token] API: {metric['count']}, Ground truth: {analytics_ground_truth['input_tokens']}")
+        assert metric["count"] == analytics_ground_truth["input_tokens"]
 
-    def test_output_token_metric(self, sync_client, seeded_data):
+    def test_output_token_metric(self, sync_client, analytics_ground_truth):
         """Test output_token metric returns CountMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -326,10 +309,10 @@ class TestIndividualMetrics:
         assert metric is not None, "output_token metric not found in response"
         assert "count" in metric, "CountMetric should have 'count' field"
 
-        print(f"\n[output_token] API: {metric['count']}, Ground truth: {seeded_data['output_tokens']}")
-        assert metric["count"] == seeded_data["output_tokens"]
+        print(f"\n[output_token] API: {metric['count']}, Ground truth: {analytics_ground_truth['output_tokens']}")
+        assert metric["count"] == analytics_ground_truth["output_tokens"]
 
-    def test_cache_metric(self, sync_client, seeded_data):
+    def test_cache_metric(self, sync_client, analytics_ground_truth):
         """Test cache metric returns CacheMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -345,10 +328,10 @@ class TestIndividualMetrics:
         # CacheMetric has hit_count or count
         hit_count = metric.get("hit_count", metric.get("count", 0))
 
-        print(f"\n[cache] API hit_count: {hit_count}, Ground truth: {seeded_data['cache_count']}")
-        assert hit_count == seeded_data["cache_count"]
+        print(f"\n[cache] API hit_count: {hit_count}, Ground truth: {analytics_ground_truth['cache_count']}")
+        assert hit_count == analytics_ground_truth["cache_count"]
 
-    def test_queuing_time_metric(self, sync_client, seeded_data):
+    def test_queuing_time_metric(self, sync_client, analytics_ground_truth):
         """Test queuing_time metric returns TimeMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -364,10 +347,10 @@ class TestIndividualMetrics:
         # TimeMetric has avg_time_ms or avg
         avg_time = metric.get("avg_time_ms", metric.get("avg", 0))
 
-        print(f"\n[queuing_time] API avg_time_ms: {avg_time}, Ground truth: {seeded_data['avg_queuing_time']}")
-        assert abs(avg_time - seeded_data["avg_queuing_time"]) < 1  # Allow small rounding diff
+        print(f"\n[queuing_time] API avg_time_ms: {avg_time}, Ground truth: {analytics_ground_truth['avg_queuing_time']}")
+        assert abs(avg_time - analytics_ground_truth["avg_queuing_time"]) < 1  # Allow small rounding diff
 
-    def test_concurrent_requests_metric(self, sync_client, seeded_data):
+    def test_concurrent_requests_metric(self, sync_client, analytics_ground_truth):
         """Test concurrent_requests metric returns PerformanceMetric structure."""
         response = sync_client.post(
             "/observability/analytics",
@@ -388,7 +371,7 @@ class TestIndividualMetrics:
 class TestDateParameters:
     """Tests for from_date and to_date parameter handling."""
 
-    def test_to_date_optional(self, sync_client, seeded_data):
+    def test_to_date_optional(self, sync_client, analytics_ground_truth):
         """Test that to_date is optional and defaults to now."""
         # Use a from_date that includes our test data
         payload = {
@@ -407,10 +390,10 @@ class TestDateParameters:
         # Should return data since to_date defaults to now()
         metric = extract_metric_value(data, "request_count")
         assert metric is not None, "request_count metric not found"
-        assert metric["count"] == seeded_data["total_count"], "Count should match seeded data"
+        assert metric["count"] == analytics_ground_truth["total_count"], "Count should match seeded data"
         print(f"\n[to_date_optional] Request succeeded with count: {metric['count']}")
 
-    def test_valid_date_range(self, sync_client, seeded_data):
+    def test_valid_date_range(self, sync_client, analytics_ground_truth):
         """Test valid date range is accepted."""
         payload = {
             "metrics": ["request_count"],
@@ -425,7 +408,7 @@ class TestDateParameters:
 
         metric = extract_metric_value(data, "request_count")
         print(f"\n[valid_date_range] Request succeeded with count: {metric['count'] if metric else 'N/A'}")
-        assert metric["count"] == seeded_data["total_count"]
+        assert metric["count"] == analytics_ground_truth["total_count"]
 
     def test_to_date_before_from_date(self, sync_client):
         """Test validation error when to_date is before from_date."""
@@ -501,7 +484,7 @@ class TestFrequencyUnit:
     # ==================== Basic Validation Tests ====================
 
     @pytest.mark.parametrize("frequency_unit", ["hour", "day", "week", "month", "quarter", "year"])
-    def test_valid_frequency_units(self, sync_client, seeded_data, frequency_unit):
+    def test_valid_frequency_units(self, sync_client, analytics_ground_truth, frequency_unit):
         """Test all valid frequency_unit values are accepted."""
         payload = {
             "metrics": ["request_count"],
@@ -516,7 +499,7 @@ class TestFrequencyUnit:
         assert data["object"] == "observability_metrics"
         print(f"\n[valid_frequency_unit] frequency_unit={frequency_unit} accepted")
 
-    def test_frequency_unit_default_is_day(self, sync_client, seeded_data):
+    def test_frequency_unit_default_is_day(self, sync_client, analytics_ground_truth):
         """Test that frequency_unit defaults to 'day' when not specified."""
         # Request without frequency_unit
         payload_no_freq = {
@@ -563,7 +546,7 @@ class TestFrequencyUnit:
 
     # ==================== Time Bucket Format Tests ====================
 
-    def test_frequency_unit_hour_returns_hourly_buckets(self, sync_client, seeded_data):
+    def test_frequency_unit_hour_returns_hourly_buckets(self, sync_client, analytics_ground_truth):
         """Test that hour frequency returns hourly time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -585,7 +568,7 @@ class TestFrequencyUnit:
             assert time_period.endswith(":00:00") or time_period.endswith(":00"), f"Hour bucket should be at hour boundary: {time_period}"
         print(f"\n[hour_buckets] Returns {len(data['items'])} hourly buckets")
 
-    def test_frequency_unit_day_returns_daily_buckets(self, sync_client, seeded_data):
+    def test_frequency_unit_day_returns_daily_buckets(self, sync_client, analytics_ground_truth):
         """Test that day frequency returns daily time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -604,7 +587,7 @@ class TestFrequencyUnit:
             assert "T00:00:00" in time_period, f"Day bucket should be at day start: {time_period}"
         print(f"\n[day_buckets] Returns {len(data['items'])} daily buckets")
 
-    def test_frequency_unit_week_returns_weekly_buckets(self, sync_client, seeded_data):
+    def test_frequency_unit_week_returns_weekly_buckets(self, sync_client, analytics_ground_truth):
         """Test that week frequency returns weekly time buckets (Monday start)."""
         payload = {
             "metrics": ["request_count"],
@@ -624,7 +607,7 @@ class TestFrequencyUnit:
             assert "2026-01-05" in time_period, f"Week bucket should be Monday 2026-01-05: {time_period}"
         print(f"\n[week_buckets] Returns {len(data['items'])} weekly buckets")
 
-    def test_frequency_unit_month_returns_monthly_buckets(self, sync_client, seeded_data):
+    def test_frequency_unit_month_returns_monthly_buckets(self, sync_client, analytics_ground_truth):
         """Test that month frequency returns monthly time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -643,7 +626,7 @@ class TestFrequencyUnit:
             assert "2026-01-01" in time_period, f"Month bucket should be 2026-01-01: {time_period}"
         print(f"\n[month_buckets] Returns {len(data['items'])} monthly buckets")
 
-    def test_frequency_unit_quarter_returns_quarterly_buckets(self, sync_client, seeded_data):
+    def test_frequency_unit_quarter_returns_quarterly_buckets(self, sync_client, analytics_ground_truth):
         """Test that quarter frequency returns quarterly time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -662,7 +645,7 @@ class TestFrequencyUnit:
             assert "2026-01-01" in time_period, f"Quarter bucket should be 2026-01-01: {time_period}"
         print(f"\n[quarter_buckets] Returns {len(data['items'])} quarterly buckets")
 
-    def test_frequency_unit_year_returns_yearly_buckets(self, sync_client, seeded_data):
+    def test_frequency_unit_year_returns_yearly_buckets(self, sync_client, analytics_ground_truth):
         """Test that year frequency returns yearly time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -683,7 +666,7 @@ class TestFrequencyUnit:
 
     # ==================== Data Accuracy Tests ====================
 
-    def test_hour_frequency_count_accuracy(self, sync_client, seeded_data):
+    def test_hour_frequency_count_accuracy(self, sync_client, analytics_ground_truth):
         """Test that summed hourly counts equal total seeded count."""
         payload = {
             "metrics": ["request_count"],
@@ -703,10 +686,10 @@ class TestFrequencyUnit:
                 rc = metrics_item.get("data", {}).get("request_count", {})
                 total_count += rc.get("count", 0)
 
-        assert total_count == seeded_data["total_count"], f"Sum of hourly counts ({total_count}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[hour_accuracy] Sum={total_count}, Expected={seeded_data['total_count']}")
+        assert total_count == analytics_ground_truth["total_count"], f"Sum of hourly counts ({total_count}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[hour_accuracy] Sum={total_count}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_day_frequency_count_accuracy(self, sync_client, seeded_data):
+    def test_day_frequency_count_accuracy(self, sync_client, analytics_ground_truth):
         """Test that daily count equals total seeded count."""
         payload = {
             "metrics": ["request_count"],
@@ -721,10 +704,10 @@ class TestFrequencyUnit:
 
         metric = extract_metric_value(data, "request_count")
         assert metric is not None
-        assert metric["count"] == seeded_data["total_count"], f"Daily count ({metric['count']}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[day_accuracy] Count={metric['count']}, Expected={seeded_data['total_count']}")
+        assert metric["count"] == analytics_ground_truth["total_count"], f"Daily count ({metric['count']}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[day_accuracy] Count={metric['count']}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_week_frequency_count_accuracy(self, sync_client, seeded_data):
+    def test_week_frequency_count_accuracy(self, sync_client, analytics_ground_truth):
         """Test that weekly count equals total seeded count."""
         payload = {
             "metrics": ["request_count"],
@@ -739,10 +722,10 @@ class TestFrequencyUnit:
 
         metric = extract_metric_value(data, "request_count")
         assert metric is not None
-        assert metric["count"] == seeded_data["total_count"], f"Weekly count ({metric['count']}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[week_accuracy] Count={metric['count']}, Expected={seeded_data['total_count']}")
+        assert metric["count"] == analytics_ground_truth["total_count"], f"Weekly count ({metric['count']}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[week_accuracy] Count={metric['count']}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_month_frequency_count_accuracy(self, sync_client, seeded_data):
+    def test_month_frequency_count_accuracy(self, sync_client, analytics_ground_truth):
         """Test that monthly count equals total seeded count."""
         payload = {
             "metrics": ["request_count"],
@@ -757,10 +740,10 @@ class TestFrequencyUnit:
 
         metric = extract_metric_value(data, "request_count")
         assert metric is not None
-        assert metric["count"] == seeded_data["total_count"], f"Monthly count ({metric['count']}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[month_accuracy] Count={metric['count']}, Expected={seeded_data['total_count']}")
+        assert metric["count"] == analytics_ground_truth["total_count"], f"Monthly count ({metric['count']}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[month_accuracy] Count={metric['count']}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_quarter_frequency_count_accuracy(self, sync_client, seeded_data):
+    def test_quarter_frequency_count_accuracy(self, sync_client, analytics_ground_truth):
         """Test that quarterly count equals total seeded count."""
         payload = {
             "metrics": ["request_count"],
@@ -775,10 +758,10 @@ class TestFrequencyUnit:
 
         metric = extract_metric_value(data, "request_count")
         assert metric is not None
-        assert metric["count"] == seeded_data["total_count"], f"Quarterly count ({metric['count']}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[quarter_accuracy] Count={metric['count']}, Expected={seeded_data['total_count']}")
+        assert metric["count"] == analytics_ground_truth["total_count"], f"Quarterly count ({metric['count']}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[quarter_accuracy] Count={metric['count']}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_year_frequency_count_accuracy(self, sync_client, seeded_data):
+    def test_year_frequency_count_accuracy(self, sync_client, analytics_ground_truth):
         """Test that yearly count equals total seeded count."""
         payload = {
             "metrics": ["request_count"],
@@ -793,12 +776,12 @@ class TestFrequencyUnit:
 
         metric = extract_metric_value(data, "request_count")
         assert metric is not None
-        assert metric["count"] == seeded_data["total_count"], f"Yearly count ({metric['count']}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[year_accuracy] Count={metric['count']}, Expected={seeded_data['total_count']}")
+        assert metric["count"] == analytics_ground_truth["total_count"], f"Yearly count ({metric['count']}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[year_accuracy] Count={metric['count']}, Expected={analytics_ground_truth['total_count']}")
 
     # ==================== Edge Cases and Combined Parameter Tests ====================
 
-    def test_multi_week_date_range(self, sync_client, seeded_data):
+    def test_multi_week_date_range(self, sync_client, analytics_ground_truth):
         """Test week frequency handles multi-week date range correctly."""
         # Use dates that span 2 weeks, within the valid test data range
         from_date = datetime(2026, 1, 1, 0, 0, 0)
@@ -818,7 +801,7 @@ class TestFrequencyUnit:
         assert len(data["items"]) >= 2, f"Should have at least 2 week buckets for 2 weeks, got {len(data['items'])}"
         print(f"\n[multi_week] Returns {len(data['items'])} weekly buckets for 2-week range")
 
-    def test_frequency_with_fill_time_gaps(self, sync_client, seeded_data):
+    def test_frequency_with_fill_time_gaps(self, sync_client, analytics_ground_truth):
         """Test that gap filling works at specified frequency."""
         payload = {
             "metrics": ["request_count"],
@@ -846,7 +829,7 @@ class TestFrequencyUnit:
         assert zero_count_found, "Should have some hours with count=0 (filled gaps)"
         print(f"\n[fill_time_gaps] Returns {len(data['items'])} hourly buckets with gaps filled")
 
-    def test_frequency_with_return_delta(self, sync_client, seeded_data):
+    def test_frequency_with_return_delta(self, sync_client, analytics_ground_truth):
         """Test that delta calculation works at specified frequency."""
         payload = {
             "metrics": ["request_count"],
@@ -926,7 +909,7 @@ class TestFrequencyInterval:
 
     # ==================== Basic Validation Tests ====================
 
-    def test_frequency_interval_default_is_none(self, sync_client, seeded_data):
+    def test_frequency_interval_default_is_none(self, sync_client, analytics_ground_truth):
         """Test that frequency_interval defaults to None when not specified."""
         # Request without frequency_interval
         payload_no_interval = {
@@ -957,7 +940,7 @@ class TestFrequencyInterval:
         assert len(data_no_interval["items"]) == len(data_null["items"])
         print(f"\n[default_interval] Default is None - verified")
 
-    def test_frequency_interval_null_accepted(self, sync_client, seeded_data):
+    def test_frequency_interval_null_accepted(self, sync_client, analytics_ground_truth):
         """Test that explicit null value is accepted."""
         payload = {
             "metrics": ["request_count"],
@@ -974,7 +957,7 @@ class TestFrequencyInterval:
         print(f"\n[null_interval] Null value accepted")
 
     @pytest.mark.parametrize("interval", [1, 2, 3, 5, 7, 12, 24])
-    def test_frequency_interval_valid_integers(self, sync_client, seeded_data, interval):
+    def test_frequency_interval_valid_integers(self, sync_client, analytics_ground_truth, interval):
         """Test that valid positive integers are accepted."""
         payload = {
             "metrics": ["request_count"],
@@ -1004,7 +987,7 @@ class TestFrequencyInterval:
 
     # ==================== Custom Interval Behavior Tests ====================
 
-    def test_interval_2_hours_creates_2hour_buckets(self, sync_client, seeded_data):
+    def test_interval_2_hours_creates_2hour_buckets(self, sync_client, analytics_ground_truth):
         """Test 2-hour interval creates 2-hour time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -1029,9 +1012,9 @@ class TestFrequencyInterval:
 
         # Verify total count is preserved
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Total should be {analytics_ground_truth['total_count']}, got {total}"
 
-    def test_interval_3_hours_creates_3hour_buckets(self, sync_client, seeded_data):
+    def test_interval_3_hours_creates_3hour_buckets(self, sync_client, analytics_ground_truth):
         """Test 3-hour interval creates 3-hour time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -1055,9 +1038,9 @@ class TestFrequencyInterval:
 
         # Verify total count is preserved
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Total should be {analytics_ground_truth['total_count']}, got {total}"
 
-    def test_interval_6_hours_creates_6hour_buckets(self, sync_client, seeded_data):
+    def test_interval_6_hours_creates_6hour_buckets(self, sync_client, analytics_ground_truth):
         """Test 6-hour interval creates 6-hour time buckets."""
         payload = {
             "metrics": ["request_count"],
@@ -1081,9 +1064,9 @@ class TestFrequencyInterval:
 
         # Verify total count is preserved
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Total should be {analytics_ground_truth['total_count']}, got {total}"
 
-    def test_interval_7_days_creates_weekly_buckets(self, sync_client, seeded_data):
+    def test_interval_7_days_creates_weekly_buckets(self, sync_client, analytics_ground_truth):
         """Test 7-day interval creates 7-day buckets."""
         # Use a wider date range to see the effect
         from_date = datetime(2026, 1, 1, 0, 0, 0)
@@ -1106,7 +1089,7 @@ class TestFrequencyInterval:
         # 12 days should fit into 2 7-day buckets
         assert len(data["items"]) <= 2, f"12 days with 7-day interval should have at most 2 buckets, got {len(data['items'])}"
 
-    def test_interval_2_days_creates_2day_buckets(self, sync_client, seeded_data):
+    def test_interval_2_days_creates_2day_buckets(self, sync_client, analytics_ground_truth):
         """Test 2-day interval creates 2-day buckets."""
         from_date = datetime(2026, 1, 6, 0, 0, 0)
         to_date = datetime(2026, 1, 10, 23, 59, 59)
@@ -1128,7 +1111,7 @@ class TestFrequencyInterval:
         # 5 days with 2-day interval should have 2-3 buckets
         assert len(data["items"]) >= 1, f"Should have at least 1 2-day bucket, got {len(data['items'])}"
 
-    def test_interval_1_same_as_none(self, sync_client, seeded_data):
+    def test_interval_1_same_as_none(self, sync_client, analytics_ground_truth):
         """Test that interval=1 produces same result as interval=None."""
         payload_1 = {
             "metrics": ["request_count"],
@@ -1171,7 +1154,7 @@ class TestFrequencyInterval:
                 total += rc.get("count", 0)
         return total
 
-    def test_2hour_interval_sum_equals_total(self, sync_client, seeded_data):
+    def test_2hour_interval_sum_equals_total(self, sync_client, analytics_ground_truth):
         """Test sum of 2-hour interval counts equals total."""
         payload = {
             "metrics": ["request_count"],
@@ -1186,11 +1169,11 @@ class TestFrequencyInterval:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], \
-            f"Sum of 2-hour counts ({total}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[2hour_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+        assert total == analytics_ground_truth["total_count"], \
+            f"Sum of 2-hour counts ({total}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[2hour_accuracy] Sum={total}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_3hour_interval_sum_equals_total(self, sync_client, seeded_data):
+    def test_3hour_interval_sum_equals_total(self, sync_client, analytics_ground_truth):
         """Test sum of 3-hour interval counts equals total."""
         payload = {
             "metrics": ["request_count"],
@@ -1205,11 +1188,11 @@ class TestFrequencyInterval:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], \
-            f"Sum of 3-hour counts ({total}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[3hour_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+        assert total == analytics_ground_truth["total_count"], \
+            f"Sum of 3-hour counts ({total}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[3hour_accuracy] Sum={total}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_6hour_interval_sum_equals_total(self, sync_client, seeded_data):
+    def test_6hour_interval_sum_equals_total(self, sync_client, analytics_ground_truth):
         """Test sum of 6-hour interval counts equals total."""
         payload = {
             "metrics": ["request_count"],
@@ -1224,11 +1207,11 @@ class TestFrequencyInterval:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], \
-            f"Sum of 6-hour counts ({total}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[6hour_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+        assert total == analytics_ground_truth["total_count"], \
+            f"Sum of 6-hour counts ({total}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[6hour_accuracy] Sum={total}, Expected={analytics_ground_truth['total_count']}")
 
-    def test_custom_day_interval_sum_equals_total(self, sync_client, seeded_data):
+    def test_custom_day_interval_sum_equals_total(self, sync_client, analytics_ground_truth):
         """Test sum of custom day interval counts equals total."""
         payload = {
             "metrics": ["request_count"],
@@ -1243,13 +1226,13 @@ class TestFrequencyInterval:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], \
-            f"Sum of 2-day counts ({total}) should equal total ({seeded_data['total_count']})"
-        print(f"\n[2day_accuracy] Sum={total}, Expected={seeded_data['total_count']}")
+        assert total == analytics_ground_truth["total_count"], \
+            f"Sum of 2-day counts ({total}) should equal total ({analytics_ground_truth['total_count']})"
+        print(f"\n[2day_accuracy] Sum={total}, Expected={analytics_ground_truth['total_count']}")
 
     # ==================== Edge Cases and Combined Parameters ====================
 
-    def test_interval_with_fill_time_gaps(self, sync_client, seeded_data):
+    def test_interval_with_fill_time_gaps(self, sync_client, analytics_ground_truth):
         """Test gap filling works with custom intervals."""
         payload = {
             "metrics": ["request_count"],
@@ -1267,7 +1250,7 @@ class TestFrequencyInterval:
         assert len(data["items"]) >= 6, f"Should have several 3-hour buckets with gaps filled, got {len(data['items'])}"
         print(f"\n[interval_fill_gaps] Returns {len(data['items'])} 3-hour buckets with gaps filled")
 
-    def test_interval_with_return_delta(self, sync_client, seeded_data):
+    def test_interval_with_return_delta(self, sync_client, analytics_ground_truth):
         """Test delta calculation works with custom intervals."""
         payload = {
             "metrics": ["request_count"],
@@ -1294,7 +1277,7 @@ class TestFrequencyInterval:
         assert delta_found, "Should have delta values for 2-hour intervals"
         print(f"\n[interval_delta] Delta values present for 2-hour intervals")
 
-    def test_large_interval_24_hours(self, sync_client, seeded_data):
+    def test_large_interval_24_hours(self, sync_client, analytics_ground_truth):
         """Test 24-hour interval is accepted and returns correct total count."""
         payload = {
             "metrics": ["request_count"],
@@ -1310,11 +1293,11 @@ class TestFrequencyInterval:
 
         # Verify the total count matches (data accuracy is maintained with large intervals)
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], \
-            f"Total count ({total}) should equal seeded data ({seeded_data['total_count']})"
+        assert total == analytics_ground_truth["total_count"], \
+            f"Total count ({total}) should equal seeded data ({analytics_ground_truth['total_count']})"
         print(f"\n[24hour_bucket] {len(data['items'])} bucket(s) with total count={total}")
 
-    def test_interval_larger_than_range(self, sync_client, seeded_data):
+    def test_interval_larger_than_range(self, sync_client, analytics_ground_truth):
         """Test interval larger than date range is handled."""
         # 3-day range with 7-day interval
         from_date = datetime(2026, 1, 6, 0, 0, 0)
@@ -1335,7 +1318,7 @@ class TestFrequencyInterval:
         assert len(data["items"]) <= 1, f"Interval > range should have 0-1 buckets, got {len(data['items'])}"
         print(f"\n[interval_gt_range] Returns {len(data['items'])} buckets for interval > range")
 
-    def test_interval_with_week_frequency(self, sync_client, seeded_data):
+    def test_interval_with_week_frequency(self, sync_client, analytics_ground_truth):
         """Test custom interval with week frequency unit."""
         from_date = datetime(2025, 12, 1, 0, 0, 0)
         to_date = datetime(2026, 1, 12, 23, 59, 59)
@@ -1354,7 +1337,7 @@ class TestFrequencyInterval:
         # ~6 weeks of data with 2-week intervals should have 3-4 buckets
         print(f"\n[2week_interval] Returns {len(data['items'])} 2-week buckets")
 
-    def test_interval_with_month_frequency(self, sync_client, seeded_data):
+    def test_interval_with_month_frequency(self, sync_client, analytics_ground_truth):
         """Test custom interval with month frequency unit."""
         # Use a date range within the 90-day limit
         from_date = datetime(2025, 11, 1, 0, 0, 0)
@@ -1428,7 +1411,7 @@ class TestFilters:
 
     # ==================== Basic Validation Tests ====================
 
-    def test_filters_default_is_none(self, sync_client, seeded_data):
+    def test_filters_default_is_none(self, sync_client, analytics_ground_truth):
         """Test that filters defaults to None (returns all data) when not specified."""
         payload = self._get_filter_payload()  # No filters
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1436,10 +1419,10 @@ class TestFilters:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Should return all data ({seeded_data['total_count']}), got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Should return all data ({analytics_ground_truth['total_count']}), got {total}"
         print(f"\n[filters_default] No filters returns all {total} records")
 
-    def test_filters_null_accepted(self, sync_client, seeded_data):
+    def test_filters_null_accepted(self, sync_client, analytics_ground_truth):
         """Test that explicit null value for filters is accepted."""
         payload = self._get_filter_payload()
         payload["filters"] = None
@@ -1448,10 +1431,10 @@ class TestFilters:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"]
+        assert total == analytics_ground_truth["total_count"]
         print(f"\n[filters_null] Null value accepted, returns {total} records")
 
-    def test_filters_empty_object_accepted(self, sync_client, seeded_data):
+    def test_filters_empty_object_accepted(self, sync_client, analytics_ground_truth):
         """Test that empty filters object is accepted (no filtering applied)."""
         payload = self._get_filter_payload(filters={})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1459,7 +1442,7 @@ class TestFilters:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"]
+        assert total == analytics_ground_truth["total_count"]
         print(f"\n[filters_empty] Empty object accepted, returns {total} records")
 
     def test_filters_empty_array_rejected(self, sync_client):
@@ -1492,7 +1475,7 @@ class TestFilters:
 
     # ==================== Single UUID Filter Tests ====================
 
-    def test_filter_by_project_single_uuid(self, sync_client, seeded_data):
+    def test_filter_by_project_single_uuid(self, sync_client, analytics_ground_truth):
         """Test filtering by single project UUID."""
         payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1503,7 +1486,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records for test project, got {total}"
         print(f"\n[filter_project] Project filter returns {total} records")
 
-    def test_filter_by_model_single_uuid(self, sync_client, seeded_data):
+    def test_filter_by_model_single_uuid(self, sync_client, analytics_ground_truth):
         """Test filtering by single model UUID."""
         payload = self._get_filter_payload(filters={"model": str(TEST_MODEL_ID)})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1514,7 +1497,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records for test model, got {total}"
         print(f"\n[filter_model] Model filter returns {total} records")
 
-    def test_filter_by_endpoint_single_uuid(self, sync_client, seeded_data):
+    def test_filter_by_endpoint_single_uuid(self, sync_client, analytics_ground_truth):
         """Test filtering by single endpoint UUID."""
         payload = self._get_filter_payload(filters={"endpoint": str(TEST_ENDPOINT_ID)})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1525,7 +1508,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records for test endpoint, got {total}"
         print(f"\n[filter_endpoint] Endpoint filter returns {total} records")
 
-    def test_filter_by_nonexistent_uuid(self, sync_client, seeded_data):
+    def test_filter_by_nonexistent_uuid(self, sync_client, analytics_ground_truth):
         """Test filtering by non-existent UUID returns empty results."""
         payload = self._get_filter_payload(filters={"project": self.NONEXISTENT_UUID})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1538,7 +1521,7 @@ class TestFilters:
 
     # ==================== UUID Array Filter Tests ====================
 
-    def test_filter_by_project_array(self, sync_client, seeded_data):
+    def test_filter_by_project_array(self, sync_client, analytics_ground_truth):
         """Test filtering by project UUID array with single element."""
         payload = self._get_filter_payload(filters={"project": [str(TEST_PROJECT_ID)]})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1549,7 +1532,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filter_project_array] Project array filter returns {total} records")
 
-    def test_filter_by_model_array(self, sync_client, seeded_data):
+    def test_filter_by_model_array(self, sync_client, analytics_ground_truth):
         """Test filtering by model UUID array with single element."""
         payload = self._get_filter_payload(filters={"model": [str(TEST_MODEL_ID)]})
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1560,7 +1543,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filter_model_array] Model array filter returns {total} records")
 
-    def test_filter_by_multiple_uuids(self, sync_client, seeded_data):
+    def test_filter_by_multiple_uuids(self, sync_client, analytics_ground_truth):
         """Test filtering with multiple UUIDs in array (uses IN clause)."""
         # Include both a valid and non-existent UUID
         payload = self._get_filter_payload(filters={
@@ -1574,7 +1557,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} for matching UUID, got {total}"
         print(f"\n[filter_multiple_uuids] Multiple UUIDs (IN clause) returns {total} records")
 
-    def test_filter_mixed_single_and_array(self, sync_client, seeded_data):
+    def test_filter_mixed_single_and_array(self, sync_client, analytics_ground_truth):
         """Test filtering with mixed single UUID and array formats."""
         payload = self._get_filter_payload(filters={
             "project": str(TEST_PROJECT_ID),  # Single UUID
@@ -1590,7 +1573,7 @@ class TestFilters:
 
     # ==================== Combined Filters (AND logic) ====================
 
-    def test_filter_project_and_model(self, sync_client, seeded_data):
+    def test_filter_project_and_model(self, sync_client, analytics_ground_truth):
         """Test filtering by project AND model (AND logic)."""
         payload = self._get_filter_payload(filters={
             "project": str(TEST_PROJECT_ID),
@@ -1604,7 +1587,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Combined filters (AND) should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filter_combined_2] Project AND model filter returns {total} records")
 
-    def test_filter_all_three(self, sync_client, seeded_data):
+    def test_filter_all_three(self, sync_client, analytics_ground_truth):
         """Test filtering by all three filter types (project, model, endpoint)."""
         payload = self._get_filter_payload(filters={
             "project": str(TEST_PROJECT_ID),
@@ -1619,7 +1602,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"All three filters should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filter_combined_3] All three filters returns {total} records")
 
-    def test_filter_with_no_matching_data(self, sync_client, seeded_data):
+    def test_filter_with_no_matching_data(self, sync_client, analytics_ground_truth):
         """Test combined filters with no matching data returns empty results."""
         payload = self._get_filter_payload(filters={
             "project": self.NONEXISTENT_UUID,
@@ -1643,7 +1626,7 @@ class TestFilters:
         assert response.status_code == 422, f"filters+topk should be rejected, got {response.status_code}"
         print(f"\n[filters_topk] Filters + topk correctly rejected")
 
-    def test_filters_with_group_by(self, sync_client, seeded_data):
+    def test_filters_with_group_by(self, sync_client, analytics_ground_truth):
         """Test filters work correctly with group_by parameter."""
         payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
         payload["group_by"] = ["model"]
@@ -1655,7 +1638,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filters_group_by] Filters + group_by returns {total} records")
 
-    def test_filters_with_frequency_interval(self, sync_client, seeded_data):
+    def test_filters_with_frequency_interval(self, sync_client, analytics_ground_truth):
         """Test filters work correctly with custom frequency_interval."""
         payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
         payload["frequency_unit"] = "hour"
@@ -1668,7 +1651,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filters_interval] Filters + frequency_interval returns {total} records")
 
-    def test_filters_with_fill_time_gaps(self, sync_client, seeded_data):
+    def test_filters_with_fill_time_gaps(self, sync_client, analytics_ground_truth):
         """Test filters work correctly with fill_time_gaps."""
         payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
         payload["fill_time_gaps"] = True
@@ -1680,7 +1663,7 @@ class TestFilters:
         assert total == self.FILTERED_RECORD_COUNT, f"Should return {self.FILTERED_RECORD_COUNT} records, got {total}"
         print(f"\n[filters_fill_gaps] Filters + fill_time_gaps returns {total} records")
 
-    def test_filters_with_return_delta(self, sync_client, seeded_data):
+    def test_filters_with_return_delta(self, sync_client, analytics_ground_truth):
         """Test filters work correctly with return_delta."""
         payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
         payload["return_delta"] = True
@@ -1718,7 +1701,7 @@ class TestFilters:
         print(f"\n[filter_accuracy] Filtered data accuracy verified: {total} records")
 
     @pytest.mark.parametrize("frequency_unit", ["hour", "day", "week", "month", "quarter", "year"])
-    def test_filter_with_all_frequency_units(self, sync_client, seeded_data, frequency_unit):
+    def test_filter_with_all_frequency_units(self, sync_client, analytics_ground_truth, frequency_unit):
         """Test filters work with all frequency_unit values."""
         payload = self._get_filter_payload(filters={"project": str(TEST_PROJECT_ID)})
         payload["frequency_unit"] = frequency_unit
@@ -1816,7 +1799,7 @@ class TestGroupBy:
 
     # ==================== Basic Validation Tests ====================
 
-    def test_group_by_default_is_none(self, sync_client, seeded_data):
+    def test_group_by_default_is_none(self, sync_client, analytics_ground_truth):
         """Test that group_by defaults to None (single item per period) when not specified."""
         payload = self._get_group_by_payload()  # No group_by
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1829,7 +1812,7 @@ class TestGroupBy:
             assert len(items) == 1, f"Without group_by, should have 1 item per period, got {len(items)}"
         print(f"\n[group_by_default] No group_by returns single item per period")
 
-    def test_group_by_null_accepted(self, sync_client, seeded_data):
+    def test_group_by_null_accepted(self, sync_client, analytics_ground_truth):
         """Test that explicit null value for group_by is accepted."""
         payload = self._get_group_by_payload()
         payload["group_by"] = None
@@ -1837,7 +1820,7 @@ class TestGroupBy:
         assert response.status_code == 200, f"Null group_by should be accepted, got {response.status_code}"
         print(f"\n[group_by_null] Null value accepted")
 
-    def test_group_by_empty_array_accepted(self, sync_client, seeded_data):
+    def test_group_by_empty_array_accepted(self, sync_client, analytics_ground_truth):
         """Test that empty array for group_by is accepted (no grouping applied)."""
         payload = self._get_group_by_payload(group_by=[])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1881,7 +1864,7 @@ class TestGroupBy:
 
     # ==================== Single Group By Tests ====================
 
-    def test_group_by_model(self, sync_client, seeded_data):
+    def test_group_by_model(self, sync_client, analytics_ground_truth):
         """Test grouping by model returns multiple items per period."""
         payload = self._get_group_by_payload(group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1894,7 +1877,7 @@ class TestGroupBy:
             f"Should have at least {self.EXPECTED_GROUP_COUNT} items in some period, got {item_counts}"
         print(f"\n[group_by_model] Returns items per period: {item_counts}")
 
-    def test_group_by_project(self, sync_client, seeded_data):
+    def test_group_by_project(self, sync_client, analytics_ground_truth):
         """Test grouping by project returns multiple items per period."""
         payload = self._get_group_by_payload(group_by=["project"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1907,7 +1890,7 @@ class TestGroupBy:
             f"Should have at least {self.EXPECTED_GROUP_COUNT} items in some period, got {item_counts}"
         print(f"\n[group_by_project] Returns items per period: {item_counts}")
 
-    def test_group_by_endpoint(self, sync_client, seeded_data):
+    def test_group_by_endpoint(self, sync_client, analytics_ground_truth):
         """Test grouping by endpoint returns multiple items per period."""
         payload = self._get_group_by_payload(group_by=["endpoint"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1920,7 +1903,7 @@ class TestGroupBy:
             f"Should have at least {self.EXPECTED_GROUP_COUNT} items in some period, got {item_counts}"
         print(f"\n[group_by_endpoint] Returns items per period: {item_counts}")
 
-    def test_group_by_user_project(self, sync_client, seeded_data):
+    def test_group_by_user_project(self, sync_client, analytics_ground_truth):
         """Test grouping by user_project works (may have different distribution)."""
         payload = self._get_group_by_payload(group_by=["user_project"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1931,7 +1914,7 @@ class TestGroupBy:
 
     # ==================== Multiple Group By Tests ====================
 
-    def test_group_by_model_and_project(self, sync_client, seeded_data):
+    def test_group_by_model_and_project(self, sync_client, analytics_ground_truth):
         """Test grouping by model and project works."""
         payload = self._get_group_by_payload(group_by=["model", "project"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1940,10 +1923,10 @@ class TestGroupBy:
 
         # Verify grouping creates multiple items and total count is preserved
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Total should be {analytics_ground_truth['total_count']}, got {total}"
         print(f"\n[group_by_two] model+project grouping works, total={total}")
 
-    def test_group_by_all_three(self, sync_client, seeded_data):
+    def test_group_by_all_three(self, sync_client, analytics_ground_truth):
         """Test grouping by model, project, and endpoint works."""
         payload = self._get_group_by_payload(group_by=["model", "project", "endpoint"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1952,10 +1935,10 @@ class TestGroupBy:
 
         # Verify grouping creates items and total count is preserved
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Total should be {analytics_ground_truth['total_count']}, got {total}"
         print(f"\n[group_by_three] model+project+endpoint grouping works, total={total}")
 
-    def test_group_by_all_four(self, sync_client, seeded_data):
+    def test_group_by_all_four(self, sync_client, analytics_ground_truth):
         """Test grouping by all four fields."""
         payload = self._get_group_by_payload(group_by=["model", "project", "endpoint", "user_project"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1966,7 +1949,7 @@ class TestGroupBy:
 
     # ==================== Data Accuracy Tests ====================
 
-    def test_group_by_sum_equals_total(self, sync_client, seeded_data):
+    def test_group_by_sum_equals_total(self, sync_client, analytics_ground_truth):
         """Test that sum of grouped counts equals total seeded count."""
         payload = self._get_group_by_payload(group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1974,11 +1957,11 @@ class TestGroupBy:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], \
-            f"Sum of groups ({total}) should equal total ({seeded_data['total_count']})"
+        assert total == analytics_ground_truth["total_count"], \
+            f"Sum of groups ({total}) should equal total ({analytics_ground_truth['total_count']})"
         print(f"\n[group_sum] Sum of groups = {total}, matches total")
 
-    def test_group_by_model_count_distribution(self, sync_client, seeded_data):
+    def test_group_by_model_count_distribution(self, sync_client, analytics_ground_truth):
         """Test that model grouping returns correct count distribution (5 and 1)."""
         payload = self._get_group_by_payload(group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -1992,7 +1975,7 @@ class TestGroupBy:
             f"Expected counts [1, 5], got {counts}"
         print(f"\n[model_distribution] Counts: {counts}")
 
-    def test_group_by_project_count_distribution(self, sync_client, seeded_data):
+    def test_group_by_project_count_distribution(self, sync_client, analytics_ground_truth):
         """Test that project grouping returns correct count distribution (5 and 1)."""
         payload = self._get_group_by_payload(group_by=["project"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2006,7 +1989,7 @@ class TestGroupBy:
             f"Expected counts [1, 5], got {counts}"
         print(f"\n[project_distribution] Counts: {counts}")
 
-    def test_group_by_creates_multiple_items(self, sync_client, seeded_data):
+    def test_group_by_creates_multiple_items(self, sync_client, analytics_ground_truth):
         """Test that grouping creates multiple items per period."""
         payload = self._get_group_by_payload(group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2029,7 +2012,7 @@ class TestGroupBy:
         assert response.status_code == 422, f"topk without group_by should be rejected, got {response.status_code}"
         print(f"\n[topk_requires_group_by] topk without group_by correctly rejected")
 
-    def test_topk_with_group_by_works(self, sync_client, seeded_data):
+    def test_topk_with_group_by_works(self, sync_client, analytics_ground_truth):
         """Test that topk with group_by is accepted and returns data."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["topk"] = 1
@@ -2051,7 +2034,7 @@ class TestGroupBy:
         assert response.status_code == 422, f"topk with filters should be rejected, got {response.status_code}"
         print(f"\n[topk_filters] topk + filters correctly rejected")
 
-    def test_topk_returns_data(self, sync_client, seeded_data):
+    def test_topk_returns_data(self, sync_client, analytics_ground_truth):
         """Test that topk returns valid grouped data."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["topk"] = 1
@@ -2066,7 +2049,7 @@ class TestGroupBy:
 
     # ==================== Interaction with Other Parameters ====================
 
-    def test_group_by_with_filters(self, sync_client, seeded_data):
+    def test_group_by_with_filters(self, sync_client, analytics_ground_truth):
         """Test that group_by works with filters."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["filters"] = {"project": str(TEST_PROJECT_ID)}
@@ -2079,7 +2062,7 @@ class TestGroupBy:
         assert total == 5, f"Filtered group_by should return 5 records, got {total}"
         print(f"\n[group_by_filters] group_by + filters works, returns {total} records")
 
-    def test_group_by_with_frequency_interval(self, sync_client, seeded_data):
+    def test_group_by_with_frequency_interval(self, sync_client, analytics_ground_truth):
         """Test that group_by works with custom frequency_interval."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["frequency_unit"] = "hour"
@@ -2089,10 +2072,10 @@ class TestGroupBy:
         data = response.json()
 
         total = self._sum_request_counts(data)
-        assert total == seeded_data["total_count"], f"Total should be {seeded_data['total_count']}, got {total}"
+        assert total == analytics_ground_truth["total_count"], f"Total should be {analytics_ground_truth['total_count']}, got {total}"
         print(f"\n[group_by_interval] group_by + frequency_interval works")
 
-    def test_group_by_with_fill_time_gaps(self, sync_client, seeded_data):
+    def test_group_by_with_fill_time_gaps(self, sync_client, analytics_ground_truth):
         """Test that group_by with fill_time_gaps doesn't create zero-UUID rows."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["fill_time_gaps"] = True
@@ -2109,7 +2092,7 @@ class TestGroupBy:
                     assert str(model_id) != zero_uuid, "Should not have zero-UUID items"
         print(f"\n[group_by_gaps] group_by + fill_time_gaps works, no zero-UUID rows")
 
-    def test_group_by_with_return_delta(self, sync_client, seeded_data):
+    def test_group_by_with_return_delta(self, sync_client, analytics_ground_truth):
         """Test that group_by works with return_delta."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["return_delta"] = True
@@ -2120,7 +2103,7 @@ class TestGroupBy:
         print(f"\n[group_by_delta] group_by + return_delta works")
 
     @pytest.mark.parametrize("frequency_unit", ["hour", "day", "week", "month", "quarter", "year"])
-    def test_group_by_with_all_frequency_units(self, sync_client, seeded_data, frequency_unit):
+    def test_group_by_with_all_frequency_units(self, sync_client, analytics_ground_truth, frequency_unit):
         """Test that group_by works with all frequency_unit values."""
         payload = self._get_group_by_payload(group_by=["model"])
         payload["frequency_unit"] = frequency_unit
@@ -2131,7 +2114,7 @@ class TestGroupBy:
 
     # ==================== Response Structure Tests ====================
 
-    def test_group_by_response_has_multiple_items(self, sync_client, seeded_data):
+    def test_group_by_response_has_multiple_items(self, sync_client, analytics_ground_truth):
         """Test that group_by response has multiple items per period."""
         payload = self._get_group_by_payload(group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2149,7 +2132,7 @@ class TestGroupBy:
         assert has_multiple, "group_by should result in multiple items per period"
         print(f"\n[response_multiple] Response has multiple items per period")
 
-    def test_group_by_each_item_has_data(self, sync_client, seeded_data):
+    def test_group_by_each_item_has_data(self, sync_client, analytics_ground_truth):
         """Test that each item in grouped response has the data field with metrics."""
         payload = self._get_group_by_payload(group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2162,7 +2145,7 @@ class TestGroupBy:
                 assert "request_count" in item["data"], "Each item should have request_count metric"
         print(f"\n[response_data] Each item has data field with metrics")
 
-    def test_no_group_by_single_item(self, sync_client, seeded_data):
+    def test_no_group_by_single_item(self, sync_client, analytics_ground_truth):
         """Test that without group_by, each period has a single item."""
         payload = self._get_group_by_payload()  # No group_by
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2207,7 +2190,7 @@ class TestReturnDelta:
 
     # ==================== Default Behavior Tests ====================
 
-    def test_return_delta_default_is_true(self, sync_client, seeded_data):
+    def test_return_delta_default_is_true(self, sync_client, analytics_ground_truth):
         """Test that return_delta defaults to True (delta fields are populated)."""
         # Omit return_delta from payload
         payload = self._get_delta_payload()
@@ -2227,7 +2210,7 @@ class TestReturnDelta:
         assert second_period.get("delta") is not None, "Delta should be populated by default"
         print(f"\n[default_true] Default return_delta=True verified, delta={second_period.get('delta')}")
 
-    def test_return_delta_explicit_true(self, sync_client, seeded_data):
+    def test_return_delta_explicit_true(self, sync_client, analytics_ground_truth):
         """Test that explicit return_delta=True includes delta fields."""
         payload = self._get_delta_payload(return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2241,7 +2224,7 @@ class TestReturnDelta:
         assert "delta" in second_period, "Explicit True should include delta"
         print(f"\n[explicit_true] return_delta=True verified, delta={second_period.get('delta')}")
 
-    def test_return_delta_explicit_false(self, sync_client, seeded_data):
+    def test_return_delta_explicit_false(self, sync_client, analytics_ground_truth):
         """Test that return_delta=False leaves delta fields as None."""
         payload = self._get_delta_payload(return_delta=False)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2259,7 +2242,7 @@ class TestReturnDelta:
 
     # ==================== Response Structure Tests ====================
 
-    def test_delta_fields_present_request_count(self, sync_client, seeded_data):
+    def test_delta_fields_present_request_count(self, sync_client, analytics_ground_truth):
         """Test delta fields are present and populated for request_count metric."""
         payload = self._get_delta_payload(metrics=["request_count"], return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2277,7 +2260,7 @@ class TestReturnDelta:
         assert second.get("delta") is not None, "Delta should be populated"
         print(f"\n[delta_request_count] delta fields present: delta={second['delta']}")
 
-    def test_delta_fields_present_latency(self, sync_client, seeded_data):
+    def test_delta_fields_present_latency(self, sync_client, analytics_ground_truth):
         """Test delta fields are present for latency metric."""
         payload = self._get_delta_payload(metrics=["latency"], return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2293,7 +2276,7 @@ class TestReturnDelta:
         else:
             print(f"\n[delta_latency] Only {len(periods)} period(s), delta logic valid")
 
-    def test_delta_fields_present_throughput(self, sync_client, seeded_data):
+    def test_delta_fields_present_throughput(self, sync_client, analytics_ground_truth):
         """Test delta fields are present for throughput metric."""
         payload = self._get_delta_payload(metrics=["throughput"], return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2309,7 +2292,7 @@ class TestReturnDelta:
         else:
             print(f"\n[delta_throughput] Only {len(periods)} period(s), delta logic valid")
 
-    def test_no_delta_fields_when_false(self, sync_client, seeded_data):
+    def test_no_delta_fields_when_false(self, sync_client, analytics_ground_truth):
         """Test that delta fields are None when return_delta=False."""
         payload = self._get_delta_payload(
             metrics=["request_count", "latency", "throughput"],
@@ -2329,7 +2312,7 @@ class TestReturnDelta:
 
     # ==================== Delta Calculation Accuracy Tests ====================
 
-    def test_delta_calculation_first_period(self, sync_client, seeded_data):
+    def test_delta_calculation_first_period(self, sync_client, analytics_ground_truth):
         """Test that first period (chronologically) has delta=0."""
         payload = self._get_delta_payload(return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2344,7 +2327,7 @@ class TestReturnDelta:
         assert first.get("delta") == 0, f"First period should have delta=0, got {first.get('delta')}"
         print(f"\n[first_period_delta] First period delta=0 verified")
 
-    def test_delta_calculation_second_period(self, sync_client, seeded_data):
+    def test_delta_calculation_second_period(self, sync_client, analytics_ground_truth):
         """Test that second period has correct delta = current - previous."""
         payload = self._get_delta_payload(return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2366,7 +2349,7 @@ class TestReturnDelta:
             f"Delta should be {expected_delta} ({second_count} - {first_count}), got {second.get('delta')}"
         print(f"\n[second_period_delta] Delta={second['delta']} verified ({second_count} - {first_count})")
 
-    def test_delta_percent_calculation(self, sync_client, seeded_data):
+    def test_delta_percent_calculation(self, sync_client, analytics_ground_truth):
         """Test that delta_percent is calculated correctly."""
         payload = self._get_delta_payload(return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2390,7 +2373,7 @@ class TestReturnDelta:
         else:
             print(f"\n[delta_percent] First period count=0, delta_percent calculation skipped")
 
-    def test_delta_based_on_prior_period(self, sync_client, seeded_data):
+    def test_delta_based_on_prior_period(self, sync_client, analytics_ground_truth):
         """Test that delta is correctly based on prior period's value."""
         payload = self._get_delta_payload(return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2415,7 +2398,7 @@ class TestReturnDelta:
 
     # ==================== Delta with Group By Tests ====================
 
-    def test_delta_per_group_model(self, sync_client, seeded_data):
+    def test_delta_per_group_model(self, sync_client, analytics_ground_truth):
         """Test delta is calculated per model group."""
         payload = self._get_delta_payload(
             group_by=["model"],
@@ -2427,7 +2410,7 @@ class TestReturnDelta:
         assert data["object"] == "observability_metrics"
         print(f"\n[delta_group_model] group_by=['model'] with delta works")
 
-    def test_delta_per_group_project(self, sync_client, seeded_data):
+    def test_delta_per_group_project(self, sync_client, analytics_ground_truth):
         """Test delta is calculated per project group."""
         payload = self._get_delta_payload(
             group_by=["project"],
@@ -2439,7 +2422,7 @@ class TestReturnDelta:
         assert data["object"] == "observability_metrics"
         print(f"\n[delta_group_project] group_by=['project'] with delta works")
 
-    def test_delta_isolated_between_groups(self, sync_client, seeded_data):
+    def test_delta_isolated_between_groups(self, sync_client, analytics_ground_truth):
         """Test that delta is calculated independently per group."""
         payload = self._get_delta_payload(
             group_by=["user_project"],
@@ -2456,7 +2439,7 @@ class TestReturnDelta:
 
     # ==================== Delta with Different Frequency Units ====================
 
-    def test_delta_with_hour_frequency(self, sync_client, seeded_data):
+    def test_delta_with_hour_frequency(self, sync_client, analytics_ground_truth):
         """Test delta calculation with hourly frequency."""
         payload = self._get_delta_payload(frequency_unit="hour", return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2468,7 +2451,7 @@ class TestReturnDelta:
         assert len(periods) >= 2, f"Hourly should have multiple periods, got {len(periods)}"
         print(f"\n[delta_hour] Hourly frequency returns {len(periods)} periods with delta")
 
-    def test_delta_with_day_frequency(self, sync_client, seeded_data):
+    def test_delta_with_day_frequency(self, sync_client, analytics_ground_truth):
         """Test delta calculation with daily frequency (single bucket for our data)."""
         payload = self._get_delta_payload(frequency_unit="day", return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2484,7 +2467,7 @@ class TestReturnDelta:
             assert periods[0].get("delta") == 0, "Single period delta should be 0"
         print(f"\n[delta_day] Daily frequency returns {len(periods)} period(s)")
 
-    def test_delta_with_week_frequency(self, sync_client, seeded_data):
+    def test_delta_with_week_frequency(self, sync_client, analytics_ground_truth):
         """Test delta calculation with weekly frequency."""
         payload = self._get_delta_payload(frequency_unit="week", return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2498,7 +2481,7 @@ class TestReturnDelta:
 
     # ==================== Delta with Frequency Interval ====================
 
-    def test_delta_with_custom_interval(self, sync_client, seeded_data):
+    def test_delta_with_custom_interval(self, sync_client, analytics_ground_truth):
         """Test delta with custom 2-hour interval."""
         payload = self._get_delta_payload(
             frequency_unit="hour",
@@ -2513,7 +2496,7 @@ class TestReturnDelta:
         assert len(periods) >= 1, "Should have at least 1 period with 2-hour interval"
         print(f"\n[delta_custom_interval] 2-hour interval returns {len(periods)} period(s)")
 
-    def test_delta_aggregates_correctly_with_interval(self, sync_client, seeded_data):
+    def test_delta_aggregates_correctly_with_interval(self, sync_client, analytics_ground_truth):
         """Test that delta is accurate for aggregated custom intervals."""
         payload = self._get_delta_payload(
             frequency_unit="hour",
@@ -2536,7 +2519,7 @@ class TestReturnDelta:
 
     # ==================== Edge Cases ====================
 
-    def test_delta_single_period(self, sync_client, seeded_data):
+    def test_delta_single_period(self, sync_client, analytics_ground_truth):
         """Test delta when only one time period exists."""
         payload = self._get_delta_payload(frequency_unit="day", return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2550,7 +2533,7 @@ class TestReturnDelta:
             assert first.get("delta") == 0, f"Single period delta should be 0, got {first.get('delta')}"
         print(f"\n[delta_single] Single period delta=0 verified")
 
-    def test_delta_with_fill_time_gaps(self, sync_client, seeded_data):
+    def test_delta_with_fill_time_gaps(self, sync_client, analytics_ground_truth):
         """Test delta behavior with gap-filled periods."""
         payload = self._get_delta_payload(
             frequency_unit="hour",
@@ -2569,7 +2552,7 @@ class TestReturnDelta:
         zero_count_periods = [p for p in periods if p.get("count") == 0]
         print(f"\n[delta_gap_fill] {len(periods)} periods, {len(zero_count_periods)} with count=0")
 
-    def test_delta_with_zero_prior_period(self, sync_client, seeded_data):
+    def test_delta_with_zero_prior_period(self, sync_client, analytics_ground_truth):
         """Test delta_percent behavior when prior period has count=0."""
         payload = self._get_delta_payload(
             frequency_unit="hour",
@@ -2595,7 +2578,7 @@ class TestReturnDelta:
         else:
             print(f"\n[delta_zero_prior] No period following a zero-count found (expected for this data)")
 
-    def test_delta_multiple_metrics(self, sync_client, seeded_data):
+    def test_delta_multiple_metrics(self, sync_client, analytics_ground_truth):
         """Test that multiple metrics each have their own delta fields."""
         payload = self._get_delta_payload(
             metrics=["request_count", "input_token", "output_token"],
@@ -2645,7 +2628,7 @@ class TestFillTimeGaps:
 
     # ==================== Default Behavior Tests ====================
 
-    def test_fill_time_gaps_default_is_true(self, sync_client, seeded_data):
+    def test_fill_time_gaps_default_is_true(self, sync_client, analytics_ground_truth):
         """Test that fill_time_gaps defaults to True."""
         # Omit fill_time_gaps from payload
         payload = self._get_fill_gaps_payload()
@@ -2658,7 +2641,7 @@ class TestFillTimeGaps:
         assert len(periods) >= 1, "Should have at least 1 period"
         print(f"\n[default_true] Default fill_time_gaps returns {len(periods)} periods")
 
-    def test_fill_time_gaps_explicit_true(self, sync_client, seeded_data):
+    def test_fill_time_gaps_explicit_true(self, sync_client, analytics_ground_truth):
         """Test that explicit fill_time_gaps=True fills gaps between data points."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2669,7 +2652,7 @@ class TestFillTimeGaps:
         assert len(periods) >= 1, "Should have periods with gaps filled"
         print(f"\n[explicit_true] fill_time_gaps=True returns {len(periods)} periods")
 
-    def test_fill_time_gaps_explicit_false(self, sync_client, seeded_data):
+    def test_fill_time_gaps_explicit_false(self, sync_client, analytics_ground_truth):
         """Test that fill_time_gaps=False returns only periods with actual data."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=False)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2684,7 +2667,7 @@ class TestFillTimeGaps:
             assert count > 0, f"With fill_time_gaps=False, all periods should have data: {period}"
         print(f"\n[explicit_false] fill_time_gaps=False returns {len(periods)} periods (all with data)")
 
-    def test_fill_time_gaps_true_matches_full_range(self, sync_client, seeded_data):
+    def test_fill_time_gaps_true_matches_full_range(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=True returns periods for the full date range."""
         payload = self._get_fill_gaps_payload(
             frequency_unit="hour",
@@ -2706,7 +2689,7 @@ class TestFillTimeGaps:
             f"fill_time_gaps=True should return {expected_hours} periods, got {len(periods)}"
         print(f"\n[true_full_range] fill_time_gaps=True returns {len(periods)} periods (expected {expected_hours})")
 
-    def test_fill_time_gaps_false_matches_actual_data_periods(self, sync_client, seeded_data):
+    def test_fill_time_gaps_false_matches_actual_data_periods(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=False returns only periods with actual data from DB."""
         # First, get all periods with fill_time_gaps=True to count actual data periods
         payload_true = self._get_fill_gaps_payload(
@@ -2736,7 +2719,7 @@ class TestFillTimeGaps:
 
     # ==================== Comparison Tests ====================
 
-    def test_fill_gaps_true_vs_false_period_count(self, sync_client, seeded_data):
+    def test_fill_gaps_true_vs_false_period_count(self, sync_client, analytics_ground_truth):
         """Test that fill_time_gaps=True returns more or equal periods than False."""
         payload_true = self._get_fill_gaps_payload(fill_time_gaps=True)
         payload_false = self._get_fill_gaps_payload(fill_time_gaps=False)
@@ -2755,7 +2738,7 @@ class TestFillTimeGaps:
             f"True ({len(periods_true)}) should have >= periods than False ({len(periods_false)})"
         print(f"\n[true_vs_false] True={len(periods_true)} periods, False={len(periods_false)} periods")
 
-    def test_fill_gaps_false_subset_of_true(self, sync_client, seeded_data):
+    def test_fill_gaps_false_subset_of_true(self, sync_client, analytics_ground_truth):
         """Test that periods from fill_time_gaps=False are a subset of True."""
         payload_true = self._get_fill_gaps_payload(fill_time_gaps=True)
         payload_false = self._get_fill_gaps_payload(fill_time_gaps=False)
@@ -2780,7 +2763,7 @@ class TestFillTimeGaps:
 
     # ==================== Zero Count Tests ====================
 
-    def test_fill_gaps_true_has_zero_count_periods(self, sync_client, seeded_data):
+    def test_fill_gaps_true_has_zero_count_periods(self, sync_client, analytics_ground_truth):
         """Test that fill_time_gaps=True includes periods with count=0."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2793,7 +2776,7 @@ class TestFillTimeGaps:
         # Should have some zero-count periods (filled gaps)
         print(f"\n[zero_count_true] {len(zero_count_periods)} periods with count=0 out of {len(periods)}")
 
-    def test_fill_gaps_false_no_zero_count_periods(self, sync_client, seeded_data):
+    def test_fill_gaps_false_no_zero_count_periods(self, sync_client, analytics_ground_truth):
         """Test that fill_time_gaps=False has no periods with count=0."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=False)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2809,7 +2792,7 @@ class TestFillTimeGaps:
 
     # ==================== Frequency Unit Tests ====================
 
-    def test_fill_gaps_with_hour_frequency(self, sync_client, seeded_data):
+    def test_fill_gaps_with_hour_frequency(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with hourly frequency."""
         payload_true = self._get_fill_gaps_payload(frequency_unit="hour", fill_time_gaps=True)
         payload_false = self._get_fill_gaps_payload(frequency_unit="hour", fill_time_gaps=False)
@@ -2825,7 +2808,7 @@ class TestFillTimeGaps:
 
         print(f"\n[hour_freq] Hourly: True={periods_true}, False={periods_false}")
 
-    def test_fill_gaps_with_day_frequency(self, sync_client, seeded_data):
+    def test_fill_gaps_with_day_frequency(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with daily frequency."""
         payload_true = self._get_fill_gaps_payload(frequency_unit="day", fill_time_gaps=True)
         payload_false = self._get_fill_gaps_payload(frequency_unit="day", fill_time_gaps=False)
@@ -2842,7 +2825,7 @@ class TestFillTimeGaps:
         # For single-day data, both should return 1 period
         print(f"\n[day_freq] Daily: True={periods_true}, False={periods_false}")
 
-    def test_fill_gaps_with_week_frequency(self, sync_client, seeded_data):
+    def test_fill_gaps_with_week_frequency(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with weekly frequency."""
         payload_true = self._get_fill_gaps_payload(frequency_unit="week", fill_time_gaps=True)
         payload_false = self._get_fill_gaps_payload(frequency_unit="week", fill_time_gaps=False)
@@ -2860,7 +2843,7 @@ class TestFillTimeGaps:
 
     # ==================== Metric Type Tests ====================
 
-    def test_fill_gaps_rollup_metric_request_count(self, sync_client, seeded_data):
+    def test_fill_gaps_rollup_metric_request_count(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with rollup metric (request_count)."""
         payload = self._get_fill_gaps_payload(metrics=["request_count"], fill_time_gaps=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2871,7 +2854,7 @@ class TestFillTimeGaps:
         assert len(periods) >= 1, "Should return periods for request_count"
         print(f"\n[rollup_request_count] {len(periods)} periods returned")
 
-    def test_fill_gaps_rollup_metric_input_token(self, sync_client, seeded_data):
+    def test_fill_gaps_rollup_metric_input_token(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with rollup metric (input_token)."""
         payload = self._get_fill_gaps_payload(metrics=["input_token"], fill_time_gaps=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2882,7 +2865,7 @@ class TestFillTimeGaps:
         assert len(periods) >= 1, "Should return periods for input_token"
         print(f"\n[rollup_input_token] {len(periods)} periods returned")
 
-    def test_fill_gaps_raw_metric_latency(self, sync_client, seeded_data):
+    def test_fill_gaps_raw_metric_latency(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with raw data metric (latency)."""
         payload = self._get_fill_gaps_payload(metrics=["latency"], fill_time_gaps=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2893,7 +2876,7 @@ class TestFillTimeGaps:
         assert len(periods) >= 1, "Should return periods for latency"
         print(f"\n[raw_latency] {len(periods)} periods returned")
 
-    def test_fill_gaps_raw_metric_throughput(self, sync_client, seeded_data):
+    def test_fill_gaps_raw_metric_throughput(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with raw data metric (throughput)."""
         payload = self._get_fill_gaps_payload(metrics=["throughput"], fill_time_gaps=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2906,7 +2889,7 @@ class TestFillTimeGaps:
 
     # ==================== Interaction Tests ====================
 
-    def test_fill_gaps_with_return_delta_true(self, sync_client, seeded_data):
+    def test_fill_gaps_with_return_delta_true(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=True combined with return_delta=True."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=True, return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2922,7 +2905,7 @@ class TestFillTimeGaps:
             assert "delta" in second, "Delta field should be present"
         print(f"\n[fill_gaps_delta] fill_time_gaps=True + return_delta=True works")
 
-    def test_fill_gaps_with_return_delta_false(self, sync_client, seeded_data):
+    def test_fill_gaps_with_return_delta_false(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=True combined with return_delta=False."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=True, return_delta=False)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2937,7 +2920,7 @@ class TestFillTimeGaps:
             assert period.get("delta") is None, "Delta should be None when return_delta=False"
         print(f"\n[fill_gaps_no_delta] fill_time_gaps=True + return_delta=False works")
 
-    def test_fill_gaps_false_with_return_delta(self, sync_client, seeded_data):
+    def test_fill_gaps_false_with_return_delta(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=False combined with return_delta=True."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=False, return_delta=True)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2952,7 +2935,7 @@ class TestFillTimeGaps:
 
     # ==================== Group By Tests ====================
 
-    def test_fill_gaps_with_group_by_model(self, sync_client, seeded_data):
+    def test_fill_gaps_with_group_by_model(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with group_by=['model']."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=True, group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2961,7 +2944,7 @@ class TestFillTimeGaps:
         assert data["object"] == "observability_metrics"
         print(f"\n[fill_gaps_group_model] fill_time_gaps + group_by=['model'] works")
 
-    def test_fill_gaps_with_group_by_project(self, sync_client, seeded_data):
+    def test_fill_gaps_with_group_by_project(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with group_by=['project']."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=True, group_by=["project"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2970,7 +2953,7 @@ class TestFillTimeGaps:
         assert data["object"] == "observability_metrics"
         print(f"\n[fill_gaps_group_project] fill_time_gaps + group_by=['project'] works")
 
-    def test_fill_gaps_false_with_group_by(self, sync_client, seeded_data):
+    def test_fill_gaps_false_with_group_by(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=False with group_by."""
         payload = self._get_fill_gaps_payload(fill_time_gaps=False, group_by=["model"])
         response = sync_client.post("/observability/analytics", json=payload)
@@ -2981,7 +2964,7 @@ class TestFillTimeGaps:
 
     # ==================== Multiple Metrics Tests ====================
 
-    def test_fill_gaps_multiple_metrics(self, sync_client, seeded_data):
+    def test_fill_gaps_multiple_metrics(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps with multiple metrics."""
         payload = self._get_fill_gaps_payload(
             metrics=["request_count", "input_token", "latency"],
@@ -2998,7 +2981,7 @@ class TestFillTimeGaps:
             print(f"  {metric_key}: {len(periods)} periods")
         print(f"\n[fill_gaps_multi] Multiple metrics with fill_time_gaps=True works")
 
-    def test_fill_gaps_false_multiple_metrics(self, sync_client, seeded_data):
+    def test_fill_gaps_false_multiple_metrics(self, sync_client, analytics_ground_truth):
         """Test fill_time_gaps=False with multiple metrics."""
         payload = self._get_fill_gaps_payload(
             metrics=["request_count", "input_token"],
@@ -3075,7 +3058,7 @@ class TestTopK:
         assert response.status_code == 422, f"topk=-1 should be rejected, got {response.status_code}"
         print("\n[topk_negative] Negative topk correctly rejected")
 
-    def test_topk_minimum_value(self, sync_client, seeded_data):
+    def test_topk_minimum_value(self, sync_client, analytics_ground_truth):
         """Test that topk=1 returns exactly 1 group."""
         payload = self._get_topk_payload(group_by=["model"], topk=1)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -3088,7 +3071,7 @@ class TestTopK:
 
     # ==================== Ranking Accuracy Tests ====================
 
-    def test_topk_returns_highest_count_groups(self, sync_client, seeded_data):
+    def test_topk_returns_highest_count_groups(self, sync_client, analytics_ground_truth):
         """Test that topk returns groups with highest request_count."""
         # First, get all groups without topk
         payload_all = self._get_topk_payload(group_by=["model"])
@@ -3119,7 +3102,7 @@ class TestTopK:
             f"topk should return highest count model ({highest_model}), got {topk_model}"
         print(f"\n[topk_highest] topk correctly returns highest count model")
 
-    def test_topk_1_returns_single_highest_group(self, sync_client, seeded_data):
+    def test_topk_1_returns_single_highest_group(self, sync_client, analytics_ground_truth):
         """Test that topk=1 returns the single group with most requests."""
         payload = self._get_topk_payload(group_by=["model"], topk=1)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -3133,7 +3116,7 @@ class TestTopK:
 
     # ==================== TopK Limit Behavior Tests ====================
 
-    def test_topk_exceeds_group_count(self, sync_client, seeded_data):
+    def test_topk_exceeds_group_count(self, sync_client, analytics_ground_truth):
         """Test when topk exceeds actual group count, all groups returned."""
         # First, count actual groups
         payload_all = self._get_topk_payload(group_by=["model"])
@@ -3157,7 +3140,7 @@ class TestTopK:
             f"topk=100 should return all {actual_count} groups, got {len(topk_models)}"
         print(f"\n[topk_exceeds] topk exceeding count returns all {actual_count} groups")
 
-    def test_topk_limits_to_exact_count(self, sync_client, seeded_data):
+    def test_topk_limits_to_exact_count(self, sync_client, analytics_ground_truth):
         """Test that topk returns exactly the specified number of groups."""
         # First, check how many groups exist
         payload_all = self._get_topk_payload(group_by=["model"])
@@ -3184,7 +3167,7 @@ class TestTopK:
 
     # ==================== Multi-Group Tests ====================
 
-    def test_topk_with_single_group_by(self, sync_client, seeded_data):
+    def test_topk_with_single_group_by(self, sync_client, analytics_ground_truth):
         """Test topk works with single group_by field."""
         payload = self._get_topk_payload(group_by=["model"], topk=1)
         response = sync_client.post("/observability/analytics", json=payload)
@@ -3196,7 +3179,7 @@ class TestTopK:
         assert len(unique_models) > 0, "Single group_by should return items with model_id"
         print("\n[topk_single_group] topk works with single group_by")
 
-    def test_topk_with_multiple_group_by(self, sync_client, seeded_data):
+    def test_topk_with_multiple_group_by(self, sync_client, analytics_ground_truth):
         """Test topk works with multiple group_by fields."""
         payload = self._get_topk_payload(group_by=["model", "project"], topk=1)
         response = sync_client.post("/observability/analytics", json=payload)

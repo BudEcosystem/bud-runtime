@@ -9,10 +9,7 @@ Run with: pytest tests/observability/test_gateway_top_routes.py -v -s
 """
 
 import asyncio
-import subprocess
-import sys
 from datetime import datetime
-from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -86,27 +83,13 @@ async def _fetch_top_routes_ground_truth():
 
 
 @pytest.fixture(scope="session")
-def seeded_routes_data():
-    """Seed test data and return ground truth from InferenceFact."""
-    # 1. Clear and seed data
-    seeder_path = Path(__file__).parent.parent / "seed_otel_traces.py"
-    result = subprocess.run(
-        [sys.executable, str(seeder_path), "--clear", "--verify"],
-        capture_output=True,
-        text=True,
-        cwd=str(seeder_path.parent.parent.parent),
-    )
-    if result.returncode != 0:
-        pytest.skip(f"Failed to seed test data: {result.stderr}")
-
-    # 2. Query InferenceFact for ground truth values
+def routes_ground_truth(seed_test_data):
+    """Fetch ground truth from InferenceFact (seeding done by shared fixture)."""
     loop = asyncio.new_event_loop()
     try:
-        ground_truth = loop.run_until_complete(_fetch_top_routes_ground_truth())
+        return loop.run_until_complete(_fetch_top_routes_ground_truth())
     finally:
         loop.close()
-
-    return ground_truth
 
 
 def get_base_url(**kwargs) -> str:
@@ -125,10 +108,11 @@ def get_base_url(**kwargs) -> str:
     return base
 
 
+@pytest.mark.usefixtures("seed_test_data")
 class TestBasicRequests:
     """Basic request tests for /observability/gateway/top-routes."""
 
-    def test_basic_request_minimal(self, sync_client, seeded_routes_data):
+    def test_basic_request_minimal(self, sync_client):
         """Test minimal request with only from_date."""
         url = get_base_url()
         response = sync_client.get(url)
@@ -138,7 +122,7 @@ class TestBasicRequests:
         assert isinstance(data["routes"], list)
         print(f"\n[basic_minimal] Got {len(data['routes'])} routes")
 
-    def test_basic_request_with_date_range(self, sync_client, seeded_routes_data):
+    def test_basic_request_with_date_range(self, sync_client):
         """Test request with from_date and to_date."""
         url = get_base_url(to_date=TEST_TO_DATE.isoformat())
         response = sync_client.get(url)
@@ -147,7 +131,7 @@ class TestBasicRequests:
         assert "routes" in data
         print(f"\n[basic_date_range] Got {len(data['routes'])} routes")
 
-    def test_response_structure(self, sync_client, seeded_routes_data):
+    def test_response_structure(self, sync_client):
         """Test that response has all expected fields."""
         url = get_base_url(limit=1)
         response = sync_client.get(url)
@@ -170,7 +154,8 @@ class TestBasicRequests:
 class TestLimit:
     """Limit parameter tests."""
 
-    def test_default_limit_10(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_default_limit_10(self, sync_client):
         """Test default limit returns up to 10 routes."""
         url = get_base_url()
         response = sync_client.get(url)
@@ -180,7 +165,8 @@ class TestLimit:
         assert len(data["routes"]) <= 10
         print(f"\n[default_limit] Got {len(data['routes'])} routes (default limit 10)")
 
-    def test_custom_limit_5(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_custom_limit_5(self, sync_client):
         """Test limit=5 returns up to 5 routes."""
         url = get_base_url(limit=5)
         response = sync_client.get(url)
@@ -189,7 +175,8 @@ class TestLimit:
         assert len(data["routes"]) <= 5
         print(f"\n[limit_5] Got {len(data['routes'])} routes")
 
-    def test_custom_limit_20(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_custom_limit_20(self, sync_client):
         """Test limit=20 returns up to 20 routes."""
         url = get_base_url(limit=20)
         response = sync_client.get(url)
@@ -198,14 +185,14 @@ class TestLimit:
         assert len(data["routes"]) <= 20
         print(f"\n[limit_20] Got {len(data['routes'])} routes")
 
-    def test_limit_1(self, sync_client, seeded_routes_data):
+    def test_limit_1(self, sync_client, routes_ground_truth):
         """Test limit=1 returns exactly 1 route if data exists."""
         url = get_base_url(limit=1)
         response = sync_client.get(url)
         assert response.status_code == 200
         data = response.json()
 
-        if seeded_routes_data["total_route_count"] > 0:
+        if routes_ground_truth["total_route_count"] > 0:
             assert len(data["routes"]) == 1
         else:
             assert len(data["routes"]) == 0
@@ -215,7 +202,7 @@ class TestLimit:
 class TestFilters:
     """Filter tests."""
 
-    def test_filter_by_project_id(self, sync_client, seeded_routes_data):
+    def test_filter_by_project_id(self, sync_client, routes_ground_truth):
         """Test filtering by project_id."""
         url = get_base_url(
             to_date=TEST_TO_DATE.isoformat(),
@@ -225,12 +212,13 @@ class TestFilters:
         assert response.status_code == 200
         data = response.json()
 
-        expected_count = seeded_routes_data["project_route_count"]
+        expected_count = routes_ground_truth["project_route_count"]
         assert len(data["routes"]) <= expected_count, \
             f"Got more routes than expected: {len(data['routes'])} > {expected_count}"
         print(f"\n[filter_project] Got {len(data['routes'])} routes for project")
 
-    def test_filter_combined_all_params(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_filter_combined_all_params(self, sync_client):
         """Test combining all parameters."""
         url = get_base_url(
             to_date=TEST_TO_DATE.isoformat(),
@@ -275,7 +263,8 @@ class TestValidation:
 class TestDataAccuracy:
     """Data accuracy tests comparing API response with DB."""
 
-    def test_routes_sorted_by_count_desc(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_routes_sorted_by_count_desc(self, sync_client):
         """Test that routes are sorted by count descending."""
         url = get_base_url(to_date=TEST_TO_DATE.isoformat(), limit=20)
         response = sync_client.get(url)
@@ -286,16 +275,16 @@ class TestDataAccuracy:
             counts = [route["count"] for route in data["routes"]]
             assert counts == sorted(counts, reverse=True), \
                 f"Routes not sorted by count desc: {counts}"
-        print(f"\n[accuracy] Routes sorted correctly by count desc")
+        print("\n[accuracy] Routes sorted correctly by count desc")
 
-    def test_routes_count_matches_db(self, sync_client, seeded_routes_data):
+    def test_routes_count_matches_db(self, sync_client, routes_ground_truth):
         """Test that route counts match database."""
         url = get_base_url(to_date=TEST_TO_DATE.isoformat(), limit=20)
         response = sync_client.get(url)
         assert response.status_code == 200
         data = response.json()
 
-        db_routes = seeded_routes_data["routes"]
+        db_routes = routes_ground_truth["routes"]
         if db_routes and data["routes"]:
             # Compare first route's count
             api_first = data["routes"][0]
@@ -306,9 +295,10 @@ class TestDataAccuracy:
                 f"Path mismatch: API={api_first['path']}, DB={db_first['path']}"
             assert api_first["count"] == db_first["count"], \
                 f"Count mismatch: API={api_first['count']}, DB={db_first['count']}"
-        print(f"\n[accuracy] Route counts match DB")
+        print("\n[accuracy] Route counts match DB")
 
-    def test_error_rate_is_percentage(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_error_rate_is_percentage(self, sync_client):
         """Test that error_rate is a valid percentage (0-100)."""
         url = get_base_url(to_date=TEST_TO_DATE.isoformat())
         response = sync_client.get(url)
@@ -319,9 +309,10 @@ class TestDataAccuracy:
             error_rate = route["error_rate"]
             assert 0 <= error_rate <= 100, \
                 f"error_rate {error_rate} is not a valid percentage for path={route['path']}"
-        print(f"\n[accuracy] All error_rate values are valid percentages")
+        print("\n[accuracy] All error_rate values are valid percentages")
 
-    def test_avg_response_time_non_negative(self, sync_client, seeded_routes_data):
+    @pytest.mark.usefixtures("seed_test_data")
+    def test_avg_response_time_non_negative(self, sync_client):
         """Test that avg_response_time is non-negative."""
         url = get_base_url(to_date=TEST_TO_DATE.isoformat())
         response = sync_client.get(url)
@@ -332,7 +323,7 @@ class TestDataAccuracy:
             avg_time = route["avg_response_time"]
             assert avg_time >= 0, \
                 f"avg_response_time {avg_time} is negative for path={route['path']}"
-        print(f"\n[accuracy] All avg_response_time values are non-negative")
+        print("\n[accuracy] All avg_response_time values are non-negative")
 
 
 # pytest tests/observability/test_gateway_top_routes.py -v -s

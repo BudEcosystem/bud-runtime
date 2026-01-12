@@ -9,10 +9,7 @@ Run with: pytest tests/observability/test_inferences_list.py -v -s
 """
 
 import asyncio
-import subprocess
-import sys
 from datetime import datetime
-from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -126,27 +123,13 @@ async def _fetch_inference_ground_truth():
 
 
 @pytest.fixture(scope="session")
-def seeded_inference_data():
-    """Seed test data and return ground truth from InferenceFact."""
-    # 1. Clear and seed data
-    seeder_path = Path(__file__).parent.parent / "seed_otel_traces.py"
-    result = subprocess.run(
-        [sys.executable, str(seeder_path), "--clear", "--verify"],
-        capture_output=True,
-        text=True,
-        cwd=str(seeder_path.parent.parent.parent),
-    )
-    if result.returncode != 0:
-        pytest.skip(f"Failed to seed test data: {result.stderr}")
-
-    # 2. Query InferenceFact for ground truth values
+def inference_ground_truth(seed_test_data):
+    """Fetch ground truth from InferenceFact (seeding done by shared fixture)."""
     loop = asyncio.new_event_loop()
     try:
-        ground_truth = loop.run_until_complete(_fetch_inference_ground_truth())
+        return loop.run_until_complete(_fetch_inference_ground_truth())
     finally:
         loop.close()
-
-    return ground_truth
 
 
 def get_base_payload(**kwargs) -> dict:
@@ -162,7 +145,7 @@ def get_base_payload(**kwargs) -> dict:
 class TestBasicRequests:
     """Basic request tests for /observability/inferences/list."""
 
-    def test_basic_request_minimal(self, sync_client, seeded_inference_data):
+    def test_basic_request_minimal(self, sync_client, inference_ground_truth):
         """Test minimal request with only from_date."""
         payload = {"from_date": TEST_FROM_DATE.isoformat()}
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -173,7 +156,7 @@ class TestBasicRequests:
         assert "total_count" in data
         print(f"\n[basic_minimal] Got {len(data['items'])} items, total_count={data['total_count']}")
 
-    def test_basic_request_with_date_range(self, sync_client, seeded_inference_data):
+    def test_basic_request_with_date_range(self, sync_client, inference_ground_truth):
         """Test request with from_date and to_date."""
         payload = get_base_payload()
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -183,7 +166,7 @@ class TestBasicRequests:
         assert data["total_count"] >= 0
         print(f"\n[basic_date_range] Got {len(data['items'])} items")
 
-    def test_response_structure(self, sync_client, seeded_inference_data):
+    def test_response_structure(self, sync_client, inference_ground_truth):
         """Test that response has all expected fields."""
         payload = get_base_payload(limit=1)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -215,7 +198,7 @@ class TestBasicRequests:
 class TestPagination:
     """Pagination tests."""
 
-    def test_pagination_first_page(self, sync_client, seeded_inference_data):
+    def test_pagination_first_page(self, sync_client, inference_ground_truth):
         """Test first page with offset=0, limit=5."""
         payload = get_base_payload(offset=0, limit=5)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -226,7 +209,7 @@ class TestPagination:
         assert len(data["items"]) <= 5
         print(f"\n[pagination_first] Got {len(data['items'])} items")
 
-    def test_pagination_second_page(self, sync_client, seeded_inference_data):
+    def test_pagination_second_page(self, sync_client, inference_ground_truth):
         """Test second page with offset=5, limit=5."""
         payload = get_base_payload(offset=5, limit=5)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -236,9 +219,9 @@ class TestPagination:
         assert data["limit"] == 5
         print(f"\n[pagination_second] Got {len(data['items'])} items at offset 5")
 
-    def test_pagination_has_more_true(self, sync_client, seeded_inference_data):
+    def test_pagination_has_more_true(self, sync_client, inference_ground_truth):
         """Test has_more=true when more data exists."""
-        total = seeded_inference_data["total_count"]
+        total = inference_ground_truth["total_count"]
         if total <= 1:
             pytest.skip("Need more than 1 record to test has_more")
 
@@ -249,9 +232,9 @@ class TestPagination:
         assert data["has_more"] is True, f"Expected has_more=True when total={total}, got {data['has_more']}"
         print(f"\n[has_more_true] has_more=True with total={total}")
 
-    def test_pagination_has_more_false(self, sync_client, seeded_inference_data):
+    def test_pagination_has_more_false(self, sync_client, inference_ground_truth):
         """Test has_more=false at end of data."""
-        total = seeded_inference_data["total_count"]
+        total = inference_ground_truth["total_count"]
         payload = get_base_payload(offset=0, limit=1000)  # Request more than total
         response = sync_client.post("/observability/inferences/list", json=payload)
         assert response.status_code == 200
@@ -259,13 +242,13 @@ class TestPagination:
         assert data["has_more"] is False, f"Expected has_more=False, got {data['has_more']}"
         print(f"\n[has_more_false] has_more=False when requesting all data")
 
-    def test_pagination_total_count_matches_db(self, sync_client, seeded_inference_data):
+    def test_pagination_total_count_matches_db(self, sync_client, inference_ground_truth):
         """Test that total_count matches database count."""
         payload = get_base_payload()
         response = sync_client.post("/observability/inferences/list", json=payload)
         assert response.status_code == 200
         data = response.json()
-        expected = seeded_inference_data["total_count"]
+        expected = inference_ground_truth["total_count"]
         assert data["total_count"] == expected, \
             f"total_count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[total_count_match] API total_count={data['total_count']} matches DB")
@@ -274,7 +257,7 @@ class TestPagination:
 class TestFilters:
     """Filter tests."""
 
-    def test_filter_by_project_id(self, sync_client, seeded_inference_data):
+    def test_filter_by_project_id(self, sync_client, inference_ground_truth):
         """Test filtering by project_id."""
         payload = get_base_payload(project_id=str(TEST_PROJECT_ID))
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -286,12 +269,12 @@ class TestFilters:
             assert item["project_id"] == str(TEST_PROJECT_ID), \
                 f"Item has wrong project_id: {item['project_id']}"
 
-        expected = seeded_inference_data["project_count"]
+        expected = inference_ground_truth["project_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_project] Got {data['total_count']} items for project")
 
-    def test_filter_by_model_id(self, sync_client, seeded_inference_data):
+    def test_filter_by_model_id(self, sync_client, inference_ground_truth):
         """Test filtering by model_id."""
         payload = get_base_payload(model_id=str(TEST_MODEL_ID))
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -303,12 +286,12 @@ class TestFilters:
             assert item["model_id"] == str(TEST_MODEL_ID), \
                 f"Item has wrong model_id: {item['model_id']}"
 
-        expected = seeded_inference_data["model_count"]
+        expected = inference_ground_truth["model_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_model] Got {data['total_count']} items for model")
 
-    def test_filter_by_endpoint_id(self, sync_client, seeded_inference_data):
+    def test_filter_by_endpoint_id(self, sync_client, inference_ground_truth):
         """Test filtering by endpoint_id."""
         payload = get_base_payload(endpoint_id=str(TEST_ENDPOINT_ID))
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -320,12 +303,12 @@ class TestFilters:
             assert item["endpoint_id"] == str(TEST_ENDPOINT_ID), \
                 f"Item has wrong endpoint_id: {item['endpoint_id']}"
 
-        expected = seeded_inference_data["endpoint_count"]
+        expected = inference_ground_truth["endpoint_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_endpoint] Got {data['total_count']} items for endpoint")
 
-    def test_filter_by_is_success_true(self, sync_client, seeded_inference_data):
+    def test_filter_by_is_success_true(self, sync_client, inference_ground_truth):
         """Test filtering by is_success=true."""
         payload = get_base_payload(is_success=True)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -336,12 +319,12 @@ class TestFilters:
         for item in data["items"]:
             assert item["is_success"] is True, f"Item has is_success={item['is_success']}"
 
-        expected = seeded_inference_data["success_count"]
+        expected = inference_ground_truth["success_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_success] Got {data['total_count']} successful items")
 
-    def test_filter_by_is_success_false(self, sync_client, seeded_inference_data):
+    def test_filter_by_is_success_false(self, sync_client, inference_ground_truth):
         """Test filtering by is_success=false."""
         payload = get_base_payload(is_success=False)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -352,12 +335,12 @@ class TestFilters:
         for item in data["items"]:
             assert item["is_success"] is False, f"Item has is_success={item['is_success']}"
 
-        expected = seeded_inference_data["failure_count"]
+        expected = inference_ground_truth["failure_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_failure] Got {data['total_count']} failed items")
 
-    def test_filter_by_min_tokens(self, sync_client, seeded_inference_data):
+    def test_filter_by_min_tokens(self, sync_client, inference_ground_truth):
         """Test filtering by min_tokens."""
         payload = get_base_payload(min_tokens=50)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -369,12 +352,12 @@ class TestFilters:
             assert item["total_tokens"] >= 50, \
                 f"Item has total_tokens={item['total_tokens']}, expected >= 50"
 
-        expected = seeded_inference_data["min_50_tokens_count"]
+        expected = inference_ground_truth["min_50_tokens_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_min_tokens] Got {data['total_count']} items with >= 50 tokens")
 
-    def test_filter_by_max_tokens(self, sync_client, seeded_inference_data):
+    def test_filter_by_max_tokens(self, sync_client, inference_ground_truth):
         """Test filtering by max_tokens."""
         payload = get_base_payload(max_tokens=100)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -386,12 +369,12 @@ class TestFilters:
             assert item["total_tokens"] <= 100, \
                 f"Item has total_tokens={item['total_tokens']}, expected <= 100"
 
-        expected = seeded_inference_data["max_100_tokens_count"]
+        expected = inference_ground_truth["max_100_tokens_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_max_tokens] Got {data['total_count']} items with <= 100 tokens")
 
-    def test_filter_by_max_latency(self, sync_client, seeded_inference_data):
+    def test_filter_by_max_latency(self, sync_client, inference_ground_truth):
         """Test filtering by max_latency_ms."""
         payload = get_base_payload(max_latency_ms=2000)
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -403,12 +386,12 @@ class TestFilters:
             assert item["response_time_ms"] <= 2000, \
                 f"Item has response_time_ms={item['response_time_ms']}, expected <= 2000"
 
-        expected = seeded_inference_data["max_2000_latency_count"]
+        expected = inference_ground_truth["max_2000_latency_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_latency] Got {data['total_count']} items with <= 2000ms latency")
 
-    def test_filter_by_endpoint_type_chat(self, sync_client, seeded_inference_data):
+    def test_filter_by_endpoint_type_chat(self, sync_client, inference_ground_truth):
         """Test filtering by endpoint_type=chat."""
         payload = get_base_payload(endpoint_type="chat")
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -420,12 +403,12 @@ class TestFilters:
             assert item["endpoint_type"] == "chat", \
                 f"Item has endpoint_type={item['endpoint_type']}, expected 'chat'"
 
-        expected = seeded_inference_data["chat_endpoint_count"]
+        expected = inference_ground_truth["chat_endpoint_count"]
         assert data["total_count"] == expected, \
             f"Count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[filter_endpoint_type] Got {data['total_count']} chat items")
 
-    def test_filter_combined(self, sync_client, seeded_inference_data):
+    def test_filter_combined(self, sync_client, inference_ground_truth):
         """Test combining multiple filters."""
         payload = get_base_payload(
             project_id=str(TEST_PROJECT_ID),
@@ -447,7 +430,7 @@ class TestFilters:
 class TestSorting:
     """Sorting tests."""
 
-    def test_sort_by_timestamp_desc(self, sync_client, seeded_inference_data):
+    def test_sort_by_timestamp_desc(self, sync_client, inference_ground_truth):
         """Test sorting by timestamp descending (default)."""
         payload = get_base_payload(sort_by="timestamp", sort_order="desc")
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -460,7 +443,7 @@ class TestSorting:
             "Items not sorted by timestamp desc"
         print(f"\n[sort_timestamp_desc] Items sorted correctly")
 
-    def test_sort_by_timestamp_asc(self, sync_client, seeded_inference_data):
+    def test_sort_by_timestamp_asc(self, sync_client, inference_ground_truth):
         """Test sorting by timestamp ascending."""
         payload = get_base_payload(sort_by="timestamp", sort_order="asc")
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -473,7 +456,7 @@ class TestSorting:
             "Items not sorted by timestamp asc"
         print(f"\n[sort_timestamp_asc] Items sorted correctly")
 
-    def test_sort_by_latency_desc(self, sync_client, seeded_inference_data):
+    def test_sort_by_latency_desc(self, sync_client, inference_ground_truth):
         """Test sorting by latency descending (slowest first)."""
         payload = get_base_payload(sort_by="latency", sort_order="desc")
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -486,7 +469,7 @@ class TestSorting:
             "Items not sorted by latency desc"
         print(f"\n[sort_latency_desc] Items sorted correctly")
 
-    def test_sort_by_latency_asc(self, sync_client, seeded_inference_data):
+    def test_sort_by_latency_asc(self, sync_client, inference_ground_truth):
         """Test sorting by latency ascending (fastest first).
 
         Note: NULL/0 values may sort last in ClickHouse, so we verify
@@ -505,7 +488,7 @@ class TestSorting:
             f"Non-zero latencies not sorted asc: {non_zero}"
         print(f"\n[sort_latency_asc] Items sorted correctly (non-zero values)")
 
-    def test_sort_by_tokens_desc(self, sync_client, seeded_inference_data):
+    def test_sort_by_tokens_desc(self, sync_client, inference_ground_truth):
         """Test sorting by tokens descending (most tokens first)."""
         payload = get_base_payload(sort_by="tokens", sort_order="desc")
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -518,7 +501,7 @@ class TestSorting:
             "Items not sorted by tokens desc"
         print(f"\n[sort_tokens_desc] Items sorted correctly")
 
-    def test_sort_by_tokens_asc(self, sync_client, seeded_inference_data):
+    def test_sort_by_tokens_asc(self, sync_client, inference_ground_truth):
         """Test sorting by tokens ascending (fewest tokens first).
 
         Note: NULL/0 values may sort last in ClickHouse, so we verify
@@ -537,7 +520,7 @@ class TestSorting:
             f"Non-zero tokens not sorted asc: {non_zero}"
         print(f"\n[sort_tokens_asc] Items sorted correctly (non-zero values)")
 
-    def test_sort_by_cost_desc(self, sync_client, seeded_inference_data):
+    def test_sort_by_cost_desc(self, sync_client, inference_ground_truth):
         """Test sorting by cost descending (most expensive first)."""
         payload = get_base_payload(sort_by="cost", sort_order="desc")
         response = sync_client.post("/observability/inferences/list", json=payload)
@@ -614,50 +597,50 @@ class TestValidation:
 class TestDataAccuracy:
     """Data accuracy tests comparing API response with DB."""
 
-    def test_total_count_matches_db(self, sync_client, seeded_inference_data):
+    def test_total_count_matches_db(self, sync_client, inference_ground_truth):
         """Test that total_count matches database count."""
         payload = get_base_payload()
         response = sync_client.post("/observability/inferences/list", json=payload)
         assert response.status_code == 200
         data = response.json()
 
-        expected = seeded_inference_data["total_count"]
+        expected = inference_ground_truth["total_count"]
         assert data["total_count"] == expected, \
             f"total_count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[accuracy] total_count={data['total_count']} matches DB")
 
-    def test_success_filter_count_matches_db(self, sync_client, seeded_inference_data):
+    def test_success_filter_count_matches_db(self, sync_client, inference_ground_truth):
         """Test that is_success=true count matches DB."""
         payload = get_base_payload(is_success=True)
         response = sync_client.post("/observability/inferences/list", json=payload)
         assert response.status_code == 200
         data = response.json()
 
-        expected = seeded_inference_data["success_count"]
+        expected = inference_ground_truth["success_count"]
         assert data["total_count"] == expected, \
             f"success count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[accuracy] success_count={data['total_count']} matches DB")
 
-    def test_failure_filter_count_matches_db(self, sync_client, seeded_inference_data):
+    def test_failure_filter_count_matches_db(self, sync_client, inference_ground_truth):
         """Test that is_success=false count matches DB."""
         payload = get_base_payload(is_success=False)
         response = sync_client.post("/observability/inferences/list", json=payload)
         assert response.status_code == 200
         data = response.json()
 
-        expected = seeded_inference_data["failure_count"]
+        expected = inference_ground_truth["failure_count"]
         assert data["total_count"] == expected, \
             f"failure count mismatch: API={data['total_count']}, DB={expected}"
         print(f"\n[accuracy] failure_count={data['total_count']} matches DB")
 
-    def test_item_fields_match_db(self, sync_client, seeded_inference_data):
+    def test_item_fields_match_db(self, sync_client, inference_ground_truth):
         """Test that item fields match DB values."""
         payload = get_base_payload(sort_by="timestamp", sort_order="desc", limit=5)
         response = sync_client.post("/observability/inferences/list", json=payload)
         assert response.status_code == 200
         data = response.json()
 
-        sample_inferences = seeded_inference_data["sample_inferences"]
+        sample_inferences = inference_ground_truth["sample_inferences"]
         if not sample_inferences or not data["items"]:
             pytest.skip("No sample data to compare")
 
