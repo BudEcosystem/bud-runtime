@@ -520,11 +520,39 @@ class QueryBuilder:
                 field_order.extend(delta_field_names)
 
         # Build final query with subquery structure
-        query = f"""
-        SELECT {', '.join(outer_select)}
-        FROM ({inner_query}) AS agg
-        ORDER BY {time_bucket_alias} ASC {fill_expr}
-        """
+        if topk and group_by_fields:
+            # Get primary metric for ranking (first metric or request_count)
+            rank_metric = metric_sql_aliases[0] if metric_sql_aliases else "request_count"
+
+            # Build ranking CTE to identify top K groups
+            topk_group_cols = ", ".join(group_by_fields)
+            ranking_cte = f"""
+            topk_groups AS (
+                SELECT {topk_group_cols}
+                FROM ({inner_query}) AS rank_agg
+                GROUP BY {topk_group_cols}
+                ORDER BY SUM({rank_metric}) DESC
+                LIMIT {topk}
+            )
+            """
+
+            # Build join conditions for topk filtering
+            topk_join_conditions = [f"agg.{col} = tg.{col}" for col in group_by_fields]
+            topk_join = f"INNER JOIN topk_groups tg ON {' AND '.join(topk_join_conditions)}"
+
+            query = f"""
+            WITH {ranking_cte}
+            SELECT {', '.join(outer_select)}
+            FROM ({inner_query}) AS agg
+            {topk_join}
+            ORDER BY {time_bucket_alias} ASC {fill_expr}
+            """
+        else:
+            query = f"""
+            SELECT {', '.join(outer_select)}
+            FROM ({inner_query}) AS agg
+            ORDER BY {time_bucket_alias} ASC {fill_expr}
+            """
 
         return query, field_order
 
