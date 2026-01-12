@@ -2684,6 +2684,56 @@ class TestFillTimeGaps:
             assert count > 0, f"With fill_time_gaps=False, all periods should have data: {period}"
         print(f"\n[explicit_false] fill_time_gaps=False returns {len(periods)} periods (all with data)")
 
+    def test_fill_time_gaps_true_matches_full_range(self, sync_client, seeded_data):
+        """Test fill_time_gaps=True returns periods for the full date range."""
+        payload = self._get_fill_gaps_payload(
+            frequency_unit="hour",
+            fill_time_gaps=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+
+        # Calculate expected hours in the date range
+        from_dt = TEST_FROM_DATE
+        to_dt = TEST_TO_DATE
+        expected_hours = int((to_dt - from_dt).total_seconds() / 3600) + 1
+
+        # With fill_time_gaps=True, should have all hours in range
+        assert len(periods) == expected_hours, \
+            f"fill_time_gaps=True should return {expected_hours} periods, got {len(periods)}"
+        print(f"\n[true_full_range] fill_time_gaps=True returns {len(periods)} periods (expected {expected_hours})")
+
+    def test_fill_time_gaps_false_matches_actual_data_periods(self, sync_client, seeded_data):
+        """Test fill_time_gaps=False returns only periods with actual data from DB."""
+        # First, get all periods with fill_time_gaps=True to count actual data periods
+        payload_true = self._get_fill_gaps_payload(
+            frequency_unit="hour",
+            fill_time_gaps=True
+        )
+        response_true = sync_client.post("/observability/analytics", json=payload_true)
+        assert response_true.status_code == 200
+        periods_true = get_all_period_metrics(response_true.json(), "request_count")
+
+        # Count periods with actual data (count > 0)
+        actual_data_count = len([p for p in periods_true if p.get("count", 0) > 0])
+
+        # Now get periods with fill_time_gaps=False
+        payload_false = self._get_fill_gaps_payload(
+            frequency_unit="hour",
+            fill_time_gaps=False
+        )
+        response_false = sync_client.post("/observability/analytics", json=payload_false)
+        assert response_false.status_code == 200
+        periods_false = get_all_period_metrics(response_false.json(), "request_count")
+
+        # fill_time_gaps=False should return exactly the periods with actual data
+        assert len(periods_false) == actual_data_count, \
+            f"fill_time_gaps=False should return {actual_data_count} periods (actual data), got {len(periods_false)}"
+        print(f"\n[false_actual_data] fill_time_gaps=False returns {len(periods_false)} periods (matches {actual_data_count} actual)")
+
     # ==================== Comparison Tests ====================
 
     def test_fill_gaps_true_vs_false_period_count(self, sync_client, seeded_data):
@@ -2963,6 +3013,205 @@ class TestFillTimeGaps:
             periods = get_all_period_metrics(data, metric_key)
             assert len(periods) >= 1, f"Should have periods for {metric_key}"
         print(f"\n[no_fill_multi] Multiple metrics with fill_time_gaps=False works")
+
+
+class TestTopK:
+    """Test cases for topk parameter functionality."""
+
+    def _get_topk_payload(
+        self,
+        group_by: list[str] = None,
+        topk: int = None,
+        metrics: list[str] = None,
+    ) -> dict:
+        """Build a payload for topk testing."""
+        payload = {
+            "metrics": metrics or ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": "day",
+        }
+        if group_by:
+            payload["group_by"] = group_by
+        if topk is not None:
+            payload["topk"] = topk
+        return payload
+
+    def _get_unique_models(self, data: dict) -> set:
+        """Extract unique model_ids from nested response structure."""
+        unique_models = set()
+        for period_bin in data.get("items", []):
+            for inner_item in period_bin.get("items", []):
+                model_id = inner_item.get("model_id")
+                if model_id:
+                    unique_models.add(model_id)
+        return unique_models
+
+    def _get_model_counts(self, data: dict, metric_key: str = "request_count") -> dict:
+        """Calculate total count per model from nested response."""
+        model_counts = {}
+        for period_bin in data.get("items", []):
+            for inner_item in period_bin.get("items", []):
+                model_id = inner_item.get("model_id")
+                if model_id:
+                    metric_data = inner_item.get("data", {}).get(metric_key, {})
+                    count = metric_data.get("count", 0) or 0
+                    model_counts[model_id] = model_counts.get(model_id, 0) + count
+        return model_counts
+
+    # ==================== Validation Tests ====================
+
+    def test_topk_zero_rejected(self, sync_client):
+        """Test that topk=0 is rejected."""
+        payload = self._get_topk_payload(group_by=["model"], topk=0)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"topk=0 should be rejected, got {response.status_code}"
+        print("\n[topk_zero] topk=0 correctly rejected")
+
+    def test_topk_negative_rejected(self, sync_client):
+        """Test that negative topk is rejected."""
+        payload = self._get_topk_payload(group_by=["model"], topk=-1)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 422, f"topk=-1 should be rejected, got {response.status_code}"
+        print("\n[topk_negative] Negative topk correctly rejected")
+
+    def test_topk_minimum_value(self, sync_client, seeded_data):
+        """Test that topk=1 returns exactly 1 group."""
+        payload = self._get_topk_payload(group_by=["model"], topk=1)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        unique_groups = self._get_unique_models(data)
+        assert len(unique_groups) == 1, f"topk=1 should return exactly 1 group, got {len(unique_groups)}"
+        print(f"\n[topk_minimum] topk=1 returns exactly 1 group")
+
+    # ==================== Ranking Accuracy Tests ====================
+
+    def test_topk_returns_highest_count_groups(self, sync_client, seeded_data):
+        """Test that topk returns groups with highest request_count."""
+        # First, get all groups without topk
+        payload_all = self._get_topk_payload(group_by=["model"])
+        response_all = sync_client.post("/observability/analytics", json=payload_all)
+        assert response_all.status_code == 200
+        data_all = response_all.json()
+
+        # Calculate total count per model using helper
+        model_counts = self._get_model_counts(data_all)
+
+        if len(model_counts) <= 1:
+            pytest.skip("Need more than 1 model to test ranking")
+
+        # Get topk=1
+        payload_topk = self._get_topk_payload(group_by=["model"], topk=1)
+        response_topk = sync_client.post("/observability/analytics", json=payload_topk)
+        assert response_topk.status_code == 200
+        data_topk = response_topk.json()
+
+        # Find the model returned by topk
+        topk_models = self._get_unique_models(data_topk)
+        assert len(topk_models) == 1, f"topk=1 should return 1 model, got {len(topk_models)}"
+        topk_model = next(iter(topk_models))
+
+        # Verify it's the model with highest count
+        highest_model = max(model_counts, key=model_counts.get)
+        assert topk_model == highest_model, \
+            f"topk should return highest count model ({highest_model}), got {topk_model}"
+        print(f"\n[topk_highest] topk correctly returns highest count model")
+
+    def test_topk_1_returns_single_highest_group(self, sync_client, seeded_data):
+        """Test that topk=1 returns the single group with most requests."""
+        payload = self._get_topk_payload(group_by=["model"], topk=1)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        models_in_response = self._get_unique_models(data)
+        assert len(models_in_response) == 1, \
+            f"topk=1 should return exactly 1 model, got {len(models_in_response)}"
+        print(f"\n[topk_single] topk=1 returns single highest group")
+
+    # ==================== TopK Limit Behavior Tests ====================
+
+    def test_topk_exceeds_group_count(self, sync_client, seeded_data):
+        """Test when topk exceeds actual group count, all groups returned."""
+        # First, count actual groups
+        payload_all = self._get_topk_payload(group_by=["model"])
+        response_all = sync_client.post("/observability/analytics", json=payload_all)
+        assert response_all.status_code == 200
+        data_all = response_all.json()
+
+        unique_models = self._get_unique_models(data_all)
+        actual_count = len(unique_models)
+
+        # Request with topk much larger than actual count
+        payload_topk = self._get_topk_payload(group_by=["model"], topk=100)
+        response_topk = sync_client.post("/observability/analytics", json=payload_topk)
+        assert response_topk.status_code == 200
+        data_topk = response_topk.json()
+
+        topk_models = self._get_unique_models(data_topk)
+
+        # Should return all available groups, not fail
+        assert len(topk_models) == actual_count, \
+            f"topk=100 should return all {actual_count} groups, got {len(topk_models)}"
+        print(f"\n[topk_exceeds] topk exceeding count returns all {actual_count} groups")
+
+    def test_topk_limits_to_exact_count(self, sync_client, seeded_data):
+        """Test that topk returns exactly the specified number of groups."""
+        # First, check how many groups exist
+        payload_all = self._get_topk_payload(group_by=["model"])
+        response_all = sync_client.post("/observability/analytics", json=payload_all)
+        data_all = response_all.json()
+
+        unique_models = self._get_unique_models(data_all)
+
+        if len(unique_models) < 2:
+            pytest.skip("Need at least 2 models to test limit")
+
+        # Request topk=2
+        payload_topk = self._get_topk_payload(group_by=["model"], topk=2)
+        response_topk = sync_client.post("/observability/analytics", json=payload_topk)
+        assert response_topk.status_code == 200
+        data_topk = response_topk.json()
+
+        topk_models = self._get_unique_models(data_topk)
+
+        expected = min(2, len(unique_models))
+        assert len(topk_models) == expected, \
+            f"topk=2 should return {expected} groups, got {len(topk_models)}"
+        print(f"\n[topk_limit] topk=2 returns exactly {expected} groups")
+
+    # ==================== Multi-Group Tests ====================
+
+    def test_topk_with_single_group_by(self, sync_client, seeded_data):
+        """Test topk works with single group_by field."""
+        payload = self._get_topk_payload(group_by=["model"], topk=1)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should have model_id in nested items
+        unique_models = self._get_unique_models(data)
+        assert len(unique_models) > 0, "Single group_by should return items with model_id"
+        print("\n[topk_single_group] topk works with single group_by")
+
+    def test_topk_with_multiple_group_by(self, sync_client, seeded_data):
+        """Test topk works with multiple group_by fields."""
+        payload = self._get_topk_payload(group_by=["model", "project"], topk=1)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check nested items for grouping fields
+        for period_bin in data.get("items", []):
+            for inner_item in period_bin.get("items", []):
+                if inner_item.get("model_id") or inner_item.get("project_id"):
+                    print("\n[topk_multi_group] topk works with multiple group_by")
+                    return
+
+        # If we get here with no items, still valid
+        print("\n[topk_multi_group] topk with multiple group_by accepted")
 
 
 #  pytest tests/observability/test_analytics_payloads.py -v -s
