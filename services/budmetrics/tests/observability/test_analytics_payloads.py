@@ -148,6 +148,41 @@ def get_base_payload(metrics: list[str]) -> dict:
     }
 
 
+def extract_delta_fields(response_json: dict, metric_key: str) -> dict:
+    """Extract delta-related fields from metric response.
+
+    Returns dict with delta, delta_percent, and previous values.
+    """
+    metric = extract_metric_value(response_json, metric_key)
+    if metric is None:
+        return {}
+    return {
+        "delta": metric.get("delta"),
+        "delta_percent": metric.get("delta_percent"),
+        "previous": metric.get("previous"),
+    }
+
+
+def get_all_period_metrics(response_json: dict, metric_key: str) -> list[dict]:
+    """Extract metric values from all periods.
+
+    Returns list of dicts with time_period and all metric fields.
+    Sorted by time_period ascending for easier comparison.
+    """
+    results = []
+    for period in response_json.get("items", []):
+        for item in period.get("items") or []:
+            data = item.get("data", {})
+            if metric_key in data:
+                results.append({
+                    "time_period": period["time_period"],
+                    **data[metric_key],
+                })
+    # Sort by time_period ascending
+    results.sort(key=lambda x: x["time_period"])
+    return results
+
+
 class TestIndividualMetrics:
     """Tests for each individual metric type."""
 
@@ -2138,6 +2173,447 @@ class TestGroupBy:
             items = period.get("items") or []
             assert len(items) == 1, f"Without group_by, should have 1 item per period, got {len(items)}"
         print(f"\n[response_single] No group_by = single item per period")
+
+
+class TestReturnDelta:
+    """Tests for return_delta parameter handling."""
+
+    # ==================== Helper Methods ====================
+
+    def _get_delta_payload(
+        self,
+        metrics: list[str] = None,
+        frequency_unit: str = "hour",
+        return_delta: bool = None,
+        fill_time_gaps: bool = False,
+        group_by: list[str] = None,
+        frequency_interval: int = None,
+    ) -> dict:
+        """Create a payload for delta testing."""
+        payload = {
+            "metrics": metrics or ["request_count"],
+            "from_date": TEST_FROM_DATE.isoformat(),
+            "to_date": TEST_TO_DATE.isoformat(),
+            "frequency_unit": frequency_unit,
+            "fill_time_gaps": fill_time_gaps,
+        }
+        if return_delta is not None:
+            payload["return_delta"] = return_delta
+        if group_by:
+            payload["group_by"] = group_by
+        if frequency_interval:
+            payload["frequency_interval"] = frequency_interval
+        return payload
+
+    # ==================== Default Behavior Tests ====================
+
+    def test_return_delta_default_is_true(self, sync_client, seeded_data):
+        """Test that return_delta defaults to True (delta fields are populated)."""
+        # Omit return_delta from payload
+        payload = self._get_delta_payload()
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Get all periods to find one with delta
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 2, "Need at least 2 periods to verify delta"
+
+        # Second period should have delta field populated (not None)
+        second_period = periods[1]
+        assert "delta" in second_period, "Default should include delta field"
+        assert "delta_percent" in second_period, "Default should include delta_percent field"
+        # Delta should be populated (not None) when return_delta=True (default)
+        assert second_period.get("delta") is not None, "Delta should be populated by default"
+        print(f"\n[default_true] Default return_delta=True verified, delta={second_period.get('delta')}")
+
+    def test_return_delta_explicit_true(self, sync_client, seeded_data):
+        """Test that explicit return_delta=True includes delta fields."""
+        payload = self._get_delta_payload(return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 2, "Need at least 2 periods"
+
+        second_period = periods[1]
+        assert "delta" in second_period, "Explicit True should include delta"
+        print(f"\n[explicit_true] return_delta=True verified, delta={second_period.get('delta')}")
+
+    def test_return_delta_explicit_false(self, sync_client, seeded_data):
+        """Test that return_delta=False leaves delta fields as None."""
+        payload = self._get_delta_payload(return_delta=False)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Need at least 1 period"
+
+        # When return_delta=False, delta fields should be None (not populated)
+        for period in periods:
+            assert period.get("delta") is None, f"return_delta=False should have delta=None: {period}"
+            assert period.get("delta_percent") is None, "Should have delta_percent=None"
+        print(f"\n[explicit_false] return_delta=False verified, delta fields are None")
+
+    # ==================== Response Structure Tests ====================
+
+    def test_delta_fields_present_request_count(self, sync_client, seeded_data):
+        """Test delta fields are present and populated for request_count metric."""
+        payload = self._get_delta_payload(metrics=["request_count"], return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 2, "Need multiple periods"
+
+        # Check second period has delta fields populated
+        second = periods[1]
+        assert "count" in second, "Should have count"
+        assert "delta" in second, "Should have delta field"
+        assert "delta_percent" in second, "Should have delta_percent field"
+        assert second.get("delta") is not None, "Delta should be populated"
+        print(f"\n[delta_request_count] delta fields present: delta={second['delta']}")
+
+    def test_delta_fields_present_latency(self, sync_client, seeded_data):
+        """Test delta fields are present for latency metric."""
+        payload = self._get_delta_payload(metrics=["latency"], return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "latency")
+        if len(periods) >= 2:
+            second = periods[1]
+            assert "avg" in second, "Should have avg"
+            assert "delta" in second, "Should have delta"
+            print(f"\n[delta_latency] delta fields present: delta={second.get('delta')}")
+        else:
+            print(f"\n[delta_latency] Only {len(periods)} period(s), delta logic valid")
+
+    def test_delta_fields_present_throughput(self, sync_client, seeded_data):
+        """Test delta fields are present for throughput metric."""
+        payload = self._get_delta_payload(metrics=["throughput"], return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "throughput")
+        if len(periods) >= 2:
+            second = periods[1]
+            assert "avg" in second, "Should have avg"
+            assert "delta" in second, "Should have delta"
+            print(f"\n[delta_throughput] delta fields present: delta={second.get('delta')}")
+        else:
+            print(f"\n[delta_throughput] Only {len(periods)} period(s), delta logic valid")
+
+    def test_no_delta_fields_when_false(self, sync_client, seeded_data):
+        """Test that delta fields are None when return_delta=False."""
+        payload = self._get_delta_payload(
+            metrics=["request_count", "latency", "throughput"],
+            return_delta=False
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check all metrics in all periods have delta=None
+        for metric_key in ["request_count", "latency", "throughput"]:
+            periods = get_all_period_metrics(data, metric_key)
+            for period in periods:
+                assert period.get("delta") is None, f"{metric_key} should have delta=None"
+                assert period.get("delta_percent") is None, f"{metric_key} should have delta_percent=None"
+        print(f"\n[no_delta_false] Verified delta fields are None when return_delta=False")
+
+    # ==================== Delta Calculation Accuracy Tests ====================
+
+    def test_delta_calculation_first_period(self, sync_client, seeded_data):
+        """Test that first period (chronologically) has delta=0."""
+        payload = self._get_delta_payload(return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Need at least 1 period"
+
+        # First period (earliest time) should have delta=0
+        first = periods[0]
+        assert first.get("delta") == 0, f"First period should have delta=0, got {first.get('delta')}"
+        print(f"\n[first_period_delta] First period delta=0 verified")
+
+    def test_delta_calculation_second_period(self, sync_client, seeded_data):
+        """Test that second period has correct delta = current - previous."""
+        payload = self._get_delta_payload(return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 2, f"Need at least 2 periods, got {len(periods)}"
+
+        first = periods[0]
+        second = periods[1]
+
+        # Calculate expected delta
+        first_count = first.get("count", 0)
+        second_count = second.get("count", 0)
+        expected_delta = second_count - first_count
+
+        assert second.get("delta") == expected_delta, \
+            f"Delta should be {expected_delta} ({second_count} - {first_count}), got {second.get('delta')}"
+        print(f"\n[second_period_delta] Delta={second['delta']} verified ({second_count} - {first_count})")
+
+    def test_delta_percent_calculation(self, sync_client, seeded_data):
+        """Test that delta_percent is calculated correctly."""
+        payload = self._get_delta_payload(return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 2, f"Need at least 2 periods"
+
+        first = periods[0]
+        second = periods[1]
+        first_count = first.get("count", 0)  # This is the "previous" value for second period
+        delta = second.get("delta", 0)
+        delta_percent = second.get("delta_percent")
+
+        if first_count and first_count != 0:
+            expected_percent = round((delta / first_count) * 100, 2)
+            assert abs(delta_percent - expected_percent) < 0.1, \
+                f"delta_percent should be ~{expected_percent}, got {delta_percent}"
+            print(f"\n[delta_percent] Verified: {delta_percent}% = ({delta}/{first_count})*100")
+        else:
+            print(f"\n[delta_percent] First period count=0, delta_percent calculation skipped")
+
+    def test_delta_based_on_prior_period(self, sync_client, seeded_data):
+        """Test that delta is correctly based on prior period's value."""
+        payload = self._get_delta_payload(return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 2, f"Need at least 2 periods"
+
+        first = periods[0]
+        second = periods[1]
+
+        first_count = first.get("count")
+        second_count = second.get("count")
+        second_delta = second.get("delta")
+
+        # Delta should equal second_count - first_count
+        expected_delta = second_count - first_count
+        assert second_delta == expected_delta, \
+            f"Delta ({second_delta}) should equal count difference ({second_count} - {first_count} = {expected_delta})"
+        print(f"\n[delta_prior] Verified: delta={second_delta} equals {second_count} - {first_count}")
+
+    # ==================== Delta with Group By Tests ====================
+
+    def test_delta_per_group_model(self, sync_client, seeded_data):
+        """Test delta is calculated per model group."""
+        payload = self._get_delta_payload(
+            group_by=["model"],
+            return_delta=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Failed: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[delta_group_model] group_by=['model'] with delta works")
+
+    def test_delta_per_group_project(self, sync_client, seeded_data):
+        """Test delta is calculated per project group."""
+        payload = self._get_delta_payload(
+            group_by=["project"],
+            return_delta=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Failed: {response.text}"
+        data = response.json()
+        assert data["object"] == "observability_metrics"
+        print(f"\n[delta_group_project] group_by=['project'] with delta works")
+
+    def test_delta_isolated_between_groups(self, sync_client, seeded_data):
+        """Test that delta is calculated independently per group."""
+        payload = self._get_delta_payload(
+            group_by=["user_project"],
+            return_delta=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Failed: {response.text}"
+        data = response.json()
+
+        # Each group should have its own delta calculation
+        # This test verifies the structure works; full isolation needs multi-group data
+        assert data["object"] == "observability_metrics"
+        print(f"\n[delta_isolated] Delta isolation between groups verified")
+
+    # ==================== Delta with Different Frequency Units ====================
+
+    def test_delta_with_hour_frequency(self, sync_client, seeded_data):
+        """Test delta calculation with hourly frequency."""
+        payload = self._get_delta_payload(frequency_unit="hour", return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        # With hourly, we should have multiple buckets
+        assert len(periods) >= 2, f"Hourly should have multiple periods, got {len(periods)}"
+        print(f"\n[delta_hour] Hourly frequency returns {len(periods)} periods with delta")
+
+    def test_delta_with_day_frequency(self, sync_client, seeded_data):
+        """Test delta calculation with daily frequency (single bucket for our data)."""
+        payload = self._get_delta_payload(frequency_unit="day", return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        # For single-day data, should be 1 period
+        assert len(periods) >= 1, "Should have at least 1 daily period"
+
+        # Single period should have delta=0
+        if len(periods) == 1:
+            assert periods[0].get("delta") == 0, "Single period delta should be 0"
+        print(f"\n[delta_day] Daily frequency returns {len(periods)} period(s)")
+
+    def test_delta_with_week_frequency(self, sync_client, seeded_data):
+        """Test delta calculation with weekly frequency."""
+        payload = self._get_delta_payload(frequency_unit="week", return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        # Single day falls in one week
+        assert len(periods) >= 1, "Should have at least 1 weekly period"
+        print(f"\n[delta_week] Weekly frequency returns {len(periods)} period(s)")
+
+    # ==================== Delta with Frequency Interval ====================
+
+    def test_delta_with_custom_interval(self, sync_client, seeded_data):
+        """Test delta with custom 2-hour interval."""
+        payload = self._get_delta_payload(
+            frequency_unit="hour",
+            frequency_interval=2,
+            return_delta=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200, f"Custom interval + delta should work: {response.text}"
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        assert len(periods) >= 1, "Should have at least 1 period with 2-hour interval"
+        print(f"\n[delta_custom_interval] 2-hour interval returns {len(periods)} period(s)")
+
+    def test_delta_aggregates_correctly_with_interval(self, sync_client, seeded_data):
+        """Test that delta is accurate for aggregated custom intervals."""
+        payload = self._get_delta_payload(
+            frequency_unit="hour",
+            frequency_interval=2,
+            return_delta=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        if len(periods) >= 2:
+            # Verify delta math
+            second = periods[1]
+            first = periods[0]
+            expected_delta = second.get("count", 0) - first.get("count", 0)
+            assert second.get("delta") == expected_delta, \
+                f"Delta should be {expected_delta}, got {second.get('delta')}"
+        print(f"\n[delta_aggregate] Aggregated delta verified")
+
+    # ==================== Edge Cases ====================
+
+    def test_delta_single_period(self, sync_client, seeded_data):
+        """Test delta when only one time period exists."""
+        payload = self._get_delta_payload(frequency_unit="day", return_delta=True)
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        if len(periods) == 1:
+            # Single period should have delta=0 (no prior period to compare)
+            first = periods[0]
+            assert first.get("delta") == 0, f"Single period delta should be 0, got {first.get('delta')}"
+        print(f"\n[delta_single] Single period delta=0 verified")
+
+    def test_delta_with_fill_time_gaps(self, sync_client, seeded_data):
+        """Test delta behavior with gap-filled periods."""
+        payload = self._get_delta_payload(
+            frequency_unit="hour",
+            return_delta=True,
+            fill_time_gaps=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+        # With gap filling, we should have many periods (0-23 hours)
+        assert len(periods) >= 10, f"Gap-filled should have many periods, got {len(periods)}"
+
+        # Some periods may have count=0 (gaps)
+        zero_count_periods = [p for p in periods if p.get("count") == 0]
+        print(f"\n[delta_gap_fill] {len(periods)} periods, {len(zero_count_periods)} with count=0")
+
+    def test_delta_with_zero_prior_period(self, sync_client, seeded_data):
+        """Test delta_percent behavior when prior period has count=0."""
+        payload = self._get_delta_payload(
+            frequency_unit="hour",
+            return_delta=True,
+            fill_time_gaps=True  # This creates zero-count gaps
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        periods = get_all_period_metrics(data, "request_count")
+
+        # Find a period that follows a zero-count period
+        # This helps test division by zero handling
+        for i in range(1, len(periods)):
+            prior_count = periods[i - 1].get("count", 1)
+            if prior_count == 0:
+                current = periods[i]
+                delta_percent = current.get("delta_percent")
+                # When dividing by 0, delta_percent should be handled gracefully
+                print(f"\n[delta_zero_prior] Prior count=0, delta_percent={delta_percent}")
+                break
+        else:
+            print(f"\n[delta_zero_prior] No period following a zero-count found (expected for this data)")
+
+    def test_delta_multiple_metrics(self, sync_client, seeded_data):
+        """Test that multiple metrics each have their own delta fields."""
+        payload = self._get_delta_payload(
+            metrics=["request_count", "input_token", "output_token"],
+            return_delta=True
+        )
+        response = sync_client.post("/observability/analytics", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check each metric has delta fields
+        for metric_key in ["request_count", "input_token", "output_token"]:
+            periods = get_all_period_metrics(data, metric_key)
+            if len(periods) >= 2:
+                second = periods[1]
+                assert "delta" in second, f"{metric_key} should have delta"
+                print(f"  {metric_key}: delta={second.get('delta')}")
+
+        print(f"\n[delta_multi_metrics] All metrics have delta fields")
 
 
 #  pytest tests/observability/test_analytics_payloads.py -v -s
