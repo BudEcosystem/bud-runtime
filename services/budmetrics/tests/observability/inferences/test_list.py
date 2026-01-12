@@ -129,7 +129,7 @@ async def _fetch_inference_ground_truth():
 def seeded_inference_data():
     """Seed test data and return ground truth from InferenceFact."""
     # 1. Clear and seed data
-    seeder_path = Path(__file__).parent / "seed_otel_traces.py"
+    seeder_path = Path(__file__).parent.parent / "seed_otel_traces.py"
     result = subprocess.run(
         [sys.executable, str(seeder_path), "--clear", "--verify"],
         capture_output=True,
