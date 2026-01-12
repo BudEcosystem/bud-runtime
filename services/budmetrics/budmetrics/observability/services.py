@@ -446,6 +446,9 @@ class ObservabilityMetricsService:
     async def get_metrics(self, request: ObservabilityMetricsRequest) -> ObservabilityMetricsResponse:
         """Get metrics based on the request.
 
+        Uses rollup tables (InferenceMetrics5m/1h/1d) for compatible metrics,
+        falls back to raw data queries for percentiles and complex metrics.
+
         Args:
             request: ObservabilityMetricsRequest with query parameters
 
@@ -454,19 +457,39 @@ class ObservabilityMetricsService:
         """
         await self.initialize()
 
-        # Build query (validation already done by Pydantic)
-        query, field_order = self.query_builder.build_query(
-            metrics=request.metrics,
-            from_date=request.from_date,
-            to_date=request.to_date,
-            frequency_unit=request.frequency_unit,
-            frequency_interval=request.frequency_interval,
-            filters=request.filters,
-            group_by=request.group_by,
-            return_delta=request.return_delta,
-            fill_time_gaps=request.fill_time_gaps,
-            topk=request.topk,
-        )
+        # Check if rollup tables can handle this request (better performance)
+        use_rollup = self.query_builder.can_use_rollup(request.metrics)
+
+        if use_rollup:
+            # Use rollup tables for pre-aggregated data (faster for large time ranges)
+            logger.debug(f"Using rollup tables for metrics: {request.metrics}")
+            query, field_order = self.query_builder.build_rollup_query(
+                metrics=request.metrics,
+                from_date=request.from_date,
+                to_date=request.to_date,
+                frequency_unit=request.frequency_unit,
+                frequency_interval=request.frequency_interval,
+                filters=request.filters,
+                group_by=request.group_by,
+                return_delta=request.return_delta,
+                fill_time_gaps=request.fill_time_gaps,
+                topk=request.topk,
+            )
+        else:
+            # Fall back to raw data queries (needed for percentiles, queuing_time, etc.)
+            logger.debug(f"Using raw data for metrics: {request.metrics}")
+            query, field_order = self.query_builder.build_query(
+                metrics=request.metrics,
+                from_date=request.from_date,
+                to_date=request.to_date,
+                frequency_unit=request.frequency_unit,
+                frequency_interval=request.frequency_interval,
+                filters=request.filters,
+                group_by=request.group_by,
+                return_delta=request.return_delta,
+                fill_time_gaps=request.fill_time_gaps,
+                topk=request.topk,
+            )
 
         # Execute query
         try:
@@ -682,6 +705,8 @@ class ObservabilityMetricsService:
     async def list_inferences(self, request: InferenceListRequest) -> InferenceListResponse:
         """List inference requests with pagination and filtering.
 
+        Uses InferenceFact (denormalized table) for optimal query performance.
+
         Args:
             request: InferenceListRequest with query parameters
 
@@ -695,15 +720,15 @@ class ObservabilityMetricsService:
         params = {}
 
         # Always filter by date range
-        where_conditions.append("mi.timestamp >= %(from_date)s")
+        where_conditions.append("inf.timestamp >= %(from_date)s")
         params["from_date"] = request.from_date
 
         if request.to_date:
-            where_conditions.append("mi.timestamp <= %(to_date)s")
+            where_conditions.append("inf.timestamp <= %(to_date)s")
             params["to_date"] = request.to_date
 
         if request.project_id:
-            where_conditions.append("mid.project_id = %(project_id)s")
+            where_conditions.append("inf.project_id = %(project_id)s")
             params["project_id"] = str(request.project_id)
 
         # Support filtering by api_key_project_id (for CLIENT users)
@@ -711,49 +736,49 @@ class ObservabilityMetricsService:
             api_key_project_ids = request.filters["api_key_project_id"]
             if isinstance(api_key_project_ids, list):
                 placeholders = [f"%(api_key_project_{i})s" for i in range(len(api_key_project_ids))]
-                where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                where_conditions.append(f"inf.api_key_project_id IN ({','.join(placeholders)})")
                 for i, val in enumerate(api_key_project_ids):
                     params[f"api_key_project_{i}"] = str(val)
             else:
-                where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                where_conditions.append("inf.api_key_project_id = %(api_key_project_id)s")
                 params["api_key_project_id"] = str(api_key_project_ids)
 
         if request.endpoint_id:
-            where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+            where_conditions.append("inf.endpoint_id = %(endpoint_id)s")
             params["endpoint_id"] = str(request.endpoint_id)
 
         if request.model_id:
-            where_conditions.append("mid.model_id = %(model_id)s")
+            where_conditions.append("inf.model_id = %(model_id)s")
             params["model_id"] = str(request.model_id)
 
         if request.is_success is not None:
-            where_conditions.append("mid.is_success = %(is_success)s")
+            where_conditions.append("inf.is_success = %(is_success)s")
             params["is_success"] = 1 if request.is_success else 0
 
         if request.min_tokens is not None:
-            where_conditions.append("(mi.input_tokens + mi.output_tokens) >= %(min_tokens)s")
+            where_conditions.append("(inf.input_tokens + inf.output_tokens) >= %(min_tokens)s")
             params["min_tokens"] = request.min_tokens
 
         if request.max_tokens is not None:
-            where_conditions.append("(mi.input_tokens + mi.output_tokens) <= %(max_tokens)s")
+            where_conditions.append("(inf.input_tokens + inf.output_tokens) <= %(max_tokens)s")
             params["max_tokens"] = request.max_tokens
 
         if request.max_latency_ms is not None:
-            where_conditions.append("mi.response_time_ms <= %(max_latency_ms)s")
+            where_conditions.append("inf.response_time_ms <= %(max_latency_ms)s")
             params["max_latency_ms"] = request.max_latency_ms
 
         if request.endpoint_type:
-            where_conditions.append("mi.endpoint_type = %(endpoint_type)s")
+            where_conditions.append("inf.endpoint_type = %(endpoint_type)s")
             params["endpoint_type"] = request.endpoint_type
 
         where_clause = " AND ".join(where_conditions)
 
         # Build ORDER BY clause - validate sort_by to prevent injection
         sort_column_map = {
-            "timestamp": "mi.timestamp",
-            "tokens": "(mi.input_tokens + mi.output_tokens)",
-            "latency": "mi.response_time_ms",
-            "cost": "mid.cost",
+            "timestamp": "inf.timestamp",
+            "tokens": "(inf.input_tokens + inf.output_tokens)",
+            "latency": "inf.response_time_ms",
+            "cost": "inf.cost",
         }
 
         # Validate sort_by is in allowed columns
@@ -766,76 +791,62 @@ class ObservabilityMetricsService:
 
         order_by = f"{sort_column_map[request.sort_by]} {request.sort_order.upper()}"
 
-        # Count total records
-        # Safe: where_clause is built from validated conditions
-        # Optimized: Use count() instead of COUNT(*) and join with ModelInference only if needed
-        # This reduces memory usage by avoiding loading large text fields from unnecessary tables
-        if any(cond.startswith("mi.") for cond in where_conditions):
-            # If we have filters on ModelInference fields, we need the JOIN
-            count_query = f"""
-            SELECT count() as total_count
-            FROM ModelInferenceDetails mid
-            INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-            WHERE {where_clause}
-            """  # nosec B608
-        else:
-            # If all filters are on ModelInferenceDetails, we can count directly
-            count_query = f"""
-            SELECT count() as total_count
-            FROM ModelInferenceDetails mid
-            WHERE {where_clause}
-            """  # nosec B608
+        # Count total records from InferenceFact (denormalized, no JOIN needed)
+        count_query = f"""
+        SELECT count() as total_count
+        FROM InferenceFact inf
+        WHERE {where_clause}
+        """  # nosec B608
 
         # Execute count query with parameters
         count_result = await self.clickhouse_client.execute_query(count_query, params)
         total_count = count_result[0][0] if count_result else 0
 
-        # Get paginated data
+        # Get paginated data from InferenceFact (denormalized table)
         # Safe: where_clause and order_by are validated, limit/offset use parameters
-        # Optimized: Removed ChatInference JOIN as data is already in ModelInference.input_messages and ModelInference.output
+        # Note: LEFT JOINs kept for modality-specific tables (embedding, audio, image, moderation)
         list_query = f"""
         SELECT
-            mi.inference_id,
-            mi.timestamp,
-            mi.model_name,
+            inf.inference_id,
+            inf.timestamp,
+            inf.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(mi.input_messages, 1, 100))
-                WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
-                WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
-                WHEN mi.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
-                ELSE toValidUTF8(substring(mi.input_messages, 1, 100))
+                WHEN inf.endpoint_type = 'chat' THEN toValidUTF8(substring(inf.input_messages, 1, 100))
+                WHEN inf.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
+                WHEN inf.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
+                WHEN inf.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
+                WHEN inf.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
+                ELSE toValidUTF8(substring(inf.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(mi.output, 1, 100))
-                WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
-                WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
-                WHEN mi.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
-                ELSE toValidUTF8(substring(mi.output, 1, 100))
+                WHEN inf.endpoint_type = 'chat' THEN toValidUTF8(substring(inf.output, 1, 100))
+                WHEN inf.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
+                WHEN inf.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
+                WHEN inf.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
+                WHEN inf.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
+                ELSE toValidUTF8(substring(inf.output, 1, 100))
             END as response_preview,
-            mi.input_tokens,
-            mi.output_tokens,
-            mi.input_tokens + mi.output_tokens as total_tokens,
-            mi.response_time_ms,
-            mid.cost,
-            mid.is_success,
-            mi.cached,
-            mid.project_id,
-            mid.api_key_project_id,
-            mid.endpoint_id,
-            mid.model_id,
-            coalesce(mi.endpoint_type, 'chat') as endpoint_type,
-            mid.error_code,
-            mid.error_message,
-            mid.error_type,
-            mid.status_code
-        FROM ModelInference mi
-        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
-        LEFT JOIN EmbeddingInference ei ON mi.inference_id = ei.id AND mi.endpoint_type = 'embedding'
-        LEFT JOIN AudioInference ai ON mi.inference_id = ai.id AND mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
-        LEFT JOIN ImageInference ii ON mi.inference_id = ii.id AND mi.endpoint_type = 'image_generation'
-        LEFT JOIN ModerationInference modi ON mi.inference_id = modi.id AND mi.endpoint_type = 'moderation'
+            inf.input_tokens,
+            inf.output_tokens,
+            inf.input_tokens + inf.output_tokens as total_tokens,
+            inf.response_time_ms,
+            inf.cost,
+            inf.is_success,
+            inf.cached,
+            inf.project_id,
+            inf.api_key_project_id,
+            inf.endpoint_id,
+            inf.model_id,
+            coalesce(inf.endpoint_type, 'chat') as endpoint_type,
+            inf.error_code,
+            inf.error_message,
+            inf.error_type,
+            inf.status_code
+        FROM InferenceFact inf
+        LEFT JOIN EmbeddingInference ei ON inf.inference_id = ei.id AND inf.endpoint_type = 'embedding'
+        LEFT JOIN AudioInference ai ON inf.inference_id = ai.id AND inf.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
+        LEFT JOIN ImageInference ii ON inf.inference_id = ii.id AND inf.endpoint_type = 'image_generation'
+        LEFT JOIN ModerationInference modi ON inf.inference_id = modi.id AND inf.endpoint_type = 'moderation'
         WHERE {where_clause}
         ORDER BY {order_by}
         LIMIT %(limit)s OFFSET %(offset)s
@@ -3495,9 +3506,9 @@ class ObservabilityMetricsService:
         self,
         request: CredentialUsageRequest,
     ) -> CredentialUsageResponse:
-        """Get credential usage statistics from ModelInferenceDetails.
+        """Get credential usage statistics from InferenceFact.
 
-        This method queries the ModelInferenceDetails table to find the most recent
+        This method queries the InferenceFact table to find the most recent
         usage for each credential (api_key_id) within the specified time window.
 
         Args:
@@ -3515,7 +3526,7 @@ class ObservabilityMetricsService:
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
                 COUNT(*) as request_count
-            FROM ModelInferenceDetails
+            FROM InferenceFact
             WHERE request_arrival_time >= %(since)s
                 AND api_key_id IS NOT NULL
             """
@@ -3651,13 +3662,13 @@ class ObservabilityMetricsService:
     async def _get_sync_credential_data(self, sync_mode: str, threshold_minutes: int) -> list[CredentialUsageItem]:
         """Get credential usage data for sync based on mode."""
         try:
-            # Base query for credential usage
+            # Base query for credential usage from InferenceFact
             query = """
             SELECT
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
                 COUNT(*) as request_count
-            FROM ModelInferenceDetails
+            FROM InferenceFact
             WHERE api_key_id IS NOT NULL
             """
 
@@ -3707,18 +3718,17 @@ class ObservabilityMetricsService:
             from datetime import datetime, timezone
 
             logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
-            # Base query for user usage - need to join with ModelInference for token data
+            # Base query for user usage from InferenceFact (denormalized, no JOIN needed)
             query = """
             SELECT
-                mid.user_id,
-                MAX(mid.request_arrival_time) as last_activity_at,
-                SUM(COALESCE(mi.input_tokens, 0) + COALESCE(mi.output_tokens, 0)) as total_tokens,
-                SUM(COALESCE(mid.cost, 0)) as total_cost,
+                user_id,
+                MAX(request_arrival_time) as last_activity_at,
+                SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as total_tokens,
+                SUM(COALESCE(cost, 0)) as total_cost,
                 COUNT(*) as request_count,
-                AVG(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_rate
-            FROM ModelInferenceDetails mid
-            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-            WHERE mid.user_id IS NOT NULL
+                AVG(CASE WHEN is_success THEN 1 ELSE 0 END) as success_rate
+            FROM InferenceFact
+            WHERE user_id IS NOT NULL
             """
 
             params = {}
@@ -3726,12 +3736,12 @@ class ObservabilityMetricsService:
             if sync_mode == "incremental":
                 # Only users with activity within threshold
                 since_time = datetime.now() - timedelta(minutes=threshold_minutes)
-                query += " AND mid.request_arrival_time >= %(since)s"
+                query += " AND request_arrival_time >= %(since)s"
                 params["since"] = since_time
             # For full sync, get ALL users with any activity (no time filter, no user filter)
 
             query += """
-            GROUP BY mid.user_id
+            GROUP BY user_id
             ORDER BY last_activity_at DESC
             """
 
