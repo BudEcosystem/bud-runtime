@@ -18,14 +18,10 @@ function ProjectTags(props: {
       }}
     >
       <div
-        className={`font-[400] leading-[100%] ${props.textClass}`}
+        className={`font-[400] leading-[100%] px-[0.375rem] py-[0.375rem] ${props.textClass}`}
         style={{
           fontSize: "0.625rem",
           color: props.color || "#B3B3B3",
-          paddingTop: "0.375rem",
-          paddingBottom: "0.375rem",
-          paddingLeft: "0.375rem",
-          paddingRight: "0.375rem",
         }}
       >
         {props.name}
