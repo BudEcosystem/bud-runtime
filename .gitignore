@@ -5,6 +5,8 @@
 result
 .cache/
 logs/
+# Exception for budadmin agent logs page
+!services/budadmin/src/pages/home/agentDetails/*/logs/
 
 # GeoIP databases (should be downloaded separately)
 *.mmdb
