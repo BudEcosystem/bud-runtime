@@ -9,6 +9,7 @@ import {
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import ProjectTags from "src/flows/components/ProjectTags";
 import CustomSelect from "src/flows/components/CustomSelect";
 import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -247,13 +248,12 @@ const LogRow = ({
 
           {/* Namespace - fixed width, no indent */}
           <div style={{ width: "90px", flexShrink: 0 }}>
-            <Tag
-              className="border-0 rounded-[6px] text-[9px] px-1.5 py-0.5 truncate max-w-[85px]"
-              style={{ backgroundColor: "rgba(212, 168, 83, 0.1)", color: "#D4A853" }}
-              title={row.namespace}
-            >
-              {row.namespace || "-"}
-            </Tag>
+            <ProjectTags
+              name={row.namespace || "-"}
+              color="#D4A853"
+              tagClass="w-fit"
+              textClass="px-[.15rem] pt-[.15rem] pb-[.2rem] text-[.5rem]"
+            />
           </div>
 
           {/* Count / Expand indicator - indented based on depth */}
@@ -371,13 +371,12 @@ const FlatLogRow = ({
 
           {/* Status */}
           <div style={{ width: "90px", flexShrink: 0 }}>
-            <Tag
-              className="border-0 rounded-[6px] text-[9px] px-1.5 py-0.5 truncate max-w-[85px]"
-              style={{ backgroundColor: "rgba(212, 168, 83, 0.1)", color: "#D4A853" }}
-              title={row.namespace}
-            >
-              {row.namespace || "-"}
-            </Tag>
+            <ProjectTags
+              name={row.namespace || "-"}
+              color="#D4A853"
+              tagClass="w-fit"
+              textClass="px-[.15rem] pt-[.15rem] pb-[.2rem] text-[.5rem]"
+            />
           </div>
 
           {/* Title + metadata */}
