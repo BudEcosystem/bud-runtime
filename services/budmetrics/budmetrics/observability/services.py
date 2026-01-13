@@ -2212,90 +2212,230 @@ class ObservabilityMetricsService:
 
     # New Aggregated Metrics Methods
     async def get_aggregated_metrics(self, request) -> dict:
-        """Get aggregated metrics with server-side calculations."""
-        from budmetrics.observability.schemas import (
-            AggregatedMetricsGroup,
-            AggregatedMetricsResponse,
-            AggregatedMetricValue,
+        """Get aggregated metrics with server-side calculations.
+
+        Strategy:
+        - Uses rollup tables for metrics that don't require raw data (pre-aggregated)
+        - Falls back to InferenceFact for percentile metrics (p95/p99 latency and ttft)
+
+        Rollup Compatible: total_requests, success_rate, avg_latency, total_tokens,
+                          total_input_tokens, total_output_tokens, avg_tokens, total_cost,
+                          avg_cost, ttft_avg, cache_hit_rate, throughput_avg, error_rate,
+                          unique_users
+        Requires Raw Data: p95_latency, p99_latency, ttft_p95, ttft_p99
+        """
+        to_date = request.to_date or datetime.now()
+
+        # Metrics that require raw data for percentile calculations
+        raw_data_metrics = {"p95_latency", "p99_latency", "ttft_p95", "ttft_p99"}
+        # Dimensions that require InferenceFact (not available in rollup tables)
+        raw_data_dimensions = {"user"}
+        needs_raw_data = (
+            any(m in raw_data_metrics for m in request.metrics)
+            or (request.group_by and any(d in raw_data_dimensions for d in request.group_by))
         )
+
+        if needs_raw_data:
+            return await self._get_aggregated_metrics_from_inference_fact(request, to_date)
+        else:
+            return await self._get_aggregated_metrics_from_rollup(request, to_date)
+
+    async def _get_aggregated_metrics_from_rollup(self, request, to_date: datetime) -> dict:
+        """Get aggregated metrics from rollup tables (pre-aggregated).
+
+        Uses InferenceMetrics5m/1h/1d based on time range for better performance.
+        """
+        # Select rollup table based on time range
+        table = self.query_builder._select_rollup_table(request.from_date, to_date)
 
         # Build the base query with efficient aggregations
         select_fields = []
 
-        # Add grouping fields if specified
+        # Add grouping fields if specified (use rm alias prefix)
         group_by_fields = []
         if request.group_by:
             for group in request.group_by:
                 if group == "model":
-                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
-                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                    group_by_fields.extend(["rm.model_id", "rm.model_name"])
+                    select_fields.extend(["rm.model_id", "rm.model_name"])
                 elif group == "project":
-                    group_by_fields.append("mid.project_id")
-                    select_fields.append("mid.project_id")
+                    group_by_fields.append("rm.project_id")
+                    select_fields.append("rm.project_id")
                 elif group == "endpoint":
-                    group_by_fields.append("mid.endpoint_id")
-                    select_fields.append("mid.endpoint_id")
-                elif group == "user":
-                    group_by_fields.append("ga.user_id")
-                    select_fields.append("ga.user_id")
+                    group_by_fields.append("rm.endpoint_id")
+                    select_fields.append("rm.endpoint_id")
                 elif group == "user_project":
-                    group_by_fields.append("mid.api_key_project_id")
-                    select_fields.append("mid.api_key_project_id")
+                    group_by_fields.append("rm.api_key_project_id")
+                    select_fields.append("rm.api_key_project_id")
+
+        # Build aggregation fields using rollup aggregations
+        # Use rm alias prefix to avoid column/alias name conflicts
+        for metric in request.metrics:
+            if metric == "total_requests":
+                select_fields.append("SUM(rm.request_count) as total_requests")
+            elif metric == "success_rate":
+                select_fields.append("SUM(rm.success_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("SUM(rm.sum_response_time_ms) / NULLIF(SUM(rm.request_count), 0) as avg_latency")
+            elif metric == "total_tokens":
+                select_fields.append(
+                    "(SUM(rm.total_input_tokens) + SUM(rm.total_output_tokens)) as total_tokens"
+                )
+            elif metric == "total_input_tokens":
+                select_fields.append("SUM(rm.total_input_tokens) as total_input_tokens")
+            elif metric == "total_output_tokens":
+                select_fields.append("SUM(rm.total_output_tokens) as total_output_tokens")
+            elif metric == "avg_tokens":
+                select_fields.append(
+                    "(SUM(rm.total_input_tokens) + SUM(rm.total_output_tokens)) / NULLIF(SUM(rm.request_count), 0) as avg_tokens"
+                )
+            elif metric == "total_cost":
+                select_fields.append("SUM(rm.total_cost) as total_cost")
+            elif metric == "avg_cost":
+                select_fields.append("SUM(rm.total_cost) / NULLIF(SUM(rm.request_count), 0) as avg_cost")
+            elif metric == "ttft_avg":
+                select_fields.append("SUM(rm.sum_ttft_ms) / NULLIF(SUM(rm.request_count), 0) as ttft_avg")
+            elif metric == "cache_hit_rate":
+                select_fields.append("SUM(rm.cached_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as cache_hit_rate")
+            elif metric == "throughput_avg":
+                select_fields.append(
+                    "SUM(rm.total_output_tokens) * 1000.0 / NULLIF(SUM(rm.sum_response_time_ms), 0) as throughput_avg"
+                )
+            elif metric == "error_rate":
+                select_fields.append("SUM(rm.error_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as error_rate")
+            elif metric == "unique_users":
+                select_fields.append("uniqMerge(rm.unique_users) as unique_users")
+
+        # Build WHERE clause (use rm alias prefix)
+        where_conditions = ["rm.time_bucket >= %(from_date)s", "rm.time_bucket <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": to_date,
+        }
+
+        # Add filters (use rm alias prefix)
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"rm.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("rm.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"rm.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("rm.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("rm.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("rm.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build final query (use rm as table alias)
+        order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        FROM {table} AS rm
+        WHERE {" AND ".join(where_conditions)}
+        {f"GROUP BY {', '.join(group_by_fields)}" if group_by_fields else ""}
+        ORDER BY {order_by}
+        """
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_aggregated_metrics_results(results, request, to_date)
+
+    async def _get_aggregated_metrics_from_inference_fact(self, request, to_date: datetime) -> dict:
+        """Get aggregated metrics from InferenceFact (for percentile metrics).
+
+        Uses InferenceFact when raw data is needed for quantile calculations.
+        No JOINs required - all data in one denormalized table.
+        """
+        # Build the base query with efficient aggregations
+        select_fields = []
+
+        # Add grouping fields if specified (using ifact alias)
+        group_by_fields = []
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["ifact.model_id", "ifact.model_name"])
+                    select_fields.extend(["ifact.model_id", "ifact.model_name"])
+                elif group == "project":
+                    group_by_fields.append("ifact.project_id")
+                    select_fields.append("ifact.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("ifact.endpoint_id")
+                    select_fields.append("ifact.endpoint_id")
+                elif group == "user":
+                    group_by_fields.append("ifact.user_id")
+                    select_fields.append("ifact.user_id")
+                elif group == "user_project":
+                    group_by_fields.append("ifact.api_key_project_id")
+                    select_fields.append("ifact.api_key_project_id")
 
         # Build aggregation fields based on requested metrics
         for metric in request.metrics:
             if metric == "total_requests":
                 select_fields.append("COUNT(*) as total_requests")
             elif metric == "success_rate":
-                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+                select_fields.append("AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
             elif metric == "avg_latency":
-                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
+                select_fields.append("AVG(ifact.response_time_ms) as avg_latency")
             elif metric == "p95_latency":
-                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
+                select_fields.append("quantile(0.95)(ifact.response_time_ms) as p95_latency")
             elif metric == "p99_latency":
-                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+                select_fields.append("quantile(0.99)(ifact.response_time_ms) as p99_latency")
             elif metric == "total_tokens":
-                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+                select_fields.append("SUM(ifact.input_tokens + ifact.output_tokens) as total_tokens")
             elif metric == "total_input_tokens":
-                select_fields.append("SUM(mi.input_tokens) as total_input_tokens")
+                select_fields.append("SUM(ifact.input_tokens) as total_input_tokens")
             elif metric == "total_output_tokens":
-                select_fields.append("SUM(mi.output_tokens) as total_output_tokens")
+                select_fields.append("SUM(ifact.output_tokens) as total_output_tokens")
             elif metric == "avg_tokens":
-                select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
+                select_fields.append("AVG(ifact.input_tokens + ifact.output_tokens) as avg_tokens")
             elif metric == "total_cost":
-                select_fields.append("SUM(mid.cost) as total_cost")
+                select_fields.append("SUM(ifact.cost) as total_cost")
             elif metric == "avg_cost":
-                select_fields.append("AVG(mid.cost) as avg_cost")
+                select_fields.append("AVG(ifact.cost) as avg_cost")
             elif metric == "ttft_avg":
-                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+                select_fields.append("AVG(ifact.ttft_ms) as ttft_avg")
             elif metric == "ttft_p95":
-                select_fields.append("quantile(0.95)(mi.ttft_ms) as ttft_p95")
+                select_fields.append("quantile(0.95)(ifact.ttft_ms) as ttft_p95")
             elif metric == "ttft_p99":
-                select_fields.append("quantile(0.99)(mi.ttft_ms) as ttft_p99")
+                select_fields.append("quantile(0.99)(ifact.ttft_ms) as ttft_p99")
             elif metric == "cache_hit_rate":
-                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+                select_fields.append("AVG(CASE WHEN ifact.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
             elif metric == "throughput_avg":
                 select_fields.append(
-                    "AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput_avg"
+                    "AVG(ifact.output_tokens * 1000.0 / NULLIF(ifact.response_time_ms, 0)) as throughput_avg"
                 )
             elif metric == "error_rate":
-                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+                select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
             elif metric == "unique_users":
-                select_fields.append("uniqExact(ga.user_id) as unique_users")
-
-        # Build FROM clause with joins
-        from_clause = """
-        FROM ModelInferenceDetails mid
-        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        LEFT JOIN GatewayAnalytics ga ON mid.inference_id = ga.inference_id
-        """
+                select_fields.append("uniqExact(ifact.user_id) as unique_users")
 
         # Build WHERE clause
-        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+        where_conditions = [
+            "ifact.request_arrival_time >= %(from_date)s",
+            "ifact.request_arrival_time <= %(to_date)s",
+        ]
 
         params = {
             "from_date": request.from_date,
-            "to_date": request.to_date or datetime.now(),
+            "to_date": to_date,
         }
 
         # Add filters
@@ -2304,34 +2444,33 @@ class ObservabilityMetricsService:
                 if filter_key == "project_id":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"ifact.project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        where_conditions.append("mid.project_id = %(project_id)s")
+                        where_conditions.append("ifact.project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
-                    # Support filtering by api_key_project_id for CLIENT users
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
-                    where_conditions.append("mid.model_id = %(model_id)s")
+                    where_conditions.append("ifact.model_id = %(model_id)s")
                     params["model_id"] = filter_value
                 elif filter_key == "endpoint_id":
-                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
-        # Build final query
+        # Build final query (no JOINs - all data in InferenceFact)
         order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
         query = f"""
         SELECT {", ".join(select_fields)}
-        {from_clause}
+        FROM InferenceFact ifact
         WHERE {" AND ".join(where_conditions)}
         {f"GROUP BY {', '.join(group_by_fields)}" if group_by_fields else ""}
         ORDER BY {order_by}
@@ -2339,6 +2478,16 @@ class ObservabilityMetricsService:
 
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_aggregated_metrics_results(results, request, to_date)
+
+    def _process_aggregated_metrics_results(self, results, request, to_date: datetime) -> dict:
+        """Process aggregated metrics query results into response format."""
+        from budmetrics.observability.schemas import (
+            AggregatedMetricsGroup,
+            AggregatedMetricsResponse,
+            AggregatedMetricValue,
+        )
 
         # Process results
         groups = []
@@ -2349,7 +2498,7 @@ class ObservabilityMetricsService:
                 groups=[],
                 summary={},
                 total_groups=0,
-                date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+                date_range={"from": request.from_date, "to": to_date},
             )
 
         # If no grouping, create summary from single result
@@ -2418,40 +2567,41 @@ class ObservabilityMetricsService:
             groups=groups,
             summary=overall_summary,
             total_groups=len(groups),
-            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            date_range={"from": request.from_date, "to": to_date},
         )
 
     async def get_time_series_data(self, request) -> dict:
-        """Get time-series data with efficient bucketing."""
-        from budmetrics.observability.schemas import (
-            TimeSeriesGroup,
-            TimeSeriesPoint,
-            TimeSeriesResponse,
-        )
+        """Get time-series data with efficient bucketing.
 
-        # Map interval to ClickHouse interval functions
-        # For simple functions, we'll add the column parameter later
-        # For toStartOfInterval, include the full expression
-        if request.interval == "1m":
-            time_bucket_expr = "toStartOfMinute(mid.request_arrival_time)"
-        elif request.interval == "5m":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 5 minute)"
-        elif request.interval == "15m":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 15 minute)"
-        elif request.interval == "30m":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 30 minute)"
-        elif request.interval == "1h":
-            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
-        elif request.interval == "6h":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 6 hour)"
-        elif request.interval == "12h":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 12 hour)"
-        elif request.interval == "1d":
-            time_bucket_expr = "toStartOfDay(mid.request_arrival_time)"
-        elif request.interval == "1w":
-            time_bucket_expr = "toStartOfWeek(mid.request_arrival_time)"
+        Strategy:
+        - Uses rollup tables for metrics that don't require raw data (pre-aggregated)
+        - Falls back to InferenceFact for percentile metrics (p95_latency, p99_latency)
+
+        Rollup Compatible: requests, success_rate, avg_latency, tokens, cost,
+                          ttft_avg, cache_hit_rate, throughput, error_rate
+        Requires Raw Data: p95_latency, p99_latency (quantile functions need raw values)
+        """
+        to_date = request.to_date or datetime.now()
+
+        # Metrics that require raw data for percentile calculations
+        raw_data_metrics = {"p95_latency", "p99_latency"}
+        needs_raw_data = any(m in raw_data_metrics for m in request.metrics)
+
+        if needs_raw_data:
+            return await self._get_time_series_from_inference_fact(request, to_date)
         else:
-            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
+            return await self._get_time_series_from_rollup(request, to_date)
+
+    async def _get_time_series_from_rollup(self, request, to_date: datetime) -> dict:
+        """Get time-series data from rollup tables (pre-aggregated).
+
+        Uses InferenceMetrics5m/1h/1d based on time range for better performance.
+        """
+        # Select rollup table based on time range
+        table = self.query_builder._select_rollup_table(request.from_date, to_date)
+
+        # Map interval to ClickHouse time bucket expression
+        time_bucket_expr = self._get_rollup_time_bucket_expr(request.interval)
 
         # Build select fields
         select_fields = [f"{time_bucket_expr} as time_bucket"]
@@ -2461,49 +2611,47 @@ class ObservabilityMetricsService:
         if request.group_by:
             for group in request.group_by:
                 if group == "model":
-                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
-                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                    group_by_fields.extend(["model_id", "model_name"])
+                    select_fields.extend(["model_id", "model_name"])
                 elif group == "project":
-                    group_by_fields.append("mid.project_id")
-                    select_fields.append("mid.project_id")
+                    group_by_fields.append("project_id")
+                    select_fields.append("project_id")
                 elif group == "endpoint":
-                    group_by_fields.append("mid.endpoint_id")
-                    select_fields.append("mid.endpoint_id")
+                    group_by_fields.append("endpoint_id")
+                    select_fields.append("endpoint_id")
                 elif group == "user_project":
-                    group_by_fields.append("mid.api_key_project_id")
-                    select_fields.append("mid.api_key_project_id")
+                    group_by_fields.append("api_key_project_id")
+                    select_fields.append("api_key_project_id")
 
-        # Add metric calculations
+        # Add metric calculations using rollup aggregations
         for metric in request.metrics:
             if metric == "requests":
-                select_fields.append("COUNT(*) as requests")
+                select_fields.append("SUM(request_count) as requests")
             elif metric == "success_rate":
-                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+                select_fields.append("SUM(success_count) * 100.0 / NULLIF(SUM(request_count), 0) as success_rate")
             elif metric == "avg_latency":
-                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
-            elif metric == "p95_latency":
-                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
-            elif metric == "p99_latency":
-                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+                select_fields.append("SUM(sum_response_time_ms) / NULLIF(SUM(request_count), 0) as avg_latency")
             elif metric == "tokens":
-                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as tokens")
+                select_fields.append("SUM(total_input_tokens + total_output_tokens) as tokens")
             elif metric == "cost":
-                select_fields.append("SUM(mid.cost) as cost")
+                select_fields.append("SUM(total_cost) as cost")
             elif metric == "ttft_avg":
-                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+                select_fields.append("SUM(sum_ttft_ms) / NULLIF(SUM(request_count), 0) as ttft_avg")
             elif metric == "cache_hit_rate":
-                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+                select_fields.append("SUM(cached_count) * 100.0 / NULLIF(SUM(request_count), 0) as cache_hit_rate")
             elif metric == "throughput":
-                select_fields.append("AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput")
+                select_fields.append(
+                    "SUM(total_output_tokens) * 1000.0 / NULLIF(SUM(sum_response_time_ms), 0) as throughput"
+                )
             elif metric == "error_rate":
-                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+                select_fields.append("SUM(error_count) * 100.0 / NULLIF(SUM(request_count), 0) as error_rate")
 
         # Build WHERE clause
-        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+        where_conditions = ["time_bucket >= %(from_date)s", "time_bucket <= %(to_date)s"]
 
         params = {
             "from_date": request.from_date,
-            "to_date": request.to_date or datetime.now(),
+            "to_date": to_date,
         }
 
         # Add filters
@@ -2512,34 +2660,32 @@ class ObservabilityMetricsService:
                 if filter_key == "project_id":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        where_conditions.append("mid.project_id = %(project_id)s")
+                        where_conditions.append("project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
-                    # Support filtering by api_key_project_id for CLIENT users
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        where_conditions.append("api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
-                    where_conditions.append("mid.model_id = %(model_id)s")
+                    where_conditions.append("model_id = %(model_id)s")
                     params["model_id"] = filter_value
                 elif filter_key == "endpoint_id":
-                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
-        # Build query
+        # Build query using rollup table
         query = f"""
         SELECT {", ".join(select_fields)}
-        FROM ModelInferenceDetails mid
-        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        FROM {table}
         WHERE {" AND ".join(where_conditions)}
         GROUP BY {", ".join(group_by_fields)}
         ORDER BY time_bucket ASC
@@ -2547,6 +2693,171 @@ class ObservabilityMetricsService:
 
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_time_series_results(results, request)
+
+    async def _get_time_series_from_inference_fact(self, request, to_date: datetime) -> dict:
+        """Get time-series data from InferenceFact (for percentile metrics).
+
+        Uses InferenceFact when raw data is needed for quantile calculations.
+        No JOINs required - all data in one denormalized table.
+        """
+        # Map interval to ClickHouse time bucket expression using ifact alias
+        time_bucket_expr = self._get_inference_fact_time_bucket_expr(request.interval)
+
+        # Build select fields
+        select_fields = [f"{time_bucket_expr} as time_bucket"]
+
+        # Add grouping fields
+        group_by_fields = ["time_bucket"]
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["ifact.model_id", "ifact.model_name"])
+                    select_fields.extend(["ifact.model_id", "ifact.model_name"])
+                elif group == "project":
+                    group_by_fields.append("ifact.project_id")
+                    select_fields.append("ifact.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("ifact.endpoint_id")
+                    select_fields.append("ifact.endpoint_id")
+                elif group == "user_project":
+                    group_by_fields.append("ifact.api_key_project_id")
+                    select_fields.append("ifact.api_key_project_id")
+
+        # Add metric calculations
+        for metric in request.metrics:
+            if metric == "requests":
+                select_fields.append("COUNT(*) as requests")
+            elif metric == "success_rate":
+                select_fields.append("AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("AVG(ifact.response_time_ms) as avg_latency")
+            elif metric == "p95_latency":
+                select_fields.append("quantile(0.95)(ifact.response_time_ms) as p95_latency")
+            elif metric == "p99_latency":
+                select_fields.append("quantile(0.99)(ifact.response_time_ms) as p99_latency")
+            elif metric == "tokens":
+                select_fields.append("SUM(ifact.input_tokens + ifact.output_tokens) as tokens")
+            elif metric == "cost":
+                select_fields.append("SUM(ifact.cost) as cost")
+            elif metric == "ttft_avg":
+                select_fields.append("AVG(ifact.ttft_ms) as ttft_avg")
+            elif metric == "cache_hit_rate":
+                select_fields.append("AVG(CASE WHEN ifact.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+            elif metric == "throughput":
+                select_fields.append(
+                    "AVG(ifact.output_tokens * 1000.0 / NULLIF(ifact.response_time_ms, 0)) as throughput"
+                )
+            elif metric == "error_rate":
+                select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+
+        # Build WHERE clause
+        where_conditions = [
+            "ifact.request_arrival_time >= %(from_date)s",
+            "ifact.request_arrival_time <= %(to_date)s",
+        ]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": to_date,
+        }
+
+        # Add filters
+        if hasattr(request, "filters") and request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("ifact.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build query (no JOINs - all data in InferenceFact)
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        FROM InferenceFact ifact
+        WHERE {" AND ".join(where_conditions)}
+        GROUP BY {", ".join(group_by_fields)}
+        ORDER BY time_bucket ASC
+        """
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_time_series_results(results, request)
+
+    def _get_rollup_time_bucket_expr(self, interval: str) -> str:
+        """Get time bucket expression for rollup tables."""
+        if interval == "1m":
+            return "toStartOfMinute(time_bucket)"
+        elif interval == "5m":
+            return "toStartOfInterval(time_bucket, INTERVAL 5 minute)"
+        elif interval == "15m":
+            return "toStartOfInterval(time_bucket, INTERVAL 15 minute)"
+        elif interval == "30m":
+            return "toStartOfInterval(time_bucket, INTERVAL 30 minute)"
+        elif interval == "1h":
+            return "toStartOfHour(time_bucket)"
+        elif interval == "6h":
+            return "toStartOfInterval(time_bucket, INTERVAL 6 hour)"
+        elif interval == "12h":
+            return "toStartOfInterval(time_bucket, INTERVAL 12 hour)"
+        elif interval == "1d":
+            return "toStartOfDay(time_bucket)"
+        elif interval == "1w":
+            return "toStartOfWeek(time_bucket)"
+        else:
+            return "toStartOfHour(time_bucket)"
+
+    def _get_inference_fact_time_bucket_expr(self, interval: str) -> str:
+        """Get time bucket expression for InferenceFact table."""
+        if interval == "1m":
+            return "toStartOfMinute(ifact.request_arrival_time)"
+        elif interval == "5m":
+            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 5 minute)"
+        elif interval == "15m":
+            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 15 minute)"
+        elif interval == "30m":
+            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 30 minute)"
+        elif interval == "1h":
+            return "toStartOfHour(ifact.request_arrival_time)"
+        elif interval == "6h":
+            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 6 hour)"
+        elif interval == "12h":
+            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 12 hour)"
+        elif interval == "1d":
+            return "toStartOfDay(ifact.request_arrival_time)"
+        elif interval == "1w":
+            return "toStartOfWeek(ifact.request_arrival_time)"
+        else:
+            return "toStartOfHour(ifact.request_arrival_time)"
+
+    def _process_time_series_results(self, results, request) -> dict:
+        """Process time series query results into response format."""
+        from budmetrics.observability.schemas import (
+            TimeSeriesGroup,
+            TimeSeriesPoint,
+            TimeSeriesResponse,
+        )
 
         # Process results into groups
         groups_dict = defaultdict(list)
@@ -2625,184 +2936,282 @@ class ObservabilityMetricsService:
         )
 
     async def get_geographic_data(self, request) -> dict:
-        """Get geographic distribution data from GatewayAnalytics table.
+        """Get geographic distribution data using rollup tables or InferenceFact.
 
-        Note: Currently inference_id in GatewayAnalytics is not populated,
-        so success_rate and avg_latency_ms will be NULL until that is fixed.
-        Geographic data (country, region, city, lat/long) is directly available.
+        Strategy:
+        - Country-level queries use rollup tables (InferenceMetrics5m/1h/1d) for performance
+        - Region/City queries use InferenceFact (rollup doesn't have these columns)
+
+        All geographic data is now available in InferenceFact, eliminating JOIN issues.
+        """
+        to_date = request.to_date or datetime.now()
+
+        # Country-level can use rollup tables for better performance
+        if request.group_by == "country":
+            return await self._get_geographic_data_from_rollup(request, to_date)
+        else:
+            # Region/City require InferenceFact (not in rollup tables)
+            return await self._get_geographic_data_from_inference_fact(request, to_date)
+
+    async def _get_geographic_data_from_rollup(self, request, to_date: datetime) -> dict:
+        """Get country-level geographic data from rollup tables.
+
+        Uses pre-aggregated data for better performance on large time ranges.
+        Rollup tables have country_code as a dimension column.
         """
         from budmetrics.observability.schemas import (
             GeographicDataPoint,
             GeographicDataResponse,
         )
 
-        # Build query based on group_by parameter
-        # Note: success_rate and avg_latency_ms require inference_id to be populated
-        # For now, we use NULL-safe expressions that return NULL when no match
-        # Success rate calculation that handles NULL inference_id (returns NULL when no match)
-        success_rate_expr = (
-            "AVG(CASE WHEN mid.is_success IS NOT NULL "
-            "THEN (CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) "
-            "ELSE NULL END) * 100 as success_rate"
-        )
-
-        if request.group_by == "country":
-            select_fields = [
-                "ga.country_code",
-                "COUNT(*) as request_count",
-                success_rate_expr,
-                "AVG(mi.response_time_ms) as avg_latency_ms",
-                "uniqExact(ga.user_id) as unique_users",
-                "any(ga.latitude) as latitude",
-                "any(ga.longitude) as longitude",
-            ]
-            group_by_clause = "ga.country_code"
-            having_clause = "ga.country_code IS NOT NULL AND ga.country_code != ''"
-        elif request.group_by == "region":
-            select_fields = [
-                "ga.country_code",
-                "ga.region",
-                "COUNT(*) as request_count",
-                success_rate_expr,
-                "AVG(mi.response_time_ms) as avg_latency_ms",
-                "uniqExact(ga.user_id) as unique_users",
-            ]
-            group_by_clause = "ga.country_code, ga.region"
-            having_clause = "ga.region IS NOT NULL AND ga.region != ''"
-        else:  # city
-            select_fields = [
-                "ga.country_code",
-                "ga.region",
-                "ga.city",
-                "COUNT(*) as request_count",
-                success_rate_expr,
-                "AVG(mi.response_time_ms) as avg_latency_ms",
-                "uniqExact(ga.user_id) as unique_users",
-                "any(ga.latitude) as latitude",
-                "any(ga.longitude) as longitude",
-            ]
-            group_by_clause = "ga.country_code, ga.region, ga.city"
-            having_clause = "ga.city IS NOT NULL AND ga.city != ''"
-
-        # Build WHERE conditions (only for GatewayAnalytics table)
-        where_conditions = ["ga.timestamp >= %(from_date)s", "ga.timestamp <= %(to_date)s"]
-
-        # Build JOIN conditions for project filtering (applied in JOIN, not WHERE)
-        join_conditions = ["ga.inference_id = mid.inference_id"]
+        # Select appropriate rollup table based on time range
+        table = self.query_builder._select_rollup_table(request.from_date, to_date)
 
         params = {
             "from_date": request.from_date,
-            "to_date": request.to_date or datetime.now(),
+            "to_date": to_date,
+            "limit": request.limit,
         }
 
-        # Add filters - project filters go in JOIN condition, others in WHERE
+        # Build WHERE conditions
+        where_conditions = [
+            "time_bucket >= %(from_date)s",
+            "time_bucket <= %(to_date)s",
+            "country_code IS NOT NULL",
+            "country_code != ''",
+        ]
+
+        # Add filters
         if request.filters:
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
-                    # Move project filter to JOIN condition to preserve LEFT JOIN semantics
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        join_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        join_conditions.append("mid.project_id = %(project_id)s")
+                        where_conditions.append("project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
-                    # Support filtering by api_key_project_id for CLIENT users
-                    # Move to JOIN condition to preserve LEFT JOIN semantics
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        join_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        join_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        where_conditions.append("api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
-                    # Country filter stays in WHERE clause
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"ga.country_code IN ({','.join(placeholders)})")
+                        where_conditions.append(f"country_code IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"country_{i}"] = val
                     else:
-                        where_conditions.append("ga.country_code = %(country_code)s")
+                        where_conditions.append("country_code = %(country_code)s")
                         params["country_code"] = filter_value
 
-        # Build main query with JOIN conditions in the ON clause
-        join_clause = " AND ".join(join_conditions)
+        where_clause = " AND ".join(where_conditions)
+
+        # Query with pre-aggregated metrics
         query = f"""
-        WITH total_requests AS (
-            SELECT COUNT(*) as total
-            FROM GatewayAnalytics ga
-            LEFT JOIN ModelInferenceDetails mid ON {join_clause}
-            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-            WHERE {" AND ".join(where_conditions)}
+        WITH
+            total_cte AS (
+                SELECT SUM(request_count) as total
+                FROM {table}
+                WHERE {where_clause}
+            )
+        SELECT
+            country_code,
+            SUM(request_count) as request_count,
+            SUM(success_count) * 100.0 / NULLIF(SUM(request_count), 0) as success_rate,
+            SUM(sum_response_time_ms) / NULLIF(SUM(request_count), 0) as avg_latency_ms,
+            uniqMerge(unique_users) as unique_users,
+            (SUM(request_count) * 100.0 / NULLIF((SELECT total FROM total_cte), 0)) as percentage
+        FROM {table}
+        WHERE {where_clause}
+        GROUP BY country_code
+        ORDER BY request_count DESC
+        LIMIT %(limit)s
+        """
+
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Get total requests
+        total_query = f"""
+        SELECT SUM(request_count) as total_requests
+        FROM {table}
+        WHERE {where_clause}
+        """
+        total_result = await self.clickhouse_client.execute_query(
+            total_query, {k: v for k, v in params.items() if k != "limit"}
         )
+        total_requests = int(total_result[0][0] or 0) if total_result else 0
+
+        # Process results
+        locations = []
+        for row in results:
+            location = GeographicDataPoint(
+                country_code=row[0],
+                request_count=int(row[1] or 0),
+                success_rate=float(row[2]) if row[2] is not None else 0.0,
+                avg_latency_ms=float(row[3]) if row[3] is not None else None,
+                unique_users=int(row[4] or 0) if row[4] is not None else None,
+                latitude=None,  # Not available in rollup tables
+                longitude=None,  # Not available in rollup tables
+                percentage=float(row[5]) if row[5] is not None else 0.0,
+            )
+            locations.append(location)
+
+        return GeographicDataResponse(
+            locations=locations,
+            total_requests=total_requests,
+            total_locations=len(locations),
+            date_range={"from": request.from_date, "to": to_date},
+            group_by=request.group_by,
+        )
+
+    async def _get_geographic_data_from_inference_fact(self, request, to_date: datetime) -> dict:
+        """Get region/city-level geographic data from InferenceFact.
+
+        Uses InferenceFact for queries that need region, city, latitude, longitude.
+        No JOINs required - all data is in one denormalized table.
+        """
+        from budmetrics.observability.schemas import (
+            GeographicDataPoint,
+            GeographicDataResponse,
+        )
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": to_date,
+            "limit": request.limit,
+        }
+
+        # Build WHERE conditions using ifact alias (avoid conflict with ClickHouse inf constant)
+        where_conditions = [
+            "ifact.timestamp >= %(from_date)s",
+            "ifact.timestamp <= %(to_date)s",
+        ]
+
+        # Build select fields and group by based on group_by parameter
+        if request.group_by == "region":
+            select_fields = [
+                "ifact.country_code",
+                "ifact.region",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(ifact.response_time_ms) as avg_latency_ms",
+                "uniqExact(ifact.user_id) as unique_users",
+            ]
+            group_by_clause = "ifact.country_code, ifact.region"
+            having_clause = "ifact.region IS NOT NULL AND ifact.region != ''"
+        else:  # city
+            select_fields = [
+                "ifact.country_code",
+                "ifact.region",
+                "ifact.city",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(ifact.response_time_ms) as avg_latency_ms",
+                "uniqExact(ifact.user_id) as unique_users",
+                "any(ifact.latitude) as latitude",
+                "any(ifact.longitude) as longitude",
+            ]
+            group_by_clause = "ifact.country_code, ifact.region, ifact.city"
+            having_clause = "ifact.city IS NOT NULL AND ifact.city != ''"
+
+        # Add filters
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
+                elif filter_key == "country_code":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.country_code IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"country_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.country_code = %(country_code)s")
+                        params["country_code"] = filter_value
+
+        where_clause = " AND ".join(where_conditions)
+
+        # Build query (no JOINs - InferenceFact has all data)
+        query = f"""
+        WITH
+            total_cte AS (
+                SELECT COUNT(*) as total
+                FROM InferenceFact ifact
+                WHERE {where_clause}
+            )
         SELECT
             {", ".join(select_fields)},
-            (request_count * 100.0 / NULLIF((SELECT total FROM total_requests), 0)) as percentage
-        FROM GatewayAnalytics ga
-        LEFT JOIN ModelInferenceDetails mid ON {join_clause}
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE {" AND ".join(where_conditions)}
+            (request_count * 100.0 / NULLIF((SELECT total FROM total_cte), 0)) as percentage
+        FROM InferenceFact ifact
+        WHERE {where_clause}
         GROUP BY {group_by_clause}
         HAVING {having_clause}
         ORDER BY request_count DESC
         LIMIT %(limit)s
         """
 
-        params["limit"] = request.limit
-        # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
-        # Get total count for summary (only from GatewayAnalytics, no need to join)
+        # Get total count
         total_query = f"""
         SELECT COUNT(*) as total_requests
-        FROM GatewayAnalytics ga
-        WHERE {" AND ".join(where_conditions)}
+        FROM InferenceFact ifact
+        WHERE {where_clause}
         """
         total_result = await self.clickhouse_client.execute_query(
             total_query, {k: v for k, v in params.items() if k != "limit"}
         )
-        total_requests = total_result[0][0] if total_result else 0
+        total_requests = int(total_result[0][0] or 0) if total_result else 0
+
         # Process results
         locations = []
         for row in results:
-            if request.group_by == "country":
-                location = GeographicDataPoint(
-                    country_code=row[0],
-                    request_count=row[1],
-                    success_rate=row[2] if len(row) > 2 else 0.0,
-                    avg_latency_ms=row[3] if len(row) > 3 else None,
-                    unique_users=row[4] if len(row) > 4 else None,
-                    latitude=row[5] if len(row) > 5 else None,
-                    longitude=row[6] if len(row) > 6 else None,
-                    percentage=row[7] if len(row) > 7 else 0.0,
-                )
-            elif request.group_by == "region":
+            if request.group_by == "region":
                 location = GeographicDataPoint(
                     country_code=row[0],
                     region=row[1],
-                    request_count=row[2],
-                    success_rate=row[3] if len(row) > 3 else 0.0,
-                    avg_latency_ms=row[4] if len(row) > 4 else None,
-                    unique_users=row[5] if len(row) > 5 else None,
-                    percentage=row[6] if len(row) > 6 else 0.0,
+                    request_count=int(row[2] or 0),
+                    success_rate=float(row[3]) if row[3] is not None else 0.0,
+                    avg_latency_ms=float(row[4]) if row[4] is not None else None,
+                    unique_users=int(row[5] or 0) if row[5] is not None else None,
+                    percentage=float(row[6]) if row[6] is not None else 0.0,
                 )
             else:  # city
                 location = GeographicDataPoint(
                     country_code=row[0],
                     region=row[1],
                     city=row[2],
-                    request_count=row[3],
-                    success_rate=row[4] if len(row) > 4 else 0.0,
-                    avg_latency_ms=row[5] if len(row) > 5 else None,
-                    unique_users=row[6] if len(row) > 6 else None,
-                    latitude=row[7] if len(row) > 7 else None,
-                    longitude=row[8] if len(row) > 8 else None,
-                    percentage=row[9] if len(row) > 9 else 0.0,
+                    request_count=int(row[3] or 0),
+                    success_rate=float(row[4]) if row[4] is not None else 0.0,
+                    avg_latency_ms=float(row[5]) if row[5] is not None else None,
+                    unique_users=int(row[6] or 0) if row[6] is not None else None,
+                    latitude=float(row[7]) if row[7] is not None else None,
+                    longitude=float(row[8]) if row[8] is not None else None,
+                    percentage=float(row[9]) if row[9] is not None else 0.0,
                 )
 
             locations.append(location)
@@ -2811,7 +3220,7 @@ class ObservabilityMetricsService:
             locations=locations,
             total_requests=total_requests,
             total_locations=len(locations),
-            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            date_range={"from": request.from_date, "to": to_date},
             group_by=request.group_by,
         )
 
@@ -2821,6 +3230,8 @@ class ObservabilityMetricsService:
         This method calculates latency distribution by creating histogram buckets
         and counting requests that fall into each bucket. It supports custom buckets
         and grouping by various dimensions.
+
+        Uses InferenceFact table (denormalized) - no JOINs required.
 
         Args:
             request: The latency distribution request parameters.
@@ -2853,10 +3264,10 @@ class ObservabilityMetricsService:
         from_date_str = request.from_date.strftime("%Y-%m-%d %H:%M:%S")
         to_date_str = (request.to_date or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
 
-        # Build filters
+        # Build filters using ifact alias (avoid conflict with ClickHouse inf constant)
         filter_conditions = [
-            f"toDateTime('{from_date_str}') <= request_arrival_time",
-            f"request_arrival_time < toDateTime('{to_date_str}')",
+            f"toDateTime('{from_date_str}') <= ifact.request_arrival_time",
+            f"ifact.request_arrival_time < toDateTime('{to_date_str}')",
         ]
 
         if request.filters:
@@ -2865,7 +3276,7 @@ class ObservabilityMetricsService:
                 if isinstance(project_ids, str):
                     project_ids = [project_ids]
                 project_filter = "', '".join(str(pid) for pid in project_ids)
-                filter_conditions.append(f"toString(project_id) IN ('{project_filter}')")
+                filter_conditions.append(f"toString(ifact.project_id) IN ('{project_filter}')")
 
             if "api_key_project_id" in request.filters:
                 # Support filtering by api_key_project_id for CLIENT users
@@ -2873,27 +3284,26 @@ class ObservabilityMetricsService:
                 if isinstance(api_key_project_ids, str):
                     api_key_project_ids = [api_key_project_ids]
                 api_key_project_filter = "', '".join(str(pid) for pid in api_key_project_ids)
-                filter_conditions.append(f"toString(api_key_project_id) IN ('{api_key_project_filter}')")
+                filter_conditions.append(f"toString(ifact.api_key_project_id) IN ('{api_key_project_filter}')")
 
             if "endpoint_id" in request.filters:
                 endpoint_ids = request.filters["endpoint_id"]
                 if isinstance(endpoint_ids, str):
                     endpoint_ids = [endpoint_ids]
                 endpoint_filter = "', '".join(str(eid) for eid in endpoint_ids)
-                filter_conditions.append(f"toString(endpoint_id) IN ('{endpoint_filter}')")
+                filter_conditions.append(f"toString(ifact.endpoint_id) IN ('{endpoint_filter}')")
 
             if "model_id" in request.filters:
                 model_ids = request.filters["model_id"]
                 if isinstance(model_ids, str):
                     model_ids = [model_ids]
                 model_filter = "', '".join(str(mid) for mid in model_ids)
-                filter_conditions.append(f"toString(model_id) IN ('{model_filter}')")
+                filter_conditions.append(f"toString(ifact.model_id) IN ('{model_filter}')")
 
         where_clause = " AND ".join(filter_conditions)
 
-        # Calculate latency from ModelInference table's response_time_ms column
-        # We need to join with ModelInference table to get the actual response time
-        latency_expr = "COALESCE(mid.response_time_ms, 0)"
+        # Latency from InferenceFact's response_time_ms column (no JOIN needed)
+        latency_expr = "COALESCE(ifact.response_time_ms, 0)"
 
         # Build bucket case expressions for distribution
         bucket_cases = []
@@ -2913,8 +3323,7 @@ class ObservabilityMetricsService:
                     {bucket_case_expr} as bucket,
                     count() as request_count,
                     avg({latency_expr}) as avg_latency_in_bucket
-                FROM ModelInferenceDetails mdi
-                LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id
+                FROM InferenceFact ifact
                 WHERE {where_clause}
                 GROUP BY bucket
                 ORDER BY
@@ -2932,8 +3341,8 @@ class ObservabilityMetricsService:
 
             result = await self.clickhouse_client.execute_query(query)
 
-            # Get total count for percentage calculation
-            total_query = f"SELECT count() FROM ModelInferenceDetails mdi LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id WHERE {where_clause}"
+            # Get total count for percentage calculation (no JOIN needed)
+            total_query = f"SELECT count() FROM InferenceFact ifact WHERE {where_clause}"
             total_result = await self.clickhouse_client.execute_query(total_query)
             total_requests = total_result[0][0] if total_result else 0
 
@@ -2968,37 +3377,29 @@ class ObservabilityMetricsService:
         groups = []
         total_requests = 0
 
-        # Determine grouping columns and joins needed
+        # Determine grouping columns (all from InferenceFact - no JOINs needed)
         group_columns = []
-        join_tables = []
-
-        # Always join with ModelInference to get response_time_ms
-        join_tables.append("LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id")
 
         if "model" in request.group_by:
-            group_columns.extend(["toString(mdi.model_id) as model_id", "mid.model_name as model_name"])
+            group_columns.extend(["toString(ifact.model_id) as model_id", "ifact.model_name as model_name"])
 
         if "project" in request.group_by:
-            # We have project_id in ModelInferenceDetails, but might need project name
-            group_columns.extend(["toString(mdi.project_id) as project_id", "'Unknown' as project_name"])
+            group_columns.extend(["toString(ifact.project_id) as project_id", "'Unknown' as project_name"])
 
         if "endpoint" in request.group_by:
-            group_columns.extend(["toString(mdi.endpoint_id) as endpoint_id", "'Unknown' as endpoint_name"])
+            group_columns.extend(["toString(ifact.endpoint_id) as endpoint_id", "'Unknown' as endpoint_name"])
 
         if "user" in request.group_by:
-            # User info would need additional joins - for now use project as proxy
-            group_columns.extend(["toString(mdi.project_id) as user_id"])
+            group_columns.extend(["toString(ifact.user_id) as user_id"])
 
         if "user_project" in request.group_by:
-            group_columns.extend(["toString(mdi.api_key_project_id) as api_key_project_id"])
+            group_columns.extend(["toString(ifact.api_key_project_id) as api_key_project_id"])
 
         group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
         select_columns = ", ".join(group_columns)
 
-        # Build grouped query with bucket distribution
+        # Build grouped query with bucket distribution (no JOINs needed)
         bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
-
-        joins_clause = " ".join(join_tables) if join_tables else ""
 
         query = f"""
             WITH grouped_data AS (
@@ -3007,8 +3408,7 @@ class ObservabilityMetricsService:
                     {bucket_case_expr} as bucket,
                     count() as request_count,
                     avg({latency_expr}) as avg_latency_in_bucket
-                FROM ModelInferenceDetails mdi
-                {joins_clause}
+                FROM InferenceFact ifact
                 WHERE {where_clause}
                 GROUP BY {group_by_clause}, bucket
             )
@@ -3021,8 +3421,8 @@ class ObservabilityMetricsService:
 
         result = await self.clickhouse_client.execute_query(query)
 
-        # Get overall total for percentage calculations
-        total_query = f"SELECT count() FROM ModelInferenceDetails mdi {joins_clause} WHERE {where_clause}"
+        # Get overall total for percentage calculations (no JOIN needed)
+        total_query = f"SELECT count() FROM InferenceFact ifact WHERE {where_clause}"
         total_result = await self.clickhouse_client.execute_query(total_query)
         total_requests = total_result[0][0] if total_result else 0
 
