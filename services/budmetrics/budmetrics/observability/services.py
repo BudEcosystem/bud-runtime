@@ -3372,6 +3372,10 @@ class ObservabilityMetricsService:
         if not request.group_by:
             bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
 
+            # Build dynamic ORDER BY based on actual number of buckets
+            order_cases = [f"WHEN '{bucket['label']}' THEN {i + 1}" for i, bucket in enumerate(buckets)]
+            order_case_expr = f"CASE bucket {' '.join(order_cases)} ELSE {len(buckets) + 1} END"
+
             query = f"""
                 SELECT
                     {bucket_case_expr} as bucket,
@@ -3380,17 +3384,7 @@ class ObservabilityMetricsService:
                 FROM InferenceFact ifact
                 WHERE {where_clause}
                 GROUP BY bucket
-                ORDER BY
-                    CASE bucket
-                        WHEN '{buckets[0]["label"]}' THEN 1
-                        WHEN '{buckets[1]["label"]}' THEN 2
-                        WHEN '{buckets[2]["label"]}' THEN 3
-                        WHEN '{buckets[3]["label"]}' THEN 4
-                        WHEN '{buckets[4]["label"]}' THEN 5
-                        WHEN '{buckets[5]["label"]}' THEN 6
-                        WHEN '{buckets[6]["label"]}' THEN 7
-                        ELSE 8
-                    END
+                ORDER BY {order_case_expr}
             """
 
             result = await self.clickhouse_client.execute_query(query)
@@ -3419,12 +3413,22 @@ class ObservabilityMetricsService:
                     )
                 )
 
+            # Clean up bucket definitions for response (replace inf with large number for JSON serialization)
+            clean_buckets = [
+                {
+                    "min": bucket["min"],
+                    "max": 999999999 if bucket["max"] == float("inf") else bucket["max"],
+                    "label": bucket["label"],
+                }
+                for bucket in buckets
+            ]
+
             return LatencyDistributionResponse(
                 groups=[],
                 overall_distribution=overall_buckets,
                 total_requests=total_requests,
                 date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
-                bucket_definitions=buckets,
+                bucket_definitions=clean_buckets,
             )
 
         # Handle grouped queries
