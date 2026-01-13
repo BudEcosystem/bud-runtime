@@ -5,7 +5,7 @@
 result
 .cache/
 logs/
-# Exception for budadmin agent logs page
+# Exception for budadmin agent logs UI page (React components, not log files)
 !services/budadmin/src/pages/home/agentDetails/*/logs/
 
 # GeoIP databases (should be downloaded separately)
