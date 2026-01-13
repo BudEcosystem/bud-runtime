@@ -247,7 +247,7 @@ const LogRow = ({
           </div>
 
           {/* Namespace - fixed width, no indent */}
-          <div style={{ width: "90px", flexShrink: 0 }}>
+          <div style={{ width: "90px", flexShrink: 0 }} className="flex justify-start items-center">
             <ProjectTags
               name={row.namespace || "-"}
               color="#D4A853"
@@ -302,7 +302,7 @@ const LogRow = ({
             </div>
           </div>
         </div>
-        <div className="flex justify-end items-center min-w-[30%] pr-[12px] pl-[12px] flex-shrink-0 bg-[#101010]">
+        <div className="flex justify-end items-center min-w-[30%] pr-[12px] pl-[12px] flex-shrink-0">
           {/* Timeline */}
           <DurationBar
             duration={row.duration}
