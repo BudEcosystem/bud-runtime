@@ -3066,6 +3066,7 @@ class ObservabilityMetricsService:
         where_clause = " AND ".join(where_conditions)
 
         # Query with pre-aggregated metrics
+        # Note: Use different alias names to avoid ClickHouse confusing column vs alias
         query = f"""
         WITH
             total_cte AS (
@@ -3075,7 +3076,7 @@ class ObservabilityMetricsService:
             )
         SELECT
             country_code,
-            SUM(request_count) as request_count,
+            SUM(request_count) as total_requests,
             SUM(success_count) * 100.0 / NULLIF(SUM(request_count), 0) as success_rate,
             SUM(sum_response_time_ms) / NULLIF(SUM(request_count), 0) as avg_latency_ms,
             uniqMerge(unique_users) as unique_users,
@@ -3083,7 +3084,7 @@ class ObservabilityMetricsService:
         FROM {table}
         WHERE {where_clause}
         GROUP BY country_code
-        ORDER BY request_count DESC
+        ORDER BY 2 DESC
         LIMIT %(limit)s
         """
 
@@ -3158,6 +3159,7 @@ class ObservabilityMetricsService:
             ]
             group_by_clause = "ifact.country_code, ifact.region"
             having_clause = "ifact.region IS NOT NULL AND ifact.region != ''"
+            request_count_pos = 3  # Position of COUNT(*) in SELECT (1-indexed)
         else:  # city
             select_fields = [
                 "ifact.country_code",
@@ -3172,6 +3174,7 @@ class ObservabilityMetricsService:
             ]
             group_by_clause = "ifact.country_code, ifact.region, ifact.city"
             having_clause = "ifact.city IS NOT NULL AND ifact.city != ''"
+            request_count_pos = 4  # Position of COUNT(*) in SELECT (1-indexed)
 
         # Add filters
         if request.filters:
@@ -3216,12 +3219,12 @@ class ObservabilityMetricsService:
             )
         SELECT
             {", ".join(select_fields)},
-            (request_count * 100.0 / NULLIF((SELECT total FROM total_cte), 0)) as percentage
+            (COUNT(*) * 100.0 / NULLIF((SELECT total FROM total_cte), 0)) as percentage
         FROM InferenceFact ifact
         WHERE {where_clause}
         GROUP BY {group_by_clause}
         HAVING {having_clause}
-        ORDER BY request_count DESC
+        ORDER BY {request_count_pos} DESC
         LIMIT %(limit)s
         """
 
