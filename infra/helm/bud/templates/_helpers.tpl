@@ -202,3 +202,62 @@ Usage: {{ include "bud.affinity" (dict "service" .Values.microservices.budapp "g
 {{- toYaml $global.affinity }}
 {{- end }}
 {{- end }}
+
+{{/*
+HPA (Horizontal Pod Autoscaler) template for microservices
+Creates a standardized HPA resource with CPU and memory based scaling
+Usage: {{ include "bud.hpa" (dict "serviceName" "budapp" "Values" .Values "Release" .Release) }}
+*/}}
+{{- define "bud.hpa" -}}
+{{- $serviceName := .serviceName -}}
+{{- $service := index .Values.microservices $serviceName -}}
+{{- if and $service.autoscaling $service.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Release.Name }}-{{ $serviceName }}
+  labels:
+    app: {{ .Release.Name }}-{{ $serviceName }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Release.Name }}-{{ $serviceName }}
+  minReplicas: {{ $service.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ $service.autoscaling.maxReplicas | default 3 }}
+  metrics:
+    {{- if $service.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $service.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $service.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $service.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ $service.autoscaling.scaleDownStabilizationSeconds | default 300 }}
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: {{ $service.autoscaling.scaleUpStabilizationSeconds | default 30 }}
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+      selectPolicy: Max
+{{- end }}
+{{- end }}

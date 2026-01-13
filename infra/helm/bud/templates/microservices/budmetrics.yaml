@@ -8,7 +8,9 @@ metadata:
     {{ $key }}: {{ $value | quote }}
     {{- end }}
 spec:
+  {{- if not (and .Values.microservices.budmetrics.autoscaling .Values.microservices.budmetrics.autoscaling.enabled) }}
   replicas: 1
+  {{- end }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-budmetrics
@@ -100,4 +102,8 @@ spec:
     maxAwaitDurationMs: 50
 scopes:
   - budmetrics
+{{- if and .Values.microservices.budmetrics.autoscaling .Values.microservices.budmetrics.autoscaling.enabled }}
+---
+{{- include "bud.hpa" (dict "serviceName" "budmetrics" "Values" .Values "Release" .Release) }}
+{{- end }}
 {{ end }}

@@ -8,7 +8,9 @@ metadata:
     {{ $key }}: {{ $value | quote }}
     {{- end }}
 spec:
+  {{- if not (and .Values.microservices.budplayground.autoscaling .Values.microservices.budplayground.autoscaling.enabled) }}
   replicas: 1
+  {{- end }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-budplayground
@@ -77,4 +79,8 @@ spec:
   selector:
     app: {{ .Release.Name }}-budplayground
   type: ClusterIP
+{{- if and .Values.microservices.budplayground.autoscaling .Values.microservices.budplayground.autoscaling.enabled }}
+---
+{{- include "bud.hpa" (dict "serviceName" "budplayground" "Values" .Values "Release" .Release) }}
+{{- end }}
 {{ end }}
