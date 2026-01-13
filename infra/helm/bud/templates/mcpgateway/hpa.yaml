@@ -1,0 +1,3 @@
+{{- if and .Values.microservices.mcpgateway.autoscaling .Values.microservices.mcpgateway.autoscaling.enabled }}
+{{- include "bud.hpa" (dict "serviceName" "mcpgateway" "Values" .Values "Release" .Release) }}
+{{- end }}

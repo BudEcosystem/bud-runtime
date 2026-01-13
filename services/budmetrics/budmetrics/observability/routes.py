@@ -701,6 +701,7 @@ async def list_traces(
     to_date: datetime = Query(..., description="End date for filtering"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=1000, description="Number of results to return"),
+    flatten: bool = Query(False, description="If true, return all spans (root + children) sorted by time"),
 ) -> Response:
     """List OTel traces filtered by resource type/id and project_id.
 
@@ -709,9 +710,11 @@ async def list_traces(
     - Filtering by project_id
     - Date range filtering
     - Pagination (offset/limit)
+    - Flatten mode to return all spans (root + children) sorted by time
 
     Returns root spans (gateway_analytics) matching the filter criteria with
     full trace details including all 22 columns from the otel_traces table.
+    When flatten=true, returns all spans for matching traces sorted by timestamp.
 
     Args:
         resource_type: Type of resource to filter by (e.g., 'prompt')
@@ -721,6 +724,7 @@ async def list_traces(
         to_date: End date for filtering
         offset: Pagination offset (default: 0)
         limit: Number of results to return (default: 50, max: 1000)
+        flatten: If true, return all spans (root + children) sorted by time (default: false)
 
     Returns:
         HTTP response containing paginated trace list with all span details.
@@ -736,6 +740,7 @@ async def list_traces(
             to_date=to_date,
             offset=offset,
             limit=limit,
+            flatten=flatten,
         )
     except Exception as e:
         logger.error(f"Error listing traces: {e}")

@@ -897,11 +897,11 @@ class ObservabilityMetricsService:
         to_date: datetime,
         offset: int = 0,
         limit: int = 50,
+        flatten: bool = False,
     ) -> TraceListResponse:
         """List OTel traces filtered by resource type/id and project_id.
 
-        Queries the otel_traces table for root spans (gateway_analytics)
-        that match the specified resource and project.
+        Queries the otel_traces table for spans that match the specified resource and project.
 
         Args:
             resource_type: Type of resource to filter by (TraceResourceType enum)
@@ -911,6 +911,7 @@ class ObservabilityMetricsService:
             to_date: End date for filtering
             offset: Pagination offset
             limit: Number of results to return
+            flatten: If True, return all spans (root + children) sorted by time
 
         Returns:
             TraceListResponse with paginated trace data
@@ -931,95 +932,178 @@ class ObservabilityMetricsService:
             "limit": limit,
         }
 
-        # Count query for pagination
-        # Note: resource_attr_key is safe because it's validated against whitelist
-        count_query = f"""
-        SELECT count() as total_count
-        FROM metrics.otel_traces
-        WHERE Timestamp >= %(from_date)s
-          AND Timestamp <= %(to_date)s
-          AND ParentSpanId = ''
-          AND SpanName = 'gateway_analytics'
-          AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
-          AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
+        # Subquery to find matching TraceIds (used by both modes for flatten, count for non-flatten)
+        trace_id_subquery = f"""
+            SELECT DISTINCT TraceId
+            FROM metrics.otel_traces
+            WHERE Timestamp >= %(from_date)s
+              AND Timestamp <= %(to_date)s
+              AND ParentSpanId = ''
+              AND SpanName = 'gateway_analytics'
+              AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
+              AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
         """  # nosec B608
 
-        count_result = await self.clickhouse_client.execute_query(count_query, params)
-        total_count = count_result[0][0] if count_result else 0
+        if flatten:
+            # Flatten mode: return all spans for matching traces
+            count_query = f"""
+            SELECT count() as total_count
+            FROM metrics.otel_traces
+            WHERE TraceId IN ({trace_id_subquery})
+            """  # nosec B608
 
-        # Data query
-        # Note: resource_attr_key is safe because it's validated against whitelist
-        data_query = f"""
-        SELECT *
-        FROM metrics.otel_traces
-        WHERE Timestamp >= %(from_date)s
-          AND Timestamp <= %(to_date)s
-          AND ParentSpanId = ''
-          AND SpanName = 'gateway_analytics'
-          AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
-          AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
-        ORDER BY Timestamp DESC
-        LIMIT %(limit)s OFFSET %(offset)s
-        """  # nosec B608
+            count_result = await self.clickhouse_client.execute_query(count_query, params)
+            total_count = count_result[0][0] if count_result else 0
 
-        results = await self.clickhouse_client.execute_query(data_query, params)
+            # Data query: all spans for matching traces, sorted by timestamp
+            data_query = f"""
+            SELECT *
+            FROM metrics.otel_traces
+            WHERE TraceId IN ({trace_id_subquery})
+            ORDER BY Timestamp DESC
+            LIMIT %(limit)s OFFSET %(offset)s
+            """  # nosec B608
 
-        # Transform rows to TraceItem objects
-        # Column indices based on otel_traces table:
-        # 0: Timestamp, 1: TraceId, 2: SpanId, 3: ParentSpanId, 4: TraceState,
-        # 5: SpanName, 6: SpanKind, 7: ServiceName, 8: ResourceAttributes,
-        # 9: ScopeName, 10: ScopeVersion, 11: SpanAttributes, 12: Duration,
-        # 13: StatusCode, 14: StatusMessage, 15: Events.Timestamp, 16: Events.Name,
-        # 17: Events.Attributes, 18: Links.TraceId, 19: Links.SpanId,
-        # 20: Links.TraceState, 21: Links.Attributes
-        items = []
-        for row in results:
-            # Build events list (columns 15, 16, 17)
-            events = []
-            if row[15] and row[16]:
-                for i in range(len(row[15])):
-                    events.append(
-                        TraceEvent(
-                            timestamp=row[15][i],
-                            name=row[16][i],
-                            attributes=dict(row[17][i]) if row[17] and i < len(row[17]) else {},
+            results = await self.clickhouse_client.execute_query(data_query, params)
+
+            # Transform rows to TraceItem objects
+            # In flatten mode, child_span_count is always 0 since all spans are visible in the flat list
+            items = []
+            for row in results:
+                events = []
+                if row[15] and row[16]:
+                    for i in range(len(row[15])):
+                        events.append(
+                            TraceEvent(
+                                timestamp=row[15][i],
+                                name=row[16][i],
+                                attributes=dict(row[17][i]) if row[17] and i < len(row[17]) else {},
+                            )
                         )
-                    )
 
-            # Build links list (columns 18, 19, 20, 21)
-            links = []
-            if row[18] and row[19]:
-                for i in range(len(row[18])):
-                    links.append(
-                        TraceLink(
-                            trace_id=row[18][i],
-                            span_id=row[19][i] if i < len(row[19]) else "",
-                            trace_state=row[20][i] if row[20] and i < len(row[20]) else "",
-                            attributes=dict(row[21][i]) if row[21] and i < len(row[21]) else {},
+                links = []
+                if row[18] and row[19]:
+                    for i in range(len(row[18])):
+                        links.append(
+                            TraceLink(
+                                trace_id=row[18][i],
+                                span_id=row[19][i] if i < len(row[19]) else "",
+                                trace_state=row[20][i] if row[20] and i < len(row[20]) else "",
+                                attributes=dict(row[21][i]) if row[21] and i < len(row[21]) else {},
+                            )
                         )
-                    )
 
-            items.append(
-                TraceItem(
-                    timestamp=row[0],
-                    trace_id=row[1],
-                    span_id=row[2],
-                    parent_span_id=row[3] or "",
-                    trace_state=row[4] or "",
-                    span_name=row[5],
-                    span_kind=row[6],
-                    service_name=row[7],
-                    resource_attributes=dict(row[8]) if row[8] else {},
-                    scope_name=row[9] or "",
-                    scope_version=row[10] or "",
-                    span_attributes=dict(row[11]) if row[11] else {},
-                    duration=row[12],
-                    status_code=row[13],
-                    status_message=row[14] or "",
-                    events=events,
-                    links=links,
+                items.append(
+                    TraceItem(
+                        timestamp=row[0],
+                        trace_id=row[1],
+                        span_id=row[2],
+                        parent_span_id=row[3] or "",
+                        trace_state=row[4] or "",
+                        span_name=row[5],
+                        span_kind=row[6],
+                        service_name=row[7],
+                        resource_attributes=dict(row[8]) if row[8] else {},
+                        scope_name=row[9] or "",
+                        scope_version=row[10] or "",
+                        span_attributes=dict(row[11]) if row[11] else {},
+                        duration=row[12],
+                        status_code=row[13],
+                        status_message=row[14] or "",
+                        events=events,
+                        links=links,
+                        child_span_count=0,  # Always 0 in flatten mode - all spans visible
+                    )
                 )
-            )
+        else:
+            # Default mode: return only root spans with child count
+            count_query = f"""
+            SELECT count() as total_count
+            FROM metrics.otel_traces
+            WHERE Timestamp >= %(from_date)s
+              AND Timestamp <= %(to_date)s
+              AND ParentSpanId = ''
+              AND SpanName = 'gateway_analytics'
+              AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
+              AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
+            """  # nosec B608
+
+            count_result = await self.clickhouse_client.execute_query(count_query, params)
+            total_count = count_result[0][0] if count_result else 0
+
+            # Data query with child span count using LEFT JOIN
+            data_query = f"""
+            SELECT
+                t.*,
+                COALESCE(counts.span_count, 1) - 1 as child_span_count
+            FROM metrics.otel_traces t
+            LEFT JOIN (
+                SELECT TraceId, count() as span_count
+                FROM metrics.otel_traces
+                WHERE TraceId IN ({trace_id_subquery})
+                GROUP BY TraceId
+            ) as counts ON t.TraceId = counts.TraceId
+            WHERE t.Timestamp >= %(from_date)s
+              AND t.Timestamp <= %(to_date)s
+              AND t.ParentSpanId = ''
+              AND t.SpanName = 'gateway_analytics'
+              AND t.SpanAttributes['{resource_attr_key}'] = %(resource_id)s
+              AND t.SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
+            ORDER BY t.Timestamp DESC
+            LIMIT %(limit)s OFFSET %(offset)s
+            """  # nosec B608
+
+            results = await self.clickhouse_client.execute_query(data_query, params)
+
+            # Transform rows to TraceItem objects
+            # Column indices: 0-21 from otel_traces, 22: child_span_count from JOIN
+            items = []
+            for row in results:
+                events = []
+                if row[15] and row[16]:
+                    for i in range(len(row[15])):
+                        events.append(
+                            TraceEvent(
+                                timestamp=row[15][i],
+                                name=row[16][i],
+                                attributes=dict(row[17][i]) if row[17] and i < len(row[17]) else {},
+                            )
+                        )
+
+                links = []
+                if row[18] and row[19]:
+                    for i in range(len(row[18])):
+                        links.append(
+                            TraceLink(
+                                trace_id=row[18][i],
+                                span_id=row[19][i] if i < len(row[19]) else "",
+                                trace_state=row[20][i] if row[20] and i < len(row[20]) else "",
+                                attributes=dict(row[21][i]) if row[21] and i < len(row[21]) else {},
+                            )
+                        )
+
+                items.append(
+                    TraceItem(
+                        timestamp=row[0],
+                        trace_id=row[1],
+                        span_id=row[2],
+                        parent_span_id=row[3] or "",
+                        trace_state=row[4] or "",
+                        span_name=row[5],
+                        span_kind=row[6],
+                        service_name=row[7],
+                        resource_attributes=dict(row[8]) if row[8] else {},
+                        scope_name=row[9] or "",
+                        scope_version=row[10] or "",
+                        span_attributes=dict(row[11]) if row[11] else {},
+                        duration=row[12],
+                        status_code=row[13],
+                        status_message=row[14] or "",
+                        events=events,
+                        links=links,
+                        child_span_count=row[22],
+                    )
+                )
 
         return TraceListResponse(
             items=items,
@@ -1059,6 +1143,33 @@ class ObservabilityMetricsService:
         # 13: StatusCode, 14: StatusMessage, 15: Events.Timestamp, 16: Events.Name,
         # 17: Events.Attributes, 18: Links.TraceId, 19: Links.SpanId,
         # 20: Links.TraceState, 21: Links.Attributes
+
+        # Build parent-child relationship map for counting all nested descendants
+        children_map: dict[str, list[str]] = {}
+        for row in results:
+            span_id = row[2]
+            parent_span_id = row[3] or ""
+            if parent_span_id:
+                if parent_span_id not in children_map:
+                    children_map[parent_span_id] = []
+                children_map[parent_span_id].append(span_id)
+
+        # Memoization cache for O(n) performance instead of O(n²)
+        descendant_count_cache: dict[str, int] = {}
+
+        def count_all_descendants(span_id: str) -> int:
+            """Count all nested descendants with memoization for O(n) performance."""
+            if span_id in descendant_count_cache:
+                return descendant_count_cache[span_id]
+
+            direct_children = children_map.get(span_id, [])
+            total = len(direct_children)
+            for child_id in direct_children:
+                total += count_all_descendants(child_id)
+
+            descendant_count_cache[span_id] = total
+            return total
+
         spans = []
         for row in results:
             # Build events list (columns 15, 16, 17)
@@ -1086,11 +1197,12 @@ class ObservabilityMetricsService:
                         )
                     )
 
+            span_id = row[2]
             spans.append(
                 TraceItem(
                     timestamp=row[0],
                     trace_id=row[1],
-                    span_id=row[2],
+                    span_id=span_id,
                     parent_span_id=row[3] or "",
                     trace_state=row[4] or "",
                     span_name=row[5],
@@ -1105,6 +1217,7 @@ class ObservabilityMetricsService:
                     status_message=row[14] or "",
                     events=events,
                     links=links,
+                    child_span_count=count_all_descendants(span_id),
                 )
             )
 
