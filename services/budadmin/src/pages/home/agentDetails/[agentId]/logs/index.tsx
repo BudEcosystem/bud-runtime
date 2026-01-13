@@ -247,7 +247,11 @@ const LogRow = ({
 
           {/* Namespace - fixed width, no indent */}
           <div style={{ width: "90px", flexShrink: 0 }}>
-            <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[9px] rounded px-1.5 py-0.5 truncate max-w-[85px]" title={row.namespace}>
+            <Tag
+              className="border-0 rounded-[6px] text-[9px] px-1.5 py-0.5 truncate max-w-[85px]"
+              style={{ backgroundColor: "rgba(212, 168, 83, 0.1)", color: "#D4A853" }}
+              title={row.namespace}
+            >
               {row.namespace || "-"}
             </Tag>
           </div>
@@ -367,7 +371,11 @@ const FlatLogRow = ({
 
           {/* Status */}
           <div style={{ width: "90px", flexShrink: 0 }}>
-            <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[9px] rounded px-1.5 py-0.5 truncate max-w-[85px]" title={row.namespace}>
+            <Tag
+              className="border-0 rounded-[6px] text-[9px] px-1.5 py-0.5 truncate max-w-[85px]"
+              style={{ backgroundColor: "rgba(212, 168, 83, 0.1)", color: "#D4A853" }}
+              title={row.namespace}
+            >
               {row.namespace || "-"}
             </Tag>
           </div>
