@@ -1315,13 +1315,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
           </div>
         </div>
 
-        {/* Vertical "now" marker line - positioned relative to the timeline column */}
+        {/* Log rows container */}
         <div className="relative">
-          {/* Red vertical line marker */}
-          <div
-            className="absolute top-0 bottom-0 w-[1px] bg-[#ff4d4f] pointer-events-none z-10"
-            style={{ left: "calc(80px + 90px + 40px + 1fr + 100px)" }}
-          />
 
           {/* Log Rows */}
           <div className="max-h-[500px] overflow-auto">
