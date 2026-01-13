@@ -1132,8 +1132,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
       yAxis: {
         type: "value",
         min: 0,
-        max: 2,
-        interval: 0.5,
         axisLine: { show: false },
         axisTick: { show: false },
         splitLine: {
