@@ -2682,13 +2682,22 @@ class ObservabilityMetricsService:
                     where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
+        # Build WITH FILL expression for time gap filling
+        fill_expr = ""
+        if request.fill_gaps:
+            step = self._get_interval_step(request.interval)
+            fill_expr = (
+                f"WITH FILL FROM toDateTime('{request.from_date.strftime('%Y-%m-%d %H:%M:%S')}') "
+                f"TO toDateTime('{to_date.strftime('%Y-%m-%d %H:%M:%S')}') STEP {step}"
+            )
+
         # Build query using rollup table
         query = f"""
         SELECT {", ".join(select_fields)}
         FROM {table}
         WHERE {" AND ".join(where_conditions)}
         GROUP BY {", ".join(group_by_fields)}
-        ORDER BY time_bucket ASC
+        ORDER BY time_bucket ASC {fill_expr}
         """
 
         # Execute query
@@ -2791,13 +2800,22 @@ class ObservabilityMetricsService:
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
+        # Build WITH FILL expression for time gap filling
+        fill_expr = ""
+        if request.fill_gaps:
+            step = self._get_interval_step(request.interval)
+            fill_expr = (
+                f"WITH FILL FROM toDateTime('{request.from_date.strftime('%Y-%m-%d %H:%M:%S')}') "
+                f"TO toDateTime('{to_date.strftime('%Y-%m-%d %H:%M:%S')}') STEP {step}"
+            )
+
         # Build query (no JOINs - all data in InferenceFact)
         query = f"""
         SELECT {", ".join(select_fields)}
         FROM InferenceFact ifact
         WHERE {" AND ".join(where_conditions)}
         GROUP BY {", ".join(group_by_fields)}
-        ORDER BY time_bucket ASC
+        ORDER BY time_bucket ASC {fill_expr}
         """
 
         # Execute query
@@ -2824,7 +2842,8 @@ class ObservabilityMetricsService:
         elif interval == "1d":
             return "toStartOfDay(time_bucket)"
         elif interval == "1w":
-            return "toStartOfWeek(time_bucket)"
+            # Wrap with toDateTime to ensure DateTime type for comparison
+            return "toDateTime(toStartOfWeek(time_bucket))"
         else:
             return "toStartOfHour(time_bucket)"
 
@@ -2847,9 +2866,25 @@ class ObservabilityMetricsService:
         elif interval == "1d":
             return "toStartOfDay(ifact.request_arrival_time)"
         elif interval == "1w":
-            return "toStartOfWeek(ifact.request_arrival_time)"
+            # Wrap with toDateTime to ensure DateTime type for comparison
+            return "toDateTime(toStartOfWeek(ifact.request_arrival_time))"
         else:
             return "toStartOfHour(ifact.request_arrival_time)"
+
+    def _get_interval_step(self, interval: str) -> str:
+        """Convert interval string to ClickHouse INTERVAL syntax for WITH FILL."""
+        interval_map = {
+            "1m": "INTERVAL 1 MINUTE",
+            "5m": "INTERVAL 5 MINUTE",
+            "15m": "INTERVAL 15 MINUTE",
+            "30m": "INTERVAL 30 MINUTE",
+            "1h": "INTERVAL 1 HOUR",
+            "6h": "INTERVAL 6 HOUR",
+            "12h": "INTERVAL 12 HOUR",
+            "1d": "INTERVAL 1 DAY",
+            "1w": "INTERVAL 1 WEEK",
+        }
+        return interval_map.get(interval, "INTERVAL 1 HOUR")
 
     def _process_time_series_results(self, results, request) -> dict:
         """Process time series query results into response format."""
@@ -2869,6 +2904,7 @@ class ObservabilityMetricsService:
             group_key = "default"
             group_info = {}
             field_idx = 1
+            is_gap_filled_row = False
 
             if request.group_by:
                 group_key_parts = []
@@ -2876,25 +2912,42 @@ class ObservabilityMetricsService:
                     if group == "model":
                         model_id = row[field_idx]
                         model_name = row[field_idx + 1]
+                        # Skip gap-filled rows with zero UUID (created by WITH FILL)
+                        if model_id == self._ZERO_UUID:
+                            is_gap_filled_row = True
+                            break
                         group_info["model_id"] = model_id
                         group_info["model_name"] = model_name
                         group_key_parts.append(f"model:{model_id}")
                         field_idx += 2
                     elif group == "project":
                         project_id = row[field_idx]
+                        if project_id == self._ZERO_UUID:
+                            is_gap_filled_row = True
+                            break
                         group_info["project_id"] = project_id
                         group_key_parts.append(f"project:{project_id}")
                         field_idx += 1
                     elif group == "endpoint":
                         endpoint_id = row[field_idx]
+                        if endpoint_id == self._ZERO_UUID:
+                            is_gap_filled_row = True
+                            break
                         group_info["endpoint_id"] = endpoint_id
                         group_key_parts.append(f"endpoint:{endpoint_id}")
                         field_idx += 1
                     elif group == "user_project":
                         api_key_project_id = row[field_idx]
+                        if api_key_project_id == self._ZERO_UUID:
+                            is_gap_filled_row = True
+                            break
                         group_info["api_key_project_id"] = api_key_project_id
                         group_key_parts.append(f"api_key_project:{api_key_project_id}")
                         field_idx += 1
+
+                # Skip gap-filled phantom rows
+                if is_gap_filled_row:
+                    continue
 
                 group_key = "|".join(group_key_parts)
 
@@ -2925,9 +2978,7 @@ class ObservabilityMetricsService:
 
             groups.append(group)
 
-        # Fill gaps if requested
-        if request.fill_gaps and groups:
-            groups = self._fill_time_series_gaps(groups, request)
+        # Gap filling is now handled by ClickHouse WITH FILL clause in the query
 
         return TimeSeriesResponse(
             groups=groups,
@@ -3635,12 +3686,6 @@ class ObservabilityMetricsService:
         # Default formatting
         else:
             return f"{value:.2f}", ""
-
-    def _fill_time_series_gaps(self, groups: list, request) -> list:
-        """Fill gaps in time series data with zero values."""
-        # This is a simplified implementation - in production you'd want more sophisticated gap filling
-        # For now, just return the groups as-is
-        return groups
 
     async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
         """Get comprehensive blocking rule statistics from ClickHouse.
