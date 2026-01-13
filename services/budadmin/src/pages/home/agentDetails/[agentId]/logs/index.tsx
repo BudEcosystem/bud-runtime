@@ -8,7 +8,6 @@ import {
   Text_12_600_EEEEEE,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
-import ProjectTags from "src/flows/components/ProjectTags";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import CustomSelect from "src/flows/components/CustomSelect";
 import { AppRequest } from "src/pages/api/requests";
@@ -56,7 +55,7 @@ interface TraceDetailResponse {
 interface LogEntry {
   id: string;
   time: string;
-  status: "unknown" | "success" | "error" | "warning";
+  namespace: string;
   title: string;
   childCount?: number;
   metrics: {
@@ -79,14 +78,6 @@ interface LogsTabProps {
   promptName?: string;
   projectId?: string;
 }
-
-// Hex colors for ProjectTags component
-const statusColors: Record<string, string> = {
-  unknown: "#D4A853",
-  success: "#22C55E",
-  error: "#EF4444",
-  warning: "#F97316",
-};
 
 // Duration bar component
 const DurationBar = ({
@@ -254,14 +245,11 @@ const LogRow = ({
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
-          {/* Status - fixed width, no indent */}
+          {/* Namespace - fixed width, no indent */}
           <div style={{ width: "90px", flexShrink: 0 }}>
-            <ProjectTags
-              name={row.status}
-              color={statusColors[row.status]}
-              tagClass="w-fit"
-              textClass="px-[.15rem] pt-[.15rem] pb-[.2rem] text-[.5rem]"
-            />
+            <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[9px] rounded px-1.5 py-0.5 truncate max-w-[85px]" title={row.namespace}>
+              {row.namespace || "-"}
+            </Tag>
           </div>
 
           {/* Count / Expand indicator - indented based on depth */}
@@ -379,12 +367,9 @@ const FlatLogRow = ({
 
           {/* Status */}
           <div style={{ width: "90px", flexShrink: 0 }}>
-            <ProjectTags
-              name={row.status}
-              color={statusColors[row.status]}
-              tagClass="w-fit"
-              textClass="px-[.15rem] pt-[.15rem] pb-[.2rem] text-[.5rem]"
-            />
+            <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[9px] rounded px-1.5 py-0.5 truncate max-w-[85px]" title={row.namespace}>
+              {row.namespace || "-"}
+            </Tag>
           </div>
 
           {/* Title + metadata */}
@@ -562,21 +547,6 @@ const formatDuration = (seconds: number): string => {
   return `${seconds.toFixed(2)}s`;
 };
 
-// Helper function to determine status from span data
-const getSpanStatus = (span: TraceSpan): "unknown" | "success" | "error" | "warning" => {
-  if (span.status_code === "ERROR" || span.span_attributes?.error) {
-    return "error";
-  }
-  if (span.status_code === "OK") {
-    return "success";
-  }
-  // Check for warning indicators in attributes
-  if (span.span_attributes?.warning) {
-    return "warning";
-  }
-  return "unknown";
-};
-
 // Helper function to extract only root spans (those with empty parent_span_id)
 const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogEntry[] => {
   const result: LogEntry[] = [];
@@ -589,7 +559,7 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
       const entry: LogEntry = {
         id: span.span_id,
         time: formatTime(span.timestamp),
-        status: getSpanStatus(span),
+        namespace: span.resource_attributes?.["service.namespace"] || "",
         title: span.span_name,
         childCount: span.child_span_count,
         metrics: {
@@ -621,7 +591,7 @@ const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
     return {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      status: getSpanStatus(span),
+      namespace: span.resource_attributes?.["service.namespace"] || "",
       title: span.span_name,
       metrics: {
         tag: span.service_name,
@@ -653,7 +623,7 @@ const buildChildrenFromTraceDetail = (
     const entry: LogEntry = {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      status: getSpanStatus(span),
+      namespace: span.resource_attributes?.["service.namespace"] || "",
       title: span.span_name,
       metrics: {
         tag: span.service_name,
