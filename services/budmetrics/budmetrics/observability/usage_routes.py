@@ -27,7 +27,7 @@ async def get_usage_summary(
 ) -> Response:
     """Get usage summary for billing purposes.
 
-    This endpoint queries ModelInferenceDetails and related tables to calculate:
+    This endpoint queries InferenceFact table to calculate:
     - Total tokens used (input + output)
     - Total cost incurred
     - Total request count
@@ -36,18 +36,17 @@ async def get_usage_summary(
     The data is filtered by user_id and/or project_id and aggregated for the specified date range.
     """
     try:
-        # Build the query to get usage data
+        # Build the query to get usage data using InferenceFact (no JOINs needed)
         query = """
         SELECT
             COUNT(*) as request_count,
             SUM(CASE WHEN is_success THEN 1 ELSE 0 END) as success_count,
             SUM(COALESCE(cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
+            SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+            SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+        FROM InferenceFact
+        WHERE timestamp >= %(start_date)s
+        AND timestamp <= %(end_date)s
         """
 
         params = {
@@ -57,11 +56,11 @@ async def get_usage_summary(
 
         # Add filters
         if user_id:
-            query += " AND mid.user_id = %(user_id)s"
+            query += " AND user_id = %(user_id)s"
             params["user_id"] = str(user_id)
 
         if project_id:
-            query += " AND mid.api_key_project_id = %(project_id)s"
+            query += " AND api_key_project_id = %(project_id)s"
             params["project_id"] = str(project_id)
 
         # Execute query
@@ -122,30 +121,30 @@ async def get_usage_history(
     """Get historical usage data with specified granularity.
 
     Returns time-series data showing usage metrics over time, grouped by the specified granularity.
+    Uses InferenceFact table (no JOINs needed).
     """
     try:
-        # Map granularity to ClickHouse date function
+        # Map granularity to ClickHouse date function using InferenceFact.timestamp
         date_trunc_map = {
-            "hourly": "toStartOfHour(mid.request_arrival_time)",
-            "daily": "toDate(mid.request_arrival_time)",
-            "weekly": "toMonday(mid.request_arrival_time)",
-            "monthly": "toStartOfMonth(mid.request_arrival_time)",
+            "hourly": "toStartOfHour(timestamp)",
+            "daily": "toDate(timestamp)",
+            "weekly": "toMonday(timestamp)",
+            "monthly": "toStartOfMonth(timestamp)",
         }
 
-        date_trunc = date_trunc_map.get(granularity, "toDate(mid.request_arrival_time)")
+        date_trunc = date_trunc_map.get(granularity, "toDate(timestamp)")
 
-        # Build the query
+        # Build the query using InferenceFact (no JOINs needed)
         query = f"""
         SELECT
             {date_trunc} as period,
             COUNT(*) as request_count,
             SUM(COALESCE(cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
+            SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+            SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+        FROM InferenceFact
+        WHERE timestamp >= %(start_date)s
+        AND timestamp <= %(end_date)s
         """
 
         params = {
@@ -155,11 +154,11 @@ async def get_usage_history(
 
         # Add filters
         if user_id:
-            query += " AND mid.user_id = %(user_id)s"
+            query += " AND user_id = %(user_id)s"
             params["user_id"] = str(user_id)
 
         if project_id:
-            query += " AND mid.api_key_project_id = %(project_id)s"
+            query += " AND api_key_project_id = %(project_id)s"
             params["project_id"] = str(project_id)
 
         query += " GROUP BY period ORDER BY period ASC"
@@ -210,23 +209,22 @@ async def get_usage_by_project(
     """Get usage breakdown by project for a specific user.
 
     Returns usage metrics grouped by project, useful for understanding which projects
-    are consuming the most resources.
+    are consuming the most resources. Uses InferenceFact table (no JOINs needed).
     """
     try:
-        # Build the query
+        # Build the query using InferenceFact (no JOINs needed)
         query = """
         SELECT
-            mid.api_key_project_id,
+            api_key_project_id,
             COUNT(*) as request_count,
             SUM(COALESCE(cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.user_id = %(user_id)s
-        AND mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
-        GROUP BY mid.api_key_project_id
+            SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+            SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+        FROM InferenceFact
+        WHERE user_id = %(user_id)s
+        AND timestamp >= %(start_date)s
+        AND timestamp <= %(end_date)s
+        GROUP BY api_key_project_id
         ORDER BY total_cost DESC
         """
 
@@ -277,7 +275,7 @@ async def get_bulk_usage_summary(
 ) -> Response:
     """Get usage summary for multiple users in a single request.
 
-    This endpoint efficiently queries ModelInferenceDetails for multiple users at once,
+    This endpoint efficiently queries InferenceFact for multiple users at once,
     returning usage data for each user. This is significantly more efficient than
     making individual API calls for each user.
 
@@ -341,20 +339,19 @@ async def get_bulk_usage_summary(
         if len(user_uuids) > 1000:
             return ErrorResponse(message="Maximum 1000 users per batch request").to_http_response()
 
-        # Build bulk query for all users
+        # Build bulk query for all users using InferenceFact (no JOINs needed)
         query = """
         SELECT
-            mid.user_id,
+            user_id,
             COUNT(*) as request_count,
-            SUM(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_count,
-            SUM(COALESCE(mid.cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
-        AND mid.user_id IS NOT NULL
+            SUM(CASE WHEN is_success THEN 1 ELSE 0 END) as success_count,
+            SUM(COALESCE(cost, 0)) as total_cost,
+            SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+            SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+        FROM InferenceFact
+        WHERE timestamp >= %(start_date)s
+        AND timestamp <= %(end_date)s
+        AND user_id IS NOT NULL
         """
 
         params = {
@@ -364,16 +361,16 @@ async def get_bulk_usage_summary(
 
         # Add user IDs filter with proper parameterization
         placeholders = [f"%(user_{i})s" for i in range(len(user_uuids))]
-        query += f" AND mid.user_id IN ({','.join(placeholders)})"
+        query += f" AND user_id IN ({','.join(placeholders)})"
         for i, user_id in enumerate(user_uuids):
             params[f"user_{i}"] = str(user_id)
 
         # Add project filter if specified
         if project_id:
-            query += " AND mid.api_key_project_id = %(project_id)s"
+            query += " AND api_key_project_id = %(project_id)s"
             params["project_id"] = str(project_id)
 
-        query += " GROUP BY mid.user_id ORDER BY total_cost DESC"
+        query += " GROUP BY user_id ORDER BY total_cost DESC"
 
         # Execute the bulk query
         result = await service.clickhouse_client.execute_query(query, params)
