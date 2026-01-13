@@ -2677,6 +2677,23 @@ const userUsage: DrawerFlowType = {
     },
   ],
 };
+
+const logDetails: DrawerFlowType = {
+  title: "Log Details",
+  description: "View span details and raw data",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Logs", "Details"],
+      id: "log-details",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["log-details"],
+      progress: [],
+    },
+  ],
+};
+
 const addBenchmark: DrawerFlowType = {
   title: "Add Benchmark",
   description: "Add Benchmark",
@@ -5035,6 +5052,7 @@ const flows = {
   "reset-password": resetPassword,
   "add-user": addUser,
   "user-usage": userUsage,
+  "log-details": logDetails,
   "model_benchmark": addBenchmark,
   "add-quantization": addQuantizationFlow,
   "add-new-cloud-provider": addNewCloudProvider,

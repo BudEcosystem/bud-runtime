@@ -153,6 +153,7 @@ import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
 import AddAgentSuccess from "./AddAgent/AgentSuccess";
 import AddAgentSelectType from "./AddAgent/SelectAgentType";
 import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
+import LogDetailsDrawer from "src/pages/home/agentDetails/[agentId]/logs/LogDetailsDrawer";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -325,6 +326,7 @@ export const StepComponents = {
   "add-agent-deployment-warning": AddAgentDeploymentWarning,
   "add-agent-success": AddAgentSuccess,
   "edit-agent-drawer": AgentEditDrawer,
+  "log-details": LogDetailsDrawer,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;
