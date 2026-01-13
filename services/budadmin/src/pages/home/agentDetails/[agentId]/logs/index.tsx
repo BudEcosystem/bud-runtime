@@ -29,7 +29,7 @@ interface TraceSpan {
   scope_version: string;
   span_attributes: Record<string, any>;
   duration_ms?: number;
-  duration?: number;
+  duration?: number; // Duration in nanoseconds (from OpenTelemetry)
   status_code?: string;
   child_span_count?: number;
 }
@@ -595,7 +595,7 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
         metrics: {
           tag: span.service_name,
         },
-        duration: (span.duration ?? 0) / 1_000_000, // Convert microseconds to seconds
+        duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
         startOffsetSec: (timestamp - earliestTimestamp) / 1000,
         traceId: span.trace_id,
         spanId: span.span_id,
@@ -626,7 +626,7 @@ const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
       metrics: {
         tag: span.service_name,
       },
-      duration: (span.duration ?? 0) / 1_000_000, // Convert microseconds to seconds
+      duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
       startOffsetSec: (timestamp - earliestTimestamp) / 1000,
       traceId: span.trace_id,
       spanId: span.span_id,
@@ -658,7 +658,7 @@ const buildChildrenFromTraceDetail = (
       metrics: {
         tag: span.service_name,
       },
-      duration: (span.duration ?? 0) / 1_000_000, // Convert microseconds to seconds
+      duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
       startOffsetSec: (timestamp - earliestTimestamp) / 1000,
       children: [],
       traceId: span.trace_id,
