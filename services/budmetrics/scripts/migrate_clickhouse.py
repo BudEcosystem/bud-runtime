@@ -1437,8 +1437,8 @@ class ClickHouseMigration:
             parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.response_timestamp']) AS response_timestamp,
             nullIf(g.SpanAttributes['gateway_analytics.tags'], '') AS gateway_tags
 
-        FROM otel_traces i
-        LEFT JOIN otel_traces g
+        FROM metrics.otel_traces i
+        LEFT JOIN metrics.otel_traces g
             ON i.TraceId = g.TraceId
             AND g.SpanName = 'gateway_analytics'
         WHERE i.SpanName = 'inference_handler_observability'
