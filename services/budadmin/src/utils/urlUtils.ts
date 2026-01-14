@@ -82,7 +82,7 @@ const UNENCODED_PARAMS = ['agent', 'prompt', 'connector'];
  * Certain parameters (agent, prompt, connector) are not encoded to preserve readability
  * @param params - The URLSearchParams to build from
  * @param excludeKeys - Keys to exclude from the final URL
- * @param additionalParams - Additional key-value pairs to add (not encoded)
+ * @param additionalParams - Additional key-value pairs to add
  * @returns The built URL string
  */
 function buildUrlWithParams(
@@ -102,10 +102,14 @@ function buildUrlWithParams(
     }
   });
 
-  // Add additional params without encoding
+  // Add additional params using the same encoding rules
   Object.entries(additionalParams).forEach(([key, value]) => {
     if (value) {
-      queryParts.push(`${key}=${value}`);
+      if (UNENCODED_PARAMS.includes(key)) {
+        queryParts.push(`${key}=${value}`);
+      } else {
+        queryParts.push(`${key}=${encodeURIComponent(value)}`);
+      }
     }
   });
 
