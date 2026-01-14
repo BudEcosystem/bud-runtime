@@ -1233,14 +1233,14 @@ function AgentBoxInner({
         e.domEvent?.stopPropagation();
       }
     },
-    {
-      key: 'delete',
-      icon: '',
-      // icon: <DeleteOutlined />,
-      label: 'Close',
-      danger: true,
-      onClick: () => session && handleCloseSession()
-    }
+    // {
+    //   key: 'delete',
+    //   icon: '',
+    //   // icon: <DeleteOutlined />,
+    //   label: 'Close',
+    //   danger: true,
+    //   onClick: () => session && handleCloseSession()
+    // }
   ];
 
   return (

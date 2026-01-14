@@ -100,7 +100,8 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     updateTarget: 'connectedTools' | 'connectors'
   ) => {
     const state = get();
-    const searchKey = params?.name ?? state.searchQuery ?? "";
+    const searchName = params?.name ?? state.searchQuery;
+    const searchKey = searchName ?? "";
     // Create a unique key for this fetch (only guard page 1 fetches, allow pagination)
     const fetchKey = `${updateTarget}:${params?.prompt_id || 'global'}:${isRegistered}:page${params?.page || 1}:search${searchKey}`;
 
@@ -125,7 +126,7 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
         page: params?.page || (updateTarget === 'connectors' ? state.currentPage : 1),
         limit: params?.limit || state.pageSize,
         is_registered: isRegistered,
-        search: params?.search !== undefined ? params.search : (state.searchQuery.length > 0),
+        search: params?.search !== undefined ? params.search : Boolean(searchName),
         order_by: params?.order_by || "-created_at",
       };
 
@@ -135,8 +136,8 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
       }
 
       // Add search query
-      if (state.searchQuery) {
-        queryParams.name = state.searchQuery;
+      if (searchName) {
+        queryParams.name = searchName;
       }
 
       // Remove undefined/empty values
