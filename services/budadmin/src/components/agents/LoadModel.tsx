@@ -174,8 +174,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
     // Check if scrolled to bottom
     if (scrollHeight - scrollTop <= clientHeight + 50 &&
-        !isLoadingMore &&
-        currentPage < totalPages) {
+      !isLoadingMore &&
+      currentPage < totalPages) {
       setCurrentPage(prev => prev + 1);
       fetchModels(currentPage + 1, searchValue, true);
     }
@@ -257,8 +257,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
               <div className="max-h-[120px] overflow-y-auto">
                 {currentlyLoaded.map((model) => (
                   <ModelListCard
-                    key={model.model.id}
-                    data={model.model}
+                    key={model.id}
+                    data={{ ...model.model, name: model.name }}
                     hideSeeMore={true}
                     selected={true}
                     handleClick={() => handleSelectModel(model)}
@@ -304,8 +304,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
                 <>
                   {availableModels.map((model) => (
                     <ModelListCard
-                      key={model.model.id}
-                      data={model.model}
+                      key={model.id}
+                      data={{ ...model.model, name: model.name }}
                       hideSeeMore={true}
                       handleClick={() => handleSelectModel(model)}
                     />
@@ -323,8 +323,8 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
                       {hasError
                         ? "Failed to load models"
                         : searchValue
-                        ? `No models found matching "${searchValue}"`
-                        : "No available models"}
+                          ? `No models found matching "${searchValue}"`
+                          : "No available models"}
                     </span>
                   }
                   className="py-8"
