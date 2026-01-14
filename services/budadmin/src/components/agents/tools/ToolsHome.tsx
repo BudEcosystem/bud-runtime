@@ -238,6 +238,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
 
     setSelectedConnector(null);
     setViewMode('list');
+    setLocalSearchQuery('');
+    setSearchQuery('');
+    setIsSearching(false);
 
     // Reset all URL restoration flags
     hasRestoredFromUrl.current = false;
@@ -260,8 +263,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
 
     // Refresh both lists when coming back
     if (promptId) {
-      fetchConnectedTools({ page: 1, prompt_id: promptId });
-      fetchUnregisteredTools({ page: 1, prompt_id: promptId });
+      fetchConnectedTools({ page: 1, prompt_id: promptId, force: true });
+      fetchUnregisteredTools({ page: 1, prompt_id: promptId, force: true });
     }
 
     // Reset back navigation flag after effects have settled

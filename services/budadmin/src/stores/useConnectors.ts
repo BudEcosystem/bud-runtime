@@ -48,6 +48,7 @@ export interface ConnectorsListParams {
   prompt_id?: string;
   is_registered?: boolean;
   order_by?: string;
+  force?: boolean;
 }
 
 export interface ConnectorsListResponse {
@@ -98,18 +99,18 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     isRegistered: boolean,
     updateTarget: 'connectedTools' | 'connectors'
   ) => {
+    const state = get();
+    const searchKey = params?.name ?? state.searchQuery ?? "";
     // Create a unique key for this fetch (only guard page 1 fetches, allow pagination)
-    const fetchKey = `${updateTarget}:${params?.prompt_id || 'global'}:${isRegistered}:page${params?.page || 1}`;
+    const fetchKey = `${updateTarget}:${params?.prompt_id || 'global'}:${isRegistered}:page${params?.page || 1}:search${searchKey}`;
 
     // Only guard against duplicate initial fetches (page 1), allow pagination
     if (params?.page === 1 || !params?.page) {
-      if (inFlightListFetches.has(fetchKey) || completedListFetches.has(fetchKey)) {
+      if (!params?.force && (inFlightListFetches.has(fetchKey) || completedListFetches.has(fetchKey))) {
         return;
       }
       inFlightListFetches.add(fetchKey);
     }
-
-    const state = get();
 
     // Set loading state based on pagination
     if (params?.page && params.page > 1) {
