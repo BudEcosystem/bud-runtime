@@ -8,7 +8,9 @@ metadata:
     {{ $key }}: {{ $value | quote }}
     {{- end }}
 spec:
+  {{- if not (and .Values.microservices.budcluster.autoscaling .Values.microservices.budcluster.autoscaling.enabled) }}
   replicas: 1
+  {{- end }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-budcluster
@@ -124,4 +126,8 @@ spec:
   deadLetterTopic: poisonMessages
 scopes:
   - budcluster
+{{- if and .Values.microservices.budcluster.autoscaling .Values.microservices.budcluster.autoscaling.enabled }}
+---
+{{- include "bud.hpa" (dict "serviceName" "budcluster" "Values" .Values "Release" .Release) }}
+{{- end }}
 {{ end }}

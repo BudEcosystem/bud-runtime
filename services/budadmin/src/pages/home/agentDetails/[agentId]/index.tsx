@@ -11,12 +11,14 @@ import OverviewTab from "./overview";
 import VersionsTab from "./versions";
 import CacheTab from "./cache";
 import LogsTracesTab from "./logsTraces";
+import LogsTab from "./logs";
 import SettingsTab from "./settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import BackButton from "@/components/ui/bud/drawer/BackButton";
 
 const AgentDetailsPage = () => {
   const router = useRouter();
+  const { id, projectId, name } = router.query;
   const [activeTab, setActiveTab] = useState("1");
 
   const handleGoBack = () => {
@@ -56,6 +58,19 @@ const AgentDetailsPage = () => {
       ),
       key: "1",
       children: <VersionsTab />,
+    },
+    {
+      label: (
+        <div className="flex items-center gap-[0.375rem]">
+          {activeTab === "2" ? (
+            <Text_14_600_EEEEEE>Logs</Text_14_600_EEEEEE>
+          ) : (
+            <Text_14_600_B3B3B3>Logs</Text_14_600_B3B3B3>
+          )}
+        </div>
+      ),
+      key: "2",
+      children: <LogsTab promptName={name as string} projectId={projectId as string} />,
     },
     // {
     //   label: (

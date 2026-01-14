@@ -392,6 +392,7 @@ class PromptService(SessionMixin):
         to_date: datetime,
         page: int = 1,
         limit: int = 50,
+        flatten: bool = False,
     ) -> dict:
         """List OTel traces for a prompt with validation.
 
@@ -402,6 +403,7 @@ class PromptService(SessionMixin):
             to_date: End date for filtering traces
             page: Page number (1-indexed)
             limit: Number of results per page
+            flatten: If true, return all spans (root + children) sorted by time
 
         Returns:
             dict: Response data with items, page, limit, and total_record
@@ -437,6 +439,7 @@ class PromptService(SessionMixin):
             "to_date": to_date.isoformat(),
             "offset": offset,
             "limit": limit,
+            "flatten": str(flatten).lower(),
         }
 
         async with aiohttp.ClientSession() as http_session:

@@ -1709,6 +1709,7 @@ async def list_prompt_traces(
     to_date: datetime = Query(..., description="End date for filtering traces"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     limit: int = Query(50, ge=1, le=1000, description="Number of results per page"),
+    flatten: bool = Query(False, description="If true, return all spans (root + children) sorted by time"),
 ) -> Union[TraceListResponse, ErrorResponse]:
     """List OTel traces for a prompt."""
     try:
@@ -1719,6 +1720,7 @@ async def list_prompt_traces(
             to_date=to_date,
             page=page,
             limit=limit,
+            flatten=flatten,
         )
         return TraceListResponse(**result).to_http_response()
     except ClientException as e:
