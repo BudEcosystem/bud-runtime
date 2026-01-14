@@ -135,22 +135,6 @@
       "system_tag": "system"
     }
   },
-  "llava_1k_en": {
-    "display_name": "LLaVA 1K English",
-    "hf_hub_url": "BUAADreamer/llava-en-zh-2k",
-    "subset": "en",
-    "formatting": "sharegpt",
-    "columns": {
-      "messages": "messages",
-      "images": "images"
-    },
-    "tags": {
-      "role_tag": "role",
-      "content_tag": "content",
-      "user_tag": "user",
-      "assistant_tag": "assistant"
-    }
-  },
   "pokemon_cap": {
     "display_name": "Pokemon GPT4o Captions",
     "hf_hub_url": "llamafactory/pokemon-gpt4o-captions",
