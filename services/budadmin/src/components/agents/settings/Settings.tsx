@@ -5,7 +5,7 @@ import { getChromeColor } from "@/utils/color";
 import SliderInput from "./input/SliderInput";
 import InlineInput from "./input/InlineInput";
 import InlineSwitch from "./input/InlineSwitch";
-import SelectWithAdd from "./input/SelectWithAdd";
+
 import { useAgentStore, AgentSettings } from "@/stores/useAgentStore";
 import { Text_16_400_EEEEEE } from '@/components/ui/text';
 
@@ -61,8 +61,6 @@ interface SettingsProps {
 
 export default function Settings({ onClose, sessionId }: SettingsProps) {
     const {
-        settingPresets,
-        addSettingPreset,
         initializeSessionSettings,
         updateSessionSettings,
         sessions
@@ -124,53 +122,6 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
         }
     }, [hasHydrated, sessionId, currentSession?.modelSettings, initializeSessionSettings]);
 
-    const handleAddPreset = useCallback((name: string) => {
-        if (!name || !settings) return;
-        const newPreset: AgentSettings = {
-            id: uuidv4(),
-            name: name,
-            temperature: settings.temperature || 0.7,
-            max_tokens: settings.max_tokens || 2000,
-            top_p: settings.top_p || 1.0,
-            frequency_penalty: settings.frequency_penalty || 0,
-            presence_penalty: settings.presence_penalty || 0,
-            stop_sequences: settings.stop_sequences || [],
-            seed: settings.seed || 0,
-            timeout: settings.timeout || 0,
-            parallel_tool_calls: settings.parallel_tool_calls ?? true,
-            logprobs: settings.logprobs ?? false,
-            logit_bias: settings.logit_bias || {},
-            extra_headers: settings.extra_headers || {},
-            max_completion_tokens: settings.max_completion_tokens || 0,
-            stream_options: settings.stream_options || {},
-            response_format: settings.response_format || {},
-            tool_choice: settings.tool_choice || "auto",
-            chat_template: settings.chat_template || "",
-            chat_template_kwargs: settings.chat_template_kwargs || {},
-            mm_processor_kwargs: settings.mm_processor_kwargs || {},
-            created_at: new Date().toISOString(),
-            modified_at: new Date().toISOString(),
-            modifiedFields: new Set<string>(settings.modifiedFields || []),
-        };
-        // Add to global presets for reuse
-        addSettingPreset(newPreset);
-        // Also apply to current session
-        updateSessionSettings(sessionId, newPreset);
-    }, [settings, addSettingPreset, updateSessionSettings, sessionId]);
-
-    const changePreset = useCallback((id: string) => {
-        const preset = settingPresets.find((preset) => preset.id === id);
-        if (preset && sessionId) {
-            // Apply the preset to this session's settings
-            const presetWithModifiedFields = {
-                ...preset,
-                id: `settings_${sessionId}`, // Keep session-specific ID
-                modifiedFields: preset.modifiedFields || new Set<string>()
-            };
-            updateSessionSettings(sessionId, presetWithModifiedFields);
-        }
-    }, [settingPresets, updateSessionSettings, sessionId]);
-
     const handleChange = useCallback((params: Partial<AgentSettings>) => {
         if (!settings || !sessionId) return;
 
@@ -180,21 +131,7 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
 
     const initComponents = React.useCallback(() => {
         const components = [
-            {
-                title: "Presets",
-                description: "Presets",
-                icon: "/agents/icons/circle-settings.svg",
-                children: (
-                    <div className="flex flex-col w-full gap-[.5rem] py-[.375rem] px-[.5rem]">
-                        <SelectWithAdd
-                            options={settingPresets}
-                            defaultValue={settingPresets[0]?.name}
-                            onChange={changePreset}
-                            onAdd={handleAddPreset}
-                        />
-                    </div>
-                ),
-            },
+
             {
                 title: "Basic",
                 description: "General settings",
@@ -347,14 +284,14 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
             },
         ];
         setComponents(components);
-    }, [settings, settingPresets, changePreset, handleAddPreset, handleChange]);
+    }, [settings, handleChange]);
 
     useEffect(() => {
         // Initialize components when settings are available (regardless of presets)
         if (settings) {
             initComponents();
         }
-    }, [settings, settingPresets.length, initComponents]);
+    }, [settings, initComponents]);
 
     return (
         <div className="relative flex flex-col w-full h-full overflow-y-auto pb-[1rem]">
