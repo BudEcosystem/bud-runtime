@@ -1904,10 +1904,14 @@ class ObservabilityMetricsService:
 
         # Build and execute query
         query = self._build_gateway_analytics_query(request)
-        result = await self._clickhouse_client.execute_query(query)
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+        result = await self._clickhouse_client.execute_query(query, params)
 
         # Process results into response format
-        items = await self._process_gateway_metrics_results(result, request)
+        items = self._process_gateway_metrics_results(result, request)
 
         # Calculate summary statistics if requested
         summary = None
@@ -2039,7 +2043,7 @@ class ObservabilityMetricsService:
                 toStartOfHour(timestamp) as time_bucket,
                 count(*) as request_count,
                 avg(response_time_ms) as avg_response_time
-            FROM bud.ModelInferenceDetails
+            FROM InferenceFact
             WHERE timestamp >= %(from_date)s
                 AND timestamp <= %(to_date)s
             GROUP BY time_bucket
@@ -2053,7 +2057,7 @@ class ObservabilityMetricsService:
                 SELECT
                     country_code,
                     count(*) as count
-                FROM bud.ModelInferenceDetails
+                FROM InferenceFact
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
@@ -2069,7 +2073,7 @@ class ObservabilityMetricsService:
                     count(*) as count,
                     any(latitude) as latitude,
                     any(longitude) as longitude
-                FROM bud.ModelInferenceDetails
+                FROM InferenceFact
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
@@ -2131,7 +2135,7 @@ class ObservabilityMetricsService:
             SELECT
                 {field},
                 count(*) as count
-            FROM bud.ModelInferenceDetails
+            FROM InferenceFact
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
@@ -2142,21 +2146,29 @@ class ObservabilityMetricsService:
 
     def _process_gateway_metrics_results(self, result, request):
         """Process gateway metrics query results."""
-        # Simplified processing - would need full implementation
-        from budmetrics.observability.schemas import GatewayMetricsData, GatewayPeriodBin
+        from budmetrics.observability.schemas import (
+            GatewayCountMetric,
+            GatewayMetricsData,
+            GatewayPeriodBin,
+            GatewayPerformanceMetric,
+        )
 
         items = []
 
         if result:
             for row in result:
+                # Explicit type conversion for ClickHouse Decimal types
+                request_count = int(row[1]) if row[1] is not None else 0
+                avg_response_time = float(row[2]) if len(row) > 2 and row[2] is not None else 0.0
+
                 items.append(
                     GatewayPeriodBin(
                         time_period=row[0],
                         items=[
                             GatewayMetricsData(
                                 data={
-                                    "request_count": {"count": row[1]},
-                                    "avg_response_time": {"avg": row[2]} if len(row) > 2 else {"avg": 0},
+                                    "request_count": GatewayCountMetric(count=request_count),
+                                    "avg_response_time": GatewayPerformanceMetric(avg=avg_response_time),
                                 }
                             )
                         ],
@@ -2198,9 +2210,12 @@ class ObservabilityMetricsService:
 
     def _calculate_gateway_summary_stats(self, items, request):
         """Calculate summary statistics for gateway metrics."""
-        total_requests = sum(
-            item.items[0].data.get("request_count", {}).get("count", 0) for item in items if item.items
-        )
+        total_requests = 0
+        for item in items:
+            if item.items:
+                metric = item.items[0].data.get("request_count")
+                if metric:
+                    total_requests += metric.count
 
         return {
             "total_requests": total_requests,
