@@ -1514,7 +1514,7 @@ class QueryBuilder:
         time_bucket_alias = "time_bucket"
 
         group_by = group_by or []
-        group_fields = self._get_group_by_fields(group_by)
+        group_fields = self._get_group_by_fields(group_by, use_inference_fact=True)
 
         select_parts = []
         select_field_order = []
@@ -1592,8 +1592,7 @@ class QueryBuilder:
                 # Build JOIN clause instead of WHERE subquery to avoid asynch driver issues
                 # The asynch library cannot handle nested subqueries in WHERE clauses
                 topk_join_conditions = []
-                for group_field in group_by:
-                    col = self._MAPPING_COLUMNS[group_field]
+                for col in group_fields:
                     col_name = col.split(".")[-1]
                     topk_join_conditions.append(f"{col} = te.{col_name}")
                 topk_join_clause = f"INNER JOIN topk_entities te ON {' AND '.join(topk_join_conditions)}"
