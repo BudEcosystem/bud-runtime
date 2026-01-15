@@ -346,6 +346,9 @@ class CreatePromptWorkflowRequest(BaseModel):
     discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
         None, description="List of temporary prompt IDs discarded by user that need cleanup"
     )
+    client_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Arbitrary metadata from client for UI state preservation"
+    )
 
     @field_validator("name")
     @classmethod
@@ -407,6 +410,9 @@ class CreatePromptWorkflowSteps(BaseModel):
     bud_prompt_id: str | None = None
     discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
         None, description="List of temporary prompt IDs to cleanup"
+    )
+    client_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Arbitrary metadata from client for UI state preservation"
     )
 
 
