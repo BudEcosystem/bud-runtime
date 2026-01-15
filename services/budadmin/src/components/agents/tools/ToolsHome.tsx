@@ -98,22 +98,53 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
 
   // Restore connector state from URL on initial load (or from OAuth state)
   // This effect runs ONCE on mount to restore connector from URL
+  // CRITICAL: Only auto-open tools if this is an OAuth callback, NOT a manual page refresh
   useEffect(() => {
     // Skip if user explicitly navigated back or no promptId
     if (isBackNavigationRef.current || !promptId) {
       return;
     }
 
-    // Check if this is an OAuth callback - get connector ID from saved state
-    const oauthState = getOAuthState();
+    // Check if this is an OAuth callback - multiple indicators:
+    // 1. code/state params in URL (OAuth redirect just happened)
+    // 2. authentication=true param in URL (set before OAuth redirect)
     const isOAuthReturn = isOAuthCallback();
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasAuthenticationParam = urlParams?.get('authentication') === 'true';
 
-    // Get connector ID for THIS session from URL using positional lookup
-    let connectorId = getConnectorFromUrlByPosition(sessionIndex);
+    // Get OAuth state from localStorage
+    const oauthState = getOAuthState();
 
-    // If OAuth callback and we have saved connector ID for this promptId, use that
-    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId && !connectorId) {
+    // CRITICAL: If there's OAuth state but NO code/state params and NO authentication param,
+    // this means the OAuth flow was started but not completed (user refreshed manually)
+    // Clear the stale OAuth state to prevent auto-opening on manual refresh
+    if (oauthState && !isOAuthReturn && !hasAuthenticationParam) {
+      clearOAuthState();
+    }
+
+    // CRITICAL: Only auto-restore connector if this is a VALID OAuth callback
+    // Must have EITHER code/state params OR authentication=true param
+    // OAuth state alone is NOT sufficient (could be stale from incomplete OAuth)
+    const isValidOAuthCallback = isOAuthReturn || hasAuthenticationParam;
+
+    console.log('[ToolsHome] OAuth check:', { isOAuthReturn, hasAuthenticationParam, isValidOAuthCallback, oauthState: !!oauthState });
+
+    if (!isValidOAuthCallback) {
+      // Not a valid OAuth callback - don't auto-open tools on manual page refresh
+      console.log('[ToolsHome] Not a valid OAuth callback - skipping auto-open');
+      return;
+    }
+
+    // Get connector ID - PRIORITIZE OAuth state's connector ID for OAuth callbacks
+    // This ensures the connector that triggered the OAuth flow is opened, not the positional one
+    let connectorId: string | null = null;
+    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId) {
+      // OAuth callback - use the connector that initiated the OAuth flow
       connectorId = oauthState.connectorId;
+      console.log('[ToolsHome] Using OAuth state connector:', connectorId);
+    } else {
+      // Fallback to positional lookup from URL
+      connectorId = getConnectorFromUrlByPosition(sessionIndex);
     }
 
     // Prevent duplicate fetch - use ref to track what we've already fetched
@@ -141,16 +172,30 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
       return;
     }
 
-    // Check if this is an OAuth callback
-    const oauthState = getOAuthState();
+    // Check if this is a valid OAuth callback
     const isOAuthReturn = isOAuthCallback();
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasAuthenticationParam = urlParams?.get('authentication') === 'true';
+    const oauthState = getOAuthState();
 
-    // Get connector ID for THIS session from URL using positional lookup
-    let connectorId = getConnectorFromUrlByPosition(sessionIndex);
+    // CRITICAL: Only auto-open if this is a VALID OAuth callback
+    // Must have EITHER code/state params OR authentication=true param
+    const isValidOAuthCallback = isOAuthReturn || hasAuthenticationParam;
 
-    // If OAuth callback and we have saved connector ID for this promptId, use that
-    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId && !connectorId) {
+    if (!isValidOAuthCallback) {
+      // Not a valid OAuth callback - don't auto-open tools on manual page refresh
+      return;
+    }
+
+    // Get connector ID - PRIORITIZE OAuth state's connector ID for OAuth callbacks
+    // This ensures the connector that triggered the OAuth flow is selected, not the positional one
+    let connectorId: string | null = null;
+    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId) {
+      // OAuth callback - use the connector that initiated the OAuth flow
       connectorId = oauthState.connectorId;
+    } else {
+      // Fallback to positional lookup from URL
+      connectorId = getConnectorFromUrlByPosition(sessionIndex);
     }
 
     // Only proceed if we have connector ID and details loaded
@@ -173,6 +218,17 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
       isFromConnectedSection: isConnected
     } as Connector);
     setViewMode('details');
+
+    // CRITICAL: Remove authentication param from URL after successfully opening tools
+    // This ensures that subsequent page refreshes won't auto-open tools
+    if (hasAuthenticationParam && typeof window !== 'undefined') {
+      const newUrlParams = new URLSearchParams(window.location.search);
+      newUrlParams.delete('authentication');
+      const newUrl = newUrlParams.toString()
+        ? `${window.location.pathname}?${newUrlParams.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
   }, [selectedConnectorDetails, promptId, sessionIndex, connectedTools]);
 
   // Handle search with debounce
