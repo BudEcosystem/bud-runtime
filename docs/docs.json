@@ -283,13 +283,8 @@
       "anchors": [
         {
           "anchor": "Blog",
-          "href": "https://bud.studio/content/blog",
+          "href": "https://budecosystem.com/blog/",
           "icon": "newspaper"
-        },
-        {
-          "anchor": "API Reference",
-          "href": "https://api.bud.studio/docs",
-          "icon": "code"
         }
       ]
     }
