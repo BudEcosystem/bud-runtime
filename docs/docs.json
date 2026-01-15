@@ -28,56 +28,56 @@
             "group": "Projects",
             "icon": "folder-tree",
             "pages": [
-              "projects/projects",
+              "projects/projects"
             ]
           },
           {
             "group": "Models",
             "icon": "brain",
             "pages": [
-              "models/models",
+              "models/models"
             ]
           },
           {
             "group": "Deployments",
             "icon": "rocket",
             "pages": [
-              "deployments/deploy-first-model",
+              "deployments/deploy-first-model"
             ]
           },
           {
             "group": "Clusters",
             "icon": "server",
             "pages": [
-              "clusters/cluster",
+              "clusters/cluster"
             ]
           },
           {
             "group": "Endpoints",
             "icon": "plug",
             "pages": [
-              "endpoints/creating-endpoints",
+              "endpoints/creating-endpoints"
             ]
           },
           {
             "group": "API Integration",
             "icon": "code",
             "pages": [
-              "api-integration/authentication",
+              "api-integration/authentication"
             ]
           },
           {
             "group": "Playground",
             "icon": "flask",
             "pages": [
-              "playground/playground",
+              "playground/playground"
             ]
           },
           {
             "group": "Observability",
             "icon": "chart-line",
             "pages": [
-              "observability/observability",
+              "observability/observability"
             ]
           },
           {
@@ -91,14 +91,14 @@
             "group": "Prompts & Agents",
             "icon": "wand-magic-sparkles",
             "pages": [
-              "prompts-agents/agents",
+              "prompts-agents/agents"
             ]
           },
           {
             "group": "Evaluations",
             "icon": "chart-bar",
             "pages": [
-              "evaluations/evaluations",
+              "evaluations/evaluations"
             ]
           },
           {
@@ -117,14 +117,14 @@
             "group": "Performance Optimization",
             "icon": "gauge-high",
             "pages": [
-              "performance/simulation-overview",
+              "performance/simulation-overview"
             ]
           },
           {
             "group": "API Keys & Security",
             "icon": "key",
             "pages": [
-              "api-keys/creating-api-keys",
+              "api-keys/creating-api-keys"
             ]
           },
           {
@@ -143,7 +143,7 @@
             "group": "Settings",
             "icon": "gear",
             "pages": [
-              "settings/account-settings",
+              "settings/account-settings"
             ]
           },
           {
@@ -151,7 +151,7 @@
             "icon": "credit-card",
             "pages": [
               "billing/understanding-pricing",
-              "billing/monitoring-usage",
+              "billing/monitoring-usage"
             ]
           }
         ]
