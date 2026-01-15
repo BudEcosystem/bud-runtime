@@ -2,7 +2,7 @@ import asyncio
 import math
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons import logging
@@ -352,6 +352,67 @@ class ObservabilityMetricsService:
         "user_project": "api_key_project_id",
     }
 
+    def _extract_single_resource_ids_from_filters(
+        self,
+        filters: Optional[Dict[str, Any]]
+    ) -> Dict[str, Optional[UUID]]:
+        """Extract resource IDs when filters contain exactly one resource.
+
+        When a filter contains exactly one resource ID, return it so the
+        response can identify which resource the metrics belong to.
+
+        Args:
+            filters: Filter dictionary (e.g., {"project": ["uuid"]})
+
+        Returns:
+            Dict with keys: project_id, model_id, endpoint_id
+            Values are UUID if single resource, None otherwise
+
+        Examples:
+            {"project": ["abc-123"]} -> {"project_id": UUID("abc-123"), ...}
+            {"project": ["id1", "id2"]} -> {"project_id": None, ...}  # Multiple = aggregated
+        """
+        result = {
+            "project_id": None,
+            "model_id": None,
+            "endpoint_id": None,
+        }
+
+        if not filters:
+            return result
+
+        # Map filter keys to result keys
+        filter_mappings = {
+            "project": "project_id",
+            "project_id": "project_id",
+            "model": "model_id",
+            "model_id": "model_id",
+            "endpoint": "endpoint_id",
+            "endpoint_id": "endpoint_id",
+        }
+
+        for filter_key, result_key in filter_mappings.items():
+            if filter_key not in filters:
+                continue
+
+            filter_value = filters[filter_key]
+
+            # Handle list with single element
+            if isinstance(filter_value, list):
+                if len(filter_value) == 1:
+                    try:
+                        result[result_key] = UUID(str(filter_value[0]))
+                    except (ValueError, TypeError):
+                        pass  # Invalid UUID
+            # Handle single value (not in list)
+            elif isinstance(filter_value, (str, UUID)):
+                try:
+                    result[result_key] = UUID(str(filter_value))
+                except (ValueError, TypeError):
+                    pass  # Invalid UUID
+
+        return result
+
     @profile_sync("result_processing")
     def _process_query_results(
         self,
@@ -359,6 +420,7 @@ class ObservabilityMetricsService:
         field_order: list[str],
         metrics: list[str],
         group_by: Optional[list[str]] = None,
+        filters: Optional[Dict[str, Any]] = None,
     ) -> list[PeriodBin]:
         """Process raw query results into structured response format."""
         if not results:
@@ -377,6 +439,11 @@ class ObservabilityMetricsService:
             elif field.endswith("_percent_change"):
                 base = field[:-15]  # Remove "_percent_change"
                 percent_field_map[base] = field
+
+        # Extract single resource IDs from filters (only when no group_by)
+        single_resource_ids = None
+        if not group_by:
+            single_resource_ids = self._extract_single_resource_ids_from_filters(filters)
 
         # Pre-compute group field indices
         # Map API field names (model, project, etc.) to column names (model_id, project_id, etc.)
@@ -425,6 +492,15 @@ class ObservabilityMetricsService:
                 if value is not None:
                     dimensions[f"{group_field}_id"] = value
 
+            # Populate dimensions from single-resource filters if no group_by
+            if single_resource_ids and not group_by:
+                if single_resource_ids["project_id"]:
+                    dimensions["project_id"] = single_resource_ids["project_id"]
+                if single_resource_ids["model_id"]:
+                    dimensions["model_id"] = single_resource_ids["model_id"]
+                if single_resource_ids["endpoint_id"]:
+                    dimensions["endpoint_id"] = single_resource_ids["endpoint_id"]
+
             # Extract metrics data using processors
             metrics_data = {}
             for metric in metrics:
@@ -447,7 +523,7 @@ class ObservabilityMetricsService:
         # Convert to list of PeriodBin objects, sorted by time descending
         # Use list comprehension for better performance
         result_bins = [
-            PeriodBin(time_period=time_period, items=period_bins[time_period] or None)
+            PeriodBin(time_period=time_period, items=period_bins[time_period] or [])
             for time_period in sorted(period_bins.keys(), reverse=True)
         ]
 
@@ -509,7 +585,9 @@ class ObservabilityMetricsService:
             raise RuntimeError("Failed to execute metrics query") from e
 
         # Process results
-        period_bins = self._process_query_results(results, field_order, request.metrics, request.group_by)
+        period_bins = self._process_query_results(
+            results, field_order, request.metrics, request.group_by, request.filters
+        )
 
         # Return response
         return ObservabilityMetricsResponse(object="observability_metrics", items=period_bins)

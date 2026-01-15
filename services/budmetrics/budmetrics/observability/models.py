@@ -1565,7 +1565,9 @@ class QueryBuilder:
 
         group_by_parts = [time_bucket_alias, *group_fields]
         select_parts = [time_bucket_expr, *group_fields, *select_parts]
-        select_field_order = [time_bucket_alias, *group_by, *select_field_order]
+        # Extract column names from group_fields (e.g., "mi.project_id" -> "project_id")
+        group_by_col_names = [field.split(".")[-1] for field in group_fields]
+        select_field_order = [time_bucket_alias, *group_by_col_names, *select_field_order]
 
         fill_expr = ""
         if fill_time_gaps:
