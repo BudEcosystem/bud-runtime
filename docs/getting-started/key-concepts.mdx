@@ -1,28 +1,32 @@
 ---
 title: "Key Concepts"
-description: "Understanding core concepts in Bud Stack"
+description: "Understanding core concepts in Bud AI Foundry"
 ---
 
 # Key Concepts
 
-Essential terminology and concepts you need to know.
+Use these definitions to navigate the Bud AI Foundry platform and documentation.
 
-## Projects
+## 1. Projects
 
-*Content to be added*
+Projects are the primary workspace for teams. Each project contains its own models, deployments, endpoints, and API keys so you can isolate workloads by application or business unit.
 
-## Models
+## 2. Models
 
-*Content to be added*
+Models are registered artifacts or managed APIs that power inference. Bud AI Foundry supports cloud providers, Hugging Face repositories, URL-based imports, and disk-mounted checkpoints, all governed under a single catalog.
 
-## Clusters
+## 3. Clusters
 
-*Content to be added*
+Clusters represent the infrastructure where models run. They can be cloud-managed Kubernetes clusters or on-prem hardware pools, and they define the compute profiles available to deployments.
 
-## Endpoints
+## 4. Endpoints
 
-*Content to be added*
+Endpoints expose deployed models to applications through OpenAI-compatible APIs. They can include routing rules, fallback strategies, and access policies.
 
-## Deployments
+## 5. Deployments
 
-*Content to be added*
+Deployments are the runtime instances of models attached to clusters. They include configuration details like hardware settings, scaling policies, and safety controls.
+
+## 6. Evaluations
+
+Evaluations measure quality, latency, and safety using datasets and benchmarks so teams can choose the best model and configuration before promoting to production.

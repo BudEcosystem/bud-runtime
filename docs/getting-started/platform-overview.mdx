@@ -1,16 +1,48 @@
 ---
 title: "Platform Overview"
-description: "High-level architecture and concepts of the Bud Stack platform"
+description: "High-level architecture and concepts of the Bud AI Foundry platform"
 ---
 
 # Platform Overview
 
-Understand the architecture and key components of Bud Stack.
+Bud AI Foundry is organized as a secure control plane for governance and a flexible data plane for inference workloads. This structure lets platform teams standardize policies while still giving application teams the flexibility to ship models quickly.
 
-## Architecture Diagram
+## 1. Description
 
-*Content to be added*
+Bud AI Foundry brings together model onboarding, deployment, routing, observability, and evaluation into a single platform. It supports hybrid environments so teams can run cloud APIs, local checkpoints, and private model endpoints under the same governance and monitoring framework.
 
-## Key Components
+## 2. Architecture Flow
 
-*Content to be added*
+1. **Model onboarding:** Register cloud models or import local checkpoints into the Model Hub with metadata and approvals.
+2. **Deployment:** Configure clusters, runtime settings, and safety controls, then deploy models to cloud or on-prem infrastructure.
+3. **Routing and endpoints:** Expose models through OpenAI-compatible endpoints and apply traffic rules across deployments.
+4. **Observability:** Monitor latency, tokens, cost, and safety metrics while capturing audit trails for compliance.
+
+## 3. Key Components
+
+### 3.1 Model Hub
+
+A governed catalog for cloud and local models with versioning, metadata, evaluation results, and approvals.
+
+### 3.2 Projects and workspaces
+
+Organize teams, workloads, and access controls so each project has its own models, deployments, and API keys.
+
+### 3.3 Clusters and deployments
+
+Connect Kubernetes or managed infrastructure, define runtime configurations, and deploy models to the right hardware.
+
+### 3.4 Endpoints and routing
+
+Publish OpenAI-compatible endpoints and control traffic splitting, fallback, and CPU/GPU placement policies.
+
+### 3.5 Observability and evaluation
+
+Track inference performance, costs, and safety signals while running structured evaluations and benchmarks.
+
+## 4. Related Guides
+
+- [Projects](/projects/creating-projects)
+- [Models management](/models/models)
+- [Deployments](/deployments/deploy-first-model)
+- [Observability](/observability/observability)
