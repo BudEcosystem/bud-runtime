@@ -7,6 +7,7 @@ import { StepComponentsType } from "src/flows";
 import { create } from "zustand";
 import drawerFlows, { Flow } from "./drawerFlows";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useAddAgent } from "@/stores/useAddAgent";
 import { updateQueryParams } from "@/utils/urlUtils";
 
 export type DrawerStepParsedType = {
@@ -216,7 +217,12 @@ export const useDrawer = create<{
           if (!stillHasPromptParam && !currentAgentState.isAgentDrawerOpen && !currentAgentState.isTransitioningToAgentDrawer) {
             // Use shared utility function for URL manipulation
             updateQueryParams({ agent: null }, { replaceHistory: true });
-            console.log('✓ Agent parameter removed after safety delay');
+
+            // Clear all related data stores since we are completely exiting the add-agent flow
+            useAddAgent.getState().reset();
+            useAgentStore.getState().resetSessionState();
+
+            console.log('✓ Agent parameter removed and stores reset after safety delay');
           } else {
             console.log('⚠️ Agent parameter preserved after delay check - conditions changed');
           }
