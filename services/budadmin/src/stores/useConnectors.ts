@@ -127,7 +127,7 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
         limit: params?.limit || state.pageSize,
         is_registered: isRegistered,
         search: params?.search !== undefined ? params.search : Boolean(searchName),
-        order_by: params?.order_by || "-created_at",
+        // order_by: params?.order_by || "-created_at",
       };
 
       // Add prompt_id if available

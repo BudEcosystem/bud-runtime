@@ -131,9 +131,20 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
-    // CRITICAL: Use saved OAuth prompt ID if available (for OAuth callback scenarios)
-    // The promptId prop might be stale during OAuth redirect
-    const effectivePromptId = getOAuthPromptId() || promptId;
+    // CRITICAL: Determine the correct prompt ID to use
+    // Priority: 1. OAuth prompt ID (for OAuth callbacks), 2. Validated session prompt ID, 3. Prop prompt ID
+    let effectivePromptId = getOAuthPromptId();
+
+    if (!effectivePromptId && promptId) {
+      // Verify the promptId exists in the store (session was properly restored)
+      const session = getSessionByPromptId(promptId);
+      if (session) {
+        effectivePromptId = session.promptId;
+      } else {
+        // Fallback to prop promptId if session not found (shouldn't happen with persist)
+        effectivePromptId = promptId;
+      }
+    }
 
     if (!effectivePromptId) return;
 
@@ -220,7 +231,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     } finally {
       setIsLoadingTools(false);
     }
-  }, [promptId, connector.id, selectedConnectorDetails?.auth_type]);
+  }, [promptId, connector.id, selectedConnectorDetails?.auth_type, getSessionByPromptId]);
 
   // Fetch connector details on mount (only if not already loaded)
   useEffect(() => {
@@ -630,6 +641,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         });
         // Refresh tools list to show updated is_added status
         await fetchTools();
+        // Go back to the tools list
+        onBack({ removeConnectorFromUrl: false });
       }
     } catch (error: any) {
       errorToast(error?.response?.data?.message || 'Failed to connect tools');

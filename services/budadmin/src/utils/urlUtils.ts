@@ -140,19 +140,26 @@ export function buildConnectorParam(connectors: string[]): string {
  * @param totalPositions - Total number of active sessions
  */
 export function updateConnectorInUrl(position: number, connectorId: string | null, totalPositions: number): void {
-  if (typeof window === 'undefined' || position < 0) return;
+  if (typeof window === 'undefined') return;
 
   const params = new URLSearchParams(window.location.search);
   const currentParam = params.get('connector') || '';
   const connectors = parseConnectorParam(currentParam);
 
-  // Ensure array is large enough
-  while (connectors.length < totalPositions) {
-    connectors.push('');
+  // If adding a connector, append it to the list (user request: append along with existing)
+  if (connectorId) {
+    // Only append if not already in the list to avoid duplicates
+    if (!connectors.includes(connectorId)) {
+      connectors.push(connectorId);
+    }
+  } else {
+    // If removing (connectorId matches null/empty), clear the specific position
+    // Ensure array is large enough
+    while (connectors.length <= position) {
+      connectors.push('');
+    }
+    connectors[position] = '';
   }
-
-  // Update the position
-  connectors[position] = connectorId || '';
 
   const newParam = buildConnectorParam(connectors);
 
@@ -184,12 +191,17 @@ export function getConnectorFromUrlByPosition(position: number): string | null {
 }
 
 /**
- * Cleans up connector array to match the number of active sessions
- * @param totalSessions - Total number of active sessions to keep
+ * Cleans up connector array
+ * Note: Modified to verify connectors but NOT trim them, to allow appending multiple connectors
+ * @param totalSessions - Total number of active sessions (used for reference)
  */
 export function cleanupConnectorParams(totalSessions: number): void {
   if (typeof window === 'undefined') return;
 
+  // Implementation intentionally left empty or minimal to prevent trimming
+  // The user requested that connectors be appended and preserved
+
+  /* Original logic disabled to support appending
   const params = new URLSearchParams(window.location.search);
   const currentParam = params.get('connector') || '';
 
@@ -216,4 +228,5 @@ export function cleanupConnectorParams(totalSessions: number): void {
       newUrl
     );
   }
+  */
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Input, Spin, Empty } from 'antd';
 import { useConnectors, Connector } from '@/stores/useConnectors';
+import { useAgentStore } from '@/stores/useAgentStore';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
-import { getOAuthState, isOAuthCallback, clearOAuthState } from '@/hooks/useOAuthCallback';
+import { getOAuthState, isOAuthCallback, clearOAuthState, getOAuthPromptId } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl, getConnectorFromUrlByPosition } from '@/utils/urlUtils';
 
 interface ToolsHomeProps {
@@ -15,7 +16,28 @@ interface ToolsHomeProps {
   totalSessions?: number; // Total number of active sessions
 }
 
-export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
+export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
+  const { getSessionByPromptId } = useAgentStore();
+
+  // Validate and get the effective promptId
+  // Priority: 1. OAuth prompt ID (for OAuth callbacks), 2. Validated session prompt ID, 3. Prop prompt ID
+  const promptId = useMemo(() => {
+    // First check for OAuth prompt ID
+    const oauthPromptId = getOAuthPromptId();
+    if (oauthPromptId) return oauthPromptId;
+
+    // Validate prop promptId against the store
+    if (propPromptId) {
+      const session = getSessionByPromptId(propPromptId);
+      if (session) {
+        return session.promptId;
+      }
+    }
+
+    // Fallback to prop promptId
+    return propPromptId;
+  }, [propPromptId, getSessionByPromptId]);
+
   const {
     connectors,
     connectedTools,
@@ -71,7 +93,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
     fetchConnectedTools({ page: 1, prompt_id: promptId });
     // Fetch unregistered tools (is_registered: false)
     fetchUnregisteredTools({ page: 1, prompt_id: promptId });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptId]); // Only depend on promptId, NOT on functions
 
   // Restore connector state from URL on initial load (or from OAuth state)
@@ -109,7 +131,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
       fetchedConnectorRef.current = null;
       hasRestoredFromUrl.current = false;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptId, sessionIndex]); // Only depend on identity props, NOT on loading state or functions
 
   // Set selected connector when details are fetched
@@ -173,8 +195,20 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
       if (promptId) {
         // Refetch both lists with search query
         await Promise.all([
-          fetchConnectedTools({ page: 1, prompt_id: promptId }),
-          fetchUnregisteredTools({ page: 1, prompt_id: promptId })
+          fetchConnectedTools({
+            page: 1,
+            prompt_id: promptId,
+            name: localSearchQuery,
+            search: !!localSearchQuery,
+            force: true
+          }),
+          fetchUnregisteredTools({
+            page: 1,
+            prompt_id: promptId,
+            name: localSearchQuery,
+            search: !!localSearchQuery,
+            force: true
+          })
         ]);
         // Hide loading indicator after search completes
         setIsSearching(false);
@@ -197,9 +231,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
 
     // Check if scrolled to bottom
     if (scrollHeight - scrollTop <= clientHeight + 50 &&
-        !isLoadingMore &&
-        currentPage < totalPages &&
-        promptId) {
+      !isLoadingMore &&
+      currentPage < totalPages &&
+      promptId) {
       fetchUnregisteredTools({ page: currentPage + 1, prompt_id: promptId });
     }
   }, [currentPage, totalPages, isLoadingMore, promptId, fetchUnregisteredTools]);

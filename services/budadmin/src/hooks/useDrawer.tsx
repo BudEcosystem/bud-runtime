@@ -219,10 +219,12 @@ export const useDrawer = create<{
             updateQueryParams({ agent: null }, { replaceHistory: true });
 
             // Clear all related data stores since we are completely exiting the add-agent flow
+            // NOTE: clearPersistedSessions disabled for now to preserve data on refresh
+            // TODO: Re-enable once the refresh issue is fully fixed
             useAddAgent.getState().reset();
-            useAgentStore.getState().resetSessionState();
+            // useAgentStore.getState().clearPersistedSessions();
 
-            console.log('✓ Agent parameter removed and stores reset after safety delay');
+            console.log('✓ Agent parameter removed after safety delay');
           } else {
             console.log('⚠️ Agent parameter preserved after delay check - conditions changed');
           }
