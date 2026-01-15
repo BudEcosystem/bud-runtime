@@ -36,69 +36,49 @@ Sensitive key values remain hidden by default with reveal and copy actions avail
 ### 3.1 Tabbed module layout
 
 - **Provider**: manage proprietary provider credentials (e.g., cloud model APIs).
-
 - **Projects**: manage project-scoped API keys with expiry and budget controls.
-
 - **Cloud Providers** (dev mode): connect cloud infrastructure providers and store their credential sets.
 
 ### 3.2 Provider credential list
 
 - Credential list table with sortable columns for name, provider, deployment counts, and creation date.
-
 - Search by credential name.
-
 - Filter by provider type using the filter popover.
-
 - Pagination with configurable page size.
-
 - **Add Credentials** action opens the credential creation flow.
-
 - Row click opens the credential detail drawer.
 
 ### 3.3 Provider credential details
 
 - Drawer view shows credential fields with masked values by default.
-
 - Toggle visibility to reveal key values and copy them to clipboard.
-
 - Action menu supports **Delete** with confirmation.
-
 - Deployments table lists associated deployments with sortable columns (project, model, type, created on).
 
 ### 3.4 Project key list
 
 - Project keys table with sortable columns for credential name, project, expiry, last used, and max budget.
-
 - Search by credential name.
-
 - Filter by project using the filter popover.
-
 - Pagination with configurable page size.
-
 - **Create New Key** action opens the project key creation flow.
-
 - Row click opens the project key detail drawer.
 
 ### 3.5 Project key details
 
 - Drawer view highlights the key, project name, expiry date, last used, and max budget.
-
 - Toggle visibility to reveal the key and copy it.
-
 - Action menu includes **Edit** and **Delete** (with confirmation) to manage lifecycle updates.
 
 ### 3.6 Cloud provider connections (dev mode)
 
 - Cloud provider table lists provider, credential name, description, and created date.
-
 - **Connect To Cloud** opens the provider connection flow.
 
 ### 3.7 Creation workflows
 
 - **Add Credentials** flow: choose provider → enter provider-specific fields → create credential.
-
 - **Create New Key** flow: set credential name, project, expiry window, and max budget → create key.
-
 - **Connect To Cloud** flow: choose provider → enter credential name and provider-specific properties → save.
 
 ## 4. How-to Guides
@@ -106,93 +86,61 @@ Sensitive key values remain hidden by default with reveal and copy actions avail
 ### 4.1 Accessing the API Keys module
 
 1. Log in to Bud Admin using SSO or your credentials.
-
 2. Select **API Keys** from the left navigation.
-
 3. Use the tabs to switch between **Provider**, **Projects**, and (when enabled) **Cloud Providers**.
 
 ### 4.2 Add provider credentials
 
 1. In **Provider** tab, click **Add Credentials**.
-
 2. Search for a provider and select it.
-
 3. Click **Next** to open the credential form.
-
 4. Enter a credential name and the provider-specific fields.
-
 5. Click **Create** to save the credentials.
-
 6. Confirm the credential appears in the list.
 
 ### 4.3 Create a project API key
 
 1. Open the **Projects** tab.
-
 2. Click **Create New Key**.
-
 3. Enter a **Credential Name**.
-
 4. Select the **Project** to scope the key.
-
 5. Set **Expiry** (e.g., 30 or 60 days).
-
 6. Set **Max Budget** for the key.
-
 7. Click **Create** to generate the key.
 
 ### 4.4 View and manage provider credentials
 
 1. In the **Provider** list, click a credential row.
-
 2. Review the credential fields in the drawer.
-
 3. Use the eye icon to show or hide the secret value.
-
 4. Click the copy icon to copy the value securely.
-
 5. Use the action menu to **Delete** credentials (confirmation required).
-
 6. Review deployments associated with the credential in the Deployments table.
 
 ### 4.5 View and manage project keys
 
 1. In the **Projects** list, click a credential row.
-
 2. Use the eye icon to reveal the key value.
-
 3. Click the copy icon to copy the key.
-
 4. Review **Project**, **Expiry Date**, **Last Used**, and **Max Budget** fields.
-
 5. Use the action menu to **Edit** or **Delete** the key (confirmation required for deletion).
 
 ### 4.6 Connect a cloud provider (dev mode)
 
 1. Open the **Cloud Providers** tab.
-
 2. Click **Connect To Cloud**.
-
 3. Select the provider, then click **Next**.
-
 4. Enter a credential name.
-
 5. Provide provider-specific credential values.
-
 6. Click **Save** to connect the provider.
 
 ### 4.7 Search, filter, and sort credentials
 
 1. Use the search bar to filter by credential name.
-
 2. Click the filter icon to open **Filter**.
-
 3. Select a **Provider** (Provider tab) or **Project** (Projects tab).
-
 4. Click **Apply** to filter or **Reset** to clear.
-
 5. Click column headers to sort by name, dates, or budgets.
-
 6. Use pagination controls to adjust page size and browse results.
 
 ## 5. FAQ
@@ -216,11 +164,17 @@ Open the credential or key detail drawer and use the action menu to delete it. D
 ### Q5. What filters are available?
 
 - **Provider tab:** filter by provider.
-
 - **Projects tab:** filter by project.
-
 - Both tabs support name search, column sorting, and pagination.
 
 ### Q6. Why do I see a Cloud Providers tab?
 
 The **Cloud Providers** tab is visible when dev mode is enabled. It lets you connect cloud infrastructure providers and manage their credentials separately from model provider credentials.
+
+### Q7. Can I control how long a project API key stays valid??
+
+Yes. Each project key is created with an expiry (currently selectable as 30 or 60 days) and can be updated later from the key detail drawer.
+
+### Q8. How do I know where a provider credential is used?
+
+The provider credential detail drawer includes a **Deployments** table that lists the model deployments using that credential, along with project, model, status, and creation date.
