@@ -5,7 +5,9 @@ description: "Manage credentials, project keys, and cloud provider access."
 
 ## 1. Description
 
-The API Keys module in Bud Admin centralizes how teams create, store, and govern credentials that power Bud AI Foundry’s API access. It blends provider credentials (for cloud model access), project-scoped API keys (for consumption and budgeting), and cloud provider integrations into one workflow so admins can enforce visibility, expiry, and usage controls across the organization.
+The API Keys module in Bud Admin centralizes how teams create, store, and govern credentials that power Bud AI Foundry’s API access. It blends provider credentials (for cloud model access), project-scoped API keys (for consumption and budgeting), and cloud provider integrations into one workflow so admins can enforce visibility, expiry, and usage controls across the organization. 
+
+Project keys are designed to cover both cloud and local workloads. They can secure access to deployments backed by cloud providers as well as local models onboarded via Hugging Face, URL-based downloads, or disk-mounted checkpoints, ensuring consistent governance regardless of where a model runs. 
 
 The module is built for enterprise environments where a single platform must support multiple projects, providers, and deployment footprints. It keeps credentials organized with searchable listings, structured detail views, and secure drawer-based workflows for creation, editing, and deletion.
 
