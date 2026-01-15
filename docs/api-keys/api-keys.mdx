@@ -146,7 +146,7 @@ Provider credentials store secrets used to access external model providers. Proj
 
 ### Q2. How do I restrict which project a key can access?
 
-Project keys are created with a single project assignment. Use the **Project** selector during key creation to scope access.
+Project keys are created with a single project assignment. Use the Project selector during key creation to scope access.
 
 ### Q3. Can I hide or reveal keys safely?
 
@@ -156,20 +156,14 @@ Yes. Keys are masked by default. Use the eye icon in the detail drawer to reveal
 
 Open the credential or key detail drawer and use the action menu to delete it. Deletion requires confirmation to prevent accidental removal.
 
-### Q5. What filters are available?
+### Q5. Why do I see a Cloud Providers tab?
 
-- **Provider tab:** filter by provider.
-- **Projects tab:** filter by project.
-- Both tabs support name search, column sorting, and pagination.
+The Cloud Providers tab allows you connect cloud infrastructure providers and manage their credentials separately from model provider credentials.
 
-### Q6. Why do I see a Cloud Providers tab?
+### Q6. Can I control how long a project API key stays valid?
 
-The **Cloud Providers** tab is visible when dev mode is enabled. It lets you connect cloud infrastructure providers and manage their credentials separately from model provider credentials.
+Yes. Each project key is created with an expiry (30 or 60 days) and can be updated later from the key detail drawer.
 
-### Q7. Can I control how long a project API key stays valid??
+### Q7. How do I know where a provider credential is used?
 
-Yes. Each project key is created with an expiry (currently selectable as 30 or 60 days) and can be updated later from the key detail drawer.
-
-### Q8. How do I know where a provider credential is used?
-
-The provider credential detail drawer includes a **Deployments** table that lists the model deployments using that credential, along with project, model, status, and creation date.
+The provider credential detail page includes a Deployments table that lists the model deployments using that credential, along with project, model, status, and creation date.
