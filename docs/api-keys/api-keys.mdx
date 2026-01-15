@@ -5,9 +5,9 @@ description: "Manage credentials, project keys, and cloud provider access."
 
 ## 1. Description
 
-The API Keys module in Bud Admin centralizes how teams create, store, and govern credentials that power Bud AI Foundry’s API access. It blends provider credentials (for cloud model access), project-scoped API keys (for consumption and budgeting), and cloud provider integrations into one workflow so admins can enforce visibility, expiry, and usage controls across the organization. 
+The API Keys module in Bud Admin centralizes how teams create, store, and govern credentials that power Bud AI Foundry’s API access. It blends provider credentials (for cloud model access), project-scoped API keys (for consumption and budgeting), and cloud provider integrations into one workflow so admins can enforce visibility, expiry, and usage controls across the organization.
 
-Project keys are designed to cover both cloud and local workloads. They can secure access to deployments backed by cloud providers as well as local models onboarded via Hugging Face, URL-based downloads, or disk-mounted checkpoints, ensuring consistent governance regardless of where a model runs. 
+Project keys are designed to cover both cloud and local workloads. They can secure access to deployments backed by cloud providers as well as local models onboarded via Hugging Face, URL-based downloads, or disk-mounted checkpoints, ensuring consistent governance regardless of where a model runs.
 
 The module is built for enterprise environments where a single platform must support multiple projects, providers, and deployment footprints. It keeps credentials organized with searchable listings, structured detail views, and secure drawer-based workflows for creation, editing, and deletion.
 
@@ -47,14 +47,14 @@ Sensitive key values remain hidden by default with reveal and copy actions avail
 - Search by credential name.
 - Filter by provider type using the filter popover.
 - Pagination with configurable page size.
-- **Add Credentials** action opens the credential creation flow.
+- Add Credentials action opens the credential creation flow.
 - Row click opens the credential detail drawer.
 
 ### 3.3 Provider credential details
 
 - Drawer view shows credential fields with masked values by default.
 - Toggle visibility to reveal key values and copy them to clipboard.
-- Action menu supports **Delete** with confirmation.
+- Action menu supports Delete with confirmation.
 - Deployments table lists associated deployments with sortable columns (project, model, type, created on).
 
 ### 3.4 Project key list
@@ -62,26 +62,19 @@ Sensitive key values remain hidden by default with reveal and copy actions avail
 - Project keys table with sortable columns for credential name, project, expiry, last used, and max budget.
 - Search by credential name.
 - Filter by project using the filter popover.
-- Pagination with configurable page size.
-- **Create New Key** action opens the project key creation flow.
+- Create New Key action opens the project key creation flow.
 - Row click opens the project key detail drawer.
 
 ### 3.5 Project key details
 
 - Drawer view highlights the key, project name, expiry date, last used, and max budget.
 - Toggle visibility to reveal the key and copy it.
-- Action menu includes **Edit** and **Delete** (with confirmation) to manage lifecycle updates.
+- Action menu includes Edit and Delete (with confirmation) to manage lifecycle updates.
 
-### 3.6 Cloud provider connections (dev mode)
+### 3.6 Cloud provider connections
 
 - Cloud provider table lists provider, credential name, description, and created date.
-- **Connect To Cloud** opens the provider connection flow.
-
-### 3.7 Creation workflows
-
-- **Add Credentials** flow: choose provider → enter provider-specific fields → create credential.
-- **Create New Key** flow: set credential name, project, expiry window, and max budget → create key.
-- **Connect To Cloud** flow: choose provider → enter credential name and provider-specific properties → save.
+- Connect To Cloud opens the provider connection flow.
 
 ## 4. How-to Guides
 
