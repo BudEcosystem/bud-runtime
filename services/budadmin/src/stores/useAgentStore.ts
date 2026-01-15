@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { infoToast } from "@/components/toast";
 
 export interface AgentVariable {
@@ -142,7 +143,7 @@ interface AgentStore {
   getSessionSettings: (sessionId: string) => AgentSettings | undefined;
 
   // UI Actions
-  openAgentDrawer: (workflowId?: string, nextStep?: string) => void;
+  openAgentDrawer: (workflowId?: string, nextStep?: string, skipSessionCreation?: boolean) => void;
   closeAgentDrawer: () => void;
   setSelectedSession: (id: string | null) => void;
   openModelSelector: () => void;
@@ -178,6 +179,9 @@ interface AgentStore {
   // TODO: Connector Management (per-session) - reserved for future use to replace URL-based connector state
   setSessionConnectorId: (sessionId: string, connectorId: string | null) => void;
   getSessionConnectorId: (sessionId: string) => string | undefined;
+
+  // Persistence Management
+  clearPersistedSessions: () => void;
 }
 
 const generateId = () => {
@@ -259,7 +263,12 @@ const createDefaultModelSettings = (sessionId: string): AgentSettings => ({
   modifiedFields: new Set<string>(),
 });
 
-export const useAgentStore = create<AgentStore>()((set, get) => ({
+// Storage key for persisted agent sessions
+const AGENT_STORE_KEY = 'agent-store-sessions';
+
+export const useAgentStore = create<AgentStore>()(
+  persist(
+    (set, get) => ({
       // Initial State
       sessions: [],
       activeSessionIds: [],
@@ -533,12 +542,13 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       },
 
       // UI Actions
-      openAgentDrawer: (workflowId?: string, nextStep?: string) => {
+      openAgentDrawer: (workflowId?: string, nextStep?: string, skipSessionCreation?: boolean) => {
         // Set transition flag FIRST to prevent race conditions with useDrawer.closeDrawer
         set({ isTransitioningToAgentDrawer: true });
 
         const sessions = get().sessions;
-        if (sessions.length === 0) {
+        // Only create session if not skipped (e.g., when restoring from URL params)
+        if (sessions.length === 0 && !skipSessionCreation) {
           const sessionId = get().createSession();
           // If workflow_id is provided, update the created session with it
           if (workflowId && sessionId) {
@@ -765,17 +775,25 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
         // Check if session with this prompt ID already exists
         const existingSession = existingSessions.find(s => s.promptId === promptId);
         if (existingSession) {
+          // Ensure session ID is in activeSessionIds (might not be if restored from persistence)
+          const newActiveSessionIds = activeSessionIds.includes(existingSession.id)
+            ? activeSessionIds
+            : [...activeSessionIds, existingSession.id];
+
           // Update existing session with new data if provided
-          if (sessionData) {
-            set({
-              sessions: existingSessions.map(s =>
+          const updatedSessions = sessionData
+            ? existingSessions.map(s =>
                 s.id === existingSession.id
                   ? { ...s, ...sessionData, updatedAt: new Date() }
                   : s
-              ),
-              selectedSessionId: existingSession.id
-            });
-          }
+              )
+            : existingSessions;
+
+          set({
+            sessions: updatedSessions,
+            activeSessionIds: newActiveSessionIds,
+            selectedSessionId: existingSession.id
+          });
           return existingSession.id;
         }
 
@@ -823,5 +841,46 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       getSessionConnectorId: (sessionId: string) => {
         const session = get().sessions.find(s => s.id === sessionId);
         return session?.selectedConnectorId;
+      },
+
+      // Persistence Management - clears persisted session data
+      clearPersistedSessions: () => {
+        // Clear the persisted storage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(AGENT_STORE_KEY);
+        }
+        // Reset session state in memory
+        set({
+          sessions: [],
+          activeSessionIds: [],
+          selectedSessionId: null,
+        });
       }
-    }));
+    }),
+    {
+      name: AGENT_STORE_KEY,
+      storage: createJSONStorage(() => localStorage),
+      // Only persist session-related data, not UI state
+      partialize: (state) => ({
+        sessions: state.sessions,
+        activeSessionIds: state.activeSessionIds,
+        selectedSessionId: state.selectedSessionId,
+      }),
+      // Custom merge function to handle Date deserialization
+      merge: (persistedState: any, currentState) => {
+        if (persistedState?.sessions) {
+          // Convert date strings back to Date objects
+          persistedState.sessions = persistedState.sessions.map((session: any) => ({
+            ...session,
+            createdAt: session.createdAt ? new Date(session.createdAt) : new Date(),
+            updatedAt: session.updatedAt ? new Date(session.updatedAt) : new Date(),
+          }));
+        }
+        return {
+          ...currentState,
+          ...persistedState,
+        };
+      },
+    }
+  )
+);

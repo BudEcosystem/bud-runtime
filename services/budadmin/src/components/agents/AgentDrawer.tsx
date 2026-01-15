@@ -120,8 +120,13 @@ const AgentDrawer: React.FC = () => {
     // Check for saved session data (most reliable indicator of OAuth in progress)
     const hasOAuthSessionData = !!localStorage.getItem('oauth_session_data');
 
-    if (isOAuthCallbackFlag || hasOAuthParamsInUrl || hasSavedOAuthPromptId || hasOAuthState || hasOAuthSessionData) {
-      // OAuth in progress - session should already exist or will be restored, don't create new one
+    // Check for prompt parameters in URL which indicates restoration will happen
+    const hasPromptParams = typeof window !== 'undefined' &&
+      (new URLSearchParams(window.location.search).has('prompt') ||
+        new URLSearchParams(window.location.search).has('agent'));
+
+    if (isOAuthCallbackFlag || hasOAuthParamsInUrl || hasSavedOAuthPromptId || hasOAuthState || hasOAuthSessionData || hasPromptParams) {
+      // OAuth or Restoration in progress - session should already exist or will be restored, don't create new one
       return;
     }
 
@@ -130,7 +135,7 @@ const AgentDrawer: React.FC = () => {
       return;
     }
 
-    // Only create session if none exist AND not OAuth callback AND not in any special mode
+    // Only create session if none exist AND not OAuth callback AND not in any special mode AND not restoring
     if (activeSessions.length === 0) {
       createSession();
     }
@@ -171,13 +176,27 @@ const AgentDrawer: React.FC = () => {
     }
 
     // Don't update URL during OAuth callback - let the OAuth handler manage it
-    const hasOAuthParamsInUrl = typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).has('code') &&
-      new URLSearchParams(window.location.search).has('state');
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasOAuthParamsInUrl = urlParams &&
+      urlParams.has('code') &&
+      urlParams.has('state');
+    const hasConnectorParam = urlParams && urlParams.has('connector');
     const hasSavedOAuthPromptId = hasOAuthPromptId(); // Check dedicated storage
 
-    if (hasOAuthParamsInUrl || hasSavedOAuthPromptId) {
-      // OAuth in progress - don't update URL, let OAuth handler manage it
+    // Define flags inside the effect scope to fix lint errors
+    const isOAuthCallbackFlag = typeof window !== 'undefined' && localStorage.getItem('oauth_should_open_drawer') === 'true';
+    const hasOAuthState = typeof window !== 'undefined' && !!localStorage.getItem('oauth_connector_state');
+    const hasOAuthSessionData = typeof window !== 'undefined' && !!localStorage.getItem('oauth_session_data');
+
+    // Check for prompt parameters in URL which indicates restoration is happening/happened
+    const hasPromptParams = urlParams && (urlParams.has('prompt') || urlParams.has('agent'));
+
+    // Only block if we have prompt params BUT no active sessions (or sessions don't match URL yet)
+    // This allows the URL to be preserved while sessions are being restored
+    const isRestoring = hasPromptParams && activeSessions.length === 0;
+
+    if (isOAuthCallbackFlag || hasOAuthParamsInUrl || hasSavedOAuthPromptId || hasOAuthState || hasOAuthSessionData || hasConnectorParam || isRestoring) {
+      // OAuth or Restoration in progress - don't update URL, let other handlers manage it
       return;
     }
 
@@ -299,13 +318,12 @@ const AgentDrawer: React.FC = () => {
               <Tooltip title={(showPlayground || showChatHistory) ? "Back to Agent Settings" : "Use settings icon in each agent box"} placement="right">
                 <button
                   onClick={handleSettingsClick}
-                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors mb-3 ${
-                    (showPlayground || showChatHistory)
-                      ? 'cursor-pointer'
-                      : activeSessions.length > 0
-                        ? 'cursor-not-allowed'
-                        : 'opacity-50 cursor-not-allowed'
-                  }`}
+                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors mb-3 ${(showPlayground || showChatHistory)
+                    ? 'cursor-pointer'
+                    : activeSessions.length > 0
+                      ? 'cursor-not-allowed'
+                      : 'opacity-50 cursor-not-allowed'
+                    }`}
                   disabled={!showPlayground && !showChatHistory}
                 >
                   <SettingOutlined className={`text-lg ${activeSessions.length > 0 && !showPlayground && !showChatHistory ? 'text-[#EEEEEE]' : 'text-[#808080]'}`} />
@@ -327,9 +345,8 @@ const AgentDrawer: React.FC = () => {
               <Tooltip title={(showPlayground || showChatHistory) ? "Chat History" : "Enable playground first"} placement="right">
                 <button
                   onClick={handleChatHistoryClick}
-                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
-                    (showPlayground || showChatHistory) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
-                  }`}
+                  className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors ${(showPlayground || showChatHistory) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                    }`}
                   disabled={!showPlayground && !showChatHistory}
                 >
                   <MessageOutlined className={`text-lg ${showChatHistory ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />

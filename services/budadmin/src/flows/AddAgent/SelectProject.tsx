@@ -37,9 +37,19 @@ export default function SelectProject() {
   // This ensures a fresh start for every new add-agent flow
   // Only clear if there's no currentWorkflow (i.e., starting a new flow, not navigating back)
   // Note: Does not affect edit/version modes since they don't use SelectProject
+  // CRITICAL: Also skip reset if URL has agent/prompt params (page refresh scenario)
+  // Otherwise, persisted sessions from localStorage would be cleared
   useEffect(() => {
     const { currentWorkflow } = useAddAgent.getState();
-    if (!currentWorkflow) {
+
+    // Check if URL has agent/prompt params indicating a restoration scenario (page refresh)
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasRestorationParams = urlParams && (urlParams.has('agent') || urlParams.has('prompt'));
+
+    // Only reset if:
+    // 1. No current workflow (not in an active flow)
+    // 2. No URL params indicating a restoration scenario (prevents clearing persisted sessions on refresh)
+    if (!currentWorkflow && !hasRestorationParams) {
       useAgentStore.getState().resetSessionState();
     }
   }, []);
