@@ -124,7 +124,7 @@
             "group": "API Keys & Security",
             "icon": "key",
             "pages": [
-              "api-keys/creating-api-keys"
+              "api-keys/api-keys"
             ]
           },
           {
