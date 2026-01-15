@@ -1,28 +1,60 @@
 ---
 title: "Quick Start Guide"
-description: "Get up and running with Bud Stack in 5 minutes"
+description: "Get up and running with Bud AI Foundry in 5 minutes"
 ---
 
 # Quick Start Guide
 
-Deploy your first AI model in just 5 minutes.
+Deploy your first model and make an API request in minutes.
 
-## Prerequisites
+## 1. Prerequisites
 
-*Content to be added*
+- Bud AI Foundry account with access to the console.
+- A project created in your workspace.
+- API key with permission to call endpoints.
 
-## Step 1: Create an Account
+## 2. Step 1: Create an account
 
-*Content to be added*
+1. Sign in or create a Bud AI Foundry account.
+2. Complete workspace setup and verify your organization details.
+3. Invite teammates if needed.
 
-## Step 2: Create Your First Project
+## 3. Step 2: Create your first project
 
-*Content to be added*
+1. Navigate to **Projects** and click **Create Project**.
+2. Name the project and set the default region.
+3. Generate an API key for the project.
 
-## Step 3: Deploy a Model
+## 4. Step 3: Add a model
 
-*Content to be added*
+1. Go to **Models** and select **+Model**.
+2. Choose a model source (Cloud, Hugging Face, URL, or Disk).
+3. Provide metadata and save the model to the catalog.
 
-## Next Steps
+## 5. Step 4: Deploy the model
 
-*Content to be added*
+1. Open your project detail page and select **Deploy Model**.
+2. Choose a model from the catalog and confirm the model source.
+3. Select a cluster and hardware profile.
+4. Configure scaling and safety settings, then launch the deployment.
+
+## 6. Step 5: Test your endpoint
+
+Use your project API key to call the endpoint with an OpenAI-compatible request.
+
+```bash
+curl https://api.bud.studio/v1/chat/completions \
+  -H "Authorization: Bearer $BUD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "your-deployed-model",
+    "messages": [{"role": "user", "content": "Hello from Bud AI Foundry"}]
+  }'
+```
+
+## 7. Next steps
+
+- [Model management](/models/models)
+- [Deploy your first model](/deployments/deploy-first-model)
+- [API authentication](/api-integration/authentication)
+- [Observability](/observability/observability)
