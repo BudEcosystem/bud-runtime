@@ -107,13 +107,6 @@
             ]
           },
           {
-            "group": "Performance Optimization",
-            "icon": "gauge-high",
-            "pages": [
-              "performance/simulation-overview"
-            ]
-          },
-          {
             "group": "API Keys & Security",
             "icon": "key",
             "pages": [
