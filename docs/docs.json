@@ -42,7 +42,7 @@
             "group": "Deployments",
             "icon": "rocket",
             "pages": [
-              "deployments/deploy-first-model"
+              "deployments/deployments"
             ]
           },
           {
@@ -50,13 +50,6 @@
             "icon": "server",
             "pages": [
               "clusters/cluster"
-            ]
-          },
-          {
-            "group": "Endpoints",
-            "icon": "plug",
-            "pages": [
-              "endpoints/creating-endpoints"
             ]
           },
           {
