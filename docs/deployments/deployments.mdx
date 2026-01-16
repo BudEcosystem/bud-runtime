@@ -1,0 +1,268 @@
+---
+title: "Deployments"
+description: "Deployment module for launching, monitoring, and governing model endpoints."
+---
+
+---
+
+## 1. Description
+
+The Deployments module in Bud Admin lives inside each Project detail page and serves as the operational hub for launching, monitoring, and governing model endpoints. It unifies cloud models with local deployments (Hugging Face, URL-based, and disk-based) under a single tab so teams can publish, tune, and observe endpoints without leaving the project workspace. Each deployment connects a model, cluster, and runtime configuration while exposing tools for reliability, cost control, and observability.
+
+Deployments make it possible to standardize how teams ship GenAI workloads with GPU-optional infrastructure. The module ties together model selection, hardware placement, concurrency settings, and endpoint publishing with built-in filters, search, and detailed tabs so both platform admins and product teams can manage production-grade inference confidently.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. One deployment hub for cloud and local models
+
+Run cloud APIs and local artifacts (Hugging Face, URL, disk) from the same project tab, enabling consistent deployment governance and lifecycle management across environments.
+
+### 2. GPU-optional configuration with cluster awareness
+
+Choose CPU-first or accelerator-backed clusters per deployment and compare performance signals before promoting changes.
+
+### 3. Built-in endpoint lifecycle controls
+
+Launch, publish, unpublish, delete, and reuse deployments with permission-aware actions that keep project workflows consistent.
+
+### 4. Deep visibility through detail-page tabs
+
+General, Workers, Settings, Benchmarks, and Model Evaluations tabs provide step-by-step insight into runtime health, policies, and quality checks.
+
+### 5. Fast discovery with search, filters, and action buttons
+
+Filter by status, cluster, or model; search by deployment name; and use action buttons such as Deploy Model, Publish, Run Another Benchmark, and Export to keep workflows efficient.
+
+## 3. Features
+
+### 3.1 Deployment list and discovery
+
+- Project-scoped deployment table with model, cluster, status, and endpoint counts.
+
+- Search by deployment name to find specific endpoints quickly.
+
+- Sort and filter by status, cluster, or model as needed.
+
+- Action buttons to Deploy Model, Publish, Use this model, or Delete based on permissions.
+
+### 3.2 Cloud and local deployment coverage
+
+- Launch cloud model endpoints with managed credentials and SLA-aware routing.
+
+- Deploy local models (Hugging Face, URL-based, disk-based) to on-prem or cloud clusters.
+
+- Keep hardware and runtime selections aligned with project-level governance.
+
+### 3.3 Deployment detail tabs
+
+#### 3.3.1 General
+
+- Review the model card, cluster card, and deployment status.
+
+- Inspect deployment analytics (usage, latency, routing signals).
+
+- Access Use this model when enabled to share integration snippets.
+
+#### 3.3.2 Workers (local deployments only)
+
+- View worker rows with status, node placement, and utilization.
+
+- Filter by status or hardware to triage worker health.
+
+- Add Worker to expand concurrency or capacity.
+
+#### 3.3.3 Settings
+
+- Configure rate limits (fixed, sliding, token bucket) and quotas.
+
+- Set retry limits and fallback deployment chains for reliability.
+
+- Save settings to enforce policies across the endpoint.
+
+#### 3.3.4 Benchmarks
+
+- Compare throughput and latency runs for the deployment.
+
+- Search and filter by status, model name, cluster name, TPOT, or TTFT.
+
+- Run Another Benchmark to launch new performance runs.
+
+#### 3.3.5 Model Evaluations
+
+- Review evaluation runs with datasets, scores, and timestamps.
+
+- Filter and sort evaluations to validate quality before promotion.
+
+- Run Another Evaluation or Export results for offline review.
+
+### 3.4 Endpoint publishing and reuse
+
+- Publish deployments with token pricing to expose endpoints in the Bud customer dashboard.
+
+- Review Publish Details, update pricing, or unpublish without deleting the deployment.
+
+- Use this model action provides ready-made cURL, Python, and JavaScript snippets.
+
+### 3.5 Governance and access control
+
+- Actions (deploy, edit, publish, delete) respect project and endpoint permissions.
+
+- Audit trails capture changes to deployment settings, retries, and publish status.
+
+## 4. How-to Guides
+
+### 4.1 Access the Deployments tab
+
+1. Log in to your Bud AI Foundry dashboard using SSO or your credentials.
+
+2. Open Projects from the side menu.
+
+3. Select a project to open the detail page.
+
+4. Choose the Deployments tab to view the deployment list.
+
+### 4.2 Deploy a model
+
+1. In the Deployments tab, click Deploy Model.
+
+2. Pick a model from the Model Zoo (cloud or local).
+
+3. Select the hardware resource mode and target cluster.
+
+4. Choose a deployment template (e.g., Question Answering, Chatbot, Code Generation).
+
+5. Provide deployment name, concurrent requests, context length, sequence length, per-session tokens/sec, TTFT, and end-to-end latency targets.
+
+6. Submit to launch the deployment and confirm it appears in the list.
+
+### 4.3 Search and filter deployments
+
+1. Use the search box to filter by deployment name.
+
+2. Apply status, model, or cluster filters to narrow the list.
+
+3. Sort columns to prioritize newest or most active deployments.
+
+### 4.4 Open a deployment detail page
+
+1. Click a deployment row from the Deployments tab.
+
+2. Review the General tab summary before switching to the other tabs below.
+
+#### 4.4.1 General
+
+1. Confirm the model and cluster cards for metadata and tags.
+
+2. Review deployment analytics and routing signals.
+
+3. Click Use this model (if enabled) to access integration snippets.
+
+#### 4.4.2 Workers (local deployments only)
+
+1. Select the Workers tab to view worker status.
+
+2. Apply status or hardware filters.
+
+3. Click Add Worker to expand capacity.
+
+4. Click a worker row to open the detail drawer.
+
+#### 4.4.3 Settings
+
+1. Open the Settings tab.
+
+2. Toggle Rate Limit and select the algorithm (fixed, sliding, token bucket).
+
+3. Configure per-second, per-minute, or per-hour quotas and burst size.
+
+4. Set retry limits and fallback deployments.
+
+5. Save to apply the policy.
+
+#### 4.4.4 Benchmarks
+
+1. Open the Benchmarks tab.
+
+2. Search or filter by status, model, cluster, TPOT, or TTFT.
+
+3. Click Run Another Benchmark to start a new run.
+
+4. Compare results to guide routing or scaling decisions.
+
+#### 4.4.5 Model Evaluations
+
+1. Open the Model Evaluations tab.
+
+2. Filter by dataset or score to validate quality.
+
+3. Click Run Another Evaluation to launch a new run.
+
+4. Click Export to download evaluation results.
+
+#### 4.4.6 Publish a deployment
+
+1. Return to the Deployments table.
+
+2. Click Publish on an active deployment row.
+
+3. Enter Input cost, Output cost, and Price per token (USD).
+
+4. Review Publish Details to update pricing or Unpublish later.
+
+#### 4.4.7 Use this model
+
+1. Click Use this model from the deployment row or the General tab.
+
+2. Copy cURL, Python, or JavaScript snippets to integrate the endpoint.
+
+### 4.5 Delete a deployment
+
+1. From the Deployments list, click Delete on the deployment row.
+
+2. Confirm the deletion prompt.
+
+3. Ensure dependent routes or applications are updated before final removal.
+
+### 4.6 Modify permissions for deployments
+
+1. Open the user management page and select a user.
+
+2. Assign view access for users who should browse deployments only.
+
+3. Grant manage permissions to users who can deploy, edit, publish, or delete endpoints.
+
+4. Save changes to enforce access across the Deployments tab.
+
+## 5. FAQ
+
+**Q1. Where do I find the Deployments module?**
+
+The Deployments module lives inside each Project detail page under the Deployments tab.
+
+**Q2. Which model types can be deployed?**
+
+Deployments support cloud APIs plus local models from Hugging Face, URL-based sources, and disk-based checkpoints.
+
+**Q3. How do I differentiate cloud vs local deployments?**
+
+The deployment list shows model and cluster details, and local deployments expose the Workers tab for worker-level monitoring.
+
+**Q4. Can I benchmark a deployment before routing traffic?**
+
+Yes. Use the Benchmarks tab to run new performance benchmarks and filter results by status, TPOT, or TTFT.
+
+**Q5. How do I publish an endpoint for organizational use?**
+
+Click Publish on the deployment row, set token pricing, and manage pricing later in Publish Details.
+
+**Q6. What if I need to use the endpoint in another app?**
+
+Use the Use this model action to copy ready-made cURL, Python, or JavaScript snippets.
+
+**Q7. Which settings help with reliability?**
+
+Rate limits, retries, and fallback chains in the Settings tab help protect endpoints from traffic spikes and failures.
+
+**Q8. Who can deploy or delete endpoints?**
+
+Only users with project or endpoint manage permissions can deploy, publish, or delete endpoints; view-only users can browse the list.
