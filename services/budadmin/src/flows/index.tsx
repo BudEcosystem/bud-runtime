@@ -61,6 +61,8 @@ import AddWorkerSuccess from "./Worker/AddWorkerSuccess";
 import AddWorkerConfigStatus from "./Worker/AddWorkerConfigStatus";
 import AddWorkerDeployStatus from "./Worker/AddWorkerDeployStatus";
 import WorkerDeleteStatus from "./Worker/WorkerDeleteStatus";
+import PipelineExecutionDetails from "./Pipeline/ExecutionDetails";
+import CreateSchedule from "./Pipeline/CreateSchedule";
 import ViewUser from "./user/ViewUser";
 import EditUser from "./user/EditUser";
 import ResetPassword from "./user/ResetPassword";
@@ -154,6 +156,7 @@ import AddAgentSuccess from "./AddAgent/AgentSuccess";
 import AddAgentSelectType from "./AddAgent/SelectAgentType";
 import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
 import LogDetailsDrawer from "src/pages/home/agentDetails/[agentId]/logs/LogDetailsDrawer";
+import NewPipeline from "./Pipeline/NewPipeline";
 
 export const StepComponents = {
   "new-project": NewProject,
@@ -228,6 +231,8 @@ export const StepComponents = {
   "license-Details": LicenseDetails,
   "derived-model-list": DerivedModelList,
   "cluster-event": ClusterEvent,
+  "pipeline-execution-details": PipelineExecutionDetails,
+  "pipeline-create-schedule": CreateSchedule,
   "delete-worker-status": WorkerDeleteStatus,
   "view-user": ViewUser,
   "edit-user": EditUser,
@@ -327,6 +332,9 @@ export const StepComponents = {
   "add-agent-success": AddAgentSuccess,
   "edit-agent-drawer": AgentEditDrawer,
   "log-details": LogDetailsDrawer,
+
+  // Pipelines
+  "new-pipeline": NewPipeline,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;

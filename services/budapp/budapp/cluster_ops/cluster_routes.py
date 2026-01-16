@@ -32,6 +32,7 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.dependencies import (
     get_current_active_user,
+    get_current_active_user_or_internal,
     get_session,
     parse_ordering_fields,
 )
@@ -44,7 +45,7 @@ from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
 from ..commons.constants import PermissionEnum
-from ..commons.permission_handler import require_permissions
+from ..commons.permission_handler import require_permissions, require_permissions_or_internal
 from .schemas import (
     CancelClusterOnboardingRequest,
     ClusterEndpointFilter,
@@ -446,9 +447,9 @@ async def create_cluster_workflow(
     },
     description="List all clusters",
 )
-@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
+@require_permissions_or_internal(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def list_clusters(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     filters: ClusterFilter = Depends(),
     page: int = Query(1, ge=1),
@@ -545,9 +546,9 @@ async def edit_cluster(
     },
     description="Retrieve details of a cluster by ID",
 )
-@require_permissions(permissions=[PermissionEnum.CLUSTER_VIEW])
+@require_permissions_or_internal(permissions=[PermissionEnum.CLUSTER_VIEW])
 async def get_cluster_details(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     cluster_id: UUID,
 ) -> Union[SingleClusterResponse, ErrorResponse]:
@@ -953,57 +954,6 @@ async def get_recommended_clusters(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Error retrieving recommended clusters",
         ).to_http_response()
-
-
-@cluster_router.get(
-    "/internal/get-clusters",
-    responses={
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to server error",
-        },
-        status.HTTP_400_BAD_REQUEST: {
-            "model": ErrorResponse,
-            "description": "Service is unavailable due to client error",
-        },
-        status.HTTP_200_OK: {
-            "model": ClusterListResponse,
-            "description": "Successfully listed all clusters",
-        },
-    },
-    description="List all clusters (internal service use only)",
-)
-async def list_clusters_internal(
-    session: Annotated[Session, Depends(get_session)],
-    filters: ClusterFilter = Depends(),
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=0),
-    order_by: Optional[List[str]] = Depends(parse_ordering_fields),
-    search: bool = False,
-) -> Union[ClusterListResponse, ErrorResponse]:
-    """List all clusters for internal service use."""
-    offset = (page - 1) * limit
-
-    filters_dict = filters.model_dump(exclude_none=True)
-
-    try:
-        db_clusters, count = await ClusterService(session).get_all_active_clusters(
-            offset, limit, filters_dict, order_by, search
-        )
-    except Exception as e:
-        logger.error(f"Error occurred while listing clusters: {str(e)}")
-        return ErrorResponse(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list clusters"
-        ).to_http_response()
-
-    return ClusterListResponse(
-        clusters=db_clusters,
-        total_record=count,
-        page=page,
-        limit=limit,
-        object="cluster.list",
-        code=status.HTTP_200_OK,
-    ).to_http_response()
 
 
 @cluster_router.get(

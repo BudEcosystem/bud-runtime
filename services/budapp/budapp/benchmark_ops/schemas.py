@@ -81,6 +81,7 @@ class RunBenchmarkWorkflowRequest(RunBenchmarkWorkflowStepData):
     workflow_total_steps: int | None = None
     step_number: int = Field(..., gt=0)
     trigger_workflow: bool = False
+    callback_topic: str | None = None  # For budpipeline integration
 
     @model_validator(mode="after")
     def validate_fields(self) -> "RunBenchmarkWorkflowRequest":

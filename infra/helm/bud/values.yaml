@@ -23,6 +23,10 @@ global:
 imagePullSecrets: []
 # NOTE: support for https://keel.sh/
 imagePullPolicy: "IfNotPresent"
+
+# Dapr APP_API_TOKEN for securing internal service-to-service endpoints
+# Leave empty to auto-generate a random token, or set explicitly for consistency across deployments
+appApiToken: ""
 deploymentAnnotations: {}
 storage:
   budmodelRegistry:
@@ -462,6 +466,15 @@ microservices:
       targetMemoryUtilizationPercentage: 75
       scaleDownStabilizationSeconds: 300
       scaleUpStabilizationSeconds: 30
+  budpipeline:
+    enabled: true
+    image: budstudio/budpipeline:0.4.8
+    daprid: budpipeline
+    pubsubTopic: budpipelineEvents
+    env:
+      LOG_LEVEL: INFO
+    nodeSelector: {}
+    affinity: {}
   global:
     env:
       PROMETHEUS_URL: https://metric.bud.studio

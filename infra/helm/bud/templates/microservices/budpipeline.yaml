@@ -1,0 +1,126 @@
+{{- if (default .Values.microservices.budpipeline.enabled false) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budpipeline
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budpipeline
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budpipeline
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: {{ .Values.microservices.budpipeline.daprid }}
+        dapr.io/app-port: "8010"
+        dapr.io/app-token-secret: "{{ .Release.Name }}-app-api-token"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $nodeSelector := include "bud.nodeSelector" (dict "service" .Values.microservices.budpipeline "global" .Values.global "context" $) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "bud.affinity" (dict "service" .Values.microservices.budpipeline "global" .Values.global "context" $) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: budpipeline
+        image: {{ .Values.microservices.budpipeline.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command: ["sh", "-c", "uvicorn budpipeline.main:app --host 0.0.0.0 --port 8010"]
+        ports:
+        - containerPort: 8010
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name }}-bud-global
+        env:
+          - name: APP_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-app-api-token
+                key: token
+          - name: SERVICE_NAME
+            value: "budpipeline"
+          - name: SERVICE_PORT
+            value: "8010"
+          - name: DAPR_HTTP_PORT
+            value: "3500"
+          - name: STATE_STORE_NAME
+            value: "{{ .Release.Name }}-dapr-statestore"
+          - name: PUBSUB_NAME
+            value: "{{ .Release.Name }}-pubsub"
+          # Service discovery - Dapr app IDs
+          - name: BUDAPP_APP_ID
+            value: "{{ .Values.microservices.budapp.daprid }}"
+          - name: BUDCLUSTER_APP_ID
+            value: "{{ .Values.microservices.budcluster.daprid }}"
+          - name: BUDMODEL_APP_ID
+            value: "{{ .Values.microservices.budmodel.daprid }}"
+          - name: BUDSIM_APP_ID
+            value: "{{ .Values.microservices.budsim.daprid }}"
+          - name: BUDNOTIFY_APP_ID
+            value: "{{ .Values.microservices.budnotify.daprid }}"
+          - name: BUDMETRICS_APP_ID
+            value: "{{ .Values.microservices.budmetrics.daprid }}"
+          {{- range $key, $value := .Values.microservices.budpipeline.env }}
+          - name: {{ $key }}
+            value: {{ tpl (toString $value) $ | quote }}
+          {{- end }}
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 500m
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8010
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8010
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budpipeline
+spec:
+  ports:
+  - port: 8010
+    targetPort: 8010
+  selector:
+    app: {{ .Release.Name }}-budpipeline
+  type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budpipeline-pubsub-subscription
+spec:
+  topic: {{ .Values.microservices.budpipeline.pubsubTopic }}
+  routes:
+    default: /workflow-events
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budpipeline
+{{ end }}

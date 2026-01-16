@@ -1,0 +1,143 @@
+{
+  "name": "cluster-health-check",
+  "version": "1.0",
+  "description": "Comprehensive health check workflow for Kubernetes clusters with notifications",
+  "parameters": [
+    {
+      "name": "cluster_id",
+      "type": "string",
+      "description": "Target cluster ID to check",
+      "required": true
+    },
+    {
+      "name": "notification_channel",
+      "type": "string",
+      "description": "Notification channel (slack, email, teams, webhook)",
+      "default": "slack"
+    },
+    {
+      "name": "notify_on_success",
+      "type": "boolean",
+      "description": "Send notification on healthy status",
+      "default": false
+    }
+  ],
+  "settings": {
+    "timeout_seconds": 300,
+    "fail_fast": false,
+    "max_parallel_steps": 5
+  },
+  "steps": [
+    {
+      "id": "start_log",
+      "name": "Log Start",
+      "action": "log",
+      "params": {
+        "message": "Starting health check for cluster {{ params.cluster_id }}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "health_check",
+      "name": "Run Health Check",
+      "action": "cluster_health",
+      "depends_on": ["start_log"],
+      "params": {
+        "cluster_id": "{{ params.cluster_id }}",
+        "checks": ["nodes", "api", "storage", "gpu"]
+      },
+      "outputs": ["healthy", "status", "issues", "details"],
+      "on_failure": "RETRY",
+      "retry": {
+        "max_attempts": 3,
+        "backoff_seconds": 5,
+        "backoff_multiplier": 2.0
+      }
+    },
+    {
+      "id": "evaluate_health",
+      "name": "Evaluate Results",
+      "action": "conditional",
+      "depends_on": ["health_check"],
+      "params": {
+        "condition": "{{ steps.health_check.outputs.healthy }}"
+      },
+      "outputs": ["result", "branch"]
+    },
+    {
+      "id": "log_healthy",
+      "name": "Log Healthy Status",
+      "action": "log",
+      "depends_on": ["evaluate_health"],
+      "condition": "{{ steps.evaluate_health.outputs.branch == 'true' }}",
+      "params": {
+        "message": "Cluster {{ params.cluster_id }} is healthy. All checks passed.",
+        "level": "info"
+      }
+    },
+    {
+      "id": "notify_healthy",
+      "name": "Notify Healthy",
+      "action": "notification",
+      "depends_on": ["log_healthy"],
+      "condition": "{{ params.notify_on_success == true }}",
+      "params": {
+        "channel": "{{ params.notification_channel }}",
+        "title": "Cluster Health Check Passed",
+        "message": "Cluster {{ params.cluster_id }} passed all health checks.",
+        "severity": "info",
+        "metadata": {
+          "cluster_id": "{{ params.cluster_id }}",
+          "status": "{{ steps.health_check.outputs.status }}"
+        }
+      }
+    },
+    {
+      "id": "log_issues",
+      "name": "Log Issues Found",
+      "action": "log",
+      "depends_on": ["evaluate_health"],
+      "condition": "{{ steps.evaluate_health.outputs.branch == 'false' }}",
+      "params": {
+        "message": "Cluster {{ params.cluster_id }} has issues: {{ steps.health_check.outputs.issues }}",
+        "level": "warning"
+      }
+    },
+    {
+      "id": "notify_issues",
+      "name": "Alert on Issues",
+      "action": "notification",
+      "depends_on": ["log_issues"],
+      "params": {
+        "channel": "{{ params.notification_channel }}",
+        "title": "Cluster Health Issues Detected",
+        "message": "Cluster {{ params.cluster_id }} has health issues that require attention.",
+        "severity": "warning",
+        "metadata": {
+          "cluster_id": "{{ params.cluster_id }}",
+          "status": "{{ steps.health_check.outputs.status }}",
+          "issues": "{{ steps.health_check.outputs.issues }}"
+        }
+      }
+    },
+    {
+      "id": "set_output",
+      "name": "Set Workflow Output",
+      "action": "set_output",
+      "depends_on": ["notify_healthy", "notify_issues"],
+      "params": {
+        "outputs": {
+          "health_status": "{{ steps.health_check.outputs.status }}",
+          "healthy": "{{ steps.health_check.outputs.healthy }}",
+          "issues": "{{ steps.health_check.outputs.issues }}",
+          "details": "{{ steps.health_check.outputs.details }}"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "health_status": "{{ steps.set_output.outputs.health_status }}",
+    "healthy": "{{ steps.set_output.outputs.healthy }}",
+    "issues": "{{ steps.set_output.outputs.issues }}"
+  }
+}

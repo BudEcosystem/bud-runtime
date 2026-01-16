@@ -18,8 +18,9 @@
 
 from collections.abc import AsyncGenerator
 from typing import List
+from uuid import UUID
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import ExpiredSignatureError
 from jwt.exceptions import PyJWTError as JWTError
@@ -31,6 +32,7 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import UserStatusEnum
 from budapp.commons.database import SessionLocal
+from budapp.commons.internal_auth import validate_internal_request
 from budapp.commons.keycloak import KeycloakManager
 from budapp.shared.jwt_blacklist_service import JWTBlacklistService
 from budapp.user_ops.crud import UserDataManager
@@ -42,6 +44,7 @@ from budapp.user_ops.schemas import TenantClientSchema, User
 logger = logging.get_logger(__name__)
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_session() -> AsyncGenerator[Session, None]:
@@ -168,6 +171,16 @@ async def get_current_user(
         raise credentials_exception
 
 
+async def get_current_user_optional(
+    token: Annotated[HTTPAuthorizationCredentials | None, Depends(security_optional)],
+    session: Session = Depends(get_session),
+) -> User | None:
+    """Return the current user if a JWT is provided, otherwise None."""
+    if token is None:
+        return None
+    return await get_current_user(token=token, session=session)
+
+
 async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)]) -> User:
     """Get the current active user.
 
@@ -180,6 +193,62 @@ async def get_current_active_user(current_user: Annotated[User, Depends(get_curr
     if current_user.status != UserStatusEnum.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
+
+
+async def get_current_active_user_optional(
+    current_user: Annotated[User | None, Depends(get_current_user_optional)],
+) -> User | None:
+    """Return the current active user if present, otherwise None."""
+    if current_user is None:
+        return None
+    if current_user.status != UserStatusEnum.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    return current_user
+
+
+async def get_current_active_user_or_internal(
+    request: Request,
+    current_user: Annotated[User | None, Depends(get_current_active_user_optional)],
+    session: Session = Depends(get_session),
+    user_id: UUID | None = Query(default=None, description="User ID initiating the workflow"),
+) -> User:
+    """Resolve the effective user from JWT or Dapr-internal token."""
+    if current_user is not None:
+        setattr(current_user, "_is_internal", False)
+        setattr(current_user, "_initiated_by_user_id", current_user.id)
+        return current_user
+
+    validate_internal_request(request)
+
+    effective_user_id = user_id
+    if not effective_user_id and app_settings.system_user_id:
+        effective_user_id = UUID(app_settings.system_user_id)
+
+    if not effective_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="user_id is required for internal calls when SYSTEM_USER_ID is not configured",
+        )
+
+    db_user = await UserDataManager(session).retrieve_by_fields(UserModel, {"id": effective_user_id}, missing_ok=True)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found for internal call",
+        )
+    if db_user.status != UserStatusEnum.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+
+    setattr(db_user, "_is_internal", True)
+    setattr(db_user, "_initiated_by_user_id", user_id)
+    return db_user
+
+
+async def get_effective_user_id(
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
+) -> UUID:
+    """Return the effective user ID for dual-auth endpoints."""
+    return current_user.id
 
 
 async def get_user_realm(current_user: Annotated[User, Depends(get_current_user)]) -> str:

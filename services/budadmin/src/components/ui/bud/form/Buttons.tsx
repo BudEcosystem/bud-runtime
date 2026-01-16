@@ -13,6 +13,7 @@ interface PrimaryButtonProps {
   textClass?: string;
   permission?: boolean;
   Children?: ReactNode; // Optional children of any type, such as text or icons
+  textStyle?: React.CSSProperties;
   [key: string]: any; // Allow any other props
 }
 
@@ -33,7 +34,7 @@ export function PrimaryButton({
           customClassName="Darker w-auto"
         >
           <div className="relative inline-block">
-            <Button
+          <Button
               {...props}
               className={`pointer-events-none opacity-60 flex justify-center items-center !border-[.5px] font-normal ${classNames}`}
               disabled={true} // keep enabled so events can bubble
@@ -46,6 +47,7 @@ export function PrimaryButton({
                 height: "1.75rem",
                 borderColor: "#965CDE",
                 background: "#1E0C34 !important",
+                ...(props.style || {}),
               }}
             >
               {Children}
@@ -57,6 +59,7 @@ export function PrimaryButton({
                   fontWeight: 600,
                   lineHeight: "100%",
                   background: "transparent",
+                  ...(props.textStyle || {}),
                 }}
               >
                 {props.children || props.text || "Next"}
@@ -83,6 +86,7 @@ export function PrimaryButton({
             height: "1.75rem",
             borderColor: "#965CDE",
             background: "#1E0C34",
+            ...(props.style || {}),
           }}
         >
           {!permission ? (
@@ -101,6 +105,7 @@ export function PrimaryButton({
                     fontWeight: 600,
                     lineHeight: "100%",
                     background: "transparent",
+                    ...(props.textStyle || {}),
                   }}
                 >
                   {props.children || props.text || "Next"}
@@ -123,6 +128,7 @@ export function PrimaryButton({
                   fontWeight: 600,
                   lineHeight: "100%",
                   background: "transparent",
+                  ...(props.textStyle || {}),
                 }}
               >
                 {props.children || props.text || "Next"}
