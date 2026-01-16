@@ -56,7 +56,7 @@
             "group": "API Integration",
             "icon": "code",
             "pages": [
-              "api-integration/authentication"
+              "api-integration/api-integration"
             ]
           },
           {
@@ -137,14 +137,6 @@
             "icon": "gear",
             "pages": [
               "settings/account-settings"
-            ]
-          },
-          {
-            "group": "Billing & Usage",
-            "icon": "credit-card",
-            "pages": [
-              "billing/understanding-pricing",
-              "billing/monitoring-usage"
             ]
           }
         ]
