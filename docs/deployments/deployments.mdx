@@ -33,7 +33,6 @@ General, Workers, Settings, and Model Evaluations tabs provide step-by-step insi
 
 - Project-scoped deployment table with model, cluster, status, and endpoint counts.
 - Search by deployment name to find specific endpoints quickly.
-- Sort and filter by status, cluster, or model as needed.
 - Action buttons to Deploy Model, Publish, Use this model, or Delete based on permissions.
 
 ### 3.2 Cloud and local deployment coverage
@@ -62,16 +61,9 @@ General, Workers, Settings, and Model Evaluations tabs provide step-by-step insi
 - Set retry limits and fallback deployment chains for reliability.
 - Save settings to enforce policies across the endpoint.
 
-#### 3.3.4 Benchmarks
-
-- Compare throughput and latency runs for the deployment.
-- Search and filter by status, model name, cluster name, TPOT, or TTFT.
-- Run Another Benchmark to launch new performance runs.
-
 #### 3.3.5 Model Evaluations
 
 - Review evaluation runs with datasets, scores, and timestamps.
-- Filter and sort evaluations to validate quality before promotion.
 - Run Another Evaluation or Export results for offline review.
 
 ### 3.4 Endpoint publishing and reuse
@@ -103,31 +95,25 @@ General, Workers, Settings, and Model Evaluations tabs provide step-by-step insi
 5. Provide deployment name, concurrent requests, context length, sequence length, per-session tokens/sec, TTFT, and end-to-end latency targets.
 6. Submit to launch the deployment and confirm it appears in the list.
 
-### 4.3 Search and filter deployments
-
-1. Use the search box to filter by deployment name.
-2. Apply status, model, or cluster filters to narrow the list.
-3. Sort columns to prioritize newest or most active deployments.
-
-### 4.4 Open a deployment detail page
+### 4.3 Open a deployment detail page
 
 1. Click a deployment row from the Deployments tab.
 2. Review the General tab summary before switching to the other tabs below.
 
-#### 4.4.1 General
+#### 4.3.1 General
 
 1. Confirm the model and cluster cards for metadata and tags.
 2. Review deployment analytics and routing signals.
 3. Click Use this model (if enabled) to access integration snippets.
 
-#### 4.4.2 Workers (local deployments only)
+#### 4.3.2 Workers (local deployments only)
 
 1. Select the Workers tab to view worker status.
 2. Apply status or hardware filters.
 3. Click Add Worker to expand capacity.
 4. Click a worker row to open the detail drawer.
 
-#### 4.4.3 Settings
+#### 4.3.3 Settings
 
 1. Open the Settings tab.
 2. Toggle Rate Limit and select the algorithm (fixed, sliding, token bucket).
@@ -135,39 +121,39 @@ General, Workers, Settings, and Model Evaluations tabs provide step-by-step insi
 4. Set retry limits and fallback deployments.
 5. Save to apply the policy.
 
-#### 4.4.4 Benchmarks
+#### 4.3.4 Benchmarks
 
 1. Open the Benchmarks tab.
 2. Search or filter by status, model, cluster, TPOT, or TTFT.
 3. Click Run Another Benchmark to start a new run.
 4. Compare results to guide routing or scaling decisions.
 
-#### 4.4.5 Model Evaluations
+#### 4.3.5 Model Evaluations
 
 1. Open the Model Evaluations tab.
 2. Filter by dataset or score to validate quality.
 3. Click Run Another Evaluation to launch a new run.
 4. Click Export to download evaluation results.
 
-#### 4.4.6 Publish a deployment
+#### 4.3.6 Publish a deployment
 
 1. Return to the Deployments table.
 2. Click Publish on an active deployment row.
 3. Enter Input cost, Output cost, and Price per token (USD).
 4. Review Publish Details to update pricing or Unpublish later.
 
-#### 4.4.7 Use this model
+#### 4.3.7 Use this model
 
 1. Click Use this model from the deployment row or the General tab.
 2. Copy cURL, Python, or JavaScript snippets to integrate the endpoint.
 
-### 4.5 Delete a deployment
+### 4.4 Delete a deployment
 
 1. From the Deployments list, click Delete on the deployment row.
 2. Confirm the deletion prompt.
 3. Ensure dependent routes or applications are updated before final removal.
 
-### 4.6 Modify permissions for deployments
+### 4.5 Modify permissions for deployments
 
 1. Open the user management page and select a user.
 2. Assign view access for users who should browse deployments only.
