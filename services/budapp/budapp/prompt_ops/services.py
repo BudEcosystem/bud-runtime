@@ -2621,6 +2621,7 @@ class PromptWorkflowService(SessionMixin):
             rate_limit_value=rate_limit_value,
             bud_prompt_id=bud_prompt_id,
             discarded_prompt_ids=request.discarded_prompt_ids,
+            client_metadata=request.client_metadata,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
         # Create or update workflow step

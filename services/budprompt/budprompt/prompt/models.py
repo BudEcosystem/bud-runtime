@@ -73,6 +73,7 @@ class PromptVersion(PSQLBase, TimestampMixin):
     allow_multiple_calls = Column(Boolean, nullable=True)
     system_prompt_role = Column(String(50), nullable=True)
     tools = Column(JSONB, nullable=False, default=list)
+    client_metadata = Column(JSONB, nullable=False, default=dict)
 
     # Relationships
     prompt = relationship("Prompt", back_populates="versions", foreign_keys=[prompt_id])

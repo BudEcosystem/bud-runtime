@@ -113,6 +113,7 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None
     discarded_prompt_ids: list[dict] | None = None
+    client_metadata: dict | None = None
     prompt_schema_events: dict | None = None
     # Hardware resource mode (dedicated vs shared/time-slicing)
     hardware_mode: str | None = None

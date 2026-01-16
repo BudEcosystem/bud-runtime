@@ -408,6 +408,10 @@ class PromptConfigurationData(BaseModel):
         default_factory=list,
         description="List of tool configurations (MCP tools) for this prompt",
     )
+    client_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client-provided metadata for custom tracking and identification",
+    )
 
 
 class MCPCleanupRegistryEntry(BaseModel):
@@ -510,6 +514,10 @@ class PromptConfigRequest(BaseModel):
     tools: List[MCPToolConfig] = Field(
         default_factory=list,
         description="List of tool configurations (MCP tools) to add/update",
+    )
+    client_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client-provided metadata for custom tracking and identification",
     )
 
 

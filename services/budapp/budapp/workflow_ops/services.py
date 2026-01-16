@@ -216,6 +216,7 @@ class WorkflowService(SessionMixin):
             bud_prompt_id = required_data.get("bud_prompt_id")
             bud_prompt_version = required_data.get("bud_prompt_version")
             discarded_prompt_ids = required_data.get("discarded_prompt_ids")
+            client_metadata = required_data.get("client_metadata")
             prompt_schema_events = required_data.get(BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value)
 
             # Extract parser metadata
@@ -434,6 +435,7 @@ class WorkflowService(SessionMixin):
                 bud_prompt_id=bud_prompt_id if bud_prompt_id else None,
                 bud_prompt_version=bud_prompt_version if bud_prompt_version else None,
                 discarded_prompt_ids=discarded_prompt_ids if discarded_prompt_ids else None,
+                client_metadata=client_metadata if client_metadata else None,
                 prompt_schema_events=prompt_schema_events if prompt_schema_events else None,
                 tool_calling_parser_type=tool_calling_parser_type if tool_calling_parser_type else None,
                 reasoning_parser_type=reasoning_parser_type if reasoning_parser_type else None,
@@ -614,6 +616,7 @@ class WorkflowService(SessionMixin):
                 "rate_limit_value",
                 "prompt_schema",
                 "discarded_prompt_ids",
+                "client_metadata",
             ],
             "prompt_schema_creation": [
                 "bud_prompt_id",
