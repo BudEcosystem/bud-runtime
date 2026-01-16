@@ -53,13 +53,6 @@
             ]
           },
           {
-            "group": "Endpoints",
-            "icon": "plug",
-            "pages": [
-              "endpoints/creating-endpoints"
-            ]
-          },
-          {
             "group": "API Integration",
             "icon": "code",
             "pages": [
