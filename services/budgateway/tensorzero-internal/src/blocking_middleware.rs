@@ -8,12 +8,17 @@ use axum::{
 };
 use std::sync::Arc;
 
-use crate::analytics::RequestAnalytics;
+use crate::analytics::{BlockingEventData, RequestAnalytics};
 use crate::blocking_rules::BlockingRulesManager;
 use crate::error::Error;
+use axum::http::{Method, Uri};
+use chrono::Utc;
+use uuid::Uuid;
 
 /// Middleware for enforcing blocking rules
 pub async fn blocking_middleware(
+    method: Method,
+    uri: Uri,
     headers: HeaderMap,
     request: Request,
     next: Next,
@@ -36,35 +41,49 @@ pub async fn blocking_middleware(
         .get::<Arc<tokio::sync::Mutex<RequestAnalytics>>>()
         .cloned();
 
-    // Extract request metadata from analytics or headers
-    let (client_ip, country_code, user_agent) = if let Some(ref analytics) = analytics {
+    // Extract request metadata from analytics or headers/parameters
+    let (
+        client_ip,
+        country_code,
+        user_agent,
+        request_path,
+        request_method,
+        api_key_id,
+        project_id,
+        endpoint_id,
+        model_name,
+    ) = if let Some(ref analytics) = analytics {
         let analytics = analytics.lock().await;
-        tracing::debug!(
-            "Using analytics data - IP: {}, Country: {:?}, User-Agent: {:?}",
-            analytics.record.client_ip,
-            analytics.record.country_code,
-            analytics.record.user_agent
-        );
         (
             analytics.record.client_ip.clone(),
             analytics.record.country_code.clone(),
             analytics.record.user_agent.clone(),
+            analytics.record.path.clone(),
+            analytics.record.method.clone(),
+            analytics.record.api_key_id.clone(),
+            analytics.record.project_id,
+            analytics.record.endpoint_id,
+            analytics.record.model_name.clone(),
         )
     } else {
-        // Fall back to extracting from headers when analytics is disabled
+        // Fallback when analytics disabled
         let client_ip = get_client_ip_from_headers(&headers);
         let user_agent_from_header = headers
             .get("user-agent")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
 
-        tracing::debug!(
-            "Using header data - IP: {}, User-Agent: {:?}",
+        (
             client_ip,
-            user_agent_from_header
-        );
-
-        (client_ip, None, user_agent_from_header)
+            None,                          // country_code
+            user_agent_from_header,        // user_agent
+            uri.path().to_string(),        // request_path
+            method.to_string(),            // request_method
+            None,                          // api_key_id
+            None,                          // project_id
+            None,                          // endpoint_id
+            None,                          // model_name
+        )
     };
 
     tracing::debug!(
@@ -76,7 +95,17 @@ pub async fn blocking_middleware(
 
     // Check if request should be blocked
     match manager
-        .should_block(&client_ip, country_code.as_deref(), user_agent.as_deref())
+        .should_block(
+            &client_ip,
+            country_code.as_deref(),
+            user_agent.as_deref(),
+            &request_path,
+            &request_method,
+            api_key_id.clone(),
+            project_id,
+            endpoint_id,
+            model_name.clone(),
+        )
         .await
     {
         Ok(Some((rule, reason))) => {
@@ -89,15 +118,27 @@ pub async fn blocking_middleware(
                 user_agent
             );
 
-            // Update analytics if available
+            // Update analytics if available - create full blocking event record
             if let Some(analytics) = request
                 .extensions()
                 .get::<Arc<tokio::sync::Mutex<RequestAnalytics>>>()
             {
                 let mut analytics = analytics.lock().await;
+
+                // Create blocking event data with all unique fields
+                let blocking_event = BlockingEventData {
+                    id: Uuid::now_v7(),
+                    rule_id: rule.id,
+                    rule_type: format!("{:?}", rule.rule_type),
+                    rule_name: rule.name.clone(),
+                    rule_priority: rule.priority,
+                    block_reason: reason.clone(),
+                    action_taken: rule.action.clone(),
+                    blocked_at: Utc::now(),
+                };
+
                 analytics.record.is_blocked = true;
-                analytics.record.block_reason = Some(reason.clone());
-                analytics.record.block_rule_id = Some(rule.id.to_string());
+                analytics.record.blocking_event = Some(blocking_event);
             }
 
             // Return 403 Forbidden response

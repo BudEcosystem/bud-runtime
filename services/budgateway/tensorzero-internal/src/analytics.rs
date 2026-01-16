@@ -83,13 +83,34 @@ pub struct GatewayAnalyticsDatabaseInsert {
     pub error_type: Option<String>,
     pub error_message: Option<String>,
 
-    /// Blocking information
+    /// Blocking information (overlapping fields reference gateway_analytics.*)
     pub is_blocked: bool,
-    pub block_reason: Option<String>,
-    pub block_rule_id: Option<String>,
+    pub blocking_event: Option<BlockingEventData>,
 
     /// Custom tags
     pub tags: HashMap<String, String>,
+}
+
+/// Blocking event metadata to be stored with analytics
+/// Only contains fields unique to blocking events (overlapping fields reference gateway_analytics.*)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockingEventData {
+    /// Event identifiers
+    pub id: Uuid,
+    pub rule_id: Uuid,
+
+    /// Rule information (unique to blocking events)
+    pub rule_type: String,
+    pub rule_name: String,
+    pub rule_priority: i32,
+
+    /// Block details
+    pub block_reason: String,
+    pub action_taken: String,
+
+    /// Timing
+    #[serde(serialize_with = "serialize_datetime")]
+    pub blocked_at: DateTime<Utc>,
 }
 
 impl GatewayAnalyticsDatabaseInsert {
@@ -142,8 +163,7 @@ impl GatewayAnalyticsDatabaseInsert {
             error_type: None,
             error_message: None,
             is_blocked: false,
-            block_reason: None,
-            block_rule_id: None,
+            blocking_event: None,
             tags: HashMap::new(),
         }
     }
