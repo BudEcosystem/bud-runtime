@@ -42,7 +42,7 @@
             "group": "Deployments",
             "icon": "rocket",
             "pages": [
-              "deployments/deploy-first-model"
+              "deployments/deployments"
             ]
           },
           {
