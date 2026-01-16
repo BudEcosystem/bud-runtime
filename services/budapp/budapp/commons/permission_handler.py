@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum, UserRoleEnum
-from budapp.commons.dependencies import get_current_active_user, get_session
+from budapp.commons.dependencies import get_current_active_user, get_current_active_user_or_internal, get_session
 from budapp.commons.keycloak import KeycloakManager
 from budapp.permissions.schemas import CheckUserResourceScope
 from budapp.permissions.service import PermissionService
@@ -217,6 +217,112 @@ def require_permissions(
                         raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for this operation"
                         )
+
+            return await func(current_user=current_user, session=session, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def require_permissions_or_internal(
+    permissions: Union[PermissionEnum, List[PermissionEnum]] | None = None,
+    roles: Union[UserRoleEnum, List[UserRoleEnum]] | None = None,
+):
+    """Decorator to check permissions for JWT users or allow Dapr-internal calls."""
+    if isinstance(permissions, PermissionEnum):
+        permissions = [permissions]
+    if isinstance(roles, UserRoleEnum):
+        roles = [roles]
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(
+            current_user: User = Depends(get_current_active_user_or_internal),
+            session: Session = Depends(get_session),
+            *args,
+            **kwargs,
+        ):
+            if getattr(current_user, "_is_internal", False):
+                return await func(current_user=current_user, session=session, *args, **kwargs)
+
+            x_resource_type = kwargs.get("x_resource_type")
+            x_entity_id = kwargs.get("x_entity_id")
+
+            logger.debug(f"::PERMISSION::Checking permissions for user: {current_user.id}")
+            logger.debug(f"::PERMISSION::Resource headers - Type: {x_resource_type}, Entity ID: {x_entity_id}")
+
+            if current_user.is_superuser:
+                return await func(current_user=current_user, session=session, *args, **kwargs)
+
+            if permissions == [PermissionEnum.CLIENT_ACCESS]:
+                return await func(current_user=current_user, session=session, *args, **kwargs)
+
+            if x_resource_type and permissions:
+                has_permission = await check_resource_based_permissions(
+                    user=current_user,
+                    session=session,
+                    permissions=permissions,
+                    resource_type=x_resource_type,
+                    entity_id=x_entity_id,
+                )
+
+                if has_permission:
+                    return await func(current_user=current_user, session=session, *args, **kwargs)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for this operation"
+                )
+
+            keycloak_manager = KeycloakManager()
+            realm_name = app_settings.default_realm_name
+            tenant = await UserDataManager(session).retrieve_by_fields(
+                Tenant, {"realm_name": realm_name}, missing_ok=True
+            )
+            tenant_client = await UserDataManager(session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
+            credentials = TenantClientSchema(
+                id=tenant_client.id,
+                client_id=tenant_client.client_id,
+                client_named_id=tenant_client.client_named_id,
+                client_secret=decrypted_secret,
+            )
+            openid = keycloak_manager.get_keycloak_openid_client(realm_name, credentials)
+
+            permission_strings = []
+            if permissions:
+                for perm in permissions:
+                    module, scope = perm.value.split(":")
+                    resource = f"module_{module}"
+                    permission_strings.append(f"{resource}#{scope}")
+            permissions_str = ",".join(permission_strings)
+            logger.debug(f"::PERMISSION:: Permission Params: {permissions_str}")
+            if permissions_str:
+                try:
+                    openid.uma_permissions(
+                        token=current_user.raw_token,
+                        permissions=permissions_str,
+                        resource_server_id=credentials.client_id,
+                        submit_request=False,
+                    )
+
+                    logger.debug(f"::PERMISSION:: User {current_user.id} has the required permissions")
+
+                except KeycloakAuthenticationError as e:
+                    logger.warning(f"::PERMISSION:: User {current_user.id} found invalid bearer token: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid authentication credentials",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+
+                except Exception as e:
+                    logger.warning(f"::PERMISSION:: User {current_user.id} lacks required permissions: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions for this operation"
+                    )
 
             return await func(current_user=current_user, session=session, *args, **kwargs)
 

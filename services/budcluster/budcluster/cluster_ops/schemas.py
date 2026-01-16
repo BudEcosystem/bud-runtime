@@ -287,3 +287,18 @@ class CreateCloudProviderClusterActivityRequest(BaseModel):
     def config_credentials(self) -> Dict[str, Any]:
         """Get the config dictionary."""
         return json.loads(self.credentials) if self.credentials else {}
+
+
+class HealthCheckStatus(BaseModel):
+    """Individual health check status."""
+
+    healthy: bool
+    message: str
+    count: Optional[int] = None
+    details: Optional[Dict[str, Any]] = None
+
+
+class ClusterHealthResponse(SuccessResponse):
+    """Cluster health check response schema."""
+
+    data: Dict[str, HealthCheckStatus]

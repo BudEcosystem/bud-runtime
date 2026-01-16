@@ -165,6 +165,20 @@ export default {
         source: '/agents',
         destination: '/home/agents',
       },
+
+      // DAG Pipelines
+      {
+        source: '/pipelines',
+        destination: '/home/budpipelines',
+      },
+      {
+        source: '/pipelines/new',
+        destination: '/home/budpipelines/new',
+      },
+      {
+        source: '/pipelines/:id',
+        destination: '/home/budpipelines/:id',
+      },
     ];
   },
   env: {

@@ -976,6 +976,10 @@ class LocalModelWorkflowService(SessionMixin):
             add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
+        # Store callback_topic for budpipeline integration
+        if request.callback_topic:
+            workflow_step_data["callback_topic"] = request.callback_topic
+
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": db_workflow.id}
@@ -1346,6 +1350,27 @@ class LocalModelWorkflowService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+        # Publish completion event for budpipeline integration
+        callback_topic = None
+        for step in db_workflow_steps:
+            if step.data and "callback_topic" in step.data:
+                callback_topic = step.data["callback_topic"]
+                break
+
+        if callback_topic:
+            from ..shared.notification_service import publish_workflow_completion_event
+
+            await publish_workflow_completion_event(
+                callback_topic=callback_topic,
+                workflow_id=str(db_workflow.id),
+                workflow_type="model_add",
+                status="COMPLETED",
+                result_data={
+                    "model_id": str(db_model.id),
+                    "model_name": db_model.name,
+                },
+            )
 
     async def _verify_provider_type_uri_duplication(
         self,

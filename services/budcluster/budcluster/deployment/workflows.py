@@ -898,7 +898,19 @@ class CreateDeploymentWorkflow:
                 target_topic_name=deployment_request_json.source_topic,
                 target_name=deployment_request_json.source,
             )
-            # yield ctx.call_activity(notify_activity, input=notification_activity_request.model_dump_json())
+            # Also send results notification so budpipeline receives completion signal
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Model transfer failed",
+                message=transfer_model_result["message"],
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=deployment_request_json.source_topic,
+                target_name=deployment_request_json.source,
+            )
             return
 
         deployment_request_json.namespace = transfer_model_result["param"]["namespace"]
@@ -939,6 +951,20 @@ class CreateDeploymentWorkflow:
             notification_req.payload.content = NotificationContent(
                 title="Model transfer failed",
                 message="Model transfer failed",
+                status=WorkflowStatus.FAILED,
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=deployment_request_json.source_topic,
+                target_name=deployment_request_json.source,
+            )
+            # Also send results notification so budpipeline receives completion signal
+            failure_reason = model_transfer_result["param"].get("reason", "Model transfer failed")
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Model transfer failed",
+                message=failure_reason,
                 status=WorkflowStatus.FAILED,
             )
             dapr_workflows.publish_notification(
@@ -1113,7 +1139,20 @@ class CreateDeploymentWorkflow:
                 target_topic_name=deployment_request_json.source_topic,
                 target_name=deployment_request_json.source,
             )
-            # yield ctx.call_activity(notify_activity, input=notification_activity_request.model_dump_json())
+            # Also send results notification so budpipeline receives completion signal
+            notification_req.payload.event = "results"
+            notification_req.payload.content = NotificationContent(
+                title="Performance benchmark failed",
+                message=run_performance_benchmark_result["message"],
+                status=WorkflowStatus.FAILED,
+                primary_action="retry",
+            )
+            dapr_workflows.publish_notification(
+                workflow_id=instance_id,
+                notification=notification_req,
+                target_topic_name=deployment_request_json.source_topic,
+                target_name=deployment_request_json.source,
+            )
             return
 
         # notify activity that performance benchmark is successful

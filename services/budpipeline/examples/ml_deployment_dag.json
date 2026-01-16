@@ -1,0 +1,290 @@
+{
+  "name": "ml-model-deployment",
+  "version": "1.0",
+  "description": "Deploy an ML model with validation, optimization, and rollback support",
+  "parameters": [
+    {
+      "name": "model_id",
+      "type": "model_ref",
+      "required": true,
+      "description": "The model to deploy"
+    },
+    {
+      "name": "cluster_id",
+      "type": "cluster_ref",
+      "required": true,
+      "description": "Target deployment cluster"
+    },
+    {
+      "name": "endpoint_name",
+      "type": "string",
+      "required": true,
+      "description": "Name for the inference endpoint"
+    },
+    {
+      "name": "min_replicas",
+      "type": "integer",
+      "default": 1
+    },
+    {
+      "name": "max_replicas",
+      "type": "integer",
+      "default": 4
+    },
+    {
+      "name": "run_simulation",
+      "type": "boolean",
+      "default": true,
+      "description": "Run budsim optimization before deployment"
+    },
+    {
+      "name": "enable_canary",
+      "type": "boolean",
+      "default": false,
+      "description": "Enable canary deployment (gradual rollout)"
+    }
+  ],
+  "settings": {
+    "timeout_seconds": 3600,
+    "fail_fast": true,
+    "max_parallel_steps": 4
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "name": "Log Deployment Start",
+      "action": "log",
+      "params": {
+        "message": "Starting deployment of model {{ params.model_id }} to cluster {{ params.cluster_id }}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "fetch_model_info",
+      "name": "Fetch Model Information",
+      "action": "budmodel_get",
+      "depends_on": ["log_start"],
+      "params": {
+        "model_id": "{{ params.model_id }}"
+      }
+    },
+    {
+      "id": "fetch_cluster_info",
+      "name": "Fetch Cluster Information",
+      "action": "budcluster_get",
+      "depends_on": ["log_start"],
+      "params": {
+        "cluster_id": "{{ params.cluster_id }}"
+      }
+    },
+    {
+      "id": "validate_compatibility",
+      "name": "Validate Model-Cluster Compatibility",
+      "action": "validate_compatibility",
+      "depends_on": ["fetch_model_info", "fetch_cluster_info"],
+      "params": {
+        "model": "{{ steps.fetch_model_info.outputs.model }}",
+        "cluster": "{{ steps.fetch_cluster_info.outputs.cluster }}",
+        "checks": ["gpu_type", "memory", "architecture"]
+      }
+    },
+    {
+      "id": "run_budsim",
+      "name": "Run Performance Simulation",
+      "action": "budsim_optimize",
+      "depends_on": ["validate_compatibility"],
+      "condition": "{{ params.run_simulation }}",
+      "params": {
+        "model_id": "{{ params.model_id }}",
+        "cluster_id": "{{ params.cluster_id }}",
+        "optimization_target": "throughput",
+        "constraints": {
+          "max_latency_ms": 100,
+          "min_throughput_rps": 10
+        }
+      },
+      "timeout_seconds": 600
+    },
+    {
+      "id": "prepare_config",
+      "name": "Prepare Deployment Configuration",
+      "action": "prepare_deployment_config",
+      "depends_on": ["run_budsim"],
+      "params": {
+        "model": "{{ steps.fetch_model_info.outputs.model }}",
+        "cluster": "{{ steps.fetch_cluster_info.outputs.cluster }}",
+        "endpoint_name": "{{ params.endpoint_name }}",
+        "optimization": "{{ steps.run_budsim.outputs.optimal_config | default(none) }}",
+        "replicas": {
+          "min": "{{ params.min_replicas }}",
+          "max": "{{ params.max_replicas }}"
+        }
+      }
+    },
+    {
+      "id": "check_existing_endpoint",
+      "name": "Check Existing Endpoint",
+      "action": "budapp_get_endpoint",
+      "depends_on": ["prepare_config"],
+      "params": {
+        "endpoint_name": "{{ params.endpoint_name }}",
+        "cluster_id": "{{ params.cluster_id }}"
+      },
+      "on_failure": "continue"
+    },
+    {
+      "id": "backup_existing",
+      "name": "Backup Existing Deployment",
+      "action": "backup_deployment",
+      "depends_on": ["check_existing_endpoint"],
+      "condition": "{{ steps.check_existing_endpoint.outputs.exists }}",
+      "params": {
+        "endpoint_id": "{{ steps.check_existing_endpoint.outputs.endpoint.id }}",
+        "backup_name": "pre-deploy-{{ params.model_id }}"
+      }
+    },
+    {
+      "id": "deploy_canary",
+      "name": "Deploy Canary Version",
+      "action": "budcluster_deploy",
+      "depends_on": ["backup_existing"],
+      "condition": "{{ params.enable_canary and steps.check_existing_endpoint.outputs.exists }}",
+      "params": {
+        "config": "{{ steps.prepare_config.outputs.config }}",
+        "deployment_type": "canary",
+        "canary_weight": 10
+      }
+    },
+    {
+      "id": "deploy_full",
+      "name": "Deploy Full Version",
+      "action": "budcluster_deploy",
+      "depends_on": ["backup_existing"],
+      "condition": "{{ not params.enable_canary or not steps.check_existing_endpoint.outputs.exists }}",
+      "params": {
+        "config": "{{ steps.prepare_config.outputs.config }}",
+        "deployment_type": "rolling"
+      }
+    },
+    {
+      "id": "wait_deployment",
+      "name": "Wait for Deployment Ready",
+      "action": "while",
+      "depends_on": ["deploy_canary", "deploy_full"],
+      "params": {
+        "condition": "{{ result.status not in ['ready', 'failed'] }}",
+        "action": "budcluster_check_deployment",
+        "action_params": {
+          "deployment_id": "{{ steps.deploy_canary.outputs.deployment_id | default(steps.deploy_full.outputs.deployment_id) }}"
+        },
+        "max_iterations": 60,
+        "delay_seconds": 10
+      }
+    },
+    {
+      "id": "health_check",
+      "name": "Run Health Check",
+      "action": "health_check",
+      "depends_on": ["wait_deployment"],
+      "condition": "{{ steps.wait_deployment.outputs.result.status == 'ready' }}",
+      "params": {
+        "endpoint_url": "{{ steps.wait_deployment.outputs.result.endpoint_url }}",
+        "checks": ["liveness", "readiness", "inference_test"],
+        "timeout_seconds": 60
+      }
+    },
+    {
+      "id": "promote_canary",
+      "name": "Promote Canary to Full",
+      "action": "budcluster_promote_canary",
+      "depends_on": ["health_check"],
+      "condition": "{{ params.enable_canary and steps.health_check.outputs.healthy }}",
+      "params": {
+        "deployment_id": "{{ steps.deploy_canary.outputs.deployment_id }}",
+        "promotion_strategy": "gradual",
+        "steps": [25, 50, 75, 100],
+        "step_delay_seconds": 60
+      }
+    },
+    {
+      "id": "rollback",
+      "name": "Rollback Deployment",
+      "action": "budcluster_rollback",
+      "depends_on": ["health_check"],
+      "condition": "{{ not steps.health_check.outputs.healthy and steps.backup_existing.outputs.backup_id is defined }}",
+      "params": {
+        "backup_id": "{{ steps.backup_existing.outputs.backup_id }}"
+      }
+    },
+    {
+      "id": "update_endpoint_registry",
+      "name": "Update Endpoint Registry",
+      "action": "budapp_update_endpoint",
+      "depends_on": ["promote_canary", "health_check"],
+      "condition": "{{ steps.health_check.outputs.healthy }}",
+      "params": {
+        "endpoint_name": "{{ params.endpoint_name }}",
+        "cluster_id": "{{ params.cluster_id }}",
+        "model_id": "{{ params.model_id }}",
+        "endpoint_url": "{{ steps.wait_deployment.outputs.result.endpoint_url }}",
+        "status": "active"
+      }
+    },
+    {
+      "id": "cleanup_old_versions",
+      "name": "Cleanup Old Versions",
+      "action": "budcluster_cleanup",
+      "depends_on": ["update_endpoint_registry"],
+      "condition": "{{ steps.health_check.outputs.healthy }}",
+      "params": {
+        "cluster_id": "{{ params.cluster_id }}",
+        "endpoint_name": "{{ params.endpoint_name }}",
+        "keep_versions": 2
+      },
+      "on_failure": "continue"
+    },
+    {
+      "id": "notify_success",
+      "name": "Notify Deployment Success",
+      "action": "notify",
+      "depends_on": ["update_endpoint_registry", "cleanup_old_versions"],
+      "condition": "{{ steps.health_check.outputs.healthy }}",
+      "params": {
+        "channel": "deployments",
+        "type": "success",
+        "title": "Model Deployed Successfully",
+        "body": {
+          "model_id": "{{ params.model_id }}",
+          "endpoint_name": "{{ params.endpoint_name }}",
+          "endpoint_url": "{{ steps.wait_deployment.outputs.result.endpoint_url }}",
+          "cluster": "{{ steps.fetch_cluster_info.outputs.cluster.name }}"
+        }
+      }
+    },
+    {
+      "id": "notify_failure",
+      "name": "Notify Deployment Failure",
+      "action": "notify",
+      "depends_on": ["rollback", "health_check"],
+      "condition": "{{ not steps.health_check.outputs.healthy }}",
+      "params": {
+        "channel": "alerts",
+        "type": "error",
+        "title": "Model Deployment Failed",
+        "body": {
+          "model_id": "{{ params.model_id }}",
+          "endpoint_name": "{{ params.endpoint_name }}",
+          "error": "{{ steps.health_check.outputs.error | default('Unknown error') }}",
+          "rolled_back": "{{ steps.rollback.outputs.success | default(false) }}"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "success": "{{ steps.health_check.outputs.healthy | default(false) }}",
+    "endpoint_url": "{{ steps.wait_deployment.outputs.result.endpoint_url if steps.health_check.outputs.healthy else none }}",
+    "deployment_id": "{{ steps.deploy_canary.outputs.deployment_id | default(steps.deploy_full.outputs.deployment_id) }}",
+    "optimization_applied": "{{ steps.run_budsim.outputs.optimal_config is defined }}",
+    "rolled_back": "{{ steps.rollback.outputs.success | default(false) }}"
+  }
+}

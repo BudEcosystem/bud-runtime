@@ -542,7 +542,18 @@ class KubernetesHandler(BaseClusterHandler):
 
         transfer_status = {"status": "inprogress"}
 
-        # Check if pod exists and its status
+        # Check ConfigMap completion FIRST - handles case where pod completed and was garbage collected
+        # but the transfer was successful (ConfigMap persists after pod deletion)
+        if configmap_data and configmap_data.get("status") == "completed":
+            transfer_status["status"] = configmap_data["status"]
+            transfer_status["total_files"] = configmap_data.get("total_files")
+            transfer_status["completed_files"] = configmap_data.get("completed_files")
+            transfer_status["total_size"] = configmap_data.get("total_size")
+            transfer_status["completed_size"] = configmap_data.get("completed_size")
+            transfer_status["eta"] = configmap_data.get("eta")
+            return transfer_status
+
+        # Check if pod exists and its status (only after confirming transfer isn't already complete)
         if not pod_status:
             transfer_status["status"] = "failed"
             transfer_status["reason"] = "Pod not found"

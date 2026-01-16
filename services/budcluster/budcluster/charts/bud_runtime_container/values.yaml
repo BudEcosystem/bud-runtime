@@ -16,7 +16,21 @@ nfs:
   server: ""
   path: "/exports"
 
-nodes: [] # will be replaced by the deployment handler
+# Node configurations - populated by deployment handler
+# Each node should include:
+#   - name: Node identifier
+#   - image: Container image for the runtime engine
+#   - type: Device type (cuda, cpu_high, hpu)
+#   - engine_type: Engine type (vllm, latentbud, sglang) - defaults to "vllm"
+#   - args: Engine-specific CLI arguments (as dict, converted to list)
+#   - envs: Engine-specific environment variables
+#   - tp_size: Tensor parallel size
+#   - pp_size: Pipeline parallel size
+#   - replicas: Number of replicas
+#   - memory: Memory allocation in GB
+#   - hardware_mode: "dedicated" or "shared"
+#   - supports_lora: Whether LoRA is enabled (vllm only)
+nodes: []
 skipMasterNodeForCpu: true  # skip master/control-plane nodes for CPU deployments
 
 imagePullSecrets:

@@ -322,3 +322,52 @@ class BudNotifyHandler:
 
                 logger.info("Successfully create multiple subscribers")
                 return response_data
+
+
+async def publish_workflow_completion_event(
+    callback_topic: str,
+    workflow_id: str,
+    workflow_type: str,
+    status: str,
+    result_data: Dict[str, Any],
+    reason: Optional[str] = None,
+) -> None:
+    """Publish workflow completion event to the specified callback topic.
+
+    This function is used for budpipeline integration. It publishes a completion
+    event when a workflow (model add, benchmark, etc.) completes, allowing
+    budpipeline to receive real-time notifications.
+
+    Only called when callback_topic was provided in the original request.
+
+    Args:
+        callback_topic: The Dapr pub/sub topic to publish to (e.g., "budpipelineEvents")
+        workflow_id: The budapp workflow ID that completed
+        workflow_type: Type of workflow (e.g., "model_add", "benchmark")
+        status: Completion status ("COMPLETED" or "FAILED")
+        result_data: Result data including IDs (e.g., {"model_id": "...", "model_name": "..."})
+        reason: Optional failure reason if status is FAILED
+    """
+    from .dapr_service import DaprService
+
+    try:
+        dapr_service = DaprService()
+        await dapr_service.publish_to_topic(
+            data={
+                "category": "INTERNAL",
+                "type": "workflow_completed",
+                "workflow_id": workflow_id,
+                "workflow_type": workflow_type,
+                "status": status,
+                "result": result_data,
+                "reason": reason,
+            },
+            target_topic_name=callback_topic,
+            event_type="workflow_completed",
+        )
+        logger.info(
+            f"Published workflow completion event: workflow_id={workflow_id}, "
+            f"type={workflow_type}, status={status}, topic={callback_topic}"
+        )
+    except Exception as e:
+        logger.exception(f"Failed to publish workflow completion event: {e}")

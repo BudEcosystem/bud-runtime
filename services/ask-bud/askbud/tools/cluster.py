@@ -77,13 +77,22 @@ class ClusterRegistry:
         return [c["name"] for c in self.clusters]
 
     async def _perform_get_clusters_request(self) -> List[Dict[str, str]]:
-        get_clusters_endpoint = (
-            f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_app_id}/method/clusters/internal/get-clusters"
-        )
+        get_clusters_endpoint = f"{app_settings.dapr_base_url}v1.0/invoke/{app_settings.bud_app_id}/method/clusters"
+        params = {}
+        system_user_id = os.getenv("SYSTEM_USER_ID")
+        if system_user_id:
+            params["user_id"] = system_user_id
+        headers = {}
+        dapr_token = os.getenv("APP_API_TOKEN")
+        if dapr_token:
+            headers["dapr-api-token"] = dapr_token
 
         try:
             logger.debug(f"Performing get clusters request. endpoint: {get_clusters_endpoint}")
-            async with aiohttp.ClientSession() as session, session.get(get_clusters_endpoint) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(get_clusters_endpoint, params=params or None, headers=headers or None) as response,
+            ):
                 response_data = await response.json()
                 if response.status != 200 or response_data.get("object") == "error":
                     logger.error(f"Failed to get clusters: {response.status} {response_data}")

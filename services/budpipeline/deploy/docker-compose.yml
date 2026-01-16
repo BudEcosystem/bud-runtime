@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  budpipeline:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=budpipeline
+      - SERVICE_PORT=8000
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
+      - DAPR_HTTP_ENDPOINT=http://localhost:3500
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - budpipeline-network
+
+  budpipeline-dapr:
+    image: "daprio/daprd:1.12.0"
+    command:
+      [
+        "./daprd",
+        "--app-id", "budpipeline",
+        "--app-port", "8000",
+        "--dapr-http-port", "3500",
+        "--dapr-grpc-port", "50001",
+        "--resources-path", "/components",
+        "--log-level", "debug",
+      ]
+    volumes:
+      - "./dapr/components:/components"
+    network_mode: "service:budpipeline"
+    depends_on:
+      - budpipeline
+      - redis
+
+networks:
+  budpipeline-network:
+    driver: bridge

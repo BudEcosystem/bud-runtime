@@ -23,6 +23,10 @@ global:
 imagePullSecrets: []
 # NOTE: support for https://keel.sh/
 imagePullPolicy: "IfNotPresent"
+
+# Dapr APP_API_TOKEN for securing internal service-to-service endpoints
+# Leave empty to auto-generate a random token, or set explicitly for consistency across deployments
+appApiToken: ""
 deploymentAnnotations: {}
 storage:
   budmodelRegistry:
@@ -334,6 +338,15 @@ microservices:
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
       OTEL_SDK_DISABLED: "false"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
+    nodeSelector: {}
+    affinity: {}
+  budpipeline:
+    enabled: true
+    image: budstudio/budpipeline:0.4.8
+    daprid: budpipeline
+    pubsubTopic: budpipelineEvents
+    env:
+      LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
   global:

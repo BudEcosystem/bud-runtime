@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: budpipeline-completion-subscription
+spec:
+  topic: budpipelineEvents
+  routes:
+    default: /workflow-events
+  pubsubname: pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budpipeline

@@ -21,7 +21,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons.schemas import PaginatedResponse, SuccessResponse
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
@@ -29,11 +29,12 @@ from budapp.commons import logging
 from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
+    get_current_active_user_or_internal,
     get_session,
     parse_ordering_fields,
 )
 from budapp.commons.exceptions import ClientException
-from budapp.commons.permission_handler import require_permissions
+from budapp.commons.permission_handler import require_permissions, require_permissions_or_internal
 from budapp.commons.schemas import ErrorResponse
 from budapp.endpoint_ops.schemas import ModelClusterDetailResponse
 from budapp.user_ops.schemas import User
@@ -78,10 +79,10 @@ benchmark_router = APIRouter(prefix="/benchmark", tags=["benchmark"])
     },
     description="Run benchmark workflow",
 )
-@require_permissions(permissions=[PermissionEnum.BENCHMARK_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.BENCHMARK_MANAGE])
 async def run_benchmark_workflow(
     request: RunBenchmarkWorkflowRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
     """Run benchmark workflow."""
@@ -636,10 +637,10 @@ async def get_request_metrics(
     },
     description="Get valid TP/PP configuration options for selected nodes by proxying to budsim",
 )
-@require_permissions(permissions=[PermissionEnum.BENCHMARK_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.BENCHMARK_MANAGE])
 async def get_node_configurations(
     request: NodeConfigurationProxyRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
 ) -> Union[NodeConfigurationProxyResponse, ErrorResponse]:
     """Get node configuration options by proxying to budsim service.

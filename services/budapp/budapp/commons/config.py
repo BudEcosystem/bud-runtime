@@ -103,6 +103,13 @@ class AppConfig(BaseAppConfig):
     superuser_email: str = Field(alias="SUPER_USER_EMAIL")
     superuser_password: str = Field(alias="SUPER_USER_PASSWORD")
 
+    # System user for internal service-to-service calls
+    system_user_id: Optional[str] = Field(
+        default=None,
+        alias="SYSTEM_USER_ID",
+        description="UUID of system user for internal service calls (optional, uses superuser if not set)",
+    )
+
     # default non master realm name
     default_realm_name: str = Field(alias="DEFAULT_REALM_NAME", default="bud")
 
@@ -142,6 +149,7 @@ class AppConfig(BaseAppConfig):
     )
     bud_eval_app_id: str = Field(alias="BUD_EVAL_APP_ID", default="budeval")
     bud_prompt_app_id: str = Field(alias="BUD_PROMPT_APP_ID")
+    bud_pipeline_app_id: str = Field(alias="BUD_PIPELINE_APP_ID", default="budpipeline")
     source_topic: str = Field(alias="SOURCE_TOPIC", default="budAppMessages")
 
     # Prometheus URL

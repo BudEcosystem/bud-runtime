@@ -488,6 +488,7 @@ class CreateLocalModelWorkflowRequest(BaseModel):
     tags: list[Tag] | None = None
     icon: str | None = None
     add_model_modality: list[AddModelModalityEnum] | None = None
+    callback_topic: str | None = None  # For budpipeline integration
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateLocalModelWorkflowRequest":

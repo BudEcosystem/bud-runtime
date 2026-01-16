@@ -1890,19 +1890,27 @@ input.ant-input:-webkit-autofill {
   .ant-form {
     justify-content: space-between;
     width: 100%;
+  }
 
-    // justify-content: flex-start;
-    .form-layout {
-      height: auto !important;
-      border-radius: 6px;
-      margin: 0 2.6rem !important;
-      margin-bottom: 1.1rem !important;
-      // background: #ffffff08;
-      background: rgba(255, 255, 255, 0.027);
-      backdrop-filter: blur(10px) !important;
-      border: 1px solid #1f1f1f !important;
-      // temp
-    }
+  .form-layout {
+    height: auto !important;
+    border-radius: 6px;
+    margin: 0 2.6rem !important;
+    margin-bottom: 1.1rem !important;
+    // background: #ffffff08;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid #1f1f1f !important;
+    // temp
+  }
+
+  .drawer-form-layout {
+    height: auto !important;
+    border-radius: 6px;
+    margin: 0 2.6rem 1.1rem !important;
+    background: rgba(255, 255, 255, 0.027);
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid #1f1f1f !important;
   }
 
   .ant-header-breadcrumb {
@@ -1925,6 +1933,7 @@ input.ant-input:-webkit-autofill {
     background: rgba(255, 255, 255, 0.027);
     backdrop-filter: blur(10px);
   }
+
 
 
 

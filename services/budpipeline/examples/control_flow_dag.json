@@ -1,0 +1,355 @@
+{
+  "name": "control-flow-demo",
+  "version": "1.0",
+  "description": "Demonstrates all control flow patterns: fan-out, fan-in, conditional branching, for-each, and while loops",
+  "parameters": [
+    {
+      "name": "items",
+      "type": "array",
+      "description": "List of items to process",
+      "default": [
+        { "id": "item1", "value": 10, "priority": "high" },
+        { "id": "item2", "value": 20, "priority": "normal" },
+        { "id": "item3", "value": 30, "priority": "low" }
+      ]
+    },
+    {
+      "name": "processing_mode",
+      "type": "string",
+      "description": "Processing mode: fast, balanced, or thorough",
+      "default": "balanced"
+    },
+    {
+      "name": "enable_validation",
+      "type": "boolean",
+      "description": "Whether to run validation steps",
+      "default": true
+    },
+    {
+      "name": "max_retries",
+      "type": "integer",
+      "description": "Maximum retry attempts for external calls",
+      "default": 3
+    }
+  ],
+  "settings": {
+    "timeout_seconds": 1800,
+    "fail_fast": false,
+    "max_parallel_steps": 10
+  },
+  "steps": [
+    {
+      "id": "start",
+      "name": "Start Workflow",
+      "action": "log",
+      "params": {
+        "message": "Starting control flow demo with {{ params.items | length }} items in {{ params.processing_mode }} mode",
+        "level": "info"
+      }
+    },
+    {
+      "id": "validate_input",
+      "name": "Validate Input",
+      "action": "validate",
+      "depends_on": ["start"],
+      "condition": "{{ params.enable_validation }}",
+      "params": {
+        "data": "{{ params.items }}",
+        "rules": {
+          "min_items": 1,
+          "required_fields": ["id", "value"]
+        }
+      }
+    },
+    {
+      "id": "classify_mode",
+      "name": "Classify Processing Mode",
+      "action": "conditional",
+      "depends_on": ["validate_input"],
+      "params": {
+        "value": "{{ params.processing_mode }}",
+        "cases": {
+          "fast": "quick_process",
+          "balanced": "standard_process",
+          "thorough": "deep_process"
+        }
+      }
+    },
+    {
+      "id": "fast_preprocess",
+      "name": "Fast Preprocessing",
+      "action": "transform",
+      "depends_on": ["classify_mode"],
+      "condition": "{{ params.processing_mode == 'fast' }}",
+      "params": {
+        "input": "{{ params.items }}",
+        "operation": "filter",
+        "filter_expr": "item.priority == 'high'"
+      }
+    },
+    {
+      "id": "balanced_preprocess",
+      "name": "Balanced Preprocessing",
+      "action": "transform",
+      "depends_on": ["classify_mode"],
+      "condition": "{{ params.processing_mode == 'balanced' }}",
+      "params": {
+        "input": "{{ params.items }}",
+        "operation": "sort",
+        "sort_key": "priority"
+      }
+    },
+    {
+      "id": "thorough_preprocess",
+      "name": "Thorough Preprocessing",
+      "action": "transform",
+      "depends_on": ["classify_mode"],
+      "condition": "{{ params.processing_mode == 'thorough' }}",
+      "params": {
+        "input": "{{ params.items }}",
+        "operation": "enrich",
+        "enrich_fields": ["metadata", "history"]
+      }
+    },
+    {
+      "id": "merge_preprocessed",
+      "name": "Merge Preprocessed Data",
+      "action": "aggregate",
+      "depends_on": ["fast_preprocess", "balanced_preprocess", "thorough_preprocess"],
+      "params": {
+        "sources": {
+          "fast": "{{ steps.fast_preprocess.outputs.result | default([]) }}",
+          "balanced": "{{ steps.balanced_preprocess.outputs.result | default([]) }}",
+          "thorough": "{{ steps.thorough_preprocess.outputs.result | default([]) }}"
+        },
+        "merge_strategy": "first_non_empty"
+      }
+    },
+    {
+      "id": "process_items",
+      "name": "Process Items (For Each)",
+      "action": "for_each",
+      "depends_on": ["merge_preprocessed"],
+      "params": {
+        "items": "{{ steps.merge_preprocessed.outputs.items }}",
+        "action": "process_single_item",
+        "action_params": {
+          "item_id": "{{ item.id }}",
+          "item_value": "{{ item.value }}",
+          "processing_mode": "{{ params.processing_mode }}"
+        },
+        "parallel": true,
+        "max_concurrency": 5,
+        "continue_on_error": true
+      }
+    },
+    {
+      "id": "check_high_priority",
+      "name": "Check High Priority Items",
+      "action": "filter",
+      "depends_on": ["process_items"],
+      "params": {
+        "items": "{{ steps.process_items.outputs.results }}",
+        "condition": "item.priority == 'high'"
+      }
+    },
+    {
+      "id": "check_normal_priority",
+      "name": "Check Normal Priority Items",
+      "action": "filter",
+      "depends_on": ["process_items"],
+      "params": {
+        "items": "{{ steps.process_items.outputs.results }}",
+        "condition": "item.priority == 'normal'"
+      }
+    },
+    {
+      "id": "check_low_priority",
+      "name": "Check Low Priority Items",
+      "action": "filter",
+      "depends_on": ["process_items"],
+      "params": {
+        "items": "{{ steps.process_items.outputs.results }}",
+        "condition": "item.priority == 'low'"
+      }
+    },
+    {
+      "id": "handle_high_priority",
+      "name": "Handle High Priority",
+      "action": "priority_handler",
+      "depends_on": ["check_high_priority"],
+      "condition": "{{ steps.check_high_priority.outputs.count > 0 }}",
+      "params": {
+        "items": "{{ steps.check_high_priority.outputs.items }}",
+        "urgency": "immediate"
+      }
+    },
+    {
+      "id": "handle_normal_priority",
+      "name": "Handle Normal Priority",
+      "action": "priority_handler",
+      "depends_on": ["check_normal_priority"],
+      "condition": "{{ steps.check_normal_priority.outputs.count > 0 }}",
+      "params": {
+        "items": "{{ steps.check_normal_priority.outputs.items }}",
+        "urgency": "standard"
+      }
+    },
+    {
+      "id": "handle_low_priority",
+      "name": "Handle Low Priority",
+      "action": "priority_handler",
+      "depends_on": ["check_low_priority"],
+      "condition": "{{ steps.check_low_priority.outputs.count > 0 }}",
+      "params": {
+        "items": "{{ steps.check_low_priority.outputs.items }}",
+        "urgency": "batch"
+      }
+    },
+    {
+      "id": "submit_external_job",
+      "name": "Submit External Job",
+      "action": "http_request",
+      "depends_on": ["handle_high_priority", "handle_normal_priority", "handle_low_priority"],
+      "params": {
+        "url": "https://api.example.com/jobs",
+        "method": "POST",
+        "body": {
+          "high_results": "{{ steps.handle_high_priority.outputs.results | default([]) }}",
+          "normal_results": "{{ steps.handle_normal_priority.outputs.results | default([]) }}",
+          "low_results": "{{ steps.handle_low_priority.outputs.results | default([]) }}"
+        }
+      },
+      "retry": {
+        "max_attempts": "{{ params.max_retries }}",
+        "backoff_seconds": 10,
+        "backoff_multiplier": 2.0
+      }
+    },
+    {
+      "id": "poll_job_status",
+      "name": "Poll Job Status (While Loop)",
+      "action": "while",
+      "depends_on": ["submit_external_job"],
+      "params": {
+        "condition": "{{ result.status not in ['completed', 'failed', 'cancelled'] }}",
+        "action": "http_request",
+        "action_params": {
+          "url": "https://api.example.com/jobs/{{ steps.submit_external_job.outputs.job_id }}/status",
+          "method": "GET"
+        },
+        "max_iterations": 60,
+        "delay_seconds": 10,
+        "timeout_seconds": 600
+      }
+    },
+    {
+      "id": "job_succeeded",
+      "name": "Handle Job Success",
+      "action": "transform",
+      "depends_on": ["poll_job_status"],
+      "condition": "{{ steps.poll_job_status.outputs.result.status == 'completed' }}",
+      "params": {
+        "input": "{{ steps.poll_job_status.outputs.result }}",
+        "operation": "extract",
+        "fields": ["job_id", "results", "metrics"]
+      }
+    },
+    {
+      "id": "job_failed",
+      "name": "Handle Job Failure",
+      "action": "log",
+      "depends_on": ["poll_job_status"],
+      "condition": "{{ steps.poll_job_status.outputs.result.status == 'failed' }}",
+      "params": {
+        "message": "External job failed: {{ steps.poll_job_status.outputs.result.error }}",
+        "level": "error"
+      }
+    },
+    {
+      "id": "calculate_metrics",
+      "name": "Calculate Metrics",
+      "action": "aggregate",
+      "depends_on": ["job_succeeded", "job_failed"],
+      "params": {
+        "sources": {
+          "processed_count": "{{ steps.process_items.outputs.results | length }}",
+          "high_priority_count": "{{ steps.check_high_priority.outputs.count | default(0) }}",
+          "normal_priority_count": "{{ steps.check_normal_priority.outputs.count | default(0) }}",
+          "low_priority_count": "{{ steps.check_low_priority.outputs.count | default(0) }}",
+          "job_status": "{{ steps.poll_job_status.outputs.result.status }}",
+          "job_results": "{{ steps.job_succeeded.outputs.result | default(none) }}"
+        }
+      }
+    },
+    {
+      "id": "generate_report",
+      "name": "Generate Report",
+      "action": "template_render",
+      "depends_on": ["calculate_metrics"],
+      "params": {
+        "template": "workflow_report",
+        "variables": {
+          "workflow_name": "{{ workflow.name }}",
+          "processing_mode": "{{ params.processing_mode }}",
+          "metrics": "{{ steps.calculate_metrics.outputs.combined }}",
+          "success": "{{ steps.poll_job_status.outputs.result.status == 'completed' }}"
+        }
+      }
+    },
+    {
+      "id": "notify_success",
+      "name": "Notify Success",
+      "action": "notify",
+      "depends_on": ["generate_report"],
+      "condition": "{{ steps.poll_job_status.outputs.result.status == 'completed' }}",
+      "params": {
+        "channel": "workflows",
+        "type": "success",
+        "title": "Workflow Completed Successfully",
+        "body": "{{ steps.generate_report.outputs.report }}"
+      }
+    },
+    {
+      "id": "notify_failure",
+      "name": "Notify Failure",
+      "action": "notify",
+      "depends_on": ["generate_report"],
+      "condition": "{{ steps.poll_job_status.outputs.result.status != 'completed' }}",
+      "params": {
+        "channel": "alerts",
+        "type": "error",
+        "title": "Workflow Failed",
+        "body": "{{ steps.generate_report.outputs.report }}"
+      }
+    },
+    {
+      "id": "cleanup",
+      "name": "Cleanup Resources",
+      "action": "cleanup",
+      "depends_on": ["notify_success", "notify_failure"],
+      "params": {
+        "job_id": "{{ steps.submit_external_job.outputs.job_id }}",
+        "temp_data": "{{ steps.merge_preprocessed.outputs.temp_files | default([]) }}"
+      },
+      "on_failure": "continue"
+    },
+    {
+      "id": "end",
+      "name": "End Workflow",
+      "action": "log",
+      "depends_on": ["cleanup"],
+      "params": {
+        "message": "Workflow completed. Status: {{ 'success' if steps.poll_job_status.outputs.result.status == 'completed' else 'failed' }}",
+        "level": "info"
+      }
+    }
+  ],
+  "outputs": {
+    "success": "{{ steps.poll_job_status.outputs.result.status == 'completed' }}",
+    "processed_items": "{{ steps.process_items.outputs.results | length }}",
+    "job_id": "{{ steps.submit_external_job.outputs.job_id }}",
+    "metrics": "{{ steps.calculate_metrics.outputs.combined }}",
+    "report": "{{ steps.generate_report.outputs.report }}"
+  }
+}

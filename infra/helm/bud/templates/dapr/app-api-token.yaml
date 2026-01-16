@@ -1,0 +1,16 @@
+{{- /*
+  Secret for Dapr APP_API_TOKEN authentication.
+  Used to secure internal service-to-service endpoints.
+  Dapr sidecar injects this token in 'dapr-api-token' header for all requests to the app.
+*/ -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-app-api-token
+type: Opaque
+data:
+  {{- if .Values.appApiToken }}
+  token: {{ .Values.appApiToken | b64enc | quote }}
+  {{- else }}
+  token: {{ randAlphaNum 32 | b64enc | quote }}
+  {{- end }}
