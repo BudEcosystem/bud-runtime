@@ -138,14 +138,6 @@
             "pages": [
               "settings/account-settings"
             ]
-          },
-          {
-            "group": "Billing & Usage",
-            "icon": "credit-card",
-            "pages": [
-              "billing/understanding-pricing",
-              "billing/monitoring-usage"
-            ]
           }
         ]
       },
