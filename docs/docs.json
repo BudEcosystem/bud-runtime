@@ -263,6 +263,11 @@
           "anchor": "Blog",
           "href": "https://budecosystem.com/blog/",
           "icon": "newspaper"
+        },
+        {
+          "anchor": "API Reference",
+          "href": "https://budecosystem-b7b14df4.mintlify.app/developer-docs/openai-api/chat",
+          "icon": "code"
         }
       ]
     }
@@ -270,10 +275,6 @@
   "logo": "/images/bud-icon.png",
   "navbar": {
     "links": [
-      {
-        "label": "Dashboard",
-        "href": "https://app.bud.studio"
-      },
       {
         "label": "Support",
         "href": "mailto:contact@bud.studio"
