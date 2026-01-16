@@ -624,6 +624,10 @@ class PromptConfigRequest(BaseModel):
         default=False,
         description="Store configuration permanently without expiration (default: False, uses configured TTL)",
     )
+    client_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client-provided metadata for custom tracking and identification",
+    )
 
 
 class PromptConfigResponse(SuccessResponse):
@@ -692,6 +696,10 @@ class PromptConfigurationData(BaseModel):
     )
     system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     tools: List[MCPToolConfig] = Field(default_factory=list, description="MCP tool configurations")
+    client_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client-provided metadata for custom tracking and identification",
+    )
 
 
 class GetPromptVersionResponse(SuccessResponse):
