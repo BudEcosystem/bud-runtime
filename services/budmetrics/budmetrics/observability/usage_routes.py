@@ -1,4 +1,12 @@
-"""Usage tracking endpoints for billing and analytics."""
+"""Usage tracking endpoints for billing and analytics.
+
+These APIs use InferenceFact (denormalized raw data) or rollup tables
+(InferenceMetrics5m/1h/1d) for better query performance.
+
+Strategy:
+- user_id queries: Must use InferenceFact (rollup tables don't group by user_id)
+- project_id only queries: Can use rollup tables for faster aggregation
+"""
 
 from datetime import datetime
 from typing import Optional
@@ -18,6 +26,41 @@ usage_router = APIRouter()
 service = ObservabilityMetricsService()
 
 
+def _select_rollup_table(start_date: datetime, end_date: datetime) -> str:
+    """Select optimal rollup table based on time range.
+
+    Table selection logic:
+    - InferenceMetrics5m: Recent data (< 6 hours)
+    - InferenceMetrics1h: Short-term (6 hours - 7 days)
+    - InferenceMetrics1d: Long-term (> 7 days)
+    """
+    time_range = end_date - start_date
+    total_hours = time_range.total_seconds() / 3600
+
+    if total_hours < 6:
+        return "InferenceMetrics5m"
+    elif time_range.days < 7:
+        return "InferenceMetrics1h"
+    else:
+        return "InferenceMetrics1d"
+
+
+def _select_rollup_table_for_granularity(granularity: str) -> str:
+    """Select optimal rollup table based on requested granularity.
+
+    Granularity-based selection:
+    - hourly: InferenceMetrics5m (5-minute precision aggregated to hourly)
+    - daily: InferenceMetrics1h (hourly precision aggregated to daily)
+    - weekly/monthly: InferenceMetrics1d (daily precision)
+    """
+    if granularity == "hourly":
+        return "InferenceMetrics5m"
+    elif granularity == "daily":
+        return "InferenceMetrics1h"
+    else:  # weekly, monthly
+        return "InferenceMetrics1d"
+
+
 @usage_router.get("/usage/summary", tags=["Usage"])
 async def get_usage_summary(
     user_id: Optional[UUID] = Query(None, description="User ID to filter by"),
@@ -27,42 +70,62 @@ async def get_usage_summary(
 ) -> Response:
     """Get usage summary for billing purposes.
 
-    This endpoint queries ModelInferenceDetails and related tables to calculate:
+    This endpoint uses InferenceFact (denormalized) or rollup tables for performance:
+    - If user_id is provided: Uses InferenceFact (rollups don't have user_id dimension)
+    - If only project_id or no filters: Uses rollup tables for faster aggregation
+
+    Returns:
     - Total tokens used (input + output)
     - Total cost incurred
     - Total request count
     - Success rate
-
-    The data is filtered by user_id and/or project_id and aggregated for the specified date range.
     """
     try:
-        # Build the query to get usage data
-        query = """
-        SELECT
-            COUNT(*) as request_count,
-            SUM(CASE WHEN is_success THEN 1 ELSE 0 END) as success_count,
-            SUM(COALESCE(cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
-        """
+        await service.initialize()
 
         params = {
             "start_date": start_date,
             "end_date": end_date,
         }
 
-        # Add filters
         if user_id:
-            query += " AND mid.user_id = %(user_id)s"
+            # Must use InferenceFact when filtering by user_id
+            # (rollup tables don't group by user_id)
+            query = """
+            SELECT
+                COUNT(*) as request_count,
+                SUM(CASE WHEN is_success THEN 1 ELSE 0 END) as success_count,
+                SUM(COALESCE(cost, 0)) as total_cost,
+                SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+                SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+            FROM InferenceFact
+            WHERE timestamp >= %(start_date)s
+            AND timestamp <= %(end_date)s
+            AND user_id = %(user_id)s
+            """
             params["user_id"] = str(user_id)
 
-        if project_id:
-            query += " AND mid.api_key_project_id = %(project_id)s"
-            params["project_id"] = str(project_id)
+            if project_id:
+                query += " AND api_key_project_id = %(project_id)s"
+                params["project_id"] = str(project_id)
+        else:
+            # Use rollup tables for better performance when no user_id filter
+            table = _select_rollup_table(start_date, end_date)
+            query = f"""
+            SELECT
+                SUM(request_count) as request_count,
+                SUM(success_count) as success_count,
+                SUM(total_cost) as total_cost,
+                SUM(total_input_tokens) as total_input_tokens,
+                SUM(total_output_tokens) as total_output_tokens
+            FROM {table}
+            WHERE time_bucket >= %(start_date)s
+            AND time_bucket <= %(end_date)s
+            """
+
+            if project_id:
+                query += " AND api_key_project_id = %(project_id)s"
+                params["project_id"] = str(project_id)
 
         # Execute query
         result = await service.clickhouse_client.execute_query(query, params)
@@ -121,48 +184,80 @@ async def get_usage_history(
 ) -> Response:
     """Get historical usage data with specified granularity.
 
+    This endpoint uses InferenceFact (denormalized) or rollup tables for performance:
+    - If user_id is provided: Uses InferenceFact (rollups don't have user_id dimension)
+    - If only project_id or no filters: Uses rollup tables for faster aggregation
+
     Returns time-series data showing usage metrics over time, grouped by the specified granularity.
     """
     try:
-        # Map granularity to ClickHouse date function
-        date_trunc_map = {
-            "hourly": "toStartOfHour(mid.request_arrival_time)",
-            "daily": "toDate(mid.request_arrival_time)",
-            "weekly": "toMonday(mid.request_arrival_time)",
-            "monthly": "toStartOfMonth(mid.request_arrival_time)",
-        }
-
-        date_trunc = date_trunc_map.get(granularity, "toDate(mid.request_arrival_time)")
-
-        # Build the query
-        query = f"""
-        SELECT
-            {date_trunc} as period,
-            COUNT(*) as request_count,
-            SUM(COALESCE(cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
-        """
+        await service.initialize()
 
         params = {
             "start_date": start_date,
             "end_date": end_date,
         }
 
-        # Add filters
         if user_id:
-            query += " AND mid.user_id = %(user_id)s"
+            # Must use InferenceFact when filtering by user_id
+            # (rollup tables don't group by user_id)
+            date_trunc_map = {
+                "hourly": "toStartOfHour(timestamp)",
+                "daily": "toDate(timestamp)",
+                "weekly": "toMonday(timestamp)",
+                "monthly": "toStartOfMonth(timestamp)",
+            }
+            date_trunc = date_trunc_map.get(granularity, "toDate(timestamp)")
+
+            query = f"""
+            SELECT
+                {date_trunc} as period,
+                COUNT(*) as request_count,
+                SUM(COALESCE(cost, 0)) as total_cost,
+                SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+                SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+            FROM InferenceFact
+            WHERE timestamp >= %(start_date)s
+            AND timestamp <= %(end_date)s
+            AND user_id = %(user_id)s
+            """
             params["user_id"] = str(user_id)
 
-        if project_id:
-            query += " AND mid.api_key_project_id = %(project_id)s"
-            params["project_id"] = str(project_id)
+            if project_id:
+                query += " AND api_key_project_id = %(project_id)s"
+                params["project_id"] = str(project_id)
 
-        query += " GROUP BY period ORDER BY period ASC"
+            query += " GROUP BY period ORDER BY period ASC"
+        else:
+            # Use rollup tables for better performance when no user_id filter
+            table = _select_rollup_table_for_granularity(granularity)
+
+            # Map granularity to rollup time bucket expression
+            date_trunc_map = {
+                "hourly": "toStartOfHour(time_bucket)",
+                "daily": "toDate(time_bucket)",
+                "weekly": "toMonday(time_bucket)",
+                "monthly": "toStartOfMonth(time_bucket)",
+            }
+            date_trunc = date_trunc_map.get(granularity, "toDate(time_bucket)")
+
+            query = f"""
+            SELECT
+                {date_trunc} as period,
+                SUM(request_count) as request_count,
+                SUM(total_cost) as total_cost,
+                SUM(total_input_tokens) as total_input_tokens,
+                SUM(total_output_tokens) as total_output_tokens
+            FROM {table}
+            WHERE time_bucket >= %(start_date)s
+            AND time_bucket <= %(end_date)s
+            """
+
+            if project_id:
+                query += " AND api_key_project_id = %(project_id)s"
+                params["project_id"] = str(project_id)
+
+            query += " GROUP BY period ORDER BY period ASC"
 
         # Execute query
         result = await service.clickhouse_client.execute_query(query, params)
@@ -209,24 +304,29 @@ async def get_usage_by_project(
 ) -> Response:
     """Get usage breakdown by project for a specific user.
 
+    This endpoint uses InferenceFact (denormalized table) since user_id is required.
+    Rollup tables don't group by user_id, so InferenceFact is the only option.
+
     Returns usage metrics grouped by project, useful for understanding which projects
     are consuming the most resources.
     """
     try:
-        # Build the query
+        await service.initialize()
+
+        # Use InferenceFact - user_id filter requires raw data
+        # (rollup tables don't have user_id as a grouping dimension)
         query = """
         SELECT
-            mid.api_key_project_id,
+            api_key_project_id,
             COUNT(*) as request_count,
             SUM(COALESCE(cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.user_id = %(user_id)s
-        AND mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
-        GROUP BY mid.api_key_project_id
+            SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+            SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+        FROM InferenceFact
+        WHERE user_id = %(user_id)s
+        AND timestamp >= %(start_date)s
+        AND timestamp <= %(end_date)s
+        GROUP BY api_key_project_id
         ORDER BY total_cost DESC
         """
 
@@ -277,9 +377,11 @@ async def get_bulk_usage_summary(
 ) -> Response:
     """Get usage summary for multiple users in a single request.
 
-    This endpoint efficiently queries ModelInferenceDetails for multiple users at once,
-    returning usage data for each user. This is significantly more efficient than
-    making individual API calls for each user.
+    This endpoint uses InferenceFact (denormalized table) since user_ids is required.
+    Rollup tables don't group by user_id, so InferenceFact is the only option.
+
+    This is significantly more efficient than making individual API calls for each user
+    since it queries InferenceFact once for all users.
 
     Request body should contain:
     {
@@ -316,6 +418,8 @@ async def get_bulk_usage_summary(
     }
     """
     try:
+        await service.initialize()
+
         # Validate request data
         user_ids = request_data.get("user_ids", [])
         start_date_str = request_data.get("start_date")
@@ -341,20 +445,20 @@ async def get_bulk_usage_summary(
         if len(user_uuids) > 1000:
             return ErrorResponse(message="Maximum 1000 users per batch request").to_http_response()
 
-        # Build bulk query for all users
+        # Use InferenceFact - user_id filter requires raw data
+        # (rollup tables don't have user_id as a grouping dimension)
         query = """
         SELECT
-            mid.user_id,
+            user_id,
             COUNT(*) as request_count,
-            SUM(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_count,
-            SUM(COALESCE(mid.cost, 0)) as total_cost,
-            SUM(COALESCE(mi.input_tokens, 0)) as total_input_tokens,
-            SUM(COALESCE(mi.output_tokens, 0)) as total_output_tokens
-        FROM ModelInferenceDetails mid
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE mid.request_arrival_time >= %(start_date)s
-        AND mid.request_arrival_time <= %(end_date)s
-        AND mid.user_id IS NOT NULL
+            SUM(CASE WHEN is_success THEN 1 ELSE 0 END) as success_count,
+            SUM(COALESCE(cost, 0)) as total_cost,
+            SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+            SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+        FROM InferenceFact
+        WHERE timestamp >= %(start_date)s
+        AND timestamp <= %(end_date)s
+        AND user_id IS NOT NULL
         """
 
         params = {
@@ -364,16 +468,16 @@ async def get_bulk_usage_summary(
 
         # Add user IDs filter with proper parameterization
         placeholders = [f"%(user_{i})s" for i in range(len(user_uuids))]
-        query += f" AND mid.user_id IN ({','.join(placeholders)})"
+        query += f" AND user_id IN ({','.join(placeholders)})"
         for i, user_id in enumerate(user_uuids):
             params[f"user_{i}"] = str(user_id)
 
         # Add project filter if specified
         if project_id:
-            query += " AND mid.api_key_project_id = %(project_id)s"
+            query += " AND api_key_project_id = %(project_id)s"
             params["project_id"] = str(project_id)
 
-        query += " GROUP BY mid.user_id ORDER BY total_cost DESC"
+        query += " GROUP BY user_id ORDER BY total_cost DESC"
 
         # Execute the bulk query
         result = await service.clickhouse_client.execute_query(query, params)
