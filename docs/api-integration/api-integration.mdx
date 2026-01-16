@@ -10,11 +10,8 @@ The API Integration module explains how to connect your applications to Bud AI F
 Common integration questions include:
 
 - How do we discover the right endpoint and model ID for a project?
-
 - What headers and authentication are required for every request?
-
 - How do we align timeouts, retries, and streaming with deployment SLOs?
-
 - Where do we monitor usage, cost, and error rates after go-live?
 
 Bud AI Foundry answers these with a unified API layer, project-scoped keys, and built-in monitoring so teams can safely ship AI features across web, mobile, and backend services.
@@ -42,39 +39,30 @@ API integrations can route to cloud, on-prem, or hybrid deployments without chan
 ### 3.1 Endpoint discovery
 
 - Project detail pages surface deployed endpoints, base URLs, and model IDs.
-
 - Deployment pages expose hardware profiles, scaling settings, and routing policies that influence latency and throughput.
 
 ### 3.2 Authentication and headers
 
 - Project-scoped API keys with rotation and audit trails.
-
 - Required headers to identify project, environment, and request metadata.
-
 - Optional idempotency keys for safe retries.
 
 ### 3.3 OpenAI-compatible operations
 
 - Chat completions, embeddings, and image generation endpoints.
-
 - Streaming and non-streaming responses with consistent error structures.
-
 - Compatible with existing OpenAI SDKs and request schemas.
 
 ### 3.4 Bud-native extensions
 
 - Deployment-level routing hints for latency or cost optimization.
-
 - Safety and guardrail toggles aligned with policy settings.
-
 - Request tagging for billing and monitoring segmentation.
 
 ### 3.5 Monitoring and troubleshooting
 
 - Real-time metrics on token usage, latency, and request volume.
-
 - Error categorization to distinguish auth, quota, and model failures.
-
 - Logs and traces linked to deployments for faster triage.
 
 ## 4. How-to Guides
@@ -82,47 +70,35 @@ API integrations can route to cloud, on-prem, or hybrid deployments without chan
 ### 4.1 Locate your endpoint
 
 1. Open the project detail page in Bud AI Foundry.
-
 2. Navigate to the Deployments tab.
-
-3. Select a deployment to view the base URL and model ID.
+3. Select a deployment and click Use this model to share integration snippets.
 
 ### 4.2 Create an API key
 
-1. Go to **API Keys** from the navigation.
-
-2. Select the project that will call the endpoint.
-
-3. Generate a key and store it in a secure secret manager.
+1. Go to API Keys from the navigation.
+2. Open the projects tab.
+3. Create new key for the required project containing endpoint.
 
 ### 4.3 Make your first request
 
-1. Build a request using the base URL and model ID from the deployment.
-
-2. Include the `Authorization` header with your API key.
-
+1. Copy code snippet via Use this model.
+2. Include the Authorization header with your API key.
 3. Send a sample prompt and confirm a successful response.
 
 ### 4.4 Enable streaming responses
 
 1. Set the request to streaming mode in your client.
-
 2. Consume the response events as they arrive.
-
 3. Handle stream termination and partial output errors gracefully.
 
 ### 4.5 Monitor usage
 
 1. Open the Observability dashboard for the project.
-
 2. Review token usage, latency, and error rates.
-
 3. Adjust retries, timeouts, or deployment scaling as needed.
 
 ## 5. Next steps
 
 - Review the [[Authentication guide](https://budecosystem-b7b14df4.mintlify.app/api-integration/authentication)] to set required headers and rotation policies.
-
 - Explore [[Deployments](https://budecosystem-b7b14df4.mintlify.app/deployments/deployments)] for scaling and routing options that impact API performance.
-
 - Use [[Projects](https://budecosystem-b7b14df4.mintlify.app/projects/projects)] to organize keys, endpoints, and access controls.
