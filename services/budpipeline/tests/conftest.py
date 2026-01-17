@@ -6,6 +6,18 @@ from uuid import uuid4
 
 import pytest
 
+# Import all models to ensure SQLAlchemy relationships are properly registered
+# This fixes "expression 'X' failed to locate a name" errors
+# Order matters: import base model first, then models with relationships
+from budpipeline.commons.database import Base  # noqa: F401
+from budpipeline.pipeline.models import (  # noqa: F401
+    PipelineDefinition,
+    PipelineExecution,
+    StepExecution,
+)
+from budpipeline.progress.models import ProgressEvent  # noqa: F401
+from budpipeline.subscriptions.models import ExecutionSubscription  # noqa: F401
+
 # ============ DAG Fixtures ============
 
 
