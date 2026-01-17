@@ -30,10 +30,18 @@ def mock_session():
     """Create a mock async session."""
     session = AsyncMock()
     session.commit = AsyncMock()
+    session.flush = AsyncMock()
     session.rollback = AsyncMock()
     session.refresh = AsyncMock()
     session.add = MagicMock()
-    session.execute = AsyncMock()
+
+    # Mock execute() to return an object with scalar_one_or_none() and scalars()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none = MagicMock(return_value=None)
+    mock_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    session.execute = AsyncMock(return_value=mock_result)
+
+    # Also support session.scalar() for backward compatibility
     session.scalar = AsyncMock()
     return session
 
@@ -81,7 +89,7 @@ class TestPipelineExecutionCRUD:
         assert execution.initiator == "test-user"
         assert execution.status == ExecutionStatus.PENDING
         mock_session.add.assert_called_once()
-        mock_session.commit.assert_called_once()
+        mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_execution_with_callback_topics(
@@ -114,7 +122,11 @@ class TestPipelineExecutionCRUD:
         mock_execution = MagicMock(spec=PipelineExecution)
         mock_execution.id = sample_execution_id
         mock_execution.status = ExecutionStatus.RUNNING
-        mock_session.scalar.return_value = mock_execution
+
+        # Mock execute() result chain
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_execution
+        mock_session.execute.return_value = mock_result
 
         result = await crud.get_by_id(sample_execution_id)
 
@@ -126,7 +138,11 @@ class TestPipelineExecutionCRUD:
     async def test_get_by_id_not_found(self, mock_session):
         """Test getting an execution by ID when it doesn't exist."""
         crud = PipelineExecutionCRUD(mock_session)
-        mock_session.scalar.return_value = None
+
+        # Mock execute() result chain returning None
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
 
         result = await crud.get_by_id(uuid4())
 
@@ -155,7 +171,7 @@ class TestPipelineExecutionCRUD:
         )
 
         assert result is not None
-        mock_session.commit.assert_called_once()
+        mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_update_with_version_conflict(self, mock_session, sample_execution_id):
@@ -359,7 +375,7 @@ class TestStepExecutionCRUD:
         )
 
         assert result is not None
-        mock_session.commit.assert_called_once()
+        mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_update_with_version_conflict(self, mock_session):
