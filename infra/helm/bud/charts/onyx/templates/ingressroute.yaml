@@ -1,0 +1,18 @@
+{{- if .Values.traefik.enabled }}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "onyx.fullname" . }}-ingressroute
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "onyx.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - {{ .Values.traefik.entryPoint }}
+  routes:
+    - match: Host(`{{ .Values.traefik.domain }}`)
+      kind: Rule
+      services:
+        - name: {{ include "onyx.fullname" . }}-nginx-controller
+          port: 80
+{{- end }}
