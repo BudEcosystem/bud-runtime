@@ -3,12 +3,14 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
+# git is required to install budmicroframe from GitHub
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md alembic.ini ./
 COPY budpipeline/ budpipeline/
 
 # Install Python dependencies

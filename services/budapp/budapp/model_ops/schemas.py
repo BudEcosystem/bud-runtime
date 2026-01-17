@@ -1302,7 +1302,7 @@ class ModelDeploymentRequest(BaseModel):
     input_tokens: int
     output_tokens: int
     notification_metadata: BudNotificationMetadata
-    source_topic: str
+    source_topic: str | list[str]  # Supports multi-topic notification (D-001)
     credential_id: UUID4 | None = None
     # BudAIScaler specification
     budaiscaler: BudAIScalerSpecification | None = None

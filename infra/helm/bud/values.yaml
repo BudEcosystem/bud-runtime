@@ -98,6 +98,10 @@ externalServices:
         name: "mcpgateway"
         username: "mcpgateway"
         password: "mcpgateway"
+      budpipeline:
+        name: "budpipeline"
+        username: "budpipeline"
+        password: "budpipeline"
         # TODO: map all external service through here
         # monogodb:
         #   endpoint: ""
@@ -692,6 +696,7 @@ postgresqlExtra:
     - buddoc
     - budprompt
     - mcpgateway
+    - budpipeline
 keycloak:
   image:
     repository: bitnamilegacy/keycloak

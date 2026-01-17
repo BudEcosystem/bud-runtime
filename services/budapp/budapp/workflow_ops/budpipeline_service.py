@@ -220,12 +220,14 @@ class BudPipelineService(SessionMixin):
         self,
         workflow_id: str,
         params: Optional[Dict[str, Any]] = None,
+        callback_topics: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Start a workflow execution.
 
         Args:
             workflow_id: The workflow ID to execute
             params: Input parameters for the execution
+            callback_topics: Optional list of callback topics for real-time updates (D-004)
 
         Returns:
             Execution details including execution_id
@@ -234,14 +236,19 @@ class BudPipelineService(SessionMixin):
             ClientException: If execution start fails
         """
         try:
+            data = {
+                "workflow_id": workflow_id,
+                "params": params or {},
+            }
+            # Forward callback_topics to budpipeline (T052)
+            if callback_topics:
+                data["callback_topics"] = callback_topics
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
                 method_path="executions",
                 method="POST",
-                data={
-                    "workflow_id": workflow_id,
-                    "params": params or {},
-                },
+                data=data,
             )
             return result
         except Exception as e:
@@ -282,6 +289,63 @@ class BudPipelineService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
+    async def list_executions_paginated(
+        self,
+        workflow_id: Optional[str] = None,
+        status: Optional[str] = None,
+        initiator: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> Dict[str, Any]:
+        """List workflow executions with filtering and pagination (T059).
+
+        Args:
+            workflow_id: Optional filter by workflow ID.
+            status: Optional filter by execution status.
+            initiator: Optional filter by initiator.
+            start_date: Optional filter by created_at >= start_date (ISO format).
+            end_date: Optional filter by created_at <= end_date (ISO format).
+            page: Page number (1-indexed).
+            page_size: Items per page.
+
+        Returns:
+            Dictionary with executions list and pagination info.
+
+        Raises:
+            ClientException: If listing fails.
+        """
+        try:
+            params: Dict[str, Any] = {
+                "page": page,
+                "page_size": page_size,
+            }
+            if workflow_id:
+                params["workflow_id"] = workflow_id
+            if status:
+                params["status"] = status
+            if initiator:
+                params["initiator"] = initiator
+            if start_date:
+                params["start_date"] = start_date
+            if end_date:
+                params["end_date"] = end_date
+
+            result = await DaprService.invoke_service(
+                app_id=BUDPIPELINE_APP_ID,
+                method_path="executions",
+                method="GET",
+                params=params,
+            )
+            return result if isinstance(result, dict) else {"executions": [], "pagination": {}}
+        except Exception as e:
+            logger.exception("Failed to list executions")
+            raise ClientException(
+                f"Failed to list executions: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
     async def get_execution(self, execution_id: str) -> Dict[str, Any]:
         """Get execution details including step statuses.
 
@@ -305,6 +369,32 @@ class BudPipelineService(SessionMixin):
             logger.exception(f"Failed to get execution {execution_id}")
             raise ClientException(
                 f"Failed to get execution: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    async def get_execution_progress(self, execution_id: str) -> Dict[str, Any]:
+        """Get detailed execution progress including steps, events, and aggregated progress.
+
+        Args:
+            execution_id: The execution ID
+
+        Returns:
+            Execution progress with steps, recent events, and aggregated progress info
+
+        Raises:
+            ClientException: If execution not found or request fails
+        """
+        try:
+            result = await DaprService.invoke_service(
+                app_id=BUDPIPELINE_APP_ID,
+                method_path=f"executions/{execution_id}/progress",
+                method="GET",
+            )
+            return result
+        except Exception as e:
+            logger.exception(f"Failed to get execution progress {execution_id}")
+            raise ClientException(
+                f"Failed to get execution progress: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 

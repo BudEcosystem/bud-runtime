@@ -1,22 +1,25 @@
-"""Workflow API routes."""
+"""Workflow API routes.
+
+This module provides endpoints for managing pipeline definitions (workflows).
+Pipeline definitions are now stored in the PostgreSQL database for persistence
+across pod restarts (002-pipeline-event-persistence).
+"""
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from budpipeline.commons.database import get_db
 from budpipeline.commons.exceptions import (
     DAGValidationError,
-    ExecutionNotFoundError,
     WorkflowNotFoundError,
 )
+from budpipeline.pipeline.crud import OptimisticLockError
 from budpipeline.pipeline.schemas import (
     DAGValidationRequest,
     DAGValidationResponse,
-    ExecutionCreateRequest,
-    ExecutionDetailResponse,
-    ExecutionResponse,
-    StepStatusResponse,
     WorkflowCreateRequest,
     WorkflowResponse,
 )
@@ -60,10 +63,23 @@ async def validate_dag(request: DAGValidationRequest) -> DAGValidationResponse:
 
 
 @router.post("/workflows", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
-async def create_workflow(request: WorkflowCreateRequest) -> WorkflowResponse:
-    """Create/register a new workflow from DAG definition."""
+async def create_workflow(
+    request: WorkflowCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowResponse:
+    """Create/register a new workflow from DAG definition.
+
+    Workflows are persisted to the database for durability across pod restarts.
+    """
     try:
-        workflow = workflow_service.create_workflow(request.dag, request.name)
+        # Use async database method for persistence
+        workflow = await workflow_service.create_workflow_async(
+            session=db,
+            dag_dict=request.dag,
+            name_override=request.name,
+            created_by="api",  # TODO: Get from auth context
+            description=None,
+        )
         return WorkflowResponse(
             id=workflow["id"],
             name=workflow["name"],
@@ -86,9 +102,11 @@ async def create_workflow(request: WorkflowCreateRequest) -> WorkflowResponse:
 
 
 @router.get("/workflows", response_model=list[WorkflowResponse])
-async def list_workflows() -> list[WorkflowResponse]:
-    """List all registered workflows."""
-    workflows = workflow_service.list_workflows()
+async def list_workflows(
+    db: AsyncSession = Depends(get_db),
+) -> list[WorkflowResponse]:
+    """List all registered workflows from database."""
+    workflows = await workflow_service.list_workflows_async(session=db)
     return [
         WorkflowResponse(
             id=w["id"],
@@ -103,10 +121,13 @@ async def list_workflows() -> list[WorkflowResponse]:
 
 
 @router.get("/workflows/{workflow_id}")
-async def get_workflow(workflow_id: str) -> dict[str, Any]:
+async def get_workflow(
+    workflow_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
     """Get workflow details including DAG definition."""
     try:
-        return workflow_service.get_workflow(workflow_id)
+        return await workflow_service.get_workflow_async(session=db, workflow_id=workflow_id)
     except WorkflowNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -115,9 +136,13 @@ async def get_workflow(workflow_id: str) -> dict[str, Any]:
 
 
 @router.delete("/workflows/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_workflow(workflow_id: str) -> None:
-    """Delete a workflow."""
-    if not workflow_service.delete_workflow(workflow_id):
+async def delete_workflow(
+    workflow_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a workflow from database."""
+    deleted = await workflow_service.delete_workflow_async(session=db, workflow_id=workflow_id)
+    if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workflow not found: {workflow_id}",
@@ -125,10 +150,19 @@ async def delete_workflow(workflow_id: str) -> None:
 
 
 @router.put("/workflows/{workflow_id}", response_model=WorkflowResponse)
-async def update_workflow(workflow_id: str, request: WorkflowCreateRequest) -> WorkflowResponse:
-    """Update an existing workflow."""
+async def update_workflow(
+    workflow_id: str,
+    request: WorkflowCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowResponse:
+    """Update an existing workflow in database."""
     try:
-        workflow = workflow_service.update_workflow(workflow_id, request.dag, request.name)
+        workflow = await workflow_service.update_workflow_async(
+            session=db,
+            workflow_id=workflow_id,
+            dag_dict=request.dag,
+            name_override=request.name,
+        )
         return WorkflowResponse(
             id=workflow["id"],
             name=workflow["name"],
@@ -141,6 +175,11 @@ async def update_workflow(workflow_id: str, request: WorkflowCreateRequest) -> W
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workflow not found: {workflow_id}",
+        )
+    except OptimisticLockError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Concurrent modification detected: {e}",
         )
     except DAGValidationError as e:
         raise HTTPException(
@@ -155,86 +194,10 @@ async def update_workflow(workflow_id: str, request: WorkflowCreateRequest) -> W
         )
 
 
-@router.post("/executions", response_model=ExecutionResponse, status_code=status.HTTP_201_CREATED)
-async def create_execution(request: ExecutionCreateRequest) -> ExecutionResponse:
-    """Start a new workflow execution."""
-    try:
-        result = await workflow_service.execute_workflow(request.workflow_id, request.params)
-        return ExecutionResponse(
-            execution_id=result["execution_id"],
-            workflow_id=result["workflow_id"],
-            workflow_name=result["workflow_name"],
-            status=result["status"],
-            started_at=result["started_at"],
-            completed_at=result.get("completed_at"),
-            params=result["params"],
-            outputs=result.get("outputs", {}),
-            error=result.get("error"),
-        )
-    except ExecutionNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workflow not found: {request.workflow_id}",
-        )
-    except Exception as e:
-        logger.error(f"Execution error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
-        )
-
-
-@router.get("/executions", response_model=list[ExecutionResponse])
-async def list_executions(workflow_id: str | None = None) -> list[ExecutionResponse]:
-    """List executions, optionally filtered by workflow ID."""
-    executions = workflow_service.list_executions(workflow_id)
-    return [
-        ExecutionResponse(
-            execution_id=e["execution_id"],
-            workflow_id=e["workflow_id"],
-            workflow_name=e["workflow_name"],
-            status=e["status"],
-            started_at=e["started_at"],
-            completed_at=e.get("completed_at"),
-            params=e["params"],
-            outputs=e.get("outputs", {}),
-            error=e.get("error"),
-        )
-        for e in executions
-    ]
-
-
-@router.get("/executions/{execution_id}", response_model=ExecutionDetailResponse)
-async def get_execution(execution_id: str) -> ExecutionDetailResponse:
-    """Get detailed execution status including step statuses."""
-    try:
-        e = workflow_service.get_execution(execution_id)
-        steps = [
-            StepStatusResponse(
-                step_id=s["step_id"],
-                name=s["name"],
-                status=s["status"],
-                started_at=s.get("started_at"),
-                completed_at=s.get("completed_at"),
-                outputs=s.get("outputs", {}),
-                error=s.get("error"),
-            )
-            for s in e.get("steps", {}).values()
-        ]
-        return ExecutionDetailResponse(
-            execution_id=e["execution_id"],
-            workflow_id=e["workflow_id"],
-            workflow_name=e["workflow_name"],
-            status=e["status"],
-            started_at=e["started_at"],
-            completed_at=e.get("completed_at"),
-            params=e["params"],
-            outputs=e.get("outputs", {}),
-            error=e.get("error"),
-            steps=steps,
-        )
-    except ExecutionNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Execution not found: {execution_id}",
-        )
+# NOTE: Execution endpoints have been moved to execution_routes.py
+# to support database persistence (002-pipeline-event-persistence).
+# The following endpoints are now available from execution_routes.py:
+# - POST /executions - Create execution with DB persistence
+# - GET /executions - List executions with filtering and pagination
+# - GET /executions/{execution_id} - Get execution details
+# - GET /executions/{execution_id}/progress - Get execution progress

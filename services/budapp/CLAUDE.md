@@ -25,7 +25,7 @@ Key modules:
 - `cluster_ops/` - Cluster management and workflows
 - `model_ops/` - Model management (cloud and local)
 - `endpoint_ops/` - Endpoint deployments
-- `workflow_ops/` - Dapr workflow definitions
+- `workflow_ops/` - Dapr workflow definitions and BudPipeline proxy routes
 - `commons/` - Shared utilities, config, and dependencies
 
 ## Development Commands
@@ -270,3 +270,81 @@ assert tampered[0]["verification_message"] == "message"
 3. **Create complete mocks** - Include all required fields for Pydantic schemas
 4. **Use consistent serialization** - Compact JSON, lowercase booleans
 5. **Verify return structures** - Check actual service methods for correct keys
+
+## BudPipeline Integration
+
+BudApp provides authenticated proxy routes to the BudPipeline service for workflow management and execution monitoring. All routes are prefixed with `/budpipeline` and require authentication.
+
+### Execution Monitoring Routes (002-pipeline-event-persistence)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/executions` | List executions with filters (workflow_id, status, initiator, date range) and pagination |
+| `GET` | `/budpipeline/executions/{id}` | Get execution details with step statuses |
+| `GET` | `/budpipeline/executions/{id}/progress` | Get detailed progress including steps, events, and aggregated progress |
+
+### Workflow Management Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/budpipeline` | Create a new workflow |
+| `GET` | `/budpipeline` | List all workflows |
+| `GET` | `/budpipeline/{id}` | Get workflow details |
+| `PUT` | `/budpipeline/{id}` | Update workflow |
+| `DELETE` | `/budpipeline/{id}` | Delete workflow |
+| `POST` | `/budpipeline/{id}/execute` | Start execution (supports `callback_topics` for real-time updates) |
+| `POST` | `/budpipeline/validate` | Validate DAG definition |
+
+### Schedule Management Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/schedules` | List schedules |
+| `POST` | `/budpipeline/schedules` | Create schedule |
+| `GET` | `/budpipeline/schedules/{id}` | Get schedule details |
+| `PUT` | `/budpipeline/schedules/{id}` | Update schedule |
+| `DELETE` | `/budpipeline/schedules/{id}` | Delete schedule |
+| `POST` | `/budpipeline/schedules/{id}/pause` | Pause schedule |
+| `POST` | `/budpipeline/schedules/{id}/resume` | Resume schedule |
+| `POST` | `/budpipeline/schedules/{id}/trigger` | Trigger immediately |
+
+### Webhook Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/webhooks` | List webhooks |
+| `POST` | `/budpipeline/webhooks` | Create webhook |
+| `DELETE` | `/budpipeline/webhooks/{id}` | Delete webhook |
+| `POST` | `/budpipeline/webhooks/{id}/rotate-secret` | Rotate webhook secret |
+
+### Event Trigger Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/event-triggers` | List event triggers |
+| `POST` | `/budpipeline/event-triggers` | Create event trigger |
+| `DELETE` | `/budpipeline/event-triggers/{id}` | Delete event trigger |
+
+### Key Files
+
+- `workflow_ops/budpipeline_routes.py` - FastAPI route definitions
+- `workflow_ops/budpipeline_service.py` - Service layer with Dapr invocation to budpipeline
+- `workflow_ops/schemas.py` - Pydantic schemas for execution responses
+
+### Usage Example
+
+```python
+# Start execution with callback topics for real-time progress
+response = await client.post(
+    "/budpipeline/{workflow_id}/execute",
+    json={
+        "params": {"input": "data"},
+        "callback_topics": ["my-progress-topic"]
+    }
+)
+execution_id = response.json()["id"]
+
+# Poll for progress
+progress = await client.get(f"/budpipeline/executions/{execution_id}/progress")
+# Returns: execution details, step progress, aggregated progress %, ETA
+```

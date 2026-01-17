@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from budpipeline.commons.config import settings
+from budpipeline.commons.config import secrets_settings, settings
 from budpipeline.handlers.base import BaseHandler, HandlerContext, HandlerResult
 from budpipeline.handlers.registry import register_handler
 
@@ -43,8 +43,8 @@ async def invoke_dapr_service(
     url = f"{settings.dapr_http_endpoint}/v1.0/invoke/{app_id}/method/{method_path}"
 
     headers = {}
-    if settings.dapr_api_token:
-        headers["dapr-api-token"] = settings.dapr_api_token
+    if secrets_settings.dapr_api_token:
+        headers["dapr-api-token"] = secrets_settings.dapr_api_token
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.request(

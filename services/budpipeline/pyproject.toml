@@ -33,6 +33,17 @@ dependencies = [
     "pyyaml>=6.0.0",
     "python-dateutil>=2.8.0",
     "structlog>=24.1.0",
+    # Bud microframe for consistent config patterns
+    "budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git",
+    # Database persistence (002-pipeline-event-persistence)
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    # Resilience & observability (002-pipeline-event-persistence)
+    "tenacity>=8.2.0",
+    "prometheus-fastapi-instrumentator>=6.1.0",
+    "asgi-correlation-id>=4.3.0",
+    "pybreaker>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -111,6 +122,10 @@ ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
     "B904",   # raise without from inside except
+    "ARG001", # unused function argument (common in interfaces/callbacks)
+    "ARG002", # unused method argument (common in base class stubs)
+    "SIM102", # use single if statement (sometimes less readable)
+    "B007",   # loop control variable not used (often intentional)
 ]
 
 [tool.ruff.lint.isort]

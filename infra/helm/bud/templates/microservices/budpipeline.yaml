@@ -75,6 +75,17 @@ spec:
             value: "{{ .Values.microservices.budnotify.daprid }}"
           - name: BUDMETRICS_APP_ID
             value: "{{ .Values.microservices.budmetrics.daprid }}"
+          # PostgreSQL configuration (002-pipeline-event-persistence)
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budpipeline.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budpipeline.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budpipeline.name }}
           {{- range $key, $value := .Values.microservices.budpipeline.env }}
           - name: {{ $key }}
             value: {{ tpl (toString $value) $ | quote }}
