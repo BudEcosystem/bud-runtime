@@ -907,6 +907,11 @@ onyx:
     auth:
       adminUser: "bud"
       adminPassword: "bud"
+  # Ingress values for subchart context (used in configMap templates)
+  # These should match the parent chart's ingress.hosts values
+  ingress:
+    hosts:
+      root: ""  # Must be set when onyx.enabled=true (e.g., dev.example.com)
   # Disable shared dependencies (use bud's instances)
   postgresql:
     enabled: false
@@ -939,28 +944,28 @@ onyx:
   global:
     version: "latest"
     pullPolicy: "Always"
-  # Use bud's shared secrets
+  # Use bud's shared secrets (created in templates/extra/onyx.yaml)
   auth:
     postgresql:
       enabled: true
-      existingSecret: "onyx-postgresql"
+      existingSecret: "{{ $.Release.Name }}-onyx-postgresql"
       secretKeys:
         POSTGRES_USER: username
         POSTGRES_PASSWORD: password
     redis:
       enabled: true
-      existingSecret: "onyx-redis"
+      existingSecret: "{{ $.Release.Name }}-onyx-redis"
       secretKeys:
         REDIS_PASSWORD: redis_password
     objectstorage:
       enabled: true
-      existingSecret: "onyx-objectstorage"
+      existingSecret: "{{ $.Release.Name }}-onyx-objectstorage"
       secretKeys:
         S3_AWS_ACCESS_KEY_ID: s3_aws_access_key_id
         S3_AWS_SECRET_ACCESS_KEY: s3_aws_secret_access_key
     oauth:
       enabled: true
-      existingSecret: "onyx-oauth"
+      existingSecret: "{{ $.Release.Name }}-onyx-oauth"
       secretKeys:
         KEYCLOAK_ADMIN_PASSWORD: keycloak_admin_password
         # Explicitly nullify subchart defaults - these keys don't exist in our secret
@@ -972,6 +977,10 @@ onyx:
   # ConfigMap overrides (template expressions are evaluated via tpl function)
   configMap:
     AUTH_TYPE: "oidc"
+    # PostgreSQL database name (created by postgres-db-create Job)
+    POSTGRES_DB: "onyx"
+    # Redis DB index 11 - unique to Onyx (other services use: 1=Novu, 3=Dapr, 5=global, 9=mcpgateway, 10=budprompt)
+    REDIS_DB: "11"
     KEYCLOAK_ADMIN_USERNAME: "{{ .Values.keycloak.auth.adminUser }}"
     KEYCLOAK_REALM: "bud-keycloak"
     WEB_DOMAIN: '{{ printf "https://chat.%s" .Values.ingress.hosts.root }}'

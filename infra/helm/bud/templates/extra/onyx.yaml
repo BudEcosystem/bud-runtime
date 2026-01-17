@@ -1,23 +1,24 @@
 {{- if .Values.onyx.enabled }}
 # PostgreSQL credentials for Onyx (shared from bud's PostgreSQL)
+# Uses the 'onyx' service user created by the postgres-db-create Job
 apiVersion: v1
 kind: Secret
 metadata:
-  name: onyx-postgresql
+  name: {{ .Release.Name }}-onyx-postgresql
   labels:
     app.kubernetes.io/component: onyx
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 type: Opaque
 data:
-  username: {{ "postgres" | b64enc }}
-  password: {{ .Values.postgresql.auth.postgresPassword | b64enc }}
+  username: {{ .Values.externalServices.postgresql.databases.onyx.username | b64enc }}
+  password: {{ .Values.externalServices.postgresql.databases.onyx.password | b64enc }}
 ---
 # Redis/Valkey credentials for Onyx (shared from bud's Valkey)
 apiVersion: v1
 kind: Secret
 metadata:
-  name: onyx-redis
+  name: {{ .Release.Name }}-onyx-redis
   labels:
     app.kubernetes.io/component: onyx
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -30,7 +31,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: onyx-objectstorage
+  name: {{ .Release.Name }}-onyx-objectstorage
   labels:
     app.kubernetes.io/component: onyx
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -46,7 +47,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: onyx-oauth
+  name: {{ .Release.Name }}-onyx-oauth
   labels:
     app.kubernetes.io/component: onyx
     app.kubernetes.io/instance: {{ .Release.Name }}
