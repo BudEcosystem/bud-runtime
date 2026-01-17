@@ -27,6 +27,32 @@ budpipeline/
 │   ├── resilience.py        # Circuit breaker, retry, fallback
 │   ├── sanitization.py      # Credential masking
 │   └── rate_limiting.py     # API rate limiting
+├── actions/                  # Pluggable action architecture
+│   ├── base/                # Base classes and registry
+│   │   ├── meta.py          # ActionMeta, ParamDefinition dataclasses
+│   │   ├── context.py       # ActionContext, EventContext
+│   │   ├── result.py        # ActionResult, EventResult
+│   │   ├── executor.py      # BaseActionExecutor ABC
+│   │   └── registry.py      # ActionRegistry singleton
+│   ├── builtin/             # Built-in control flow actions
+│   │   ├── log.py           # Log message action
+│   │   ├── delay.py         # Async delay action
+│   │   ├── conditional.py   # Multi-branch routing
+│   │   ├── transform.py     # Data transformation
+│   │   ├── aggregate.py     # Data aggregation
+│   │   ├── set_output.py    # Set workflow outputs
+│   │   └── fail.py          # Intentional failure
+│   ├── model/               # Model-related actions
+│   │   ├── add.py           # Add model (event-driven)
+│   │   ├── delete.py        # Delete model
+│   │   └── benchmark.py     # Benchmark model (event-driven)
+│   ├── cluster/             # Cluster actions
+│   │   └── health.py        # Cluster health check
+│   ├── deployment/          # Deployment actions (placeholders)
+│   └── integration/         # Integration actions
+│       ├── http_request.py  # Generic HTTP request
+│       ├── notification.py  # Send notifications
+│       └── webhook.py       # Trigger webhooks
 ├── pipeline/                 # Core pipeline functionality
 │   ├── models.py            # PipelineExecution, StepExecution models
 │   ├── schemas.py           # Pydantic request/response schemas
@@ -51,7 +77,8 @@ budpipeline/
 ├── scheduler/               # Schedule and trigger management
 │   ├── routes.py            # Schedule/webhook/trigger endpoints
 │   └── polling.py           # Cron-based schedule polling
-├── handlers/                # Built-in step handlers
+├── handlers/                # Event routing infrastructure
+│   └── event_router.py      # Routes events to action executors
 └── main.py                  # FastAPI application setup
 ```
 
@@ -143,6 +170,11 @@ pytest --dapr-http-port 3510 --dapr-api-token <TOKEN>
 - `POST /webhooks` - Create webhook trigger
 - `POST /event-triggers` - Create event-based trigger
 
+### Actions API (Pluggable Action Architecture)
+- `GET /actions` - List all available actions with metadata
+- `GET /actions/{action_type}` - Get metadata for specific action
+- `POST /actions/validate` - Validate action parameters
+
 ## Configuration
 
 Key environment variables (see `.env.sample`):
@@ -203,6 +235,196 @@ This feature adds durable persistence for pipeline executions:
 - [DAG Structure](docs/DAG_STRUCTURE.md) - Pipeline DAG schema and control flow patterns
 - [Service Communication](docs/SERVICE_COMMUNICATION.md) - Dapr service invocation and authentication
 - [Event Flow](docs/EVENT_FLOW.md) - Event-driven architecture and callback topics
+
+## Pluggable Action Architecture
+
+BudPipeline uses a pluggable action architecture that allows actions to be defined as independent modules with declarative metadata. This enables:
+- **Dynamic action discovery** via Python entry points
+- **Consistent metadata** for frontend rendering
+- **Type-safe parameter validation**
+- **Extensibility** through external action packages
+
+### Creating a New Action
+
+Actions are defined by combining an `ActionMeta` descriptor with a `BaseActionExecutor` implementation:
+
+```python
+# budpipeline/actions/builtin/my_action.py
+from budpipeline.actions.base import (
+    ActionMeta,
+    ParamDefinition,
+    ParamType,
+    ExecutionMode,
+    BaseActionExecutor,
+    ActionContext,
+    ActionResult,
+)
+
+# 1. Define metadata
+META = ActionMeta(
+    type="my_action",
+    version="1.0.0",
+    name="My Action",
+    description="Does something useful",
+    category="Control Flow",
+    icon="⚙️",
+    color="#1890ff",
+    params=[
+        ParamDefinition(
+            name="message",
+            label="Message",
+            type=ParamType.STRING,
+            required=True,
+            description="The message to process",
+        ),
+    ],
+    outputs=[
+        OutputDefinition(name="result", type="string", description="The result"),
+    ],
+    execution_mode=ExecutionMode.SYNC,
+    idempotent=True,
+    required_services=[],
+    required_permissions=["pipeline:execute"],
+)
+
+# 2. Implement executor
+class Executor(BaseActionExecutor):
+    async def execute(self, context: ActionContext) -> ActionResult:
+        message = context.params.get("message", "")
+        return ActionResult(
+            success=True,
+            outputs={"result": message.upper()},
+        )
+
+    def validate_params(self, params: dict) -> list[str]:
+        """Optional: Custom validation beyond schema."""
+        errors = []
+        if not params.get("message"):
+            errors.append("Message is required")
+        return errors
+
+# 3. Export action class
+class MyAction:
+    meta = META
+    executor_class = Executor
+```
+
+### Registering Actions via Entry Points
+
+Actions are discovered via Python entry points defined in `pyproject.toml`:
+
+```toml
+[project.entry-points."budpipeline.actions"]
+log = "budpipeline.actions.builtin.log:LogAction"
+delay = "budpipeline.actions.builtin.delay:DelayAction"
+conditional = "budpipeline.actions.builtin.conditional:ConditionalAction"
+model_add = "budpipeline.actions.model.add:ModelAddAction"
+# ... more actions
+```
+
+At startup, `action_registry.discover_actions()` loads all registered actions.
+
+### Event-Driven Actions
+
+For long-running operations (e.g., model downloads), actions can use event-driven completion:
+
+```python
+class Executor(BaseActionExecutor):
+    async def execute(self, context: ActionContext) -> ActionResult:
+        # Start external operation
+        workflow_id = await start_model_download(context.params)
+
+        return ActionResult(
+            success=True,
+            awaiting_event=True,
+            external_workflow_id=workflow_id,
+            timeout_seconds=1800,
+            outputs={"status": "waiting"},
+        )
+
+    async def on_event(self, context: EventContext) -> EventResult:
+        """Handle completion event from external service."""
+        if context.event_type == "workflow_completed":
+            return EventResult(
+                action=EventAction.COMPLETE,
+                status="completed",
+                outputs={"model_id": context.event_data.get("model_id")},
+            )
+        return EventResult(action=EventAction.IGNORE)
+```
+
+### ActionMeta Fields Reference
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | str | Yes | Unique identifier (e.g., "log", "model_add") |
+| `version` | str | Yes | Semantic version (e.g., "1.0.0") |
+| `name` | str | Yes | Human-readable name |
+| `description` | str | Yes | What this action does |
+| `category` | str | Yes | Grouping (e.g., "Control Flow", "Model") |
+| `icon` | str | No | Emoji or icon identifier |
+| `color` | str | No | Hex color for UI |
+| `params` | list[ParamDefinition] | Yes | Parameter definitions |
+| `outputs` | list[OutputDefinition] | Yes | Output definitions |
+| `execution_mode` | ExecutionMode | Yes | SYNC or EVENT_DRIVEN |
+| `timeout_seconds` | int | No | Default timeout |
+| `retry_policy` | RetryPolicy | No | Retry configuration |
+| `idempotent` | bool | Yes | Whether action is safe to retry |
+| `required_services` | list[str] | Yes | Dapr services needed |
+| `required_permissions` | list[str] | Yes | Permissions required |
+| `examples` | list[ActionExample] | No | Usage examples |
+| `docs_url` | str | No | Documentation link |
+
+### ParamType Reference
+
+| Type | Description |
+|------|-------------|
+| `STRING` | Single-line text input |
+| `NUMBER` | Numeric input with optional min/max |
+| `BOOLEAN` | Checkbox input |
+| `SELECT` | Dropdown with static options |
+| `MULTISELECT` | Multi-select dropdown |
+| `JSON` | JSON object/array editor |
+| `TEMPLATE` | Jinja2 template string |
+| `BRANCHES` | Multi-branch conditional routing |
+| `MODEL_REF` | Reference to a model (dynamic dropdown) |
+| `CLUSTER_REF` | Reference to a cluster |
+| `PROJECT_REF` | Reference to a project |
+| `ENDPOINT_REF` | Reference to an endpoint |
+
+### Actions API Response Format
+
+```json
+GET /actions
+{
+  "actions": [
+    {
+      "type": "log",
+      "version": "1.0.0",
+      "name": "Log",
+      "description": "Log a message",
+      "category": "Control Flow",
+      "icon": "📝",
+      "color": "#8c8c8c",
+      "params": [...],
+      "outputs": [...],
+      "executionMode": "sync",
+      "idempotent": true,
+      "requiredServices": [],
+      "requiredPermissions": ["pipeline:execute"],
+      "examples": [...]
+    }
+  ],
+  "categories": [
+    {
+      "name": "Control Flow",
+      "icon": "🔀",
+      "actions": [...]
+    }
+  ],
+  "total": 20
+}
+```
 
 ## Service-to-Service Communication
 

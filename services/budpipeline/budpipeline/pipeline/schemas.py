@@ -40,6 +40,10 @@ class ExecutionCreateRequest(BaseModel):
     callback_topics: list[str] | None = Field(
         None, description="Optional callback topics for real-time progress updates"
     )
+    user_id: str | None = Field(
+        None, description="User ID initiating the execution (for service-to-service auth)"
+    )
+    initiator: str = Field(default="api", description="Initiator identifier")
 
 
 class ExecutionResponse(BaseModel):

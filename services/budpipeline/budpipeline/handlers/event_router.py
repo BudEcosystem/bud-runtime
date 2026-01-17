@@ -1,8 +1,8 @@
-"""Event Router - routes incoming events to the appropriate handlers.
+"""Event Router - routes incoming events to the appropriate action executors.
 
 This module provides event routing for the event-driven completion architecture.
 When an event arrives, it extracts the workflow_id, finds the step waiting for it,
-and routes the event to the handler's on_event() method.
+and routes the event to the action executor's on_event() method.
 """
 
 import logging
@@ -13,8 +13,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from budpipeline.handlers.base import EventAction, EventContext, EventHandlerResult  # noqa: F401
-from budpipeline.handlers.registry import global_registry
+# Use new action architecture
+from budpipeline.actions.base import EventAction, EventContext, EventResult, action_registry
 from budpipeline.pipeline.crud import StepExecutionCRUD
 from budpipeline.pipeline.models import StepExecution, StepStatus
 
@@ -136,10 +136,10 @@ async def route_event(
         f"for workflow_id={workflow_id}, handler_type={step.handler_type}"
     )
 
-    # Get the handler for this step
-    handler_type = step.handler_type
-    if not handler_type:
-        error_msg = f"Step {step.id} has no handler_type set"
+    # Get the action executor for this step
+    action_type = step.handler_type
+    if not action_type:
+        error_msg = f"Step {step.id} has no handler_type/action_type set"
         logger.error(error_msg)
         return EventRouteResult(
             routed=False,
@@ -147,8 +147,8 @@ async def route_event(
             error=error_msg,
         )
 
-    if not global_registry.has(handler_type):
-        error_msg = f"Handler '{handler_type}' not found in registry"
+    if not action_registry.has(action_type):
+        error_msg = f"Action '{action_type}' not found in registry"
         logger.error(error_msg)
         return EventRouteResult(
             routed=False,
@@ -156,23 +156,32 @@ async def route_event(
             error=error_msg,
         )
 
-    handler = global_registry.get(handler_type)
+    executor = action_registry.get_executor(action_type)
 
-    # Create event context for the handler
+    # Create event context for the executor
     context = EventContext(
-        step_execution_id=str(step.id),
-        execution_id=str(step.execution_id),
+        step_execution_id=step.id,
+        execution_id=step.execution_id,
         external_workflow_id=workflow_id,
         event_type=event_type,
         event_data=event_data,
         step_outputs=step.outputs or {},
     )
 
-    # Call the handler's on_event method
+    # Call the executor's on_event method
     try:
-        result = await handler.on_event(context)
+        result: EventResult = await executor.on_event(context)
+    except NotImplementedError:
+        # Action doesn't support events - ignore
+        logger.warning(f"Action {action_type} does not implement on_event(), ignoring event")
+        return EventRouteResult(
+            routed=True,
+            step_execution_id=step.id,
+            action_taken=EventAction.IGNORE,
+            error=f"Action {action_type} does not support event handling",
+        )
     except Exception as e:
-        error_msg = f"Handler on_event() raised exception: {e}"
+        error_msg = f"Executor on_event() raised exception: {e}"
         logger.exception(error_msg)
         return EventRouteResult(
             routed=True,
@@ -181,7 +190,7 @@ async def route_event(
             error=error_msg,
         )
 
-    logger.info(f"Handler {handler_type} returned action={result.action} for step {step.id}")
+    logger.info(f"Action {action_type} returned action={result.action} for step {step.id}")
 
     # Process the handler result
     if result.action == EventAction.COMPLETE:
@@ -234,7 +243,7 @@ async def route_event(
         )
 
     else:  # EventAction.IGNORE
-        logger.debug(f"Handler {handler_type} ignored event for step {step.id}")
+        logger.debug(f"Handler {action_type} ignored event for step {step.id}")
         return EventRouteResult(
             routed=True,
             step_execution_id=step.id,

@@ -37,6 +37,7 @@ import type { DAGDefinition, PipelineStep } from '@/stores/useBudPipeline';
 import { pipelineNodeTypes, SPECIAL_NODE_TYPES, UNDELETABLE_NODE_TYPES } from './config/pipelineNodeTypes';
 import { validatePipeline } from './config/pipelineValidation';
 import { actionCategories } from './config/actionRegistry';
+import { useActions } from 'src/hooks/useActions';
 import { usePipelineConversion } from './hooks/usePipelineConversion';
 import type { StepNodeData } from './nodes/StepNode';
 
@@ -150,6 +151,9 @@ function PipelineEditorInner({
 }: PipelineEditorProps) {
   // Conversion utilities
   const { createInitialState, flowToDag, createStepNode } = usePipelineConversion();
+
+  // Dynamic actions from API (with fallback to static definitions)
+  const { categories: apiCategories, isLoading: actionsLoading } = useActions();
 
   // Flow state
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -379,28 +383,53 @@ function PipelineEditorInner({
   });
 
   // Build node palette config from action categories
-  const paletteConfig: NodePaletteConfig = useMemo(
-    () => ({
-      categories: actionCategories.map((cat) => ({
-        id: cat.category.toLowerCase().replace(/\s+/g, '-'),
-        label: cat.category,
-        collapsed: false,
-      })),
-      items: actionCategories.flatMap((cat) =>
-        cat.actions.map((action) => ({
-          type: action.value,
-          label: action.label,
-          description: action.description,
-          icon: action.icon,
-          color: action.color,
-          categoryId: cat.category.toLowerCase().replace(/\s+/g, '-'),
-        }))
-      ),
+  // Uses API categories if available, falls back to static definitions
+  const paletteConfig: NodePaletteConfig = useMemo(() => {
+    // Use API categories if they're loaded, otherwise fall back to static
+    const categories =
+      apiCategories && apiCategories.length > 0
+        ? apiCategories.map((cat) => ({
+            id: cat.name.toLowerCase().replace(/\s+/g, '-'),
+            label: cat.name,
+            collapsed: false,
+          }))
+        : actionCategories.map((cat) => ({
+            id: cat.category.toLowerCase().replace(/\s+/g, '-'),
+            label: cat.category,
+            collapsed: false,
+          }));
+
+    // Build items from API categories or static definitions
+    const items =
+      apiCategories && apiCategories.length > 0
+        ? apiCategories.flatMap((cat) =>
+            cat.actions.map((action) => ({
+              type: action.type,
+              label: action.name,
+              description: action.description,
+              icon: action.icon || '⚙️',
+              color: action.color || '#8c8c8c',
+              categoryId: cat.name.toLowerCase().replace(/\s+/g, '-'),
+            }))
+          )
+        : actionCategories.flatMap((cat) =>
+            cat.actions.map((action) => ({
+              type: action.value,
+              label: action.label,
+              description: action.description,
+              icon: action.icon,
+              color: action.color,
+              categoryId: cat.category.toLowerCase().replace(/\s+/g, '-'),
+            }))
+          );
+
+    return {
+      categories,
+      items,
       searchable: true,
       collapsible: true,
-    }),
-    []
-  );
+    };
+  }, [apiCategories]);
 
   // Save workflow
   const handleSave = useCallback(() => {

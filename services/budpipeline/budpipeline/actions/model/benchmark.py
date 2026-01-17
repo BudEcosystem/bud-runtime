@@ -1,35 +1,39 @@
-"""Model-related workflow handlers.
+"""Model Benchmark Action.
 
-Provides handlers for model operations via Dapr service invocation to budapp.
-Uses event-driven completion - handlers return immediately and receive
-completion events via on_event() when the external workflow completes.
+Runs performance benchmarks on a model via budapp benchmark workflow.
+Uses event-driven completion - returns immediately after starting workflow
+and receives completion event via on_event().
 """
 
-import logging
+from __future__ import annotations
+
 from typing import Any
 
 import httpx
+import structlog
 
-from budpipeline.commons.config import settings
-from budpipeline.handlers.base import (
-    BaseHandler,
+from budpipeline.actions.base import (
+    ActionContext,
+    ActionMeta,
+    ActionResult,
+    BaseActionExecutor,
     EventAction,
     EventContext,
-    EventHandlerResult,
-    HandlerContext,
-    HandlerResult,
+    EventResult,
+    ExecutionMode,
+    OutputDefinition,
+    ParamDefinition,
+    ParamType,
+    StepStatus,
+    register_action,
 )
-from budpipeline.handlers.cluster_handlers import invoke_dapr_service
-from budpipeline.handlers.registry import register_handler
-from budpipeline.pipeline.models import StepStatus
+from budpipeline.commons.config import settings
+from budpipeline.commons.constants import CALLBACK_TOPIC
 
-logger = logging.getLogger(__name__)
-
-# Topic that budpipeline subscribes to for completion events
-CALLBACK_TOPIC = "budpipelineEvents"
+logger = structlog.get_logger(__name__)
 
 
-def _resolve_initiator_user_id(context: HandlerContext) -> str | None:
+def _resolve_initiator_user_id(context: ActionContext) -> str | None:
     """Resolve the initiator user ID for downstream service calls."""
     return (
         context.params.get("user_id")
@@ -38,299 +42,29 @@ def _resolve_initiator_user_id(context: HandlerContext) -> str | None:
     )
 
 
-@register_handler("model_add")
-class ModelAddHandler(BaseHandler):
-    """Handler for adding a model to the repository.
-
-    Invokes the budapp local-model-workflow to add a new model from HuggingFace.
-    Uses event-driven completion - returns immediately after starting workflow
-    and receives completion event via on_event().
-    """
-
-    action_type = "model_add"
-    name = "Add Model"
-    description = "Add a new model to the model repository"
-    requires_events = True  # Event-driven completion
-
-    def get_required_params(self) -> list[str]:
-        """Get list of required parameters."""
-        return []  # All params optional for flexibility
-
-    def get_optional_params(self) -> dict[str, Any]:
-        """Get optional parameters with defaults."""
-        return {
-            "model_source": "huggingface",
-            "huggingface_id": "",
-            "model_name": "",
-            "description": "",
-            "author": "",
-            "modality": ["text"],
-            "project_id": None,
-            "max_wait_seconds": 1800,  # 30 minutes default
-        }
-
-    def get_output_names(self) -> list[str]:
-        """Get list of output names."""
-        return ["success", "model_id", "model_name", "workflow_id", "status", "message"]
-
-    def validate_params(self, params: dict[str, Any]) -> list[str]:
-        """Validate parameters."""
-        errors = []
-        source = params.get("model_source", "huggingface")
-
-        if source == "huggingface" and not params.get("huggingface_id"):
-            errors.append("huggingface_id is required for huggingface source")
-
-        return errors
-
-    async def execute(self, context: HandlerContext) -> HandlerResult:
-        """Start model add workflow and return immediately.
-
-        The workflow completion will be signaled via on_event() when
-        budcluster publishes the completion event.
-        """
-        model_source = context.params.get("model_source", "huggingface")
-        huggingface_id = context.params.get("huggingface_id", "")
-        model_name = context.params.get(
-            "model_name", huggingface_id.split("/")[-1] if huggingface_id else ""
-        )
-        description = context.params.get("description", "")
-        author = context.params.get("author", "")
-        modality = context.params.get("modality", ["text"])
-        project_id = context.params.get("project_id")
-        max_wait_seconds = context.params.get("max_wait_seconds", 1800)
-
-        logger.info(
-            f"[{context.step_id}] Adding model from {model_source}: {huggingface_id or model_name}"
-        )
-
-        try:
-            # Call budapp endpoint to start the local-model-workflow
-            initiator_user_id = _resolve_initiator_user_id(context)
-            method_path = "models/local-model-workflow"
-            params = {"user_id": initiator_user_id} if initiator_user_id else None
-
-            response = await invoke_dapr_service(
-                app_id=settings.budapp_app_id,
-                method_path=method_path,
-                method="POST",
-                params=params,
-                data={
-                    "workflow_total_steps": 1,
-                    "step_number": 1,
-                    "trigger_workflow": True,
-                    "provider_type": "hugging_face",
-                    "name": model_name,
-                    "uri": huggingface_id,
-                    "description": description,
-                    "author": author,
-                    "modality": modality,
-                    "project_id": project_id,
-                    "callback_topic": CALLBACK_TOPIC,
-                },
-                timeout=60,
-            )
-
-            # Extract workflow_id from response
-            workflow_id = response.get("data", {}).get("workflow_id") or response.get("workflow_id")
-
-            if not workflow_id:
-                error_msg = "No workflow_id returned from budapp"
-                logger.error(f"[{context.step_id}] {error_msg}")
-                return HandlerResult(
-                    success=False,
-                    outputs={
-                        "success": False,
-                        "model_id": None,
-                        "model_name": model_name,
-                        "workflow_id": None,
-                        "status": "failed",
-                        "message": error_msg,
-                    },
-                    error=error_msg,
-                )
-
-            logger.info(
-                f"[{context.step_id}] Model workflow started: {workflow_id}, "
-                f"awaiting completion event..."
-            )
-
-            # Return immediately with awaiting_event=True
-            # The step will complete when on_event() receives the completion event
-            return HandlerResult(
-                success=True,
-                outputs={
-                    "success": True,
-                    "model_id": None,  # Will be set when event arrives
-                    "model_name": model_name,
-                    "workflow_id": str(workflow_id),
-                    "status": "running",
-                    "message": f"Model workflow started: {workflow_id}",
-                },
-                awaiting_event=True,
-                external_workflow_id=str(workflow_id),
-                timeout_seconds=max_wait_seconds,
-            )
-
-        except httpx.HTTPStatusError as e:
-            error_msg = f"Failed to start model workflow: HTTP {e.response.status_code}"
-            try:
-                error_detail = e.response.json()
-                error_msg = f"{error_msg} - {error_detail}"
-            except Exception:
-                pass
-            logger.error(f"[{context.step_id}] {error_msg}")
-            return HandlerResult(
-                success=False,
-                outputs={
-                    "success": False,
-                    "model_id": None,
-                    "model_name": model_name,
-                    "workflow_id": None,
-                    "status": "failed",
-                    "message": error_msg,
-                },
-                error=error_msg,
-            )
-
-        except Exception as e:
-            error_msg = f"Failed to add model: {str(e)}"
-            logger.exception(f"[{context.step_id}] {error_msg}")
-            return HandlerResult(
-                success=False,
-                outputs={
-                    "success": False,
-                    "model_id": None,
-                    "model_name": model_name,
-                    "workflow_id": None,
-                    "status": "failed",
-                    "message": error_msg,
-                },
-                error=error_msg,
-            )
-
-    async def on_event(self, context: EventContext) -> EventHandlerResult:
-        """Process completion event from model add workflow.
-
-        Called when an event arrives matching this step's external_workflow_id.
-        """
-        event_type = context.event_data.get("type", "")
-        event_name = context.event_data.get("payload", {}).get("event", "")
-        payload = context.event_data.get("payload", {})
-        content = payload.get("content", {})
-        status_str = content.get("status", "")
-
-        logger.info(
-            f"[{context.step_execution_id}] Received event: type={event_type}, "
-            f"event={event_name}, status={status_str}"
-        )
-
-        # Check for model extraction completion events
-        # budapp sends type="workflow_completed" for model workflows
-        if event_type == "workflow_completed":
-            result_data = context.event_data.get("result", {})
-            status = context.event_data.get("status", "UNKNOWN")
-
-            if status == "COMPLETED":
-                model_id = result_data.get("model_id")
-                model_name = result_data.get("model_name", "")
-
-                logger.info(f"[{context.step_execution_id}] Model added successfully: {model_id}")
-
-                return EventHandlerResult(
-                    action=EventAction.COMPLETE,
-                    status=StepStatus.COMPLETED,
-                    outputs={
-                        "success": True,
-                        "model_id": model_id,
-                        "model_name": model_name,
-                        "workflow_id": context.external_workflow_id,
-                        "status": "completed",
-                        "message": f"Model '{model_name}' added successfully",
-                    },
-                )
-            else:
-                error_msg = context.event_data.get("reason", "Model workflow failed")
-                logger.error(f"[{context.step_execution_id}] Model workflow failed: {error_msg}")
-
-                return EventHandlerResult(
-                    action=EventAction.COMPLETE,
-                    status=StepStatus.FAILED,
-                    outputs={
-                        "success": False,
-                        "model_id": None,
-                        "model_name": context.step_outputs.get("model_name", ""),
-                        "workflow_id": context.external_workflow_id,
-                        "status": "failed",
-                        "message": error_msg,
-                    },
-                    error=error_msg,
-                )
-
-        # Check for direct model_extraction events from budcluster
-        if event_type == "model_extraction" and event_name == "results":
-            if status_str == "COMPLETED":
-                result = content.get("result", {})
-                model_id = result.get("model_id")
-                model_name = result.get("model_name", "")
-
-                return EventHandlerResult(
-                    action=EventAction.COMPLETE,
-                    status=StepStatus.COMPLETED,
-                    outputs={
-                        "success": True,
-                        "model_id": model_id,
-                        "model_name": model_name,
-                        "workflow_id": context.external_workflow_id,
-                        "status": "completed",
-                        "message": f"Model '{model_name}' added successfully",
-                    },
-                )
-            elif status_str == "FAILED":
-                error_msg = content.get("message", "Model extraction failed")
-                return EventHandlerResult(
-                    action=EventAction.COMPLETE,
-                    status=StepStatus.FAILED,
-                    outputs={
-                        "success": False,
-                        "model_id": None,
-                        "model_name": context.step_outputs.get("model_name", ""),
-                        "workflow_id": context.external_workflow_id,
-                        "status": "failed",
-                        "message": error_msg,
-                    },
-                    error=error_msg,
-                )
-
-        # Event not relevant to completion
-        logger.debug(
-            f"[{context.step_execution_id}] Ignoring event: type={event_type}, event={event_name}"
-        )
-        return EventHandlerResult(action=EventAction.IGNORE)
-
-
 async def _fetch_cluster_info(
+    context: ActionContext,
     cluster_id: str,
     user_id: str | None = None,
 ) -> tuple[str | None, list[dict[str, Any]]]:
     """Fetch cluster information including bud_cluster_id and nodes.
 
     Args:
+        context: Action context for service invocation
         cluster_id: The cluster ID (budapp cluster id)
+        user_id: User ID for authorization
 
     Returns:
         Tuple of (bud_cluster_id, nodes_list)
-        bud_cluster_id: The cluster's internal UUID from budcluster
-        nodes_list: List of node dictionaries with hostname and hardware info
     """
     try:
         # Step 1: Fetch cluster details from budapp to get bud_cluster_id
-        cluster_response = await invoke_dapr_service(
+        cluster_response = await context.invoke_service(
             app_id=settings.budapp_app_id,
             method_path=f"clusters/{cluster_id}",
-            method="GET",
+            http_method="GET",
             params={"user_id": user_id} if user_id else None,
-            timeout=30,
+            timeout_seconds=30,
         )
 
         # Extract bud_cluster_id from cluster response
@@ -338,17 +72,24 @@ async def _fetch_cluster_info(
         bud_cluster_id = cluster_data.get("cluster_id")
 
         if not bud_cluster_id:
-            logger.warning(f"Could not get bud_cluster_id for cluster {cluster_id}")
+            logger.warning(
+                "cluster_info_no_bud_cluster_id",
+                cluster_id=cluster_id,
+            )
             return None, []
 
-        logger.info(f"Got bud_cluster_id: {bud_cluster_id} for cluster {cluster_id}")
+        logger.info(
+            "cluster_info_fetched",
+            cluster_id=cluster_id,
+            bud_cluster_id=bud_cluster_id,
+        )
 
         # Step 2: Fetch cluster nodes from budcluster using bud_cluster_id
-        nodes_response = await invoke_dapr_service(
+        nodes_response = await context.invoke_service(
             app_id=settings.budcluster_app_id,
             method_path=f"cluster/{bud_cluster_id}/nodes",
-            method="GET",
-            timeout=30,
+            http_method="GET",
+            timeout_seconds=30,
         )
 
         # Extract nodes from response
@@ -368,15 +109,24 @@ async def _fetch_cluster_info(
             if node_dict["hostname"]:
                 nodes_list.append(node_dict)
 
-        logger.info(f"Got {len(nodes_list)} nodes for cluster {cluster_id}")
+        logger.info(
+            "cluster_nodes_fetched",
+            cluster_id=cluster_id,
+            node_count=len(nodes_list),
+        )
         return str(bud_cluster_id), nodes_list
 
     except Exception as e:
-        logger.error(f"Failed to fetch cluster info for {cluster_id}: {e}")
+        logger.error(
+            "cluster_info_fetch_failed",
+            cluster_id=cluster_id,
+            error=str(e),
+        )
         return None, []
 
 
 async def _get_node_configurations(
+    context: ActionContext,
     model_id: str,
     cluster_id: str,
     hostnames: list[str],
@@ -398,24 +148,29 @@ async def _get_node_configurations(
     }
 
     logger.info(
-        f"Fetching node configurations for model={model_id}, "
-        f"cluster={cluster_id}, hostnames={hostnames}"
+        "node_configurations_fetching",
+        model_id=model_id,
+        cluster_id=cluster_id,
+        hostname_count=len(hostnames),
     )
 
-    response = await invoke_dapr_service(
+    response = await context.invoke_service(
         app_id=settings.budapp_app_id,
         method_path="benchmark/node-configurations",
-        method="POST",
+        http_method="POST",
         data=payload,
         params={"user_id": user_id} if user_id else None,
-        timeout=60,
+        timeout_seconds=60,
     )
 
     if isinstance(response, dict) and response.get("code") and response.get("code") >= 400:
         error_msg = response.get("message", "Unknown error")
         raise Exception(f"Failed to get node configurations: {error_msg}")
 
-    logger.info(f"Got node configurations response: {list(response.keys())}")
+    logger.info(
+        "node_configurations_fetched",
+        response_keys=list(response.keys()),
+    )
     return response
 
 
@@ -515,71 +270,18 @@ def _extract_device_config_from_nodes(
     replicas = 1
 
     logger.info(
-        f"[fallback] Extracted device config from nodes: "
-        f"device_type={device_type}, available_count={device_types_found.get(device_type, 0)}"
+        "device_config_fallback_extracted",
+        device_type=device_type,
+        available_count=device_types_found.get(device_type, 0),
     )
 
     return device_type, tp_size, pp_size, replicas
 
 
-@register_handler("model_benchmark")
-class ModelBenchmarkHandler(BaseHandler):
-    """Handler for running benchmarks on a model.
+class ModelBenchmarkExecutor(BaseActionExecutor):
+    """Executor for running benchmarks on a model."""
 
-    Triggers benchmark execution via budapp benchmark workflow.
-    Uses event-driven completion - returns immediately after starting workflow
-    and receives completion event via on_event().
-    """
-
-    action_type = "model_benchmark"
-    name = "Model Benchmark"
-    description = "Run benchmarks on a model"
-    requires_events = True  # Event-driven completion
-
-    def get_required_params(self) -> list[str]:
-        """Get list of required parameters."""
-        return ["model_id", "cluster_id"]
-
-    def get_optional_params(self) -> dict[str, Any]:
-        """Get optional parameters with defaults."""
-        return {
-            "benchmark_name": "auto-benchmark",
-            "concurrent_requests": 1,
-            "max_input_tokens": 1024,
-            "max_output_tokens": 512,
-            "prompt": None,
-            "prompt_tokens": None,
-            "max_wait_seconds": 1200,  # 20 minutes default
-            "hardware_mode": "dedicated",
-            "selected_device_type": None,
-            "tp_size": None,
-            "pp_size": None,
-            "replicas": None,
-            "num_prompts": 10,
-            "run_as_simulation": False,
-        }
-
-    def get_output_names(self) -> list[str]:
-        """Get list of output names."""
-        return [
-            "success",
-            "benchmark_id",
-            "workflow_id",
-            "status",
-            "results",
-            "message",
-        ]
-
-    def validate_params(self, params: dict[str, Any]) -> list[str]:
-        """Validate parameters."""
-        errors = []
-        if not params.get("model_id"):
-            errors.append("model_id is required for benchmarking")
-        if not params.get("cluster_id"):
-            errors.append("cluster_id is required for benchmarking")
-        return errors
-
-    async def execute(self, context: HandlerContext) -> HandlerResult:
+    async def execute(self, context: ActionContext) -> ActionResult:
         """Start model benchmark workflow and return immediately.
 
         The workflow completion will be signaled via on_event() when
@@ -597,17 +299,26 @@ class ModelBenchmarkHandler(BaseHandler):
         initiator_user_id = _resolve_initiator_user_id(context)
 
         logger.info(
-            f"[{context.step_id}] Running benchmark on model {model_id} in cluster {cluster_id}"
+            "model_benchmark_starting",
+            step_id=context.step_id,
+            model_id=model_id,
+            cluster_id=cluster_id,
         )
 
         try:
             # Step 0: Fetch cluster information (bud_cluster_id and nodes)
-            bud_cluster_id, nodes = await _fetch_cluster_info(cluster_id, user_id=initiator_user_id)
+            bud_cluster_id, nodes = await _fetch_cluster_info(
+                context, cluster_id, user_id=initiator_user_id
+            )
 
             if not bud_cluster_id:
                 error_msg = f"Could not fetch cluster info for cluster {cluster_id}"
-                logger.error(f"[{context.step_id}] {error_msg}")
-                return HandlerResult(
+                logger.error(
+                    "model_benchmark_no_cluster_info",
+                    step_id=context.step_id,
+                    cluster_id=cluster_id,
+                )
+                return ActionResult(
                     success=False,
                     outputs={
                         "success": False,
@@ -622,8 +333,12 @@ class ModelBenchmarkHandler(BaseHandler):
 
             if not nodes:
                 error_msg = f"No nodes found for cluster {cluster_id}"
-                logger.error(f"[{context.step_id}] {error_msg}")
-                return HandlerResult(
+                logger.error(
+                    "model_benchmark_no_nodes",
+                    step_id=context.step_id,
+                    cluster_id=cluster_id,
+                )
+                return ActionResult(
                     success=False,
                     outputs={
                         "success": False,
@@ -636,11 +351,6 @@ class ModelBenchmarkHandler(BaseHandler):
                     error=error_msg,
                 )
 
-            logger.info(
-                f"[{context.step_id}] Fetched cluster info: bud_cluster_id={bud_cluster_id}, "
-                f"nodes_count={len(nodes)}"
-            )
-
             # Step 1: Get node configurations
             hostnames = [
                 node.get("hostname") or node.get("name")
@@ -650,8 +360,12 @@ class ModelBenchmarkHandler(BaseHandler):
 
             if not hostnames:
                 error_msg = f"No valid hostnames found in cluster nodes for {cluster_id}"
-                logger.error(f"[{context.step_id}] {error_msg}")
-                return HandlerResult(
+                logger.error(
+                    "model_benchmark_no_hostnames",
+                    step_id=context.step_id,
+                    cluster_id=cluster_id,
+                )
+                return ActionResult(
                     success=False,
                     outputs={
                         "success": False,
@@ -669,6 +383,7 @@ class ModelBenchmarkHandler(BaseHandler):
             # Fetch available device configurations from budsim
             try:
                 config_response = await _get_node_configurations(
+                    context=context,
                     model_id=model_id,
                     cluster_id=cluster_id,
                     hostnames=hostnames,
@@ -687,8 +402,12 @@ class ModelBenchmarkHandler(BaseHandler):
                 )
 
                 if error:
-                    logger.error(f"[{context.step_id}] {error}")
-                    return HandlerResult(
+                    logger.error(
+                        "model_benchmark_device_selection_failed",
+                        step_id=context.step_id,
+                        error=error,
+                    )
+                    return ActionResult(
                         success=False,
                         outputs={
                             "success": False,
@@ -712,8 +431,12 @@ class ModelBenchmarkHandler(BaseHandler):
                 )
 
                 if error:
-                    logger.error(f"[{context.step_id}] {error}")
-                    return HandlerResult(
+                    logger.error(
+                        "model_benchmark_tp_pp_selection_failed",
+                        step_id=context.step_id,
+                        error=error,
+                    )
+                    return ActionResult(
                         success=False,
                         outputs={
                             "success": False,
@@ -731,32 +454,37 @@ class ModelBenchmarkHandler(BaseHandler):
                 replicas = tp_pp_config["replicas"]
 
                 logger.info(
-                    f"[{context.step_id}] Selected configuration: device_type={device_type}, "
-                    f"tp_size={tp_size}, pp_size={pp_size}, replicas={replicas}"
+                    "model_benchmark_config_selected",
+                    step_id=context.step_id,
+                    device_type=device_type,
+                    tp_size=tp_size,
+                    pp_size=pp_size,
+                    replicas=replicas,
                 )
 
             except Exception as e:
                 # Fallback: Extract device config directly from nodes
                 logger.warning(
-                    f"[{context.step_id}] Node-configurations endpoint failed: {e}. "
-                    f"Falling back to direct hardware_info extraction."
+                    "model_benchmark_config_fallback",
+                    step_id=context.step_id,
+                    error=str(e),
                 )
                 try:
                     selected_device_type_param = context.params.get("selected_device_type")
                     device_type, tp_size, pp_size, replicas = _extract_device_config_from_nodes(
                         nodes, selected_device_type_param
                     )
-                    logger.info(
-                        f"[{context.step_id}] Fallback configuration: device_type={device_type}, "
-                        f"tp_size={tp_size}, pp_size={pp_size}, replicas={replicas}"
-                    )
                 except ValueError as fallback_error:
                     error_msg = (
-                        f"Failed to discover node configurations: {str(e)}. "
+                        f"Failed to discover node configurations: {e!s}. "
                         f"Fallback also failed: {fallback_error}"
                     )
-                    logger.error(f"[{context.step_id}] {error_msg}")
-                    return HandlerResult(
+                    logger.error(
+                        "model_benchmark_config_fallback_failed",
+                        step_id=context.step_id,
+                        error=error_msg,
+                    )
+                    return ActionResult(
                         success=False,
                         outputs={
                             "success": False,
@@ -801,22 +529,16 @@ class ModelBenchmarkHandler(BaseHandler):
             if prompt_tokens:
                 request_data["prompt_tokens"] = prompt_tokens
 
-            method_path = "benchmark/run-workflow"
-            params = {"user_id": initiator_user_id} if initiator_user_id else None
-
-            response = await invoke_dapr_service(
+            response = await context.invoke_service(
                 app_id=settings.budapp_app_id,
-                method_path=method_path,
-                method="POST",
+                method_path="benchmark/run-workflow",
+                http_method="POST",
                 data=request_data,
-                params=params,
-                timeout=60,
+                params={"user_id": initiator_user_id} if initiator_user_id else None,
+                timeout_seconds=60,
             )
 
             # Extract workflow_id from response
-            # The response contains budapp's internal workflow_id
-            # We use this for event correlation because budcluster notifications
-            # use payload.workflow_id = budapp internal ID (from deployment_request.workflow_id)
             data = response.get("data", {}) if "data" in response else response
 
             # Get the budapp internal workflow ID - this is used for event correlation
@@ -830,20 +552,21 @@ class ModelBenchmarkHandler(BaseHandler):
             dapr_workflow_id = budserve_events.get("workflow_id") if budserve_events else None
 
             # Use budapp internal workflow ID for event correlation
-            # because budcluster notifications publish with payload.workflow_id = budapp internal ID
             workflow_id = budapp_workflow_id
             logger.info(
-                f"[{context.step_id}] Using budapp workflow_id for event correlation: {workflow_id}"
+                "model_benchmark_workflow_started",
+                step_id=context.step_id,
+                workflow_id=workflow_id,
+                dapr_workflow_id=dapr_workflow_id,
             )
-            if dapr_workflow_id:
-                logger.debug(
-                    f"[{context.step_id}] Dapr workflow_id (for reference): {dapr_workflow_id}"
-                )
 
             if not workflow_id:
                 error_msg = "No workflow_id returned from budapp"
-                logger.error(f"[{context.step_id}] {error_msg}")
-                return HandlerResult(
+                logger.error(
+                    "model_benchmark_no_workflow_id",
+                    step_id=context.step_id,
+                )
+                return ActionResult(
                     success=False,
                     outputs={
                         "success": False,
@@ -856,13 +579,8 @@ class ModelBenchmarkHandler(BaseHandler):
                     error=error_msg,
                 )
 
-            logger.info(
-                f"[{context.step_id}] Benchmark workflow started: {workflow_id}, "
-                f"awaiting completion event..."
-            )
-
             # Return immediately with awaiting_event=True
-            return HandlerResult(
+            return ActionResult(
                 success=True,
                 outputs={
                     "success": True,
@@ -884,8 +602,12 @@ class ModelBenchmarkHandler(BaseHandler):
                 error_msg = f"{error_msg} - {error_detail}"
             except Exception:
                 pass
-            logger.error(f"[{context.step_id}] {error_msg}")
-            return HandlerResult(
+            logger.error(
+                "model_benchmark_http_error",
+                step_id=context.step_id,
+                error=error_msg,
+            )
+            return ActionResult(
                 success=False,
                 outputs={
                     "success": False,
@@ -899,9 +621,13 @@ class ModelBenchmarkHandler(BaseHandler):
             )
 
         except Exception as e:
-            error_msg = f"Benchmark failed: {str(e)}"
-            logger.exception(f"[{context.step_id}] {error_msg}")
-            return HandlerResult(
+            error_msg = f"Benchmark failed: {e!s}"
+            logger.exception(
+                "model_benchmark_error",
+                step_id=context.step_id,
+                error=error_msg,
+            )
+            return ActionResult(
                 success=False,
                 outputs={
                     "success": False,
@@ -914,7 +640,7 @@ class ModelBenchmarkHandler(BaseHandler):
                 error=error_msg,
             )
 
-    async def on_event(self, context: EventContext) -> EventHandlerResult:
+    async def on_event(self, context: EventContext) -> EventResult:
         """Process completion event from benchmark workflow.
 
         Called when an event arrives matching this step's external_workflow_id.
@@ -928,8 +654,11 @@ class ModelBenchmarkHandler(BaseHandler):
         status_str = content.get("status", "")
 
         logger.info(
-            f"[{context.step_execution_id}] Received event: type={event_type}, "
-            f"event={event_name}, status={status_str}"
+            "model_benchmark_event_received",
+            step_execution_id=context.step_execution_id,
+            event_type=event_type,
+            event_name=event_name,
+            status=status_str,
         )
 
         # Handle workflow_completed event (from budapp workaround or future direct)
@@ -941,9 +670,13 @@ class ModelBenchmarkHandler(BaseHandler):
                 benchmark_id = result_data.get("benchmark_id")
                 benchmark_name = result_data.get("benchmark_name", "")
 
-                logger.info(f"[{context.step_execution_id}] Benchmark completed: {benchmark_id}")
+                logger.info(
+                    "model_benchmark_completed",
+                    step_execution_id=context.step_execution_id,
+                    benchmark_id=benchmark_id,
+                )
 
-                return EventHandlerResult(
+                return EventResult(
                     action=EventAction.COMPLETE,
                     status=StepStatus.COMPLETED,
                     outputs={
@@ -958,10 +691,12 @@ class ModelBenchmarkHandler(BaseHandler):
             else:
                 error_msg = context.event_data.get("reason", "Benchmark workflow failed")
                 logger.error(
-                    f"[{context.step_execution_id}] Benchmark workflow failed: {error_msg}"
+                    "model_benchmark_workflow_failed",
+                    step_execution_id=context.step_execution_id,
+                    error=error_msg,
                 )
 
-                return EventHandlerResult(
+                return EventResult(
                     action=EventAction.COMPLETE,
                     status=StepStatus.FAILED,
                     outputs={
@@ -986,10 +721,12 @@ class ModelBenchmarkHandler(BaseHandler):
                 benchmark_name = result.get("benchmark_name", "")
 
                 logger.info(
-                    f"[{context.step_execution_id}] Benchmark completed (direct): {benchmark_id}"
+                    "model_benchmark_completed_direct",
+                    step_execution_id=context.step_execution_id,
+                    benchmark_id=benchmark_id,
                 )
 
-                return EventHandlerResult(
+                return EventResult(
                     action=EventAction.COMPLETE,
                     status=StepStatus.COMPLETED,
                     outputs={
@@ -1004,10 +741,12 @@ class ModelBenchmarkHandler(BaseHandler):
             elif status_str in ("FAILED", "failed"):
                 error_msg = content.get("message", "Benchmark failed")
                 logger.error(
-                    f"[{context.step_execution_id}] Benchmark failed (direct): {error_msg}"
+                    "model_benchmark_failed_direct",
+                    step_execution_id=context.step_execution_id,
+                    error=error_msg,
                 )
 
-                return EventHandlerResult(
+                return EventResult(
                     action=EventAction.COMPLETE,
                     status=StepStatus.FAILED,
                     outputs={
@@ -1021,18 +760,21 @@ class ModelBenchmarkHandler(BaseHandler):
                     error=error_msg,
                 )
 
-        # Handle failure events from intermediate steps (e.g., verify_deployment_status FAILED)
-        # budcluster sends FAILED status for events like verify_deployment_status when deployment fails
+        # Handle failure events from intermediate steps
         if (
             event_type == "performance_benchmark" or event_type == "notification"
         ) and status_str in ("FAILED", "failed"):
             error_msg = content.get("message", f"Benchmark step '{event_name}' failed")
             title = content.get("title", "Benchmark failed")
             logger.error(
-                f"[{context.step_execution_id}] Benchmark step failed: {title} - {error_msg}"
+                "model_benchmark_step_failed",
+                step_execution_id=context.step_execution_id,
+                event_name=event_name,
+                title=title,
+                error=error_msg,
             )
 
-            return EventHandlerResult(
+            return EventResult(
                 action=EventAction.COMPLETE,
                 status=StepStatus.FAILED,
                 outputs={
@@ -1049,103 +791,190 @@ class ModelBenchmarkHandler(BaseHandler):
 
         # Event not relevant to completion
         logger.debug(
-            f"[{context.step_execution_id}] Ignoring event: type={event_type}, event={event_name}"
+            "model_benchmark_event_ignored",
+            step_execution_id=context.step_execution_id,
+            event_type=event_type,
+            event_name=event_name,
         )
-        return EventHandlerResult(action=EventAction.IGNORE)
+        return EventResult(action=EventAction.IGNORE)
 
-
-@register_handler("model_delete")
-class ModelDeleteHandler(BaseHandler):
-    """Handler for deleting a model from the repository.
-
-    Invokes the budapp service to delete a model.
-    This is a synchronous operation that doesn't require waiting.
-    """
-
-    action_type = "model_delete"
-    name = "Delete Model"
-    description = "Delete a model from the repository"
-    requires_events = False  # Synchronous operation
-
-    def get_required_params(self) -> list[str]:
-        """Get list of required parameters."""
-        return ["model_id"]
-
-    def get_optional_params(self) -> dict[str, Any]:
-        """Get optional parameters with defaults."""
-        return {
-            "force": False,
-        }
-
-    def get_output_names(self) -> list[str]:
-        """Get list of output names."""
-        return ["success", "model_id", "message"]
-
-    def validate_params(self, params: dict[str, Any]) -> list[str]:
+    def validate_params(self, params: dict) -> list[str]:
         """Validate parameters."""
         errors = []
         if not params.get("model_id"):
-            errors.append("model_id is required for deletion")
+            errors.append("model_id is required for benchmarking")
+        if not params.get("cluster_id"):
+            errors.append("cluster_id is required for benchmarking")
         return errors
 
-    async def execute(self, context: HandlerContext) -> HandlerResult:
-        """Execute model delete action."""
-        model_id = context.params.get("model_id", "")
-        force = context.params.get("force", False)
-        initiator_user_id = _resolve_initiator_user_id(context)
 
-        logger.info(f"[{context.step_id}] Deleting model {model_id} (force={force})")
+META = ActionMeta(
+    type="model_benchmark",
+    version="1.0.0",
+    name="Model Benchmark",
+    description="Run performance benchmarks on a model",
+    category="Model Operations",
+    icon="chart-bar",
+    color="#3B82F6",  # Blue
+    execution_mode=ExecutionMode.EVENT_DRIVEN,
+    timeout_seconds=1200,  # 20 minutes
+    idempotent=True,
+    required_services=["budapp", "budcluster"],
+    params=[
+        ParamDefinition(
+            name="model_id",
+            label="Model",
+            type=ParamType.MODEL_REF,
+            description="The model to benchmark",
+            required=True,
+        ),
+        ParamDefinition(
+            name="cluster_id",
+            label="Cluster",
+            type=ParamType.CLUSTER_REF,
+            description="The cluster to run the benchmark on",
+            required=True,
+        ),
+        ParamDefinition(
+            name="benchmark_name",
+            label="Benchmark Name",
+            type=ParamType.STRING,
+            description="Name for this benchmark run",
+            default="auto-benchmark",
+        ),
+        ParamDefinition(
+            name="concurrent_requests",
+            label="Concurrent Requests",
+            type=ParamType.NUMBER,
+            description="Number of concurrent requests to run",
+            default=1,
+            validation={"min": 1, "max": 100},
+        ),
+        ParamDefinition(
+            name="max_input_tokens",
+            label="Max Input Tokens",
+            type=ParamType.NUMBER,
+            description="Maximum input tokens for benchmark prompts",
+            default=1024,
+            validation={"min": 1, "max": 128000},
+        ),
+        ParamDefinition(
+            name="max_output_tokens",
+            label="Max Output Tokens",
+            type=ParamType.NUMBER,
+            description="Maximum output tokens for benchmark responses",
+            default=512,
+            validation={"min": 1, "max": 32000},
+        ),
+        ParamDefinition(
+            name="num_prompts",
+            label="Number of Prompts",
+            type=ParamType.NUMBER,
+            description="Number of prompts to run in the benchmark",
+            default=10,
+            validation={"min": 1, "max": 1000},
+        ),
+        ParamDefinition(
+            name="hardware_mode",
+            label="Hardware Mode",
+            type=ParamType.SELECT,
+            description="Hardware allocation mode",
+            default="dedicated",
+            options=[
+                {"value": "dedicated", "label": "Dedicated"},
+                {"value": "shared", "label": "Shared"},
+            ],
+        ),
+        ParamDefinition(
+            name="selected_device_type",
+            label="Device Type",
+            type=ParamType.SELECT,
+            description="Override automatic device selection",
+            required=False,
+            options=[
+                {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
+                {"value": "hpu", "label": "Habana Gaudi (HPU)"},
+                {"value": "cpu", "label": "CPU"},
+            ],
+        ),
+        ParamDefinition(
+            name="tp_size",
+            label="Tensor Parallelism Size",
+            type=ParamType.NUMBER,
+            description="Tensor parallelism size (auto-selected if not specified)",
+            required=False,
+            validation={"min": 1, "max": 16},
+        ),
+        ParamDefinition(
+            name="pp_size",
+            label="Pipeline Parallelism Size",
+            type=ParamType.NUMBER,
+            description="Pipeline parallelism size (auto-selected if not specified)",
+            required=False,
+            validation={"min": 1, "max": 16},
+        ),
+        ParamDefinition(
+            name="replicas",
+            label="Replicas",
+            type=ParamType.NUMBER,
+            description="Number of model replicas",
+            required=False,
+            validation={"min": 1, "max": 32},
+        ),
+        ParamDefinition(
+            name="run_as_simulation",
+            label="Run as Simulation",
+            type=ParamType.BOOLEAN,
+            description="Run benchmark as simulation (no actual deployment)",
+            default=False,
+        ),
+        ParamDefinition(
+            name="max_wait_seconds",
+            label="Max Wait Time",
+            type=ParamType.NUMBER,
+            description="Maximum time to wait for benchmark completion (seconds)",
+            default=1200,
+            validation={"min": 60, "max": 7200},
+        ),
+    ],
+    outputs=[
+        OutputDefinition(
+            name="success",
+            type="boolean",
+            description="Whether the benchmark completed successfully",
+        ),
+        OutputDefinition(
+            name="benchmark_id",
+            type="string",
+            description="The unique identifier of the benchmark run",
+        ),
+        OutputDefinition(
+            name="workflow_id",
+            type="string",
+            description="The workflow ID for tracking the operation",
+        ),
+        OutputDefinition(
+            name="status",
+            type="string",
+            description="Current status of the benchmark",
+        ),
+        OutputDefinition(
+            name="results",
+            type="object",
+            description="Benchmark results including throughput, latency, etc.",
+        ),
+        OutputDefinition(
+            name="message",
+            type="string",
+            description="Status message or error description",
+        ),
+    ],
+)
 
-        try:
-            params = {"force": str(force).lower()}
-            if initiator_user_id:
-                params["user_id"] = initiator_user_id
-            await invoke_dapr_service(
-                app_id=settings.budapp_app_id,
-                method_path=f"models/{model_id}",
-                method="DELETE",
-                params=params,
-                timeout=30,
-            )
 
-            logger.info(f"[{context.step_id}] Model deleted successfully: {model_id}")
+@register_action(META)
+class ModelBenchmarkAction:
+    """Action for running benchmarks on a model."""
 
-            return HandlerResult(
-                success=True,
-                outputs={
-                    "success": True,
-                    "model_id": model_id,
-                    "message": f"Model {model_id} deleted successfully",
-                },
-            )
-
-        except httpx.HTTPStatusError as e:
-            error_msg = f"Failed to delete model: HTTP {e.response.status_code}"
-            try:
-                error_detail = e.response.json()
-                error_msg = f"{error_msg} - {error_detail}"
-            except Exception:
-                pass
-            logger.error(f"[{context.step_id}] {error_msg}")
-            return HandlerResult(
-                success=False,
-                outputs={
-                    "success": False,
-                    "model_id": model_id,
-                    "message": error_msg,
-                },
-                error=error_msg,
-            )
-
-        except Exception as e:
-            error_msg = f"Failed to delete model: {str(e)}"
-            logger.exception(f"[{context.step_id}] {error_msg}")
-            return HandlerResult(
-                success=False,
-                outputs={
-                    "success": False,
-                    "model_id": model_id,
-                    "message": error_msg,
-                },
-                error=error_msg,
-            )
+    meta = META
+    executor_class = ModelBenchmarkExecutor

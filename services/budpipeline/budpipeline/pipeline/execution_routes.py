@@ -339,14 +339,19 @@ async def create_execution(
     )
 
     try:
+        # Merge user_id into params for downstream action use
+        execution_params = request.params.copy()
+        if request.user_id:
+            execution_params["user_id"] = request.user_id
+
         # Execute workflow from database - uses execute_workflow_async to look up
         # workflow from PostgreSQL and link execution to pipeline_id
         result = await workflow_service.execute_workflow_async(
             session=db,
             workflow_id=request.workflow_id,
-            params=request.params,
+            params=execution_params,
             callback_topics=request.callback_topics,
-            initiator="api",
+            initiator=request.initiator or "api",
         )
 
         return ExecutionResponse(

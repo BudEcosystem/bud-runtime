@@ -112,3 +112,6 @@ STEP_STATE_PREFIX = f"{STATE_KEY_PREFIX}:step"
 TOPIC_EXECUTION_STATUS = "workflow.execution.status"
 TOPIC_STEP_STATUS = "workflow.step.status"
 TOPIC_EXECUTION_LOGS = "workflow.execution.logs"
+
+# Callback topic for event-driven actions (used by budapp/budcluster to notify completion)
+CALLBACK_TOPIC = "budpipelineEvents"

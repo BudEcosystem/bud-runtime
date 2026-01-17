@@ -763,6 +763,145 @@ async def delete_event_trigger(
 
 
 # =============================================================================
+# Actions API Routes (Pluggable Action Architecture)
+# =============================================================================
+
+
+@budpipeline_router.get(
+    "/actions",
+    response_class=JSONResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_200_OK: {
+            "description": "List of available pipeline actions",
+        },
+    },
+    description="List all available pipeline actions with metadata",
+)
+async def list_actions(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """List all available pipeline actions with metadata.
+
+    Returns actions grouped by category for the pipeline editor.
+    """
+    try:
+        result = await BudPipelineService(session).list_actions()
+        return JSONResponse(content=result, status_code=status.HTTP_200_OK)
+    except ClientException as e:
+        logger.exception(f"Failed to list actions: {e}")
+        return JSONResponse(
+            content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
+            status_code=e.status_code,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to list actions: {e}")
+        return JSONResponse(
+            content=ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list actions"
+            ).model_dump(mode="json"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@budpipeline_router.get(
+    "/actions/{action_type}",
+    response_class=JSONResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Action type not found",
+        },
+        status.HTTP_200_OK: {
+            "description": "Action metadata",
+        },
+    },
+    description="Get metadata for a specific action type",
+)
+async def get_action(
+    action_type: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Get metadata for a specific action type.
+
+    Returns complete action metadata including parameters, outputs, and execution mode.
+    """
+    try:
+        result = await BudPipelineService(session).get_action(action_type)
+        return JSONResponse(content=result, status_code=status.HTTP_200_OK)
+    except ClientException as e:
+        logger.exception(f"Failed to get action {action_type}: {e}")
+        return JSONResponse(
+            content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
+            status_code=e.status_code,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to get action {action_type}: {e}")
+        return JSONResponse(
+            content=ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get action"
+            ).model_dump(mode="json"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@budpipeline_router.post(
+    "/actions/validate",
+    response_class=JSONResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_200_OK: {
+            "description": "Validation result",
+        },
+    },
+    description="Validate parameters for an action type",
+)
+async def validate_action_params(
+    request_body: Dict[str, Any],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Validate parameters for an action type.
+
+    Request body should contain:
+    - action_type: The action type to validate against
+    - params: The parameters to validate
+    """
+    try:
+        result = await BudPipelineService(session).validate_action_params(
+            action_type=request_body.get("action_type", ""),
+            params=request_body.get("params", {}),
+        )
+        return JSONResponse(content=result, status_code=status.HTTP_200_OK)
+    except ClientException as e:
+        logger.exception(f"Failed to validate action params: {e}")
+        return JSONResponse(
+            content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
+            status_code=e.status_code,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to validate action params: {e}")
+        return JSONResponse(
+            content=ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to validate action params"
+            ).model_dump(mode="json"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+# =============================================================================
 # Workflow Routes (parameterized routes MUST come after specific routes)
 # =============================================================================
 
@@ -936,6 +1075,7 @@ async def execute_budpipeline(
             workflow_id=workflow_id,
             params=request_body.get("params", {}),
             callback_topics=request_body.get("callback_topics"),
+            user_id=str(current_user.id),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:
