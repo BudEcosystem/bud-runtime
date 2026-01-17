@@ -174,19 +174,33 @@ async def list_budpipelines(
             "description": "Service is unavailable due to server error",
         },
         status.HTTP_200_OK: {
-            "description": "List of workflow executions",
+            "description": "List of workflow executions with pagination",
         },
     },
-    description="List workflow executions, optionally filtered by workflow_id",
+    description="List workflow executions with filtering and pagination (T059)",
 )
 async def list_budpipeline_executions(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
     workflow_id: Optional[str] = Query(default=None, description="Filter by workflow ID"),
+    status_filter: Optional[str] = Query(default=None, alias="status", description="Filter by status"),
+    initiator: Optional[str] = Query(default=None, description="Filter by initiator"),
+    start_date: Optional[str] = Query(default=None, description="Filter by created_at >= start_date (ISO format)"),
+    end_date: Optional[str] = Query(default=None, description="Filter by created_at <= end_date (ISO format)"),
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
 ):
-    """List workflow executions."""
+    """List workflow executions with filtering and pagination."""
     try:
-        result = await BudPipelineService(session).list_executions(workflow_id)
+        result = await BudPipelineService(session).list_executions_paginated(
+            workflow_id=workflow_id,
+            status=status_filter,
+            initiator=initiator,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            page_size=page_size,
+        )
         return JSONResponse(content=result, status_code=status.HTTP_200_OK)
     except ClientException as e:
         logger.exception(f"Failed to list executions: {e}")
@@ -242,6 +256,56 @@ async def get_budpipeline_execution(
         return JSONResponse(
             content=ErrorResponse(
                 code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get execution"
+            ).model_dump(mode="json"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@budpipeline_router.get(
+    "/executions/{execution_id}/progress",
+    response_class=JSONResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Execution not found",
+        },
+        status.HTTP_200_OK: {
+            "description": "Execution progress with steps, events, and aggregated progress",
+        },
+    },
+    description="Get detailed execution progress including steps, events, and aggregated progress",
+)
+async def get_budpipeline_execution_progress(
+    execution_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Get detailed execution progress with aggregated progress info.
+
+    Returns step-by-step progress including:
+    - Execution details
+    - Step executions with status and progress
+    - Recent progress events
+    - Aggregated progress (overall %, ETA, completed/total steps)
+    """
+    try:
+        result = await BudPipelineService(session).get_execution_progress(execution_id)
+        return JSONResponse(content=result, status_code=status.HTTP_200_OK)
+    except ClientException as e:
+        logger.exception(f"Failed to get execution progress: {e}")
+        return JSONResponse(
+            content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
+            status_code=e.status_code,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to get execution progress: {e}")
+        return JSONResponse(
+            content=ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get execution progress"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
@@ -861,11 +925,17 @@ async def execute_budpipeline(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Start a workflow execution."""
+    """Start a workflow execution.
+
+    Request body can include:
+    - params: Input parameters for the execution
+    - callback_topics: List of callback topics for real-time progress updates (D-004)
+    """
     try:
         result = await BudPipelineService(session).execute_workflow(
             workflow_id=workflow_id,
             params=request_body.get("params", {}),
+            callback_topics=request_body.get("callback_topics"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:

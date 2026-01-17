@@ -1,6 +1,22 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: budpipeline
+      POSTGRES_PASSWORD: budpipeline_dev
+      POSTGRES_DB: budpipeline
+    volumes:
+      - budpipeline-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U budpipeline -d budpipeline"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     ports:
@@ -23,11 +39,12 @@ services:
       - LOG_LEVEL=DEBUG
       - DEBUG=true
       - DAPR_HTTP_ENDPOINT=http://localhost:3500
+      - DATABASE_URL=postgresql+asyncpg://budpipeline:budpipeline_dev@postgres:5432/budpipeline
     depends_on:
       redis:
         condition: service_healthy
-    networks:
-      - budpipeline-network
+      postgres:
+        condition: service_healthy
 
   budpipeline-dapr:
     image: "daprio/daprd:1.12.0"
@@ -48,6 +65,5 @@ services:
       - budpipeline
       - redis
 
-networks:
-  budpipeline-network:
-    driver: bridge
+volumes:
+  budpipeline-postgres-data:

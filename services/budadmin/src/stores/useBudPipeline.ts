@@ -722,7 +722,20 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
     try {
       const params = workflowId ? { workflow_id: workflowId } : {};
       const response = await AppRequest.Get(`${BUDPIPELINE_API}/executions`, { params });
-      const executions = response.data?.executions || response.data || [];
+      const rawExecutions = response.data?.executions || response.data || [];
+      // Map backend field names to frontend expected names
+      const executions = rawExecutions.map((e: any) => ({
+        execution_id: e.execution_id || e.id,
+        workflow_id: e.workflow_id || e.pipeline_definition?.workflow_id || e.id,
+        workflow_name: e.workflow_name || e.pipeline_definition?.name || "Unknown Pipeline",
+        status: e.status,
+        started_at: e.started_at || e.start_time,
+        completed_at: e.completed_at || e.end_time,
+        params: e.params || e.pipeline_definition?.params || {},
+        outputs: e.outputs || e.final_outputs || {},
+        error: e.error || e.error_info?.message,
+        steps: e.steps || [],
+      }));
       set({ executions, isLoading: false });
     } catch (error: any) {
       console.error("Failed to fetch executions:", error);
@@ -750,8 +763,32 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
     }
 
     try {
-      const response = await AppRequest.Get(`${BUDPIPELINE_API}/executions/${executionId}`);
-      const execution = response.data;
+      // Use progress endpoint to get execution with steps
+      const response = await AppRequest.Get(`${BUDPIPELINE_API}/executions/${executionId}/progress`);
+      const data = response.data;
+      const e = data.execution || data;
+      // Map backend field names to frontend expected names
+      const execution = {
+        execution_id: e.execution_id || e.id,
+        workflow_id: e.workflow_id || e.pipeline_definition?.workflow_id || e.id,
+        workflow_name: e.workflow_name || e.pipeline_definition?.workflow_name || e.pipeline_definition?.name || "Unknown Pipeline",
+        status: e.status?.toLowerCase() || e.status,
+        started_at: e.started_at || e.start_time,
+        completed_at: e.completed_at || e.end_time,
+        params: e.params || e.pipeline_definition?.params || {},
+        outputs: e.outputs || e.final_outputs || {},
+        error: e.error || e.error_info?.message,
+        // Map steps from progress response
+        steps: (data.steps || []).map((s: any) => ({
+          step_id: s.step_id,
+          name: s.step_name || s.name,
+          status: s.status?.toLowerCase() || s.status,
+          started_at: s.started_at || s.start_time,
+          completed_at: s.completed_at || s.end_time,
+          outputs: s.outputs || {},
+          error: s.error || s.error_message,
+        })),
+      };
       set({ selectedExecution: execution, isLoading: false });
     } catch (error: any) {
       console.error("Failed to fetch execution:", error);

@@ -246,3 +246,12 @@ When planning any non-trivial task, conduct extensive web-based research before 
 - **Articles/blogs**: Look for tutorials and experience reports from practitioners
 
 This research phase should inform the implementation plan and help avoid reinventing solutions or missing established patterns.
+
+## Active Technologies
+- Python 3.11 (service), TypeScript 5.x (frontend), Rust 1.70+ (unaffected gateway) + FastAPI, Dapr, Next.js 14, Zustand, Helm, Docker (001-rename-budworkflow-to-budpipeline)
+- Dapr state store (Valkey/Redis) - existing state will be abandoned (001-rename-budworkflow-to-budpipeline)
+- Python 3.11 (budpipeline service), TypeScript 5.x (budadmin frontend if needed) + FastAPI, PostgreSQL, SQLAlchemy, Alembic, Pydantic, Dapr (pub/sub, service invocation), structlog (002-pipeline-event-persistence)
+- PostgreSQL with Alembic migrations (budpipeline and budapp databases) (002-pipeline-event-persistence)
+
+## Recent Changes
+- 001-rename-budworkflow-to-budpipeline: Added Python 3.11 (service), TypeScript 5.x (frontend), Rust 1.70+ (unaffected gateway) + FastAPI, Dapr, Next.js 14, Zustand, Helm, Docker

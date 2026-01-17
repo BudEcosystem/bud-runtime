@@ -204,12 +204,8 @@ class ConditionEvaluator:
         except ValueError:
             pass
 
-        # Handle empty list/dict representations
-        if value in ("[]", "{}", "()", "set()"):
-            return False
-
-        # Any other non-empty value is truthy
-        return True
+        # Handle empty list/dict representations - return True for non-empty values
+        return value not in ("[]", "{}", "()", "set()")
 
     @classmethod
     def validate(
@@ -280,7 +276,4 @@ class ConditionEvaluator:
             return False
 
         stripped = condition.strip().lower()
-        if not stripped or stripped in ("true", "false"):
-            return False
-
-        return True
+        return bool(stripped) and stripped not in ("true", "false")

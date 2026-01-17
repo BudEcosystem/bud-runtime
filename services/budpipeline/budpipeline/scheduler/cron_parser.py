@@ -271,7 +271,7 @@ class CronParser:
             Human-readable description
         """
         minute, hour = expr.minute, expr.hour
-        day_of_month, month, day_of_week = (
+        day_of_month, _month, day_of_week = (
             expr.day_of_month,
             expr.month,
             expr.day_of_week,

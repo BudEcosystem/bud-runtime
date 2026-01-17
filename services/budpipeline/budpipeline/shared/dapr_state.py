@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from budpipeline.commons.config import settings
+from budpipeline.commons.config import secrets_settings, settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class DaprStateStore:
         self.store_name = store_name or settings.state_store_name
         self.base_url = f"{settings.dapr_http_endpoint}/v1.0/state/{self.store_name}"
         self.headers: dict[str, str] = {"Content-Type": "application/json"}
-        if settings.dapr_api_token:
-            self.headers["dapr-api-token"] = settings.dapr_api_token
+        if secrets_settings.dapr_api_token:
+            self.headers["dapr-api-token"] = secrets_settings.dapr_api_token
 
     async def save(
         self,

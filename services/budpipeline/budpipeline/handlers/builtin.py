@@ -132,8 +132,8 @@ class HttpRequestHandler(BaseHandler):
         """Execute HTTP request action (mock)."""
         url = context.params.get("url", "")
         method = context.params.get("method", "GET").upper()
-        headers = context.params.get("headers", {})
-        body = context.params.get("body", {})
+        context.params.get("headers", {})
+        context.params.get("body", {})
 
         logger.info(f"[{context.step_id}] Mock HTTP {method} to {url}")
 
@@ -323,7 +323,7 @@ class AggregateHandler(BaseHandler):
             if operation == "list":
                 result = list(inputs)
             elif operation == "sum":
-                result = sum(inputs) if all(isinstance(i, (int, float)) for i in inputs) else 0
+                result = sum(inputs) if all(isinstance(i, int | float) for i in inputs) else 0
             elif operation == "join":
                 separator = context.params.get("separator", ", ")
                 result = separator.join(str(i) for i in inputs)

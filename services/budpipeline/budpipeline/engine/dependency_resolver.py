@@ -113,7 +113,7 @@ class DependencyResolver:
                         return True
                 elif neighbor in rec_stack:
                     # Found cycle - extract it from path
-                    cycle_start = path.index(neighbor)
+                    path.index(neighbor)
                     path.append(neighbor)
                     return True
 
@@ -122,13 +122,12 @@ class DependencyResolver:
             return False
 
         for step_id in self._step_index:
-            if step_id not in visited:
-                if dfs(step_id):
-                    # Extract the cycle portion
-                    for i, node in enumerate(path):
-                        if node == path[-1] and i != len(path) - 1:
-                            return path[i:]
-                    return path
+            if step_id not in visited and dfs(step_id):
+                # Extract the cycle portion
+                for i, node in enumerate(path):
+                    if node == path[-1] and i != len(path) - 1:
+                        return path[i:]
+                return path
 
         return []
 
