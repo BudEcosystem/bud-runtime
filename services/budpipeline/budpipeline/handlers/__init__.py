@@ -1,30 +1,41 @@
-"""Handlers module - action handlers for different action types."""
+"""Handlers module - event routing for pipeline steps.
 
-# Import handlers to register them via decorator
-from budpipeline.handlers import (
-    builtin,  # noqa: F401
-    cluster_handlers,  # noqa: F401
-    model_handlers,  # noqa: F401
-    notification_handlers,  # noqa: F401
+NOTE: The legacy handler system has been removed.
+All action implementations are now in budpipeline.actions/ using the
+pluggable action architecture.
+
+This module now only contains:
+- event_router: Routes incoming events to action executors
+
+For creating new actions, use the actions module:
+    from budpipeline.actions.base import (
+        ActionMeta,
+        ParamDefinition,
+        BaseActionExecutor,
+        ActionContext,
+        ActionResult,
+        action_registry,
+    )
+
+See the documentation at:
+    services/budpipeline/docs/ACTIONS.md
+    services/budpipeline/docs/ACTION_MIGRATION.md
+"""
+
+from budpipeline.handlers.event_router import (
+    EventRouteResult,
+    extract_workflow_id,
+    get_steps_awaiting_events,
+    process_timeout,
+    route_event,
+    trigger_pipeline_continuation,
 )
-from budpipeline.handlers.base import (
-    BaseHandler,
-    EventAction,
-    EventContext,
-    EventHandlerResult,
-    HandlerContext,
-    HandlerResult,
-)
-from budpipeline.handlers.registry import HandlerRegistry, global_registry, register_handler
 
 __all__ = [
-    "BaseHandler",
-    "EventAction",
-    "EventContext",
-    "EventHandlerResult",
-    "HandlerContext",
-    "HandlerResult",
-    "HandlerRegistry",
-    "global_registry",
-    "register_handler",
+    "EventRouteResult",
+    "extract_workflow_id",
+    "get_steps_awaiting_events",
+    "process_timeout",
+    "route_event",
+    "trigger_pipeline_continuation",
 ]

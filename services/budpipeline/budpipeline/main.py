@@ -23,10 +23,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Starting {settings.name} v{__version__}")
     logger.info(f"Dapr HTTP endpoint: {settings.dapr_http_endpoint}")
 
-    # Register built-in handlers
-    from budpipeline.handlers import global_registry
+    # Discover and register all actions via entry points
+    from budpipeline.actions import action_registry
 
-    logger.info(f"Registered handlers: {global_registry.list_handlers()}")
+    action_registry.discover_actions()
+    action_types = action_registry.list_actions()
+    logger.info(f"Discovered {len(action_types)} actions: {action_types}")
 
     yield
 
@@ -179,6 +181,7 @@ def create_app() -> FastAPI:
         }
 
     # Register routers
+    from budpipeline.actions.routes import router as actions_router
     from budpipeline.pipeline.execution_routes import router as execution_router
     from budpipeline.pipeline.routes import router as pipeline_router
     from budpipeline.progress.routes import router as progress_router
@@ -187,6 +190,10 @@ def create_app() -> FastAPI:
         schedule_router,
         webhook_router,
     )
+
+    # Actions API (pluggable action architecture)
+    app.include_router(actions_router, prefix="/actions", tags=["Actions"])
+    app.include_router(actions_router, prefix="/api/v1/actions", tags=["Actions API"])
 
     # Mount at root for direct Dapr service invocation compatibility
     # Also mount at /api/v1/pipeline for direct API access

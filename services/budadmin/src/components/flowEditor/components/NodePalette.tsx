@@ -8,8 +8,44 @@
  */
 
 import React, { memo, useState, useMemo, type DragEvent, type ComponentType } from 'react';
+import { Icon } from '@iconify/react';
 import type { NodePaletteConfig, NodePaletteCategory, NodePaletteItem } from '../core/types';
 import { DEFAULT_DRAG_MIME_TYPE } from '../hooks/useDragAndDrop';
+
+// ============================================================================
+// Icon Mapping - Maps action icon names to iconify icon identifiers
+// ============================================================================
+
+const ICON_MAP: Record<string, string> = {
+  // Model Operations
+  'database-plus': 'ph:database-bold',
+  'chart-bar': 'ph:chart-bar-bold',
+  'trash': 'ph:trash-bold',
+
+  // Cluster Operations
+  'heart-pulse': 'ph:heartbeat-bold',
+  'server-x': 'ph:x-circle-bold',
+  'server-plus': 'ph:plus-circle-bold',
+
+  // Deployment Operations
+  'rocket': 'ph:rocket-launch-bold',
+  'shield': 'ph:shield-bold',
+  'trending-up': 'ph:trend-up-bold',
+
+  // Integration Operations
+  'globe': 'ph:globe-bold',
+  'bell': 'ph:bell-bold',
+  'link': 'ph:link-bold',
+
+  // Control Flow
+  'note': 'ph:note-bold',
+  'timer': 'ph:timer-bold',
+  'git-branch': 'ph:git-branch-bold',
+  'swap': 'ph:swap-bold',
+  'stack': 'ph:stack-bold',
+  'arrow-square-out': 'ph:arrow-square-out-bold',
+  'x-circle': 'ph:x-circle-bold',
+};
 
 // ============================================================================
 // Icons
@@ -339,15 +375,55 @@ function NodePaletteComponent({
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  // Check if a string is an emoji (starts with emoji unicode range)
+  const isEmoji = (str: string): boolean => {
+    if (!str || str.length === 0) return false;
+    // Simple check: emoji strings typically have length > 1 due to surrogate pairs
+    // and consist of high surrogate characters (0xD800-0xDBFF)
+    const codePoint = str.codePointAt(0);
+    if (!codePoint) return false;
+    // Common emoji ranges: emoticons, symbols, pictographs
+    return codePoint >= 0x1F300 || (codePoint >= 0x2600 && codePoint <= 0x27BF);
+  };
+
   // Render icon
   const renderIcon = (item: NodePaletteItem) => {
     const bgColor = item.color ? `${item.color}20` : themeStyles.iconBgDefault;
     const iconColor = item.color || themeStyles.iconColorDefault;
 
     if (typeof item.icon === 'string') {
+      // Check if it's an emoji - render directly
+      if (isEmoji(item.icon)) {
+        return (
+          <div style={{ ...themeStyles.itemIcon, backgroundColor: bgColor }}>
+            <span style={{ color: iconColor }}>{item.icon}</span>
+          </div>
+        );
+      }
+
+      // Check if we have a mapping for this icon name
+      const iconifyName = ICON_MAP[item.icon.toLowerCase()];
+      if (iconifyName) {
+        return (
+          <div style={{ ...themeStyles.itemIcon, backgroundColor: bgColor }}>
+            <Icon icon={iconifyName} style={{ color: iconColor, width: 16, height: 16 }} />
+          </div>
+        );
+      }
+
+      // Fallback: try to use it as a Phosphor icon directly (ph:icon-name)
+      if (!item.icon.includes(':')) {
+        return (
+          <div style={{ ...themeStyles.itemIcon, backgroundColor: bgColor }}>
+            <Icon icon={`ph:${item.icon}-bold`} style={{ color: iconColor, width: 16, height: 16 }} />
+          </div>
+        );
+      }
+
+      // If it contains a colon, assume it's already a valid iconify identifier
       return (
         <div style={{ ...themeStyles.itemIcon, backgroundColor: bgColor }}>
-          <span style={{ color: iconColor }}>{item.icon}</span>
+          <Icon icon={item.icon} style={{ color: iconColor, width: 16, height: 16 }} />
         </div>
       );
     }

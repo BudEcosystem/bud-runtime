@@ -221,6 +221,7 @@ class BudPipelineService(SessionMixin):
         workflow_id: str,
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Start a workflow execution.
 
@@ -228,6 +229,7 @@ class BudPipelineService(SessionMixin):
             workflow_id: The workflow ID to execute
             params: Input parameters for the execution
             callback_topics: Optional list of callback topics for real-time updates (D-004)
+            user_id: User ID initiating the execution (for service-to-service auth)
 
         Returns:
             Execution details including execution_id
@@ -243,6 +245,10 @@ class BudPipelineService(SessionMixin):
             # Forward callback_topics to budpipeline (T052)
             if callback_topics:
                 data["callback_topics"] = callback_topics
+            # Pass user_id for downstream service-to-service auth
+            if user_id:
+                data["user_id"] = user_id
+                data["initiator"] = user_id
 
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
@@ -654,5 +660,93 @@ class BudPipelineService(SessionMixin):
             logger.exception(f"Failed to delete event trigger {trigger_id}")
             raise ClientException(
                 f"Failed to delete event trigger: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    # =========================================================================
+    # Actions API Methods (Pluggable Action Architecture)
+    # =========================================================================
+
+    async def list_actions(self) -> Dict[str, Any]:
+        """List all available pipeline actions with metadata.
+
+        Returns:
+            Dictionary with actions list, categories, and total count
+
+        Raises:
+            ClientException: If listing fails
+        """
+        try:
+            result = await DaprService.invoke_service(
+                app_id=BUDPIPELINE_APP_ID,
+                method_path="actions",
+                method="GET",
+            )
+            return result if isinstance(result, dict) else {"actions": [], "categories": [], "total": 0}
+        except Exception as e:
+            logger.exception("Failed to list actions")
+            raise ClientException(
+                f"Failed to list actions: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    async def get_action(self, action_type: str) -> Dict[str, Any]:
+        """Get metadata for a specific action type.
+
+        Args:
+            action_type: The action type identifier (e.g., 'log', 'model_add')
+
+        Returns:
+            Action metadata including params, outputs, execution mode
+
+        Raises:
+            ClientException: If action not found or request fails
+        """
+        try:
+            result = await DaprService.invoke_service(
+                app_id=BUDPIPELINE_APP_ID,
+                method_path=f"actions/{action_type}",
+                method="GET",
+            )
+            return result
+        except Exception as e:
+            logger.exception(f"Failed to get action {action_type}")
+            raise ClientException(
+                f"Failed to get action: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    async def validate_action_params(
+        self,
+        action_type: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Validate parameters for an action type.
+
+        Args:
+            action_type: The action type to validate against
+            params: The parameters to validate
+
+        Returns:
+            Validation result with 'valid' bool and 'errors' list
+
+        Raises:
+            ClientException: If validation request fails
+        """
+        try:
+            result = await DaprService.invoke_service(
+                app_id=BUDPIPELINE_APP_ID,
+                method_path="actions/validate",
+                method="POST",
+                data={
+                    "action_type": action_type,
+                    "params": params,
+                },
+            )
+            return result if isinstance(result, dict) else {"valid": False, "errors": ["Validation failed"]}
+        except Exception as e:
+            logger.exception(f"Failed to validate action params for {action_type}")
+            raise ClientException(
+                f"Failed to validate action params: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e

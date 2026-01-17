@@ -8,6 +8,8 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# New action architecture (002-pipeline-event-persistence)
+from budpipeline.actions.base import ActionContext, ActionResult, action_registry
 from budpipeline.commons.config import settings
 from budpipeline.commons.constants import ExecutionStatus, StepStatus
 from budpipeline.commons.exceptions import (
@@ -22,8 +24,6 @@ from budpipeline.engine.dag_parser import DAGParser
 from budpipeline.engine.dependency_resolver import DependencyResolver
 from budpipeline.engine.param_resolver import ParamResolver
 from budpipeline.engine.schemas import OnFailureAction
-from budpipeline.handlers.base import HandlerContext, HandlerResult
-from budpipeline.handlers.registry import global_registry
 from budpipeline.pipeline.crud import PipelineDefinitionCRUD
 from budpipeline.pipeline.models import PipelineStatus
 
@@ -176,9 +176,9 @@ class WorkflowService:
                     if dep_id not in step_ids:
                         errors.append(f"Step '{step.id}' depends on unknown step '{dep_id}'")
 
-            # Check for unregistered actions
+            # Check for unregistered actions (using new action_registry)
             for step in dag.steps:
-                if not global_registry.has(step.action):
+                if not action_registry.has(step.action):
                     warnings.append(f"Action '{step.action}' is not registered")
 
         except DAGParseError as e:
@@ -847,34 +847,49 @@ class WorkflowService:
                         step.params, merged_params, step_outputs
                     )
 
-                    # Execute handler
-                    if global_registry.has(step.action):
+                    # Execute action using action_registry
+                    if action_registry.has(step.action):
+                        # Get retry policy from action metadata or step config
+                        action_meta = action_registry.get_meta(step.action)
                         if step.retry:
                             max_attempts = step.retry.max_attempts
                             backoff_seconds = step.retry.backoff_seconds
                             backoff_multiplier = step.retry.backoff_multiplier
                             max_backoff_seconds = step.retry.max_backoff_seconds
+                        elif action_meta and action_meta.retry_policy:
+                            max_attempts = action_meta.retry_policy.max_attempts
+                            backoff_seconds = action_meta.retry_policy.initial_interval_seconds
+                            backoff_multiplier = action_meta.retry_policy.backoff_multiplier
+                            max_backoff_seconds = settings.retry_max_backoff_seconds
                         else:
                             max_attempts = settings.retry_max_attempts
                             backoff_seconds = settings.retry_backoff_seconds
                             backoff_multiplier = settings.retry_backoff_multiplier
                             max_backoff_seconds = settings.retry_max_backoff_seconds
 
+                        # Use timeout from action meta if not specified in step
+                        timeout_seconds = step.timeout_seconds
+                        if timeout_seconds is None and action_meta:
+                            timeout_seconds = action_meta.timeout_seconds
+
                         attempt = 0
-                        result: HandlerResult | None = None
+                        result: ActionResult | None = None
 
                         while attempt < max_attempts:
-                            context = HandlerContext(
+                            # Create ActionContext for new actions
+                            action_context = ActionContext(
                                 step_id=step.id,
                                 execution_id=execution_id,
                                 params=resolved_params,
                                 workflow_params=merged_params,
                                 step_outputs=step_outputs,
-                                timeout_seconds=step.timeout_seconds,
+                                timeout_seconds=timeout_seconds,
                                 retry_count=attempt,
                             )
 
-                            result = await global_registry.execute(step.action, context)
+                            # Execute via action registry
+                            executor = action_registry.get_executor(step.action)
+                            result = await executor.execute(action_context)
 
                             if result.success:
                                 break
@@ -894,7 +909,7 @@ class WorkflowService:
                             )
 
                         if not result:
-                            raise Exception("Handler execution failed without a result")
+                            raise Exception("Action execution failed without a result")
 
                         if result.success:
                             # Check if handler is waiting for external event (event-driven completion)

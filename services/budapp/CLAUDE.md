@@ -325,6 +325,14 @@ BudApp provides authenticated proxy routes to the BudPipeline service for workfl
 | `POST` | `/budpipeline/event-triggers` | Create event trigger |
 | `DELETE` | `/budpipeline/event-triggers/{id}` | Delete event trigger |
 
+### Actions API Routes (Pluggable Action Architecture)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/actions` | List all available pipeline actions with metadata |
+| `GET` | `/budpipeline/actions/{action_type}` | Get metadata for a specific action type |
+| `POST` | `/budpipeline/actions/validate` | Validate parameters for an action type |
+
 ### Key Files
 
 - `workflow_ops/budpipeline_routes.py` - FastAPI route definitions

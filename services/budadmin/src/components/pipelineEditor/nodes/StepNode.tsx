@@ -9,7 +9,51 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
+import { Icon } from '@iconify/react';
 import { getActionMeta } from '../config/actionRegistry';
+
+// Icon mapping for action icon names to iconify identifiers
+const ICON_MAP: Record<string, string> = {
+  // Model Operations
+  'database-plus': 'ph:database-bold',
+  'chart-bar': 'ph:chart-bar-bold',
+  'trash': 'ph:trash-bold',
+
+  // Cluster Operations
+  'heart-pulse': 'ph:heartbeat-bold',
+  'server-x': 'ph:x-circle-bold',
+  'server-plus': 'ph:plus-circle-bold',
+
+  // Deployment Operations
+  'rocket': 'ph:rocket-launch-bold',
+  'shield': 'ph:shield-bold',
+  'trending-up': 'ph:trend-up-bold',
+
+  // Integration Operations
+  'globe': 'ph:globe-bold',
+  'bell': 'ph:bell-bold',
+  'link': 'ph:link-bold',
+
+  // Control Flow
+  'note': 'ph:note-bold',
+  'timer': 'ph:timer-bold',
+  'git-branch': 'ph:git-branch-bold',
+  'swap': 'ph:swap-bold',
+  'stack': 'ph:stack-bold',
+  'arrow-square-out': 'ph:arrow-square-out-bold',
+  'x-circle': 'ph:x-circle-bold',
+};
+
+// Check if a string is an emoji
+const isEmoji = (str: string): boolean => {
+  if (!str || str.length === 0) return false;
+  // Simple check: emoji strings typically have length > 1 due to surrogate pairs
+  // and consist of high surrogate characters (0xD800-0xDBFF)
+  const codePoint = str.codePointAt(0);
+  if (!codePoint) return false;
+  // Common emoji ranges: emoticons, symbols, pictographs
+  return codePoint >= 0x1F300 || (codePoint >= 0x2600 && codePoint <= 0x27BF);
+};
 
 // ============================================================================
 // Types
@@ -132,6 +176,28 @@ const handleStyles: React.CSSProperties = {
 // Component
 // ============================================================================
 
+// Render icon from icon name string
+const renderActionIcon = (iconName: string, color: string): React.ReactNode => {
+  // Check if it's an emoji - render directly
+  if (isEmoji(iconName)) {
+    return <span style={{ color }}>{iconName}</span>;
+  }
+
+  // Check if we have a mapping for this icon name
+  const iconifyName = ICON_MAP[iconName.toLowerCase()];
+  if (iconifyName) {
+    return <Icon icon={iconifyName} style={{ color, width: 16, height: 16 }} />;
+  }
+
+  // Fallback: try to use it as a Phosphor icon directly
+  if (!iconName.includes(':')) {
+    return <Icon icon={`ph:${iconName}-bold`} style={{ color, width: 16, height: 16 }} />;
+  }
+
+  // If it contains a colon, assume it's already a valid iconify identifier
+  return <Icon icon={iconName} style={{ color, width: 16, height: 16 }} />;
+};
+
 function StepNodeComponent({ data, selected }: StepNodeProps) {
   const nodeData = data as StepNodeData;
   const action = nodeData?.action || 'unknown';
@@ -183,7 +249,9 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
 
       {/* Card Header */}
       <div style={headerStyles}>
-        <span style={iconContainerStyles}>{actionMeta.icon}</span>
+        <span style={iconContainerStyles}>
+          {renderActionIcon(actionMeta.icon, actionMeta.color)}
+        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 style={titleStyles} title={name}>{name}</h3>
           <div style={subtitleStyles}>{actionMeta.label}</div>

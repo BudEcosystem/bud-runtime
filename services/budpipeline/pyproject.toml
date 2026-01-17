@@ -60,6 +60,37 @@ dev = [
     "pre-commit>=3.6.0",
 ]
 
+[project.entry-points."budpipeline.actions"]
+# Built-in Control Flow Actions
+log = "budpipeline.actions.builtin.log:LogAction"
+delay = "budpipeline.actions.builtin.delay:DelayAction"
+conditional = "budpipeline.actions.builtin.conditional:ConditionalAction"
+transform = "budpipeline.actions.builtin.transform:TransformAction"
+aggregate = "budpipeline.actions.builtin.aggregate:AggregateAction"
+set_output = "budpipeline.actions.builtin.set_output:SetOutputAction"
+fail = "budpipeline.actions.builtin.fail:FailAction"
+
+# Model Actions
+model_add = "budpipeline.actions.model.add:ModelAddAction"
+model_delete = "budpipeline.actions.model.delete:ModelDeleteAction"
+model_benchmark = "budpipeline.actions.model.benchmark:ModelBenchmarkAction"
+
+# Cluster Actions
+cluster_health = "budpipeline.actions.cluster.health:ClusterHealthAction"
+cluster_create = "budpipeline.actions.cluster.create:ClusterCreateAction"
+cluster_delete = "budpipeline.actions.cluster.delete:ClusterDeleteAction"
+
+# Deployment Actions (placeholders)
+deployment_create = "budpipeline.actions.deployment.create:DeploymentCreateAction"
+deployment_delete = "budpipeline.actions.deployment.delete:DeploymentDeleteAction"
+deployment_autoscale = "budpipeline.actions.deployment.autoscale:DeploymentAutoscaleAction"
+deployment_ratelimit = "budpipeline.actions.deployment.ratelimit:DeploymentRateLimitAction"
+
+# Integration Actions
+http_request = "budpipeline.actions.integration.http_request:HttpRequestAction"
+notification = "budpipeline.actions.integration.notification:NotificationAction"
+webhook = "budpipeline.actions.integration.webhook:WebhookAction"
+
 [tool.hatch.metadata]
 allow-direct-references = true
 
@@ -105,6 +136,9 @@ fail_under = 80
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+exclude = [
+    "docs/templates/",  # Jinja2 template files, not valid Python
+]
 
 [tool.ruff.lint]
 select = [

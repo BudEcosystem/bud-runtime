@@ -3,7 +3,15 @@
  *
  * Defines all available workflow actions with their metadata and parameter schemas.
  * This is shared between the sidebar, node rendering, and configuration panel.
+ *
+ * NOTE: This module now supports dynamic actions from the budpipeline API.
+ * The utility functions (getActionMeta, getActionParams, etc.) first check the
+ * API cache before falling back to static definitions.
  */
+
+// Import dynamic action utilities
+import { getCachedAction } from 'src/hooks/useActions';
+import type { ActionMeta as ApiActionMeta } from 'src/types/actions';
 
 // ============================================================================
 // Parameter Schema Types
@@ -904,9 +912,47 @@ export const actionCategories: ActionCategory[] = [
 export const allActions: ActionMeta[] = actionCategories.flatMap((cat) => cat.actions);
 
 /**
- * Get action metadata by action type
+ * Convert API action metadata to the local ActionMeta format
+ */
+function convertApiActionToLocal(apiAction: ApiActionMeta): ActionMeta {
+  return {
+    value: apiAction.type,
+    label: apiAction.name,
+    icon: apiAction.icon || '⚙️',
+    color: apiAction.color || '#8c8c8c',
+    description: apiAction.description,
+    outputs: apiAction.outputs.map((o) => o.name),
+    params: apiAction.params.map((p) => ({
+      name: p.name,
+      label: p.label,
+      type: p.type as ParamType,
+      required: p.required,
+      default: p.default,
+      description: p.description,
+      placeholder: p.placeholder,
+      options: p.options,
+      validation: p.validation,
+      showWhen: p.visibleWhen ? {
+        param: p.visibleWhen.param,
+        equals: p.visibleWhen.equals,
+        notEquals: p.visibleWhen.notEquals,
+      } : undefined,
+    })),
+  };
+}
+
+/**
+ * Get action metadata by action type.
+ * First checks API cache, then falls back to static definitions.
  */
 export function getActionMeta(action: string): ActionMeta {
+  // Try to get from API cache first (dynamic actions from budpipeline)
+  const cachedAction = getCachedAction(action);
+  if (cachedAction) {
+    return convertApiActionToLocal(cachedAction);
+  }
+
+  // Fall back to static definitions
   return (
     allActions.find((a) => a.value === action) || {
       value: action,
