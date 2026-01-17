@@ -542,7 +542,7 @@ impl Client {
                         gateway.state.inference_batcher.clone(), // Use inference batcher from state
                     )
                     .await
-                    .map_err(err_to_http)
+                    .map_err(|(err, _failure_data)| err_to_http(err))
                 })
                 .await?)
             }

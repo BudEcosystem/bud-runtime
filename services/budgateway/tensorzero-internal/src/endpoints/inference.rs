@@ -229,7 +229,14 @@ pub async fn inference_handler(
         analytics.as_ref().map(|ext| ext.0.clone()),
         inference_batcher.clone(),
     )
-    .await;
+    .await
+    .map_err(|(err, failure_data)| {
+        // NEW: Record model_inference span attributes if failure data available
+        if let Some(failure_model_inference) = failure_data {
+            super::observability::record_error_model_inference(&failure_model_inference);
+        }
+        err // Return original error
+    });
 
     match inference_output {
         Ok(InferenceOutput::NonStreaming {
@@ -425,7 +432,13 @@ pub async fn inference(
     params: Params,
     analytics: Option<Arc<tokio::sync::Mutex<RequestAnalytics>>>,
     inference_batcher: Option<InferenceBatcher>,
-) -> Result<InferenceOutput, Error> {
+) -> Result<
+    InferenceOutput,
+    (
+        Error,
+        Option<crate::inference::types::ModelInferenceDatabaseInsert>,
+    ),
+> {
     let span = tracing::Span::current();
     if let Some(function_name) = &params.function_name {
         span.record("function_name", function_name);
@@ -443,14 +456,17 @@ pub async fn inference(
     let start_time = Instant::now();
     let inference_id = Uuid::now_v7();
     span.record("inference_id", inference_id.to_string());
-    validate_tags(&params.tags, params.internal)?;
+    validate_tags(&params.tags, params.internal).map_err(|e| (e, None))?;
 
     if params.include_original_response && params.stream.unwrap_or(false) {
-        return Err(ErrorDetails::InvalidRequest {
-            message: "Cannot set both `include_original_response` and `stream` to `true`"
-                .to_string(),
-        }
-        .into());
+        return Err((
+            ErrorDetails::InvalidRequest {
+                message: "Cannot set both `include_original_response` and `stream` to `true`"
+                    .to_string(),
+            }
+            .into(),
+            None, // No failure data for early errors
+        ));
     }
 
     // Retrieve or generate the episode ID
@@ -463,11 +479,12 @@ pub async fn inference(
         &mut params.tags,
         &clickhouse_connection_info,
     )
-    .await?;
+    .await
+    .map_err(|e| (e, None))?;
     tracing::Span::current().record("episode_id", episode_id.to_string());
 
     let models = config.models.read().await;
-    let (function, function_name) = find_function(&params, &config, &models)?;
+    let (function, function_name) = find_function(&params, &config, &models).map_err(|e| (e, None))?;
     // Release the read lock on the models table before potentially spawning
     drop(models);
 
@@ -477,16 +494,23 @@ pub async fn inference(
 
     // If the function has no variants, return an error
     if candidate_variant_names.is_empty() {
-        return Err(ErrorDetails::InvalidFunctionVariants {
-            message: format!("Function `{function_name}` has no variants"),
-        }
-        .into());
+        return Err((
+            ErrorDetails::InvalidFunctionVariants {
+                message: format!("Function `{function_name}` has no variants"),
+            }
+            .into(),
+            None,
+        ));
     }
 
     // Validate the input
-    function.validate_inference_params(&params)?;
+    function
+        .validate_inference_params(&params)
+        .map_err(|e| (e, None))?;
 
-    let tool_config = function.prepare_tool_config(params.dynamic_tool_params, &config.tools)?;
+    let tool_config = function
+        .prepare_tool_config(params.dynamic_tool_params, &config.tools)
+        .map_err(|e| (e, None))?;
 
     // If a variant is pinned, only that variant should be attempted
     if let Some(ref variant_name) = params.variant_name {
@@ -494,10 +518,13 @@ pub async fn inference(
 
         // If the pinned variant doesn't exist, return an error
         if candidate_variant_names.is_empty() {
-            return Err(ErrorDetails::UnknownVariant {
-                name: variant_name.to_string(),
-            }
-            .into());
+            return Err((
+                ErrorDetails::UnknownVariant {
+                    name: variant_name.to_string(),
+                }
+                .into(),
+                None,
+            ));
         }
         params.tags.insert(
             "tensorzero::variant_pinned".to_string(),
@@ -590,7 +617,8 @@ pub async fn inference(
             client: http_client,
             object_store_info: &config.object_store_info,
         })
-        .await?;
+        .await
+        .map_err(|e| (e, None))?;
 
     // Keep sampling variants until one succeeds
     while !candidate_variant_names.is_empty() {
@@ -599,7 +627,8 @@ pub async fn inference(
             function.variants(),
             &function_name,
             &episode_id,
-        )?;
+        )
+        .map_err(|e| (e, None))?;
         // Will be edited by the variant as part of making the request so we must clone here
         let variant_inference_params = params.params.clone();
 
@@ -780,7 +809,19 @@ pub async fn inference(
         }
     }
 
-    // Send failure event to Kafka and ClickHouse for observability
+    // Extract failure model inference before returning error
+    let failure_model_inference = extract_failure_model_inference(
+        inference_id,
+        &error,
+        &resolved_input,
+        model_name_clone.clone(),
+        start_time,
+        gateway_request_clone.clone(),
+        Some(&error_response_json),
+        obs_metadata_clone.as_ref(),
+    );
+
+    // Send failure event to Kafka and ClickHouse for observability (async)
     if !dryrun {
         send_failure_event(
             &kafka_connection_info,
@@ -795,11 +836,20 @@ pub async fn inference(
             model_name_clone,
             start_time,
             gateway_request_clone,
+            failure_model_inference.clone(), // NEW: Pass pre-built data
         )
         .await;
     }
 
-    Err(error)
+    // Return error WITH failure data for span recording
+    Err((
+        error,
+        if !dryrun {
+            Some(failure_model_inference)
+        } else {
+            None
+        },
+    ))
 }
 
 /// Finds a function by `function_name` or `model_name`, erroring if an
@@ -1618,13 +1668,14 @@ async fn send_failure_event(
     inference_id: Uuid,
     _episode_id: Uuid, // Currently unused but kept for future use
     error: &Error,
-    gateway_response: Option<&serde_json::Value>, // Add gateway_response parameter
-    resolved_input: &ResolvedInput,
+    _gateway_response: Option<&serde_json::Value>, // Unused - now passed via model_inference
+    _resolved_input: &ResolvedInput,               // Unused - now passed via model_inference
     observability_metadata: Option<ObservabilityMetadata>,
     function_name: Option<String>,
     model_name: Option<String>,
     start_time: Instant,
-    gateway_request: Option<String>,
+    _gateway_request: Option<String>, // Unused - now passed via model_inference
+    model_inference: crate::inference::types::ModelInferenceDatabaseInsert, // NEW: Pre-built model inference data
 ) {
     let request_arrival_time = chrono::Utc::now()
         - chrono::Duration::milliseconds(start_time.elapsed().as_millis() as i64);
@@ -1724,38 +1775,7 @@ async fn send_failure_event(
     }
 
     // Also write to ClickHouse for failed inferences
-    // First, create a ModelInference record (required for JOIN queries)
-
-    let serialized_input = serialize_or_log(&resolved_input.messages);
-
-    // Use the gateway_response passed in (already serialized from the error response)
-    let gateway_response = gateway_response.and_then(|v| serde_json::to_string(v).ok());
-
-    let model_inference = crate::inference::types::ModelInferenceDatabaseInsert {
-        id: uuid::Uuid::now_v7(),
-        inference_id,
-        raw_request: "".to_string(), // Failed before request could be made
-        raw_response: error_message.clone(), // Store error as response
-        system: resolved_input
-            .system
-            .as_ref()
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        input_messages: serialized_input.clone(),
-        output: format!("Error: {}", error_message),
-        input_tokens: None,
-        output_tokens: None,
-        response_time_ms: Some(start_time.elapsed().as_millis() as u32),
-        model_name: model_id.clone(),
-        model_provider_name: "unknown".to_string(),
-        ttft_ms: None,
-        cached: false,
-        finish_reason: None,
-        gateway_request,
-        gateway_response,
-        endpoint_type: "chat".to_string(),
-        guardrail_scan_summary: Some(serde_json::json!({}).to_string()),
-    };
+    // Use the pre-built model_inference passed in
 
     // Write the ModelInference record
     if let Err(e) = clickhouse_connection_info
@@ -1807,6 +1827,56 @@ async fn send_failure_event(
             "Failed to write failure to ClickHouse ModelInferenceDetails: {}",
             e
         );
+    }
+}
+
+/// Extract ModelInferenceDatabaseInsert for error scenarios
+/// Used for both span recording (sync) and database writes (async)
+fn extract_failure_model_inference(
+    inference_id: Uuid,
+    error: &Error,
+    resolved_input: &ResolvedInput,
+    model_name: Option<String>,
+    start_time: Instant,
+    gateway_request: Option<String>,
+    gateway_response: Option<&serde_json::Value>,
+    observability_metadata: Option<&ObservabilityMetadata>,
+) -> crate::inference::types::ModelInferenceDatabaseInsert {
+    let error_message = error.to_string();
+    let serialized_input = serialize_or_log(&resolved_input.messages);
+    let gateway_response_str = gateway_response.and_then(|v| serde_json::to_string(v).ok());
+
+    // Determine model_id for model_name field
+    let model_id = if let Some(obs_metadata) = observability_metadata {
+        obs_metadata.model_id.clone()
+    } else {
+        model_name.unwrap_or_else(|| "unknown".to_string())
+    };
+
+    crate::inference::types::ModelInferenceDatabaseInsert {
+        id: uuid::Uuid::now_v7(),
+        inference_id,
+        raw_request: "".to_string(),        // Empty - failed before provider
+        raw_response: error_message.clone(), // Error message
+        system: resolved_input
+            .system
+            .as_ref()
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        input_messages: serialized_input,
+        output: format!("Error: {}", error_message),
+        input_tokens: None,          // None - no provider response
+        output_tokens: None,         // None - no provider response
+        response_time_ms: Some(start_time.elapsed().as_millis() as u32),
+        model_name: model_id,
+        model_provider_name: "unknown".to_string(), // Provider not reached
+        ttft_ms: None,              // None - no streaming
+        cached: false,
+        finish_reason: None,        // None - no completion
+        gateway_request,
+        gateway_response: gateway_response_str,
+        endpoint_type: "chat".to_string(),
+        guardrail_scan_summary: Some(serde_json::json!({}).to_string()),
     }
 }
 
