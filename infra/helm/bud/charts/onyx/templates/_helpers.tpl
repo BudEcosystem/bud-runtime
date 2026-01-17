@@ -62,16 +62,26 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Set secret name
+Set secret name - supports both direct call and dict with root context for tpl evaluation
+Usage 1 (no tpl): {{ include "onyx.secretName" $secretContent }}
+Usage 2 (with tpl): {{ include "onyx.secretName" (dict "secretContent" $secretContent "root" $root) }}
 */}}
 {{- define "onyx.secretName" -}}
+{{- if .secretContent }}
+{{- /* Called with dict containing secretContent and root - use tpl for template evaluation */}}
+{{- $secretName := default .secretContent.secretName .secretContent.existingSecret }}
+{{- tpl $secretName .root }}
+{{- else }}
+{{- /* Called directly with secretContent - no tpl needed */}}
 {{- default .secretName .existingSecret }}
+{{- end }}
 {{- end }}
 
 {{/*
 Create env vars from secrets
 */}}
 {{- define "onyx.envSecrets" -}}
+    {{- $root := . }}
     {{- range $secretSuffix, $secretContent := .Values.auth }}
     {{- if and (ne $secretContent.enabled false) ($secretContent.secretKeys) }}
     {{- range $name, $key := $secretContent.secretKeys }}
@@ -79,7 +89,7 @@ Create env vars from secrets
 - name: {{ $name | upper | replace "-" "_" | quote }}
   valueFrom:
     secretKeyRef:
-      name: {{ include "onyx.secretName" $secretContent }}
+      name: {{ include "onyx.secretName" (dict "secretContent" $secretContent "root" $root) }}
       key: {{ default $name $key }}
     {{- end }}
     {{- end }}
