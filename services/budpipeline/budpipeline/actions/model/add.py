@@ -22,7 +22,9 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
     StepStatus,
+    ValidationRules,
     register_action,
 )
 from budpipeline.commons.config import settings
@@ -314,7 +316,7 @@ META = ActionMeta(
             type=ParamType.SELECT,
             description="Source of the model",
             default="huggingface",
-            options=[{"value": "huggingface", "label": "HuggingFace"}],
+            options=[SelectOption(value="huggingface", label="HuggingFace")],
         ),
         ParamDefinition(
             name="huggingface_id",
@@ -352,10 +354,10 @@ META = ActionMeta(
             description="Model modalities",
             default=["text"],
             options=[
-                {"value": "text", "label": "Text"},
-                {"value": "image", "label": "Image"},
-                {"value": "audio", "label": "Audio"},
-                {"value": "video", "label": "Video"},
+                SelectOption(value="text", label="Text"),
+                SelectOption(value="image", label="Image"),
+                SelectOption(value="audio", label="Audio"),
+                SelectOption(value="video", label="Video"),
             ],
         ),
         ParamDefinition(
@@ -371,7 +373,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum time to wait for model extraction (seconds)",
             default=1800,
-            validation={"min": 60, "max": 7200},
+            validation=ValidationRules(min=60, max=7200),
         ),
     ],
     outputs=[

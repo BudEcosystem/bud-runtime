@@ -24,7 +24,9 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
     StepStatus,
+    ValidationRules,
     register_action,
 )
 from budpipeline.commons.config import settings
@@ -848,7 +850,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Number of concurrent requests to run",
             default=1,
-            validation={"min": 1, "max": 100},
+            validation=ValidationRules(min=1, max=100),
         ),
         ParamDefinition(
             name="max_input_tokens",
@@ -856,7 +858,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum input tokens for benchmark prompts",
             default=1024,
-            validation={"min": 1, "max": 128000},
+            validation=ValidationRules(min=1, max=128000),
         ),
         ParamDefinition(
             name="max_output_tokens",
@@ -864,7 +866,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum output tokens for benchmark responses",
             default=512,
-            validation={"min": 1, "max": 32000},
+            validation=ValidationRules(min=1, max=32000),
         ),
         ParamDefinition(
             name="num_prompts",
@@ -872,7 +874,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Number of prompts to run in the benchmark",
             default=10,
-            validation={"min": 1, "max": 1000},
+            validation=ValidationRules(min=1, max=1000),
         ),
         ParamDefinition(
             name="hardware_mode",
@@ -881,8 +883,8 @@ META = ActionMeta(
             description="Hardware allocation mode",
             default="dedicated",
             options=[
-                {"value": "dedicated", "label": "Dedicated"},
-                {"value": "shared", "label": "Shared"},
+                SelectOption(value="dedicated", label="Dedicated"),
+                SelectOption(value="shared", label="Shared"),
             ],
         ),
         ParamDefinition(
@@ -892,9 +894,9 @@ META = ActionMeta(
             description="Override automatic device selection",
             required=False,
             options=[
-                {"value": "cuda", "label": "NVIDIA GPU (CUDA)"},
-                {"value": "hpu", "label": "Habana Gaudi (HPU)"},
-                {"value": "cpu", "label": "CPU"},
+                SelectOption(value="cuda", label="NVIDIA GPU (CUDA)"),
+                SelectOption(value="hpu", label="Habana Gaudi (HPU)"),
+                SelectOption(value="cpu", label="CPU"),
             ],
         ),
         ParamDefinition(
@@ -903,7 +905,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Tensor parallelism size (auto-selected if not specified)",
             required=False,
-            validation={"min": 1, "max": 16},
+            validation=ValidationRules(min=1, max=16),
         ),
         ParamDefinition(
             name="pp_size",
@@ -911,7 +913,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Pipeline parallelism size (auto-selected if not specified)",
             required=False,
-            validation={"min": 1, "max": 16},
+            validation=ValidationRules(min=1, max=16),
         ),
         ParamDefinition(
             name="replicas",
@@ -919,7 +921,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Number of model replicas",
             required=False,
-            validation={"min": 1, "max": 32},
+            validation=ValidationRules(min=1, max=32),
         ),
         ParamDefinition(
             name="run_as_simulation",
@@ -934,7 +936,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum time to wait for benchmark completion (seconds)",
             default=1200,
-            validation={"min": 60, "max": 7200},
+            validation=ValidationRules(min=60, max=7200),
         ),
     ],
     outputs=[

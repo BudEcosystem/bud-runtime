@@ -18,6 +18,8 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
+    ValidationRules,
     register_action,
 )
 from budpipeline.commons.config import settings
@@ -225,11 +227,11 @@ META = ActionMeta(
             description="Types of health checks to perform",
             default=["nodes", "api"],
             options=[
-                {"value": "nodes", "label": "Node Health"},
-                {"value": "api", "label": "API Server"},
-                {"value": "storage", "label": "Storage"},
-                {"value": "network", "label": "Network"},
-                {"value": "gpu", "label": "GPU Drivers"},
+                SelectOption(value="nodes", label="Node Health"),
+                SelectOption(value="api", label="API Server"),
+                SelectOption(value="storage", label="Storage"),
+                SelectOption(value="network", label="Network"),
+                SelectOption(value="gpu", label="GPU Drivers"),
             ],
         ),
         ParamDefinition(
@@ -238,7 +240,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Health check timeout in seconds",
             default=30,
-            validation={"min": 5, "max": 300},
+            validation=ValidationRules(min=5, max=300),
         ),
     ],
     outputs=[
