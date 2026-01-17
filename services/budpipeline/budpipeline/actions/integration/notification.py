@@ -21,6 +21,7 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
     register_action,
 )
 from budpipeline.commons.config import settings
@@ -210,10 +211,10 @@ META = ActionMeta(
             description="Notification channel to use",
             required=True,
             options=[
-                {"value": "email", "label": "Email"},
-                {"value": "slack", "label": "Slack"},
-                {"value": "teams", "label": "Microsoft Teams"},
-                {"value": "webhook", "label": "Webhook"},
+                SelectOption(value="email", label="Email"),
+                SelectOption(value="slack", label="Slack"),
+                SelectOption(value="teams", label="Microsoft Teams"),
+                SelectOption(value="webhook", label="Webhook"),
             ],
         ),
         ParamDefinition(
@@ -237,10 +238,10 @@ META = ActionMeta(
             description="Notification severity level",
             default="info",
             options=[
-                {"value": "info", "label": "Info"},
-                {"value": "warning", "label": "Warning"},
-                {"value": "error", "label": "Error"},
-                {"value": "critical", "label": "Critical"},
+                SelectOption(value="info", label="Info"),
+                SelectOption(value="warning", label="Warning"),
+                SelectOption(value="error", label="Error"),
+                SelectOption(value="critical", label="Critical"),
             ],
         ),
         ParamDefinition(

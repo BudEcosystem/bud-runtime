@@ -17,6 +17,7 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    ValidationRules,
     register_action,
 )
 
@@ -87,7 +88,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Minimum number of replicas",
             default=1,
-            validation={"min": 0, "max": 100},
+            validation=ValidationRules(min=0, max=100),
         ),
         ParamDefinition(
             name="max_replicas",
@@ -95,7 +96,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum number of replicas",
             default=10,
-            validation={"min": 1, "max": 100},
+            validation=ValidationRules(min=1, max=100),
         ),
         ParamDefinition(
             name="target_cpu_utilization",
@@ -103,7 +104,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Target CPU utilization percentage for scaling",
             default=70,
-            validation={"min": 10, "max": 100},
+            validation=ValidationRules(min=10, max=100),
         ),
         ParamDefinition(
             name="target_memory_utilization",
@@ -111,7 +112,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Target memory utilization percentage for scaling",
             default=80,
-            validation={"min": 10, "max": 100},
+            validation=ValidationRules(min=10, max=100),
         ),
         ParamDefinition(
             name="scale_down_delay_seconds",
@@ -119,7 +120,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Seconds to wait before scaling down",
             default=300,
-            validation={"min": 60, "max": 3600},
+            validation=ValidationRules(min=60, max=3600),
         ),
     ],
     outputs=[

@@ -17,6 +17,7 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
     register_action,
 )
 
@@ -87,9 +88,9 @@ META = ActionMeta(
             description="Cloud provider for the cluster",
             required=True,
             options=[
-                {"value": "aws", "label": "AWS (EKS)"},
-                {"value": "azure", "label": "Azure (AKS)"},
-                {"value": "onprem", "label": "On-Premises"},
+                SelectOption(value="aws", label="AWS (EKS)"),
+                SelectOption(value="azure", label="Azure (AKS)"),
+                SelectOption(value="onprem", label="On-Premises"),
             ],
         ),
     ],

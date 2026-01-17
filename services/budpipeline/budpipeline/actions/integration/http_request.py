@@ -22,6 +22,8 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
+    ValidationRules,
     register_action,
 )
 
@@ -230,11 +232,11 @@ META = ActionMeta(
             description="HTTP method to use",
             default="GET",
             options=[
-                {"value": "GET", "label": "GET"},
-                {"value": "POST", "label": "POST"},
-                {"value": "PUT", "label": "PUT"},
-                {"value": "PATCH", "label": "PATCH"},
-                {"value": "DELETE", "label": "DELETE"},
+                SelectOption(value="GET", label="GET"),
+                SelectOption(value="POST", label="POST"),
+                SelectOption(value="PUT", label="PUT"),
+                SelectOption(value="PATCH", label="PATCH"),
+                SelectOption(value="DELETE", label="DELETE"),
             ],
         ),
         ParamDefinition(
@@ -257,7 +259,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Request timeout in seconds",
             default=30,
-            validation={"min": 1, "max": 300},
+            validation=ValidationRules(min=1, max=300),
         ),
     ],
     outputs=[

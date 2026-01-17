@@ -17,6 +17,7 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    ValidationRules,
     register_action,
 )
 
@@ -88,7 +89,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum time to wait for deletion to complete",
             default=120,
-            validation={"min": 30, "max": 600},
+            validation=ValidationRules(min=30, max=600),
         ),
     ],
     outputs=[

@@ -17,6 +17,7 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    ValidationRules,
     register_action,
 )
 
@@ -99,7 +100,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Number of replicas to deploy",
             default=1,
-            validation={"min": 1, "max": 100},
+            validation=ValidationRules(min=1, max=100),
         ),
         ParamDefinition(
             name="max_wait_seconds",
@@ -107,7 +108,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum time to wait for deployment to be ready",
             default=300,
-            validation={"min": 60, "max": 1800},
+            validation=ValidationRules(min=60, max=1800),
         ),
     ],
     outputs=[

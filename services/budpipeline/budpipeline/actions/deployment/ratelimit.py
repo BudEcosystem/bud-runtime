@@ -17,6 +17,8 @@ from budpipeline.actions.base import (
     OutputDefinition,
     ParamDefinition,
     ParamType,
+    SelectOption,
+    ValidationRules,
     register_action,
 )
 
@@ -85,7 +87,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum requests per second allowed",
             required=True,
-            validation={"min": 1, "max": 100000},
+            validation=ValidationRules(min=1, max=100000),
         ),
         ParamDefinition(
             name="burst_size",
@@ -93,7 +95,7 @@ META = ActionMeta(
             type=ParamType.NUMBER,
             description="Maximum burst size for rate limiting",
             default=100,
-            validation={"min": 1, "max": 10000},
+            validation=ValidationRules(min=1, max=10000),
         ),
         ParamDefinition(
             name="rate_limit_by",
@@ -102,10 +104,10 @@ META = ActionMeta(
             description="How to identify clients for rate limiting",
             default="api_key",
             options=[
-                {"value": "api_key", "label": "API Key"},
-                {"value": "ip_address", "label": "IP Address"},
-                {"value": "user_id", "label": "User ID"},
-                {"value": "global", "label": "Global (all clients)"},
+                SelectOption(value="api_key", label="API Key"),
+                SelectOption(value="ip_address", label="IP Address"),
+                SelectOption(value="user_id", label="User ID"),
+                SelectOption(value="global", label="Global (all clients)"),
             ],
         ),
         ParamDefinition(
