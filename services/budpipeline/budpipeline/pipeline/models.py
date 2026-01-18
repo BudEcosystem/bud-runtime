@@ -118,6 +118,19 @@ class PipelineDefinition(Base):
         comment="Current pipeline status (draft, active, archived)",
     )
 
+    # User isolation
+    user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+        comment="UUID of the owning user (null for system or legacy pipelines)",
+    )
+    system_owned: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="True if this is a system-owned pipeline visible to all users",
+    )
+
     # Metadata
     step_count: Mapped[int] = mapped_column(
         Integer,
@@ -171,6 +184,12 @@ class PipelineDefinition(Base):
         Index("idx_pipeline_definition_created_by", "created_by"),
         # Query by date for sorting
         Index("idx_pipeline_definition_created_at", "created_at", postgresql_using="btree"),
+        # Query by user_id for user isolation (partial index for non-null values)
+        Index(
+            "idx_pipeline_definition_user_id",
+            "user_id",
+            postgresql_where="user_id IS NOT NULL",
+        ),
     )
 
     def __repr__(self) -> str:

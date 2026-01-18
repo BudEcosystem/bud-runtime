@@ -67,21 +67,23 @@ class BudPipelineService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def create_workflow(
+    async def create_pipeline(
         self,
         dag: Dict[str, Any],
         name: Optional[str] = None,
         user_id: Optional[str] = None,
+        system_owned: bool = False,
     ) -> Dict[str, Any]:
-        """Create a new workflow in budpipeline service.
+        """Create a new pipeline in budpipeline service.
 
         Args:
             dag: The DAG definition
-            name: Optional workflow name override
-            user_id: The ID of the user creating the workflow
+            name: Optional pipeline name override
+            user_id: The ID of the user creating the pipeline
+            system_owned: True if this is a system-owned pipeline visible to all users
 
         Returns:
-            Created workflow data including ID
+            Created pipeline data including ID
 
         Raises:
             ClientException: If creation fails
@@ -89,86 +91,135 @@ class BudPipelineService(SessionMixin):
         try:
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
-                method_path="workflows",
+                method_path="pipelines",
                 method="POST",
                 data={
                     "dag": dag,
                     "name": name,
-                    "created_by": user_id,
+                    "user_id": user_id,
+                    "system_owned": system_owned,
                 },
             )
             return result
         except Exception as e:
-            logger.exception("Failed to create workflow")
+            logger.exception("Failed to create pipeline")
             raise ClientException(
-                f"Failed to create workflow: {str(e)}",
+                f"Failed to create pipeline: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def list_workflows(self) -> List[Dict[str, Any]]:
-        """List all workflows from budpipeline service.
+    # Backwards compatibility alias
+    async def create_workflow(
+        self,
+        dag: Dict[str, Any],
+        name: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Deprecated: Use create_pipeline() instead."""
+        return await self.create_pipeline(dag=dag, name=name, user_id=user_id)
+
+    async def list_pipelines(
+        self,
+        user_id: Optional[str] = None,
+        include_system: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """List pipelines from budpipeline service.
+
+        Args:
+            user_id: Filter by user ID (if provided via X-User-ID header)
+            include_system: Include system-owned pipelines in results
 
         Returns:
-            List of workflow summaries
+            List of pipeline summaries
 
         Raises:
             ClientException: If listing fails
         """
         try:
+            # Convert boolean to lowercase string for aiohttp query params
+            params: Dict[str, Any] = {"include_system": str(include_system).lower()}
+            headers = {}
+            if user_id:
+                headers["X-User-ID"] = user_id
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
-                method_path="workflows",
+                method_path="pipelines",
                 method="GET",
+                params=params,
+                headers=headers,
             )
             return result if isinstance(result, list) else []
         except Exception as e:
-            logger.exception("Failed to list workflows")
+            logger.exception("Failed to list pipelines")
             raise ClientException(
-                f"Failed to list workflows: {str(e)}",
+                f"Failed to list pipelines: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
-        """Get workflow details including DAG definition.
+    # Backwards compatibility alias
+    async def list_workflows(self) -> List[Dict[str, Any]]:
+        """Deprecated: Use list_pipelines() instead."""
+        return await self.list_pipelines()
+
+    async def get_pipeline(
+        self,
+        pipeline_id: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get pipeline details including DAG definition.
 
         Args:
-            workflow_id: The workflow ID
+            pipeline_id: The pipeline ID
+            user_id: User ID for permission check (optional)
 
         Returns:
-            Workflow details with DAG
+            Pipeline details with DAG
 
         Raises:
-            ClientException: If workflow not found or request fails
+            ClientException: If pipeline not found or request fails
         """
         try:
+            headers = {}
+            if user_id:
+                headers["X-User-ID"] = user_id
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
-                method_path=f"workflows/{workflow_id}",
+                method_path=f"pipelines/{pipeline_id}",
                 method="GET",
+                headers=headers,
             )
             return result
         except Exception as e:
-            logger.exception(f"Failed to get workflow {workflow_id}")
+            logger.exception(f"Failed to get pipeline {pipeline_id}")
             raise ClientException(
-                f"Failed to get workflow: {str(e)}",
+                f"Failed to get pipeline: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def update_workflow(
+    # Backwards compatibility alias
+    async def get_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Deprecated: Use get_pipeline() instead."""
+        return await self.get_pipeline(pipeline_id=workflow_id)
+
+    async def update_pipeline(
         self,
-        workflow_id: str,
+        pipeline_id: str,
         dag: Optional[Dict[str, Any]] = None,
         name: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a workflow's DAG definition.
+        """Update a pipeline's DAG definition.
 
         Args:
-            workflow_id: The workflow ID to update
+            pipeline_id: The pipeline ID to update
             dag: New DAG definition
             name: Optional new name
+            user_id: User ID for permission check (optional)
 
         Returns:
-            Updated workflow data
+            Updated pipeline data
 
         Raises:
             ClientException: If update fails
@@ -180,56 +231,86 @@ class BudPipelineService(SessionMixin):
             if name is not None:
                 data["name"] = name
 
+            headers = {}
+            if user_id:
+                headers["X-User-ID"] = user_id
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
-                method_path=f"workflows/{workflow_id}",
+                method_path=f"pipelines/{pipeline_id}",
                 method="PUT",
                 data=data,
+                headers=headers,
             )
             return result
         except Exception as e:
-            logger.exception(f"Failed to update workflow {workflow_id}")
+            logger.exception(f"Failed to update pipeline {pipeline_id}")
             raise ClientException(
-                f"Failed to update workflow: {str(e)}",
+                f"Failed to update pipeline: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def delete_workflow(self, workflow_id: str) -> None:
-        """Delete a workflow.
+    # Backwards compatibility alias
+    async def update_workflow(
+        self,
+        workflow_id: str,
+        dag: Optional[Dict[str, Any]] = None,
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Deprecated: Use update_pipeline() instead."""
+        return await self.update_pipeline(pipeline_id=workflow_id, dag=dag, name=name)
+
+    async def delete_pipeline(
+        self,
+        pipeline_id: str,
+        user_id: Optional[str] = None,
+    ) -> None:
+        """Delete a pipeline.
 
         Args:
-            workflow_id: The workflow ID to delete
+            pipeline_id: The pipeline ID to delete
+            user_id: User ID for permission check (optional)
 
         Raises:
             ClientException: If deletion fails
         """
         try:
+            headers = {}
+            if user_id:
+                headers["X-User-ID"] = user_id
+
             await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
-                method_path=f"workflows/{workflow_id}",
+                method_path=f"pipelines/{pipeline_id}",
                 method="DELETE",
+                headers=headers,
             )
         except Exception as e:
-            logger.exception(f"Failed to delete workflow {workflow_id}")
+            logger.exception(f"Failed to delete pipeline {pipeline_id}")
             raise ClientException(
-                f"Failed to delete workflow: {str(e)}",
+                f"Failed to delete pipeline: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def execute_workflow(
+    # Backwards compatibility alias
+    async def delete_workflow(self, workflow_id: str) -> None:
+        """Deprecated: Use delete_pipeline() instead."""
+        return await self.delete_pipeline(pipeline_id=workflow_id)
+
+    async def execute_pipeline(
         self,
-        workflow_id: str,
+        pipeline_id: str,
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Start a workflow execution.
+        """Start a pipeline execution.
 
         Args:
-            workflow_id: The workflow ID to execute
+            pipeline_id: The pipeline ID to execute
             params: Input parameters for the execution
-            callback_topics: Optional list of callback topics for real-time updates (D-004)
-            user_id: User ID initiating the execution (for service-to-service auth)
+            callback_topics: Optional list of callback topics for real-time updates
+            user_id: User ID initiating the execution
 
         Returns:
             Execution details including execution_id
@@ -239,13 +320,11 @@ class BudPipelineService(SessionMixin):
         """
         try:
             data = {
-                "workflow_id": workflow_id,
+                "workflow_id": pipeline_id,  # Keep as workflow_id for API compatibility
                 "params": params or {},
             }
-            # Forward callback_topics to budpipeline (T052)
             if callback_topics:
                 data["callback_topics"] = callback_topics
-            # Pass user_id for downstream service-to-service auth
             if user_id:
                 data["user_id"] = user_id
                 data["initiator"] = user_id
@@ -258,9 +337,75 @@ class BudPipelineService(SessionMixin):
             )
             return result
         except Exception as e:
-            logger.exception(f"Failed to execute workflow {workflow_id}")
+            logger.exception(f"Failed to execute pipeline {pipeline_id}")
             raise ClientException(
-                f"Failed to execute workflow: {str(e)}",
+                f"Failed to execute pipeline: {str(e)}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
+    # Backwards compatibility alias
+    async def execute_workflow(
+        self,
+        workflow_id: str,
+        params: Optional[Dict[str, Any]] = None,
+        callback_topics: Optional[List[str]] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Deprecated: Use execute_pipeline() instead."""
+        return await self.execute_pipeline(
+            pipeline_id=workflow_id,
+            params=params,
+            callback_topics=callback_topics,
+            user_id=user_id,
+        )
+
+    async def run_ephemeral_execution(
+        self,
+        pipeline_definition: Dict[str, Any],
+        params: Optional[Dict[str, Any]] = None,
+        callback_topics: Optional[List[str]] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute a pipeline inline without saving the pipeline definition.
+
+        This allows executing a pipeline definition without registering it
+        in the database. The execution is tracked but the pipeline itself
+        is NOT saved.
+
+        Args:
+            pipeline_definition: Complete pipeline DAG definition to execute
+            params: Input parameters for the execution
+            callback_topics: Optional list of callback topics for real-time updates
+            user_id: User ID initiating the execution
+
+        Returns:
+            Execution details including execution_id
+
+        Raises:
+            ClientException: If execution fails
+        """
+        try:
+            data = {
+                "pipeline_definition": pipeline_definition,
+                "params": params or {},
+            }
+            if callback_topics:
+                data["callback_topics"] = callback_topics
+            if user_id:
+                data["user_id"] = user_id
+                data["initiator"] = user_id
+
+            result = await DaprService.invoke_service(
+                app_id=BUDPIPELINE_APP_ID,
+                method_path="executions/run",
+                method="POST",
+                data=data,
+            )
+            return result
+        except Exception as e:
+            logger.exception("Failed to run ephemeral execution")
+            raise ClientException(
+                f"Failed to run ephemeral execution: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 

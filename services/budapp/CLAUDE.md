@@ -273,27 +273,35 @@ assert tampered[0]["verification_message"] == "message"
 
 ## BudPipeline Integration
 
-BudApp provides authenticated proxy routes to the BudPipeline service for workflow management and execution monitoring. All routes are prefixed with `/budpipeline` and require authentication.
+BudApp provides authenticated proxy routes to the BudPipeline service for pipeline management and execution monitoring. All routes are prefixed with `/budpipeline` and require authentication.
+
+### User Isolation
+
+Pipelines support user-scoped ownership via the `user_id` field:
+- Each pipeline is owned by the user who created it (extracted from JWT)
+- Users can only see/modify pipelines they own
+- System-owned pipelines (`system_owned=true`) are visible to all users when using `include_system=true`
 
 ### Execution Monitoring Routes (002-pipeline-event-persistence)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/budpipeline/executions` | List executions with filters (workflow_id, status, initiator, date range) and pagination |
+| `GET` | `/budpipeline/executions` | List executions with filters (pipeline_id, status, initiator, date range) and pagination |
 | `GET` | `/budpipeline/executions/{id}` | Get execution details with step statuses |
 | `GET` | `/budpipeline/executions/{id}/progress` | Get detailed progress including steps, events, and aggregated progress |
 
-### Workflow Management Routes
+### Pipeline Management Routes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/budpipeline` | Create a new workflow |
-| `GET` | `/budpipeline` | List all workflows |
-| `GET` | `/budpipeline/{id}` | Get workflow details |
-| `PUT` | `/budpipeline/{id}` | Update workflow |
-| `DELETE` | `/budpipeline/{id}` | Delete workflow |
+| `POST` | `/budpipeline` | Create a new pipeline (user_id extracted from JWT) |
+| `GET` | `/budpipeline` | List user's pipelines (add `?include_system=true` to include system pipelines) |
+| `GET` | `/budpipeline/{id}` | Get pipeline details (user must own or system_owned) |
+| `PUT` | `/budpipeline/{id}` | Update pipeline (user must own) |
+| `DELETE` | `/budpipeline/{id}` | Delete pipeline (user must own) |
 | `POST` | `/budpipeline/{id}/execute` | Start execution (supports `callback_topics` for real-time updates) |
 | `POST` | `/budpipeline/validate` | Validate DAG definition |
+| `POST` | `/budpipeline/run` | Execute pipeline inline without saving the definition (ephemeral execution) |
 
 ### Schedule Management Routes
 
@@ -342,15 +350,40 @@ BudApp provides authenticated proxy routes to the BudPipeline service for workfl
 ### Usage Example
 
 ```python
+# Create a pipeline (user_id automatically set from JWT)
+response = await client.post(
+    "/budpipeline",
+    json={
+        "dag": {"name": "my-pipeline", "version": "1.0", "steps": [...]},
+        "name": "My Pipeline"
+    }
+)
+pipeline_id = response.json()["id"]
+
+# List user's pipelines (excluding system pipelines)
+pipelines = await client.get("/budpipeline")
+
+# List including system pipelines
+pipelines = await client.get("/budpipeline?include_system=true")
+
 # Start execution with callback topics for real-time progress
 response = await client.post(
-    "/budpipeline/{workflow_id}/execute",
+    f"/budpipeline/{pipeline_id}/execute",
     json={
         "params": {"input": "data"},
         "callback_topics": ["my-progress-topic"]
     }
 )
-execution_id = response.json()["id"]
+execution_id = response.json()["execution_id"]
+
+# Ephemeral execution (pipeline definition is not saved)
+response = await client.post(
+    "/budpipeline/run",
+    json={
+        "pipeline_definition": {"name": "temp", "version": "1.0", "steps": [...]},
+        "params": {"input": "data"}
+    }
+)
 
 # Poll for progress
 progress = await client.get(f"/budpipeline/executions/{execution_id}/progress")
