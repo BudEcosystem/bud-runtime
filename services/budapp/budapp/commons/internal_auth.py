@@ -78,9 +78,10 @@ class InternalAuthMiddleware(BaseHTTPMiddleware):
                     media_type="application/json",
                 )
 
-            actual_token = request.headers.get("dapr-api-token")
+            # Check both dapr-api-token and x-app-api-token (same as validate_internal_request)
+            actual_token = request.headers.get("dapr-api-token") or request.headers.get("x-app-api-token")
             if actual_token != expected_token:
-                logger.warning("Invalid dapr-api-token header - rejecting internal request to %s", request.url.path)
+                logger.warning("Invalid internal token header - rejecting internal request to %s", request.url.path)
                 return Response(
                     content='{"detail":"Forbidden - Invalid internal token"}',
                     status_code=status.HTTP_403_FORBIDDEN,

@@ -1,7 +1,7 @@
 """Deployment-related actions.
 
 This module contains actions for deployment operations:
-- deployment_create: Create a new deployment (TODO: implementation pending)
+- deployment_create: Deploy a model to create an inference endpoint
 - deployment_delete: Delete a deployment (TODO: implementation pending)
 - deployment_autoscale: Configure autoscaling (TODO: implementation pending)
 - deployment_ratelimit: Configure rate limiting (TODO: implementation pending)

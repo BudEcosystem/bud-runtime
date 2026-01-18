@@ -1,4 +1,4 @@
-"""Tests for deployment actions (placeholders)."""
+"""Tests for deployment actions."""
 
 from __future__ import annotations
 
@@ -29,46 +29,60 @@ def make_context(**params) -> ActionContext:
 
 
 class TestDeploymentCreateAction:
-    """Tests for DeploymentCreateAction (placeholder)."""
+    """Tests for DeploymentCreateAction."""
 
     def test_meta_attributes(self) -> None:
         """Test action metadata attributes."""
         meta = DeploymentCreateAction.meta
         assert meta.type == "deployment_create"
-        assert meta.name == "Create Deployment"
+        assert meta.name == "Deploy Model"
         assert meta.category == "Deployment"
         assert meta.execution_mode.value == "event_driven"
         assert meta.idempotent is False
-        assert "budcluster" in meta.required_services
+        assert "budapp" in meta.required_services
 
     def test_validate_params_missing_model_id(self) -> None:
         """Test validation catches missing model_id."""
         executor = DeploymentCreateExecutor()
-        errors = executor.validate_params({"cluster_id": "cluster-123"})
+        errors = executor.validate_params({"project_id": "proj-123", "endpoint_name": "test-ep"})
         assert any("model_id" in e for e in errors)
 
-    def test_validate_params_missing_cluster_id(self) -> None:
-        """Test validation catches missing cluster_id."""
+    def test_validate_params_missing_project_id(self) -> None:
+        """Test validation catches missing project_id."""
         executor = DeploymentCreateExecutor()
-        errors = executor.validate_params({"model_id": "model-123"})
-        assert any("cluster_id" in e for e in errors)
+        errors = executor.validate_params({"model_id": "model-123", "endpoint_name": "test-ep"})
+        assert any("project_id" in e for e in errors)
+
+    def test_validate_params_missing_endpoint_name(self) -> None:
+        """Test validation catches missing endpoint_name."""
+        executor = DeploymentCreateExecutor()
+        errors = executor.validate_params({"model_id": "model-123", "project_id": "proj-123"})
+        assert any("endpoint_name" in e for e in errors)
 
     def test_validate_params_valid(self) -> None:
         """Test validation passes with required params."""
         executor = DeploymentCreateExecutor()
-        errors = executor.validate_params({"model_id": "model-123", "cluster_id": "cluster-123"})
+        errors = executor.validate_params(
+            {
+                "model_id": "model-123",
+                "project_id": "proj-123",
+                "endpoint_name": "test-endpoint",
+            }
+        )
         assert len(errors) == 0
 
-    @pytest.mark.asyncio
-    async def test_execute_returns_not_implemented(self) -> None:
-        """Test that execute returns not implemented error."""
+    def test_validate_params_cluster_optional(self) -> None:
+        """Test that cluster_id is optional (for cloud models)."""
         executor = DeploymentCreateExecutor()
-        context = make_context(model_id="model-123", cluster_id="cluster-123")
-
-        result = await executor.execute(context)
-
-        assert result.success is False
-        assert "not yet implemented" in result.error.lower()
+        errors = executor.validate_params(
+            {
+                "model_id": "model-123",
+                "project_id": "proj-123",
+                "endpoint_name": "test-endpoint",
+                # cluster_id intentionally omitted
+            }
+        )
+        assert len(errors) == 0
 
 
 class TestDeploymentDeleteAction:
