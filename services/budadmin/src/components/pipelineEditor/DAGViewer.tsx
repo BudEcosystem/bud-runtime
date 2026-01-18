@@ -52,7 +52,7 @@ const StepNode: React.FC<StepNodeProps> = ({
   isSelected,
 }) => {
   const config = actionConfig[step.action] || { icon: "⚙️", color: "#8c8c8c" };
-  const status = execution?.status || "pending";
+  const status = (execution?.status?.toLowerCase()) || "pending";
 
   return (
     <Tooltip

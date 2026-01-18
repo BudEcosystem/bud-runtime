@@ -72,6 +72,7 @@ fail = "budpipeline.actions.builtin.fail:FailAction"
 
 # Model Actions
 model_add = "budpipeline.actions.model.add:ModelAddAction"
+cloud_model_add = "budpipeline.actions.model.add_cloud:CloudModelAddAction"
 model_delete = "budpipeline.actions.model.delete:ModelDeleteAction"
 model_benchmark = "budpipeline.actions.model.benchmark:ModelBenchmarkAction"
 

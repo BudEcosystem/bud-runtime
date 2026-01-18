@@ -26,6 +26,7 @@ class ParamType(str, Enum):
     CLUSTER_REF = "cluster_ref"  # Cluster reference
     PROJECT_REF = "project_ref"  # Project reference
     ENDPOINT_REF = "endpoint_ref"  # Endpoint reference
+    PROVIDER_REF = "provider_ref"  # Cloud provider reference
 
 
 class ExecutionMode(str, Enum):

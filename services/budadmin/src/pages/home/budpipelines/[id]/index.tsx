@@ -24,6 +24,7 @@ import {
 import { useBudPipeline, PipelineStep, PipelineStepExecution, DAGDefinition } from "src/stores/useBudPipeline";
 import { useCluster } from "src/hooks/useCluster";
 import { useModels } from "src/hooks/useModels";
+import { useCloudProviders } from "src/hooks/useCloudProviders";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
@@ -117,6 +118,7 @@ const WorkflowDetail = () => {
 
   const { clusters, getClusters } = useCluster();
   const { models, getGlobalModels } = useModels();
+  const { providers, getProviders } = useCloudProviders();
 
   const [activeTab, setActiveTab] = useState("dag");
   const [selectedStep, setSelectedStep] = useState<PipelineStep | null>(null);
@@ -140,7 +142,7 @@ const WorkflowDetail = () => {
     [executions]
   );
 
-  // Transform clusters and models to SelectOption format for WorkflowEditor
+  // Transform clusters, models, and providers to SelectOption format for WorkflowEditor
   const dataSources = useMemo(() => ({
     clusters: clusters.map((c) => ({
       label: c.name,
@@ -150,9 +152,13 @@ const WorkflowDetail = () => {
       label: m.name,
       value: m.id,
     })),
-  }), [clusters, models]);
+    providers: providers.map((p) => ({
+      label: p.name,
+      value: p.id,
+    })),
+  }), [clusters, models, providers]);
 
-  // Fetch clusters and models when entering edit mode
+  // Fetch clusters, models, and providers when entering edit mode
   useEffect(() => {
     if (isEditing) {
       const loadingSet = new Set<string>();
@@ -162,6 +168,9 @@ const WorkflowDetail = () => {
       }
       if (models.length === 0) {
         loadingSet.add("models");
+      }
+      if (providers.length === 0) {
+        loadingSet.add("providers");
       }
 
       if (loadingSet.size > 0) {
@@ -192,6 +201,19 @@ const WorkflowDetail = () => {
               setLoadingDataSources(prev => {
                 const next = new Set(prev);
                 next.delete("models");
+                return next;
+              });
+            })()
+          );
+        }
+
+        if (providers.length === 0) {
+          fetchPromises.push(
+            (async () => {
+              await getProviders(1, 100);
+              setLoadingDataSources(prev => {
+                const next = new Set(prev);
+                next.delete("providers");
                 return next;
               });
             })()
@@ -500,21 +522,26 @@ const WorkflowDetail = () => {
                               title: "Status",
                               dataIndex: "status",
                               key: "status",
-                              render: (status: string) => (
-                                <Tag
-                                  className={`border-0 text-[10px] ${
-                                    status === "completed"
-                                      ? "bg-green-500/20 text-green-500"
-                                      : status === "failed"
-                                      ? "bg-red-500/20 text-red-500"
-                                      : status === "running"
-                                      ? "bg-blue-500/20 text-blue-500"
-                                      : "bg-gray-500/20 text-gray-500"
-                                  }`}
-                                >
-                                  {status}
-                                </Tag>
-                              ),
+                              render: (status: string) => {
+                                const normalizedStatus = status?.toUpperCase();
+                                return (
+                                  <Tag
+                                    className={`border-0 text-[10px] ${
+                                      normalizedStatus === "COMPLETED"
+                                        ? "bg-green-500/20 text-green-500"
+                                        : normalizedStatus === "FAILED"
+                                        ? "bg-red-500/20 text-red-500"
+                                        : normalizedStatus === "RUNNING"
+                                        ? "bg-blue-500/20 text-blue-500"
+                                        : normalizedStatus === "PENDING"
+                                        ? "bg-yellow-500/20 text-yellow-500"
+                                        : "bg-gray-500/20 text-gray-500"
+                                    }`}
+                                  >
+                                    {status?.toLowerCase()}
+                                  </Tag>
+                                );
+                              },
                             },
                             {
                               title: "Started",

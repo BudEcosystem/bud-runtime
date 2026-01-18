@@ -3,27 +3,28 @@
  *
  * Registers all node types for the workflow editor.
  * This is used by the FlowEditor to render different node types.
+ *
+ * Note: All action types use the StepNode component, which reads
+ * the action type from node data and renders dynamically based on
+ * action metadata from the API.
  */
 
 import type { NodeTypes } from '@xyflow/react';
 import { StartNode } from '../nodes/StartNode';
 import { StepNode } from '../nodes/StepNode';
-import { allActions } from './actionRegistry';
 
 /**
- * Node types for the workflow editor
+ * Node types for the workflow editor.
+ *
+ * - 'start': The trigger/start node
+ * - 'step': Generic step node used for all action types
+ *
+ * The StepNode component handles all action types dynamically by reading
+ * the action type from node.data and fetching metadata from the API cache.
  */
 export const pipelineNodeTypes: NodeTypes = {
-  // Start trigger node
   start: StartNode,
-
-  // Step nodes - all actions use the same StepNode component
-  // which reads the action type from node data
   step: StepNode,
-
-  // Register all action types to use StepNode
-  // This allows both 'step' type and specific action types
-  ...Object.fromEntries(allActions.map((action) => [action.value, StepNode])),
 };
 
 /**

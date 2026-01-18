@@ -51,22 +51,18 @@ class ModelAddExecutor(BaseActionExecutor):
         The workflow completion will be signaled via on_event() when
         budcluster publishes the completion event.
         """
-        model_source = context.params.get("model_source", "huggingface")
-        huggingface_id = context.params.get("huggingface_id", "")
-        model_name = context.params.get(
-            "model_name", huggingface_id.split("/")[-1] if huggingface_id else ""
-        )
+        model_source = context.params.get("model_source", "hugging_face")
+        model_uri = context.params.get("model_uri", "")
+        model_name = context.params.get("model_name", model_uri.split("/")[-1] if model_uri else "")
         description = context.params.get("description", "")
         author = context.params.get("author", "")
-        modality = context.params.get("modality", ["text"])
-        project_id = context.params.get("project_id")
-        max_wait_seconds = context.params.get("max_wait_seconds", 1800)
+        max_wait_seconds = context.params.get("max_wait_seconds", 86400)
 
         logger.info(
             "model_add_starting",
             step_id=context.step_id,
             model_source=model_source,
-            huggingface_id=huggingface_id,
+            model_uri=model_uri,
             model_name=model_name,
         )
 
@@ -83,13 +79,11 @@ class ModelAddExecutor(BaseActionExecutor):
                     "workflow_total_steps": 1,
                     "step_number": 1,
                     "trigger_workflow": True,
-                    "provider_type": "hugging_face",
+                    "provider_type": model_source,
                     "name": model_name,
-                    "uri": huggingface_id,
+                    "uri": model_uri,
                     "description": description,
                     "author": author,
-                    "modality": modality,
-                    "project_id": project_id,
                     "callback_topic": CALLBACK_TOPIC,
                 },
                 timeout_seconds=60,
@@ -289,48 +283,61 @@ class ModelAddExecutor(BaseActionExecutor):
     def validate_params(self, params: dict) -> list[str]:
         """Validate parameters."""
         errors = []
-        source = params.get("model_source", "huggingface")
+        source = params.get("model_source", "hugging_face")
 
-        if source == "huggingface" and not params.get("huggingface_id"):
-            errors.append("huggingface_id is required for huggingface source")
+        if not params.get("model_uri"):
+            errors.append("model_uri is required")
+
+        # Validate URI format based on source
+        model_uri = params.get("model_uri", "")
+        if source == "hugging_face" and "/" not in model_uri:
+            errors.append("HuggingFace model_uri should be in format 'org/model-name'")
+        elif source == "url" and not model_uri.startswith(("http://", "https://")):
+            errors.append("URL model_uri should start with http:// or https://")
+        elif source == "disk" and not model_uri.startswith("/"):
+            errors.append("Disk model_uri should be an absolute path starting with /")
 
         return errors
 
 
 META = ActionMeta(
     type="model_add",
-    version="1.0.0",
+    version="1.1.0",
     name="Add Model",
-    description="Add a new model to the model repository from HuggingFace",
+    description="Add a new model to the model repository from HuggingFace, URL, or local disk",
     category="Model Operations",
     icon="database-plus",
     color="#10B981",  # Green
     execution_mode=ExecutionMode.EVENT_DRIVEN,
-    timeout_seconds=1800,  # 30 minutes
+    timeout_seconds=86400,  # 1 day
     idempotent=False,
-    required_services=["budapp"],
+    required_services=["budapp", "budmodel"],
     params=[
         ParamDefinition(
             name="model_source",
             label="Model Source",
             type=ParamType.SELECT,
             description="Source of the model",
-            default="huggingface",
-            options=[SelectOption(value="huggingface", label="HuggingFace")],
+            default="hugging_face",
+            options=[
+                SelectOption(value="hugging_face", label="HuggingFace"),
+                SelectOption(value="url", label="URL (Direct Download)"),
+                SelectOption(value="disk", label="Disk (Local Path)"),
+            ],
         ),
         ParamDefinition(
-            name="huggingface_id",
-            label="HuggingFace ID",
+            name="model_uri",
+            label="Model URI",
             type=ParamType.STRING,
-            description="HuggingFace model identifier (e.g., 'meta-llama/Llama-2-7b')",
+            description="Model location: HuggingFace ID (org/model), URL, or disk path",
             required=True,
-            placeholder="org/model-name",
+            placeholder="meta-llama/Llama-2-7b or https://... or /path/to/model",
         ),
         ParamDefinition(
             name="model_name",
             label="Model Name",
             type=ParamType.STRING,
-            description="Display name for the model (defaults to HuggingFace model name)",
+            description="Display name for the model (defaults to name from URI)",
             required=False,
         ),
         ParamDefinition(
@@ -348,32 +355,12 @@ META = ActionMeta(
             required=False,
         ),
         ParamDefinition(
-            name="modality",
-            label="Modality",
-            type=ParamType.MULTISELECT,
-            description="Model modalities",
-            default=["text"],
-            options=[
-                SelectOption(value="text", label="Text"),
-                SelectOption(value="image", label="Image"),
-                SelectOption(value="audio", label="Audio"),
-                SelectOption(value="video", label="Video"),
-            ],
-        ),
-        ParamDefinition(
-            name="project_id",
-            label="Project ID",
-            type=ParamType.PROJECT_REF,
-            description="Project to associate the model with",
-            required=False,
-        ),
-        ParamDefinition(
             name="max_wait_seconds",
             label="Max Wait Time",
             type=ParamType.NUMBER,
             description="Maximum time to wait for model extraction (seconds)",
-            default=1800,
-            validation=ValidationRules(min=60, max=7200),
+            default=86400,
+            validation=ValidationRules(min=300, max=172800),
         ),
     ],
     outputs=[

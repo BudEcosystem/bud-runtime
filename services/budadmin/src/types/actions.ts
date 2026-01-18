@@ -21,7 +21,8 @@ export type ParamType =
   | 'model_ref'
   | 'cluster_ref'
   | 'project_ref'
-  | 'endpoint_ref';
+  | 'endpoint_ref'
+  | 'provider_ref';
 
 export interface SelectOption {
   value: string;

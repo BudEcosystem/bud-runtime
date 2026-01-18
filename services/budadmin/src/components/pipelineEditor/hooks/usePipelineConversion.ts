@@ -88,7 +88,7 @@ export function usePipelineConversion(): UsePipelineConversionReturn {
 
         const stepNode: Node<StepNodeData> = {
           id: nodeId,
-          type: step.action, // Use action type as node type
+          type: 'step', // All action nodes use the 'step' node type
           position: {
             x: xOffset,
             y: startY + index * (DEFAULT_NODE_HEIGHT + VERTICAL_SPACING),
@@ -287,7 +287,7 @@ export function usePipelineConversion(): UsePipelineConversionReturn {
 
       return {
         id: `step_${stepId}`,
-        type: action,
+        type: 'step', // All action nodes use the 'step' node type
         position: position || { x: 500, y: 150 }, // Default position for horizontal flow
         data: {
           stepId,

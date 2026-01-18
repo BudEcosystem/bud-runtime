@@ -5,9 +5,9 @@
  */
 
 export {
-  actionCategories,
-  allActions,
   getActionMeta,
+  getAllActions,
+  getActionCategories,
   getActionParams,
   getRequiredParams,
   getOptionalParams,

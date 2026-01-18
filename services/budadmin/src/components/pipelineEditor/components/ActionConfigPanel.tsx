@@ -242,6 +242,7 @@ export interface ActionConfigPanelProps {
     clusters?: SelectOption[];
     projects?: SelectOption[];
     endpoints?: SelectOption[];
+    providers?: SelectOption[];
   };
   /** Whether data sources are loading */
   loadingDataSources?: Set<string>;
@@ -544,6 +545,8 @@ export function ActionConfigPanel({
           return dataSources.projects || [];
         case 'endpoint_ref':
           return dataSources.endpoints || [];
+        case 'provider_ref':
+          return dataSources.providers || [];
         default:
           return [];
       }
@@ -661,8 +664,8 @@ export function ActionConfigPanel({
             </select>
           )}
 
-          {/* Ref types (model, cluster, etc.) - with toggle for template mode */}
-          {['model_ref', 'cluster_ref', 'project_ref', 'endpoint_ref'].includes(param.type) && (
+          {/* Ref types (model, cluster, provider, etc.) - with toggle for template mode */}
+          {['model_ref', 'cluster_ref', 'project_ref', 'endpoint_ref', 'provider_ref'].includes(param.type) && (
             <div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
                 <button

@@ -298,13 +298,17 @@ async def list_providers(
     },
     description="Add cloud model workflow",
 )
-@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.MODEL_MANAGE])
 async def add_cloud_model_workflow(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     request: CreateCloudModelWorkflowRequest,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
-    """Add cloud model workflow."""
+    """Add cloud model workflow.
+
+    This endpoint supports both JWT authentication (for external API calls)
+    and internal Dapr service-to-service calls (using dapr-api-token header).
+    """
     try:
         db_workflow = await CloudModelWorkflowService(session).add_cloud_model_workflow(
             current_user_id=current_user.id,

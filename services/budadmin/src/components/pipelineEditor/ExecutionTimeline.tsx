@@ -55,7 +55,8 @@ const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
   onSelect,
   isSelected,
 }) => {
-  const config = statusConfig[step.status];
+  const normalizedStatus = step.status?.toLowerCase() || 'pending';
+  const config = statusConfig[normalizedStatus] || statusConfig.pending;
   const duration =
     step.started_at && step.completed_at
       ? differenceInSeconds(new Date(step.completed_at), new Date(step.started_at))
@@ -100,7 +101,7 @@ const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
               className="border-0 text-[10px]"
               style={{ backgroundColor: config.bgColor, color: config.color }}
             >
-              {step.status}
+              {normalizedStatus}
             </Tag>
           </Flex>
           <Flex align="center" gap="2">
@@ -164,7 +165,8 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({
   onStepSelect,
   selectedStepId,
 }) => {
-  const overallConfig = statusConfig[execution.status];
+  const normalizedExecStatus = execution.status?.toLowerCase() || 'pending';
+  const overallConfig = statusConfig[normalizedExecStatus] || statusConfig.pending;
   const duration =
     execution.started_at && execution.completed_at
       ? differenceInSeconds(

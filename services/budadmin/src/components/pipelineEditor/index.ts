@@ -18,9 +18,9 @@ export type { StartNodeData, StartNodeProps, StepNodeData, StepNodeProps } from 
 
 // Configuration
 export {
-  actionCategories,
-  allActions,
   getActionMeta,
+  getAllActions,
+  getActionCategories,
   getActionParams,
   validateParams,
   getDefaultParams,

@@ -16,6 +16,7 @@ import { getActionMeta } from '../config/actionRegistry';
 const ICON_MAP: Record<string, string> = {
   // Model Operations
   'database-plus': 'ph:database-bold',
+  'cloud-upload': 'ph:cloud-arrow-up-bold',
   'chart-bar': 'ph:chart-bar-bold',
   'trash': 'ph:trash-bold',
 
