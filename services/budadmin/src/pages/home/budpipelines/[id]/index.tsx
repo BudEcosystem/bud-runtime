@@ -25,6 +25,7 @@ import { useBudPipeline, PipelineStep, PipelineStepExecution, DAGDefinition } fr
 import { useCluster } from "src/hooks/useCluster";
 import { useModels } from "src/hooks/useModels";
 import { useCloudProviders } from "src/hooks/useCloudProviders";
+import { useProjects } from "src/hooks/useProjects";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
@@ -119,6 +120,7 @@ const WorkflowDetail = () => {
   const { clusters, getClusters } = useCluster();
   const { models, getGlobalModels } = useModels();
   const { providers, getProviders } = useCloudProviders();
+  const { projects, getProjects } = useProjects();
 
   const [activeTab, setActiveTab] = useState("dag");
   const [selectedStep, setSelectedStep] = useState<PipelineStep | null>(null);
@@ -142,7 +144,7 @@ const WorkflowDetail = () => {
     [executions]
   );
 
-  // Transform clusters, models, and providers to SelectOption format for WorkflowEditor
+  // Transform clusters, models, projects, and providers to SelectOption format for WorkflowEditor
   const dataSources = useMemo(() => ({
     clusters: clusters.map((c) => ({
       label: c.name,
@@ -152,13 +154,17 @@ const WorkflowDetail = () => {
       label: m.name,
       value: m.id,
     })),
+    projects: projects.map((p: any) => ({
+      label: p.project?.name || p.name || "",
+      value: p.project?.id || p.id || "",
+    })),
     providers: providers.map((p) => ({
       label: p.name,
       value: p.id,
     })),
-  }), [clusters, models, providers]);
+  }), [clusters, models, projects, providers]);
 
-  // Fetch clusters, models, and providers when entering edit mode
+  // Fetch clusters, models, projects, and providers when entering edit mode
   useEffect(() => {
     if (isEditing) {
       const loadingSet = new Set<string>();
@@ -168,6 +174,9 @@ const WorkflowDetail = () => {
       }
       if (models.length === 0) {
         loadingSet.add("models");
+      }
+      if (projects.length === 0) {
+        loadingSet.add("projects");
       }
       if (providers.length === 0) {
         loadingSet.add("providers");
@@ -201,6 +210,19 @@ const WorkflowDetail = () => {
               setLoadingDataSources(prev => {
                 const next = new Set(prev);
                 next.delete("models");
+                return next;
+              });
+            })()
+          );
+        }
+
+        if (projects.length === 0) {
+          fetchPromises.push(
+            (async () => {
+              await getProjects(1, 100);
+              setLoadingDataSources(prev => {
+                const next = new Set(prev);
+                next.delete("projects");
                 return next;
               });
             })()

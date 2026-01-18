@@ -1199,9 +1199,9 @@ async def cancel_model_quantization(
     },
     description="Deploy a model in server for a specified project by step",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def deploy_model_by_step(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     deploy_request: ModelDeployStepRequest,
     x_resource_type: Annotated[Optional[str], Header()] = None,

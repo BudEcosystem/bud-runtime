@@ -51,7 +51,9 @@ def validate_internal_request(request: Request) -> None:
             detail="Forbidden - Internal auth not configured",
         )
 
-    actual_token = request.headers.get("dapr-api-token")
+    # Check both dapr-api-token (for direct Dapr calls) and x-app-api-token
+    # (for calls where Dapr consumes dapr-api-token but forwards x-app-api-token)
+    actual_token = request.headers.get("dapr-api-token") or request.headers.get("x-app-api-token")
     if actual_token != expected_token:
         logger.warning("Invalid dapr-api-token header - rejecting internal request")
         raise HTTPException(
