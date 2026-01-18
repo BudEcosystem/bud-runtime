@@ -48,6 +48,8 @@ class PipelineDefinitionCRUD:
         created_by: str,
         description: str | None = None,
         status: PipelineStatus = PipelineStatus.DRAFT,
+        user_id: UUID | None = None,
+        system_owned: bool = False,
     ) -> PipelineDefinition:
         """Create a new pipeline definition.
 
@@ -57,6 +59,8 @@ class PipelineDefinitionCRUD:
             created_by: User or service that created the pipeline.
             description: Optional pipeline description.
             status: Initial pipeline status (default: draft).
+            user_id: UUID of the owning user (None for system/anonymous pipelines).
+            system_owned: True if this is a system-owned pipeline visible to all users.
 
         Returns:
             Created PipelineDefinition instance.
@@ -72,6 +76,8 @@ class PipelineDefinitionCRUD:
             status=status,
             step_count=step_count,
             created_by=created_by,
+            user_id=user_id,
+            system_owned=system_owned,
         )
         self.session.add(definition)
         await self.session.flush()
@@ -104,12 +110,16 @@ class PipelineDefinitionCRUD:
         self,
         status: PipelineStatus | None = None,
         created_by: str | None = None,
+        user_id: UUID | None = None,
+        include_system: bool = False,
     ) -> list[PipelineDefinition]:
         """List all pipeline definitions with optional filtering.
 
         Args:
             status: Filter by pipeline status.
             created_by: Filter by creator.
+            user_id: Filter by user_id (returns only pipelines owned by this user).
+            include_system: If True, also include system-owned pipelines when filtering by user_id.
 
         Returns:
             List of PipelineDefinition instances.
@@ -121,9 +131,73 @@ class PipelineDefinitionCRUD:
         if created_by is not None:
             stmt = stmt.where(PipelineDefinition.created_by == created_by)
 
+        # User isolation filter
+        if user_id is not None:
+            if include_system:
+                # User's own pipelines OR system-owned pipelines
+                from sqlalchemy import or_
+
+                stmt = stmt.where(
+                    or_(
+                        PipelineDefinition.user_id == user_id,
+                        PipelineDefinition.system_owned == True,  # noqa: E712
+                    )
+                )
+            else:
+                # Only user's own pipelines
+                stmt = stmt.where(PipelineDefinition.user_id == user_id)
+
         stmt = stmt.order_by(PipelineDefinition.created_at.desc())
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_by_id_for_user(
+        self,
+        definition_id: UUID,
+        user_id: UUID | None,
+        include_executions: bool = False,
+    ) -> PipelineDefinition | None:
+        """Get pipeline definition by ID with user permission check.
+
+        Returns the pipeline if:
+        - It belongs to the specified user, OR
+        - It is a system-owned pipeline, OR
+        - user_id is None (system/admin context)
+
+        Args:
+            definition_id: Pipeline definition UUID.
+            user_id: User UUID to check ownership. None means system/admin access.
+            include_executions: Include related executions.
+
+        Returns:
+            PipelineDefinition instance or None if not found or not authorized.
+        """
+        stmt = select(PipelineDefinition).where(PipelineDefinition.id == definition_id)
+
+        if include_executions:
+            stmt = stmt.options(selectinload(PipelineDefinition.executions))
+
+        result = await self.session.execute(stmt)
+        definition = result.scalar_one_or_none()
+
+        if definition is None:
+            return None
+
+        # Check permission
+        if user_id is None:
+            # System/admin access - can see everything
+            return definition
+
+        if definition.system_owned:
+            # System-owned pipelines are visible to everyone
+            return definition
+
+        if definition.user_id == user_id:
+            # User owns this pipeline
+            return definition
+
+        # User doesn't have permission
+        return None
 
     async def update_with_version(
         self,

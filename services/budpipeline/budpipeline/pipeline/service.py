@@ -1,4 +1,4 @@
-"""Workflow service for managing DAGs and executions."""
+"""Pipeline service for managing DAGs and executions."""
 
 import asyncio
 import logging
@@ -77,57 +77,22 @@ class ExecutionStorage:
 execution_storage = ExecutionStorage()
 
 
-# Keep WorkflowStorage as an alias for backwards compatibility (deprecated)
-class WorkflowStorage(ExecutionStorage):
-    """Deprecated: Use ExecutionStorage for execution state.
-
-    Workflow definitions are now stored in the database via PipelineDefinition model.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.workflows: dict[str, dict[str, Any]] = {}
-
-    def save_workflow(self, workflow_id: str, data: dict[str, Any]) -> None:
-        """Deprecated: Workflows are now stored in database."""
-        self.workflows[workflow_id] = data
-
-    def get_workflow(self, workflow_id: str) -> dict[str, Any] | None:
-        """Deprecated: Workflows are now stored in database."""
-        return self.workflows.get(workflow_id)
-
-    def list_workflows(self) -> list[dict[str, Any]]:
-        """Deprecated: Workflows are now stored in database."""
-        return list(self.workflows.values())
-
-    def delete_workflow(self, workflow_id: str) -> bool:
-        """Deprecated: Workflows are now stored in database."""
-        if workflow_id in self.workflows:
-            del self.workflows[workflow_id]
-            return True
-        return False
-
-
-# Global storage instance (deprecated, use execution_storage)
-storage = WorkflowStorage()
-
-
-class WorkflowService:
-    """Service for managing workflow DAGs and executions.
+class PipelineService:
+    """Service for managing pipeline DAGs and executions.
 
     This service provides both sync (deprecated, uses in-memory storage) and
-    async (uses database via CRUD) methods for workflow management.
+    async (uses database via CRUD) methods for pipeline management.
 
     For new code, use the async methods with a database session:
-    - create_workflow_async(session, dag_dict, name_override, created_by)
-    - get_workflow_async(session, workflow_id)
-    - list_workflows_async(session)
-    - update_workflow_async(session, workflow_id, dag_dict, name_override)
-    - delete_workflow_async(session, workflow_id)
+    - create_pipeline_async(session, dag_dict, name_override, created_by, user_id, system_owned)
+    - get_pipeline_async(session, pipeline_id)
+    - get_pipeline_async_for_user(session, pipeline_id, user_id)
+    - list_pipelines_async(session, user_id, include_system)
+    - update_pipeline_async(session, pipeline_id, dag_dict, name_override)
+    - delete_pipeline_async(session, pipeline_id)
     """
 
     def __init__(self) -> None:
-        self.storage = storage
         self.execution_storage = execution_storage
 
     def validate_dag(self, dag_dict: dict[str, Any]) -> tuple[bool, list[str], list[str]]:
@@ -190,173 +155,48 @@ class WorkflowService:
 
         return (len(errors) == 0, errors, warnings)
 
-    def create_workflow(
-        self, dag_dict: dict[str, Any], name_override: str | None = None
-    ) -> dict[str, Any]:
-        """Create/register a workflow from DAG definition.
-
-        Args:
-            dag_dict: DAG definition dict
-            name_override: Optional name override
-
-        Returns:
-            Workflow metadata dict
-        """
-        # Check if this is a draft workflow (empty or no steps)
-        steps = dag_dict.get("steps") or []
-        is_draft = len(steps) == 0
-
-        if is_draft:
-            # For draft workflows, skip full validation but ensure required fields exist
-            if "name" not in dag_dict and not name_override:
-                raise DAGValidationError(
-                    "Workflow name is required", errors=["name: Field required"]
-                )
-
-            # Create a minimal parsed representation for drafts
-            name = name_override or dag_dict.get("name", "Untitled Workflow")
-            version = dag_dict.get("version", "1.0.0")
-            warnings = []
-        else:
-            # Validate first for non-empty workflows
-            is_valid, errors, warnings = self.validate_dag(dag_dict)
-            if not is_valid:
-                raise DAGValidationError("DAG validation failed", errors=errors)
-
-            # Parse DAG
-            dag = DAGParser.parse(dag_dict)
-            name = name_override or dag.name
-            version = dag.version
-
-        # Generate workflow ID
-        workflow_id = str(uuid4())
-
-        workflow_data = {
-            "id": workflow_id,
-            "name": name,
-            "version": version,
-            "status": "draft" if is_draft else "active",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "step_count": len(steps),
-            "dag": dag_dict,
-            "warnings": warnings,
-        }
-
-        self.storage.save_workflow(workflow_id, workflow_data)
-
-        logger.info(f"Created workflow: {workflow_id} ({name})")
-        return workflow_data
-
-    def get_workflow(self, workflow_id: str) -> dict[str, Any]:
-        """Get workflow by ID."""
-        workflow = self.storage.get_workflow(workflow_id)
-        if not workflow:
-            raise WorkflowNotFoundError(workflow_id)
-        return workflow
-
-    def list_workflows(self) -> list[dict[str, Any]]:
-        """List all workflows."""
-        return self.storage.list_workflows()
-
-    def delete_workflow(self, workflow_id: str) -> bool:
-        """Delete a workflow."""
-        return self.storage.delete_workflow(workflow_id)
-
-    def update_workflow(
-        self, workflow_id: str, dag_dict: dict[str, Any], name_override: str | None = None
-    ) -> dict[str, Any]:
-        """Update an existing workflow.
-
-        Args:
-            workflow_id: Workflow ID to update
-            dag_dict: Updated DAG definition dict
-            name_override: Optional name override
-
-        Returns:
-            Updated workflow metadata dict
-
-        Raises:
-            WorkflowNotFoundError: If workflow doesn't exist
-            DAGValidationError: If DAG validation fails
-        """
-        # Get existing workflow (raises WorkflowNotFoundError if not found)
-        existing = self.get_workflow(workflow_id)
-
-        # Check if this is a draft workflow (empty or no steps)
-        steps = dag_dict.get("steps") or []
-        is_draft = len(steps) == 0
-
-        if is_draft:
-            # For draft workflows, skip full validation
-            name = name_override or dag_dict.get("name", existing.get("name", "Untitled"))
-            version = dag_dict.get("version", existing.get("version", "1.0.0"))
-            warnings: list[str] = []
-        else:
-            # Validate for non-empty workflows
-            is_valid, errors, warnings = self.validate_dag(dag_dict)
-            if not is_valid:
-                raise DAGValidationError("DAG validation failed", errors=errors)
-            dag = DAGParser.parse(dag_dict)
-            name = name_override or dag.name
-            version = dag.version
-
-        # Update workflow data
-        workflow_data = {
-            "id": workflow_id,
-            "name": name,
-            "version": version,
-            "status": "draft" if is_draft else "active",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "created_at": existing.get("created_at"),
-            "step_count": len(steps),
-            "dag": dag_dict,
-            "warnings": warnings,
-        }
-
-        # Save to storage
-        self.storage.save_workflow(workflow_id, workflow_data)
-
-        logger.info(f"Updated workflow: {workflow_id} ({name})")
-        return workflow_data
-
     # =========================================================================
     # Async Database Methods (002-pipeline-event-persistence)
-    # These methods use the database for persistent workflow storage
+    # These methods use the database for persistent pipeline storage
     # =========================================================================
 
-    async def create_workflow_async(
+    async def create_pipeline_async(
         self,
         session: AsyncSession,
         dag_dict: dict[str, Any],
         name_override: str | None = None,
         created_by: str = "api",
         description: str | None = None,
+        user_id: UUID | None = None,
+        system_owned: bool = False,
     ) -> dict[str, Any]:
-        """Create/register a workflow from DAG definition (database persistence).
+        """Create/register a pipeline from DAG definition (database persistence).
 
         Args:
             session: Database session.
             dag_dict: DAG definition dict.
             name_override: Optional name override.
-            created_by: User or service creating the workflow.
-            description: Optional workflow description.
+            created_by: User or service creating the pipeline.
+            description: Optional pipeline description.
+            user_id: UUID of the owning user (None for system/anonymous pipelines).
+            system_owned: True if this is a system-owned pipeline visible to all users.
 
         Returns:
-            Workflow metadata dict.
+            Pipeline metadata dict.
         """
-        # Check if this is a draft workflow (empty or no steps)
+        # Check if this is a draft pipeline (empty or no steps)
         steps = dag_dict.get("steps") or []
         is_draft = len(steps) == 0
 
         if is_draft:
-            # For draft workflows, skip full validation but ensure required fields exist
+            # For draft pipelines, skip full validation but ensure required fields exist
             if "name" not in dag_dict and not name_override:
                 raise DAGValidationError(
-                    "Workflow name is required", errors=["name: Field required"]
+                    "Pipeline name is required", errors=["name: Field required"]
                 )
-            name = name_override or dag_dict.get("name", "Untitled Workflow")
+            name = name_override or dag_dict.get("name", "Untitled Pipeline")
         else:
-            # Validate first for non-empty workflows
+            # Validate first for non-empty pipelines
             is_valid, errors, _ = self.validate_dag(dag_dict)
             if not is_valid:
                 raise DAGValidationError("DAG validation failed", errors=errors)
@@ -374,10 +214,12 @@ class WorkflowService:
             created_by=created_by,
             description=description,
             status=status,
+            user_id=user_id,
+            system_owned=system_owned,
         )
         await session.commit()
 
-        logger.info(f"Created workflow in database: {definition.id} ({name})")
+        logger.info(f"Created pipeline in database: {definition.id} ({name})")
 
         return {
             "id": str(definition.id),
@@ -390,35 +232,37 @@ class WorkflowService:
             "dag": definition.dag_definition,
             "created_by": definition.created_by,
             "description": definition.description,
+            "user_id": str(definition.user_id) if definition.user_id else None,
+            "system_owned": definition.system_owned,
         }
 
-    async def get_workflow_async(
+    async def get_pipeline_async(
         self,
         session: AsyncSession,
-        workflow_id: str,
+        pipeline_id: str,
     ) -> dict[str, Any]:
-        """Get workflow by ID from database.
+        """Get pipeline by ID from database.
 
         Args:
             session: Database session.
-            workflow_id: Workflow ID (UUID string).
+            pipeline_id: Pipeline ID (UUID string).
 
         Returns:
-            Workflow metadata dict.
+            Pipeline metadata dict.
 
         Raises:
-            WorkflowNotFoundError: If workflow not found.
+            WorkflowNotFoundError: If pipeline not found.
         """
         try:
-            definition_id = UUID(workflow_id)
+            definition_id = UUID(pipeline_id)
         except ValueError:
-            raise WorkflowNotFoundError(workflow_id)
+            raise WorkflowNotFoundError(pipeline_id)
 
         crud = PipelineDefinitionCRUD(session)
         definition = await crud.get_by_id(definition_id)
 
         if definition is None:
-            raise WorkflowNotFoundError(workflow_id)
+            raise WorkflowNotFoundError(pipeline_id)
 
         execution_count = await crud.get_execution_count(definition_id)
 
@@ -434,26 +278,90 @@ class WorkflowService:
             "created_by": definition.created_by,
             "description": definition.description,
             "execution_count": execution_count,
+            "user_id": str(definition.user_id) if definition.user_id else None,
+            "system_owned": definition.system_owned,
         }
 
-    async def list_workflows_async(
+    async def get_pipeline_async_for_user(
+        self,
+        session: AsyncSession,
+        pipeline_id: str,
+        user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Get pipeline by ID with user permission check.
+
+        Returns the pipeline if:
+        - It belongs to the specified user, OR
+        - It is a system-owned pipeline, OR
+        - user_id is None (system/admin context)
+
+        Args:
+            session: Database session.
+            pipeline_id: Pipeline ID (UUID string).
+            user_id: User UUID to check ownership. None means system/admin access.
+
+        Returns:
+            Pipeline metadata dict.
+
+        Raises:
+            WorkflowNotFoundError: If pipeline not found or user doesn't have permission.
+        """
+        try:
+            definition_id = UUID(pipeline_id)
+        except ValueError:
+            raise WorkflowNotFoundError(pipeline_id)
+
+        crud = PipelineDefinitionCRUD(session)
+        definition = await crud.get_by_id_for_user(definition_id, user_id)
+
+        if definition is None:
+            raise WorkflowNotFoundError(pipeline_id)
+
+        execution_count = await crud.get_execution_count(definition_id)
+
+        return {
+            "id": str(definition.id),
+            "name": definition.name,
+            "version": str(definition.version),
+            "status": definition.status.value,
+            "created_at": definition.created_at.isoformat(),
+            "updated_at": definition.updated_at.isoformat(),
+            "step_count": definition.step_count,
+            "dag": definition.dag_definition,
+            "created_by": definition.created_by,
+            "description": definition.description,
+            "execution_count": execution_count,
+            "user_id": str(definition.user_id) if definition.user_id else None,
+            "system_owned": definition.system_owned,
+        }
+
+    async def list_pipelines_async(
         self,
         session: AsyncSession,
         status: PipelineStatus | None = None,
         created_by: str | None = None,
+        user_id: UUID | None = None,
+        include_system: bool = False,
     ) -> list[dict[str, Any]]:
-        """List all workflows from database.
+        """List all pipelines from database with optional user filtering.
 
         Args:
             session: Database session.
             status: Filter by pipeline status.
             created_by: Filter by creator.
+            user_id: Filter by user_id (returns only pipelines owned by this user).
+            include_system: If True, also include system-owned pipelines when filtering by user_id.
 
         Returns:
-            List of workflow metadata dicts.
+            List of pipeline metadata dicts.
         """
         crud = PipelineDefinitionCRUD(session)
-        definitions = await crud.list_all(status=status, created_by=created_by)
+        definitions = await crud.list_all(
+            status=status,
+            created_by=created_by,
+            user_id=user_id,
+            include_system=include_system,
+        )
 
         return [
             {
@@ -467,49 +375,51 @@ class WorkflowService:
                 "dag": d.dag_definition,
                 "created_by": d.created_by,
                 "description": d.description,
+                "user_id": str(d.user_id) if d.user_id else None,
+                "system_owned": d.system_owned,
             }
             for d in definitions
         ]
 
-    async def update_workflow_async(
+    async def update_pipeline_async(
         self,
         session: AsyncSession,
-        workflow_id: str,
+        pipeline_id: str,
         dag_dict: dict[str, Any],
         name_override: str | None = None,
         expected_version: int | None = None,
     ) -> dict[str, Any]:
-        """Update an existing workflow in database.
+        """Update an existing pipeline in database.
 
         Args:
             session: Database session.
-            workflow_id: Workflow ID to update.
+            pipeline_id: Pipeline ID to update.
             dag_dict: Updated DAG definition dict.
             name_override: Optional name override.
             expected_version: Version for optimistic locking (if not provided, current version is used).
 
         Returns:
-            Updated workflow metadata dict.
+            Updated pipeline metadata dict.
 
         Raises:
-            WorkflowNotFoundError: If workflow doesn't exist.
+            WorkflowNotFoundError: If pipeline doesn't exist.
             DAGValidationError: If DAG validation fails.
         """
         try:
-            definition_id = UUID(workflow_id)
+            definition_id = UUID(pipeline_id)
         except ValueError:
-            raise WorkflowNotFoundError(workflow_id)
+            raise WorkflowNotFoundError(pipeline_id)
 
         crud = PipelineDefinitionCRUD(session)
         existing = await crud.get_by_id(definition_id)
 
         if existing is None:
-            raise WorkflowNotFoundError(workflow_id)
+            raise WorkflowNotFoundError(pipeline_id)
 
         # Use provided version or current version for optimistic locking
         version = expected_version if expected_version is not None else existing.version
 
-        # Check if this is a draft workflow (empty or no steps)
+        # Check if this is a draft pipeline (empty or no steps)
         steps = dag_dict.get("steps") or []
         is_draft = len(steps) == 0
 
@@ -533,7 +443,7 @@ class WorkflowService:
         )
         await session.commit()
 
-        logger.info(f"Updated workflow in database: {definition.id} ({name})")
+        logger.info(f"Updated pipeline in database: {definition.id} ({name})")
 
         return {
             "id": str(definition.id),
@@ -546,24 +456,26 @@ class WorkflowService:
             "dag": definition.dag_definition,
             "created_by": definition.created_by,
             "description": definition.description,
+            "user_id": str(definition.user_id) if definition.user_id else None,
+            "system_owned": definition.system_owned,
         }
 
-    async def delete_workflow_async(
+    async def delete_pipeline_async(
         self,
         session: AsyncSession,
-        workflow_id: str,
+        pipeline_id: str,
     ) -> bool:
-        """Delete a workflow from database.
+        """Delete a pipeline from database.
 
         Args:
             session: Database session.
-            workflow_id: Workflow ID to delete.
+            pipeline_id: Pipeline ID to delete.
 
         Returns:
             True if deleted, False if not found.
         """
         try:
-            definition_id = UUID(workflow_id)
+            definition_id = UUID(pipeline_id)
         except ValueError:
             return False
 
@@ -572,26 +484,26 @@ class WorkflowService:
 
         if deleted:
             await session.commit()
-            logger.info(f"Deleted workflow from database: {workflow_id}")
+            logger.info(f"Deleted pipeline from database: {pipeline_id}")
 
         return deleted
 
-    async def execute_workflow_async(
+    async def execute_pipeline_async(
         self,
         session: AsyncSession,
-        workflow_id: str,
+        pipeline_id: str,
         params: dict[str, Any],
         callback_topics: list[str] | None = None,
         initiator: str = "api",
     ) -> dict[str, Any]:
-        """Execute a workflow from database.
+        """Execute a pipeline from database.
 
-        This method fetches the workflow from database and executes it,
+        This method fetches the pipeline from database and executes it,
         linking the execution to the pipeline definition via pipeline_id.
 
         Args:
             session: Database session.
-            workflow_id: Workflow ID to execute.
+            pipeline_id: Pipeline ID to execute.
             params: Input parameters.
             callback_topics: Optional list of callback topics for real-time updates.
             initiator: User or service that initiated execution.
@@ -600,47 +512,46 @@ class WorkflowService:
             Execution result dict.
 
         Raises:
-            WorkflowNotFoundError: If workflow not found.
-            DAGValidationError: If workflow has no steps (is still a draft).
+            WorkflowNotFoundError: If pipeline not found.
+            DAGValidationError: If pipeline has no steps (is still a draft).
         """
-        # Get workflow from database
-        workflow = await self.get_workflow_async(session, workflow_id)
-        dag_dict = workflow.get("dag", {})
+        # Get pipeline from database
+        pipeline = await self.get_pipeline_async(session, pipeline_id)
+        dag_dict = pipeline.get("dag", {})
         steps = dag_dict.get("steps") or []
 
         if len(steps) == 0:
             raise DAGValidationError(
-                "Cannot execute a draft workflow with no steps",
-                errors=["steps: At least one step is required to execute workflow"],
+                "Cannot execute a draft pipeline with no steps",
+                errors=["steps: At least one step is required to execute pipeline"],
             )
 
         # Get the pipeline_id for linking execution
-        pipeline_id = UUID(workflow_id)
+        pipeline_uuid = UUID(pipeline_id)
 
-        # Use the existing execute_workflow_with_definition method
-        return await self._execute_workflow_impl(
-            workflow=workflow,
+        # Use the internal implementation
+        return await self._execute_pipeline_impl(
+            pipeline=pipeline,
             params=params,
             callback_topics=callback_topics,
             initiator=initiator,
-            pipeline_id=pipeline_id,
+            pipeline_id=pipeline_uuid,
         )
 
-    async def _execute_workflow_impl(
+    async def _execute_pipeline_impl(
         self,
-        workflow: dict[str, Any],
+        pipeline: dict[str, Any],
         params: dict[str, Any],
         callback_topics: list[str] | None = None,
         initiator: str = "api",
         pipeline_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Internal implementation for workflow execution.
+        """Internal implementation for pipeline execution.
 
-        This method executes a workflow using the provided workflow data.
-        Used by both execute_workflow (in-memory) and execute_workflow_async (database).
+        This method executes a pipeline using the provided pipeline data.
 
         Args:
-            workflow: Workflow data dict.
+            pipeline: Pipeline data dict.
             params: Input parameters.
             callback_topics: Optional list of callback topics for real-time updates.
             initiator: User or service that initiated execution.
@@ -649,12 +560,12 @@ class WorkflowService:
         Returns:
             Execution result dict.
         """
-        dag_dict = workflow.get("dag", {})
+        dag_dict = pipeline.get("dag", {})
         dag = DAGParser.parse(dag_dict)
 
         execution_id = str(uuid4())
         started_at = datetime.now(timezone.utc)
-        workflow_id = workflow.get("id", "unknown")
+        workflow_id = pipeline.get("id", "unknown")
 
         # Persist execution to database (002-pipeline-event-persistence)
         db_version = 1  # Track version for optimistic locking
@@ -665,7 +576,7 @@ class WorkflowService:
             persistence = get_persistence_service()
             pipeline_definition = {
                 "workflow_id": workflow_id,
-                "workflow_name": workflow["name"],
+                "workflow_name": pipeline["name"],
                 "dag": dag_dict,
                 "params": params,
             }
@@ -740,7 +651,7 @@ class WorkflowService:
         execution_data = {
             "execution_id": execution_id,
             "workflow_id": workflow_id,
-            "workflow_name": workflow["name"],
+            "workflow_name": pipeline["name"],
             "status": ExecutionStatus.RUNNING.value,
             "started_at": started_at.isoformat(),
             "completed_at": None,
@@ -1192,61 +1103,20 @@ class WorkflowService:
         self.execution_storage.save_execution(execution_id, execution_data)
         return execution_data
 
-    async def execute_workflow(
-        self,
-        workflow_id: str,
-        params: dict[str, Any],
-        callback_topics: list[str] | None = None,
-        initiator: str = "api",
-    ) -> dict[str, Any]:
-        """Execute a workflow (from in-memory storage).
-
-        This method uses in-memory storage for backwards compatibility.
-        For new code using database persistence, use execute_workflow_async().
-
-        Args:
-            workflow_id: Workflow ID to execute.
-            params: Input parameters.
-            callback_topics: Optional list of callback topics for real-time updates.
-            initiator: User or service that initiated execution.
-
-        Returns:
-            Execution result dict.
-
-        Raises:
-            DAGValidationError: If workflow has no steps (is still a draft).
-        """
-        workflow = self.get_workflow(workflow_id)
-
-        # Check if workflow has steps before executing
-        dag_dict = workflow.get("dag", {})
-        steps = dag_dict.get("steps") or []
-        if len(steps) == 0:
-            raise DAGValidationError(
-                "Cannot execute a draft workflow with no steps",
-                errors=["steps: At least one step is required to execute workflow"],
-            )
-
-        # Delegate to the shared implementation
-        return await self._execute_workflow_impl(
-            workflow=workflow,
-            params=params,
-            callback_topics=callback_topics,
-            initiator=initiator,
-            pipeline_id=None,  # No pipeline_id for in-memory workflows
-        )
-
     def get_execution(self, execution_id: str) -> dict[str, Any]:
         """Get execution by ID."""
-        execution = self.storage.get_execution(execution_id)
+        execution = self.execution_storage.get_execution(execution_id)
         if not execution:
             raise ExecutionNotFoundError(execution_id)
         return execution
 
-    def list_executions(self, workflow_id: str | None = None) -> list[dict[str, Any]]:
-        """List executions, optionally filtered by workflow."""
-        return self.storage.list_executions(workflow_id)
+    def list_executions(self, pipeline_id: str | None = None) -> list[dict[str, Any]]:
+        """List executions, optionally filtered by pipeline."""
+        return self.execution_storage.list_executions(pipeline_id)
 
 
 # Global service instance
-workflow_service = WorkflowService()
+pipeline_service = PipelineService()
+
+# Backwards compatibility alias
+workflow_service = pipeline_service

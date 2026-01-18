@@ -14,15 +14,25 @@ from pydantic import BaseModel, Field
 from budpipeline.pipeline.models import ExecutionStatus, PipelineStatus, StepStatus
 
 
-class WorkflowCreateRequest(BaseModel):
-    """Request to create/register a workflow DAG."""
+class PipelineCreateRequest(BaseModel):
+    """Request to create/register a pipeline DAG."""
 
     dag: dict[str, Any] = Field(..., description="The DAG definition")
-    name: str | None = Field(None, description="Optional workflow name override")
+    name: str | None = Field(None, description="Optional pipeline name override")
+    user_id: str | None = Field(
+        None, description="User ID for pipeline ownership (set by service from auth context)"
+    )
+    system_owned: bool = Field(
+        False, description="True if this is a system-owned pipeline visible to all users"
+    )
 
 
-class WorkflowResponse(BaseModel):
-    """Response for workflow operations."""
+# Backwards compatibility alias
+WorkflowCreateRequest = PipelineCreateRequest
+
+
+class PipelineResponse(BaseModel):
+    """Response for pipeline operations."""
 
     id: str
     name: str
@@ -30,6 +40,12 @@ class WorkflowResponse(BaseModel):
     status: str
     created_at: datetime
     step_count: int
+    user_id: str | None = None
+    system_owned: bool = False
+
+
+# Backwards compatibility alias
+WorkflowResponse = PipelineResponse
 
 
 class ExecutionCreateRequest(BaseModel):
@@ -335,6 +351,8 @@ class PipelineDefinitionResponse(BaseModel):
     step_count: int = Field(..., description="Number of steps in the pipeline DAG")
     dag: dict[str, Any] = Field(..., alias="dag_definition", description="Pipeline DAG definition")
     created_by: str = Field(..., description="User or service that created the pipeline")
+    user_id: UUID | None = Field(None, description="UUID of the owning user")
+    system_owned: bool = Field(False, description="True if system-owned pipeline")
     created_at: datetime = Field(..., description="Record creation time")
     updated_at: datetime = Field(..., description="Last update time")
     execution_count: int | None = Field(None, description="Number of executions (computed)")
@@ -347,3 +365,28 @@ class PipelineDefinitionListResponse(BaseModel):
         ..., description="List of pipeline definitions"
     )
     total_count: int = Field(..., description="Total number of pipelines")
+
+
+# ============================================================================
+# Ephemeral Execution Schemas
+# ============================================================================
+
+
+class EphemeralExecutionRequest(BaseModel):
+    """Request for ephemeral pipeline execution without saving the pipeline.
+
+    This allows executing a pipeline definition inline without registering it
+    in the database. The execution is tracked but the pipeline itself is not saved.
+    """
+
+    pipeline_definition: dict[str, Any] = Field(
+        ..., description="Complete pipeline DAG definition to execute"
+    )
+    params: dict[str, Any] = Field(
+        default_factory=dict, description="Input parameters for the execution"
+    )
+    user_id: str | None = Field(None, description="User ID for tracking execution ownership")
+    initiator: str = Field(default="api", description="Initiator identifier")
+    callback_topics: list[str] | None = Field(
+        None, description="Optional callback topics for real-time progress updates"
+    )

@@ -20,6 +20,7 @@ from budpipeline.pipeline.models import ExecutionStatus
 from budpipeline.pipeline.persistence_service import persistence_service
 from budpipeline.pipeline.schemas import (
     AggregatedProgress,
+    EphemeralExecutionRequest,
     ExecutionCreateRequest,
     ExecutionListResponse,
     ExecutionResponse,
@@ -27,7 +28,7 @@ from budpipeline.pipeline.schemas import (
     PipelineExecutionResponse,
     StepExecutionResponse,
 )
-from budpipeline.pipeline.service import workflow_service
+from budpipeline.pipeline.service import pipeline_service
 from budpipeline.progress.schemas import (
     ExecutionProgressResponse,
     ProgressEventResponse,
@@ -311,14 +312,10 @@ async def create_execution(
     corr_id: str | None = Depends(_get_correlation_id),
     db: AsyncSession = Depends(get_db),
 ) -> ExecutionResponse:
-    """Start a new workflow execution with database persistence.
+    """Start a new pipeline execution with database persistence.
 
-    This endpoint accepts workflow_id and params (for backward compatibility),
-    executes the workflow, and persists execution state to PostgreSQL.
-
-    The workflow_service handles both:
-    - In-memory execution (for real-time step processing)
-    - Database persistence (for durability and querying)
+    This endpoint accepts pipeline_id (or workflow_id for backwards compatibility)
+    and params, executes the pipeline, and persists execution state to PostgreSQL.
 
     Args:
         request: Execution request with workflow_id and params.
@@ -329,7 +326,7 @@ async def create_execution(
         ExecutionResponse with execution details.
 
     Raises:
-        404: Workflow not found.
+        404: Pipeline not found.
         500: Execution failed.
     """
     logger.info(
@@ -344,11 +341,11 @@ async def create_execution(
         if request.user_id:
             execution_params["user_id"] = request.user_id
 
-        # Execute workflow from database - uses execute_workflow_async to look up
-        # workflow from PostgreSQL and link execution to pipeline_id
-        result = await workflow_service.execute_workflow_async(
+        # Execute pipeline from database - uses execute_pipeline_async to look up
+        # pipeline from PostgreSQL and link execution to pipeline_id
+        result = await pipeline_service.execute_pipeline_async(
             session=db,
-            workflow_id=request.workflow_id,
+            pipeline_id=request.workflow_id,
             params=execution_params,
             callback_topics=request.callback_topics,
             initiator=request.initiator or "api",
@@ -367,6 +364,93 @@ async def create_execution(
         )
     except Exception as e:
         logger.error(f"Execution error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post("/run", response_model=ExecutionResponse, status_code=status.HTTP_201_CREATED)
+async def run_ephemeral_execution(
+    request: EphemeralExecutionRequest,
+    corr_id: str | None = Depends(_get_correlation_id),
+    db: AsyncSession = Depends(get_db),
+) -> ExecutionResponse:
+    """Execute a pipeline inline without saving the pipeline definition.
+
+    This endpoint allows executing a pipeline definition without registering it
+    in the database. The execution is tracked and persisted, but the pipeline
+    definition itself is NOT saved. Useful for:
+    - One-off executions
+    - Testing pipeline definitions
+    - Temporary/ad-hoc workflows
+
+    The execution will have pipeline_id=None (ephemeral marker).
+
+    Args:
+        request: Ephemeral execution request with inline pipeline_definition.
+        corr_id: Correlation ID for tracing.
+        db: Database session.
+
+    Returns:
+        ExecutionResponse with execution details.
+
+    Raises:
+        400: Invalid pipeline definition.
+        500: Execution failed.
+    """
+    logger.info(
+        "Starting ephemeral execution",
+        pipeline_name=request.pipeline_definition.get("name", "ephemeral"),
+        user_id=request.user_id,
+        correlation_id=corr_id,
+    )
+
+    try:
+        # Validate the inline pipeline definition
+        is_valid, errors, warnings = pipeline_service.validate_dag(request.pipeline_definition)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Invalid pipeline definition", "errors": errors},
+            )
+
+        # Merge user_id into params for downstream action use
+        execution_params = request.params.copy()
+        if request.user_id:
+            execution_params["user_id"] = request.user_id
+
+        # Create ephemeral pipeline data (not saved to database)
+        ephemeral_pipeline = {
+            "id": "ephemeral",
+            "name": request.pipeline_definition.get("name", "Ephemeral Pipeline"),
+            "dag": request.pipeline_definition,
+        }
+
+        # Execute the ephemeral pipeline (pipeline_id=None marks it as ephemeral)
+        result = await pipeline_service._execute_pipeline_impl(
+            pipeline=ephemeral_pipeline,
+            params=execution_params,
+            callback_topics=request.callback_topics,
+            initiator=request.initiator,
+            pipeline_id=None,  # None marks this as an ephemeral execution
+        )
+
+        return ExecutionResponse(
+            execution_id=result["execution_id"],
+            workflow_id=result["workflow_id"],
+            workflow_name=result["workflow_name"],
+            status=result["status"],
+            started_at=result["started_at"],
+            completed_at=result.get("completed_at"),
+            params=result["params"],
+            outputs=result.get("outputs", {}),
+            error=result.get("error"),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ephemeral execution error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

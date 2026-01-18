@@ -81,6 +81,67 @@ async def validate_workflow_dag(
 
 
 @budpipeline_router.post(
+    "/run",
+    response_class=JSONResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid pipeline definition",
+        },
+        status.HTTP_201_CREATED: {
+            "description": "Ephemeral execution started",
+        },
+    },
+    description="Execute a pipeline inline without saving the pipeline definition",
+)
+async def run_ephemeral_execution(
+    request_body: Dict[str, Any],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Execute a pipeline inline without saving the pipeline definition.
+
+    This endpoint allows executing a pipeline definition without registering it
+    in the database. The execution is tracked and persisted, but the pipeline
+    definition itself is NOT saved. Useful for:
+    - One-off executions
+    - Testing pipeline definitions
+    - Temporary/ad-hoc workflows
+
+    Request body should include:
+    - pipeline_definition: The inline pipeline DAG definition
+    - params: Optional input parameters for the execution
+    - callback_topics: Optional list of callback topics for real-time updates
+    """
+    try:
+        result = await BudPipelineService(session).run_ephemeral_execution(
+            pipeline_definition=request_body.get("pipeline_definition", {}),
+            params=request_body.get("params", {}),
+            callback_topics=request_body.get("callback_topics"),
+            user_id=str(current_user.id),
+        )
+        return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
+    except ClientException as e:
+        logger.exception(f"Failed to run ephemeral execution: {e}")
+        return JSONResponse(
+            content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
+            status_code=e.status_code,
+        )
+    except Exception as e:
+        logger.exception(f"Failed to run ephemeral execution: {e}")
+        return JSONResponse(
+            content=ErrorResponse(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to run ephemeral execution"
+            ).model_dump(mode="json"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@budpipeline_router.post(
     "",
     response_class=JSONResponse,
     responses={
@@ -90,38 +151,39 @@ async def validate_workflow_dag(
         },
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
-            "description": "Invalid workflow creation request",
+            "description": "Invalid pipeline creation request",
         },
         status.HTTP_201_CREATED: {
-            "description": "Successfully created workflow",
+            "description": "Successfully created pipeline",
         },
     },
-    description="Create a new workflow in budpipeline service",
+    description="Create a new pipeline in budpipeline service",
 )
 async def create_budpipeline(
     request_body: Dict[str, Any],
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Create a new workflow in budpipeline service."""
+    """Create a new pipeline in budpipeline service."""
     try:
-        result = await BudPipelineService(session).create_workflow(
+        result = await BudPipelineService(session).create_pipeline(
             dag=request_body.get("dag"),
             name=request_body.get("name"),
             user_id=str(current_user.id),
+            system_owned=request_body.get("system_owned", False),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:
-        logger.exception(f"Failed to create workflow: {e}")
+        logger.exception(f"Failed to create pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
             status_code=e.status_code,
         )
     except Exception as e:
-        logger.exception(f"Failed to create workflow: {e}")
+        logger.exception(f"Failed to create pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create workflow"
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to create pipeline"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
@@ -136,30 +198,38 @@ async def create_budpipeline(
             "description": "Service is unavailable due to server error",
         },
         status.HTTP_200_OK: {
-            "description": "List of workflows",
+            "description": "List of pipelines",
         },
     },
-    description="List all workflows from budpipeline service",
+    description="List all pipelines from budpipeline service",
 )
 async def list_budpipelines(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
+    include_system: bool = Query(False, description="Include system-owned pipelines"),
 ):
-    """List all workflows from budpipeline service."""
+    """List all pipelines from budpipeline service.
+
+    If a user context is present, only returns pipelines owned by that user.
+    Use include_system=true to also include system-owned pipelines.
+    """
     try:
-        result = await BudPipelineService(session).list_workflows()
+        result = await BudPipelineService(session).list_pipelines(
+            user_id=str(current_user.id),
+            include_system=include_system,
+        )
         return JSONResponse(content=result, status_code=status.HTTP_200_OK)
     except ClientException as e:
-        logger.exception(f"Failed to list workflows: {e}")
+        logger.exception(f"Failed to list pipelines: {e}")
         return JSONResponse(
             content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
             status_code=e.status_code,
         )
     except Exception as e:
-        logger.exception(f"Failed to list workflows: {e}")
+        logger.exception(f"Failed to list pipelines: {e}")
         return JSONResponse(
             content=ErrorResponse(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list workflows"
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to list pipelines"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
@@ -902,12 +972,12 @@ async def validate_action_params(
 
 
 # =============================================================================
-# Workflow Routes (parameterized routes MUST come after specific routes)
+# Pipeline Routes (parameterized routes MUST come after specific routes)
 # =============================================================================
 
 
 @budpipeline_router.get(
-    "/{workflow_id}",
+    "/{pipeline_id}",
     response_class=JSONResponse,
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -916,41 +986,44 @@ async def validate_action_params(
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "Workflow not found",
+            "description": "Pipeline not found",
         },
         status.HTTP_200_OK: {
-            "description": "Workflow details including DAG",
+            "description": "Pipeline details including DAG",
         },
     },
-    description="Get workflow details including DAG definition",
+    description="Get pipeline details including DAG definition",
 )
 async def get_budpipeline(
-    workflow_id: str,
+    pipeline_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Get workflow details including DAG."""
+    """Get pipeline details including DAG."""
     try:
-        result = await BudPipelineService(session).get_workflow(workflow_id)
+        result = await BudPipelineService(session).get_pipeline(
+            pipeline_id=pipeline_id,
+            user_id=str(current_user.id),
+        )
         return JSONResponse(content=result, status_code=status.HTTP_200_OK)
     except ClientException as e:
-        logger.exception(f"Failed to get workflow: {e}")
+        logger.exception(f"Failed to get pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
             status_code=e.status_code,
         )
     except Exception as e:
-        logger.exception(f"Failed to get workflow: {e}")
+        logger.exception(f"Failed to get pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get workflow"
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get pipeline"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
 @budpipeline_router.put(
-    "/{workflow_id}",
+    "/{pipeline_id}",
     response_class=JSONResponse,
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -959,46 +1032,47 @@ async def get_budpipeline(
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "Workflow not found",
+            "description": "Pipeline not found",
         },
         status.HTTP_200_OK: {
-            "description": "Updated workflow",
+            "description": "Updated pipeline",
         },
     },
-    description="Update a workflow's DAG definition",
+    description="Update a pipeline's DAG definition",
 )
 async def update_budpipeline(
-    workflow_id: str,
+    pipeline_id: str,
     request_body: Dict[str, Any],
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Update a workflow's DAG definition."""
+    """Update a pipeline's DAG definition."""
     try:
-        result = await BudPipelineService(session).update_workflow(
-            workflow_id=workflow_id,
+        result = await BudPipelineService(session).update_pipeline(
+            pipeline_id=pipeline_id,
             dag=request_body.get("dag"),
             name=request_body.get("name"),
+            user_id=str(current_user.id),
         )
         return JSONResponse(content=result, status_code=status.HTTP_200_OK)
     except ClientException as e:
-        logger.exception(f"Failed to update workflow: {e}")
+        logger.exception(f"Failed to update pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
             status_code=e.status_code,
         )
     except Exception as e:
-        logger.exception(f"Failed to update workflow: {e}")
+        logger.exception(f"Failed to update pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update workflow"
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to update pipeline"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
 @budpipeline_router.delete(
-    "/{workflow_id}",
+    "/{pipeline_id}",
     response_class=JSONResponse,
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -1007,41 +1081,44 @@ async def update_budpipeline(
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "Workflow not found",
+            "description": "Pipeline not found",
         },
         status.HTTP_204_NO_CONTENT: {
-            "description": "Workflow deleted successfully",
+            "description": "Pipeline deleted successfully",
         },
     },
-    description="Delete a workflow",
+    description="Delete a pipeline",
 )
 async def delete_budpipeline(
-    workflow_id: str,
+    pipeline_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Delete a workflow."""
+    """Delete a pipeline."""
     try:
-        await BudPipelineService(session).delete_workflow(workflow_id)
+        await BudPipelineService(session).delete_pipeline(
+            pipeline_id=pipeline_id,
+            user_id=str(current_user.id),
+        )
         return JSONResponse(content={}, status_code=status.HTTP_204_NO_CONTENT)
     except ClientException as e:
-        logger.exception(f"Failed to delete workflow: {e}")
+        logger.exception(f"Failed to delete pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
             status_code=e.status_code,
         )
     except Exception as e:
-        logger.exception(f"Failed to delete workflow: {e}")
+        logger.exception(f"Failed to delete pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete workflow"
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to delete pipeline"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
 @budpipeline_router.post(
-    "/{workflow_id}/execute",
+    "/{pipeline_id}/execute",
     response_class=JSONResponse,
     responses={
         status.HTTP_500_INTERNAL_SERVER_ERROR: {
@@ -1050,45 +1127,45 @@ async def delete_budpipeline(
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "Workflow not found",
+            "description": "Pipeline not found",
         },
         status.HTTP_201_CREATED: {
-            "description": "Workflow execution started",
+            "description": "Pipeline execution started",
         },
     },
-    description="Start a workflow execution",
+    description="Start a pipeline execution",
 )
 async def execute_budpipeline(
-    workflow_id: str,
+    pipeline_id: str,
     request_body: Dict[str, Any],
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    """Start a workflow execution.
+    """Start a pipeline execution.
 
     Request body can include:
     - params: Input parameters for the execution
     - callback_topics: List of callback topics for real-time progress updates (D-004)
     """
     try:
-        result = await BudPipelineService(session).execute_workflow(
-            workflow_id=workflow_id,
+        result = await BudPipelineService(session).execute_pipeline(
+            pipeline_id=pipeline_id,
             params=request_body.get("params", {}),
             callback_topics=request_body.get("callback_topics"),
             user_id=str(current_user.id),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:
-        logger.exception(f"Failed to execute workflow: {e}")
+        logger.exception(f"Failed to execute pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(code=e.status_code, message=e.message).model_dump(mode="json"),
             status_code=e.status_code,
         )
     except Exception as e:
-        logger.exception(f"Failed to execute workflow: {e}")
+        logger.exception(f"Failed to execute pipeline: {e}")
         return JSONResponse(
             content=ErrorResponse(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute workflow"
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to execute pipeline"
             ).model_dump(mode="json"),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

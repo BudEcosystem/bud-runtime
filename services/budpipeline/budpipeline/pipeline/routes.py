@@ -1,17 +1,23 @@
-"""Workflow API routes.
+"""Pipeline API routes.
 
-This module provides endpoints for managing pipeline definitions (workflows).
-Pipeline definitions are now stored in the PostgreSQL database for persistence
+This module provides endpoints for managing pipeline definitions.
+Pipeline definitions are stored in the PostgreSQL database for persistence
 across pod restarts (002-pipeline-event-persistence).
+
+Routes have been renamed from /workflows to /pipelines.
+User isolation is enforced via X-User-ID header.
 """
 
+import contextlib
 import logging
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from budpipeline.commons.database import get_db
+from budpipeline.commons.dependencies import UserContext, get_user_context
 from budpipeline.commons.exceptions import (
     DAGValidationError,
     WorkflowNotFoundError,
@@ -20,10 +26,10 @@ from budpipeline.pipeline.crud import OptimisticLockError
 from budpipeline.pipeline.schemas import (
     DAGValidationRequest,
     DAGValidationResponse,
-    WorkflowCreateRequest,
-    WorkflowResponse,
+    PipelineCreateRequest,
+    PipelineResponse,
 )
-from budpipeline.pipeline.service import workflow_service
+from budpipeline.pipeline.service import pipeline_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +40,7 @@ router = APIRouter()
 async def validate_dag(request: DAGValidationRequest) -> DAGValidationResponse:
     """Validate a DAG definition without registering it."""
     try:
-        is_valid, errors, warnings = workflow_service.validate_dag(request.dag)
+        is_valid, errors, warnings = pipeline_service.validate_dag(request.dag)
 
         step_count = 0
         has_cycles = False
@@ -62,31 +68,45 @@ async def validate_dag(request: DAGValidationRequest) -> DAGValidationResponse:
         )
 
 
-@router.post("/workflows", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
-async def create_workflow(
-    request: WorkflowCreateRequest,
+@router.post("/pipelines", response_model=PipelineResponse, status_code=status.HTTP_201_CREATED)
+async def create_pipeline(
+    request: PipelineCreateRequest,
     db: AsyncSession = Depends(get_db),
-) -> WorkflowResponse:
-    """Create/register a new workflow from DAG definition.
+    user_context: UserContext = Depends(get_user_context),
+) -> PipelineResponse:
+    """Create/register a new pipeline from DAG definition.
 
-    Workflows are persisted to the database for durability across pod restarts.
+    Pipelines are persisted to the database for durability across pod restarts.
+    If a user_id is provided in the request body, it takes precedence over the header.
     """
     try:
+        # Determine user_id: request body takes precedence, then header, then None
+        user_id: UUID | None = None
+        if request.user_id:
+            with contextlib.suppress(ValueError):
+                user_id = UUID(request.user_id)
+        if user_id is None and user_context.user_id:
+            user_id = user_context.user_id
+
         # Use async database method for persistence
-        workflow = await workflow_service.create_workflow_async(
+        pipeline = await pipeline_service.create_pipeline_async(
             session=db,
             dag_dict=request.dag,
             name_override=request.name,
             created_by="api",  # TODO: Get from auth context
             description=None,
+            user_id=user_id,
+            system_owned=request.system_owned,
         )
-        return WorkflowResponse(
-            id=workflow["id"],
-            name=workflow["name"],
-            version=workflow["version"],
-            status=workflow["status"],
-            created_at=workflow["created_at"],
-            step_count=workflow["step_count"],
+        return PipelineResponse(
+            id=pipeline["id"],
+            name=pipeline["name"],
+            version=pipeline["version"],
+            status=pipeline["status"],
+            created_at=pipeline["created_at"],
+            step_count=pipeline["step_count"],
+            user_id=pipeline.get("user_id"),
+            system_owned=pipeline.get("system_owned", False),
         )
     except DAGValidationError as e:
         raise HTTPException(
@@ -94,87 +114,143 @@ async def create_workflow(
             detail={"error": "Validation failed", "errors": e.errors},
         )
     except Exception as e:
-        logger.error(f"Create workflow error: {e}")
+        logger.error(f"Create pipeline error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
 
 
-@router.get("/workflows", response_model=list[WorkflowResponse])
-async def list_workflows(
+@router.get("/pipelines", response_model=list[PipelineResponse])
+async def list_pipelines(
     db: AsyncSession = Depends(get_db),
-) -> list[WorkflowResponse]:
-    """List all registered workflows from database."""
-    workflows = await workflow_service.list_workflows_async(session=db)
+    user_context: UserContext = Depends(get_user_context),
+    include_system: bool = Query(False, description="Include system-owned pipelines"),
+) -> list[PipelineResponse]:
+    """List pipelines from database.
+
+    If a user context is present (via X-User-ID header), only returns pipelines
+    owned by that user. Use include_system=true to also include system-owned pipelines.
+    """
+    pipelines = await pipeline_service.list_pipelines_async(
+        session=db,
+        user_id=user_context.user_id,
+        include_system=include_system,
+    )
     return [
-        WorkflowResponse(
-            id=w["id"],
-            name=w["name"],
-            version=w["version"],
-            status=w["status"],
-            created_at=w["created_at"],
-            step_count=w["step_count"],
+        PipelineResponse(
+            id=p["id"],
+            name=p["name"],
+            version=p["version"],
+            status=p["status"],
+            created_at=p["created_at"],
+            step_count=p["step_count"],
+            user_id=p.get("user_id"),
+            system_owned=p.get("system_owned", False),
         )
-        for w in workflows
+        for p in pipelines
     ]
 
 
-@router.get("/workflows/{workflow_id}")
-async def get_workflow(
-    workflow_id: str,
+@router.get("/pipelines/{pipeline_id}")
+async def get_pipeline(
+    pipeline_id: str,
     db: AsyncSession = Depends(get_db),
+    user_context: UserContext = Depends(get_user_context),
 ) -> dict[str, Any]:
-    """Get workflow details including DAG definition."""
+    """Get pipeline details including DAG definition.
+
+    If a user context is present, checks that the user has permission to view the pipeline.
+    """
     try:
-        return await workflow_service.get_workflow_async(session=db, workflow_id=workflow_id)
+        return await pipeline_service.get_pipeline_async_for_user(
+            session=db,
+            pipeline_id=pipeline_id,
+            user_id=user_context.user_id,
+        )
     except WorkflowNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workflow not found: {workflow_id}",
+            detail=f"Pipeline not found: {pipeline_id}",
         )
 
 
-@router.delete("/workflows/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_workflow(
-    workflow_id: str,
+@router.delete("/pipelines/{pipeline_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pipeline(
+    pipeline_id: str,
     db: AsyncSession = Depends(get_db),
+    user_context: UserContext = Depends(get_user_context),
 ) -> None:
-    """Delete a workflow from database."""
-    deleted = await workflow_service.delete_workflow_async(session=db, workflow_id=workflow_id)
+    """Delete a pipeline from database.
+
+    Users can only delete pipelines they own (or system-owned if they're admin).
+    """
+    # First check that user has permission to access this pipeline
+    try:
+        await pipeline_service.get_pipeline_async_for_user(
+            session=db,
+            pipeline_id=pipeline_id,
+            user_id=user_context.user_id,
+        )
+    except WorkflowNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline not found: {pipeline_id}",
+        )
+
+    deleted = await pipeline_service.delete_pipeline_async(session=db, pipeline_id=pipeline_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workflow not found: {workflow_id}",
+            detail=f"Pipeline not found: {pipeline_id}",
         )
 
 
-@router.put("/workflows/{workflow_id}", response_model=WorkflowResponse)
-async def update_workflow(
-    workflow_id: str,
-    request: WorkflowCreateRequest,
+@router.put("/pipelines/{pipeline_id}", response_model=PipelineResponse)
+async def update_pipeline(
+    pipeline_id: str,
+    request: PipelineCreateRequest,
     db: AsyncSession = Depends(get_db),
-) -> WorkflowResponse:
-    """Update an existing workflow in database."""
+    user_context: UserContext = Depends(get_user_context),
+) -> PipelineResponse:
+    """Update an existing pipeline in database.
+
+    Users can only update pipelines they own.
+    """
+    # First check that user has permission to access this pipeline
     try:
-        workflow = await workflow_service.update_workflow_async(
+        await pipeline_service.get_pipeline_async_for_user(
             session=db,
-            workflow_id=workflow_id,
-            dag_dict=request.dag,
-            name_override=request.name,
-        )
-        return WorkflowResponse(
-            id=workflow["id"],
-            name=workflow["name"],
-            version=workflow["version"],
-            status=workflow["status"],
-            created_at=workflow["created_at"],
-            step_count=workflow["step_count"],
+            pipeline_id=pipeline_id,
+            user_id=user_context.user_id,
         )
     except WorkflowNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workflow not found: {workflow_id}",
+            detail=f"Pipeline not found: {pipeline_id}",
+        )
+
+    try:
+        pipeline = await pipeline_service.update_pipeline_async(
+            session=db,
+            pipeline_id=pipeline_id,
+            dag_dict=request.dag,
+            name_override=request.name,
+        )
+        return PipelineResponse(
+            id=pipeline["id"],
+            name=pipeline["name"],
+            version=pipeline["version"],
+            status=pipeline["status"],
+            created_at=pipeline["created_at"],
+            step_count=pipeline["step_count"],
+            user_id=pipeline.get("user_id"),
+            system_owned=pipeline.get("system_owned", False),
+        )
+    except WorkflowNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline not found: {pipeline_id}",
         )
     except OptimisticLockError as e:
         raise HTTPException(
@@ -187,17 +263,18 @@ async def update_workflow(
             detail={"error": "Validation failed", "errors": e.errors},
         )
     except Exception as e:
-        logger.error(f"Update workflow error: {e}")
+        logger.error(f"Update pipeline error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
 
 
-# NOTE: Execution endpoints have been moved to execution_routes.py
+# NOTE: Execution endpoints are in execution_routes.py
 # to support database persistence (002-pipeline-event-persistence).
-# The following endpoints are now available from execution_routes.py:
+# The following endpoints are available from execution_routes.py:
 # - POST /executions - Create execution with DB persistence
+# - POST /executions/run - Ephemeral execution (no saved pipeline)
 # - GET /executions - List executions with filtering and pagination
 # - GET /executions/{execution_id} - Get execution details
 # - GET /executions/{execution_id}/progress - Get execution progress
