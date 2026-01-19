@@ -444,6 +444,7 @@ class DaprService(DaprClient):
         data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
         timeout: int = 30,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
         """Invoke a method on another Dapr-enabled service via the Dapr sidecar.
 
@@ -457,6 +458,7 @@ class DaprService(DaprClient):
             data (Optional[Dict[str, Any]]): JSON data to send in the request body.
             params (Optional[Dict[str, Any]]): Query parameters to append to the URL.
             timeout (int): Request timeout in seconds. Defaults to 30.
+            headers (Optional[Dict[str, str]]): Additional headers to send with the request.
 
         Returns:
             Any: The JSON response from the target service, or the raw response if not JSON.
@@ -467,9 +469,9 @@ class DaprService(DaprClient):
         dapr_base_url = f"http://localhost:{app_settings.dapr_http_port}"
         url = f"{dapr_base_url}/v1.0/invoke/{app_id}/method/{method_path}"
 
-        headers = {}
+        request_headers = headers.copy() if headers else {}
         if secrets_settings.dapr_api_token:
-            headers["dapr-api-token"] = secrets_settings.dapr_api_token
+            request_headers["dapr-api-token"] = secrets_settings.dapr_api_token
 
         async with AsyncHTTPClient(timeout=timeout) as client:
             response = await client.send_request(
@@ -477,7 +479,7 @@ class DaprService(DaprClient):
                 url=url,
                 json=data,
                 params=params,
-                headers=headers if headers else None,
+                headers=request_headers if request_headers else None,
                 raise_for_status=False,
             )
 

@@ -102,3 +102,21 @@ spec:
     value: "/leaderboard/extraction-cron"
 scopes:
   - budmodel
+
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: budpipeline-schedule-poll
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+  - name: schedule
+    value: "@every 1m"  # Poll schedules every minute
+  - name: direction
+    value: "input"
+  - name: route
+    value: "/internal/schedule-poll"
+scopes:
+  - budpipeline

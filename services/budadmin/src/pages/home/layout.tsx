@@ -190,6 +190,13 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       cmd: "10",
       hide: !enableDevMode,
     },
+    {
+      label: "Pipelines",
+      route: "/pipelines",
+      icon: '/icons/simulations.png',
+      iconWhite: '/icons/simulationsWhite.svg',
+      cmd: "w",
+    },
   ]
 
   const tabsTwo = [

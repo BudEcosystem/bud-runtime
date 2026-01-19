@@ -18,19 +18,20 @@
 
 import json
 import logging
-from typing import Annotated, Union
+from typing import Annotated, Optional, Union
 from uuid import UUID
 
 import yaml
 from budmicroframe.commons.logging import get_logger
 from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse, WorkflowMetadataResponse
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ..commons.dependencies import get_session
 from .schemas import (
     ClusterCreateRequest,
     ClusterDeleteRequest,
+    ClusterHealthResponse,
     EditClusterRequest,
     NodeEventsCountSuccessResponse,
     NodeEventsResponse,
@@ -477,6 +478,67 @@ async def get_cluster_storage_classes(
         response = await ClusterService(session).get_cluster_storage_classes(cluster_id)
     except Exception as e:
         logger.error(f"Error getting storage classes for cluster {cluster_id}: {e}")
+        response = ErrorResponse(message=str(e))
+    return response.to_http_response()
+
+
+@cluster_router.get(
+    "/{cluster_id}/health",
+    responses={
+        status.HTTP_200_OK: {
+            "model": ClusterHealthResponse,
+            "description": "Cluster health check results",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Bad request",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Get cluster health status for specified checks",
+    tags=["Clusters"],
+)
+async def get_cluster_health(
+    cluster_id: UUID,
+    checks: Optional[str] = Query(
+        default=None,
+        description="Comma-separated list of health checks to perform. "
+        "Valid values: nodes, api, storage, network, gpu. "
+        "If not specified, all checks are performed.",
+    ),
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Union[ClusterHealthResponse, ErrorResponse]:
+    """Get cluster health status for specified checks.
+
+    This endpoint performs health checks on the cluster and returns the status
+    of each requested check. Available checks include:
+    - nodes: Check if all cluster nodes are ready
+    - api: Check if the Kubernetes API server is responding
+    - storage: Check if PVCs are bound
+    - network: Check if network policies are active and DNS is healthy
+    - gpu: Check if GPU drivers are detected and GPUs are allocatable
+
+    Args:
+        cluster_id: The ID of the cluster to check health for.
+        checks: Comma-separated list of checks to perform (e.g., "nodes,api,gpu").
+
+    Returns:
+        ClusterHealthResponse: Health status for each requested check.
+        ErrorResponse: Error message if the check fails.
+    """
+    try:
+        # Parse checks parameter
+        checks_list = None
+        if checks:
+            checks_list = [c.strip().lower() for c in checks.split(",") if c.strip()]
+
+        response = await ClusterService(session).get_cluster_health(cluster_id, checks_list)
+    except Exception as e:
+        logger.error(f"Error checking cluster health for {cluster_id}: {e}")
         response = ErrorResponse(message=str(e))
     return response.to_http_response()
 

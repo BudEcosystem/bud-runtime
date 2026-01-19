@@ -11,20 +11,27 @@ microservices:
     budmodel:
         storageSize: "1Ti"
     buddoc:
+        enabled: false
         image: dittops/buddoc:nightly
     budapp:
-        image: budstudio/budapp:nightly
+        image: dittops/budapp:nightly
     budgateway:
         image: budstudio/budgateway:nightly
     budsim:
         image: budstudio/budsim:nightly
+        env:
+            SKIP_MASTER_NODE_FOR_CPU: "false"
     budcluster:
         image: dittops/budcluster:nightly
         env:
             # Update OTel endpoint for ditto environment
             OTEL_COLLECTOR_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
+            SKIP_MASTER_NODE_FOR_CPU: "false"
     askbud:
+        enabled: false
         image: dittops/ask-bud:nightly
+    budpipeline:
+        image: dittops/budpipeline:nightly
     global:
         env:
             LOG_LEVEL: DEBUG
@@ -35,3 +42,7 @@ storage:
         size: "1Ti"
     budevalDataset:
         className: "nfs-csi"
+
+# Disable prometheus-adapter to avoid ClusterRole conflict with bud-dev
+prometheus-adapter:
+  enabled: false

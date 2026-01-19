@@ -17,6 +17,7 @@
 """The main entry point for the application, initializing the FastAPI app and setting up the application's lifespan management, including configuration and secret syncs."""
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
@@ -63,7 +64,7 @@ from .project_ops import project_routes
 from .prompt_ops import prompt_routes
 from .router_ops import router_routes
 from .user_ops import user_routes
-from .workflow_ops import workflow_routes
+from .workflow_ops import budpipeline_routes, workflow_routes
 
 
 logger = logging.get_logger(__name__)
@@ -271,6 +272,34 @@ app = configure_app(
     lifespan=lifespan,
 )
 
+# Add middleware to validate Dapr APP_API_TOKEN for internal endpoints (MUST be added early)
+_middleware_logger = logging.get_logger("budapp.middleware.internal_auth")
+
+
+@app.middleware("http")
+async def internal_auth_middleware(request: Request, call_next):
+    """Validate Dapr APP_API_TOKEN for /internal/ endpoints."""
+    _middleware_logger.debug(f"Middleware processing: {request.url.path}")
+    if "/internal/" in request.url.path:
+        _middleware_logger.info(f"Internal endpoint: {request.url.path}")
+        expected_token = os.environ.get("APP_API_TOKEN")
+        if not expected_token:
+            _middleware_logger.warning("APP_API_TOKEN not configured")
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Forbidden - Internal auth not configured"},
+            )
+        # Check both dapr-api-token and x-app-api-token (Dapr may consume dapr-api-token)
+        actual_token = request.headers.get("dapr-api-token") or request.headers.get("x-app-api-token")
+        if actual_token != expected_token:
+            _middleware_logger.warning(f"Invalid internal token for {request.url.path}")
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Forbidden - Invalid internal token"},
+            )
+        _middleware_logger.debug("Token valid")
+    return await call_next(request)
+
 
 # Add exception handler for ClientException
 @app.exception_handler(ClientException)
@@ -293,6 +322,8 @@ if app_settings.cors_origins:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+logger = logging.get_logger(__name__)
 
 internal_router = APIRouter()
 internal_router.include_router(audit_routes.audit_router)
@@ -317,6 +348,7 @@ internal_router.include_router(notify_routes.notify_router)
 internal_router.include_router(permission_routes.permission_router)
 internal_router.include_router(user_routes.user_router)
 internal_router.include_router(workflow_routes.workflow_router)
+internal_router.include_router(budpipeline_routes.budpipeline_router)
 internal_router.include_router(playground_routes.playground_router)
 internal_router.include_router(project_routes.project_router)
 internal_router.include_router(prompt_routes.router)

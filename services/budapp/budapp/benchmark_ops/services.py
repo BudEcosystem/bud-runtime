@@ -112,7 +112,8 @@ class BenchmarkService(SessionMixin):
                 request.model = model_uri if not credential_id else f"{model_source}/{model_uri}"
                 request.provider_type = db_model.provider_type.value
             else:
-                request.model = db_model.local_path
+                # Use local_path if available (MinIO storage path), otherwise fall back to uri
+                request.model = db_model.local_path or db_model.uri
                 request.provider_type = db_model.provider_type.value
             # Update icon on workflow
             if db_model.provider_type == ModelProviderTypeEnum.HUGGING_FACE:
@@ -164,8 +165,14 @@ class BenchmarkService(SessionMixin):
 
         # Prepare workflow step data
         workflow_step_data = RunBenchmarkWorkflowStepData(
-            **request.model_dump(exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow"})
+            **request.model_dump(
+                exclude={"workflow_id", "workflow_total_steps", "step_number", "trigger_workflow", "callback_topic"}
+            )
         ).model_dump(mode="json", exclude_none=True)
+
+        # Store callback_topic for budpipeline integration
+        if request.callback_topic:
+            workflow_step_data["callback_topic"] = request.callback_topic
 
         # For avoiding another db call for record retrieval, storing db object while iterating over db_workflow_steps
         db_current_workflow_step = None
@@ -283,6 +290,7 @@ class BenchmarkService(SessionMixin):
                 "run_as_simulation",
                 "user_id",
                 "simulator_id",
+                "callback_topic",  # For budpipeline integration
             ]
 
             # from workflow steps extract necessary information
@@ -378,10 +386,20 @@ class BenchmarkService(SessionMixin):
             logger.debug(f"Benchmark created with id {db_benchmark.id}")
             benchmark_id = db_benchmark.id
 
-        # Exclude provider_type from payload - budcluster doesn't use it
+        # Exclude fields from payload that budcluster doesn't use
+        # But save callback_topic for workflow step storage (budpipeline integration)
+        callback_topic = request.get("callback_topic")
         budcluster_request = request.copy()
         budcluster_request.pop("provider_type", None)
-        run_benchmark_payload = {
+        budcluster_request.pop("callback_topic", None)  # Handled via source_topic multi-topic
+
+        # Build source_topic - include callback_topic for direct budpipeline notification (D-001)
+        source_topics: str | list[str] = app_settings.source_topic
+        if callback_topic:
+            source_topics = [app_settings.source_topic, callback_topic]
+
+        # Build base payload for budcluster
+        budcluster_payload = {
             "benchmark_id": str(benchmark_id),
             **budcluster_request,
             "notification_metadata": {
@@ -389,19 +407,25 @@ class BenchmarkService(SessionMixin):
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(db_workflow.id),
             },
-            "source_topic": f"{app_settings.source_topic}",
+            "source_topic": source_topics,  # Multi-topic: budapp + budpipeline
             # Storage configuration from cluster settings
             "default_storage_class": default_storage_class,
             "default_access_mode": default_access_mode,
         }
 
-        # Update current workflow step
+        # Workflow step payload includes callback_topic for budpipeline integration (fallback)
+        workflow_step_payload = budcluster_payload.copy()
+        if callback_topic:
+            workflow_step_payload["callback_topic"] = callback_topic
+
+        # Update current workflow step (with callback_topic for completion tracking)
         db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-            db_workflow.id, current_step_number, run_benchmark_payload
+            db_workflow.id, current_step_number, workflow_step_payload
         )
 
-        logger.debug(f"Performing run benchmark request to budcluster {run_benchmark_payload}")
-        run_benchmark_response = await self._perform_run_benchmark_request(run_benchmark_payload)
+        # Send to budcluster with multi-topic source_topic
+        logger.debug(f"Performing run benchmark request to budcluster {budcluster_payload}")
+        run_benchmark_response = await self._perform_run_benchmark_request(budcluster_payload)
 
         # Add payload dict to response
         for step in run_benchmark_response["steps"]:
@@ -661,6 +685,10 @@ class BenchmarkService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+
+        # NOTE: budpipeline notification is handled via multi-topic publishing (event-driven-completion)
+        # budcluster publishes directly to budpipelineEvents topic, and budpipeline's
+        # event router routes events to the appropriate handler (ModelBenchmarkHandler.on_event())
 
     async def get_benchmarks(
         self,

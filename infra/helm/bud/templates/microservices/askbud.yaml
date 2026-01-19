@@ -24,6 +24,7 @@ spec:
         dapr.io/app-id: {{ .Values.microservices.askbud.daprid }}
         dapr.io/app-port: "3000"
         dapr.io/volume-mounts: "crypto-keys:/mnt/crypto-keys"
+        dapr.io/app-token-secret: "{{ .Release.Name }}-app-api-token"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -47,6 +48,11 @@ spec:
         ports:
         - containerPort: 3000
         env:
+          - name: APP_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-app-api-token
+                key: token
           - name: INFERENCE_MODEL
             value: {{ .Values.microservices.askbud.model }}
           - name: BUD_CLUSTER_APP_ID

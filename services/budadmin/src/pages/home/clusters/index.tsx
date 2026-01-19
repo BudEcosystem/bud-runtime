@@ -75,12 +75,12 @@ export default function Clusters() {
     }
   }, [getClusters, hasPermission, pageSize]);
 
-  // Initial load
+  // Initial load - wait for permissions to be loaded before checking hasPermission
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && !loadingUser) {
       loadClusters(1, false);
     }
-  }, [isMounted, loadClusters]);
+  }, [isMounted, loadingUser, loadClusters]);
 
   useHandleRouteChange(() => {
     notification.destroy();

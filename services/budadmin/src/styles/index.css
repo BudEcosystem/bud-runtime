@@ -77,6 +77,17 @@ input {
   background-color: #060606;
 }
 
+.step-node,
+.start-node {
+  background-color: #0E0E0E !important;
+  border: 1px solid #1F1F1F !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 4px 10px rgba(0, 0, 0, 0.25),
+    0 12px 24px rgba(0, 0, 0, 0.2) !important;
+}
+
 /* Reduce flowgram canvas dot pattern brightness to 30% */
 .demo-fixed-container svg[data-background="true"] circle,
 .demo-fixed-container [data-background="true"] circle,
@@ -200,4 +211,35 @@ textarea:-moz-placeholder {
 .ant-dropdown-menu-item-danger:hover {
   background-color: #1A1A1A !important;
   color: #FF6666 !important;
+}
+
+/* Workflow Action Sidebar - Ant Design Collapse Dark Theme */
+.ant-collapse.ant-collapse-ghost {
+  background-color: transparent !important;
+}
+
+.ant-collapse.ant-collapse-ghost > .ant-collapse-item {
+  border-bottom: none !important;
+}
+
+.ant-collapse.ant-collapse-ghost > .ant-collapse-item > .ant-collapse-header {
+  padding: 8px 0 !important;
+  color: #b3b3b3 !important;
+}
+
+.ant-collapse.ant-collapse-ghost > .ant-collapse-item > .ant-collapse-header:hover {
+  color: #fff !important;
+}
+
+.ant-collapse.ant-collapse-ghost > .ant-collapse-item > .ant-collapse-content {
+  background-color: transparent !important;
+  border-top: none !important;
+}
+
+.ant-collapse.ant-collapse-ghost > .ant-collapse-item > .ant-collapse-content > .ant-collapse-content-box {
+  padding: 0 0 8px 0 !important;
+}
+
+.ant-collapse-expand-icon {
+  color: #666 !important;
 }

@@ -976,6 +976,10 @@ class LocalModelWorkflowService(SessionMixin):
             add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
+        # Store callback_topic for budpipeline integration
+        if request.callback_topic:
+            workflow_step_data["callback_topic"] = request.callback_topic
+
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": db_workflow.id}
@@ -1037,6 +1041,7 @@ class LocalModelWorkflowService(SessionMixin):
                 "proprietary_credential_id",  # Only required for HuggingFace (Optional)
                 "name",
                 "uri",
+                "callback_topic",  # For direct budpipeline notification (D-001)
             ]
 
             # from workflow steps extract necessary information
@@ -1346,6 +1351,7 @@ class LocalModelWorkflowService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+        # NOTE: budpipeline notification is handled directly by budmodel via multi-topic source_topic (D-001)
 
     async def _verify_provider_type_uri_duplication(
         self,
@@ -1417,8 +1423,11 @@ class LocalModelWorkflowService(SessionMixin):
         self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
     ) -> None:
         """Perform model extraction."""
-        # Perform model extraction request
-        model_extraction_response = await self._perform_model_extraction_request(db_workflow.id, data, current_user_id)
+        # Perform model extraction request with callback_topic for direct budpipeline notification
+        callback_topic = data.get("callback_topic")
+        model_extraction_response = await self._perform_model_extraction_request(
+            db_workflow.id, data, current_user_id, callback_topic
+        )
 
         # Add payload dict to response
         for step in model_extraction_response["steps"]:
@@ -1443,7 +1452,13 @@ class LocalModelWorkflowService(SessionMixin):
             db_workflow, {"progress": model_extraction_response, "current_step": workflow_current_step}
         )
 
-    async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
+    async def _perform_model_extraction_request(
+        self,
+        workflow_id: UUID,
+        data: Dict,
+        current_user_id: UUID,
+        callback_topic: str | None = None,
+    ) -> None:
         """Perform model extraction request."""
         model_extraction_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/extract"
@@ -1465,6 +1480,11 @@ class LocalModelWorkflowService(SessionMixin):
                 logger.error(f"Failed to decrypt token: {e}")
                 raise ClientException("Invalid credential found while adding model") from e
 
+        # Build source_topic - include callback_topic for direct budpipeline notification (D-001)
+        source_topics: str | list[str] = app_settings.source_topic
+        if callback_topic:
+            source_topics = [app_settings.source_topic, callback_topic]
+
         model_extraction_request = {
             "model_name": data["name"],
             "model_uri": data["uri"],
@@ -1475,7 +1495,7 @@ class LocalModelWorkflowService(SessionMixin):
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
-            "source_topic": f"{app_settings.source_topic}",
+            "source_topic": source_topics,  # Multi-topic: budapp + budpipeline
         }
 
         try:
@@ -3398,6 +3418,7 @@ class ModelService(SessionMixin):
                 "tool_calling_parser_type",
                 "reasoning_parser_type",
                 "chat_template",
+                "callback_topic",  # For direct budpipeline notification (D-001)
             ]
 
             # from workflow steps extract necessary information
@@ -3521,6 +3542,7 @@ class ModelService(SessionMixin):
                     budaiscaler_specification=required_data.get("budaiscaler_specification"),
                     enable_tool_calling=required_data.get("enable_tool_calling"),
                     enable_reasoning=required_data.get("enable_reasoning"),
+                    callback_topic=required_data.get("callback_topic"),  # For direct budpipeline notification
                 )
                 model_deployment_events = {
                     "budserve_cluster_events": model_deployment_response,
@@ -3666,6 +3688,7 @@ class ModelService(SessionMixin):
         budaiscaler_specification: Optional[BudAIScalerSpecification] = None,
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
+        callback_topic: Optional[str] = None,  # For direct budpipeline notification (D-001)
     ) -> Dict[str, Any]:
         """Trigger model deployment by step."""
         logger.debug("Triggering model deployment")
@@ -3745,6 +3768,11 @@ class ModelService(SessionMixin):
                 default_access_mode,
             )
 
+        # Build source_topic - include callback_topic for direct budpipeline notification (D-001)
+        source_topics: str | list[str] = app_settings.source_topic
+        if callback_topic:
+            source_topics = [app_settings.source_topic, callback_topic]
+
         # Perform model deployment
         model_deployment_request = ModelDeploymentRequest(
             cluster_id=cluster_id,
@@ -3760,7 +3788,7 @@ class ModelService(SessionMixin):
             input_tokens=deploy_config.avg_context_length,
             output_tokens=deploy_config.avg_sequence_length,
             notification_metadata=notification_metadata,
-            source_topic=app_settings.source_topic,
+            source_topic=source_topics,  # Multi-topic: budapp + budpipeline
             credential_id=credential_id,
             budaiscaler=budaiscaler_specification,
             provider=db_model.source,

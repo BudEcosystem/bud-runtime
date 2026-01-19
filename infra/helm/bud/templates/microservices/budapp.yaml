@@ -22,6 +22,7 @@ spec:
         dapr.io/enabled: "true"
         dapr.io/app-id: {{ .Values.microservices.budapp.daprid }}
         dapr.io/app-port: "9082"
+        dapr.io/app-token-secret: "{{ .Release.Name }}-app-api-token"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -44,6 +45,11 @@ spec:
         ports:
         - containerPort: 9082
         env:
+          - name: APP_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-app-api-token
+                key: token
           - name: PRIVATE_KEY_PATH
             value: "/app/keys/rsa-private-key.pem"
           - name: PRIVATE_KEY_PASSWORD
@@ -67,6 +73,8 @@ spec:
             value: {{ .Values.microservices.budeval.daprid }}
           - name: BUD_PROMPT_APP_ID
             value: {{ .Values.microservices.budprompt.daprid }}
+          - name: BUD_PIPELINE_APP_ID
+            value: {{ .Values.microservices.budpipeline.daprid }}
           - name: FRONTEND_URL
             value: {{ include "bud.ingress.url.budcustomer" . }}
           - name: ADMIN_FRONTEND_URL

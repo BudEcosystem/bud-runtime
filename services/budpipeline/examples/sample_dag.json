@@ -1,0 +1,57 @@
+{
+  "name": "sample-workflow",
+  "version": "1.0.0",
+  "description": "Sample workflow demonstrating budpipeline capabilities",
+  "parameters": [
+    {
+      "name": "message",
+      "type": "string",
+      "description": "Input message to process",
+      "default": "Hello World"
+    },
+    {
+      "name": "run_transform",
+      "type": "boolean",
+      "description": "Whether to run transformation step",
+      "default": true
+    }
+  ],
+  "steps": [
+    {
+      "id": "log_start",
+      "name": "Log Start",
+      "action": "log",
+      "params": {
+        "message": "Starting workflow with message: {{ params.message }}",
+        "level": "info"
+      }
+    },
+    {
+      "id": "transform",
+      "name": "Transform Message",
+      "action": "transform",
+      "depends_on": ["log_start"],
+      "condition": "{{ params.run_transform }}",
+      "params": {
+        "input": "{{ params.message }}",
+        "operation": "uppercase"
+      }
+    },
+    {
+      "id": "set_result",
+      "name": "Set Result",
+      "action": "set_output",
+      "depends_on": ["transform"],
+      "params": {
+        "outputs": {
+          "result": "{{ steps.transform.outputs.result | default(params.message) }}",
+          "transformed": "{{ steps.transform.outputs.result is defined }}"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "final_result": "{{ steps.set_result.outputs.result }}",
+    "was_transformed": "{{ steps.set_result.outputs.transformed }}"
+  }
+}

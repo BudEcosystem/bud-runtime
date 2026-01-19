@@ -488,6 +488,7 @@ class CreateLocalModelWorkflowRequest(BaseModel):
     tags: list[Tag] | None = None
     icon: str | None = None
     add_model_modality: list[AddModelModalityEnum] | None = None
+    callback_topic: str | None = None  # For budpipeline integration
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateLocalModelWorkflowRequest":
@@ -1301,7 +1302,7 @@ class ModelDeploymentRequest(BaseModel):
     input_tokens: int
     output_tokens: int
     notification_metadata: BudNotificationMetadata
-    source_topic: str
+    source_topic: str | list[str]  # Supports multi-topic notification (D-001)
     credential_id: UUID4 | None = None
     # BudAIScaler specification
     budaiscaler: BudAIScalerSpecification | None = None
