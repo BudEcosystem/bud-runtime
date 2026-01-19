@@ -426,6 +426,29 @@ class PlaygroundInitializeRequest(BaseModel):
         return v.strip()
 
 
+class PlaygroundInitializeWithAccessTokenRequest(BaseModel):
+    """Request schema for playground access token initialization (cross-app SSO).
+
+    This endpoint accepts an access token from any OAuth client in the same Keycloak realm.
+    Unlike refresh tokens, access tokens can be validated by any service using Keycloak's
+    public keys, enabling cross-app SSO without shared client credentials.
+    """
+
+    access_token: str = Field(..., description="Access token to validate and use for session initialization")
+
+    @field_validator("access_token")
+    @classmethod
+    def validate_access_token_format(cls, v: str) -> str:
+        """Basic access token format validation."""
+        if not v or not v.strip():
+            raise ValueError("Access token cannot be empty")
+        # JWT tokens have 3 parts separated by dots
+        parts = v.strip().split(".")
+        if len(parts) != 3:
+            raise ValueError("Invalid access token format - expected JWT")
+        return v.strip()
+
+
 class EndpointInfo(BaseModel):
     """Information about an endpoint available to the user."""
 
@@ -453,3 +476,17 @@ class PlaygroundInitializeResponse(BaseModel):
     refresh_token: str = Field(..., description="New refresh token")
     token_type: str = Field(default="Bearer", description="Token type")
     expires_in: int | None = Field(None, description="Access token expiry in seconds")
+
+
+class PlaygroundInitializeWithAccessTokenResponse(BaseModel):
+    """Response schema for playground access token initialization (cross-app SSO).
+
+    This response does not include new tokens - the access token was validated but not refreshed.
+    The session is initialized using the provided access token's claims.
+    """
+
+    user_id: UUID = Field(..., description="User ID extracted from access token")
+    initialization_status: str = Field(default="success", description="Status of initialization")
+    ttl: int | None = Field(None, description="Session TTL in seconds based on access token expiry")
+    message: str | None = Field(None, description="Optional message about initialization")
+    expires_in: int | None = Field(None, description="Access token expiry in seconds (from token claims)")

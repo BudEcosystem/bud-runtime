@@ -62,6 +62,8 @@ from .schemas import (
     PlaygroundDeploymentListResponse,
     PlaygroundInitializeRequest,
     PlaygroundInitializeResponse,
+    PlaygroundInitializeWithAccessTokenRequest,
+    PlaygroundInitializeWithAccessTokenResponse,
 )
 from .services import ChatSessionService, ChatSettingService, MessageService, NoteService, PlaygroundService
 
@@ -121,6 +123,70 @@ async def initialize_playground(
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
     except Exception as e:
         logger.exception(f"Failed to initialize playground session: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to initialize playground session"
+        ).to_http_response()
+
+
+@playground_router.post(
+    "/initialize-with-token",
+    responses={
+        status.HTTP_200_OK: {
+            "model": PlaygroundInitializeWithAccessTokenResponse,
+            "description": "Successfully initialized playground session with access token",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "Invalid or expired access token",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Invalid request or access token format",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "User not found",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+    },
+    description="Initialize playground session with access token authentication (cross-app SSO). "
+    "Validates access token using Keycloak's public keys and populates Redis cache. "
+    "This endpoint accepts tokens from any OAuth client in the same Keycloak realm.",
+)
+async def initialize_playground_with_access_token(
+    request: PlaygroundInitializeWithAccessTokenRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[PlaygroundInitializeWithAccessTokenResponse, ErrorResponse]:
+    """Initialize playground session with access token authentication (cross-app SSO).
+
+    This endpoint enables cross-app SSO by accepting access tokens from any OAuth client
+    in the same Keycloak realm. Unlike refresh tokens, access tokens can be validated
+    using Keycloak's public keys without requiring client-specific credentials.
+
+    This endpoint:
+    1. Validates the access token signature using Keycloak's public keys
+    2. Extracts user information from the token claims
+    3. Creates hash(access_token) for Redis key
+    4. Populates Redis with user's available deployments
+    5. Returns session information (no new tokens - no refresh performed)
+
+    Use this endpoint for cross-app SSO scenarios where the calling app (e.g., Onyx)
+    has its own OAuth client but needs to initialize a session in BudApp.
+    """
+    try:
+        playground_service = PlaygroundService(session)
+        response = await playground_service.initialize_session_with_access_token(access_token=request.access_token)
+
+        return response.model_dump()
+
+    except ClientException as e:
+        logger.exception(f"Failed to initialize playground session with access token: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to initialize playground session with access token: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to initialize playground session"
         ).to_http_response()

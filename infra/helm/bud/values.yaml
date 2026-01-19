@@ -2,6 +2,23 @@
 global:
   security:
     allowInsecureImages: true
+  # Ingress hosts configuration - shared with subcharts (e.g., onyx)
+  # Subcharts access via .Values.global.ingress.hosts.root
+  ingress:
+    hosts:
+      root: "bud.example.com"
+      # NOTE: rest is derived from root by ./templates/_helpers.tpl
+      budadmin: ""
+      budcustomer: ""
+      budplayground: ""
+      budapp: ""
+      budgateway: ""
+      budask: ""
+      novuapi: ""
+      novuws: ""
+      s3: ""
+      mcpgateway: ""
+      onyx: ""  # Auto-derives to chat.{root} e.g., chat.dev.domain.com
   # Optional node scheduling configuration applied to all microservices by default
   # Can be overridden per-service in microservices.<service>.nodeSelector and microservices.<service>.affinity
   nodeSelector: {}
@@ -102,6 +119,10 @@ externalServices:
         name: "budpipeline"
         username: "budpipeline"
         password: "budpipeline"
+      onyx:
+        name: "onyx"
+        username: "onyx"
+        password: "onyx"
         # TODO: map all external service through here
         # monogodb:
         #   endpoint: ""
@@ -121,19 +142,7 @@ ingress:
   enabled: true
   # NOTE: used to derive public urls for client side services: (external|internal|disabled)
   https: disabled
-  hosts:
-    root: "bud.example.com"
-    # NOTE: rest is derived from root by ./templates/_helpers.tpl
-    budadmin: ""
-    budcustomer: ""
-    budplayground: ""
-    budapp: ""
-    budgateway: ""
-    budask: ""
-    novuapi: ""
-    novuws: ""
-    s3: ""
-    mcpgateway: ""
+  # NOTE: hosts moved to global.ingress.hosts for subchart access
 microservices:
   # frontend services
   budadmin:
@@ -697,6 +706,7 @@ postgresqlExtra:
     - budprompt
     - mcpgateway
     - budpipeline
+    - onyx
 keycloak:
   image:
     repository: bitnamilegacy/keycloak
@@ -705,6 +715,11 @@ keycloak:
     limits:
       memory: 2Gi
   enabled: true
+  # Keycloak admin credentials (for provisioning and management)
+  auth:
+    adminUser: bud
+    adminPassword: bud
+  adminRealm: master
   postgresql:
     enabled: false
   externalDatabase:
@@ -799,6 +814,7 @@ minio:
       - name: novu-local
       - name: models-registry
       - name: model-info
+      - name: onyx-file-store-bucket
   # Optional node scheduling for MinIO
   nodeSelector: {}
   affinity: {}
@@ -891,6 +907,133 @@ prometheus-adapter:
         name:
           as: "gateway_processing_seconds_p95"
         metricsQuery: 'gateway_processing_seconds{quantile="0.95",<<.LabelMatchers>>}'
+# Onyx - AI-powered knowledge assistant with document search
+# Uses shared PostgreSQL, Valkey, and MinIO from bud chart
+onyx:
+  enabled: false
+  # Keycloak values for subchart context (used in configMap templates)
+  keycloak:
+    auth:
+      adminUser: "bud"
+      adminPassword: "bud"
+  # OAuth client configuration - automatically provisioned by keycloak-provisioning.yaml Job
+  # The Job reuses 'default-internal-client' created by budapp, enables Direct Access Grants,
+  # retrieves the secret from Keycloak, and updates the K8s secret for Onyx
+  # Disable shared dependencies (use bud's instances)
+  postgresql:
+    enabled: false
+  valkey:
+    enabled: false
+  minio:
+    enabled: false
+  # Onyx-managed dependencies
+  vespa:
+    enabled: true
+    name: da-vespa-0
+    service:
+      name: vespa-service
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 4000m
+        memory: 8000Mi
+      limits:
+        cpu: 8000m
+        memory: 32000Mi
+  nginx:
+    enabled: false  # Disabled - bud uses traefik for ingress
+  # Disable Onyx's own ingress (bud's traefik handles routing via ingress.yaml)
+  # NOTE: Onyx uses global.ingress.hosts.root for domain configuration
+  ingress:
+    enabled: false
+  letsencrypt:
+    enabled: false
+  # Application configuration
+  global:
+    version: "latest"
+    pullPolicy: "Always"
+  # Use bud's shared secrets (created in templates/extra/onyx.yaml)
+  auth:
+    postgresql:
+      enabled: true
+      existingSecret: "{{ $.Release.Name }}-onyx-postgresql"
+      secretKeys:
+        POSTGRES_USER: username
+        POSTGRES_PASSWORD: password
+    redis:
+      enabled: true
+      existingSecret: "{{ $.Release.Name }}-onyx-redis"
+      secretKeys:
+        REDIS_PASSWORD: redis_password
+    objectstorage:
+      enabled: true
+      existingSecret: "{{ $.Release.Name }}-onyx-objectstorage"
+      secretKeys:
+        S3_AWS_ACCESS_KEY_ID: s3_aws_access_key_id
+        S3_AWS_SECRET_ACCESS_KEY: s3_aws_secret_access_key
+    oauth:
+      enabled: true
+      existingSecret: "{{ $.Release.Name }}-onyx-oauth"
+      secretKeys:
+        # Keycloak admin password - Onyx uses this to auto-provision its OAuth client
+        KEYCLOAK_ADMIN_PASSWORD: keycloak_admin_password
+        # Cookie secret for session encryption
+        OAUTH_COOKIE_SECRET: oauth_cookie_secret
+        # NOTE: OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are NOT set here.
+        # Onyx auto-provisions 'onyx-client' at startup with directAccessGrantsEnabled.
+    smtp:
+      enabled: false
+  # ConfigMap overrides (template expressions are evaluated via tpl function)
+  configMap:
+    AUTH_TYPE: "oidc"
+    # PostgreSQL database name (created by postgres-db-create Job)
+    POSTGRES_DB: "onyx"
+    # Redis DB index 11 - unique to Onyx (other services use: 1=Novu, 3=Dapr, 5=global, 9=mcpgateway, 10=budprompt)
+    REDIS_DB: "11"
+    # NOTE: Keycloak admin user is 'user' in the deployed instance (from example.secrets.yaml)
+    # even though values.yaml defaults to 'bud'. Using 'user' directly for compatibility.
+    KEYCLOAK_ADMIN_USERNAME: "user"
+    KEYCLOAK_REALM: "bud-keycloak"
+    WEB_DOMAIN: '{{ printf "https://chat.%s" .Values.global.ingress.hosts.root }}'
+    DOMAIN: "{{ .Values.global.ingress.hosts.root }}"
+    S3_FILE_STORE_BUCKET_NAME: "onyx-file-store-bucket"
+    BUD_FOUNDRY_API_BASE: '{{ printf "https://gateway.%s" .Values.global.ingress.hosts.root }}/v1'
+    BUD_FOUNDRY_APP_BASE: '{{ printf "https://app.%s" .Values.global.ingress.hosts.root }}'
+    OPENID_CONFIG_URL: 'http://{{ .Release.Name }}-keycloak/realms/bud-keycloak/.well-known/openid-configuration'
+  # Component configurations
+  webserver:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  api:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  celery_beat:
+    replicaCount: 1
+  celery_worker_primary:
+    replicaCount: 1
+  celery_worker_light:
+    replicaCount: 1
+  celery_worker_heavy:
+    replicaCount: 1
+  slackbot:
+    enabled: false
+  # Inference and indexing model servers
+  inferenceCapability:
+    replicaCount: 1
+  indexCapability:
+    replicaCount: 1
 # best to be installed cluster wide, not as part of this chart
 dapr:
   enabled: false
