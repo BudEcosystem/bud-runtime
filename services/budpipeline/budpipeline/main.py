@@ -395,7 +395,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "budpipeline.main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 - binding to all interfaces for container deployment
         port=settings.service_port,
         reload=settings.debug,
     )

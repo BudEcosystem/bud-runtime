@@ -58,6 +58,7 @@ dev = [
     "ruff>=0.2.0",
     "mypy>=1.8.0",
     "pre-commit>=3.6.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [project.entry-points."budpipeline.actions"]
@@ -199,6 +200,7 @@ module = [
     "budpipeline.actions.model.benchmark",
     "budpipeline.actions.cluster.health",
     "budpipeline.engine.param_resolver",
+    "budpipeline.engine.dag_parser",
     "budpipeline.commons.observability",
     "budpipeline.commons.resilience",
     "budpipeline.commons.database",

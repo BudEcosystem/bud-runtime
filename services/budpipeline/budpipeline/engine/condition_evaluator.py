@@ -54,7 +54,8 @@ class ConditionEvaluator:
         return Environment(
             loader=BaseLoader(),
             undefined=StrictUndefined if strict else Undefined,
-            autoescape=False,
+            # autoescape disabled - not rendering HTML, only evaluating conditions
+            autoescape=False,  # nosec B701
         )
 
     @classmethod

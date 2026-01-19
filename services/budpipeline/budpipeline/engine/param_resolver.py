@@ -34,7 +34,7 @@ class _ChainableUndefined(Undefined):
         # Return another ChainableUndefined for chained access
         return _ChainableUndefined(name=f"{self._undefined_name}.{name}")
 
-    def __getitem__(self, key: Any) -> "_ChainableUndefined":
+    def __getitem__(self, key: Any) -> "_ChainableUndefined":  # type: ignore[override]
         return _ChainableUndefined(name=f"{self._undefined_name}[{key!r}]")
 
 
@@ -49,7 +49,7 @@ class _StrictChainableUndefined(StrictUndefined):
         # Return another StrictChainableUndefined for chained access
         return _StrictChainableUndefined(name=f"{self._undefined_name}.{name}")
 
-    def __getitem__(self, key: Any) -> "_StrictChainableUndefined":
+    def __getitem__(self, key: Any) -> "_StrictChainableUndefined":  # type: ignore[override]
         return _StrictChainableUndefined(name=f"{self._undefined_name}[{key!r}]")
 
 
@@ -135,7 +135,8 @@ class ParamResolver:
         env = Environment(
             loader=BaseLoader(),
             undefined=StrictUndefined if strict else Undefined,
-            autoescape=False,
+            # autoescape disabled - not rendering HTML, only resolving workflow params
+            autoescape=False,  # nosec B701
         )
         return env
 
