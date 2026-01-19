@@ -277,6 +277,7 @@ SKIP_COLUMNS = {
     "request_forward_time",  # DateTime format comparison is complex
     "request_timestamp",  # DateTime format comparison is complex
     "response_timestamp",  # DateTime format comparison is complex
+    "blocked_at",  # DateTime format comparison is complex
     # Content fields - too long to compare, verified separately
     "input_messages",
     "output",
@@ -574,3 +575,196 @@ def test_all_ground_truth(data_key, expected):
             mismatches.append(f"{col}: expected={expected_val!r}, actual={actual_val!r}")
 
     assert not mismatches, f"Mismatches in {data_key}:\n" + "\n".join(mismatches)
+
+
+# =============================================================================
+# BLOCKING EVENT DATA TEST
+# =============================================================================
+# Test data for blocked-only requests (no inference span, only gateway_analytics with blocking event)
+
+EXPECTED_BLOCKED_DATA = {
+    # Core identifiers (from gateway_analytics span)
+    "trace_id": "blocked0000000000000000000000001",
+    "inference_id": None,  # Blocked requests don't have inference_id
+    "project_id": "019787c1-3de1-7b50-969b-e0a58514b6a1",
+    "endpoint_id": "019787c1-3de1-7b50-969b-e0a58514b6a4",
+    "model_id": "019787c1-3de1-7b50-969b-e0a58514b6a2",
+    "api_key_id": None,
+    "api_key_project_id": None,
+    "user_id": None,
+    # Status (blocked = failed)
+    "is_success": False,
+    "status_code": 403,
+    "cost": None,
+    "request_ip": None,
+    "response_analysis": None,
+    # Error fields
+    "error_code": "BLOCKED",
+    "error_message": None,
+    "error_type": None,
+    # Model inference fields (NULL for blocked requests)
+    "model_inference_id": None,
+    "model_name": None,
+    "model_provider": None,
+    "endpoint_type": "blocked",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "response_time_ms": None,
+    "ttft_ms": None,
+    "cached": False,
+    "finish_reason": None,
+    "model_inference_timestamp": None,
+    "system_prompt": None,
+    "guardrail_scan_summary": None,
+    # Chat inference fields (NULL for blocked requests)
+    "chat_inference_id": None,
+    "episode_id": None,
+    "function_name": None,
+    "variant_name": None,
+    "processing_time_ms": None,
+    "tags": None,
+    "inference_params": None,
+    "extra_body": None,
+    "tool_params": None,
+    # Gateway analytics
+    "device_type": "desktop",
+    "browser_name": "PostmanRuntime",
+    "browser_version": "7.51",
+    "os_name": "Other",
+    "os_version": None,
+    "is_bot": False,
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "protocol_version": "HTTP/1.1",
+    "user_agent": "PostmanRuntime/7.51.0",
+    "gateway_processing_ms": 5,
+    "total_duration_ms": 5,
+    "is_blocked": True,  # Always true for blocked requests
+    "block_reason": "rate_limit_exceeded",
+    "block_rule_id": "019b971a-5a01-7000-a001-a10000000001",
+    "client_ip": "192.168.1.50",
+    "proxy_chain": None,
+    "query_params": None,
+    "body_size": 256,
+    "response_size": None,
+    "request_headers": '{"content-type":"application/json","accept":"*/*"}',
+    "response_headers": '{"content-type":"application/json"}',
+    "gateway_tags": "{}",
+    # Geo fields
+    "country_code": "CN",
+    "country_name": "China",
+    "region": "Beijing",
+    "city": "Beijing",
+    "latitude": 39.9042,
+    "longitude": 116.4074,
+    "timezone": "Asia/Shanghai",
+    "asn": 4808,
+    "isp": "China Unicom",
+    "model_version": None,
+    "routing_decision": None,
+    # Blocking event data
+    "blocking_event_id": "019b971a-6a01-7000-a001-a10000000001",
+    "rule_id": "019b971a-5a01-7000-a001-a10000000001",
+    "rule_type": "rate_limit",
+    "rule_name": "API Rate Limit (100/min)",
+    "rule_priority": 100,
+    "block_reason_detail": "Rate limit exceeded: 101 requests in 60 seconds",
+    "action_taken": "block",
+}
+
+
+def query_blocked_inference_fact(trace_id: str) -> dict:
+    """Query InferenceFact for a blocked request by trace_id."""
+    query = f"""
+    SELECT *
+    FROM {DATABASE}.InferenceFact
+    WHERE trace_id = '{trace_id}' AND is_blocked = true
+    FORMAT JSONEachRow
+    """
+    result = execute_query(query)
+    if not result:
+        return {}
+    return json.loads(result)
+
+
+class TestInferenceFactBlocking:
+    """Test blocking event data in InferenceFact."""
+
+    @pytest.mark.integration
+    def test_blocking_columns_exist_in_schema(self):
+        """Verify that blocking columns exist in InferenceFact schema."""
+        query = f"""
+        SELECT name
+        FROM system.columns
+        WHERE database = '{DATABASE}' AND table = 'InferenceFact'
+        AND name IN (
+            'blocking_event_id', 'rule_id', 'rule_type', 'rule_name',
+            'rule_priority', 'block_reason_detail', 'action_taken', 'blocked_at'
+        )
+        ORDER BY name
+        """
+        result = execute_query(query)
+        columns = set(result.strip().split('\n')) if result else set()
+
+        expected_columns = {
+            'blocking_event_id', 'rule_id', 'rule_type', 'rule_name',
+            'rule_priority', 'block_reason_detail', 'action_taken', 'blocked_at'
+        }
+
+        assert columns == expected_columns, f"Missing columns: {expected_columns - columns}"
+
+    @pytest.mark.integration
+    def test_rollup_tables_have_blocking_columns(self):
+        """Verify that rollup tables have block_count and unique_blocked_ips columns."""
+        for table in ['InferenceMetrics5m', 'InferenceMetrics1h', 'InferenceMetrics1d']:
+            query = f"""
+            SELECT name
+            FROM system.columns
+            WHERE database = '{DATABASE}' AND table = '{table}'
+            AND name IN ('block_count', 'unique_blocked_ips')
+            ORDER BY name
+            """
+            result = execute_query(query)
+            columns = set(result.strip().split('\n')) if result else set()
+
+            assert 'block_count' in columns, f"Missing block_count in {table}"
+            assert 'unique_blocked_ips' in columns, f"Missing unique_blocked_ips in {table}"
+
+    @pytest.mark.integration
+    def test_blocking_mv_exists(self):
+        """Verify that mv_otel_blocking_to_inference_fact MV exists."""
+        query = f"""
+        SELECT name
+        FROM system.tables
+        WHERE database = '{DATABASE}'
+        AND name = 'mv_otel_blocking_to_inference_fact'
+        """
+        result = execute_query(query)
+        assert result.strip() == 'mv_otel_blocking_to_inference_fact', \
+            "mv_otel_blocking_to_inference_fact MV not found"
+
+    @pytest.mark.integration
+    def test_is_blocked_index_exists(self):
+        """Verify that is_blocked index exists for efficient filtering."""
+        query = f"""
+        SELECT name
+        FROM system.data_skipping_indices
+        WHERE database = '{DATABASE}'
+        AND table = 'InferenceFact'
+        AND name = 'idx_is_blocked'
+        """
+        result = execute_query(query)
+        assert result.strip() == 'idx_is_blocked', "idx_is_blocked index not found"
+
+    @pytest.mark.integration
+    def test_rule_id_index_exists(self):
+        """Verify that rule_id index exists for efficient filtering."""
+        query = f"""
+        SELECT name
+        FROM system.data_skipping_indices
+        WHERE database = '{DATABASE}'
+        AND table = 'InferenceFact'
+        AND name = 'idx_rule_id'
+        """
+        result = execute_query(query)
+        assert result.strip() == 'idx_rule_id', "idx_rule_id index not found"

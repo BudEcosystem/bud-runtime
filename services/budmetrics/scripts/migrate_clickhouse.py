@@ -1120,10 +1120,12 @@ class ClickHouseMigration:
             span_id String CODEC(ZSTD(1)),
 
             -- ===== CORE IDENTIFIERS (from model_inference_details.*) =====
-            inference_id UUID CODEC(ZSTD(1)),
-            project_id UUID CODEC(ZSTD(1)),
-            endpoint_id UUID CODEC(ZSTD(1)),
-            model_id UUID CODEC(ZSTD(1)),
+            -- Nullable to support blocked requests that never reach inference
+            inference_id Nullable(UUID) CODEC(ZSTD(1)),
+            -- Nullable to support early-blocked requests that may not have these set
+            project_id Nullable(UUID) CODEC(ZSTD(1)),
+            endpoint_id Nullable(UUID) CODEC(ZSTD(1)),
+            model_id Nullable(UUID) CODEC(ZSTD(1)),
             api_key_id Nullable(UUID) CODEC(ZSTD(1)),
             api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
             user_id Nullable(String) CODEC(ZSTD(1)),
@@ -1232,13 +1234,23 @@ class ClickHouseMigration:
             response_timestamp Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
             gateway_tags Nullable(String) CODEC(ZSTD(1)),
 
+            -- ===== BLOCKING EVENT DATA (from gateway_blocking_events.* span) =====
+            blocking_event_id Nullable(UUID) CODEC(ZSTD(1)),
+            rule_id Nullable(UUID) CODEC(ZSTD(1)),
+            rule_type LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            rule_name Nullable(String) CODEC(ZSTD(1)),
+            rule_priority Nullable(Int32) CODEC(ZSTD(1)),
+            block_reason_detail Nullable(String) CODEC(ZSTD(1)),
+            action_taken LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            blocked_at Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
+
             -- ===== MATERIALIZED COLUMNS =====
             date Date MATERIALIZED toDate(timestamp),
             hour DateTime MATERIALIZED toStartOfHour(timestamp)
         )
-        ENGINE = MergeTree()
+        ENGINE = ReplacingMergeTree(timestamp)
         PARTITION BY toYYYYMMDD(timestamp)
-        ORDER BY (project_id, endpoint_id, model_id, timestamp, inference_id)
+        ORDER BY (trace_id)
         TTL toDateTime(timestamp) + INTERVAL 30 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1276,6 +1288,10 @@ class ClickHouseMigration:
                 "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_routing_decision (routing_decision) TYPE set(20) GRANULARITY 4",
                 # Error tracking
                 "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_error_type (error_type) TYPE set(50) GRANULARITY 4",
+                # Blocking event data
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_rule_id (rule_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_rule_type (rule_type) TYPE set(20) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_action_taken (action_taken) TYPE set(10) GRANULARITY 4",
             ]
 
             for index_query in indexes:
@@ -1435,7 +1451,17 @@ class ClickHouseMigration:
             nullIf(g.SpanAttributes['gateway_analytics.response_headers'], '') AS response_headers,
             parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp']) AS request_timestamp,
             parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.response_timestamp']) AS response_timestamp,
-            nullIf(g.SpanAttributes['gateway_analytics.tags'], '') AS gateway_tags
+            nullIf(g.SpanAttributes['gateway_analytics.tags'], '') AS gateway_tags,
+
+            -- ===== BLOCKING EVENT DATA (from gateway_blocking_events.* in gateway span) =====
+            toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.id'], '')) AS blocking_event_id,
+            toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.rule_id'], '')) AS rule_id,
+            nullIf(g.SpanAttributes['gateway_blocking_events.rule_type'], '') AS rule_type,
+            nullIf(g.SpanAttributes['gateway_blocking_events.rule_name'], '') AS rule_name,
+            toInt32OrNull(g.SpanAttributes['gateway_blocking_events.rule_priority']) AS rule_priority,
+            nullIf(g.SpanAttributes['gateway_blocking_events.block_reason'], '') AS block_reason_detail,
+            nullIf(g.SpanAttributes['gateway_blocking_events.action_taken'], '') AS action_taken,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at']) AS blocked_at
 
         FROM metrics.otel_traces i
         LEFT JOIN metrics.otel_traces g
@@ -1474,9 +1500,10 @@ class ClickHouseMigration:
             time_bucket DateTime,
 
             -- Dimension UUIDs (for filtering)
-            project_id UUID CODEC(ZSTD(1)),
-            endpoint_id UUID CODEC(ZSTD(1)),
-            model_id UUID CODEC(ZSTD(1)),
+            -- NOTE: Nullable to support blocked requests that don't have project/endpoint/model
+            project_id Nullable(UUID) CODEC(ZSTD(1)),
+            endpoint_id Nullable(UUID) CODEC(ZSTD(1)),
+            model_id Nullable(UUID) CODEC(ZSTD(1)),
             api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
 
             -- String dimensions (for grouping)
@@ -1507,9 +1534,13 @@ class ClickHouseMigration:
 
             -- Unique counts (using AggregateFunction for rollup compatibility)
             unique_users AggregateFunction(uniq, Nullable(String)),
-            unique_inferences AggregateFunction(uniq, UUID),
+            unique_inferences AggregateFunction(uniq, Nullable(UUID)),
             unique_episodes AggregateFunction(uniq, Nullable(UUID)),
-            unique_api_keys AggregateFunction(uniq, Nullable(UUID))
+            unique_api_keys AggregateFunction(uniq, Nullable(UUID)),
+
+            -- Blocking metrics
+            block_count UInt64 DEFAULT 0 CODEC(Delta, ZSTD(1)),
+            unique_blocked_ips AggregateFunction(uniq, IPv4)
         """
 
         # InferenceMetrics5m - 5-minute granularity, 30 day TTL
@@ -1650,7 +1681,11 @@ class ClickHouseMigration:
             uniqState(user_id) AS unique_users,
             uniqState(inference_id) AS unique_inferences,
             uniqState(episode_id) AS unique_episodes,
-            uniqState(api_key_id) AS unique_api_keys
+            uniqState(api_key_id) AS unique_api_keys,
+
+            -- Blocking metrics
+            countIf(is_blocked = true) AS block_count,
+            uniqStateIf(client_ip, is_blocked = true) AS unique_blocked_ips
 
         FROM InferenceFact
         GROUP BY
@@ -1701,7 +1736,11 @@ class ClickHouseMigration:
             uniqMergeState(unique_users) AS unique_users,
             uniqMergeState(unique_inferences) AS unique_inferences,
             uniqMergeState(unique_episodes) AS unique_episodes,
-            uniqMergeState(unique_api_keys) AS unique_api_keys
+            uniqMergeState(unique_api_keys) AS unique_api_keys,
+
+            -- Blocking metrics
+            sum(block_count) AS block_count,
+            uniqMergeState(unique_blocked_ips) AS unique_blocked_ips
 
         FROM InferenceMetrics5m
         GROUP BY
@@ -1752,7 +1791,11 @@ class ClickHouseMigration:
             uniqMergeState(unique_users) AS unique_users,
             uniqMergeState(unique_inferences) AS unique_inferences,
             uniqMergeState(unique_episodes) AS unique_episodes,
-            uniqMergeState(unique_api_keys) AS unique_api_keys
+            uniqMergeState(unique_api_keys) AS unique_api_keys,
+
+            -- Blocking metrics
+            sum(block_count) AS block_count,
+            uniqMergeState(unique_blocked_ips) AS unique_blocked_ips
 
         FROM InferenceMetrics1h
         GROUP BY
@@ -1983,6 +2026,387 @@ class ClickHouseMigration:
                     logger.warning(f"Index creation warning for {index_name}: {e}")
 
         logger.info("Gateway analytics columns migration to InferenceFact completed successfully")
+
+    async def add_blocking_columns_to_inference_fact(self):
+        """Add blocking event columns to existing InferenceFact table.
+
+        This migration adds columns for detailed blocking event data:
+        - blocking_event_id: UUID of the blocking event
+        - rule_id: UUID of the rule that triggered the block
+        - rule_type: Type of blocking rule (e.g., 'rate_limit', 'geo_block')
+        - rule_name: Human-readable rule name
+        - rule_priority: Priority of the rule
+        - block_reason_detail: Detailed reason for the block
+        - action_taken: Action taken (e.g., 'block', 'allow', 'log')
+        - blocked_at: Timestamp when the request was blocked
+        """
+        logger.info("Adding blocking event columns to InferenceFact table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceFact")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceFact table does not exist. Skipping blocking columns migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if InferenceFact table exists: {e}")
+            return
+
+        # Define the columns to add with their types and codecs
+        columns_to_add = [
+            ("blocking_event_id", "Nullable(UUID) CODEC(ZSTD(1))"),
+            ("rule_id", "Nullable(UUID) CODEC(ZSTD(1))"),
+            ("rule_type", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("rule_name", "Nullable(String) CODEC(ZSTD(1))"),
+            ("rule_priority", "Nullable(Int32) CODEC(ZSTD(1))"),
+            ("block_reason_detail", "Nullable(String) CODEC(ZSTD(1))"),
+            ("action_taken", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("blocked_at", "Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1))"),
+        ]
+
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = 'InferenceFact'
+                  AND database = currentDatabase()
+                  AND name = '{column_name}'
+                """
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    alter_query = f"""
+                    ALTER TABLE InferenceFact
+                    ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column {column_name} to InferenceFact table")
+                else:
+                    logger.debug(f"Column {column_name} already exists in InferenceFact table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.debug(f"Column {column_name} already exists")
+                else:
+                    logger.error(f"Error adding column {column_name}: {e}")
+
+        # Add indexes for blocking columns
+        indexes = [
+            ("idx_rule_id", "rule_id", "bloom_filter(0.01)", 4),
+            ("idx_rule_type", "rule_type", "set(20)", 4),
+            ("idx_action_taken", "action_taken", "set(10)", 4),
+        ]
+
+        for index_name, column, index_type, granularity in indexes:
+            index_query = f"ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS {index_name} ({column}) TYPE {index_type} GRANULARITY {granularity}"
+            try:
+                await self.client.execute_query(index_query)
+                logger.debug(f"Index {index_name} created or already exists")
+            except Exception as e:
+                if "already exists" not in str(e).lower():
+                    logger.warning(f"Index creation warning for {index_name}: {e}")
+
+        logger.info("Blocking event columns migration to InferenceFact completed successfully")
+
+    async def create_mv_otel_blocking_to_inference_fact(self):
+        """Create Materialized View for blocked-only requests to InferenceFact.
+
+        This MV captures gateway_analytics spans with blocking events that never reached inference.
+        It uses NOT EXISTS to avoid duplicates (in case both spans exist for the same trace).
+
+        Key insight: The main MV (mv_otel_to_inference_fact) only triggers when an
+        inference_handler_observability span exists. Blocked requests are stopped BEFORE
+        reaching inference, so they only have a gateway_analytics span. This MV captures
+        those blocked-only requests.
+        """
+        logger.info("Creating mv_otel_blocking_to_inference_fact materialized view...")
+
+        # First drop existing view if it exists to ensure clean state
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_otel_blocking_to_inference_fact")
+            logger.info("Dropped existing mv_otel_blocking_to_inference_fact (if any)")
+        except Exception as e:
+            logger.warning(f"Could not drop existing view: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_otel_blocking_to_inference_fact TO InferenceFact AS
+        SELECT
+            -- ===== OTel TRACE IDENTIFIERS =====
+            -- Note: GROUP BY TraceId with any() ensures only ONE row per trace is inserted,
+            -- even if multiple gateway_analytics spans arrive in the same batch.
+            -- This prevents duplicates that can occur when NOT EXISTS checks don't see
+            -- uncommitted/unmerged rows from concurrent inserts.
+            generateUUIDv4() AS id,
+            TraceId AS trace_id,
+            any(g.SpanId) AS span_id,
+
+            -- ===== CORE IDENTIFIERS (from gateway_analytics span) =====
+            -- No inference_id for blocked requests
+            any(CAST(NULL AS Nullable(UUID))) AS inference_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.project_id'], ''))) AS project_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.endpoint_id'], ''))) AS endpoint_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.model_id'], ''))) AS model_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.api_key_id'], ''))) AS api_key_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.api_key_project_id'], ''))) AS api_key_project_id,
+            any(nullIf(g.SpanAttributes['gateway_analytics.user_id'], '')) AS user_id,
+
+            -- ===== TIMESTAMPS =====
+            any(toDateTime64(g.Timestamp, 3)) AS timestamp,
+            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp'])) AS request_arrival_time,
+            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp'])) AS request_forward_time,
+
+            -- ===== STATUS (blocked = failed) =====
+            any(false) AS is_success,
+            any(CAST(NULL AS Nullable(Float64))) AS cost,
+            any(toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code'])) AS status_code,
+            any(toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip'])) AS request_ip,
+            any(CAST(NULL AS Nullable(String))) AS response_analysis,
+
+            -- ===== ERROR TRACKING =====
+            any('BLOCKED') AS error_code,
+            any(nullIf(g.SpanAttributes['gateway_analytics.error_message'], '')) AS error_message,
+            any(nullIf(g.SpanAttributes['gateway_analytics.error_type'], '')) AS error_type,
+
+            -- ===== MODEL INFO (from gateway_analytics if available) =====
+            -- model_name and model_provider are LowCardinality(String) (non-nullable)
+            -- so we must provide empty string instead of NULL
+            any(CAST(NULL AS Nullable(UUID))) AS model_inference_id,
+            any(g.SpanAttributes['gateway_analytics.model_name']) AS model_name,
+            any(g.SpanAttributes['gateway_analytics.model_provider']) AS model_provider,
+            any('blocked') AS endpoint_type,
+
+            -- ===== PERFORMANCE METRICS (zeros for blocked requests) =====
+            any(CAST(0 AS Nullable(UInt32))) AS input_tokens,
+            any(CAST(0 AS Nullable(UInt32))) AS output_tokens,
+            any(CAST(NULL AS Nullable(UInt32))) AS response_time_ms,
+            any(CAST(NULL AS Nullable(UInt32))) AS ttft_ms,
+            any(false) AS cached,
+            any(CAST(NULL AS Nullable(String))) AS finish_reason,
+
+            -- ===== CONTENT (empty for blocked requests) =====
+            any(CAST(NULL AS Nullable(String))) AS system_prompt,
+            any(CAST(NULL AS Nullable(String))) AS input_messages,
+            any(CAST(NULL AS Nullable(String))) AS output,
+            any(CAST(NULL AS Nullable(String))) AS raw_request,
+            any(CAST(NULL AS Nullable(String))) AS raw_response,
+            any(CAST(NULL AS Nullable(String))) AS gateway_request,
+            any(CAST(NULL AS Nullable(String))) AS gateway_response,
+            any(CAST(NULL AS Nullable(String))) AS guardrail_scan_summary,
+            any(CAST(NULL AS Nullable(UInt64))) AS model_inference_timestamp,
+
+            -- ===== CHAT INFERENCE (empty for blocked requests) =====
+            any(CAST(NULL AS Nullable(UUID))) AS chat_inference_id,
+            any(CAST(NULL AS Nullable(UUID))) AS episode_id,
+            any(CAST(NULL AS Nullable(String))) AS function_name,
+            any(CAST(NULL AS Nullable(String))) AS variant_name,
+            any(CAST(NULL AS Nullable(UInt32))) AS processing_time_ms,
+            any(CAST(NULL AS Nullable(String))) AS chat_input,
+            any(CAST(NULL AS Nullable(String))) AS chat_output,
+            any(CAST(NULL AS Nullable(String))) AS tags,
+            any(CAST(NULL AS Nullable(String))) AS inference_params,
+            any(CAST(NULL AS Nullable(String))) AS extra_body,
+            any(CAST(NULL AS Nullable(String))) AS tool_params,
+
+            -- ===== GATEWAY ANALYTICS (full data available) =====
+            any(nullIf(g.SpanAttributes['gateway_analytics.country_code'], '')) AS country_code,
+            any(nullIf(g.SpanAttributes['gateway_analytics.country_name'], '')) AS country_name,
+            any(nullIf(g.SpanAttributes['gateway_analytics.region'], '')) AS region,
+            any(nullIf(g.SpanAttributes['gateway_analytics.city'], '')) AS city,
+            any(toFloat32OrNull(g.SpanAttributes['gateway_analytics.latitude'])) AS latitude,
+            any(toFloat32OrNull(g.SpanAttributes['gateway_analytics.longitude'])) AS longitude,
+            any(nullIf(g.SpanAttributes['gateway_analytics.timezone'], '')) AS timezone,
+            any(toUInt32OrNull(g.SpanAttributes['gateway_analytics.asn'])) AS asn,
+            any(nullIf(g.SpanAttributes['gateway_analytics.isp'], '')) AS isp,
+            any(toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip'])) AS client_ip,
+            any(nullIf(g.SpanAttributes['gateway_analytics.user_agent'], '')) AS user_agent,
+            any(nullIf(g.SpanAttributes['gateway_analytics.device_type'], '')) AS device_type,
+            any(nullIf(g.SpanAttributes['gateway_analytics.browser_name'], '')) AS browser_name,
+            any(nullIf(g.SpanAttributes['gateway_analytics.browser_version'], '')) AS browser_version,
+            any(nullIf(g.SpanAttributes['gateway_analytics.os_name'], '')) AS os_name,
+            any(nullIf(g.SpanAttributes['gateway_analytics.os_version'], '')) AS os_version,
+            any(g.SpanAttributes['gateway_analytics.is_bot'] = 'true') AS is_bot,
+            any(nullIf(g.SpanAttributes['gateway_analytics.method'], '')) AS method,
+            any(nullIf(g.SpanAttributes['gateway_analytics.path'], '')) AS path,
+            any(nullIf(g.SpanAttributes['gateway_analytics.query_params'], '')) AS query_params,
+            any(toUInt32OrNull(g.SpanAttributes['gateway_analytics.body_size'])) AS body_size,
+            any(toUInt32OrNull(g.SpanAttributes['gateway_analytics.response_size'])) AS response_size,
+            any(nullIf(g.SpanAttributes['gateway_analytics.protocol_version'], '')) AS protocol_version,
+            any(toUInt32OrNull(g.SpanAttributes['gateway_analytics.gateway_processing_ms'])) AS gateway_processing_ms,
+            any(toUInt32OrNull(g.SpanAttributes['gateway_analytics.total_duration_ms'])) AS total_duration_ms,
+            any(nullIf(g.SpanAttributes['gateway_analytics.model_version'], '')) AS model_version,
+            any(nullIf(g.SpanAttributes['gateway_analytics.routing_decision'], '')) AS routing_decision,
+            any(true) AS is_blocked,  -- Always true for this MV
+            any(nullIf(g.SpanAttributes['gateway_analytics.block_reason'], '')) AS block_reason,
+            any(nullIf(g.SpanAttributes['gateway_analytics.block_rule_id'], '')) AS block_rule_id,
+            any(nullIf(g.SpanAttributes['gateway_analytics.proxy_chain'], '')) AS proxy_chain,
+            any(nullIf(g.SpanAttributes['gateway_analytics.request_headers'], '')) AS request_headers,
+            any(nullIf(g.SpanAttributes['gateway_analytics.response_headers'], '')) AS response_headers,
+            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp'])) AS request_timestamp,
+            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.response_timestamp'])) AS response_timestamp,
+            any(nullIf(g.SpanAttributes['gateway_analytics.tags'], '')) AS gateway_tags,
+
+            -- ===== BLOCKING EVENT DATA =====
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.id'], ''))) AS blocking_event_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.rule_id'], ''))) AS rule_id,
+            any(nullIf(g.SpanAttributes['gateway_blocking_events.rule_type'], '')) AS rule_type,
+            any(nullIf(g.SpanAttributes['gateway_blocking_events.rule_name'], '')) AS rule_name,
+            any(toInt32OrNull(g.SpanAttributes['gateway_blocking_events.rule_priority'])) AS rule_priority,
+            any(nullIf(g.SpanAttributes['gateway_blocking_events.block_reason'], '')) AS block_reason_detail,
+            any(nullIf(g.SpanAttributes['gateway_blocking_events.action_taken'], '')) AS action_taken,
+            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at'])) AS blocked_at
+
+        FROM metrics.otel_traces g
+        WHERE g.SpanName = 'gateway_analytics'
+          AND g.SpanAttributes['gateway_blocking_events.id'] != ''
+          AND g.SpanAttributes['gateway_blocking_events.action_taken'] = 'block'
+          -- PRODUCTION FIX: Commented out NOT EXISTS - ClickHouse doesn't support correlated subqueries
+          -- AND NOT EXISTS (
+          --     -- Exclude if there's already a row for this trace in InferenceFact
+          --     -- This prevents duplicates when multiple gateway_analytics spans exist
+          --     SELECT 1 FROM InferenceFact f
+          --     WHERE f.trace_id = g.TraceId
+          -- )
+          -- Deduplication is handled by:
+          -- 1. GROUP BY TraceId - ensures one row per trace within each batch
+          -- 2. ReplacingMergeTree - handles cross-batch deduplication at merge time
+          -- 3. The fact that blocked requests never reach inference (no overlap)
+        GROUP BY TraceId
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("mv_otel_blocking_to_inference_fact materialized view created successfully")
+        except Exception as e:
+            logger.error(f"Error creating mv_otel_blocking_to_inference_fact: {e}")
+            raise
+
+    async def add_blocking_metrics_to_rollup_tables(self):
+        """Add blocking metrics columns to InferenceMetrics rollup tables.
+
+        This migration adds block_count and unique_blocked_ips columns to:
+        - InferenceMetrics5m
+        - InferenceMetrics1h
+        - InferenceMetrics1d
+
+        These columns enable efficient querying of blocking statistics.
+        """
+        logger.info("Adding blocking metrics columns to rollup tables...")
+
+        tables = ["InferenceMetrics5m", "InferenceMetrics1h", "InferenceMetrics1d"]
+
+        for table_name in tables:
+            try:
+                # Check if table exists
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    logger.info(f"{table_name} table does not exist. Skipping blocking metrics migration.")
+                    continue
+
+                # Define columns to add
+                columns_to_add = [
+                    ("block_count", "UInt64 DEFAULT 0 CODEC(Delta, ZSTD(1))"),
+                    ("unique_blocked_ips", "AggregateFunction(uniq, IPv4)"),
+                ]
+
+                for column_name, column_type in columns_to_add:
+                    try:
+                        # Check if column already exists
+                        check_column_query = f"""
+                        SELECT COUNT(*)
+                        FROM system.columns
+                        WHERE table = '{table_name}'
+                          AND database = currentDatabase()
+                          AND name = '{column_name}'
+                        """
+                        result = await self.client.execute_query(check_column_query)
+                        column_exists = result[0][0] > 0 if result else False
+
+                        if not column_exists:
+                            alter_query = f"""
+                            ALTER TABLE {table_name}
+                            ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                            """
+                            await self.client.execute_query(alter_query)
+                            logger.info(f"Added column {column_name} to {table_name} table")
+                        else:
+                            logger.debug(f"Column {column_name} already exists in {table_name} table")
+
+                    except Exception as e:
+                        if "already exists" in str(e).lower():
+                            logger.debug(f"Column {column_name} already exists in {table_name}")
+                        else:
+                            logger.error(f"Error adding column {column_name} to {table_name}: {e}")
+
+            except Exception as e:
+                logger.error(f"Error adding blocking metrics to {table_name}: {e}")
+
+        logger.info("Blocking metrics columns migration to rollup tables completed successfully")
+
+    async def make_metrics_dimension_columns_nullable(self):
+        """Make dimension columns nullable in InferenceMetrics rollup tables.
+
+        Blocked requests don't have project_id, endpoint_id, or model_id (they're blocked
+        before routing to a model). Since these columns are part of the ORDER BY (primary key),
+        we need to recreate the tables with nullable columns.
+
+        This fixes duplicate inserts in otel_traces caused by the OTel Collector retrying
+        when MV inserts fail due to NULL values in non-nullable columns.
+        """
+        logger.info("Checking if dimension columns need to be made nullable in rollup tables...")
+
+        tables = ["InferenceMetrics5m", "InferenceMetrics1h", "InferenceMetrics1d"]
+        mvs = ["mv_inference_to_5m", "mv_5m_to_1h", "mv_1h_to_1d"]
+
+        needs_recreation = False
+
+        # First check if any table needs recreation
+        for table_name in tables:
+            try:
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    continue
+
+                check_query = f"""
+                SELECT type
+                FROM system.columns
+                WHERE database = currentDatabase()
+                  AND table = '{table_name}'
+                  AND name = 'project_id'
+                """
+                result = await self.client.execute_query(check_query)
+
+                if result and result[0][0] and "Nullable" not in result[0][0]:
+                    needs_recreation = True
+                    break
+            except Exception as e:
+                logger.error(f"Error checking {table_name}: {e}")
+
+        if not needs_recreation:
+            logger.info("Dimension columns are already nullable, no recreation needed")
+            return
+
+        logger.info("Dimension columns are not nullable, recreating tables...")
+
+        # Drop MVs first (they reference the tables)
+        for mv_name in mvs:
+            try:
+                await self.client.execute_query(f"DROP VIEW IF EXISTS {mv_name}")
+                logger.info(f"Dropped MV {mv_name}")
+            except Exception as e:
+                logger.debug(f"Could not drop MV {mv_name}: {e}")
+
+        # Drop tables
+        for table_name in tables:
+            try:
+                await self.client.execute_query(f"DROP TABLE IF EXISTS {table_name}")
+                logger.info(f"Dropped {table_name} for recreation with nullable columns")
+            except Exception as e:
+                logger.error(f"Error dropping {table_name}: {e}")
+
+        logger.info("Dimension columns nullable migration completed - tables will be recreated")
 
     async def setup_cluster_metrics_materialized_views(self):
         """Set up materialized views for cluster metrics.
@@ -2321,8 +2745,20 @@ class ClickHouseMigration:
             await (
                 self.add_gateway_columns_to_inference_fact()
             )  # Add gateway analytics columns to existing InferenceFact
+            await (
+                self.add_blocking_columns_to_inference_fact()
+            )  # Add blocking event columns to existing InferenceFact
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
+            await (
+                self.create_mv_otel_blocking_to_inference_fact()
+            )  # Create MV for blocked-only requests to InferenceFact
+            await (
+                self.make_metrics_dimension_columns_nullable()
+            )  # Drop old tables if dimension columns aren't nullable (must be before table creation)
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
+            await (
+                self.add_blocking_metrics_to_rollup_tables()
+            )  # Add blocking metrics columns to rollup tables
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
             await self.verify_tables()
             logger.info("Migration completed successfully!")

@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 DATA_FILE = Path(__file__).parent / "data" / "otel_traces_sample.json"
-DEFAULT_DATABASE = os.getenv("CLICKHOUSE_DB_NAME", "default_v4")
+DEFAULT_DATABASE = os.getenv("CLICKHOUSE_DB_NAME", "default_v8")
 
 
 def load_trace_data() -> dict[str, list[dict]]:

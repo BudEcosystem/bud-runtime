@@ -473,10 +473,10 @@ class ObservabilityMetricsService:
 
             # Fast path for gap-filled row detection
             if check_gap_filled:
-                # Check if any group field has a zero UUID
+                # Check if any group field has a zero UUID or NULL
                 is_gap_filled = False
                 for _group_field, idx in group_field_indices.items():
-                    if row[idx] == self._ZERO_UUID:
+                    if row[idx] == self._ZERO_UUID or row[idx] is None:
                         is_gap_filled = True
                         break
 
@@ -3005,17 +3005,17 @@ class ObservabilityMetricsService:
                     if group == "model":
                         model_id = row[field_idx]
                         model_name = row[field_idx + 1]
-                        # Skip gap-filled rows with zero UUID (created by WITH FILL)
-                        if model_id == self._ZERO_UUID:
+                        # Skip gap-filled rows with zero UUID or NULL (created by WITH FILL)
+                        if model_id == self._ZERO_UUID or model_id is None:
                             is_gap_filled_row = True
                             break
                         group_info["model_id"] = model_id
                         group_info["model_name"] = model_name
-                        group_key_parts.append(f"model:{model_id}")
+                        group_key_parts.append(f"model:{model_id}|{model_name}")
                         field_idx += 2
                     elif group == "project":
                         project_id = row[field_idx]
-                        if project_id == self._ZERO_UUID:
+                        if project_id == self._ZERO_UUID or project_id is None:
                             is_gap_filled_row = True
                             break
                         group_info["project_id"] = project_id
@@ -3023,7 +3023,7 @@ class ObservabilityMetricsService:
                         field_idx += 1
                     elif group == "endpoint":
                         endpoint_id = row[field_idx]
-                        if endpoint_id == self._ZERO_UUID:
+                        if endpoint_id == self._ZERO_UUID or endpoint_id is None:
                             is_gap_filled_row = True
                             break
                         group_info["endpoint_id"] = endpoint_id
@@ -3031,7 +3031,7 @@ class ObservabilityMetricsService:
                         field_idx += 1
                     elif group == "user_project":
                         api_key_project_id = row[field_idx]
-                        if api_key_project_id == self._ZERO_UUID:
+                        if api_key_project_id == self._ZERO_UUID or api_key_project_id is None:
                             is_gap_filled_row = True
                             break
                         group_info["api_key_project_id"] = api_key_project_id
@@ -3788,7 +3788,11 @@ class ObservabilityMetricsService:
             return f"{value:.2f}", ""
 
     async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
-        """Get comprehensive blocking rule statistics from ClickHouse.
+        """Get comprehensive blocking rule statistics from InferenceFact table.
+
+        This method queries the unified InferenceFact table which contains blocking event data
+        from both the main inference MV (for requests that reached inference) and the blocking MV
+        (for blocked-only requests that never reached inference).
 
         Args:
             from_date: Start date for the query
@@ -3797,23 +3801,9 @@ class ObservabilityMetricsService:
             rule_id: Optional specific rule filter
 
         Returns:
-            Dictionary with blocking statistics
+            GatewayBlockingRuleStats with blocking statistics
         """
         self._ensure_initialized()
-
-        # Check if GatewayBlockingEvents table exists
-        try:
-            table_exists_query = "EXISTS TABLE GatewayBlockingEvents"
-            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
-            blocking_table_exists = table_exists_result and table_exists_result[0][0] == 1
-        except Exception as e:
-            logger.warning(f"Failed to check GatewayBlockingEvents table existence: {e}")
-            # Fallback to basic statistics from ModelInferenceDetails
-            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
-
-        if not blocking_table_exists:
-            logger.info("GatewayBlockingEvents table not found, using fallback")
-            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
 
         # Build parameters
         params = {
@@ -3821,8 +3811,12 @@ class ObservabilityMetricsService:
             "to_date": to_date or datetime.now(),
         }
 
-        # Build base where conditions
-        where_conditions = ["blocked_at >= %(from_date)s", "blocked_at <= %(to_date)s"]
+        # Build WHERE conditions - filter on is_blocked = true
+        where_conditions = [
+            "is_blocked = true",
+            "timestamp >= %(from_date)s",
+            "timestamp <= %(to_date)s",
+        ]
 
         if project_id:
             where_conditions.append("project_id = %(project_id)s")
@@ -3834,20 +3828,20 @@ class ObservabilityMetricsService:
 
         where_clause = " AND ".join(where_conditions)
 
-        # Get total blocked count and rule breakdown
+        # Query 1: Total stats
         stats_query = f"""
             SELECT
                 COUNT(*) as total_blocked,
                 uniqExact(rule_id) as unique_rules,
                 uniqExact(client_ip) as unique_ips
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
         """
 
         stats_result = await self.clickhouse_client.execute_query(stats_query, params)
         total_blocked = stats_result[0][0] if stats_result else 0
 
-        # Get blocks by rule type and name
+        # Query 2: Rule breakdown
         rule_breakdown_query = f"""
             SELECT
                 rule_type,
@@ -3855,7 +3849,7 @@ class ObservabilityMetricsService:
                 rule_id,
                 COUNT(*) as block_count,
                 uniqExact(client_ip) as unique_ips_blocked
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
             GROUP BY rule_type, rule_name, rule_id
             ORDER BY block_count DESC
@@ -3871,33 +3865,35 @@ class ObservabilityMetricsService:
             rule_name = row[1]
             block_count = row[3]
 
-            blocked_by_rule[rule_name] = block_count
-            if rule_type in blocked_by_type:
-                blocked_by_type[rule_type] += block_count
-            else:
-                blocked_by_type[rule_type] = block_count
+            if rule_name:
+                blocked_by_rule[rule_name] = block_count
+            if rule_type:
+                if rule_type in blocked_by_type:
+                    blocked_by_type[rule_type] += block_count
+                else:
+                    blocked_by_type[rule_type] = block_count
 
-        # Get blocks by reason
+        # Query 3: Block reason breakdown (using block_reason_detail for detailed reason)
         reason_query = f"""
             SELECT
-                block_reason,
+                coalesce(block_reason_detail, block_reason, 'unknown') as reason,
                 COUNT(*) as count
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
-            GROUP BY block_reason
+            GROUP BY reason
             ORDER BY count DESC
         """
 
         reason_result = await self.clickhouse_client.execute_query(reason_query, params)
-        blocked_by_reason = {row[0]: row[1] for row in reason_result}
+        blocked_by_reason = {row[0]: row[1] for row in reason_result if row[0]}
 
-        # Get top blocked IPs with country info
+        # Query 4: Top blocked IPs
         top_ips_query = f"""
             SELECT
-                client_ip,
+                toString(client_ip) as ip,
                 any(country_code) as country_code,
                 COUNT(*) as block_count
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
             GROUP BY client_ip
             ORDER BY block_count DESC
@@ -3905,14 +3901,16 @@ class ObservabilityMetricsService:
         """
 
         top_ips_result = await self.clickhouse_client.execute_query(top_ips_query, params)
-        top_blocked_ips = [{"ip": row[0], "country": row[1] or "Unknown", "count": row[2]} for row in top_ips_result]
+        top_blocked_ips = [
+            {"ip": row[0] or "Unknown", "country": row[1] or "Unknown", "count": row[2]} for row in top_ips_result
+        ]
 
-        # Get time series data (hourly buckets)
+        # Query 5: Time series (hourly)
         time_series_query = f"""
             SELECT
-                toStartOfHour(blocked_at) as hour,
+                toStartOfHour(timestamp) as hour,
                 COUNT(*) as blocked_count
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
             GROUP BY hour
             ORDER BY hour
@@ -3921,12 +3919,12 @@ class ObservabilityMetricsService:
         time_series_result = await self.clickhouse_client.execute_query(time_series_query, params)
         time_series = [{"timestamp": row[0].isoformat(), "blocked_count": row[1]} for row in time_series_result]
 
-        # Calculate block rate (need total requests in same period)
+        # Calculate block rate (total requests from InferenceFact in same period)
         total_requests_query = f"""
             SELECT COUNT(*)
-            FROM ModelInferenceDetails
-            WHERE request_arrival_time >= %(from_date)s
-            AND request_arrival_time <= %(to_date)s
+            FROM InferenceFact
+            WHERE timestamp >= %(from_date)s
+            AND timestamp <= %(to_date)s
             {"AND project_id = %(project_id)s" if project_id else ""}
         """
 
@@ -3937,7 +3935,6 @@ class ObservabilityMetricsService:
         except Exception:
             # If we can't get total requests, set block rate to 0
             block_rate = 0.0
-            total_requests = 0
 
         # Import the response model
         from .schemas import GatewayBlockingRuleStats

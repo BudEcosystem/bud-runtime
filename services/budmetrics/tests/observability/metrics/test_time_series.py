@@ -80,16 +80,20 @@ async def _fetch_time_series_ground_truth():
             for r in result
         }
 
-        # By model
+        # By model (group by both model_id and model_name to match API behavior)
         result = await client.execute_query(f"""
             SELECT
                 model_id,
+                model_name,
                 COUNT(*) as requests
             FROM InferenceFact
             WHERE {date_filter}
-            GROUP BY model_id
+            GROUP BY model_id, model_name
         """)
-        ground_truth["by_model"] = {str(r[0]): {"requests": r[1]} for r in result}
+        # Key by tuple of (model_id, model_name) to match API's grouping behavior
+        ground_truth["by_model"] = {
+            f"{r[0]}|{r[1]}": {"requests": r[2]} for r in result
+        }
 
         # Filtered by primary project
         result = await client.execute_query(f"""
