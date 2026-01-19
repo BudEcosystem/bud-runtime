@@ -323,7 +323,7 @@ class TestCorrelationIds:
 
             published_payloads = []
 
-            async def capture_payload(topic, exec_id, event_type, payload):
+            async def capture_payload(*, topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
                 return True
 
@@ -352,7 +352,7 @@ class TestCorrelationIds:
 
             published_payloads = []
 
-            async def capture_payload(topic, exec_id, event_type, payload):
+            async def capture_payload(*, topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
                 return True
 
@@ -397,7 +397,7 @@ class TestRetryQueue:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
             # Mock Dapr client to raise exception
-            with patch("budpipeline.progress.publisher.DaprClient") as mock_dapr:
+            with patch("dapr.aio.clients.DaprClient") as mock_dapr:
                 mock_client = AsyncMock()
                 mock_client.publish_event = AsyncMock(side_effect=Exception("Connection failed"))
                 mock_dapr.return_value.__aenter__.return_value = mock_client

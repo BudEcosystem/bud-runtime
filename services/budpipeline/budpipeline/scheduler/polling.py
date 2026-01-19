@@ -11,6 +11,7 @@ from typing import Any
 
 from budpipeline.commons.config import settings
 from budpipeline.commons.constants import ScheduleType
+from budpipeline.commons.database import get_db_session
 from budpipeline.commons.exceptions import CronParseError
 from budpipeline.pipeline.service import workflow_service
 from budpipeline.scheduler.cron_parser import CronParser
@@ -156,13 +157,15 @@ class SchedulePollingService:
         # Execute workflow
         logger.info(f"Triggering workflow {schedule.workflow_id} from schedule {schedule.id}")
 
-        result = await workflow_service.execute_workflow(
-            workflow_id=schedule.workflow_id,
-            params={
-                **schedule.params,
-                "_trigger": trigger_info,
-            },
-        )
+        async with get_db_session() as session:
+            result = await workflow_service.execute_pipeline_async(
+                session=session,
+                pipeline_id=schedule.workflow_id,
+                params={
+                    **schedule.params,
+                    "_trigger": trigger_info,
+                },
+            )
 
         execution_id = result.get("execution_id", "")
         execution_status = result.get("status", "pending")

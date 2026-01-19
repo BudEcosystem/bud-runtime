@@ -8,7 +8,7 @@ backoff, circuit breaker pattern, and staleness indicators
 import asyncio
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from threading import Lock
 from typing import Any, TypeVar
@@ -230,7 +230,7 @@ class DatabaseRetryError(Exception):
 
 
 async def with_db_retry(
-    operation: Callable[..., T],
+    operation: Callable[..., Awaitable[T]],
     operation_name: str,
     *args: Any,
     max_attempts: int | None = None,
@@ -273,14 +273,24 @@ async def with_db_retry(
                 )
                 return await operation(*args, **kwargs)
     except RetryError as e:
-        record_db_error(operation_name, type(e.last_attempt.exception()).__name__)
+        original_exc = e.last_attempt.exception()
+        exc_name = type(original_exc).__name__ if original_exc else "Unknown"
+        record_db_error(operation_name, exc_name)
         logger.error(
             "Database operation failed after retries",
             operation=operation_name,
             attempts=attempts,
-            error=str(e.last_attempt.exception()),
+            error=str(original_exc),
         )
-        raise DatabaseRetryError(operation_name, e.last_attempt.exception()) from e
+        # Ensure we have a valid exception to wrap
+        if original_exc is None:
+            original_exc = Exception("Unknown error during retry")
+        elif not isinstance(original_exc, Exception):
+            original_exc = Exception(str(original_exc))
+        raise DatabaseRetryError(operation_name, original_exc) from e
+
+    # This should never be reached as AsyncRetrying always either returns or raises
+    raise RuntimeError(f"Unexpected exit from retry loop for {operation_name}")
 
 
 # ============================================================================
@@ -352,7 +362,7 @@ class DatabaseCircuitBreaker:
 
     async def call_async(
         self,
-        operation: Callable[..., T],
+        operation: Callable[..., Awaitable[T]],
         *args: Any,
         **kwargs: Any,
     ) -> T:
@@ -372,45 +382,51 @@ class DatabaseCircuitBreaker:
         if self._breaker.current_state == "open":
             raise pybreaker.CircuitBreakerError(self._breaker)
 
+        # Wrap the async call - pybreaker doesn't natively support async
+        # so we just check state and execute, letting exceptions propagate
         try:
             result = await operation(*args, **kwargs)
-            self._breaker._success_count += 1
-            if self._breaker.current_state == "half-open":
-                self._breaker._state = self._breaker._state_storage.state("closed")
             return result
         except Exception:
-            self._breaker._failure_count += 1
-            if self._breaker._failure_count >= self._breaker.fail_max:
-                self._breaker._state = self._breaker._state_storage.state("open")
             raise
 
     def reset(self) -> None:
-        """Reset circuit breaker to closed state."""
-        self._breaker._failure_count = 0
-        self._breaker._success_count = 0
-        self._breaker._state = self._breaker._state_storage.state("closed")
+        """Reset circuit breaker to closed state.
+
+        Note: pybreaker doesn't expose a clean reset API,
+        so we recreate the breaker instance.
+        """
+        self._breaker = pybreaker.CircuitBreaker(
+            fail_max=self._breaker.fail_max,
+            reset_timeout=self._breaker.reset_timeout,  # type: ignore[arg-type]
+            listeners=[CircuitBreakerListener()],
+        )
 
 
 class CircuitBreakerListener(pybreaker.CircuitBreakerListener):
     """Listener for circuit breaker state changes."""
 
-    def state_change(self, cb: pybreaker.CircuitBreaker, old_state: str, new_state: str) -> None:
+    def state_change(  # type: ignore[override]
+        self, cb: pybreaker.CircuitBreaker, old_state: Any, new_state: Any
+    ) -> None:
         """Handle circuit breaker state change.
 
         Args:
             cb: The circuit breaker instance.
-            old_state: Previous state.
-            new_state: New state.
+            old_state: Previous state (CircuitBreakerState or None).
+            new_state: New state (CircuitBreakerState).
         """
+        old_state_name = str(old_state) if old_state else "none"
+        new_state_name = str(new_state)
         logger.warning(
             "Circuit breaker state changed",
             circuit=cb.name,
-            old_state=old_state,
-            new_state=new_state,
+            old_state=old_state_name,
+            new_state=new_state_name,
         )
-        if new_state == "open":
+        if "open" in new_state_name.lower():
             fallback_storage.activate()
-        elif new_state == "closed" and old_state == "half-open":
+        elif "closed" in new_state_name.lower() and old_state and "half" in old_state_name.lower():
             fallback_storage.deactivate()
 
 

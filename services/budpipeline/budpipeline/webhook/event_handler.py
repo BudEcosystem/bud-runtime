@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from budpipeline.commons.database import get_db_session
 from budpipeline.pipeline.service import workflow_service
 from budpipeline.scheduler.services import event_trigger_service
 from budpipeline.scheduler.storage import schedule_storage
@@ -96,10 +97,12 @@ class EventHandler:
                     f"Triggering workflow {trigger.workflow_id} from event trigger {trigger.id}"
                 )
 
-                result = await workflow_service.execute_workflow(
-                    workflow_id=trigger.workflow_id,
-                    params=merged_params,
-                )
+                async with get_db_session() as session:
+                    result = await workflow_service.execute_pipeline_async(
+                        session=session,
+                        pipeline_id=trigger.workflow_id,
+                        params=merged_params,
+                    )
 
                 # Update trigger stats
                 await schedule_storage.update_event_trigger_triggered(trigger.id)

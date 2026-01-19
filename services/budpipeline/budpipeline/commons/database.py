@@ -6,11 +6,16 @@ Uses budmicroframe patterns for consistent database configuration.
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from pydantic import PostgresDsn
 from sqlalchemy import MetaData
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,  # type: ignore[attr-defined]
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase  # type: ignore[attr-defined]
 
 from budpipeline.commons.config import app_settings, secrets_settings
 
@@ -33,7 +38,7 @@ class Base(DeclarativeBase):
     metadata = metadata_obj
 
 
-def get_async_engine():
+def get_async_engine() -> Any:
     """Create and return an async SQLAlchemy engine instance.
 
     Uses DATABASE_URL environment variable if available (docker-compose),

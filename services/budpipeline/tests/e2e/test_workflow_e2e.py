@@ -1,9 +1,38 @@
-"""End-to-end tests for workflow service."""
+"""End-to-end tests for workflow service.
+
+These tests require a PostgreSQL database connection. They are skipped by default
+when the database is not available. Run with `--run-e2e` flag to include them.
+
+To run e2e tests:
+    pytest tests/e2e/ --run-e2e
+"""
+
+import os
+import socket
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from budpipeline.main import app
+
+
+def _check_database_available() -> bool:
+    """Check if database is available."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(("127.0.0.1", 5432))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+# Skip all tests in this module if database not available
+pytestmark = pytest.mark.skipif(
+    not _check_database_available() and os.environ.get("RUN_E2E_TESTS") != "true",
+    reason="E2E tests require PostgreSQL database. Set RUN_E2E_TESTS=true or ensure DB is running",
+)
 
 # Sample DAG for testing
 SAMPLE_DAG = {
@@ -102,7 +131,7 @@ class TestDAGValidation:
     async def test_validate_valid_dag(self, client: AsyncClient):
         """Test validation of valid DAG."""
         response = await client.post(
-            "/api/v1/workflow/validate",
+            "/api/v1/pipeline/validate",
             json={"dag": SAMPLE_DAG},
         )
         assert response.status_code == 200
@@ -120,7 +149,7 @@ class TestDAGValidation:
             "version": "1.0.0",
         }
         response = await client.post(
-            "/api/v1/workflow/validate",
+            "/api/v1/pipeline/validate",
             json={"dag": invalid_dag},
         )
         assert response.status_code == 200
@@ -140,7 +169,7 @@ class TestDAGValidation:
             ],
         }
         response = await client.post(
-            "/api/v1/workflow/validate",
+            "/api/v1/pipeline/validate",
             json={"dag": cyclic_dag},
         )
         assert response.status_code == 200
@@ -156,7 +185,7 @@ class TestWorkflowCRUD:
     async def test_create_workflow(self, client: AsyncClient):
         """Test creating a workflow."""
         response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG, "name": "my-test-workflow"},
         )
         assert response.status_code == 201
@@ -172,11 +201,11 @@ class TestWorkflowCRUD:
         """Test listing workflows."""
         # Create a workflow first
         await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
 
-        response = await client.get("/api/v1/workflow/workflows")
+        response = await client.get("/api/v1/pipeline/pipelines")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -187,12 +216,12 @@ class TestWorkflowCRUD:
         """Test getting a specific workflow."""
         # Create a workflow first
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
-        response = await client.get(f"/api/v1/workflow/workflows/{workflow_id}")
+        response = await client.get(f"/api/v1/pipeline/pipelines/{workflow_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == workflow_id
@@ -201,7 +230,7 @@ class TestWorkflowCRUD:
     @pytest.mark.asyncio
     async def test_get_nonexistent_workflow(self, client: AsyncClient):
         """Test getting a nonexistent workflow."""
-        response = await client.get("/api/v1/workflow/workflows/nonexistent-id")
+        response = await client.get("/api/v1/pipeline/pipelines/nonexistent-id")
         assert response.status_code == 404
 
     @pytest.mark.asyncio
@@ -209,16 +238,16 @@ class TestWorkflowCRUD:
         """Test deleting a workflow."""
         # Create a workflow first
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
-        response = await client.delete(f"/api/v1/workflow/workflows/{workflow_id}")
+        response = await client.delete(f"/api/v1/pipeline/pipelines/{workflow_id}")
         assert response.status_code == 204
 
         # Verify it's deleted
-        get_response = await client.get(f"/api/v1/workflow/workflows/{workflow_id}")
+        get_response = await client.get(f"/api/v1/pipeline/pipelines/{workflow_id}")
         assert get_response.status_code == 404
 
 
@@ -230,14 +259,14 @@ class TestWorkflowExecution:
         """Test executing a workflow."""
         # Create a workflow first
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
         # Execute the workflow
         response = await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={
                 "workflow_id": workflow_id,
                 "params": {"input_message": "Test Message"},
@@ -256,14 +285,14 @@ class TestWorkflowExecution:
         """Test executing a workflow with condition evaluating to false."""
         # Create a workflow first
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
         # Execute with transform disabled
         response = await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={
                 "workflow_id": workflow_id,
                 "params": {
@@ -283,19 +312,19 @@ class TestWorkflowExecution:
         """Test getting execution details."""
         # Create and execute a workflow
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
         exec_response = await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={"workflow_id": workflow_id, "params": {}},
         )
         execution_id = exec_response.json()["execution_id"]
 
         # Get execution details
-        response = await client.get(f"/api/v1/workflow/executions/{execution_id}")
+        response = await client.get(f"/api/v1/executions/{execution_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["execution_id"] == execution_id
@@ -314,18 +343,18 @@ class TestWorkflowExecution:
         """Test listing executions."""
         # Create and execute a workflow
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
         await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={"workflow_id": workflow_id, "params": {}},
         )
 
         # List all executions
-        response = await client.get("/api/v1/workflow/executions")
+        response = await client.get("/api/v1/executions")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -336,19 +365,19 @@ class TestWorkflowExecution:
         """Test listing executions filtered by workflow."""
         # Create and execute a workflow
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": SAMPLE_DAG},
         )
         workflow_id = create_response.json()["id"]
 
         await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={"workflow_id": workflow_id, "params": {}},
         )
 
         # List executions for this workflow
         response = await client.get(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             params={"workflow_id": workflow_id},
         )
         assert response.status_code == 200
@@ -412,13 +441,13 @@ class TestComplexWorkflow:
 
         # Create and execute
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": parallel_dag},
         )
         workflow_id = create_response.json()["id"]
 
         exec_response = await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={"workflow_id": workflow_id, "params": {}},
         )
         assert exec_response.status_code == 201
@@ -453,13 +482,13 @@ class TestComplexWorkflow:
         }
 
         create_response = await client.post(
-            "/api/v1/workflow/workflows",
+            "/api/v1/pipeline/pipelines",
             json={"dag": failure_dag},
         )
         workflow_id = create_response.json()["id"]
 
         exec_response = await client.post(
-            "/api/v1/workflow/executions",
+            "/api/v1/executions",
             json={"workflow_id": workflow_id, "params": {}},
         )
         assert exec_response.status_code == 201
@@ -467,7 +496,7 @@ class TestComplexWorkflow:
         assert data["status"] == "completed"
 
         # Get detailed status
-        detail_response = await client.get(f"/api/v1/workflow/executions/{data['execution_id']}")
+        detail_response = await client.get(f"/api/v1/executions/{data['execution_id']}")
         details = detail_response.json()
         step_statuses = {s["step_id"]: s for s in details["steps"]}
         assert step_statuses["fail_step"]["status"] == "failed"

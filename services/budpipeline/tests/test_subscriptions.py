@@ -262,7 +262,7 @@ class TestSubscriptionStatusUpdates:
 
     @pytest.mark.asyncio
     async def test_mark_delivery_success(self, subscription_service):
-        """Test marking subscription as delivered."""
+        """Test marking subscription as active (delivered successfully)."""
         subscription_id = uuid4()
 
         with patch("budpipeline.subscriptions.service.AsyncSessionLocal") as mock_session_cls:
@@ -278,9 +278,10 @@ class TestSubscriptionStatusUpdates:
             ):
                 await subscription_service.mark_delivery_success(subscription_id)
 
+        # Note: The actual enum uses ACTIVE for successful delivery
         mock_crud.update_status.assert_called_once_with(
             subscription_id=subscription_id,
-            status=DeliveryStatus.DELIVERED,
+            status=DeliveryStatus.ACTIVE,
         )
 
     @pytest.mark.asyncio

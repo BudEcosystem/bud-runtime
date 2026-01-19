@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import importlib.metadata
 import threading
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import structlog
 
@@ -21,6 +21,14 @@ if TYPE_CHECKING:
     pass
 
 logger = structlog.get_logger()
+
+
+@runtime_checkable
+class ActionClassProtocol(Protocol):
+    """Protocol for action classes with meta and executor_class attributes."""
+
+    meta: ActionMeta
+    executor_class: type[BaseActionExecutor]
 
 
 class ActionRegistry:
@@ -49,6 +57,11 @@ class ActionRegistry:
     _instance: ActionRegistry | None = None
     _lock: threading.Lock = threading.Lock()
 
+    # Instance attributes - declared here for mypy
+    _actions: dict[str, dict[str, Any]]
+    _loaded: bool
+    _executor_lock: threading.Lock
+
     def __new__(cls) -> ActionRegistry:
         """Thread-safe singleton pattern."""
         if cls._instance is None:
@@ -56,7 +69,7 @@ class ActionRegistry:
                 # Double-check locking pattern
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
-                    cls._instance._actions: dict[str, dict[str, Any]] = {}
+                    cls._instance._actions = {}
                     cls._instance._loaded = False
                     cls._instance._executor_lock = threading.Lock()
         return cls._instance
@@ -75,7 +88,7 @@ class ActionRegistry:
         except TypeError:
             # Python < 3.10 compatibility
             all_eps = importlib.metadata.entry_points()
-            entry_points = all_eps.get("budpipeline.actions", [])
+            entry_points: Iterable[Any] = all_eps.get("budpipeline.actions", [])
 
         for ep in entry_points:
             try:
@@ -92,7 +105,9 @@ class ActionRegistry:
         self._loaded = True
         logger.info("action_discovery_complete", count=len(self._actions))
 
-    def _register_action_class(self, action_type: str, action_class: type) -> None:
+    def _register_action_class(
+        self, action_type: str, action_class: type[ActionClassProtocol] | Any
+    ) -> None:
         """Register an action class.
 
         Args:
@@ -107,7 +122,7 @@ class ActionRegistry:
         if not hasattr(action_class, "executor_class"):
             raise ValueError(f"Action {action_type} missing 'executor_class' attribute")
 
-        meta: ActionMeta = action_class.meta
+        meta: ActionMeta = action_class.meta  # type: ignore[union-attr]
 
         # Validate metadata
         errors = self._validate_meta(meta)
@@ -115,7 +130,7 @@ class ActionRegistry:
             raise ValueError(f"Invalid action metadata for {action_type}: {errors}")
 
         # Verify executor class
-        executor_class = action_class.executor_class
+        executor_class: type[BaseActionExecutor] = action_class.executor_class  # type: ignore[union-attr]
         if not issubclass(executor_class, BaseActionExecutor):
             raise ValueError(
                 f"executor_class for {action_type} must inherit from BaseActionExecutor"
@@ -127,7 +142,7 @@ class ActionRegistry:
             "executor_instance": None,  # Lazy instantiation
         }
 
-    def register(self, action_class: type) -> type:
+    def register(self, action_class: type[ActionClassProtocol] | Any) -> type:
         """Decorator for manual action registration.
 
         Usage:
@@ -142,7 +157,7 @@ class ActionRegistry:
         Returns:
             The same action class (for decorator chaining)
         """
-        meta: ActionMeta = action_class.meta
+        meta: ActionMeta = action_class.meta  # type: ignore[union-attr]
         self._register_action_class(meta.type, action_class)
         return action_class
 
@@ -266,7 +281,7 @@ def register_action(meta: ActionMeta) -> Callable[[type], type]:
     """
 
     def decorator(cls: type) -> type:
-        cls.meta = meta
+        cls.meta = meta  # type: ignore[attr-defined]
         # Registration happens when entry point is loaded
         return cls
 

@@ -33,6 +33,12 @@ class AppConfig(BaseAppConfig):
     description: str = "Pipeline orchestration service for Bud Runtime"
     api_root: str = ""
 
+    # Service Port
+    service_port: int = Field(default=9082, alias="SERVICE_PORT")
+
+    # Debug mode
+    debug: bool = Field(default=False, alias="DEBUG")
+
     # Base Directory
     base_dir: DirectoryPath = Field(
         default_factory=lambda: Path(__file__).parent.parent.parent.resolve()
@@ -45,7 +51,9 @@ class AppConfig(BaseAppConfig):
     psql_dbname: str = Field(default="budpipeline", alias="PSQL_DB_NAME")
 
     # Dapr
-    dapr_base_url: AnyHttpUrl = Field(default="http://localhost:3500", alias="DAPR_BASE_URL")
+    dapr_base_url: AnyHttpUrl = Field(  # type: ignore[assignment]
+        default="http://localhost:3500", alias="DAPR_BASE_URL"
+    )
 
     # State Store
     state_store_name: str = Field(default="statestore", alias="STATE_STORE_NAME")
@@ -229,8 +237,9 @@ class SecretsConfig(BaseSecretsConfig):
 
 
 # Global settings instances
-app_settings = AppConfig()
-secrets_settings = SecretsConfig()
+# Note: BaseAppConfig/BaseSecretsConfig have optional fields that mypy thinks are required
+app_settings = AppConfig()  # type: ignore[call-arg]
+secrets_settings = SecretsConfig()  # type: ignore[call-arg]
 
 # Register settings for Dapr config store sync
 register_settings(app_settings, secrets_settings)

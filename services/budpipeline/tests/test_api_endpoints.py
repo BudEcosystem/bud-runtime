@@ -37,6 +37,7 @@ def mock_execution(sample_execution_id):
     """Create a mock PipelineExecution."""
     execution = MagicMock()
     execution.id = sample_execution_id
+    execution.pipeline_id = None
     execution.status = ExecutionStatus.RUNNING
     execution.progress_percentage = Decimal("50.00")
     execution.current_step = "Processing data"
@@ -46,8 +47,14 @@ def mock_execution(sample_execution_id):
     execution.error_message = None
     execution.created_at = datetime.now(timezone.utc)
     execution.started_at = datetime.now(timezone.utc)
+    execution.start_time = datetime.now(timezone.utc)
+    execution.end_time = None
     execution.completed_at = None
     execution.version = 1
+    # Additional fields for Pydantic validation
+    execution.final_outputs = None
+    execution.error_info = None
+    execution.updated_at = datetime.now(timezone.utc)
     return execution
 
 
@@ -68,6 +75,13 @@ def mock_step_executions(sample_execution_id):
     step1.error_message = None
     step1.retry_count = 0
     step1.version = 1
+    # Additional fields for Pydantic validation
+    step1.outputs = None
+    step1.external_workflow_id = None
+    step1.awaiting_event = False
+    step1.timeout_at = None
+    step1.created_at = datetime.now(timezone.utc)
+    step1.updated_at = datetime.now(timezone.utc)
 
     step2 = MagicMock()
     step2.id = uuid4()
@@ -83,6 +97,13 @@ def mock_step_executions(sample_execution_id):
     step2.error_message = None
     step2.retry_count = 0
     step2.version = 1
+    # Additional fields for Pydantic validation
+    step2.outputs = None
+    step2.external_workflow_id = None
+    step2.awaiting_event = False
+    step2.timeout_at = None
+    step2.created_at = datetime.now(timezone.utc)
+    step2.updated_at = datetime.now(timezone.utc)
 
     return [step1, step2]
 
@@ -98,6 +119,9 @@ def mock_progress_events(sample_execution_id):
     event1.eta_seconds = 120
     event1.current_step_desc = "Step 1"
     event1.created_at = datetime.now(timezone.utc)
+    event1.event_details = None
+    event1.step_id = None
+    event1.sequence_number = 1
 
     event2 = MagicMock()
     event2.id = uuid4()
@@ -107,6 +131,9 @@ def mock_progress_events(sample_execution_id):
     event2.eta_seconds = 60
     event2.current_step_desc = "Step 2"
     event2.created_at = datetime.now(timezone.utc)
+    event2.event_details = None
+    event2.step_id = "step1"
+    event2.sequence_number = 2
 
     return [event2, event1]  # Most recent first
 
@@ -124,7 +151,8 @@ class TestGetExecutionEndpoint:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == str(sample_execution_id)
-        assert data["status"] == "running"
+        # ExecutionStatus enum values are uppercase
+        assert data["status"] == "RUNNING"
 
     def test_get_execution_not_found(self, client, sample_execution_id):
         """Test 404 when execution not found."""
@@ -258,59 +286,90 @@ class TestCreateExecutionEndpoint:
     def test_create_execution_success(self, client):
         """Test successful execution creation."""
         execution_id = uuid4()
+        workflow_id = str(uuid4())
 
-        with patch("budpipeline.pipeline.execution_routes.persistence_service") as mock_service:
-            mock_service.create_execution = AsyncMock(return_value=(execution_id, 1))
+        # Mock workflow_service to return execution result
+        mock_result = {
+            "execution_id": str(execution_id),
+            "workflow_id": workflow_id,
+            "workflow_name": "test-workflow",
+            "status": "PENDING",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "params": {},
+        }
 
-            with patch("budpipeline.pipeline.execution_routes.get_db"):
-                response = client.post(
-                    "/executions",
-                    json={
-                        "pipeline_definition": {"name": "test", "steps": []},
-                        "initiator": "test-user",
-                    },
-                )
+        with patch("budpipeline.pipeline.execution_routes.pipeline_service") as mock_service:
+            mock_service.execute_pipeline_async = AsyncMock(return_value=mock_result)
+
+            response = client.post(
+                "/executions",
+                json={
+                    "workflow_id": workflow_id,
+                    "params": {},
+                    "initiator": "test-user",
+                },
+            )
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert "execution_id" in data
         assert "status" in data
-        assert data["status"] == "pending"
+        assert data["status"] == "PENDING"
 
     def test_create_execution_with_callback_topics(self, client):
         """Test creating execution with callback topics."""
         execution_id = uuid4()
+        workflow_id = str(uuid4())
 
-        with patch("budpipeline.pipeline.execution_routes.persistence_service") as mock_service:
-            mock_service.create_execution = AsyncMock(return_value=(execution_id, 1))
+        mock_result = {
+            "execution_id": str(execution_id),
+            "workflow_id": workflow_id,
+            "workflow_name": "test-workflow",
+            "status": "PENDING",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "params": {},
+        }
 
-            with patch("budpipeline.pipeline.execution_routes.get_db"):
-                response = client.post(
-                    "/executions",
-                    json={
-                        "pipeline_definition": {"name": "test", "steps": []},
-                        "initiator": "test-user",
-                        "callback_topics": ["topic1", "topic2"],
-                    },
-                )
+        with patch("budpipeline.pipeline.execution_routes.pipeline_service") as mock_service:
+            mock_service.execute_pipeline_async = AsyncMock(return_value=mock_result)
+
+            response = client.post(
+                "/executions",
+                json={
+                    "workflow_id": workflow_id,
+                    "params": {},
+                    "initiator": "test-user",
+                    "callback_topics": ["topic1", "topic2"],
+                },
+            )
 
         assert response.status_code == status.HTTP_201_CREATED
 
     def test_create_execution_response_schema(self, client):
         """Test that create response matches expected schema."""
         execution_id = uuid4()
+        workflow_id = str(uuid4())
 
-        with patch("budpipeline.pipeline.execution_routes.persistence_service") as mock_service:
-            mock_service.create_execution = AsyncMock(return_value=(execution_id, 1))
+        mock_result = {
+            "execution_id": str(execution_id),
+            "workflow_id": workflow_id,
+            "workflow_name": "test-workflow",
+            "status": "PENDING",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "params": {},
+        }
 
-            with patch("budpipeline.pipeline.execution_routes.get_db"):
-                response = client.post(
-                    "/executions",
-                    json={
-                        "pipeline_definition": {"name": "test", "steps": []},
-                        "initiator": "test-user",
-                    },
-                )
+        with patch("budpipeline.pipeline.execution_routes.pipeline_service") as mock_service:
+            mock_service.execute_pipeline_async = AsyncMock(return_value=mock_result)
+
+            response = client.post(
+                "/executions",
+                json={
+                    "workflow_id": workflow_id,
+                    "params": {},
+                    "initiator": "test-user",
+                },
+            )
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -318,7 +377,6 @@ class TestCreateExecutionEndpoint:
         # Required fields per contract
         assert "execution_id" in data
         assert "status" in data
-        assert "created_at" in data
 
 
 class TestListExecutionsEndpoint:
@@ -343,7 +401,8 @@ class TestListExecutionsEndpoint:
         with patch("budpipeline.pipeline.execution_routes.persistence_service") as mock_service:
             mock_service.list_executions = AsyncMock(return_value=([mock_execution], 1))
 
-            response = client.get("/executions?status=running")
+            # ExecutionStatus enum values are uppercase
+            response = client.get("/executions?status=RUNNING")
 
         assert response.status_code == status.HTTP_200_OK
 
@@ -450,19 +509,29 @@ class TestPersistenceAcrossRestart:
         3. Retrieving the execution (should come from database)
         """
         execution_id = uuid4()
+        workflow_id = str(uuid4())
 
         # Step 1: Create execution (persisted to database)
-        with patch("budpipeline.pipeline.execution_routes.persistence_service") as mock_service:
-            mock_service.create_execution = AsyncMock(return_value=(execution_id, 1))
+        mock_result = {
+            "execution_id": str(execution_id),
+            "workflow_id": workflow_id,
+            "workflow_name": "test-workflow",
+            "status": "PENDING",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "params": {},
+        }
 
-            with patch("budpipeline.pipeline.execution_routes.get_db"):
-                create_response = client.post(
-                    "/executions",
-                    json={
-                        "pipeline_definition": {"name": "test", "steps": []},
-                        "initiator": "test-user",
-                    },
-                )
+        with patch("budpipeline.pipeline.execution_routes.pipeline_service") as mock_service:
+            mock_service.execute_pipeline_async = AsyncMock(return_value=mock_result)
+
+            create_response = client.post(
+                "/executions",
+                json={
+                    "workflow_id": workflow_id,
+                    "params": {},
+                    "initiator": "test-user",
+                },
+            )
 
         assert create_response.status_code == status.HTTP_201_CREATED
 

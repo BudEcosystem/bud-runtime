@@ -53,17 +53,17 @@ class TestModelAddAction:
         assert len(meta.params) > 0
         assert len(meta.outputs) > 0
 
-    def test_validate_params_missing_huggingface_id(self) -> None:
-        """Test validation catches missing huggingface_id."""
+    def test_validate_params_missing_model_uri(self) -> None:
+        """Test validation catches missing model_uri."""
         executor = ModelAddExecutor()
-        errors = executor.validate_params({"model_source": "huggingface"})
-        assert any("huggingface_id" in e for e in errors)
+        errors = executor.validate_params({"model_source": "hugging_face"})
+        assert any("model_uri" in e for e in errors)
 
     def test_validate_params_valid(self) -> None:
         """Test validation passes with valid params."""
         executor = ModelAddExecutor()
         errors = executor.validate_params(
-            {"model_source": "huggingface", "huggingface_id": "meta-llama/Llama-2-7b"}
+            {"model_source": "hugging_face", "model_uri": "meta-llama/Llama-2-7b"}
         )
         assert len(errors) == 0
 

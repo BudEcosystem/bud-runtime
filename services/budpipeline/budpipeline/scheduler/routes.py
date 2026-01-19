@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
+from budpipeline.commons.database import get_db_session
 from budpipeline.pipeline.service import workflow_service
 from budpipeline.scheduler.schemas import (
     EventTriggerCreate,
@@ -183,10 +184,12 @@ async def trigger_schedule_now(
 
     # Execute workflow
     try:
-        result = await workflow_service.execute_workflow(
-            workflow_id=schedule.workflow_id,
-            params=merged_params,
-        )
+        async with get_db_session() as session:
+            result = await workflow_service.execute_pipeline_async(
+                session=session,
+                pipeline_id=schedule.workflow_id,
+                params=merged_params,
+            )
         return {
             "execution_id": result.get("execution_id"),
             "workflow_id": schedule.workflow_id,
@@ -380,10 +383,12 @@ async def trigger_webhook(
 
     # Execute workflow
     try:
-        result = await workflow_service.execute_workflow(
-            workflow_id=webhook.workflow_id,
-            params=merged_params,
-        )
+        async with get_db_session() as session:
+            result = await workflow_service.execute_pipeline_async(
+                session=session,
+                pipeline_id=webhook.workflow_id,
+                params=merged_params,
+            )
 
         # Update webhook stats
         await schedule_storage.update_webhook_triggered(webhook_id)

@@ -181,7 +181,10 @@ class SubscriptionService:
         self,
         subscription_id: UUID,
     ) -> None:
-        """Mark subscription as successfully delivered.
+        """Mark subscription as successfully delivered (stays ACTIVE).
+
+        Note: Subscriptions remain ACTIVE after successful delivery,
+        as they continue to receive events until expiry or failure.
 
         Args:
             subscription_id: Subscription UUID.
@@ -190,7 +193,7 @@ class SubscriptionService:
             crud = ExecutionSubscriptionCRUD(session)
             await crud.update_status(
                 subscription_id=subscription_id,
-                status=DeliveryStatus.DELIVERED,
+                status=DeliveryStatus.ACTIVE,
             )
             await session.commit()
 
