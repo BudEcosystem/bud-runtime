@@ -289,9 +289,10 @@ async def internal_auth_middleware(request: Request, call_next):
                 status_code=403,
                 content={"detail": "Forbidden - Internal auth not configured"},
             )
-        actual_token = request.headers.get("dapr-api-token")
+        # Check both dapr-api-token and x-app-api-token (Dapr may consume dapr-api-token)
+        actual_token = request.headers.get("dapr-api-token") or request.headers.get("x-app-api-token")
         if actual_token != expected_token:
-            _middleware_logger.warning(f"Invalid token for {request.url.path}")
+            _middleware_logger.warning(f"Invalid internal token for {request.url.path}")
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Forbidden - Invalid internal token"},

@@ -281,12 +281,12 @@ export function usePipelineConversion(): UsePipelineConversionReturn {
    */
   const createStepNode = useCallback(
     (action: string, position?: { x: number; y: number }): Node<StepNodeData> => {
-      const stepId = `step_${nanoid(5)}`;
+      const stepId = nanoid(5); // Raw ID without prefix
       const actionMeta = getActionMeta(action);
       const defaultParams = getDefaultParams(action);
 
       return {
-        id: `step_${stepId}`,
+        id: `step_${stepId}`, // Node ID has step_ prefix
         type: 'step', // All action nodes use the 'step' node type
         position: position || { x: 500, y: 150 }, // Default position for horizontal flow
         data: {
