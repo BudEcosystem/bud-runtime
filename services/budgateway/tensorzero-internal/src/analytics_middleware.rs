@@ -322,12 +322,11 @@ pub async fn analytics_middleware(
                     analytics.record.error_message = Some(body_str.clone());
 
                     // Create OTEL exception event via tracing::error!
-                    // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
-                    // We use a field name starting with "otel." to pass the observability.rs filter
-                    // Note: Using span.in_scope() to ensure event is attached to the analytics span
+                    // Using target: "budgateway_internal::analytics_middleware" to avoid exposing internal module path
                     span.in_scope(|| {
                         tracing::error!(
-                            otel.exception = true,
+                            // otel.exception = true, Commenting out cannot use otel.exception with target: due to macro parsing
+                            target: "budgateway_internal::analytics_middleware",
                             error_type = %error_type,
                             error_message = %body_str,
                             "Exception: {}", error_type
@@ -346,12 +345,11 @@ pub async fn analytics_middleware(
                 analytics.record.error_message = Some(error_msg.clone());
 
                 // Create OTEL exception event via tracing::error!
-                // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
-                // We use a field name starting with "otel." to pass the observability.rs filter
-                // Note: Using span.in_scope() to ensure event is attached to the analytics span
+                // Using target: "budgateway_internal::analytics_middleware" to avoid exposing internal module path
                 span.in_scope(|| {
                     tracing::error!(
-                        otel.exception = true,
+                        // otel.exception = true, Commenting out cannot use otel.exception with target: due to macro parsing
+                        target: "budgateway_internal::analytics_middleware",
                         error_type = %error_type,
                         error_message = %error_msg,
                         "Exception: {}", error_type

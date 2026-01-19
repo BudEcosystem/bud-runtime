@@ -48,7 +48,7 @@ pub fn record_metadata(metadata: &InferenceDatabaseInsertMetadata) {
 
     span.record(
         "chat_inference.function_name",
-        metadata.function_name.as_str(),
+        "budgateway::default",
     );
     span.record(
         "chat_inference.variant_name",
@@ -212,9 +212,11 @@ pub fn record_error(error: &Error) {
 
     // Create OTEL exception event via tracing::error!
     // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
+    // Using target: "budgateway_internal::endpoints::openai_compatible" to avoid exposing internal module path
     span.in_scope(|| {
         tracing::error!(
-            otel.exception = true,
+            // otel.exception = true, Commenting out cannot use otel.exception with target: due to macro parsing
+            target: "budgateway_internal::endpoints::openai_compatible",
             error_type = %error_type,
             error_message = %error_message,
             "Exception: {}", error_type

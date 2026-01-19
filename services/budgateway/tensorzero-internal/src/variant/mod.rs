@@ -196,7 +196,7 @@ impl VariantConfig {
 
 impl Variant for VariantConfig {
     #[instrument(
-        fields(function_name = %inference_config.function_name, variant_name = %inference_config.variant_name.unwrap_or(""), otel.name="variant_inference", stream=false),
+        fields(function_name = "budgateway::default", variant_name = %inference_config.variant_name.unwrap_or(""), otel.name="variant_inference", stream=false),
         skip_all
     )]
     async fn infer<'a: 'request, 'request>(
@@ -274,7 +274,7 @@ impl Variant for VariantConfig {
     }
 
     #[instrument(
-        fields(function_name = %inference_config.function_name, variant_name = %inference_config.variant_name.unwrap_or(""), otel.name="variant_inference", stream=true),
+        fields(function_name = "budgateway::default", variant_name = %inference_config.variant_name.unwrap_or(""), otel.name="variant_inference", stream=true),
         skip_all
     )]
     async fn infer_stream<'a, 'request>(
