@@ -297,6 +297,10 @@ class SuccessResponse(ResponseBase):
         Returns:
             dict: The validated and potentially adjusted data.
         """
+        # Handle case where data is already a model instance (e.g., during Union type validation)
+        if not isinstance(data, dict):
+            return data
+
         if data.get("code") is not None and data.get("message") is None:
             data["message"] = HTTPStatus(data["code"]).description
 
@@ -368,6 +372,10 @@ class ErrorResponse(ResponseBase):
         Returns:
             dict: The validated and potentially adjusted data.
         """
+        # Handle case where data is already a model instance (e.g., during Union type validation)
+        if not isinstance(data, dict):
+            return data
+
         # Use default code if not provided
         code = data.get("code", HTTPStatus.INTERNAL_SERVER_ERROR.value)
         data["code"] = code
