@@ -353,8 +353,7 @@ class ObservabilityMetricsService:
     }
 
     def _extract_single_resource_ids_from_filters(
-        self,
-        filters: Optional[Dict[str, Any]]
+        self, filters: Optional[Dict[str, Any]]
     ) -> Dict[str, Optional[UUID]]:
         """Extract resource IDs when filters contain exactly one resource.
 
@@ -1327,6 +1326,414 @@ class ObservabilityMetricsService:
             total_spans=len(spans),
         )
 
+    async def _get_inference_from_fact_table(self, inference_id: str) -> Optional[dict]:
+        """Try to get inference from InferenceFact table.
+
+        This is the optimized path for chat/blocked endpoint types.
+        Returns None if not found, otherwise returns dict with all columns.
+
+        Args:
+            inference_id: UUID of the inference or trace_id for blocked requests
+
+        Returns:
+            Dictionary with all InferenceFact columns, or None if not found
+        """
+        # First check if InferenceFact table exists
+        try:
+            table_exists_query = "EXISTS TABLE InferenceFact"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            if not table_exists_result or table_exists_result[0][0] != 1:
+                logger.debug("InferenceFact table does not exist")
+                return None
+        except Exception as e:
+            logger.warning(f"Failed to check InferenceFact table existence: {e}")
+            return None
+
+        # Query InferenceFact by inference_id OR trace_id (for blocked requests)
+        query = """
+        SELECT
+            -- OTel identifiers
+            id,
+            trace_id,
+            span_id,
+            -- Core identifiers
+            inference_id,
+            project_id,
+            endpoint_id,
+            model_id,
+            api_key_id,
+            api_key_project_id,
+            user_id,
+            -- Timestamps
+            timestamp,
+            request_arrival_time,
+            request_forward_time,
+            -- Status & cost
+            is_success,
+            cost,
+            status_code,
+            toString(request_ip) as request_ip,
+            response_analysis,
+            -- Error tracking
+            error_code,
+            error_message,
+            error_type,
+            -- Model info
+            model_inference_id,
+            model_name,
+            model_provider,
+            endpoint_type,
+            -- Performance metrics
+            input_tokens,
+            output_tokens,
+            response_time_ms,
+            ttft_ms,
+            cached,
+            finish_reason,
+            -- Content
+            toValidUTF8(system_prompt) as system_prompt,
+            toValidUTF8(input_messages) as input_messages,
+            toValidUTF8(output) as output,
+            toValidUTF8(raw_request) as raw_request,
+            toValidUTF8(raw_response) as raw_response,
+            toValidUTF8(gateway_request) as gateway_request,
+            toValidUTF8(gateway_response) as gateway_response,
+            guardrail_scan_summary,
+            -- Chat inference
+            chat_inference_id,
+            episode_id,
+            function_name,
+            variant_name,
+            processing_time_ms,
+            toValidUTF8(chat_input) as chat_input,
+            toValidUTF8(chat_output) as chat_output,
+            tags,
+            inference_params,
+            extra_body,
+            tool_params,
+            -- Gateway analytics - geographic
+            country_code,
+            country_name,
+            region,
+            city,
+            latitude,
+            longitude,
+            timezone,
+            asn,
+            isp,
+            -- Gateway analytics - client
+            toString(client_ip) as client_ip,
+            toValidUTF8(user_agent) as user_agent,
+            device_type,
+            browser_name,
+            browser_version,
+            os_name,
+            os_version,
+            is_bot,
+            -- Gateway analytics - request context
+            method,
+            path,
+            query_params,
+            body_size,
+            response_size,
+            protocol_version,
+            -- Gateway analytics - performance
+            gateway_processing_ms,
+            total_duration_ms,
+            -- Gateway analytics - routing & blocking
+            model_version,
+            routing_decision,
+            is_blocked,
+            block_reason,
+            block_rule_id,
+            proxy_chain,
+            -- Gateway analytics - headers & timestamps
+            request_headers,
+            response_headers,
+            request_timestamp,
+            response_timestamp,
+            gateway_tags,
+            -- Blocking event data
+            blocking_event_id,
+            rule_id,
+            rule_type,
+            rule_name,
+            rule_priority,
+            block_reason_detail,
+            action_taken,
+            blocked_at
+        FROM InferenceFact
+        WHERE inference_id = %(inference_id)s
+           OR trace_id = %(inference_id)s
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """
+
+        params = {"inference_id": inference_id}
+        try:
+            results, column_descriptions = await self.clickhouse_client.execute_query(
+                query, params, with_column_types=True
+            )
+
+            if not results:
+                logger.debug(f"Inference {inference_id} not found in InferenceFact")
+                return None
+
+            # Convert row to dictionary
+            from budmetrics.observability.models import ClickHouseClient
+
+            row_dict = ClickHouseClient.row_to_dict(results[0], column_descriptions)
+            logger.info(f"Found inference {inference_id} in InferenceFact table")
+            return row_dict
+        except Exception as e:
+            logger.warning(f"Error querying InferenceFact for {inference_id}: {e}")
+            return None
+
+    def _build_response_from_fact_row(self, row_dict: dict) -> EnhancedInferenceDetailResponse:
+        """Build EnhancedInferenceDetailResponse from InferenceFact row.
+
+        Args:
+            row_dict: Dictionary with all InferenceFact columns
+
+        Returns:
+            EnhancedInferenceDetailResponse populated from the fact table row
+        """
+        import json
+
+        # Helper functions
+        def safe_uuid(value):
+            if value is None:
+                return None
+            if isinstance(value, UUID):
+                return value
+            try:
+                return UUID(str(value))
+            except (ValueError, TypeError):
+                return None
+
+        def safe_float(val):
+            try:
+                if val is None or val == "":
+                    return None
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        def safe_int(val):
+            try:
+                if val is None or val == "":
+                    return None
+                return int(val)
+            except (ValueError, TypeError):
+                return None
+
+        def safe_dict(val):
+            try:
+                if val is None or val == "":
+                    return None
+                if isinstance(val, dict):
+                    return val
+                if isinstance(val, str):
+                    return json.loads(val)
+                if isinstance(val, (list, tuple)):
+                    return dict(val)
+                return None
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return None
+
+        def safe_str(val):
+            if val is None or val == "":
+                return None
+            return str(val)
+
+        # Get endpoint type
+        endpoint_type = row_dict.get("endpoint_type", "chat")
+
+        # Parse input messages - prefer chat_input over input_messages
+        input_messages_raw = row_dict.get("chat_input") or row_dict.get("input_messages")
+        messages = []
+        try:
+            if input_messages_raw:
+                if isinstance(input_messages_raw, str):
+                    parsed_data = json.loads(input_messages_raw)
+                    if isinstance(parsed_data, dict) and "messages" in parsed_data:
+                        messages = parsed_data["messages"]
+                    elif isinstance(parsed_data, list):
+                        messages = parsed_data
+                elif isinstance(input_messages_raw, list):
+                    messages = input_messages_raw
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse messages: {e}")
+            if input_messages_raw and isinstance(input_messages_raw, str):
+                messages = [{"role": "user", "content": input_messages_raw}]
+
+        # Build combined messages with system prompt
+        combined_messages = []
+        system_prompt = row_dict.get("system_prompt")
+        if system_prompt:
+            combined_messages.append({"role": "system", "content": str(system_prompt)})
+        combined_messages.extend(messages)
+
+        # Add assistant response - prefer chat_output over output
+        output_raw = row_dict.get("chat_output") or row_dict.get("output")
+        if output_raw:
+            try:
+                output_content = json.loads(output_raw)
+                content = output_content
+            except (json.JSONDecodeError, TypeError):
+                content = str(output_raw)
+            combined_messages.append({"role": "assistant", "content": content})
+
+        # Build gateway metadata if data is present
+        gateway_metadata = None
+        gateway_field_names = [
+            "client_ip",
+            "proxy_chain",
+            "protocol_version",
+            "country_code",
+            "region",
+            "city",
+            "latitude",
+            "longitude",
+            "timezone",
+            "asn",
+            "isp",
+            "user_agent",
+            "device_type",
+            "browser_name",
+            "browser_version",
+            "os_name",
+            "os_version",
+            "is_bot",
+            "method",
+            "path",
+            "query_params",
+            "request_headers",
+            "body_size",
+            "gateway_processing_ms",
+            "total_duration_ms",
+            "routing_decision",
+            "model_version",
+            "response_size",
+            "response_headers",
+            "is_blocked",
+            "block_reason",
+            "block_rule_id",
+            "gateway_tags",
+        ]
+        gateway_field_values = [row_dict.get(field) for field in gateway_field_names]
+        has_gateway_data = any(field is not None and field != "" for field in gateway_field_values)
+
+        if has_gateway_data:
+            try:
+                gateway_metadata = GatewayMetadata(
+                    client_ip=safe_str(row_dict.get("client_ip")),
+                    proxy_chain=safe_str(row_dict.get("proxy_chain")),
+                    protocol_version=safe_str(row_dict.get("protocol_version")),
+                    country_code=safe_str(row_dict.get("country_code")),
+                    region=safe_str(row_dict.get("region")),
+                    city=safe_str(row_dict.get("city")),
+                    latitude=safe_float(row_dict.get("latitude")),
+                    longitude=safe_float(row_dict.get("longitude")),
+                    timezone=safe_str(row_dict.get("timezone")),
+                    asn=safe_int(row_dict.get("asn")),
+                    isp=safe_str(row_dict.get("isp")),
+                    user_agent=safe_str(row_dict.get("user_agent")),
+                    device_type=safe_str(row_dict.get("device_type")),
+                    browser_name=safe_str(row_dict.get("browser_name")),
+                    browser_version=safe_str(row_dict.get("browser_version")),
+                    os_name=safe_str(row_dict.get("os_name")),
+                    os_version=safe_str(row_dict.get("os_version")),
+                    is_bot=row_dict.get("is_bot"),
+                    method=safe_str(row_dict.get("method")),
+                    path=safe_str(row_dict.get("path")),
+                    query_params=safe_str(row_dict.get("query_params")),
+                    request_headers=safe_dict(row_dict.get("request_headers")),
+                    body_size=safe_int(row_dict.get("body_size")),
+                    api_key_id=safe_str(row_dict.get("api_key_id")),
+                    auth_method=None,  # Not stored in InferenceFact
+                    user_id=safe_str(row_dict.get("user_id")),
+                    gateway_processing_ms=safe_int(row_dict.get("gateway_processing_ms")),
+                    total_duration_ms=safe_int(row_dict.get("total_duration_ms")),
+                    routing_decision=safe_str(row_dict.get("routing_decision")),
+                    model_version=safe_str(row_dict.get("model_version")),
+                    status_code=safe_int(row_dict.get("status_code")),
+                    response_size=safe_int(row_dict.get("response_size")),
+                    response_headers=safe_dict(row_dict.get("response_headers")),
+                    error_type=safe_str(row_dict.get("error_type")),
+                    error_message=safe_str(row_dict.get("error_message")),
+                    is_blocked=row_dict.get("is_blocked"),
+                    block_reason=safe_str(row_dict.get("block_reason")),
+                    block_rule_id=safe_str(row_dict.get("block_rule_id")),
+                    tags=safe_dict(row_dict.get("gateway_tags")),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to build gateway metadata: {e}")
+                gateway_metadata = None
+
+        # Get inference_id - for blocked requests it might be None
+        inference_id = safe_uuid(row_dict.get("inference_id"))
+        # Fall back to trace_id for blocked requests
+        if inference_id is None:
+            trace_id = row_dict.get("trace_id")
+            if trace_id:
+                try:
+                    inference_id = UUID(trace_id)
+                except (ValueError, TypeError):
+                    # Use a generated UUID based on trace_id hash
+                    pass
+
+        # Get timestamps
+        timestamp = row_dict.get("timestamp")
+        request_arrival_time = row_dict.get("request_arrival_time") or timestamp
+        request_forward_time = row_dict.get("request_forward_time") or timestamp
+
+        return EnhancedInferenceDetailResponse(
+            object="inference_detail",
+            inference_id=inference_id,
+            timestamp=timestamp,
+            model_name=str(row_dict.get("model_name")) if row_dict.get("model_name") else "",
+            model_provider=str(row_dict.get("model_provider")) if row_dict.get("model_provider") else "unknown",
+            model_id=safe_uuid(row_dict.get("model_id")),
+            system_prompt=safe_str(row_dict.get("system_prompt")),
+            messages=combined_messages,
+            output=str(output_raw) if output_raw else "",
+            function_name=safe_str(row_dict.get("function_name")),
+            variant_name=safe_str(row_dict.get("variant_name")),
+            episode_id=safe_uuid(row_dict.get("episode_id")),
+            input_tokens=safe_int(row_dict.get("input_tokens")) or 0,
+            output_tokens=safe_int(row_dict.get("output_tokens")) or 0,
+            response_time_ms=safe_int(row_dict.get("response_time_ms")) or 0,
+            ttft_ms=safe_int(row_dict.get("ttft_ms")),
+            processing_time_ms=safe_int(row_dict.get("processing_time_ms")),
+            request_ip=safe_str(row_dict.get("request_ip")),
+            request_arrival_time=request_arrival_time,
+            request_forward_time=request_forward_time,
+            project_id=safe_uuid(row_dict.get("project_id")),
+            api_key_project_id=safe_uuid(row_dict.get("api_key_project_id")),
+            endpoint_id=safe_uuid(row_dict.get("endpoint_id")),
+            is_success=bool(row_dict.get("is_success")) if row_dict.get("is_success") is not None else True,
+            cached=bool(row_dict.get("cached")) if row_dict.get("cached") is not None else False,
+            finish_reason=safe_str(row_dict.get("finish_reason")),
+            cost=safe_float(row_dict.get("cost")),
+            error_code=safe_str(row_dict.get("error_code")),
+            error_message=safe_str(row_dict.get("error_message")),
+            error_type=safe_str(row_dict.get("error_type")),
+            status_code=safe_int(row_dict.get("status_code")),
+            raw_request=safe_str(row_dict.get("raw_request")),
+            raw_response=safe_str(row_dict.get("raw_response")),
+            gateway_request=safe_str(row_dict.get("gateway_request")),
+            gateway_response=safe_str(row_dict.get("gateway_response")),
+            gateway_metadata=gateway_metadata,
+            feedback_count=0,  # Will be fetched separately if needed
+            average_rating=None,
+            endpoint_type=endpoint_type,
+            embedding_details=None,
+            audio_details=None,
+            image_details=None,
+            moderation_details=None,
+        )
+
     async def get_inference_details(self, inference_id: str) -> EnhancedInferenceDetailResponse:
         """Get complete details for a single inference.
 
@@ -1343,6 +1750,24 @@ class ObservabilityMetricsService:
             UUID(inference_id)
         except ValueError:
             raise ValueError("Invalid inference ID format") from None
+
+        # Phase 1: Try InferenceFact first for chat/blocked endpoint types
+        # This is the optimized path using a single pre-joined table
+        fact_row = await self._get_inference_from_fact_table(inference_id)
+        if fact_row:
+            endpoint_type = fact_row.get("endpoint_type", "chat")
+            # Use InferenceFact for chat and blocked endpoint types
+            if endpoint_type in ("chat", "blocked"):
+                logger.info(f"Using InferenceFact for inference {inference_id} (endpoint_type={endpoint_type})")
+                return self._build_response_from_fact_row(fact_row)
+            else:
+                logger.info(
+                    f"InferenceFact found but endpoint_type={endpoint_type}, "
+                    f"falling back to legacy tables for type-specific details"
+                )
+
+        # Phase 2: Fall back to legacy 4-table JOIN for other endpoint types
+        # or when not found in InferenceFact (data before InferenceFact was created)
 
         # First check if GatewayAnalytics table exists
         try:
@@ -2323,9 +2748,8 @@ class ObservabilityMetricsService:
         raw_data_metrics = {"p95_latency", "p99_latency", "ttft_p95", "ttft_p99"}
         # Dimensions that require InferenceFact (not available in rollup tables)
         raw_data_dimensions = {"user"}
-        needs_raw_data = (
-            any(m in raw_data_metrics for m in request.metrics)
-            or (request.group_by and any(d in raw_data_dimensions for d in request.group_by))
+        needs_raw_data = any(m in raw_data_metrics for m in request.metrics) or (
+            request.group_by and any(d in raw_data_dimensions for d in request.group_by)
         )
 
         if needs_raw_data:
@@ -2367,13 +2791,13 @@ class ObservabilityMetricsService:
             if metric == "total_requests":
                 select_fields.append("SUM(rm.request_count) as total_requests")
             elif metric == "success_rate":
-                select_fields.append("SUM(rm.success_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as success_rate")
+                select_fields.append(
+                    "SUM(rm.success_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as success_rate"
+                )
             elif metric == "avg_latency":
                 select_fields.append("SUM(rm.sum_response_time_ms) / NULLIF(SUM(rm.request_count), 0) as avg_latency")
             elif metric == "total_tokens":
-                select_fields.append(
-                    "(SUM(rm.total_input_tokens) + SUM(rm.total_output_tokens)) as total_tokens"
-                )
+                select_fields.append("(SUM(rm.total_input_tokens) + SUM(rm.total_output_tokens)) as total_tokens")
             elif metric == "total_input_tokens":
                 select_fields.append("SUM(rm.total_input_tokens) as total_input_tokens")
             elif metric == "total_output_tokens":
@@ -2389,7 +2813,9 @@ class ObservabilityMetricsService:
             elif metric == "ttft_avg":
                 select_fields.append("SUM(rm.sum_ttft_ms) / NULLIF(SUM(rm.request_count), 0) as ttft_avg")
             elif metric == "cache_hit_rate":
-                select_fields.append("SUM(rm.cached_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as cache_hit_rate")
+                select_fields.append(
+                    "SUM(rm.cached_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as cache_hit_rate"
+                )
             elif metric == "throughput_avg":
                 select_fields.append(
                     "SUM(rm.total_output_tokens) * 1000.0 / NULLIF(SUM(rm.sum_response_time_ms), 0) as throughput_avg"
