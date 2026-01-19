@@ -1,6 +1,7 @@
-ingress:
-    hosts:
-        root: ditto.bud.studio
+global:
+    ingress:
+        hosts:
+            root: ditto.bud.studio
 
 # disable keel
 deploymentAnnotations: null

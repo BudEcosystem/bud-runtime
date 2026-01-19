@@ -1,8 +1,9 @@
 imagePullPolicy: Always
 
-ingress:
-  hosts:
-    root: karthik.bud.studio
+global:
+  ingress:
+    hosts:
+      root: karthik.bud.studio
 
 microservices:
   budgateway:
