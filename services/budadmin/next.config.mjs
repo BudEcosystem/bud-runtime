@@ -169,15 +169,15 @@ export default {
       // DAG Pipelines
       {
         source: '/pipelines',
-        destination: '/home/budpipelines',
+        destination: '/home/pipelines',
       },
       {
         source: '/pipelines/new',
-        destination: '/home/budpipelines/new',
+        destination: '/home/pipelines/new',
       },
       {
         source: '/pipelines/:id',
-        destination: '/home/budpipelines/:id',
+        destination: '/home/pipelines/:id',
       },
     ];
   },
