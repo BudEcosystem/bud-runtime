@@ -135,8 +135,8 @@ def seed_otel_traces(
 
     sql = generate_insert_sql(all_spans, database)
 
-    # Write SQL to temp file to avoid shell escaping issues
-    sql_file = Path("/tmp/otel_seed.sql")
+    # Write SQL to temp file for debugging (not used in execution)
+    sql_file = Path("/tmp/otel_seed.sql")  # nosec B108
     sql_file.write_text(sql)
 
     # Execute via docker
