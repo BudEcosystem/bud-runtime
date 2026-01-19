@@ -515,7 +515,7 @@ class QueryBuilder:
         # Add delta expressions if requested (use SQL aliases for window functions)
         if return_delta:
             # Zip SQL aliases with semantic field names to build delta expressions
-            for sql_alias, semantic_name in zip(metric_sql_aliases, metric_fields):
+            for sql_alias, semantic_name in zip(metric_sql_aliases, metric_fields, strict=False):
                 delta_clauses, delta_field_names = self._build_rollup_delta_expressions(
                     sql_alias, semantic_name, time_bucket_alias, group_by_fields if group_by_fields else None
                 )

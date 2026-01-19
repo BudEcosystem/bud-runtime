@@ -400,16 +400,12 @@ class ObservabilityMetricsService:
             # Handle list with single element
             if isinstance(filter_value, list):
                 if len(filter_value) == 1:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         result[result_key] = UUID(str(filter_value[0]))
-                    except (ValueError, TypeError):
-                        pass  # Invalid UUID
             # Handle single value (not in list)
             elif isinstance(filter_value, (str, UUID)):
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     result[result_key] = UUID(str(filter_value))
-                except (ValueError, TypeError):
-                    pass  # Invalid UUID
 
         return result
 
@@ -1678,11 +1674,8 @@ class ObservabilityMetricsService:
         if inference_id is None:
             trace_id = row_dict.get("trace_id")
             if trace_id:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     inference_id = UUID(trace_id)
-                except (ValueError, TypeError):
-                    # Use a generated UUID based on trace_id hash
-                    pass
 
         # Get timestamps
         timestamp = row_dict.get("timestamp")
