@@ -2745,9 +2745,7 @@ class ClickHouseMigration:
             await (
                 self.add_gateway_columns_to_inference_fact()
             )  # Add gateway analytics columns to existing InferenceFact
-            await (
-                self.add_blocking_columns_to_inference_fact()
-            )  # Add blocking event columns to existing InferenceFact
+            await self.add_blocking_columns_to_inference_fact()  # Add blocking event columns to existing InferenceFact
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
             await (
                 self.create_mv_otel_blocking_to_inference_fact()
@@ -2756,9 +2754,7 @@ class ClickHouseMigration:
                 self.make_metrics_dimension_columns_nullable()
             )  # Drop old tables if dimension columns aren't nullable (must be before table creation)
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
-            await (
-                self.add_blocking_metrics_to_rollup_tables()
-            )  # Add blocking metrics columns to rollup tables
+            await self.add_blocking_metrics_to_rollup_tables()  # Add blocking metrics columns to rollup tables
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
             await self.verify_tables()
             logger.info("Migration completed successfully!")
