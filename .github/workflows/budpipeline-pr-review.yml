@@ -151,10 +151,12 @@ jobs:
       - name: Set up environment
         run: |
           cp .env.sample .env
-          # Update database connection for CI
-          sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/budpipeline_test|' .env
-          # Set Redis URL
-          sed -i 's|REDIS_URL=.*|REDIS_URL=redis://localhost:6379|' .env
+          # Update database connection for CI (uses PSQL_* vars, not DATABASE_URL)
+          sed -i 's|PSQL_HOST=.*|PSQL_HOST=localhost|' .env
+          sed -i 's|PSQL_PORT=.*|PSQL_PORT=5432|' .env
+          sed -i 's|PSQL_USER=.*|PSQL_USER=postgres|' .env
+          sed -i 's|PSQL_PASSWORD=.*|PSQL_PASSWORD=postgres|' .env
+          sed -i 's|PSQL_DB_NAME=.*|PSQL_DB_NAME=budpipeline_test|' .env
           # Disable Dapr for unit tests
           echo "DAPR_HTTP_ENDPOINT=http://localhost:3500" >> .env
           echo "DAPR_GRPC_ENDPOINT=localhost:50001" >> .env
