@@ -44,6 +44,10 @@ data:
   rootPassword: {{ .Values.minio.auth.rootPassword | b64enc }}
 ---
 # OAuth/Keycloak credentials for Onyx
+# Onyx auto-provisions its own Keycloak client ('onyx-client') at startup
+# using the KEYCLOAK_ADMIN_PASSWORD to authenticate to Keycloak admin API.
+# DO NOT set oauth_client_id or oauth_client_secret - leave them empty
+# so Onyx's built-in provisioning creates the client with directAccessGrantsEnabled.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -54,5 +58,8 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 type: Opaque
 data:
+  # Keycloak admin password - required for Onyx to auto-provision its OAuth client
   keycloak_admin_password: {{ .Values.keycloak.auth.adminPassword | b64enc }}
+  # Cookie secret for session encryption (separate from OAuth client credentials)
+  oauth_cookie_secret: {{ randAlphaNum 64 | b64enc }}
 {{- end }}

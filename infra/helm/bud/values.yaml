@@ -2,6 +2,23 @@
 global:
   security:
     allowInsecureImages: true
+  # Ingress hosts configuration - shared with subcharts (e.g., onyx)
+  # Subcharts access via .Values.global.ingress.hosts.root
+  ingress:
+    hosts:
+      root: "bud.example.com"
+      # NOTE: rest is derived from root by ./templates/_helpers.tpl
+      budadmin: ""
+      budcustomer: ""
+      budplayground: ""
+      budapp: ""
+      budgateway: ""
+      budask: ""
+      novuapi: ""
+      novuws: ""
+      s3: ""
+      mcpgateway: ""
+      onyx: ""  # Auto-derives to chat.{root} e.g., chat.dev.domain.com
   # Optional node scheduling configuration applied to all microservices by default
   # Can be overridden per-service in microservices.<service>.nodeSelector and microservices.<service>.affinity
   nodeSelector: {}
@@ -125,20 +142,7 @@ ingress:
   enabled: true
   # NOTE: used to derive public urls for client side services: (external|internal|disabled)
   https: disabled
-  hosts:
-    root: "bud.example.com"
-    # NOTE: rest is derived from root by ./templates/_helpers.tpl
-    budadmin: ""
-    budcustomer: ""
-    budplayground: ""
-    budapp: ""
-    budgateway: ""
-    budask: ""
-    novuapi: ""
-    novuws: ""
-    s3: ""
-    mcpgateway: ""
-    onyx: ""  # Auto-derives to chat.{root} e.g., chat.dev.domain.com
+  # NOTE: hosts moved to global.ingress.hosts for subchart access
 microservices:
   # frontend services
   budadmin:
@@ -711,6 +715,11 @@ keycloak:
     limits:
       memory: 2Gi
   enabled: true
+  # Keycloak admin credentials (for provisioning and management)
+  auth:
+    adminUser: bud
+    adminPassword: bud
+  adminRealm: master
   postgresql:
     enabled: false
   externalDatabase:
@@ -907,11 +916,9 @@ onyx:
     auth:
       adminUser: "bud"
       adminPassword: "bud"
-  # Ingress values for subchart context (used in configMap templates)
-  # These should match the parent chart's ingress.hosts values
-  ingress:
-    hosts:
-      root: ""  # Must be set when onyx.enabled=true (e.g., dev.example.com)
+  # OAuth client configuration - automatically provisioned by keycloak-provisioning.yaml Job
+  # The Job reuses 'default-internal-client' created by budapp, enables Direct Access Grants,
+  # retrieves the secret from Keycloak, and updates the K8s secret for Onyx
   # Disable shared dependencies (use bud's instances)
   postgresql:
     enabled: false
@@ -936,6 +943,7 @@ onyx:
   nginx:
     enabled: false  # Disabled - bud uses traefik for ingress
   # Disable Onyx's own ingress (bud's traefik handles routing via ingress.yaml)
+  # NOTE: Onyx uses global.ingress.hosts.root for domain configuration
   ingress:
     enabled: false
   letsencrypt:
@@ -967,11 +975,12 @@ onyx:
       enabled: true
       existingSecret: "{{ $.Release.Name }}-onyx-oauth"
       secretKeys:
+        # Keycloak admin password - Onyx uses this to auto-provision its OAuth client
         KEYCLOAK_ADMIN_PASSWORD: keycloak_admin_password
-        # Explicitly nullify subchart defaults - these keys don't exist in our secret
-        OAUTH_CLIENT_ID: null
-        OAUTH_CLIENT_SECRET: null
-        OAUTH_COOKIE_SECRET: null
+        # Cookie secret for session encryption
+        OAUTH_COOKIE_SECRET: oauth_cookie_secret
+        # NOTE: OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are NOT set here.
+        # Onyx auto-provisions 'onyx-client' at startup with directAccessGrantsEnabled.
     smtp:
       enabled: false
   # ConfigMap overrides (template expressions are evaluated via tpl function)
@@ -981,13 +990,15 @@ onyx:
     POSTGRES_DB: "onyx"
     # Redis DB index 11 - unique to Onyx (other services use: 1=Novu, 3=Dapr, 5=global, 9=mcpgateway, 10=budprompt)
     REDIS_DB: "11"
-    KEYCLOAK_ADMIN_USERNAME: "{{ .Values.keycloak.auth.adminUser }}"
+    # NOTE: Keycloak admin user is 'user' in the deployed instance (from example.secrets.yaml)
+    # even though values.yaml defaults to 'bud'. Using 'user' directly for compatibility.
+    KEYCLOAK_ADMIN_USERNAME: "user"
     KEYCLOAK_REALM: "bud-keycloak"
-    WEB_DOMAIN: '{{ printf "https://chat.%s" .Values.ingress.hosts.root }}'
-    DOMAIN: "{{ .Values.ingress.hosts.root }}"
+    WEB_DOMAIN: '{{ printf "https://chat.%s" .Values.global.ingress.hosts.root }}'
+    DOMAIN: "{{ .Values.global.ingress.hosts.root }}"
     S3_FILE_STORE_BUCKET_NAME: "onyx-file-store-bucket"
-    BUD_FOUNDRY_API_BASE: '{{ printf "https://gateway.%s" .Values.ingress.hosts.root }}/v1'
-    BUD_FOUNDRY_APP_BASE: '{{ printf "https://app.%s" .Values.ingress.hosts.root }}'
+    BUD_FOUNDRY_API_BASE: '{{ printf "https://gateway.%s" .Values.global.ingress.hosts.root }}/v1'
+    BUD_FOUNDRY_APP_BASE: '{{ printf "https://app.%s" .Values.global.ingress.hosts.root }}'
     OPENID_CONFIG_URL: 'http://{{ .Release.Name }}-keycloak/realms/bud-keycloak/.well-known/openid-configuration'
   # Component configurations
   webserver:

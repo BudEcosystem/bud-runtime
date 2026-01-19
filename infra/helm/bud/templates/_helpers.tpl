@@ -1,78 +1,78 @@
 {{- define "bud.ingress.hosts.budadmin" -}}
-{{- if .Values.ingress.hosts.budadmin }}
-{{- .Values.ingress.hosts.budadmin }}
+{{- if .Values.global.ingress.hosts.budadmin }}
+{{- .Values.global.ingress.hosts.budadmin }}
 {{- else }}
-{{- printf "admin.%s" .Values.ingress.hosts.root }}
+{{- printf "admin.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.budcustomer" -}}
-{{- if .Values.ingress.hosts.budcustomer }}
-{{- .Values.ingress.hosts.budcustomer }}
+{{- if .Values.global.ingress.hosts.budcustomer }}
+{{- .Values.global.ingress.hosts.budcustomer }}
 {{- else }}
-{{- printf "customer.%s" .Values.ingress.hosts.root }}
+{{- printf "customer.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.budplayground" -}}
-{{- if .Values.ingress.hosts.budplayground }}
-{{- .Values.ingress.hosts.budplayground }}
+{{- if .Values.global.ingress.hosts.budplayground }}
+{{- .Values.global.ingress.hosts.budplayground }}
 {{- else }}
-{{- printf "playground.%s" .Values.ingress.hosts.root }}
+{{- printf "playground.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.budapp" -}}
-{{- if .Values.ingress.hosts.budapp }}
-{{- .Values.ingress.hosts.budapp }}
+{{- if .Values.global.ingress.hosts.budapp }}
+{{- .Values.global.ingress.hosts.budapp }}
 {{- else }}
-{{- printf "app.%s" .Values.ingress.hosts.root }}
+{{- printf "app.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.budgateway" -}}
-{{- if .Values.ingress.hosts.budgateway }}
-{{- .Values.ingress.hosts.budgateway }}
+{{- if .Values.global.ingress.hosts.budgateway }}
+{{- .Values.global.ingress.hosts.budgateway }}
 {{- else }}
-{{- printf "gateway.%s" .Values.ingress.hosts.root }}
+{{- printf "gateway.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.budask" -}}
-{{- if .Values.ingress.hosts.budask }}
-{{- .Values.ingress.hosts.budask }}
+{{- if .Values.global.ingress.hosts.budask }}
+{{- .Values.global.ingress.hosts.budask }}
 {{- else }}
-{{- printf "ask.%s" .Values.ingress.hosts.root }}
+{{- printf "ask.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.novuapi" -}}
-{{- if .Values.ingress.hosts.novuapi }}
-{{- .Values.ingress.hosts.novuapi }}
+{{- if .Values.global.ingress.hosts.novuapi }}
+{{- .Values.global.ingress.hosts.novuapi }}
 {{- else }}
-{{- printf "api.novu.%s" .Values.ingress.hosts.root }}
+{{- printf "api.novu.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.novuws" -}}
-{{- if .Values.ingress.hosts.novuws }}
-{{- .Values.ingress.hosts.novuws }}
+{{- if .Values.global.ingress.hosts.novuws }}
+{{- .Values.global.ingress.hosts.novuws }}
 {{- else }}
-{{- printf "ws.novu.%s" .Values.ingress.hosts.root }}
+{{- printf "ws.novu.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.s3" -}}
-{{- if .Values.ingress.hosts.s3 }}
-{{- .Values.ingress.hosts.s3 }}
+{{- if .Values.global.ingress.hosts.s3 }}
+{{- .Values.global.ingress.hosts.s3 }}
 {{- else }}
-{{- printf "s3.%s" .Values.ingress.hosts.root }}
+{{- printf "s3.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.mcpgateway" -}}
-{{- if .Values.ingress.hosts.mcpgateway }}
-{{- .Values.ingress.hosts.mcpgateway }}
+{{- if .Values.global.ingress.hosts.mcpgateway }}
+{{- .Values.global.ingress.hosts.mcpgateway }}
 {{- else }}
-{{- printf "mcpgateway.%s" .Values.ingress.hosts.root }}
+{{- printf "mcpgateway.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.hosts.onyx" -}}
-{{- if .Values.ingress.hosts.onyx }}
-{{- .Values.ingress.hosts.onyx }}
+{{- if .Values.global.ingress.hosts.onyx }}
+{{- .Values.global.ingress.hosts.onyx }}
 {{- else }}
-{{- printf "chat.%s" .Values.ingress.hosts.root }}
+{{- printf "chat.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
 

@@ -1,7 +1,10 @@
+global:
+    ingress:
+        hosts:
+            root: bane.tsnet.bud.studio
+
 ingress:
     https: disabled
-    hosts:
-        root: bane.tsnet.bud.studio
 
 deploymentAnnotations:
     keel.sh/policy: all

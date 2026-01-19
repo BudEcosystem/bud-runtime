@@ -3,28 +3,49 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-postgres-db-create-script
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
 data:
   script.sh: |-
     export PGPASSWORD="{{ $.Values.postgresql.auth.postgresPassword }}"
 
+    echo "Waiting for PostgreSQL to be ready..."
     while ! pg_isready -h {{ $.Release.Name }}-postgresql -U postgres ; do
       sleep 1
     done
+    echo "PostgreSQL is ready"
 
-    psql -h {{ $.Release.Name }}-postgresql -U postgres <<- EOF
     {{- range $.Values.postgresqlExtra.autoCreateDB }}
-      CREATE USER {{ . }} WITH PASSWORD '{{ . }}';
-      CREATE DATABASE {{ . }} OWNER {{ . }};
-    {{- end }}
+    echo "Creating user and database: {{ . }}"
+    psql -h {{ $.Release.Name }}-postgresql -U postgres <<- EOF
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{ . }}') THEN
+          CREATE USER {{ . }} WITH PASSWORD '{{ . }}';
+          RAISE NOTICE 'User {{ . }} created';
+        ELSE
+          RAISE NOTICE 'User {{ . }} already exists';
+        END IF;
+      END
+      \$\$;
+      SELECT 'CREATE DATABASE {{ . }} OWNER {{ . }}' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ . }}')\gexec
     EOF
+    {{- end }}
+    echo "Database initialization complete"
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ .Release.Name }}-postgres-db-create
   annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-4"
+    "helm.sh/hook-delete-policy": before-hook-creation
     checksum/databases: "{{ join "-" $.Values.postgresqlExtra.autoCreateDB | sha256sum }}"
 spec:
+  ttlSecondsAfterFinished: 300
   template:
     spec:
       volumes:
