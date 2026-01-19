@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import math
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -2652,8 +2653,8 @@ class ObservabilityMetricsService:
         from budmetrics.observability.schemas import (
             GatewayCountMetric,
             GatewayMetricsData,
-            GatewayPeriodBin,
             GatewayPerformanceMetric,
+            GatewayPeriodBin,
         )
 
         items = []
@@ -3342,53 +3343,41 @@ class ObservabilityMetricsService:
 
         return self._process_time_series_results(results, request)
 
+    # Time bucket expression mappings for rollup tables
+    _ROLLUP_TIME_BUCKET_EXPRS = {
+        "1m": "toStartOfMinute(time_bucket)",
+        "5m": "toStartOfInterval(time_bucket, INTERVAL 5 minute)",
+        "15m": "toStartOfInterval(time_bucket, INTERVAL 15 minute)",
+        "30m": "toStartOfInterval(time_bucket, INTERVAL 30 minute)",
+        "1h": "toStartOfHour(time_bucket)",
+        "6h": "toStartOfInterval(time_bucket, INTERVAL 6 hour)",
+        "12h": "toStartOfInterval(time_bucket, INTERVAL 12 hour)",
+        "1d": "toStartOfDay(time_bucket)",
+        # Wrap with toDateTime to ensure DateTime type for comparison
+        "1w": "toDateTime(toStartOfWeek(time_bucket))",
+    }
+
+    # Time bucket expression mappings for InferenceFact table
+    _INFERENCE_FACT_TIME_BUCKET_EXPRS = {
+        "1m": "toStartOfMinute(ifact.request_arrival_time)",
+        "5m": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 5 minute)",
+        "15m": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 15 minute)",
+        "30m": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 30 minute)",
+        "1h": "toStartOfHour(ifact.request_arrival_time)",
+        "6h": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 6 hour)",
+        "12h": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 12 hour)",
+        "1d": "toStartOfDay(ifact.request_arrival_time)",
+        # Wrap with toDateTime to ensure DateTime type for comparison
+        "1w": "toDateTime(toStartOfWeek(ifact.request_arrival_time))",
+    }
+
     def _get_rollup_time_bucket_expr(self, interval: str) -> str:
         """Get time bucket expression for rollup tables."""
-        if interval == "1m":
-            return "toStartOfMinute(time_bucket)"
-        elif interval == "5m":
-            return "toStartOfInterval(time_bucket, INTERVAL 5 minute)"
-        elif interval == "15m":
-            return "toStartOfInterval(time_bucket, INTERVAL 15 minute)"
-        elif interval == "30m":
-            return "toStartOfInterval(time_bucket, INTERVAL 30 minute)"
-        elif interval == "1h":
-            return "toStartOfHour(time_bucket)"
-        elif interval == "6h":
-            return "toStartOfInterval(time_bucket, INTERVAL 6 hour)"
-        elif interval == "12h":
-            return "toStartOfInterval(time_bucket, INTERVAL 12 hour)"
-        elif interval == "1d":
-            return "toStartOfDay(time_bucket)"
-        elif interval == "1w":
-            # Wrap with toDateTime to ensure DateTime type for comparison
-            return "toDateTime(toStartOfWeek(time_bucket))"
-        else:
-            return "toStartOfHour(time_bucket)"
+        return self._ROLLUP_TIME_BUCKET_EXPRS.get(interval, "toStartOfHour(time_bucket)")
 
     def _get_inference_fact_time_bucket_expr(self, interval: str) -> str:
         """Get time bucket expression for InferenceFact table."""
-        if interval == "1m":
-            return "toStartOfMinute(ifact.request_arrival_time)"
-        elif interval == "5m":
-            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 5 minute)"
-        elif interval == "15m":
-            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 15 minute)"
-        elif interval == "30m":
-            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 30 minute)"
-        elif interval == "1h":
-            return "toStartOfHour(ifact.request_arrival_time)"
-        elif interval == "6h":
-            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 6 hour)"
-        elif interval == "12h":
-            return "toStartOfInterval(ifact.request_arrival_time, INTERVAL 12 hour)"
-        elif interval == "1d":
-            return "toStartOfDay(ifact.request_arrival_time)"
-        elif interval == "1w":
-            # Wrap with toDateTime to ensure DateTime type for comparison
-            return "toDateTime(toStartOfWeek(ifact.request_arrival_time))"
-        else:
-            return "toStartOfHour(ifact.request_arrival_time)"
+        return self._INFERENCE_FACT_TIME_BUCKET_EXPRS.get(interval, "toStartOfHour(ifact.request_arrival_time)")
 
     def _get_interval_step(self, interval: str) -> str:
         """Convert interval string to ClickHouse INTERVAL syntax for WITH FILL."""

@@ -490,9 +490,9 @@ class QueryBuilder:
 
         # Build inner aggregation query
         inner_query = f"""
-            SELECT {', '.join(inner_select)}
+            SELECT {", ".join(inner_select)}
             FROM {table}
-            WHERE {' AND '.join(conditions)}
+            WHERE {" AND ".join(conditions)}
             {group_by_sql}
         """
 
@@ -545,14 +545,14 @@ class QueryBuilder:
 
             query = f"""
             WITH {ranking_cte}
-            SELECT {', '.join(outer_select)}
+            SELECT {", ".join(outer_select)}
             FROM ({inner_query}) AS agg
             {topk_join}
             ORDER BY {time_bucket_alias} ASC {fill_expr}
             """
         else:
             query = f"""
-            SELECT {', '.join(outer_select)}
+            SELECT {", ".join(outer_select)}
             FROM ({inner_query}) AS agg
             ORDER BY {time_bucket_alias} ASC {fill_expr}
             """
@@ -780,10 +780,7 @@ class QueryBuilder:
         for cte_name in cte_tables:
             if from_parts and ("ModelInferenceDetails" in base_tables or "InferenceFact" in base_tables):
                 # Determine the table alias for join conditions
-                if "InferenceFact" in base_tables:
-                    table_alias = inference_fact_alias
-                else:
-                    table_alias = model_inference_details_alias
+                table_alias = inference_fact_alias if "InferenceFact" in base_tables else model_inference_details_alias
 
                 # If we have base tables, join the CTE
                 # For concurrent_counts CTE, we use LEFT JOIN to handle cases with no concurrency
@@ -869,9 +866,7 @@ class QueryBuilder:
                     else:
                         conditions.append(f"{col_name}='{str(value)}'")
                 else:
-                    raise ValueError(
-                        f"{key} is not a supported filter. Choose from ({', '.join(col_mapping_dict)})"
-                    )
+                    raise ValueError(f"{key} is not a supported filter. Choose from ({', '.join(col_mapping_dict)})")
 
         return conditions
 
@@ -1392,7 +1387,9 @@ class QueryBuilder:
 
             # Get required tables for the metric
             required_tables = [
-                t for t in metric_def.required_tables if t in ["ModelInference", "ModelInferenceDetails", "InferenceFact"]
+                t
+                for t in metric_def.required_tables
+                if t in ["ModelInference", "ModelInferenceDetails", "InferenceFact"]
             ]
 
             # Ensure InferenceFact is included for grouping
