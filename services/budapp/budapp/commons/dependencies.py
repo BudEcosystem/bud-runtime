@@ -214,8 +214,8 @@ async def get_current_active_user_or_internal(
 ) -> User:
     """Resolve the effective user from JWT or Dapr-internal token."""
     if current_user is not None:
-        setattr(current_user, "_is_internal", False)
-        setattr(current_user, "_initiated_by_user_id", current_user.id)
+        current_user._is_internal = False  # type: ignore[attr-defined]
+        current_user._initiated_by_user_id = current_user.id  # type: ignore[attr-defined]
         return current_user
 
     validate_internal_request(request)
@@ -239,8 +239,8 @@ async def get_current_active_user_or_internal(
     if db_user.status != UserStatusEnum.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
-    setattr(db_user, "_is_internal", True)
-    setattr(db_user, "_initiated_by_user_id", user_id)
+    db_user._is_internal = True  # type: ignore[attr-defined]
+    db_user._initiated_by_user_id = user_id  # type: ignore[attr-defined]
     return db_user
 
 
