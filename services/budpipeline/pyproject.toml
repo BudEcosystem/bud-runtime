@@ -81,7 +81,7 @@ cluster_health = "budpipeline.actions.cluster.health:ClusterHealthAction"
 cluster_create = "budpipeline.actions.cluster.create:ClusterCreateAction"
 cluster_delete = "budpipeline.actions.cluster.delete:ClusterDeleteAction"
 
-# Deployment Actions (placeholders)
+# Deployment Actions
 deployment_create = "budpipeline.actions.deployment.create:DeploymentCreateAction"
 deployment_delete = "budpipeline.actions.deployment.delete:DeploymentDeleteAction"
 deployment_autoscale = "budpipeline.actions.deployment.autoscale:DeploymentAutoscaleAction"
