@@ -270,6 +270,42 @@ class QueryBuilder:
     _MAPPING_TABLE_ALIAS = {
         "ModelInference": "mi",
         "ModelInferenceDetails": "mid",
+        "InferenceFact": "ifact",
+    }
+
+    # InferenceFact column mappings (for raw data queries using InferenceFact)
+    _INFERENCE_FACT_MAPPING_COLUMNS = {
+        "model": "ifact.model_id",
+        "project": "ifact.project_id",
+        "endpoint": "ifact.endpoint_id",
+        "user_project": "ifact.api_key_project_id",
+    }
+
+    # Rollup table column mappings (for rollup queries)
+    _ROLLUP_MAPPING_COLUMNS = {
+        "model": "model_id",
+        "project": "project_id",
+        "endpoint": "endpoint_id",
+        "user_project": "api_key_project_id",
+    }
+
+    # Metrics that can be served from rollup tables (pre-aggregated)
+    ROLLUP_COMPATIBLE_METRICS = {
+        "request_count",
+        "success_request",
+        "failure_request",
+        "input_token",
+        "output_token",
+        "cache",
+        "throughput",
+    }
+
+    # Metrics that always require raw data (InferenceFact) for percentiles or timestamps
+    REQUIRES_RAW_DATA_METRICS = {
+        "queuing_time",
+        "concurrent_requests",
+        "latency",  # Requires raw data for p95/p99 percentiles
+        "ttft",  # Requires raw data for p95/p99 percentiles
     }
 
     def __init__(self, performance_metrics: Optional[PerformanceMetrics] = None):
@@ -292,6 +328,413 @@ class QueryBuilder:
             "throughput": self._get_throughput_metrics_definitions,
             "cache": self._get_cache_metrics_definitions,
         }
+
+    def can_use_rollup(self, metrics: list[str]) -> bool:
+        """Check if all requested metrics can be served from rollup tables.
+
+        Rollup tables have pre-aggregated counts and sums but cannot provide:
+        - Percentiles (p95, p99) - need raw latency values
+        - Queuing time - needs raw timestamps
+        - Concurrent requests - needs raw timestamps
+
+        Args:
+            metrics: List of metric types requested
+
+        Returns:
+            True if all metrics can use rollup tables, False otherwise
+        """
+        for metric in metrics:
+            # Metrics that always require raw data
+            if metric in self.REQUIRES_RAW_DATA_METRICS:
+                return False
+            # Check if metric is known and compatible
+            if metric not in self.ROLLUP_COMPATIBLE_METRICS:
+                # Unknown metric - fall back to raw data
+                return False
+        return True
+
+    def _select_rollup_table(
+        self,
+        from_date: datetime,
+        to_date: datetime,
+        frequency_unit: Optional[str] = None,
+    ) -> str:
+        """Select optimal rollup table based on time range and granularity.
+
+        Table selection logic:
+        - InferenceMetrics5m: Recent data (< 6 hours) or hourly frequency
+        - InferenceMetrics1h: Short-term (6 hours - 7 days) or daily frequency
+        - InferenceMetrics1d: Long-term (> 7 days) or weekly/monthly frequency
+
+        Args:
+            from_date: Start of the query time range
+            to_date: End of the query time range
+            frequency_unit: Optional frequency hint (hour, day, week, month)
+
+        Returns:
+            Table name to query
+        """
+        # Frequency-based selection (most accurate)
+        if frequency_unit:
+            if frequency_unit == "hour":
+                return "InferenceMetrics5m"
+            elif frequency_unit == "day":
+                return "InferenceMetrics1h"
+            elif frequency_unit in ("week", "month", "quarter", "year"):
+                return "InferenceMetrics1d"
+
+        # Time range-based selection (fallback)
+        time_range = to_date - from_date
+        total_hours = time_range.total_seconds() / 3600
+
+        if total_hours < 6:
+            return "InferenceMetrics5m"
+        elif time_range.days < 7:
+            return "InferenceMetrics1h"
+        else:
+            return "InferenceMetrics1d"
+
+    def build_rollup_query(
+        self,
+        metrics: list[str],
+        from_date: datetime,
+        to_date: datetime,
+        frequency_unit: str = "day",
+        frequency_interval: Optional[int] = None,
+        filters: Optional[dict[str, Union[list[UUID], UUID]]] = None,
+        group_by: Optional[list[str]] = None,
+        return_delta: bool = False,
+        fill_time_gaps: bool = True,
+        topk: Optional[int] = None,
+    ) -> tuple[str, list[str]]:
+        """Build query against rollup tables (InferenceMetrics5m/1h/1d).
+
+        Uses pre-aggregated data for better performance on large time ranges.
+        Supports delta calculations via window functions and time gap filling.
+
+        Args:
+            metrics: List of metrics to retrieve
+            from_date: Start of the query time range
+            to_date: End of the query time range
+            frequency_unit: Time bucket granularity (hour, day, week, month)
+            frequency_interval: Custom interval value
+            filters: Optional filters (project, model, endpoint)
+            group_by: Optional grouping fields
+            return_delta: Whether to include delta calculations
+            fill_time_gaps: Whether to fill time gaps with zeros
+            topk: Optional limit for top K results
+
+        Returns:
+            Tuple of (query_string, field_order_list)
+        """
+        # Handle optional to_date (default to now)
+        to_date = datetime.now(UTC) if to_date is None else to_date
+
+        # Select appropriate rollup table
+        table = self._select_rollup_table(from_date, to_date, frequency_unit)
+
+        # Build time bucket expression based on frequency and interval
+        time_bucket_expr = self._get_rollup_time_bucket_expr(frequency_unit, frequency_interval, from_date)
+
+        # Build field order list
+        field_order = ["time_bucket"]
+
+        # Add group by fields
+        group_by_fields = []
+        if group_by:
+            for field in group_by:
+                col = self._ROLLUP_MAPPING_COLUMNS.get(field)
+                if col:
+                    group_by_fields.append(col)
+                    field_order.append(col)
+
+        # Add metric aggregations
+        metric_select, metric_fields = self._build_rollup_metric_select(metrics)
+        field_order.extend(metric_fields)
+
+        # Extract SQL aliases from metric_select (e.g., "sum(x) AS alias" -> "alias")
+        metric_sql_aliases = []
+        for clause in metric_select:
+            if " AS " in clause:
+                alias = clause.split(" AS ")[-1].strip()
+                metric_sql_aliases.append(alias)
+
+        # Build WHERE conditions
+        conditions = [
+            f"time_bucket >= '{from_date.strftime(self.datetime_fmt)}'",
+            f"time_bucket <= '{to_date.strftime(self.datetime_fmt)}'",
+        ]
+
+        # Add filter conditions
+        if filters:
+            for key, value in filters.items():
+                col = self._ROLLUP_MAPPING_COLUMNS.get(key.lower())
+                if col:
+                    if isinstance(value, list) and len(value):
+                        conditions.append(f"{col} IN (" + ",".join([f"'{str(v)}'" for v in value]) + ")")
+                    else:
+                        conditions.append(f"{col} = '{str(value)}'")
+
+        # Use a different alias for the time bucket to avoid shadowing the column in WHERE clause
+        # This prevents ClickHouse from resolving time_bucket in WHERE to the alias instead of the column
+        time_bucket_alias = "period_bucket"
+
+        # Build GROUP BY clause for inner query
+        inner_group_by_cols = [time_bucket_alias] + group_by_fields
+        group_by_sql = f"GROUP BY {', '.join(inner_group_by_cols)}"
+
+        # Build inner SELECT fields (aggregation query)
+        inner_select = [f"{time_bucket_expr} AS {time_bucket_alias}"]
+        inner_select.extend(group_by_fields)
+        inner_select.extend(metric_select)
+
+        # Build inner aggregation query
+        inner_query = f"""
+            SELECT {", ".join(inner_select)}
+            FROM {table}
+            WHERE {" AND ".join(conditions)}
+            {group_by_sql}
+        """
+
+        # Build WITH FILL expression for time gap filling
+        fill_expr = ""
+        if fill_time_gaps:
+            frequency = Frequency(frequency_interval, FrequencyUnit(frequency_unit))
+            # For week/month/quarter/year, the time bucket returns Date type, so use toDate()
+            # For hour/day, the time bucket returns DateTime type, so use toDateTime()
+            if frequency_unit in ("week", "month", "quarter", "year"):
+                fill_expr = f"WITH FILL FROM toDate('{from_date.strftime('%Y-%m-%d')}') TO toDate('{to_date.strftime('%Y-%m-%d')}') STEP {frequency.to_clickhouse_interval('asc')}"
+            else:
+                fill_expr = f"WITH FILL FROM toDateTime('{from_date.strftime(self.datetime_fmt)}') TO toDateTime('{to_date.strftime(self.datetime_fmt)}') STEP {frequency.to_clickhouse_interval('asc')}"
+
+        # Build outer SELECT fields (rename period_bucket back to time_bucket for API compatibility)
+        outer_select = [f"{time_bucket_alias} AS time_bucket"]
+        outer_select.extend(group_by_fields)
+        outer_select.extend(metric_sql_aliases)
+
+        # Add delta expressions if requested (use SQL aliases for window functions)
+        if return_delta:
+            # Zip SQL aliases with semantic field names to build delta expressions
+            for sql_alias, semantic_name in zip(metric_sql_aliases, metric_fields, strict=False):
+                delta_clauses, delta_field_names = self._build_rollup_delta_expressions(
+                    sql_alias, semantic_name, time_bucket_alias, group_by_fields if group_by_fields else None
+                )
+                outer_select.extend(delta_clauses)
+                field_order.extend(delta_field_names)
+
+        # Build final query with subquery structure
+        if topk and group_by_fields:
+            # Get primary metric for ranking (first metric or request_count)
+            rank_metric = metric_sql_aliases[0] if metric_sql_aliases else "request_count"
+
+            # Build ranking CTE to identify top K groups
+            topk_group_cols = ", ".join(group_by_fields)
+            ranking_cte = f"""
+            topk_groups AS (
+                SELECT {topk_group_cols}
+                FROM ({inner_query}) AS rank_agg
+                GROUP BY {topk_group_cols}
+                ORDER BY SUM({rank_metric}) DESC
+                LIMIT {topk}
+            )
+            """
+
+            # Build join conditions for topk filtering
+            topk_join_conditions = [f"agg.{col} = tg.{col}" for col in group_by_fields]
+            topk_join = f"INNER JOIN topk_groups tg ON {' AND '.join(topk_join_conditions)}"
+
+            query = f"""
+            WITH {ranking_cte}
+            SELECT {", ".join(outer_select)}
+            FROM ({inner_query}) AS agg
+            {topk_join}
+            ORDER BY {time_bucket_alias} ASC {fill_expr}
+            """
+        else:
+            query = f"""
+            SELECT {", ".join(outer_select)}
+            FROM ({inner_query}) AS agg
+            ORDER BY {time_bucket_alias} ASC {fill_expr}
+            """
+
+        return query, field_order
+
+    def _get_rollup_time_bucket_expr(
+        self,
+        frequency_unit: str,
+        frequency_interval: Optional[int] = None,
+        from_date: Optional[datetime] = None,
+    ) -> str:
+        """Get ClickHouse time bucket expression for rollup queries.
+
+        Args:
+            frequency_unit: Time bucket unit (hour, day, week, etc.)
+            frequency_interval: Custom interval multiplier (e.g., 2 for 2-hour buckets)
+            from_date: Start date for custom interval alignment
+
+        Returns:
+            ClickHouse expression for time bucketing
+        """
+        # If frequency_interval is provided and > 1, use custom interval formula
+        if frequency_interval is not None and frequency_interval > 1 and from_date is not None:
+            # Calculate interval in seconds
+            unit_seconds = {
+                "hour": 3600,
+                "day": 86400,
+                "week": 604800,
+                "month": 2592000,  # Approximate (30 days)
+                "quarter": 7776000,  # Approximate (90 days)
+                "year": 31536000,  # Approximate (365 days)
+            }
+            interval_seconds = frequency_interval * unit_seconds.get(frequency_unit, 86400)
+            from_timestamp = f"toUnixTimestamp('{from_date.strftime('%Y-%m-%d %H:%M:%S')}')"
+
+            # Formula: from_date + floor((timestamp - from_date) / interval) * interval
+            return (
+                f"toDateTime("
+                f"{from_timestamp} + "
+                f"floor((toUnixTimestamp(time_bucket) - {from_timestamp}) / {interval_seconds}) * {interval_seconds}"
+                f")"
+            )
+
+        # Standard functions for single-unit intervals
+        time_bucket_map = {
+            "hour": "toStartOfHour(time_bucket)",
+            "day": "toStartOfDay(time_bucket)",
+            "week": "toMonday(time_bucket)",
+            "month": "toStartOfMonth(time_bucket)",
+            "quarter": "toStartOfQuarter(time_bucket)",
+            "year": "toStartOfYear(time_bucket)",
+        }
+        return time_bucket_map.get(frequency_unit, "toStartOfDay(time_bucket)")
+
+    def _build_rollup_metric_select(self, metrics: list[str]) -> tuple[list[str], list[str]]:
+        """Build SELECT clauses for rollup metrics.
+
+        Maps metric names to rollup table columns with proper aggregations.
+
+        Args:
+            metrics: List of metric types
+
+        Returns:
+            Tuple of (select_clauses, field_names)
+        """
+        select_clauses = []
+        field_names = []
+
+        for metric in metrics:
+            if metric == "request_count":
+                # Use alias 'req_count_sum' to avoid collision with column name 'request_count'
+                select_clauses.append("sum(request_count) AS req_count_sum")
+                field_names.append("request_count")
+
+            elif metric == "success_request":
+                select_clauses.append("sum(success_count) AS success_request_count")
+                select_clauses.append(
+                    "if(sum(request_count) > 0, sum(success_count) * 100.0 / sum(request_count), 0) AS success_rate"
+                )
+                field_names.extend(["success_request_count", "success_rate"])
+
+            elif metric == "failure_request":
+                select_clauses.append("sum(error_count) AS failure_request_count")
+                select_clauses.append(
+                    "if(sum(request_count) > 0, sum(error_count) * 100.0 / sum(request_count), 0) AS failure_rate"
+                )
+                field_names.extend(["failure_request_count", "failure_rate"])
+
+            elif metric == "input_token":
+                select_clauses.append("sum(total_input_tokens) AS input_token_count")
+                field_names.append("input_token_count")
+
+            elif metric == "output_token":
+                select_clauses.append("sum(total_output_tokens) AS output_token_count")
+                field_names.append("output_token_count")
+
+            elif metric == "cache":
+                select_clauses.append("sum(cached_count) AS cache_hit_count")
+                select_clauses.append(
+                    "if(sum(request_count) > 0, sum(cached_count) * 100.0 / sum(request_count), 0) AS cache_hit_rate"
+                )
+                field_names.extend(["cache_hit_count", "cache_hit_rate"])
+
+            elif metric == "latency":
+                # Average latency from sum/count
+                select_clauses.append(
+                    "if(sum(request_count) > 0, sum(sum_response_time_ms) / sum(request_count), 0) AS avg_latency_ms"
+                )
+                select_clauses.append("min(min_response_time_ms) AS min_latency_ms")
+                select_clauses.append("max(max_response_time_ms) AS max_latency_ms")
+                field_names.extend(["avg_latency_ms", "min_latency_ms", "max_latency_ms"])
+
+            elif metric == "ttft":
+                # Average TTFT from sum/count
+                select_clauses.append(
+                    "if(sum(request_count) > 0, sum(sum_ttft_ms) / sum(request_count), 0) AS avg_ttft_ms"
+                )
+                field_names.append("avg_ttft_ms")
+
+            elif metric == "throughput":
+                # Weighted average throughput: total output tokens / total response time
+                select_clauses.append(
+                    "if(sum(sum_response_time_ms) > 0, "
+                    "sum(total_output_tokens) * 1000.0 / sum(sum_response_time_ms), 0) "
+                    "AS avg_throughput_tokens_per_sec"
+                )
+                field_names.append("avg_throughput_tokens_per_sec")
+
+        return select_clauses, field_names
+
+    def _build_rollup_delta_expressions(
+        self,
+        sql_alias: str,
+        semantic_name: str,
+        time_bucket_alias: str,
+        group_by_fields: Optional[list[str]] = None,
+    ) -> tuple[list[str], list[str]]:
+        """Build delta window function expressions for rollup queries.
+
+        Uses lagInFrame to calculate previous value, delta, and percent change
+        for time series metrics.
+
+        Args:
+            sql_alias: The SQL column alias from inner query (e.g., 'req_count_sum')
+            semantic_name: The semantic field name for API response (e.g., 'request_count')
+            time_bucket_alias: The time bucket column alias
+            group_by_fields: Optional list of grouping fields for PARTITION BY
+
+        Returns:
+            Tuple of (select_clauses, field_names)
+        """
+        # SQL aliases use the actual column name from inner query
+        sql_previous = f"previous_{sql_alias}"
+        sql_delta = f"{sql_alias}_delta"
+        sql_percent = f"{sql_alias}_percent_change"
+
+        # Semantic field names use the API field name for field_order
+        semantic_previous = f"previous_{semantic_name}"
+        semantic_delta = f"{semantic_name}_delta"
+        semantic_percent = f"{semantic_name}_percent_change"
+
+        # Build PARTITION BY clause if grouping
+        partition_clause = ""
+        if group_by_fields:
+            partition_clause = f"PARTITION BY {', '.join(group_by_fields)} "
+
+        window_spec = (
+            f"OVER ({partition_clause}ORDER BY {time_bucket_alias} ASC "
+            f"ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)"
+        )
+
+        # SQL clauses use SQL aliases for the actual query
+        select_clauses = [
+            f"lagInFrame({sql_alias}, 1, {sql_alias}) {window_spec} AS {sql_previous}",
+            f"COALESCE(ROUND({sql_alias} - {sql_previous}, 2)) AS {sql_delta}",
+            f"COALESCE(ROUND(({sql_delta} / NULLIF({sql_previous}, 0)) * 100, 2)) AS {sql_percent}",
+        ]
+
+        # Field names use semantic names for the services layer to map correctly
+        field_names = [semantic_previous, semantic_delta, semantic_percent]
+        return select_clauses, field_names
 
     def _get_table_join_clause(
         self,
@@ -329,13 +772,19 @@ class QueryBuilder:
             from_parts.append(f"ModelInference {self._MAPPING_TABLE_ALIAS['ModelInference']}")
         elif "ModelInferenceDetails" in base_tables:
             from_parts.append(f"ModelInferenceDetails {self._MAPPING_TABLE_ALIAS['ModelInferenceDetails']}")
+        elif "InferenceFact" in base_tables:
+            from_parts.append(f"InferenceFact {self._MAPPING_TABLE_ALIAS['InferenceFact']}")
 
         # Add CTEs as joins
+        inference_fact_alias = self._MAPPING_TABLE_ALIAS["InferenceFact"]
         for cte_name in cte_tables:
-            if from_parts and "ModelInferenceDetails" in base_tables:
+            if from_parts and ("ModelInferenceDetails" in base_tables or "InferenceFact" in base_tables):
+                # Determine the table alias for join conditions
+                table_alias = inference_fact_alias if "InferenceFact" in base_tables else model_inference_details_alias
+
                 # If we have base tables, join the CTE
                 # For concurrent_counts CTE, we use LEFT JOIN to handle cases with no concurrency
-                join_conditions = [f"cc.request_arrival_time = {model_inference_details_alias}.request_arrival_time"]
+                join_conditions = [f"cc.request_arrival_time = {table_alias}.request_arrival_time"]
 
                 # Add group by fields to join conditions
                 if group_by_fields:
@@ -380,7 +829,13 @@ class QueryBuilder:
         conditions = []
 
         if include_date_filters:
-            time_field = "mid.request_arrival_time" if "ModelInferenceDetails" in required_tables else "mi.timestamp"
+            # Determine time field based on table being used
+            if "InferenceFact" in required_tables:
+                time_field = "ifact.request_arrival_time"
+            elif "ModelInferenceDetails" in required_tables:
+                time_field = "mid.request_arrival_time"
+            else:
+                time_field = "mi.timestamp"
 
             # Remove prefix if not needed (for CTEs)
             if not include_table_prefix:
@@ -390,8 +845,14 @@ class QueryBuilder:
             conditions.append(f"{time_field} <= '{to_date.strftime(self.datetime_fmt)}'")
 
         if filters is not None:
+            # Choose column mapping based on table being used
+            if "InferenceFact" in required_tables:
+                col_mapping_dict = self._INFERENCE_FACT_MAPPING_COLUMNS
+            else:
+                col_mapping_dict = self._MAPPING_COLUMNS
+
             for key, value in filters.items():
-                if col_mapping := self._MAPPING_COLUMNS.get(key.lower(), None):
+                if col_mapping := col_mapping_dict.get(key.lower(), None):
                     if not value:
                         raise ValueError(
                             f"{key} filter expected type list[UUID] or UUID, but got type {type(value).__name__}"
@@ -405,23 +866,24 @@ class QueryBuilder:
                     else:
                         conditions.append(f"{col_name}='{str(value)}'")
                 else:
-                    raise ValueError(
-                        f"{key} is not a supported filter. Choose from ({', '.join(self._MAPPING_COLUMNS)})"
-                    )
+                    raise ValueError(f"{key} is not a supported filter. Choose from ({', '.join(col_mapping_dict)})")
 
         return conditions
 
-    def _get_group_by_fields(self, fields: Optional[list[str]]):
+    def _get_group_by_fields(self, fields: Optional[list[str]], use_inference_fact: bool = False):
         if not fields:
             return []
 
+        # Choose column mapping based on table being used
+        col_mapping_dict = self._INFERENCE_FACT_MAPPING_COLUMNS if use_inference_fact else self._MAPPING_COLUMNS
+
         group_by_fields = []
         for field in fields:
-            if value := self._MAPPING_COLUMNS.get(field):
+            if value := col_mapping_dict.get(field):
                 group_by_fields.append(value)
             else:
                 raise ValueError(
-                    f"{field} is not a supported field for grouping. Choose from ({', '.join(self._MAPPING_COLUMNS)})"
+                    f"{field} is not a supported field for grouping. Choose from ({', '.join(col_mapping_dict)})"
                 )
 
         return group_by_fields
@@ -438,8 +900,8 @@ class QueryBuilder:
         req_count_alias = "request_count"
         metric = MetricDefinition(
             metrics_name="request_count",
-            required_tables=["ModelInferenceDetails"],
-            select_clause=f"COUNT(mid.inference_id) AS {req_count_alias}",
+            required_tables=["InferenceFact"],
+            select_clause=f"COUNT(ifact.inference_id) AS {req_count_alias}",
             select_alias=req_count_alias,
         )
         metric_delta = []
@@ -461,14 +923,14 @@ class QueryBuilder:
         metrics = [
             MetricDefinition(
                 metrics_name="success_request",
-                required_tables=["ModelInferenceDetails"],
-                select_clause=f"SUM(CASE WHEN mid.is_success THEN 1 ELSE 0 END) AS {success_req_count_alias}",
+                required_tables=["InferenceFact"],
+                select_clause=f"SUM(CASE WHEN ifact.is_success THEN 1 ELSE 0 END) AS {success_req_count_alias}",
                 select_alias=success_req_count_alias,
             ),
             MetricDefinition(
                 metrics_name="success_request",
-                required_tables=["ModelInferenceDetails"],
-                select_clause="AVG(CASE WHEN mid.is_success THEN 1 ELSE 0 END) * 100 AS success_rate",
+                required_tables=["InferenceFact"],
+                select_clause="AVG(CASE WHEN ifact.is_success THEN 1 ELSE 0 END) * 100 AS success_rate",
                 select_alias="success_rate",
             ),
         ]
@@ -493,14 +955,14 @@ class QueryBuilder:
         metrics = [
             MetricDefinition(
                 metrics_name="failure_request",
-                required_tables=["ModelInferenceDetails"],
-                select_clause=f"SUM(CASE WHEN NOT mid.is_success THEN 1 ELSE 0 END) AS {failure_req_count_alias}",
+                required_tables=["InferenceFact"],
+                select_clause=f"SUM(CASE WHEN NOT ifact.is_success THEN 1 ELSE 0 END) AS {failure_req_count_alias}",
                 select_alias=failure_req_count_alias,
             ),
             MetricDefinition(
                 metrics_name="failure_request",
-                required_tables=["ModelInferenceDetails"],
-                select_clause="AVG(CASE WHEN NOT mid.is_success THEN 1 ELSE 0 END) * 100 AS failure_rate",
+                required_tables=["InferenceFact"],
+                select_clause="AVG(CASE WHEN NOT ifact.is_success THEN 1 ELSE 0 END) * 100 AS failure_rate",
                 select_alias="failure_rate",
             ),
         ]
@@ -524,8 +986,8 @@ class QueryBuilder:
         queuing_time_alias = "avg_queuing_time_ms"
         metric = MetricDefinition(
             metrics_name="queuing_time",
-            required_tables=["ModelInferenceDetails"],
-            select_clause=f"AVG(toUnixTimestamp(mid.request_forward_time) - toUnixTimestamp(mid.request_arrival_time)) * 1000 AS {queuing_time_alias}",
+            required_tables=["InferenceFact"],
+            select_clause=f"AVG(toUnixTimestamp64Milli(ifact.request_forward_time) - toUnixTimestamp64Milli(ifact.request_arrival_time)) AS {queuing_time_alias}",
             select_alias=queuing_time_alias,
             topk_sort_order="ASC",  # Lower queuing time is better
         )
@@ -549,8 +1011,8 @@ class QueryBuilder:
         input_token_alias = "input_token_count"
         metric = MetricDefinition(
             metrics_name="input_token",
-            required_tables=["ModelInference"],
-            select_clause=f"SUM(mi.input_tokens) AS {input_token_alias}",
+            required_tables=["InferenceFact"],
+            select_clause=f"SUM(ifact.input_tokens) AS {input_token_alias}",
             select_alias=input_token_alias,
         )
         metric_delta = []
@@ -573,8 +1035,8 @@ class QueryBuilder:
         output_token_alias = "output_token_count"
         metric = MetricDefinition(
             metrics_name="output_token",
-            required_tables=["ModelInference"],
-            select_clause=f"SUM(mi.output_tokens) AS {output_token_alias}",
+            required_tables=["InferenceFact"],
+            select_clause=f"SUM(ifact.output_tokens) AS {output_token_alias}",
             select_alias=output_token_alias,
         )
         metric_delta = []
@@ -614,7 +1076,7 @@ class QueryBuilder:
             SELECT
                 {", ".join(select_columns)},
                 COUNT(*) as concurrent_count
-            FROM ModelInferenceDetails
+            FROM InferenceFact
             WHERE request_arrival_time >= '{{from_date}}'
               AND request_arrival_time <= '{{to_date}}'
               {{filters}}
@@ -625,7 +1087,7 @@ class QueryBuilder:
         cte_def = CTEDefinition(
             name="concurrent_counts",
             query=cte_template,
-            base_tables=["ModelInferenceDetails"],
+            base_tables=["InferenceFact"],
             is_template=True,
         )
 
@@ -636,7 +1098,7 @@ class QueryBuilder:
                 SELECT
                     {", ".join(select_columns)},
                     COUNT(*) as concurrent_count
-                FROM ModelInferenceDetails
+                FROM InferenceFact
                 WHERE request_arrival_time >= '{{from_date}}'
                   AND request_arrival_time <= '{{to_date}}'
                   {{filters}}
@@ -650,7 +1112,7 @@ class QueryBuilder:
         # Use COALESCE to return 0 when no concurrent requests exist
         metric = MetricDefinition(
             metrics_name="concurrent_requests",
-            required_tables=["ModelInferenceDetails", "concurrent_counts"],
+            required_tables=["InferenceFact", "concurrent_counts"],
             select_clause=f"COALESCE(MAX(cc.concurrent_count), 0) AS {concurrent_alias}",
             select_alias=concurrent_alias,
             cte_definition=cte_def,
@@ -677,21 +1139,21 @@ class QueryBuilder:
         metrics = [
             MetricDefinition(
                 metrics_name="ttft",
-                required_tables=["ModelInference"],
-                select_clause=f"AVG(mi.ttft_ms) AS {ttft_alias}",
+                required_tables=["InferenceFact"],
+                select_clause=f"AVG(ifact.ttft_ms) AS {ttft_alias}",
                 select_alias=ttft_alias,
                 topk_sort_order="ASC",  # Lower TTFT is better
             ),
             MetricDefinition(
                 metrics_name="ttft_p99",
-                required_tables=["ModelInference"],
-                select_clause="quantile(0.99)(mi.ttft_ms) AS ttft_p99",
+                required_tables=["InferenceFact"],
+                select_clause="quantile(0.99)(ifact.ttft_ms) AS ttft_p99",
                 select_alias="ttft_p99",
             ),
             MetricDefinition(
                 metrics_name="ttft_p95",
-                required_tables=["ModelInference"],
-                select_clause="quantile(0.95)(mi.ttft_ms) AS ttft_p95",
+                required_tables=["InferenceFact"],
+                select_clause="quantile(0.95)(ifact.ttft_ms) AS ttft_p95",
                 select_alias="ttft_p95",
             ),
         ]
@@ -714,21 +1176,21 @@ class QueryBuilder:
         metrics = [
             MetricDefinition(
                 metrics_name="latency",
-                required_tables=["ModelInference"],
-                select_clause=f"AVG(mi.response_time_ms) AS {latency_alias}",
+                required_tables=["InferenceFact"],
+                select_clause=f"AVG(ifact.response_time_ms) AS {latency_alias}",
                 select_alias=latency_alias,
                 topk_sort_order="ASC",  # Lower latency is better
             ),
             MetricDefinition(
                 metrics_name="latency_p99",
-                required_tables=["ModelInference"],
-                select_clause="quantile(0.99)(mi.response_time_ms) AS latency_p99",
+                required_tables=["InferenceFact"],
+                select_clause="quantile(0.99)(ifact.response_time_ms) AS latency_p99",
                 select_alias="latency_p99",
             ),
             MetricDefinition(
                 metrics_name="latency_p95",
-                required_tables=["ModelInference"],
-                select_clause="quantile(0.95)(mi.response_time_ms) AS latency_p95",
+                required_tables=["InferenceFact"],
+                select_clause="quantile(0.95)(ifact.response_time_ms) AS latency_p95",
                 select_alias="latency_p95",
             ),
         ]
@@ -750,8 +1212,8 @@ class QueryBuilder:
         throughput_alias = "avg_throughput_tokens_per_sec"
         metric = MetricDefinition(
             metrics_name="throughput",
-            required_tables=["ModelInference"],
-            select_clause=f"AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) AS {throughput_alias}",
+            required_tables=["InferenceFact"],
+            select_clause=f"AVG(ifact.output_tokens * 1000.0 / NULLIF(ifact.response_time_ms, 0)) AS {throughput_alias}",
             select_alias=throughput_alias,
         )
         metric_delta = []
@@ -776,20 +1238,20 @@ class QueryBuilder:
         metrics = [
             MetricDefinition(
                 metrics_name="cache_hit_rate",
-                required_tables=["ModelInference"],
-                select_clause=f"AVG(CASE WHEN mi.cached THEN 1 ELSE 0 END) * 100 AS {cache_hit_rate_alias}",
+                required_tables=["InferenceFact"],
+                select_clause=f"AVG(CASE WHEN ifact.cached THEN 1 ELSE 0 END) * 100 AS {cache_hit_rate_alias}",
                 select_alias=cache_hit_rate_alias,
             ),
             MetricDefinition(
                 metrics_name="cache_hit_count",
-                required_tables=["ModelInference"],
-                select_clause=f"SUM(CASE WHEN mi.cached THEN 1 ELSE 0 END) AS {cache_hit_count_alias}",
+                required_tables=["InferenceFact"],
+                select_clause=f"SUM(CASE WHEN ifact.cached THEN 1 ELSE 0 END) AS {cache_hit_count_alias}",
                 select_alias=cache_hit_count_alias,
             ),
             MetricDefinition(
                 metrics_name="cache_latency",
-                required_tables=["ModelInference"],
-                select_clause="AVG(CASE WHEN mi.cached THEN mi.response_time_ms END) AS avg_cache_latency_ms",
+                required_tables=["InferenceFact"],
+                select_clause="AVG(CASE WHEN ifact.cached THEN ifact.response_time_ms END) AS avg_cache_latency_ms",
                 select_alias="avg_cache_latency_ms",
             ),
         ]
@@ -820,19 +1282,19 @@ class QueryBuilder:
         return [
             MetricDefinition(
                 metrics_name=lag_in_frame_alias,
-                required_tables=["ModelInferenceDetails"],
+                required_tables=["InferenceFact"],
                 select_clause=lag_in_frame_query,
                 select_alias=lag_in_frame_alias,
             ),
             MetricDefinition(
                 metrics_name=delta_alias,
-                required_tables=["ModelInferenceDetails"],
+                required_tables=["InferenceFact"],
                 select_clause=f"COALESCE(ROUND({metrics_alias_or_column} - {lag_in_frame_alias}, 2)) AS {delta_alias}",
                 select_alias=delta_alias,
             ),
             MetricDefinition(
                 metrics_name=p_change_alias,
-                required_tables=["ModelInferenceDetails"],
+                required_tables=["InferenceFact"],
                 select_clause=f"COALESCE(ROUND(({delta_alias} / {lag_in_frame_alias}) * 100, 2)) AS {p_change_alias}",
                 select_alias=p_change_alias,
             ),
@@ -848,7 +1310,7 @@ class QueryBuilder:
 
         # Get filter conditions without table prefixes and without date filters
         filter_conditions = self._get_filter_conditions(
-            required_tables=["ModelInferenceDetails"],  # Dummy, just to satisfy the function
+            required_tables=["InferenceFact"],  # Dummy, just to satisfy the function
             from_date=datetime.now(),  # Dummy dates
             to_date=datetime.now(),
             filters=filters,
@@ -925,12 +1387,14 @@ class QueryBuilder:
 
             # Get required tables for the metric
             required_tables = [
-                t for t in metric_def.required_tables if t in ["ModelInference", "ModelInferenceDetails"]
+                t
+                for t in metric_def.required_tables
+                if t in ["ModelInference", "ModelInferenceDetails", "InferenceFact"]
             ]
 
-            # Ensure ModelInferenceDetails is included for grouping
-            if "ModelInferenceDetails" not in required_tables:
-                required_tables.append("ModelInferenceDetails")
+            # Ensure InferenceFact is included for grouping
+            if "InferenceFact" not in required_tables:
+                required_tables.append("InferenceFact")
 
             # Build the FROM clause
             from_clause = self._get_table_join_clause(required_tables, {}, [])
@@ -940,8 +1404,8 @@ class QueryBuilder:
             ranking_query = f"""(
                 SELECT {", ".join(topk_group_cols_without_alias)}, {ranking_metric} as rank_value
                 {from_clause}
-                WHERE mid.request_arrival_time >= '{from_date}'
-                  AND mid.request_arrival_time <= '{(to_date)}'
+                WHERE ifact.request_arrival_time >= '{from_date}'
+                  AND ifact.request_arrival_time <= '{(to_date)}'
                   {filters_clause}
                 GROUP BY {", ".join(topk_group_cols_without_alias)}
             )"""
@@ -950,9 +1414,9 @@ class QueryBuilder:
             filters_clause = self._build_filter_clause(filters) if filters else ""
             ranking_query = f"""(
                 SELECT {", ".join(topk_group_cols_without_alias)}, COUNT(*) as rank_value
-                FROM ModelInferenceDetails mid
-                WHERE mid.request_arrival_time >= '{from_date}'
-                  AND mid.request_arrival_time <= '{(to_date)}'
+                FROM InferenceFact inf
+                WHERE ifact.request_arrival_time >= '{from_date}'
+                  AND ifact.request_arrival_time <= '{(to_date)}'
                   {filters_clause}
                 GROUP BY {", ".join(topk_group_cols_without_alias)}
             )"""
@@ -1047,7 +1511,7 @@ class QueryBuilder:
         time_bucket_alias = "time_bucket"
 
         group_by = group_by or []
-        group_fields = self._get_group_by_fields(group_by)
+        group_fields = self._get_group_by_fields(group_by, use_inference_fact=True)
 
         select_parts = []
         select_field_order = []
@@ -1081,14 +1545,16 @@ class QueryBuilder:
 
         required_tables = list(set(required_tables))
 
-        if group_by and "ModelInferenceDetails" not in required_tables:
-            required_tables.append("ModelInferenceDetails")
+        if group_by and "InferenceFact" not in required_tables:
+            required_tables.append("InferenceFact")
 
-        time_column = (
-            f"{self._MAPPING_TABLE_ALIAS['ModelInferenceDetails']}.request_arrival_time"
-            if "ModelInferenceDetails" in required_tables
-            else "ModelInference"
-        )
+        # Determine time column based on table being used
+        if "InferenceFact" in required_tables:
+            time_column = f"{self._MAPPING_TABLE_ALIAS['InferenceFact']}.request_arrival_time"
+        elif "ModelInferenceDetails" in required_tables:
+            time_column = f"{self._MAPPING_TABLE_ALIAS['ModelInferenceDetails']}.request_arrival_time"
+        else:
+            time_column = "mi.timestamp"
         time_bucket_expr = self.time_helper.get_time_bucket_expression(frequency, time_column, from_date)
         time_bucket_expr += f" AS {time_bucket_alias}"
 
@@ -1096,7 +1562,9 @@ class QueryBuilder:
 
         group_by_parts = [time_bucket_alias, *group_fields]
         select_parts = [time_bucket_expr, *group_fields, *select_parts]
-        select_field_order = [time_bucket_alias, *group_by, *select_field_order]
+        # Extract column names from group_fields (e.g., "mi.project_id" -> "project_id")
+        group_by_col_names = [field.split(".")[-1] for field in group_fields]
+        select_field_order = [time_bucket_alias, *group_by_col_names, *select_field_order]
 
         fill_expr = ""
         if fill_time_gaps:
@@ -1123,8 +1591,7 @@ class QueryBuilder:
                 # Build JOIN clause instead of WHERE subquery to avoid asynch driver issues
                 # The asynch library cannot handle nested subqueries in WHERE clauses
                 topk_join_conditions = []
-                for group_field in group_by:
-                    col = self._MAPPING_COLUMNS[group_field]
+                for col in group_fields:
                     col_name = col.split(".")[-1]
                     topk_join_conditions.append(f"{col} = te.{col_name}")
                 topk_join_clause = f"INNER JOIN topk_entities te ON {' AND '.join(topk_join_conditions)}"

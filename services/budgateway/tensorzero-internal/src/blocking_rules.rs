@@ -581,6 +581,12 @@ impl BlockingRulesManager {
         client_ip: &str,
         country_code: Option<&str>,
         user_agent: Option<&str>,
+        request_path: &str,
+        request_method: &str,
+        api_key_id: Option<String>,
+        project_id: Option<Uuid>,
+        endpoint_id: Option<Uuid>,
+        model_name: Option<String>,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
         debug!(
             "should_block called with: ip={}, country={:?}, user_agent={:?}",
@@ -702,7 +708,19 @@ impl BlockingRulesManager {
                     debug!("MATCH FOUND: Global rule '{}' matched!", rule.name);
                     // Record metrics and return blocked result
                     return self
-                        .handle_rule_match(rule, client_ip, country_code, "global")
+                        .handle_rule_match(
+                            rule,
+                            client_ip,
+                            country_code,
+                            user_agent,
+                            request_path,
+                            request_method,
+                            api_key_id.clone(),
+                            project_id,
+                            endpoint_id,
+                            model_name.clone(),
+                            "global",
+                        )
                         .await;
                 } else {
                     debug!("No match for global rule '{}'", rule.name);
@@ -726,6 +744,13 @@ impl BlockingRulesManager {
         rule: &BlockingRule,
         client_ip: &str,
         country_code: Option<&str>,
+        user_agent: Option<&str>,
+        request_path: &str,
+        request_method: &str,
+        api_key_id: Option<String>,
+        project_id: Option<Uuid>,
+        endpoint_id: Option<Uuid>,
+        model_name: Option<String>,
         scope: &str,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
         counter!("blocking_rules_matched",
@@ -785,19 +810,28 @@ impl BlockingRulesManager {
             let rule_clone = rule.clone();
             let client_ip_clone = client_ip.to_string();
             let country_code_clone = country_code.map(|s| s.to_string());
+            let user_agent_clone = user_agent.map(|s| s.to_string());
+            let request_path_clone = request_path.to_string();
+            let request_method_clone = request_method.to_string();
             let reason_clone = reason.clone();
 
             tokio::spawn(async move {
-                let blocking_event = GatewayBlockingEventDatabaseInsert::new(
+                let mut blocking_event = GatewayBlockingEventDatabaseInsert::new(
                     rule_clone.id,
                     &rule_clone,
                     client_ip_clone,
                     country_code_clone,
-                    None,                  // user_agent: TODO - need to pass from caller
-                    "unknown".to_string(), // request_path: TODO - need to pass from caller
-                    "unknown".to_string(), // request_method: TODO - need to pass from caller
+                    user_agent_clone,      // Now populated (was TODO)
+                    request_path_clone,    // Now populated (was TODO)
+                    request_method_clone,  // Now populated (was TODO)
                     reason_clone,
                 );
+
+                // Set optional fields if available
+                blocking_event.api_key_id = api_key_id;
+                blocking_event.project_id = project_id;
+                blocking_event.endpoint_id = endpoint_id;
+                blocking_event.model_name = model_name;
 
                 if let Err(e) =
                     write_blocking_event_to_clickhouse(&clickhouse, blocking_event).await

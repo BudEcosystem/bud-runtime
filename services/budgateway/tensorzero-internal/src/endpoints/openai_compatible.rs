@@ -749,7 +749,14 @@ pub async fn inference_handler(
         analytics.as_ref().map(|ext| ext.0.clone()),
         inference_batcher.clone(),
     )
-    .await?;
+    .await
+    .map_err(|(err, failure_data)| {
+        // NEW: Record model_inference span attributes if failure data available
+        if let Some(failure_model_inference) = failure_data {
+            super::observability::record_error_model_inference(&failure_model_inference);
+        }
+        err // Return original error
+    })?;
 
     match response {
         InferenceOutput::NonStreaming {

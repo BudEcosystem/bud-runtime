@@ -95,10 +95,24 @@ pub async fn analytics_middleware(
         // Error details (from HTTP status)
         gateway_analytics.error_type = tracing::field::Empty,
         gateway_analytics.error_message = tracing::field::Empty,
-        // Blocking
-        gateway_analytics.is_blocked = tracing::field::Empty,
-        gateway_analytics.block_reason = tracing::field::Empty,
-        gateway_analytics.block_rule_id = tracing::field::Empty,
+        // Blocking events (all 17 GatewayBlockingEvents table columns)
+        gateway_blocking_events.id = tracing::field::Empty,
+        gateway_blocking_events.rule_id = tracing::field::Empty,
+        gateway_blocking_events.client_ip = tracing::field::Empty,
+        gateway_blocking_events.country_code = tracing::field::Empty,
+        gateway_blocking_events.user_agent = tracing::field::Empty,
+        gateway_blocking_events.request_path = tracing::field::Empty,
+        gateway_blocking_events.request_method = tracing::field::Empty,
+        gateway_blocking_events.api_key_id = tracing::field::Empty,
+        gateway_blocking_events.project_id = tracing::field::Empty,
+        gateway_blocking_events.endpoint_id = tracing::field::Empty,
+        gateway_blocking_events.model_name = tracing::field::Empty,
+        gateway_blocking_events.rule_type = tracing::field::Empty,
+        gateway_blocking_events.rule_name = tracing::field::Empty,
+        gateway_blocking_events.rule_priority = tracing::field::Empty,
+        gateway_blocking_events.block_reason = tracing::field::Empty,
+        gateway_blocking_events.action_taken = tracing::field::Empty,
+        gateway_blocking_events.blocked_at = tracing::field::Empty,
         // Tags
         gateway_analytics.tags = tracing::field::Empty,
         // Prompt (for /v1/responses with prompt parameter)
@@ -360,15 +374,13 @@ pub async fn analytics_middleware(
             }
         }
 
-        // Check if request was blocked
-        if response.status() == StatusCode::FORBIDDEN
-            || response.status() == StatusCode::TOO_MANY_REQUESTS
+        // Fallback blocking detection from status codes (when blocking_event not populated by middleware)
+        if (response.status() == StatusCode::FORBIDDEN
+            || response.status() == StatusCode::TOO_MANY_REQUESTS)
+            && analytics.record.blocking_event.is_none()
         {
+            // Legacy fallback - only set is_blocked flag without full event data
             analytics.record.is_blocked = true;
-            // Block reason might be in a custom header or response body
-            if let Some(reason) = response.headers().get("x-block-reason") {
-                analytics.record.block_reason = reason.to_str().ok().map(|s| s.to_string());
-            }
         }
 
         // Record post-response span attributes (after all response data is captured)
@@ -575,13 +587,53 @@ fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAn
         span.record("gateway_analytics.error_message", error_message.as_str());
     }
 
-    // Blocking
+    // Blocking events - record all 17 GatewayBlockingEvents table columns
     span.record("gateway_analytics.is_blocked", record.is_blocked);
-    if let Some(ref block_reason) = record.block_reason {
-        span.record("gateway_analytics.block_reason", block_reason.as_str());
-    }
-    if let Some(ref block_rule_id) = record.block_rule_id {
-        span.record("gateway_analytics.block_rule_id", block_rule_id.as_str());
+
+    if let Some(ref blocking_event) = record.blocking_event {
+        // Event identifiers (unique fields from BlockingEventData)
+        span.record("gateway_blocking_events.id", blocking_event.id.to_string().as_str());
+        span.record("gateway_blocking_events.rule_id", blocking_event.rule_id.to_string().as_str());
+
+        // Client information (from analytics record - overlapping fields)
+        span.record("gateway_blocking_events.client_ip", record.client_ip.as_str());
+        if let Some(ref country_code) = record.country_code {
+            span.record("gateway_blocking_events.country_code", country_code.as_str());
+        }
+        if let Some(ref user_agent) = record.user_agent {
+            span.record("gateway_blocking_events.user_agent", user_agent.as_str());
+        }
+
+        // Request context (from analytics record - overlapping fields)
+        span.record("gateway_blocking_events.request_path", record.path.as_str());
+        span.record("gateway_blocking_events.request_method", record.method.as_str());
+        if let Some(ref api_key_id) = record.api_key_id {
+            span.record("gateway_blocking_events.api_key_id", api_key_id.as_str());
+        }
+
+        // Project/endpoint context (from analytics record - overlapping fields)
+        if let Some(project_id) = record.project_id {
+            span.record("gateway_blocking_events.project_id", project_id.to_string().as_str());
+        }
+        if let Some(endpoint_id) = record.endpoint_id {
+            span.record("gateway_blocking_events.endpoint_id", endpoint_id.to_string().as_str());
+        }
+        if let Some(ref model_name) = record.model_name {
+            span.record("gateway_blocking_events.model_name", model_name.as_str());
+        }
+
+        // Rule information (unique fields from BlockingEventData)
+        span.record("gateway_blocking_events.rule_type", blocking_event.rule_type.as_str());
+        span.record("gateway_blocking_events.rule_name", blocking_event.rule_name.as_str());
+        span.record("gateway_blocking_events.rule_priority", blocking_event.rule_priority as i64);
+
+        // Block details (unique fields from BlockingEventData)
+        span.record("gateway_blocking_events.block_reason", blocking_event.block_reason.as_str());
+        span.record("gateway_blocking_events.action_taken", blocking_event.action_taken.as_str());
+
+        // Timing (unique field from BlockingEventData)
+        let blocked_at_formatted = blocking_event.blocked_at.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
+        span.record("gateway_blocking_events.blocked_at", blocked_at_formatted.as_str());
     }
 
     // Tags
