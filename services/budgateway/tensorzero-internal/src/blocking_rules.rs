@@ -299,20 +299,8 @@ impl BlockingRulesManager {
     /// * `key_suffix` - The key suffix (e.g., "global", "endpoint:uuid") to reload,
     ///   or None to reload all rules
     pub async fn invalidate_and_reload(&self, key_suffix: Option<&str>) {
-        match key_suffix {
-            Some(suffix) if suffix == "global" || suffix.is_empty() => {
-                // Invalidate global rules cache
-                info!("Invalidating global blocking rules cache due to Redis update");
-                self.global_rules_loaded.store(false, Ordering::Release);
-
-                // Immediately reload from Redis
-                if let Err(e) = self.load_rules("global").await {
-                    warn!("Failed to reload global blocking rules: {}", e);
-                } else {
-                    info!("Successfully reloaded global blocking rules from Redis");
-                }
-            }
-            Some(suffix) if suffix.starts_with("endpoint:") => {
+        if let Some(suffix) = key_suffix {
+            if suffix.starts_with("endpoint:") {
                 // For endpoint-specific rules, we currently don't cache them separately
                 // They are loaded on-demand, so just log the update
                 info!(
@@ -321,28 +309,27 @@ impl BlockingRulesManager {
                 );
                 // Note: Endpoint rules are loaded on-demand in should_block()
                 // so no explicit cache invalidation is needed here
-            }
-            Some(suffix) => {
+                return;
+            } else if suffix == "global" || suffix.is_empty() {
+                info!("Invalidating global blocking rules cache due to Redis update");
+            } else {
                 // Unknown suffix - invalidate global rules as a fallback
                 info!(
                     "Unknown blocking rules key suffix '{}', invalidating global rules",
                     suffix
                 );
-                self.global_rules_loaded.store(false, Ordering::Release);
-                if let Err(e) = self.load_rules("global").await {
-                    warn!("Failed to reload global blocking rules: {}", e);
-                }
             }
-            None => {
-                // Invalidate all rules
-                info!("Invalidating all blocking rules cache");
-                self.global_rules_loaded.store(false, Ordering::Release);
-                if let Err(e) = self.load_rules("global").await {
-                    warn!("Failed to reload global blocking rules: {}", e);
-                } else {
-                    info!("Successfully reloaded global blocking rules from Redis");
-                }
-            }
+        } else {
+            // Invalidate all rules
+            info!("Invalidating all blocking rules cache");
+        }
+
+        // Common logic for reloading global rules
+        self.global_rules_loaded.store(false, Ordering::Release);
+        if let Err(e) = self.load_rules("global").await {
+            warn!("Failed to reload global blocking rules: {}", e);
+        } else {
+            info!("Successfully reloaded global blocking rules from Redis");
         }
     }
 
@@ -350,29 +337,25 @@ impl BlockingRulesManager {
     ///
     /// This method clears the cached rules and resets the loaded flag.
     pub async fn clear_rules_cache(&self, key_suffix: Option<&str>) {
-        match key_suffix {
-            Some(suffix) if suffix == "global" || suffix.is_empty() => {
+        if let Some(suffix) = key_suffix {
+            if suffix == "global" || suffix.is_empty() {
                 info!("Clearing global blocking rules cache due to Redis deletion");
-                self.global_rules_loaded.store(false, Ordering::Release);
-                // Clear the rules
-                let mut rules = self.global_rules.write().await;
-                rules.clear();
-                gauge!("blocking_rules_cached").set(0.0);
-                info!("Global blocking rules cache cleared");
-            }
-            Some(suffix) => {
+            } else {
                 info!("Blocking rules deleted for key: {}", suffix);
                 // For endpoint-specific rules, they're loaded on-demand
                 // so clearing isn't strictly necessary
+                return;
             }
-            None => {
-                info!("Clearing all blocking rules cache");
-                self.global_rules_loaded.store(false, Ordering::Release);
-                let mut rules = self.global_rules.write().await;
-                rules.clear();
-                gauge!("blocking_rules_cached").set(0.0);
-            }
+        } else {
+            info!("Clearing all blocking rules cache");
         }
+
+        // Common logic for clearing global rules
+        self.global_rules_loaded.store(false, Ordering::Release);
+        let mut rules = self.global_rules.write().await;
+        rules.clear();
+        gauge!("blocking_rules_cached").set(0.0);
+        info!("Global blocking rules cache cleared");
     }
 
     /// Compile a rule for efficient evaluation

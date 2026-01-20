@@ -1062,10 +1062,16 @@ impl RedisClient {
                         }
                     };
 
-                    tracing::info!(
+                    // Log at debug level to avoid noise; redact api_key values to prevent credential exposure
+                    let redacted_key = if payload.starts_with(API_KEY_KEY_PREFIX) {
+                        format!("{}[REDACTED]", API_KEY_KEY_PREFIX)
+                    } else {
+                        payload.clone()
+                    };
+                    tracing::debug!(
                         "Received Redis pub/sub message on channel: {}, key: {}",
                         channel,
-                        payload
+                        redacted_key
                     );
 
                     match channel.as_str() {
