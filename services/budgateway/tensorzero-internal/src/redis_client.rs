@@ -24,6 +24,7 @@ const MODEL_TABLE_KEY_PREFIX: &str = "model_table:";
 const API_KEY_KEY_PREFIX: &str = "api_key:";
 const PUBLISHED_MODEL_INFO_KEY: &str = "published_model_info";
 const GUARDRAIL_KEY_PREFIX: &str = "guardrail_table:";
+const BLOCKING_RULES_KEY_PREFIX: &str = "blocking_rules:";
 const DEFAULT_CONFIG_GET_RETRIES: u32 = 3;
 
 pub struct RedisClient {
@@ -31,6 +32,7 @@ pub struct RedisClient {
     conn: MultiplexedConnection,
     app_state: AppStateData,
     auth: Auth,
+    db_number: u32,
 }
 
 impl RedisClient {
@@ -41,12 +43,33 @@ impl RedisClient {
                 message: format!("Redis connection failed: {e}"),
             })
         })?;
+
+        // Extract database number from URL (e.g., redis://host:port/2 -> 2)
+        let db_number = Self::extract_db_from_url(url);
+
         Ok(Self {
             client,
             conn,
             app_state,
             auth,
+            db_number,
         })
+    }
+
+    /// Extract the database number from a Redis URL.
+    /// Returns 0 if no database is specified or if parsing fails.
+    fn extract_db_from_url(url: &str) -> u32 {
+        // Parse URL and extract the path component (database number)
+        // Format: redis://[user:pass@]host:port[/db]
+        if let Ok(parsed) = Url::parse(url) {
+            let path = parsed.path().trim_start_matches('/');
+            if !path.is_empty() {
+                if let Ok(db) = path.parse::<u32>() {
+                    return db;
+                }
+            }
+        }
+        0 // Default to database 0
     }
 
     /// Retry a Redis GET operation with exponential backoff to handle race conditions
@@ -685,11 +708,32 @@ impl RedisClient {
                     }
                 }
             }
+            k if k.starts_with(BLOCKING_RULES_KEY_PREFIX) => {
+                // Blocking rules updated - invalidate cache and reload
+                let key_suffix = key
+                    .strip_prefix(BLOCKING_RULES_KEY_PREFIX)
+                    .unwrap_or("global");
+
+                if let Some(ref blocking_manager) = app_state.blocking_manager {
+                    tracing::info!(
+                        "Blocking rules updated in Redis (key: {}), invalidating cache",
+                        key
+                    );
+                    blocking_manager
+                        .invalidate_and_reload(Some(key_suffix))
+                        .await;
+                } else {
+                    tracing::warn!(
+                        "Blocking rules updated but no blocking manager configured: {}",
+                        key
+                    );
+                }
+            }
             k if k.starts_with("usage_limit:") => {
                 // Usage limit keys are handled by other components, ignore silently
             }
             _ => {
-                tracing::debug!("Received message from unknown key pattern: {key}");
+                tracing::debug!("Ignoring unhandled Redis key: {}", key);
             }
         }
 
@@ -758,6 +802,25 @@ impl RedisClient {
                 }
                 app_state.remove_guardrail(guardrail_id).await;
                 tracing::info!("Deleted guardrail: {guardrail_id}");
+            }
+            k if k.starts_with(BLOCKING_RULES_KEY_PREFIX) => {
+                // Blocking rules deleted - clear cache
+                let key_suffix = key
+                    .strip_prefix(BLOCKING_RULES_KEY_PREFIX)
+                    .unwrap_or("global");
+
+                if let Some(ref blocking_manager) = app_state.blocking_manager {
+                    tracing::info!(
+                        "Blocking rules deleted in Redis (key: {}), clearing cache",
+                        key
+                    );
+                    blocking_manager.clear_rules_cache(Some(key_suffix)).await;
+                } else {
+                    tracing::debug!(
+                        "Blocking rules deleted but no blocking manager configured: {}",
+                        key
+                    );
+                }
             }
             k if k.starts_with("usage_limit:") => {
                 // Usage limit keys are handled by other components, ignore silently
@@ -905,6 +968,7 @@ impl RedisClient {
         let client = self.client.clone();
         let app_state = self.app_state.clone();
         let auth = self.auth.clone();
+        let db_number = self.db_number;
 
         // Spawn pub-sub event loop with automatic reconnection
         tokio::spawn(async move {
@@ -952,15 +1016,18 @@ impl RedisClient {
                     }
                 };
 
-                // Subscribe to keyspace events
-                let patterns = &[
-                    "__keyevent@*__:set",
-                    "__keyevent@*__:del",
-                    "__keyevent@*__:expired",
+                // Subscribe to keyspace events for the specific database
+                // Note: We subscribe to specific database patterns because some Redis
+                // implementations (like Valkey) may not properly deliver events when
+                // using wildcard patterns with PSUBSCRIBE.
+                let patterns = vec![
+                    format!("__keyevent@{db_number}__:set"),
+                    format!("__keyevent@{db_number}__:del"),
+                    format!("__keyevent@{db_number}__:expired"),
                 ];
                 let mut all_subscribed = true;
-                for pattern in patterns {
-                    if let Err(e) = pubsub_conn.psubscribe(pattern).await {
+                for pattern in &patterns {
+                    if let Err(e) = pubsub_conn.psubscribe(pattern.as_str()).await {
                         tracing::error!(
                             "Failed to subscribe to Redis '{}' events: {}, reconnecting in {}s",
                             pattern,
@@ -977,7 +1044,10 @@ impl RedisClient {
                     continue;
                 }
 
-                tracing::info!("Successfully subscribed to Redis keyspace events");
+                tracing::info!(
+                    "Successfully subscribed to Redis keyspace events for database {}",
+                    db_number
+                );
 
                 // Process events until stream ends
                 let mut stream = pubsub_conn.on_message();
@@ -991,6 +1061,18 @@ impl RedisClient {
                             continue;
                         }
                     };
+
+                    // Log at debug level to avoid noise; redact api_key values to prevent credential exposure
+                    let redacted_key = if payload.starts_with(API_KEY_KEY_PREFIX) {
+                        format!("{}[REDACTED]", API_KEY_KEY_PREFIX)
+                    } else {
+                        payload.clone()
+                    };
+                    tracing::debug!(
+                        "Received Redis pub/sub message on channel: {}, key: {}",
+                        channel,
+                        redacted_key
+                    );
 
                     match channel.as_str() {
                         c if c.ends_with("__:set") => {

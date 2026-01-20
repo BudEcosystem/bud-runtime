@@ -289,6 +289,75 @@ impl BlockingRulesManager {
         }
     }
 
+    /// Invalidate the cache and reload blocking rules from Redis
+    ///
+    /// This method is called when a Redis keyspace notification indicates
+    /// that blocking rules have been updated. It resets the loaded flag
+    /// and triggers an immediate reload from Redis.
+    ///
+    /// # Arguments
+    /// * `key_suffix` - The key suffix (e.g., "global", "endpoint:uuid") to reload,
+    ///   or None to reload all rules
+    pub async fn invalidate_and_reload(&self, key_suffix: Option<&str>) {
+        if let Some(suffix) = key_suffix {
+            if suffix.starts_with("endpoint:") {
+                // For endpoint-specific rules, we currently don't cache them separately
+                // They are loaded on-demand, so just log the update
+                info!(
+                    "Blocking rules updated for endpoint: {}",
+                    suffix.strip_prefix("endpoint:").unwrap_or(suffix)
+                );
+                // Note: Endpoint rules are loaded on-demand in should_block()
+                // so no explicit cache invalidation is needed here
+                return;
+            } else if suffix == "global" || suffix.is_empty() {
+                info!("Invalidating global blocking rules cache due to Redis update");
+            } else {
+                // Unknown suffix - invalidate global rules as a fallback
+                info!(
+                    "Unknown blocking rules key suffix '{}', invalidating global rules",
+                    suffix
+                );
+            }
+        } else {
+            // Invalidate all rules
+            info!("Invalidating all blocking rules cache");
+        }
+
+        // Common logic for reloading global rules
+        self.global_rules_loaded.store(false, Ordering::Release);
+        if let Err(e) = self.load_rules("global").await {
+            warn!("Failed to reload global blocking rules: {}", e);
+        } else {
+            info!("Successfully reloaded global blocking rules from Redis");
+        }
+    }
+
+    /// Clear the blocking rules cache (used for rule deletion)
+    ///
+    /// This method clears the cached rules and resets the loaded flag.
+    pub async fn clear_rules_cache(&self, key_suffix: Option<&str>) {
+        if let Some(suffix) = key_suffix {
+            if suffix == "global" || suffix.is_empty() {
+                info!("Clearing global blocking rules cache due to Redis deletion");
+            } else {
+                info!("Blocking rules deleted for key: {}", suffix);
+                // For endpoint-specific rules, they're loaded on-demand
+                // so clearing isn't strictly necessary
+                return;
+            }
+        } else {
+            info!("Clearing all blocking rules cache");
+        }
+
+        // Common logic for clearing global rules
+        self.global_rules_loaded.store(false, Ordering::Release);
+        let mut rules = self.global_rules.write().await;
+        rules.clear();
+        gauge!("blocking_rules_cached").set(0.0);
+        info!("Global blocking rules cache cleared");
+    }
+
     /// Compile a rule for efficient evaluation
     fn compile_rule(rule: BlockingRule) -> Result<CompiledRule, String> {
         let mut compiled = CompiledRule {
