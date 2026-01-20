@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { infoToast } from "@/components/toast";
+import { WorkflowClientMetadata } from "@/types/agentWorkflow";
 
 export interface AgentVariable {
   id: string;
@@ -182,6 +183,14 @@ interface AgentStore {
 
   // Persistence Management
   clearPersistedSessions: () => void;
+
+  // Workflow API Metadata Restoration
+  restoreSessionsFromMetadata: (metadata: WorkflowClientMetadata) => void;
+
+  // Auto-save trigger (used by AgentBox to signal changes)
+  markSessionChanged: (sessionId: string) => void;
+  getLastChangeTimestamp: () => number;
+  lastChangeTimestamp: number;
 }
 
 const generateId = () => {
@@ -289,6 +298,7 @@ export const useAgentStore = create<AgentStore>()(
       isEditVersionMode: false,
       editVersionData: null,
       deletedPromptIds: [],
+      lastChangeTimestamp: 0,
 
       // Session Management
       createSession: () => {
@@ -855,6 +865,80 @@ export const useAgentStore = create<AgentStore>()(
           activeSessionIds: [],
           selectedSessionId: null,
         });
+      },
+
+      // Workflow API Metadata Restoration - restores sessions from API client_metadata
+      restoreSessionsFromMetadata: (metadata: WorkflowClientMetadata) => {
+        if (!metadata || !metadata.sessions || !Array.isArray(metadata.sessions)) {
+          console.warn('[useAgentStore] Invalid metadata provided for restoration');
+          return;
+        }
+
+        // Import conversion function dynamically to avoid circular dependency
+        import('@/services/workflowMetadataService').then(({ clientMetadataToSessions }) => {
+          const result = clientMetadataToSessions(metadata);
+          if (!result) {
+            console.warn('[useAgentStore] Failed to parse metadata');
+            return;
+          }
+
+          // Limit to max 3 sessions
+          const limitedSessions = result.sessions.slice(0, 3);
+          const limitedActiveIds = result.activeSessionIds.slice(0, 3);
+
+          // Convert partial sessions to full sessions with required fields
+          const fullSessions: AgentSession[] = limitedSessions.map((partialSession, index) => ({
+            id: partialSession.id || generateId(),
+            name: partialSession.name || `Agent ${index + 1}`,
+            active: true,
+            promptId: partialSession.promptId,
+            modelId: partialSession.modelId,
+            modelName: partialSession.modelName,
+            selectedDeployment: partialSession.selectedDeployment,
+            systemPrompt: partialSession.systemPrompt || "",
+            promptMessages: partialSession.promptMessages || "",
+            inputVariables: partialSession.inputVariables || [],
+            outputVariables: partialSession.outputVariables || [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            position: partialSession.position ?? index,
+            llm_retry_limit: partialSession.llm_retry_limit ?? 3,
+            settings: partialSession.settings || {
+              temperature: 0.7,
+              maxTokens: 2000,
+              topP: 1.0,
+            },
+            allowMultipleCalls: partialSession.allowMultipleCalls,
+            structuredInputEnabled: partialSession.structuredInputEnabled,
+            structuredOutputEnabled: partialSession.structuredOutputEnabled,
+            modelSettings: partialSession.modelSettings as AgentSettings | undefined,
+            selectedConnectorId: partialSession.selectedConnectorId,
+            workflowId: partialSession.workflowId,
+            inputWorkflowId: partialSession.inputWorkflowId,
+            outputWorkflowId: partialSession.outputWorkflowId,
+            systemPromptWorkflowId: partialSession.systemPromptWorkflowId,
+            promptMessagesWorkflowId: partialSession.promptMessagesWorkflowId,
+          }));
+
+          // Update store with restored sessions
+          set({
+            sessions: fullSessions,
+            activeSessionIds: limitedActiveIds.length > 0 ? limitedActiveIds : fullSessions.map(s => s.id),
+            selectedSessionId: result.selectedSessionId || (fullSessions.length > 0 ? fullSessions[0].id : null),
+          });
+
+          console.log('[useAgentStore] Successfully restored sessions from metadata:', fullSessions.length);
+        });
+      },
+
+      // Mark a session as changed (triggers auto-save in AgentDrawer)
+      markSessionChanged: (sessionId: string) => {
+        set({ lastChangeTimestamp: Date.now() });
+      },
+
+      // Get the last change timestamp
+      getLastChangeTimestamp: () => {
+        return get().lastChangeTimestamp;
       }
     }),
     {

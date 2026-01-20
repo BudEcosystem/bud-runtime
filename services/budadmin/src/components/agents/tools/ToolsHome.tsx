@@ -9,6 +9,9 @@ import { ConnectorDetails } from './ConnectorDetails';
 import { getOAuthState, isOAuthCallback, clearOAuthState, getOAuthPromptId } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl, getConnectorFromUrlByPosition } from '@/utils/urlUtils';
 
+const EMPTY_CONNECTOR_LIST: Connector[] = [];
+const EMPTY_CONNECTED_TOOL_LIST: Connector[] = [];
+
 interface ToolsHomeProps {
   promptId?: string;
   workflowId?: string;
@@ -17,15 +20,11 @@ interface ToolsHomeProps {
 }
 
 export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
-  const { getSessionByPromptId } = useAgentStore();
+  const getSessionByPromptId = useAgentStore((state) => state.getSessionByPromptId);
 
   // Validate and get the effective promptId
-  // Priority: 1. OAuth prompt ID (for OAuth callbacks), 2. Validated session prompt ID, 3. Prop prompt ID
+  // Priority: 1. Validated session prompt ID, 2. Prop prompt ID
   const promptId = useMemo(() => {
-    // First check for OAuth prompt ID
-    const oauthPromptId = getOAuthPromptId();
-    if (oauthPromptId) return oauthPromptId;
-
     // Validate prop promptId against the store
     if (propPromptId) {
       const session = getSessionByPromptId(propPromptId);
@@ -38,33 +37,58 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     return propPromptId;
   }, [propPromptId, getSessionByPromptId]);
 
-  const {
-    connectors,
-    connectedTools,
-    isLoading,
-    isLoadingMore,
-    totalPages,
-    currentPage,
-    setSearchQuery,
-    fetchConnectedTools,
-    fetchUnregisteredTools,
-    fetchConnectorDetails,
-    clearConnectorDetailsForPromptId,
-  } = useConnectors();
+  // Get store actions via selectors so their references stay stable
+  const fetchConnectedTools = useConnectors((state) => state.fetchConnectedTools);
+  const fetchUnregisteredTools = useConnectors((state) => state.fetchUnregisteredTools);
+  const fetchConnectorDetails = useConnectors((state) => state.fetchConnectorDetails);
+  const clearConnectorDetailsForPromptId = useConnectors((state) => state.clearConnectorDetailsForPromptId);
 
-  // Use proper Zustand selectors for stable references
-  const selectedConnectorDetails = useConnectors(
-    useCallback(
-      (state) => promptId ? state.connectorDetailsByPromptId[promptId] || null : null,
-      [promptId]
-    )
+  const fetchConnectedToolsRef = useRef(fetchConnectedTools);
+  const fetchUnregisteredToolsRef = useRef(fetchUnregisteredTools);
+
+  useEffect(() => {
+    fetchConnectedToolsRef.current = fetchConnectedTools;
+  }, [fetchConnectedTools]);
+
+  useEffect(() => {
+    fetchUnregisteredToolsRef.current = fetchUnregisteredTools;
+  }, [fetchUnregisteredTools]);
+
+  // Use per-session selectors for data (isolated per agent box)
+  const connectors = useConnectors((state) =>
+    promptId ? state.connectorsByPromptId[promptId] ?? EMPTY_CONNECTOR_LIST : state.connectors
   );
 
-  const isLoadingDetails = useConnectors(
-    useCallback(
-      (state) => promptId ? state.loadingDetailsByPromptId[promptId] || false : false,
-      [promptId]
-    )
+  const connectedTools = useConnectors((state) =>
+    promptId ? state.connectedToolsByPromptId[promptId] ?? EMPTY_CONNECTED_TOOL_LIST : state.connectedTools
+  );
+
+  const pagination = useConnectors((state) =>
+    promptId ? state.paginationByPromptId[promptId] : null
+  );
+
+  const loadingState = useConnectors((state) =>
+    promptId ? state.loadingStatesByPromptId[promptId] : null
+  );
+
+  // Atomic selectors for global state to prevent object identity churn
+  const globalIsLoading = useConnectors(state => state.isLoading);
+  const globalIsLoadingMore = useConnectors(state => state.isLoadingMore);
+  const globalCurrentPage = useConnectors(state => state.currentPage);
+  const globalTotalPages = useConnectors(state => state.totalPages);
+
+  const isLoading = loadingState?.isLoading ?? globalIsLoading;
+  const isLoadingMore = loadingState?.isLoadingMore ?? globalIsLoadingMore;
+  const currentPage = pagination?.currentPage ?? globalCurrentPage;
+  const totalPages = pagination?.totalPages ?? globalTotalPages;
+
+  // Use proper Zustand selectors for stable references
+  const selectedConnectorDetails = useConnectors((state) =>
+    promptId ? state.connectorDetailsByPromptId[promptId] || null : null
+  );
+
+  const isLoadingDetails = useConnectors((state) =>
+    promptId ? state.loadingDetailsByPromptId[promptId] || false : false
   );
 
   const [connectedExpanded, setConnectedExpanded] = useState(true);
@@ -82,7 +106,6 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
   const fetchedConnectorRef = useRef<string | null>(null); // Track which connector we've fetched
   const isBackNavigationRef = useRef(false);
   const hasFetchedListsRef = useRef<string | null>(null); // Track if we've fetched lists for this promptId
-
   // Initial load - Fetch both connected and unregistered tools (ONCE per promptId)
   useEffect(() => {
     if (!promptId || hasFetchedListsRef.current === promptId) {
@@ -247,18 +270,17 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     setIsSearching(true);
 
     searchTimeoutRef.current = setTimeout(async () => {
-      setSearchQuery(localSearchQuery);
       if (promptId) {
         // Refetch both lists with search query
         await Promise.all([
-          fetchConnectedTools({
+          fetchConnectedToolsRef.current({
             page: 1,
             prompt_id: promptId,
             name: localSearchQuery,
             search: !!localSearchQuery,
             force: true
           }),
-          fetchUnregisteredTools({
+          fetchUnregisteredToolsRef.current({
             page: 1,
             prompt_id: promptId,
             name: localSearchQuery,
@@ -278,7 +300,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [localSearchQuery, setSearchQuery, promptId]);
+  }, [localSearchQuery, promptId]);
 
   // Handle scroll for lazy loading
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -313,7 +335,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
   const handleConnectorClick = (connector: Connector, isConnected: boolean = false) => {
     // Clear search when navigating to details
     setLocalSearchQuery('');
-    setSearchQuery('');
+    // Clear per-session search query
     setIsSearching(false);
     setSelectedConnector({ ...connector, isFromConnectedSection: isConnected } as Connector);
     setViewMode('details');
@@ -329,7 +351,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     setSelectedConnector(null);
     setViewMode('list');
     setLocalSearchQuery('');
-    setSearchQuery('');
+    // Clear per-session search query
     setIsSearching(false);
 
     // Reset all URL restoration flags

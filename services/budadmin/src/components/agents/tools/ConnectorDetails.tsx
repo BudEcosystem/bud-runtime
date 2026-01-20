@@ -11,8 +11,10 @@ import { ConnectorService } from 'src/services/connectorService';
 import { CredentialConfigStep } from './CredentialConfigStep';
 import { ToolSelectionStep } from './ToolSelectionStep';
 import { useAgentStore } from '@/stores/useAgentStore';
+import { useAddAgent } from '@/stores/useAddAgent';
 import { OAuthState, OAuthSessionData, clearOAuthState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl } from '@/utils/urlUtils';
+import { saveAgentMetadata } from '@/services/workflowMetadataService';
 
 interface Tool {
   id: string;
@@ -88,7 +90,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   totalSessions = 1,
 }) => {
   const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
-  const { getSessionByPromptId } = useAgentStore();
+  const { getSessionByPromptId, sessions, activeSessionIds, selectedSessionId } = useAgentStore();
+  const { currentWorkflow, selectedProject } = useAddAgent();
 
   // Determine initial step - check if this is an OAuth callback for this connector
   const getInitialStep = (): 1 | 2 => {
@@ -130,7 +133,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const oauthCallbackProcessed = React.useRef(false);
 
   // Reusable function to fetch tools
-  const fetchTools = React.useCallback(async () => {
+  // isOAuthCallback: When true, always try fetchOAuthTools first (regardless of selectedConnectorDetails loading state)
+  const fetchTools = React.useCallback(async (isOAuthCallback: boolean = false) => {
     // CRITICAL: Determine the correct prompt ID to use
     // Priority: 1. OAuth prompt ID (for OAuth callbacks), 2. Validated session prompt ID, 3. Prop prompt ID
     let effectivePromptId = getOAuthPromptId();
@@ -154,10 +158,21 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       let allTools: Tool[] = [];
 
-      // If auth_type is "Open" or empty/undefined, only call fetchTools
-      // If auth_type is "OAuth" or any other value, call fetchOAuthTools
-      if (authType && authType.toLowerCase() !== 'open') {
+      // CRITICAL FIX: If this is an OAuth callback, ALWAYS try fetchOAuthTools first
+      // because selectedConnectorDetails might not be loaded yet when this is called
+      // after OAuth redirect. We know it's an OAuth connector since we came from OAuth flow.
+      const shouldFetchOAuthTools = isOAuthCallback || (authType && authType.toLowerCase() !== 'open');
+
+      // If auth_type is "Open" or empty/undefined (and not OAuth callback), only call fetchTools
+      // If auth_type is "OAuth" or any other value (or is OAuth callback), call fetchOAuthTools
+      if (shouldFetchOAuthTools) {
         try {
+          console.log('[ConnectorDetails] Calling fetchOAuthTools with:', {
+            prompt_id: effectivePromptId,
+            connector_id: connector.id,
+            isOAuthCallback,
+            authType
+          });
           const oauthResponse = await ConnectorService.fetchOAuthTools({
             prompt_id: effectivePromptId,
             connector_id: connector.id,
@@ -166,6 +181,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
           if (oauthResponse.data && oauthResponse.data.tools) {
             allTools = oauthResponse.data.tools;
+            console.log('[ConnectorDetails] OAuth tools fetched:', allTools.length);
           }
         } catch (error) {
           // No user-facing toast, but log for developers
@@ -197,7 +213,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
           throw error;
         }
       } else {
-        // auth_type is "Open" or not set, only call GET /prompts/tools
+        // auth_type is "Open" or not set (and not OAuth callback), only call GET /prompts/tools
         const response = await ConnectorService.fetchTools({
           prompt_id: effectivePromptId,
           connector_id: connector.id,
@@ -321,8 +337,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         // Move to step 2 to show tools
         setStep(2);
 
-        // Fetch tools
-        await fetchTools();
+        // Fetch tools - pass true to indicate this is an OAuth callback
+        // This ensures fetchOAuthTools is called even if selectedConnectorDetails isn't loaded yet
+        await fetchTools(true);
       } catch (error: any) {
         errorToast(error?.response?.data?.message || 'Failed to complete OAuth authorization');
       } finally {
@@ -561,6 +578,41 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 workflowNextStep: agentStoreState.workflowContext?.nextStep,
               } : undefined;
 
+              // CRITICAL: Save to workflow API's client_metadata before OAuth redirect
+              // This reduces dependency on localStorage and enables API-based restoration
+              const effectiveWorkflowId = workflowId || currentWorkflow?.workflow_id || agentId;
+              const effectiveProjectId = selectedProject?.id || currentWorkflow?.workflow_steps?.project?.id;
+
+              if (effectiveWorkflowId && effectiveProjectId) {
+                try {
+                  // Get active sessions to save
+                  const sessionsToSave = sessions.filter(s => activeSessionIds.includes(s.id));
+
+                  // Update the current session with connector state before saving
+                  const updatedSessions = sessionsToSave.map(s => {
+                    if (s.promptId === promptId) {
+                      return {
+                        ...s,
+                        selectedConnectorId: connector.id,
+                      };
+                    }
+                    return s;
+                  });
+
+                  await saveAgentMetadata(
+                    effectiveWorkflowId,
+                    effectiveProjectId,
+                    updatedSessions,
+                    activeSessionIds,
+                    selectedSessionId
+                  );
+                  console.log('[ConnectorDetails] Saved metadata to API before OAuth redirect');
+                } catch (apiError) {
+                  // Log but don't block - localStorage backup will still work
+                  console.warn('[ConnectorDetails] Failed to save to API, relying on localStorage:', apiError);
+                }
+              }
+
               // CRITICAL: Save prompt ID in dedicated localStorage key for reliable restoration
               if (promptId) {
                 saveOAuthPromptId(promptId);
@@ -576,7 +628,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 promptId: promptId,
                 connectorId: connector.id,
                 connectorName: connector.name,
-                workflowId: workflowId,
+                workflowId: effectiveWorkflowId,
                 agentId: agentId,
                 step: 1,
                 timestamp: Date.now(),

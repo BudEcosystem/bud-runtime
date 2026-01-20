@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Drawer, Empty, Tooltip, Image } from "antd";
 import {
   SettingOutlined,
@@ -6,6 +6,7 @@ import {
   MessageOutlined
 } from "@ant-design/icons";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useAddAgent } from "@/stores/useAddAgent";
 import { useDrawer } from "@/hooks/useDrawer";
 import AgentBoxWrapper from "./AgentBoxWrapper";
 import AgentSelector from "./AgentSelector";
@@ -13,6 +14,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { removePromptFromUrl, cleanupConnectorParams } from "@/utils/urlUtils";
 import { hasOAuthPromptId } from "@/hooks/useOAuthCallback";
+import { saveAgentMetadata } from "@/services/workflowMetadataService";
 
 const AgentIframe = dynamic(() => import("./AgentIframe"), { ssr: false });
 
@@ -32,7 +34,12 @@ const AgentDrawer: React.FC = () => {
     addVersionPromptId,
     isEditVersionMode,
     editVersionData,
+    selectedSessionId,
+    lastChangeTimestamp,
   } = useAgentStore();
+
+  // Get workflow info from AddAgent store
+  const { currentWorkflow, selectedProject } = useAddAgent();
 
   const { openDrawerWithStep, step, currentFlow } = useDrawer();
 
@@ -263,7 +270,101 @@ const AgentDrawer: React.FC = () => {
     }
   }, [activeSessions, isAgentDrawerOpen, router, currentFlow, step]);
 
+  // Track if initial save has been done for this workflow
+  const initialSaveRef = useRef<string | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Save agent metadata to workflow API (step 3)
+  const saveMetadataToApi = useCallback(async () => {
+    const workflowId = currentWorkflow?.workflow_id;
+    const projectId = selectedProject?.id || currentWorkflow?.workflow_steps?.project?.id;
+
+    if (!workflowId || !projectId) {
+      return;
+    }
+
+    // Don't save if in edit mode (not creating new agent)
+    if (isEditMode || isAddVersionMode || isEditVersionMode) {
+      return;
+    }
+
+    // Get active sessions to save
+    const sessionsToSave = sessions.filter(s => activeSessionIds.includes(s.id));
+    if (sessionsToSave.length === 0) {
+      return;
+    }
+
+    try {
+      await saveAgentMetadata(
+        workflowId,
+        projectId,
+        sessionsToSave,
+        activeSessionIds,
+        selectedSessionId
+      );
+    } catch (error) {
+      console.error('[AgentDrawer] Failed to save metadata to API:', error);
+    }
+  }, [currentWorkflow, selectedProject, sessions, activeSessionIds, selectedSessionId, isEditMode, isAddVersionMode, isEditVersionMode]);
+
+  // Initial save when drawer opens in workflow mode (step 3 API call)
+  useEffect(() => {
+    if (!isAgentDrawerOpen) return;
+    if (!workflowContext.isInWorkflow) return;
+
+    const workflowId = currentWorkflow?.workflow_id;
+    if (!workflowId) return;
+
+    // Skip if we already did initial save for this workflow
+    if (initialSaveRef.current === workflowId) return;
+
+    // Don't do initial save if in special modes
+    if (isEditMode || isAddVersionMode || isEditVersionMode) return;
+
+    // Check if we have sessions to save
+    const sessionsToSave = sessions.filter(s => activeSessionIds.includes(s.id));
+    if (sessionsToSave.length === 0) return;
+
+    // Mark this workflow as having initial save done
+    initialSaveRef.current = workflowId;
+
+    // Perform initial save with a small delay to ensure session is fully created
+    const timeoutId = setTimeout(() => {
+      saveMetadataToApi();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [isAgentDrawerOpen, workflowContext.isInWorkflow, currentWorkflow?.workflow_id, sessions, activeSessionIds, isEditMode, isAddVersionMode, isEditVersionMode, saveMetadataToApi]);
+
+  // Debounced auto-save when sessions change (triggered by lastChangeTimestamp)
+  useEffect(() => {
+    if (!isAgentDrawerOpen) return;
+    if (!workflowContext.isInWorkflow) return;
+    if (!lastChangeTimestamp) return;
+
+    // Clear any pending auto-save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Schedule new auto-save with 1 second debounce
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      saveMetadataToApi();
+    }, 1000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [lastChangeTimestamp, isAgentDrawerOpen, workflowContext.isInWorkflow, saveMetadataToApi]);
+
+  // Reset initial save ref when drawer closes
+  useEffect(() => {
+    if (!isAgentDrawerOpen) {
+      initialSaveRef.current = null;
+    }
+  }, [isAgentDrawerOpen]);
 
   return (
     <>

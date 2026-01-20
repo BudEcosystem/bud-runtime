@@ -67,6 +67,7 @@ function AgentBoxInner({
     closeAgentDrawer,
     addDeletedPromptId,
     isEditMode,
+    markSessionChanged,
   } = useAgentStore();
 
   // Get prompts store for loading config
@@ -490,6 +491,46 @@ function AgentBoxInner({
       setSetAsDefault(editVersionData.isDefault);
     }
   }, [isEditVersionMode, editVersionData]);
+
+  // Track previous values for detecting significant changes
+  const prevSelectedDeploymentRef = React.useRef(session?.selectedDeployment?.id);
+  const prevSystemPromptRef = React.useRef(session?.systemPrompt);
+  const prevInputVarsLengthRef = React.useRef(session?.inputVariables?.length);
+  const prevOutputVarsLengthRef = React.useRef(session?.outputVariables?.length);
+
+  // Trigger auto-save when significant session properties change
+  React.useEffect(() => {
+    if (!session?.id) return;
+
+    const currentDeploymentId = session?.selectedDeployment?.id;
+    const currentSystemPrompt = session?.systemPrompt;
+    const currentInputVarsLength = session?.inputVariables?.length;
+    const currentOutputVarsLength = session?.outputVariables?.length;
+
+    // Check if any significant property changed
+    const deploymentChanged = currentDeploymentId !== prevSelectedDeploymentRef.current;
+    const systemPromptChanged = currentSystemPrompt !== prevSystemPromptRef.current;
+    const inputVarsChanged = currentInputVarsLength !== prevInputVarsLengthRef.current;
+    const outputVarsChanged = currentOutputVarsLength !== prevOutputVarsLengthRef.current;
+
+    if (deploymentChanged || systemPromptChanged || inputVarsChanged || outputVarsChanged) {
+      // Mark session as changed to trigger auto-save in AgentDrawer
+      markSessionChanged(session.id);
+
+      // Update refs
+      prevSelectedDeploymentRef.current = currentDeploymentId;
+      prevSystemPromptRef.current = currentSystemPrompt;
+      prevInputVarsLengthRef.current = currentInputVarsLength;
+      prevOutputVarsLengthRef.current = currentOutputVarsLength;
+    }
+  }, [
+    session?.id,
+    session?.selectedDeployment?.id,
+    session?.systemPrompt,
+    session?.inputVariables?.length,
+    session?.outputVariables?.length,
+    markSessionChanged
+  ]);
 
   // NOTE: Removed auto-refresh on settings sidebar open
   // The session data is already loaded when the drawer opens or when editing a prompt
@@ -1351,7 +1392,7 @@ function AgentBoxInner({
 
           {/* Tools Button - Works as toggle */}
           <button
-            className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isToolsOpen ? 'bg-[#965CDE] bg-opacity-20 text-[#B3B3B3] hover:text-[#FFFFFF]' : ''}`}
+            className={`w-[1.475rem] h-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isToolsOpen ? 'bg-[#965CDE] bg-opacity-20 text-[#B3B3B3] hover:text-[#FFFFFF]' : ''}`}
             onClick={toggleTools}
             style={{ transform: 'none' }}
           >
@@ -1367,7 +1408,7 @@ function AgentBoxInner({
                   fill="none"
                   style={{ transform: 'none', display: 'block' }}
                 >
-                  <g clipPath="url(#clip0_959_20489)">
+                  <g clipPath={`url(#clip0_959_20489_${index})`}>
                     <path d="M7.3045 8.31543L4.23567 11.3836C3.12453 11.0635 1.85415 11.3794 0.984831 12.2488C0.0076377 13.226 -0.27205 14.7053 0.279734 15.9723C0.379981 16.1998 0.684095 16.2444 0.844998 16.0549L2.55258 14.0373L3.78419 14.2159L3.96278 15.4475L1.94519 17.1551C1.75648 17.316 1.80113 17.6201 2.02774 17.7203C3.29558 18.2721 4.77394 17.9924 5.75131 17.0152C6.61983 16.1467 6.93575 14.8763 6.61646 13.7644L8.8977 11.4832L8.47566 10.9558L6.00313 13.4283C5.91299 13.5185 5.88182 13.6516 5.92226 13.7729C6.23732 14.7122 6.02503 15.7888 5.27528 16.5385C4.57607 17.2377 3.62161 17.4357 2.84912 17.2739L4.53984 15.841C4.62914 15.766 4.67295 15.6498 4.6561 15.5352L4.41684 13.868C4.40589 13.7948 4.37135 13.7282 4.32165 13.6785C4.27195 13.6288 4.2054 13.5934 4.13211 13.5833L2.46496 13.3441C2.34954 13.3272 2.23414 13.3719 2.15915 13.4603L0.726206 15.151C0.564462 14.3785 0.762431 13.4241 1.46165 12.7249C2.21141 11.9751 3.28802 11.7628 4.22725 12.0779C4.34856 12.1183 4.48083 12.0872 4.57181 11.997L7.77887 8.78996L7.3045 8.31543Z" fill="currentColor" />
                     <path d="M14.6192 0.000147943C13.7473 0.00267525 12.8897 0.343002 12.2487 0.984932C11.3801 1.85346 11.0642 3.12384 11.3843 4.23577L8.31616 7.30395L8.7896 7.77823L11.9975 4.57117C12.0877 4.48103 12.1188 4.34792 12.0784 4.22661C11.7633 3.28731 11.9756 2.21069 12.7254 1.461C13.4246 0.76179 14.379 0.563815 15.1515 0.725559L13.4608 2.1585C13.3715 2.23348 13.3277 2.34973 13.3446 2.46431L13.5838 4.13146C13.5948 4.20475 13.6293 4.2713 13.679 4.321C13.7287 4.37071 13.7953 4.40609 13.8685 4.4162L15.5357 4.65545C15.6511 4.6723 15.7665 4.62765 15.8415 4.5392L17.2744 2.84847C17.4362 3.62096 17.2382 4.57543 16.539 5.27464C15.7892 6.02439 14.7126 6.23667 13.7734 5.92161C13.6521 5.88118 13.5198 5.91235 13.4288 6.00248L11.0954 8.33591L11.4509 8.92982L13.7643 6.61644C14.8754 6.93657 16.1458 6.62066 17.0151 5.75129C17.9923 4.77409 18.272 3.29472 17.7202 2.02772C17.6208 1.80027 17.3167 1.75562 17.155 1.94432L15.4474 3.96192L14.2158 3.78417L14.038 2.55256L16.0556 0.844974C16.2443 0.68323 16.1997 0.379108 15.973 0.27887C15.5367 0.0893251 15.0757 -0.0015342 14.6192 0.000147943Z" fill="currentColor" />
                     <path d="M8.72412 11.0844L9.67942 12.9891C9.69543 13.0219 9.71733 13.0514 9.74261 13.0767L13.7929 17.127C13.7929 17.127 14.0785 17.4193 14.5207 17.5667C14.963 17.7141 15.5814 17.7192 16.1744 17.127L17.128 16.1733C17.7186 15.5828 17.7152 14.9628 17.5678 14.5197C17.4204 14.0774 17.128 13.7918 17.128 13.7918L13.0777 9.74239C13.0516 9.71628 13.0221 9.69521 12.9901 9.67921L11.0838 8.72559L10.783 9.32876L12.6406 10.2571L16.6522 14.2688C16.6522 14.2688 16.8376 14.4592 16.9285 14.7313C17.0195 15.0034 17.0195 15.3336 16.6539 15.6984L15.7003 16.652C15.3381 17.0142 15.0053 17.0168 14.7332 16.9266C14.4611 16.8356 14.2707 16.6503 14.2707 16.6503L10.2584 12.6395L9.33004 10.782L8.72412 11.0844Z" fill="currentColor" />
@@ -1377,7 +1418,7 @@ function AgentBoxInner({
                     <path d="M12.8397 11.886C12.7075 12.0174 12.7066 12.2306 12.838 12.3628L14.9837 14.5085C15.1159 14.6399 15.3291 14.639 15.4605 14.5068C15.591 14.3753 15.591 14.163 15.4605 14.0316L13.3148 11.886C13.1834 11.7554 12.9711 11.7554 12.8397 11.886Z" fill="currentColor" />
                   </g>
                   <defs>
-                    <clipPath id="clip0_959_20489" fill="currentColor">
+                    <clipPath id={`clip0_959_20489_${index}`} fill="currentColor">
                       <rect width="18" height="18" fill="white" />
                     </clipPath>
                   </defs>
