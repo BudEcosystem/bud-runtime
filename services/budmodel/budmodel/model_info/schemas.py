@@ -85,6 +85,23 @@ class EmbeddingConfig(BaseModel):
     embedding_dimension: Optional[int] = None
 
 
+class ClassifierConfig(BaseModel):
+    num_labels: Optional[int] = None
+    label2id: Optional[Dict[str, int]] = None
+    id2label: Optional[Dict[int, str]] = None
+    task: Optional[
+        Literal[
+            "sequence_classification",
+            "token_classification",
+            "object_detection",
+            "question_answering",
+            "image_classification",
+            "audio_classification",
+            "semantic_segmentation",
+        ]
+    ] = None
+
+
 class ModelArchitecture(BaseModel):
     class Config:
         """Configuration class for ModelArchitecture."""
@@ -100,6 +117,7 @@ class ModelArchitecture(BaseModel):
     vision_config: Optional[VisionConfig] = None
     audio_config: Optional[AudioConfig] = None
     embedding_config: Optional[EmbeddingConfig] = None
+    classifier_config: Optional[ClassifierConfig] = None
 
 
 class ModelInfoBase(BaseModel):

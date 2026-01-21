@@ -586,6 +586,19 @@ class CloudModelWorkflowService(SessionMixin):
         if extracted_metadata.get("website_url"):
             update_fields["website_url"] = extracted_metadata["website_url"]
 
+        if extracted_metadata.get("modality"):
+            try:
+                model_details = await determine_modality_endpoints(extracted_metadata["modality"])
+                update_fields["modality"] = model_details["modality"]
+                update_fields["supported_endpoints"] = model_details["endpoints"]
+            except ValueError as exc:
+                logger.warning(
+                    "Skipping modality update for model %s due to invalid modality %s: %s",
+                    model.id,
+                    extracted_metadata.get("modality"),
+                    exc,
+                )
+
         # Calculate and update storage size from MinIO if local_path is available
         if model.local_path:
             storage_size_gib = await calculate_and_get_storage_size(model.id, model.local_path)
