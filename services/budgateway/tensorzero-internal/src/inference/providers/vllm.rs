@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
 use futures::{StreamExt, TryStreamExt};
@@ -581,6 +582,18 @@ struct VLLMEmbeddingRequest<'a> {
     input: VLLMEmbeddingRequestInput<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     encoding_format: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dimensions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modality: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_input: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunking: Option<&'a crate::embeddings::ChunkingConfig>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -628,6 +641,12 @@ impl EmbeddingProvider for VLLMProvider {
             model: &self.model_name,
             input,
             encoding_format: request.encoding_format.as_deref(),
+            dimensions: request.dimensions,
+            modality: request.modality.as_deref(),
+            priority: request.priority.as_deref(),
+            include_input: request.include_input,
+            chunking: request.chunking.as_ref(),
+            extra: request.extra.clone(),
         };
         let request_url = get_embedding_url(&self.api_base)?;
         let start_time = Instant::now();

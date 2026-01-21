@@ -28,6 +28,7 @@ use crate::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -218,11 +219,46 @@ impl EmbeddingInput {
     }
 }
 
+/// Configuration for text chunking - passed through to provider
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+pub struct ChunkingConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chunk_size: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chunk_overlap: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokenizer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub return_chunk_text: Option<bool>,
+}
+
 #[derive(Debug, PartialEq, Serialize)]
 pub struct EmbeddingRequest {
     pub input: EmbeddingInput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoding_format: Option<String>,
+    /// Matryoshka dimensions - forwarded to provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<u32>,
+    /// Modality type (text/image/audio) - forwarded to provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modality: Option<String>,
+    /// Priority level (high/normal/low) - forwarded to provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Include original input text in response - forwarded to provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_input: Option<bool>,
+    /// Chunking configuration - forwarded to provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunking: Option<ChunkingConfig>,
+    /// Extra fields to pass through to providers
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -558,6 +594,12 @@ mod tests {
         let request = EmbeddingRequest {
             input: EmbeddingInput::Batch(vec!["Text 1".to_string(), "Text 2".to_string()]),
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         assert_eq!(request.input.len(), 2);
@@ -638,6 +680,12 @@ mod tests {
         let request = EmbeddingRequest {
             input: EmbeddingInput::Single("Hello, world!".to_string()),
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
         let response = fallback_embedding_model
             .embed(
