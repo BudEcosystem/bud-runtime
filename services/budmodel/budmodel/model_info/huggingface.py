@@ -500,7 +500,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
         return False
 
     @staticmethod
-    def parse_classifier_model_config(config: Dict[str, Any]) -> Dict[str, Any] | None:
+    def parse_classifier_model_config(config: Dict[str, Any]) -> ClassifierConfig | None:
         """Parse classifier model configuration from config."""
         architectures = config.get("architectures", [])
         # Map the substring signature to the variable name
@@ -520,34 +520,63 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
         # 2. Robust Label Extraction
         # Use explicit signals only; do not infer classification from num_labels alone.
-        label2id = config.get("label2id") or {}
-        id2label = config.get("id2label") or {}
+        def _normalize_map(
+            mapping: Dict[Any, Any], convert_keys: bool = False, convert_values: bool = False
+        ) -> Dict[Any, Any]:
+            if not mapping:
+                return {}
+            normalized: Dict[Any, Any] = {}
+            for key, value in mapping.items():
+                new_key = key
+                new_value = value
+                if convert_keys:
+                    try:
+                        new_key = int(key)
+                    except (TypeError, ValueError):
+                        new_key = key
+                if convert_values:
+                    try:
+                        new_value = int(value)
+                    except (TypeError, ValueError):
+                        new_value = value
+                normalized[new_key] = new_value
+            return normalized
+
+        def _is_default_label2id(mapping: Dict[Any, Any]) -> bool:
+            if not mapping:
+                return False
+            for label, idx in mapping.items():
+                if not isinstance(label, str) or not isinstance(idx, int):
+                    return False
+                if label != f"LABEL_{idx}":
+                    return False
+            return True
+
+        def _is_default_id2label(mapping: Dict[Any, Any]) -> bool:
+            if not mapping:
+                return False
+            for idx, label in mapping.items():
+                if not isinstance(idx, int) or not isinstance(label, str):
+                    return False
+                if label != f"LABEL_{idx}":
+                    return False
+            return True
+
+        label2id = _normalize_map(config.get("label2id") or {}, convert_values=True)
+        id2label = _normalize_map(config.get("id2label") or {}, convert_keys=True)
         problem_type = config.get("problem_type")
 
         has_label_map = bool(label2id) or bool(id2label)
         has_task_flag = any(flags.values())
         has_problem_type = bool(problem_type)
 
-        if not (has_task_flag or has_label_map or has_problem_type):
+        is_default_label_map = has_label_map and (
+            (not label2id or _is_default_label2id(label2id)) and (not id2label or _is_default_id2label(id2label))
+        )
+        has_explicit_label_map = has_label_map and not is_default_label_map
+
+        if not (has_task_flag or has_explicit_label_map or has_problem_type):
             return None
-
-        if id2label:
-            normalized_id2label = {}
-            for key, value in id2label.items():
-                try:
-                    normalized_id2label[int(key)] = value
-                except (TypeError, ValueError):
-                    normalized_id2label[key] = value
-            id2label = normalized_id2label
-
-        if label2id:
-            normalized_label2id = {}
-            for key, value in label2id.items():
-                try:
-                    normalized_label2id[key] = int(value)
-                except (TypeError, ValueError):
-                    normalized_label2id[key] = value
-            label2id = normalized_label2id
 
         if not label2id and id2label:
             label2id = {label: idx for idx, label in id2label.items()}

@@ -449,11 +449,8 @@ async def determine_modality_endpoints(
     ]
 
     raw_modality = input_modality
-    normalized_modality = input_modality
-    has_classification = False
-    if "_classification" in normalized_modality:
-        has_classification = True
-        normalized_modality = normalized_modality.replace("_classification", "")
+    normalized_modality = raw_modality.removesuffix("_classification")
+    has_classification = raw_modality != normalized_modality
 
     # Parse input to modality enums
     if "," in normalized_modality:
