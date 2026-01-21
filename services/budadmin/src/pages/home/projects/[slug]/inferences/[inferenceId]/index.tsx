@@ -151,7 +151,7 @@ const InferenceDetailPage: React.FC = () => {
   };
 
   const goBack = () => {
-    router.push(`/home/projects/${slug}/inferences`);
+    router.push(`/projects/${slug}?tab=observability`);
   };
 
   const HeaderContent = () => {

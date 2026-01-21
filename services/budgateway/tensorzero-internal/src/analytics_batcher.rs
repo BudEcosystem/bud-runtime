@@ -234,8 +234,7 @@ mod tests {
             model_latency_ms: Some(90),
             inference_id: None,
             is_blocked: false,
-            block_reason: None,
-            block_rule_id: None,
+            blocking_event: None,
             tags: HashMap::new(),
         }
     }

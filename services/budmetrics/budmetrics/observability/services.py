@@ -1,8 +1,9 @@
 import asyncio
+import contextlib
 import math
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 from uuid import UUID
 
 from budmicroframe.commons import logging
@@ -344,6 +345,70 @@ class ObservabilityMetricsService:
     # Pre-compile zero UUID for faster comparison
     _ZERO_UUID = UUID("00000000-0000-0000-0000-000000000000")
 
+    # Mapping from API group_by field names to database column names
+    _GROUP_BY_TO_COLUMN = {
+        "model": "model_id",
+        "project": "project_id",
+        "endpoint": "endpoint_id",
+        "user_project": "api_key_project_id",
+    }
+
+    def _extract_single_resource_ids_from_filters(
+        self, filters: Optional[Dict[str, Any]]
+    ) -> Dict[str, Optional[UUID]]:
+        """Extract resource IDs when filters contain exactly one resource.
+
+        When a filter contains exactly one resource ID, return it so the
+        response can identify which resource the metrics belong to.
+
+        Args:
+            filters: Filter dictionary (e.g., {"project": ["uuid"]})
+
+        Returns:
+            Dict with keys: project_id, model_id, endpoint_id
+            Values are UUID if single resource, None otherwise
+
+        Examples:
+            {"project": ["abc-123"]} -> {"project_id": UUID("abc-123"), ...}
+            {"project": ["id1", "id2"]} -> {"project_id": None, ...}  # Multiple = aggregated
+        """
+        result = {
+            "project_id": None,
+            "model_id": None,
+            "endpoint_id": None,
+        }
+
+        if not filters:
+            return result
+
+        # Map filter keys to result keys
+        filter_mappings = {
+            "project": "project_id",
+            "project_id": "project_id",
+            "model": "model_id",
+            "model_id": "model_id",
+            "endpoint": "endpoint_id",
+            "endpoint_id": "endpoint_id",
+        }
+
+        for filter_key, result_key in filter_mappings.items():
+            if filter_key not in filters:
+                continue
+
+            filter_value = filters[filter_key]
+
+            # Handle list with single element
+            if isinstance(filter_value, list):
+                if len(filter_value) == 1:
+                    with contextlib.suppress(ValueError, TypeError):
+                        result[result_key] = UUID(str(filter_value[0]))
+            # Handle single value (not in list)
+            elif isinstance(filter_value, (str, UUID)):
+                with contextlib.suppress(ValueError, TypeError):
+                    result[result_key] = UUID(str(filter_value))
+
+        return result
+
     @profile_sync("result_processing")
     def _process_query_results(
         self,
@@ -351,6 +416,7 @@ class ObservabilityMetricsService:
         field_order: list[str],
         metrics: list[str],
         group_by: Optional[list[str]] = None,
+        filters: Optional[Dict[str, Any]] = None,
     ) -> list[PeriodBin]:
         """Process raw query results into structured response format."""
         if not results:
@@ -370,12 +436,19 @@ class ObservabilityMetricsService:
                 base = field[:-15]  # Remove "_percent_change"
                 percent_field_map[base] = field
 
+        # Extract single resource IDs from filters (only when no group_by)
+        single_resource_ids = None
+        if not group_by:
+            single_resource_ids = self._extract_single_resource_ids_from_filters(filters)
+
         # Pre-compute group field indices
+        # Map API field names (model, project, etc.) to column names (model_id, project_id, etc.)
         group_field_indices = {}
         if group_by:
             for group_field in group_by:
-                if group_field in field_index:
-                    group_field_indices[group_field] = field_index[group_field]
+                col_name = self._GROUP_BY_TO_COLUMN.get(group_field, group_field)
+                if col_name in field_index:
+                    group_field_indices[group_field] = field_index[col_name]
 
         # Get metric processors (create once and cache)
         if self._metric_processors is None:
@@ -396,10 +469,10 @@ class ObservabilityMetricsService:
 
             # Fast path for gap-filled row detection
             if check_gap_filled:
-                # Check if any group field has a zero UUID
+                # Check if any group field has a zero UUID or NULL
                 is_gap_filled = False
                 for _group_field, idx in group_field_indices.items():
-                    if row[idx] == self._ZERO_UUID:
+                    if row[idx] == self._ZERO_UUID or row[idx] is None:
                         is_gap_filled = True
                         break
 
@@ -414,6 +487,15 @@ class ObservabilityMetricsService:
                 value = row[idx]
                 if value is not None:
                     dimensions[f"{group_field}_id"] = value
+
+            # Populate dimensions from single-resource filters if no group_by
+            if single_resource_ids and not group_by:
+                if single_resource_ids["project_id"]:
+                    dimensions["project_id"] = single_resource_ids["project_id"]
+                if single_resource_ids["model_id"]:
+                    dimensions["model_id"] = single_resource_ids["model_id"]
+                if single_resource_ids["endpoint_id"]:
+                    dimensions["endpoint_id"] = single_resource_ids["endpoint_id"]
 
             # Extract metrics data using processors
             metrics_data = {}
@@ -437,7 +519,7 @@ class ObservabilityMetricsService:
         # Convert to list of PeriodBin objects, sorted by time descending
         # Use list comprehension for better performance
         result_bins = [
-            PeriodBin(time_period=time_period, items=period_bins[time_period] or None)
+            PeriodBin(time_period=time_period, items=period_bins[time_period] or [])
             for time_period in sorted(period_bins.keys(), reverse=True)
         ]
 
@@ -445,6 +527,9 @@ class ObservabilityMetricsService:
 
     async def get_metrics(self, request: ObservabilityMetricsRequest) -> ObservabilityMetricsResponse:
         """Get metrics based on the request.
+
+        Uses rollup tables (InferenceMetrics5m/1h/1d) for compatible metrics,
+        falls back to raw data queries for percentiles and complex metrics.
 
         Args:
             request: ObservabilityMetricsRequest with query parameters
@@ -454,19 +539,39 @@ class ObservabilityMetricsService:
         """
         await self.initialize()
 
-        # Build query (validation already done by Pydantic)
-        query, field_order = self.query_builder.build_query(
-            metrics=request.metrics,
-            from_date=request.from_date,
-            to_date=request.to_date,
-            frequency_unit=request.frequency_unit,
-            frequency_interval=request.frequency_interval,
-            filters=request.filters,
-            group_by=request.group_by,
-            return_delta=request.return_delta,
-            fill_time_gaps=request.fill_time_gaps,
-            topk=request.topk,
-        )
+        # Check if rollup tables can handle this request (better performance)
+        use_rollup = self.query_builder.can_use_rollup(request.metrics)
+
+        if use_rollup:
+            # Use rollup tables for pre-aggregated data (faster for large time ranges)
+            logger.debug(f"Using rollup tables for metrics: {request.metrics}")
+            query, field_order = self.query_builder.build_rollup_query(
+                metrics=request.metrics,
+                from_date=request.from_date,
+                to_date=request.to_date,
+                frequency_unit=request.frequency_unit,
+                frequency_interval=request.frequency_interval,
+                filters=request.filters,
+                group_by=request.group_by,
+                return_delta=request.return_delta,
+                fill_time_gaps=request.fill_time_gaps,
+                topk=request.topk,
+            )
+        else:
+            # Fall back to raw data queries (needed for percentiles, queuing_time, etc.)
+            logger.debug(f"Using raw data for metrics: {request.metrics}")
+            query, field_order = self.query_builder.build_query(
+                metrics=request.metrics,
+                from_date=request.from_date,
+                to_date=request.to_date,
+                frequency_unit=request.frequency_unit,
+                frequency_interval=request.frequency_interval,
+                filters=request.filters,
+                group_by=request.group_by,
+                return_delta=request.return_delta,
+                fill_time_gaps=request.fill_time_gaps,
+                topk=request.topk,
+            )
 
         # Execute query
         try:
@@ -476,7 +581,9 @@ class ObservabilityMetricsService:
             raise RuntimeError("Failed to execute metrics query") from e
 
         # Process results
-        period_bins = self._process_query_results(results, field_order, request.metrics, request.group_by)
+        period_bins = self._process_query_results(
+            results, field_order, request.metrics, request.group_by, request.filters
+        )
 
         # Return response
         return ObservabilityMetricsResponse(object="observability_metrics", items=period_bins)
@@ -682,6 +789,8 @@ class ObservabilityMetricsService:
     async def list_inferences(self, request: InferenceListRequest) -> InferenceListResponse:
         """List inference requests with pagination and filtering.
 
+        Uses InferenceFact (denormalized table) for optimal query performance.
+
         Args:
             request: InferenceListRequest with query parameters
 
@@ -695,15 +804,16 @@ class ObservabilityMetricsService:
         params = {}
 
         # Always filter by date range
-        where_conditions.append("mi.timestamp >= %(from_date)s")
+        # Note: Using 'ifact' alias instead of 'inf' to avoid conflict with ClickHouse's infinity constant
+        where_conditions.append("ifact.timestamp >= %(from_date)s")
         params["from_date"] = request.from_date
 
         if request.to_date:
-            where_conditions.append("mi.timestamp <= %(to_date)s")
+            where_conditions.append("ifact.timestamp <= %(to_date)s")
             params["to_date"] = request.to_date
 
         if request.project_id:
-            where_conditions.append("mid.project_id = %(project_id)s")
+            where_conditions.append("ifact.project_id = %(project_id)s")
             params["project_id"] = str(request.project_id)
 
         # Support filtering by api_key_project_id (for CLIENT users)
@@ -711,49 +821,49 @@ class ObservabilityMetricsService:
             api_key_project_ids = request.filters["api_key_project_id"]
             if isinstance(api_key_project_ids, list):
                 placeholders = [f"%(api_key_project_{i})s" for i in range(len(api_key_project_ids))]
-                where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
                 for i, val in enumerate(api_key_project_ids):
                     params[f"api_key_project_{i}"] = str(val)
             else:
-                where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
                 params["api_key_project_id"] = str(api_key_project_ids)
 
         if request.endpoint_id:
-            where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+            where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
             params["endpoint_id"] = str(request.endpoint_id)
 
         if request.model_id:
-            where_conditions.append("mid.model_id = %(model_id)s")
+            where_conditions.append("ifact.model_id = %(model_id)s")
             params["model_id"] = str(request.model_id)
 
         if request.is_success is not None:
-            where_conditions.append("mid.is_success = %(is_success)s")
+            where_conditions.append("ifact.is_success = %(is_success)s")
             params["is_success"] = 1 if request.is_success else 0
 
         if request.min_tokens is not None:
-            where_conditions.append("(mi.input_tokens + mi.output_tokens) >= %(min_tokens)s")
+            where_conditions.append("(ifact.input_tokens + ifact.output_tokens) >= %(min_tokens)s")
             params["min_tokens"] = request.min_tokens
 
         if request.max_tokens is not None:
-            where_conditions.append("(mi.input_tokens + mi.output_tokens) <= %(max_tokens)s")
+            where_conditions.append("(ifact.input_tokens + ifact.output_tokens) <= %(max_tokens)s")
             params["max_tokens"] = request.max_tokens
 
         if request.max_latency_ms is not None:
-            where_conditions.append("mi.response_time_ms <= %(max_latency_ms)s")
+            where_conditions.append("ifact.response_time_ms <= %(max_latency_ms)s")
             params["max_latency_ms"] = request.max_latency_ms
 
         if request.endpoint_type:
-            where_conditions.append("mi.endpoint_type = %(endpoint_type)s")
+            where_conditions.append("ifact.endpoint_type = %(endpoint_type)s")
             params["endpoint_type"] = request.endpoint_type
 
         where_clause = " AND ".join(where_conditions)
 
         # Build ORDER BY clause - validate sort_by to prevent injection
         sort_column_map = {
-            "timestamp": "mi.timestamp",
-            "tokens": "(mi.input_tokens + mi.output_tokens)",
-            "latency": "mi.response_time_ms",
-            "cost": "mid.cost",
+            "timestamp": "ifact.timestamp",
+            "tokens": "(ifact.input_tokens + ifact.output_tokens)",
+            "latency": "ifact.response_time_ms",
+            "cost": "ifact.cost",
         }
 
         # Validate sort_by is in allowed columns
@@ -766,76 +876,62 @@ class ObservabilityMetricsService:
 
         order_by = f"{sort_column_map[request.sort_by]} {request.sort_order.upper()}"
 
-        # Count total records
-        # Safe: where_clause is built from validated conditions
-        # Optimized: Use count() instead of COUNT(*) and join with ModelInference only if needed
-        # This reduces memory usage by avoiding loading large text fields from unnecessary tables
-        if any(cond.startswith("mi.") for cond in where_conditions):
-            # If we have filters on ModelInference fields, we need the JOIN
-            count_query = f"""
-            SELECT count() as total_count
-            FROM ModelInferenceDetails mid
-            INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-            WHERE {where_clause}
-            """  # nosec B608
-        else:
-            # If all filters are on ModelInferenceDetails, we can count directly
-            count_query = f"""
-            SELECT count() as total_count
-            FROM ModelInferenceDetails mid
-            WHERE {where_clause}
-            """  # nosec B608
+        # Count total records from InferenceFact (denormalized, no JOIN needed)
+        count_query = f"""
+        SELECT count() as total_count
+        FROM InferenceFact ifact
+        WHERE {where_clause}
+        """  # nosec B608
 
         # Execute count query with parameters
         count_result = await self.clickhouse_client.execute_query(count_query, params)
         total_count = count_result[0][0] if count_result else 0
 
-        # Get paginated data
+        # Get paginated data from InferenceFact (denormalized table)
         # Safe: where_clause and order_by are validated, limit/offset use parameters
-        # Optimized: Removed ChatInference JOIN as data is already in ModelInference.input_messages and ModelInference.output
+        # Note: LEFT JOINs kept for modality-specific tables (embedding, audio, image, moderation)
         list_query = f"""
         SELECT
-            mi.inference_id,
-            mi.timestamp,
-            mi.model_name,
+            ifact.inference_id,
+            ifact.timestamp,
+            ifact.model_name,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(mi.input_messages, 1, 100))
-                WHEN mi.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
-                WHEN mi.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
-                WHEN mi.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
-                ELSE toValidUTF8(substring(mi.input_messages, 1, 100))
+                WHEN ifact.endpoint_type = 'chat' THEN toValidUTF8(substring(ifact.input_messages, 1, 100))
+                WHEN ifact.endpoint_type = 'embedding' THEN toValidUTF8(substring(ei.input, 1, 100))
+                WHEN ifact.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.input, 1, 100))
+                WHEN ifact.endpoint_type = 'image_generation' THEN toValidUTF8(substring(ii.prompt, 1, 100))
+                WHEN ifact.endpoint_type = 'moderation' THEN toValidUTF8(substring(modi.input, 1, 100))
+                ELSE toValidUTF8(substring(ifact.input_messages, 1, 100))
             END as prompt_preview,
             CASE
-                WHEN mi.endpoint_type = 'chat' THEN toValidUTF8(substring(mi.output, 1, 100))
-                WHEN mi.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
-                WHEN mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
-                WHEN mi.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
-                WHEN mi.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
-                ELSE toValidUTF8(substring(mi.output, 1, 100))
+                WHEN ifact.endpoint_type = 'chat' THEN toValidUTF8(substring(ifact.output, 1, 100))
+                WHEN ifact.endpoint_type = 'embedding' THEN concat('Generated ', toString(ei.input_count), ' embeddings')
+                WHEN ifact.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech') THEN toValidUTF8(substring(ai.output, 1, 100))
+                WHEN ifact.endpoint_type = 'image_generation' THEN concat('Generated ', toString(ii.image_count), ' images')
+                WHEN ifact.endpoint_type = 'moderation' THEN if(modi.flagged, 'Content flagged', 'Content passed')
+                ELSE toValidUTF8(substring(ifact.output, 1, 100))
             END as response_preview,
-            mi.input_tokens,
-            mi.output_tokens,
-            mi.input_tokens + mi.output_tokens as total_tokens,
-            mi.response_time_ms,
-            mid.cost,
-            mid.is_success,
-            mi.cached,
-            mid.project_id,
-            mid.api_key_project_id,
-            mid.endpoint_id,
-            mid.model_id,
-            coalesce(mi.endpoint_type, 'chat') as endpoint_type,
-            mid.error_code,
-            mid.error_message,
-            mid.error_type,
-            mid.status_code
-        FROM ModelInference mi
-        INNER JOIN ModelInferenceDetails mid ON mi.inference_id = mid.inference_id
-        LEFT JOIN EmbeddingInference ei ON mi.inference_id = ei.id AND mi.endpoint_type = 'embedding'
-        LEFT JOIN AudioInference ai ON mi.inference_id = ai.id AND mi.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
-        LEFT JOIN ImageInference ii ON mi.inference_id = ii.id AND mi.endpoint_type = 'image_generation'
-        LEFT JOIN ModerationInference modi ON mi.inference_id = modi.id AND mi.endpoint_type = 'moderation'
+            ifact.input_tokens,
+            ifact.output_tokens,
+            ifact.input_tokens + ifact.output_tokens as total_tokens,
+            ifact.response_time_ms,
+            ifact.cost,
+            ifact.is_success,
+            ifact.cached,
+            ifact.project_id,
+            ifact.api_key_project_id,
+            ifact.endpoint_id,
+            ifact.model_id,
+            coalesce(ifact.endpoint_type, 'chat') as endpoint_type,
+            ifact.error_code,
+            ifact.error_message,
+            ifact.error_type,
+            ifact.status_code
+        FROM InferenceFact ifact
+        LEFT JOIN EmbeddingInference ei ON ifact.inference_id = ei.id AND ifact.endpoint_type = 'embedding'
+        LEFT JOIN AudioInference ai ON ifact.inference_id = ai.id AND ifact.endpoint_type IN ('audio_transcription', 'audio_translation', 'text_to_speech')
+        LEFT JOIN ImageInference ii ON ifact.inference_id = ii.id AND ifact.endpoint_type = 'image_generation'
+        LEFT JOIN ModerationInference modi ON ifact.inference_id = modi.id AND ifact.endpoint_type = 'moderation'
         WHERE {where_clause}
         ORDER BY {order_by}
         LIMIT %(limit)s OFFSET %(offset)s
@@ -1227,6 +1323,411 @@ class ObservabilityMetricsService:
             total_spans=len(spans),
         )
 
+    async def _get_inference_from_fact_table(self, inference_id: str) -> Optional[dict]:
+        """Try to get inference from InferenceFact table.
+
+        This is the optimized path for chat/blocked endpoint types.
+        Returns None if not found, otherwise returns dict with all columns.
+
+        Args:
+            inference_id: UUID of the inference or trace_id for blocked requests
+
+        Returns:
+            Dictionary with all InferenceFact columns, or None if not found
+        """
+        # First check if InferenceFact table exists
+        try:
+            table_exists_query = "EXISTS TABLE InferenceFact"
+            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
+            if not table_exists_result or table_exists_result[0][0] != 1:
+                logger.debug("InferenceFact table does not exist")
+                return None
+        except Exception as e:
+            logger.warning(f"Failed to check InferenceFact table existence: {e}")
+            return None
+
+        # Query InferenceFact by inference_id OR trace_id (for blocked requests)
+        query = """
+        SELECT
+            -- OTel identifiers
+            id,
+            trace_id,
+            span_id,
+            -- Core identifiers
+            inference_id,
+            project_id,
+            endpoint_id,
+            model_id,
+            api_key_id,
+            api_key_project_id,
+            user_id,
+            -- Timestamps
+            timestamp,
+            request_arrival_time,
+            request_forward_time,
+            -- Status & cost
+            is_success,
+            cost,
+            status_code,
+            toString(request_ip) as request_ip,
+            response_analysis,
+            -- Error tracking
+            error_code,
+            error_message,
+            error_type,
+            -- Model info
+            model_inference_id,
+            model_name,
+            model_provider,
+            endpoint_type,
+            -- Performance metrics
+            input_tokens,
+            output_tokens,
+            response_time_ms,
+            ttft_ms,
+            cached,
+            finish_reason,
+            -- Content
+            toValidUTF8(system_prompt) as system_prompt,
+            toValidUTF8(input_messages) as input_messages,
+            toValidUTF8(output) as output,
+            toValidUTF8(raw_request) as raw_request,
+            toValidUTF8(raw_response) as raw_response,
+            toValidUTF8(gateway_request) as gateway_request,
+            toValidUTF8(gateway_response) as gateway_response,
+            guardrail_scan_summary,
+            -- Chat inference
+            chat_inference_id,
+            episode_id,
+            function_name,
+            variant_name,
+            processing_time_ms,
+            toValidUTF8(chat_input) as chat_input,
+            toValidUTF8(chat_output) as chat_output,
+            tags,
+            inference_params,
+            extra_body,
+            tool_params,
+            -- Gateway analytics - geographic
+            country_code,
+            country_name,
+            region,
+            city,
+            latitude,
+            longitude,
+            timezone,
+            asn,
+            isp,
+            -- Gateway analytics - client
+            toString(client_ip) as client_ip,
+            toValidUTF8(user_agent) as user_agent,
+            device_type,
+            browser_name,
+            browser_version,
+            os_name,
+            os_version,
+            is_bot,
+            -- Gateway analytics - request context
+            method,
+            path,
+            query_params,
+            body_size,
+            response_size,
+            protocol_version,
+            -- Gateway analytics - performance
+            gateway_processing_ms,
+            total_duration_ms,
+            -- Gateway analytics - routing & blocking
+            model_version,
+            routing_decision,
+            is_blocked,
+            block_reason,
+            block_rule_id,
+            proxy_chain,
+            -- Gateway analytics - headers & timestamps
+            request_headers,
+            response_headers,
+            request_timestamp,
+            response_timestamp,
+            gateway_tags,
+            -- Blocking event data
+            blocking_event_id,
+            rule_id,
+            rule_type,
+            rule_name,
+            rule_priority,
+            block_reason_detail,
+            action_taken,
+            blocked_at
+        FROM InferenceFact
+        WHERE inference_id = %(inference_id)s
+           OR trace_id = %(inference_id)s
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """
+
+        params = {"inference_id": inference_id}
+        try:
+            results, column_descriptions = await self.clickhouse_client.execute_query(
+                query, params, with_column_types=True
+            )
+
+            if not results:
+                logger.debug(f"Inference {inference_id} not found in InferenceFact")
+                return None
+
+            # Convert row to dictionary
+            from budmetrics.observability.models import ClickHouseClient
+
+            row_dict = ClickHouseClient.row_to_dict(results[0], column_descriptions)
+            logger.info(f"Found inference {inference_id} in InferenceFact table")
+            return row_dict
+        except Exception as e:
+            logger.warning(f"Error querying InferenceFact for {inference_id}: {e}")
+            return None
+
+    def _build_response_from_fact_row(self, row_dict: dict) -> EnhancedInferenceDetailResponse:
+        """Build EnhancedInferenceDetailResponse from InferenceFact row.
+
+        Args:
+            row_dict: Dictionary with all InferenceFact columns
+
+        Returns:
+            EnhancedInferenceDetailResponse populated from the fact table row
+        """
+        import json
+
+        # Helper functions
+        def safe_uuid(value):
+            if value is None:
+                return None
+            if isinstance(value, UUID):
+                return value
+            try:
+                return UUID(str(value))
+            except (ValueError, TypeError):
+                return None
+
+        def safe_float(val):
+            try:
+                if val is None or val == "":
+                    return None
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        def safe_int(val):
+            try:
+                if val is None or val == "":
+                    return None
+                return int(val)
+            except (ValueError, TypeError):
+                return None
+
+        def safe_dict(val):
+            try:
+                if val is None or val == "":
+                    return None
+                if isinstance(val, dict):
+                    return val
+                if isinstance(val, str):
+                    return json.loads(val)
+                if isinstance(val, (list, tuple)):
+                    return dict(val)
+                return None
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return None
+
+        def safe_str(val):
+            if val is None or val == "":
+                return None
+            return str(val)
+
+        # Get endpoint type
+        endpoint_type = row_dict.get("endpoint_type", "chat")
+
+        # Parse input messages - prefer chat_input over input_messages
+        input_messages_raw = row_dict.get("chat_input") or row_dict.get("input_messages")
+        messages = []
+        try:
+            if input_messages_raw:
+                if isinstance(input_messages_raw, str):
+                    parsed_data = json.loads(input_messages_raw)
+                    if isinstance(parsed_data, dict) and "messages" in parsed_data:
+                        messages = parsed_data["messages"]
+                    elif isinstance(parsed_data, list):
+                        messages = parsed_data
+                elif isinstance(input_messages_raw, list):
+                    messages = input_messages_raw
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse messages: {e}")
+            if input_messages_raw and isinstance(input_messages_raw, str):
+                messages = [{"role": "user", "content": input_messages_raw}]
+
+        # Build combined messages with system prompt
+        combined_messages = []
+        system_prompt = row_dict.get("system_prompt")
+        if system_prompt:
+            combined_messages.append({"role": "system", "content": str(system_prompt)})
+        combined_messages.extend(messages)
+
+        # Add assistant response - prefer chat_output over output
+        output_raw = row_dict.get("chat_output") or row_dict.get("output")
+        if output_raw:
+            try:
+                output_content = json.loads(output_raw)
+                content = output_content
+            except (json.JSONDecodeError, TypeError):
+                content = str(output_raw)
+            combined_messages.append({"role": "assistant", "content": content})
+
+        # Build gateway metadata if data is present
+        gateway_metadata = None
+        gateway_field_names = [
+            "client_ip",
+            "proxy_chain",
+            "protocol_version",
+            "country_code",
+            "region",
+            "city",
+            "latitude",
+            "longitude",
+            "timezone",
+            "asn",
+            "isp",
+            "user_agent",
+            "device_type",
+            "browser_name",
+            "browser_version",
+            "os_name",
+            "os_version",
+            "is_bot",
+            "method",
+            "path",
+            "query_params",
+            "request_headers",
+            "body_size",
+            "gateway_processing_ms",
+            "total_duration_ms",
+            "routing_decision",
+            "model_version",
+            "response_size",
+            "response_headers",
+            "is_blocked",
+            "block_reason",
+            "block_rule_id",
+            "gateway_tags",
+        ]
+        gateway_field_values = [row_dict.get(field) for field in gateway_field_names]
+        has_gateway_data = any(field is not None and field != "" for field in gateway_field_values)
+
+        if has_gateway_data:
+            try:
+                gateway_metadata = GatewayMetadata(
+                    client_ip=safe_str(row_dict.get("client_ip")),
+                    proxy_chain=safe_str(row_dict.get("proxy_chain")),
+                    protocol_version=safe_str(row_dict.get("protocol_version")),
+                    country_code=safe_str(row_dict.get("country_code")),
+                    region=safe_str(row_dict.get("region")),
+                    city=safe_str(row_dict.get("city")),
+                    latitude=safe_float(row_dict.get("latitude")),
+                    longitude=safe_float(row_dict.get("longitude")),
+                    timezone=safe_str(row_dict.get("timezone")),
+                    asn=safe_int(row_dict.get("asn")),
+                    isp=safe_str(row_dict.get("isp")),
+                    user_agent=safe_str(row_dict.get("user_agent")),
+                    device_type=safe_str(row_dict.get("device_type")),
+                    browser_name=safe_str(row_dict.get("browser_name")),
+                    browser_version=safe_str(row_dict.get("browser_version")),
+                    os_name=safe_str(row_dict.get("os_name")),
+                    os_version=safe_str(row_dict.get("os_version")),
+                    is_bot=row_dict.get("is_bot"),
+                    method=safe_str(row_dict.get("method")),
+                    path=safe_str(row_dict.get("path")),
+                    query_params=safe_str(row_dict.get("query_params")),
+                    request_headers=safe_dict(row_dict.get("request_headers")),
+                    body_size=safe_int(row_dict.get("body_size")),
+                    api_key_id=safe_str(row_dict.get("api_key_id")),
+                    auth_method=None,  # Not stored in InferenceFact
+                    user_id=safe_str(row_dict.get("user_id")),
+                    gateway_processing_ms=safe_int(row_dict.get("gateway_processing_ms")),
+                    total_duration_ms=safe_int(row_dict.get("total_duration_ms")),
+                    routing_decision=safe_str(row_dict.get("routing_decision")),
+                    model_version=safe_str(row_dict.get("model_version")),
+                    status_code=safe_int(row_dict.get("status_code")),
+                    response_size=safe_int(row_dict.get("response_size")),
+                    response_headers=safe_dict(row_dict.get("response_headers")),
+                    error_type=safe_str(row_dict.get("error_type")),
+                    error_message=safe_str(row_dict.get("error_message")),
+                    is_blocked=row_dict.get("is_blocked"),
+                    block_reason=safe_str(row_dict.get("block_reason")),
+                    block_rule_id=safe_str(row_dict.get("block_rule_id")),
+                    tags=safe_dict(row_dict.get("gateway_tags")),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to build gateway metadata: {e}")
+                gateway_metadata = None
+
+        # Get inference_id - for blocked requests it might be None
+        inference_id = safe_uuid(row_dict.get("inference_id"))
+        # Fall back to trace_id for blocked requests
+        if inference_id is None:
+            trace_id = row_dict.get("trace_id")
+            if trace_id:
+                with contextlib.suppress(ValueError, TypeError):
+                    inference_id = UUID(trace_id)
+
+        # Get timestamps
+        timestamp = row_dict.get("timestamp")
+        request_arrival_time = row_dict.get("request_arrival_time") or timestamp
+        request_forward_time = row_dict.get("request_forward_time") or timestamp
+
+        return EnhancedInferenceDetailResponse(
+            object="inference_detail",
+            inference_id=inference_id,
+            timestamp=timestamp,
+            model_name=str(row_dict.get("model_name")) if row_dict.get("model_name") else "",
+            model_provider=str(row_dict.get("model_provider")) if row_dict.get("model_provider") else "unknown",
+            model_id=safe_uuid(row_dict.get("model_id")),
+            system_prompt=safe_str(row_dict.get("system_prompt")),
+            messages=combined_messages,
+            output=str(output_raw) if output_raw else "",
+            function_name=safe_str(row_dict.get("function_name")),
+            variant_name=safe_str(row_dict.get("variant_name")),
+            episode_id=safe_uuid(row_dict.get("episode_id")),
+            input_tokens=safe_int(row_dict.get("input_tokens")) or 0,
+            output_tokens=safe_int(row_dict.get("output_tokens")) or 0,
+            response_time_ms=safe_int(row_dict.get("response_time_ms")) or 0,
+            ttft_ms=safe_int(row_dict.get("ttft_ms")),
+            processing_time_ms=safe_int(row_dict.get("processing_time_ms")),
+            request_ip=safe_str(row_dict.get("request_ip")),
+            request_arrival_time=request_arrival_time,
+            request_forward_time=request_forward_time,
+            project_id=safe_uuid(row_dict.get("project_id")),
+            api_key_project_id=safe_uuid(row_dict.get("api_key_project_id")),
+            endpoint_id=safe_uuid(row_dict.get("endpoint_id")),
+            is_success=bool(row_dict.get("is_success")) if row_dict.get("is_success") is not None else True,
+            cached=bool(row_dict.get("cached")) if row_dict.get("cached") is not None else False,
+            finish_reason=safe_str(row_dict.get("finish_reason")),
+            cost=safe_float(row_dict.get("cost")),
+            error_code=safe_str(row_dict.get("error_code")),
+            error_message=safe_str(row_dict.get("error_message")),
+            error_type=safe_str(row_dict.get("error_type")),
+            status_code=safe_int(row_dict.get("status_code")),
+            raw_request=safe_str(row_dict.get("raw_request")),
+            raw_response=safe_str(row_dict.get("raw_response")),
+            gateway_request=safe_str(row_dict.get("gateway_request")),
+            gateway_response=safe_str(row_dict.get("gateway_response")),
+            gateway_metadata=gateway_metadata,
+            feedback_count=0,  # Will be fetched separately if needed
+            average_rating=None,
+            endpoint_type=endpoint_type,
+            embedding_details=None,
+            audio_details=None,
+            image_details=None,
+            moderation_details=None,
+        )
+
     async def get_inference_details(self, inference_id: str) -> EnhancedInferenceDetailResponse:
         """Get complete details for a single inference.
 
@@ -1243,6 +1744,24 @@ class ObservabilityMetricsService:
             UUID(inference_id)
         except ValueError:
             raise ValueError("Invalid inference ID format") from None
+
+        # Phase 1: Try InferenceFact first for chat/blocked endpoint types
+        # This is the optimized path using a single pre-joined table
+        fact_row = await self._get_inference_from_fact_table(inference_id)
+        if fact_row:
+            endpoint_type = fact_row.get("endpoint_type", "chat")
+            # Use InferenceFact for chat and blocked endpoint types
+            if endpoint_type in ("chat", "blocked"):
+                logger.info(f"Using InferenceFact for inference {inference_id} (endpoint_type={endpoint_type})")
+                return self._build_response_from_fact_row(fact_row)
+            else:
+                logger.info(
+                    f"InferenceFact found but endpoint_type={endpoint_type}, "
+                    f"falling back to legacy tables for type-specific details"
+                )
+
+        # Phase 2: Fall back to legacy 4-table JOIN for other endpoint types
+        # or when not found in InferenceFact (data before InferenceFact was created)
 
         # First check if GatewayAnalytics table exists
         try:
@@ -1882,10 +2401,14 @@ class ObservabilityMetricsService:
 
         # Build and execute query
         query = self._build_gateway_analytics_query(request)
-        result = await self._clickhouse_client.execute_query(query)
+        params = {
+            "from_date": request.from_date,
+            "to_date": request.to_date or datetime.now(),
+        }
+        result = await self._clickhouse_client.execute_query(query, params)
 
         # Process results into response format
-        items = await self._process_gateway_metrics_results(result, request)
+        items = self._process_gateway_metrics_results(result, request)
 
         # Calculate summary statistics if requested
         summary = None
@@ -2017,7 +2540,7 @@ class ObservabilityMetricsService:
                 toStartOfHour(timestamp) as time_bucket,
                 count(*) as request_count,
                 avg(response_time_ms) as avg_response_time
-            FROM bud.ModelInferenceDetails
+            FROM InferenceFact
             WHERE timestamp >= %(from_date)s
                 AND timestamp <= %(to_date)s
             GROUP BY time_bucket
@@ -2031,7 +2554,7 @@ class ObservabilityMetricsService:
                 SELECT
                     country_code,
                     count(*) as count
-                FROM bud.ModelInferenceDetails
+                FROM InferenceFact
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
@@ -2047,7 +2570,7 @@ class ObservabilityMetricsService:
                     count(*) as count,
                     any(latitude) as latitude,
                     any(longitude) as longitude
-                FROM bud.ModelInferenceDetails
+                FROM InferenceFact
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
@@ -2087,15 +2610,15 @@ class ObservabilityMetricsService:
         return f"""
             SELECT
                 path,
-                http_method,
+                method,
                 count(*) as count,
                 avg(response_time_ms) as avg_response_time,
                 sum(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) / count(*) * 100 as error_rate
-            FROM bud.ModelInferenceDetails
+            FROM InferenceFact
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
-            GROUP BY path, http_method
+            GROUP BY path, method
             ORDER BY count DESC
             LIMIT {limit}
         """
@@ -2109,7 +2632,7 @@ class ObservabilityMetricsService:
             SELECT
                 {field},
                 count(*) as count
-            FROM bud.ModelInferenceDetails
+            FROM InferenceFact
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
@@ -2120,21 +2643,29 @@ class ObservabilityMetricsService:
 
     def _process_gateway_metrics_results(self, result, request):
         """Process gateway metrics query results."""
-        # Simplified processing - would need full implementation
-        from budmetrics.observability.schemas import GatewayMetricsData, GatewayPeriodBin
+        from budmetrics.observability.schemas import (
+            GatewayCountMetric,
+            GatewayMetricsData,
+            GatewayPerformanceMetric,
+            GatewayPeriodBin,
+        )
 
         items = []
 
         if result:
             for row in result:
+                # Explicit type conversion for ClickHouse Decimal types
+                request_count = int(row[1]) if row[1] is not None else 0
+                avg_response_time = float(row[2]) if len(row) > 2 and row[2] is not None else 0.0
+
                 items.append(
                     GatewayPeriodBin(
                         time_period=row[0],
                         items=[
                             GatewayMetricsData(
                                 data={
-                                    "request_count": {"count": row[1]},
-                                    "avg_response_time": {"avg": row[2]} if len(row) > 2 else {"avg": 0},
+                                    "request_count": GatewayCountMetric(count=request_count),
+                                    "avg_response_time": GatewayPerformanceMetric(avg=avg_response_time),
                                 }
                             )
                         ],
@@ -2176,9 +2707,12 @@ class ObservabilityMetricsService:
 
     def _calculate_gateway_summary_stats(self, items, request):
         """Calculate summary statistics for gateway metrics."""
-        total_requests = sum(
-            item.items[0].data.get("request_count", {}).get("count", 0) for item in items if item.items
-        )
+        total_requests = 0
+        for item in items:
+            if item.items:
+                metric = item.items[0].data.get("request_count")
+                if metric:
+                    total_requests += metric.count
 
         return {
             "total_requests": total_requests,
@@ -2190,90 +2724,231 @@ class ObservabilityMetricsService:
 
     # New Aggregated Metrics Methods
     async def get_aggregated_metrics(self, request) -> dict:
-        """Get aggregated metrics with server-side calculations."""
-        from budmetrics.observability.schemas import (
-            AggregatedMetricsGroup,
-            AggregatedMetricsResponse,
-            AggregatedMetricValue,
+        """Get aggregated metrics with server-side calculations.
+
+        Strategy:
+        - Uses rollup tables for metrics that don't require raw data (pre-aggregated)
+        - Falls back to InferenceFact for percentile metrics (p95/p99 latency and ttft)
+
+        Rollup Compatible: total_requests, success_rate, avg_latency, total_tokens,
+                          total_input_tokens, total_output_tokens, avg_tokens, total_cost,
+                          avg_cost, ttft_avg, cache_hit_rate, throughput_avg, error_rate,
+                          unique_users
+        Requires Raw Data: p95_latency, p99_latency, ttft_p95, ttft_p99
+        """
+        to_date = request.to_date or datetime.now()
+
+        # Metrics that require raw data for percentile calculations
+        raw_data_metrics = {"p95_latency", "p99_latency", "ttft_p95", "ttft_p99"}
+        # Dimensions that require InferenceFact (not available in rollup tables)
+        raw_data_dimensions = {"user"}
+        needs_raw_data = any(m in raw_data_metrics for m in request.metrics) or (
+            request.group_by and any(d in raw_data_dimensions for d in request.group_by)
         )
+
+        if needs_raw_data:
+            return await self._get_aggregated_metrics_from_inference_fact(request, to_date)
+        else:
+            return await self._get_aggregated_metrics_from_rollup(request, to_date)
+
+    async def _get_aggregated_metrics_from_rollup(self, request, to_date: datetime) -> dict:
+        """Get aggregated metrics from rollup tables (pre-aggregated).
+
+        Uses InferenceMetrics5m/1h/1d based on time range for better performance.
+        """
+        # Select rollup table based on time range
+        table = self.query_builder._select_rollup_table(request.from_date, to_date)
 
         # Build the base query with efficient aggregations
         select_fields = []
 
-        # Add grouping fields if specified
+        # Add grouping fields if specified (use rm alias prefix)
         group_by_fields = []
         if request.group_by:
             for group in request.group_by:
                 if group == "model":
-                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
-                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                    group_by_fields.extend(["rm.model_id", "rm.model_name"])
+                    select_fields.extend(["rm.model_id", "rm.model_name"])
                 elif group == "project":
-                    group_by_fields.append("mid.project_id")
-                    select_fields.append("mid.project_id")
+                    group_by_fields.append("rm.project_id")
+                    select_fields.append("rm.project_id")
                 elif group == "endpoint":
-                    group_by_fields.append("mid.endpoint_id")
-                    select_fields.append("mid.endpoint_id")
-                elif group == "user":
-                    group_by_fields.append("ga.user_id")
-                    select_fields.append("ga.user_id")
+                    group_by_fields.append("rm.endpoint_id")
+                    select_fields.append("rm.endpoint_id")
                 elif group == "user_project":
-                    group_by_fields.append("mid.api_key_project_id")
-                    select_fields.append("mid.api_key_project_id")
+                    group_by_fields.append("rm.api_key_project_id")
+                    select_fields.append("rm.api_key_project_id")
+
+        # Build aggregation fields using rollup aggregations
+        # Use rm alias prefix to avoid column/alias name conflicts
+        for metric in request.metrics:
+            if metric == "total_requests":
+                select_fields.append("SUM(rm.request_count) as total_requests")
+            elif metric == "success_rate":
+                select_fields.append(
+                    "SUM(rm.success_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as success_rate"
+                )
+            elif metric == "avg_latency":
+                select_fields.append("SUM(rm.sum_response_time_ms) / NULLIF(SUM(rm.request_count), 0) as avg_latency")
+            elif metric == "total_tokens":
+                select_fields.append("(SUM(rm.total_input_tokens) + SUM(rm.total_output_tokens)) as total_tokens")
+            elif metric == "total_input_tokens":
+                select_fields.append("SUM(rm.total_input_tokens) as total_input_tokens")
+            elif metric == "total_output_tokens":
+                select_fields.append("SUM(rm.total_output_tokens) as total_output_tokens")
+            elif metric == "avg_tokens":
+                select_fields.append(
+                    "(SUM(rm.total_input_tokens) + SUM(rm.total_output_tokens)) / NULLIF(SUM(rm.request_count), 0) as avg_tokens"
+                )
+            elif metric == "total_cost":
+                select_fields.append("SUM(rm.total_cost) as total_cost")
+            elif metric == "avg_cost":
+                select_fields.append("SUM(rm.total_cost) / NULLIF(SUM(rm.request_count), 0) as avg_cost")
+            elif metric == "ttft_avg":
+                select_fields.append("SUM(rm.sum_ttft_ms) / NULLIF(SUM(rm.request_count), 0) as ttft_avg")
+            elif metric == "cache_hit_rate":
+                select_fields.append(
+                    "SUM(rm.cached_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as cache_hit_rate"
+                )
+            elif metric == "throughput_avg":
+                select_fields.append(
+                    "SUM(rm.total_output_tokens) * 1000.0 / NULLIF(SUM(rm.sum_response_time_ms), 0) as throughput_avg"
+                )
+            elif metric == "error_rate":
+                select_fields.append("SUM(rm.error_count) * 100.0 / NULLIF(SUM(rm.request_count), 0) as error_rate")
+            elif metric == "unique_users":
+                select_fields.append("uniqMerge(rm.unique_users) as unique_users")
+
+        # Build WHERE clause (use rm alias prefix)
+        where_conditions = ["rm.time_bucket >= %(from_date)s", "rm.time_bucket <= %(to_date)s"]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": to_date,
+        }
+
+        # Add filters (use rm alias prefix)
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"rm.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("rm.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"rm.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("rm.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("rm.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("rm.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build final query (use rm as table alias)
+        order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        FROM {table} AS rm
+        WHERE {" AND ".join(where_conditions)}
+        {f"GROUP BY {', '.join(group_by_fields)}" if group_by_fields else ""}
+        ORDER BY {order_by}
+        """
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_aggregated_metrics_results(results, request, to_date)
+
+    async def _get_aggregated_metrics_from_inference_fact(self, request, to_date: datetime) -> dict:
+        """Get aggregated metrics from InferenceFact (for percentile metrics).
+
+        Uses InferenceFact when raw data is needed for quantile calculations.
+        No JOINs required - all data in one denormalized table.
+        """
+        # Build the base query with efficient aggregations
+        select_fields = []
+
+        # Add grouping fields if specified (using ifact alias)
+        group_by_fields = []
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["ifact.model_id", "ifact.model_name"])
+                    select_fields.extend(["ifact.model_id", "ifact.model_name"])
+                elif group == "project":
+                    group_by_fields.append("ifact.project_id")
+                    select_fields.append("ifact.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("ifact.endpoint_id")
+                    select_fields.append("ifact.endpoint_id")
+                elif group == "user":
+                    group_by_fields.append("ifact.user_id")
+                    select_fields.append("ifact.user_id")
+                elif group == "user_project":
+                    group_by_fields.append("ifact.api_key_project_id")
+                    select_fields.append("ifact.api_key_project_id")
 
         # Build aggregation fields based on requested metrics
         for metric in request.metrics:
             if metric == "total_requests":
                 select_fields.append("COUNT(*) as total_requests")
             elif metric == "success_rate":
-                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+                select_fields.append("AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
             elif metric == "avg_latency":
-                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
+                select_fields.append("AVG(ifact.response_time_ms) as avg_latency")
             elif metric == "p95_latency":
-                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
+                select_fields.append("quantile(0.95)(ifact.response_time_ms) as p95_latency")
             elif metric == "p99_latency":
-                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+                select_fields.append("quantile(0.99)(ifact.response_time_ms) as p99_latency")
             elif metric == "total_tokens":
-                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as total_tokens")
+                select_fields.append("SUM(ifact.input_tokens + ifact.output_tokens) as total_tokens")
             elif metric == "total_input_tokens":
-                select_fields.append("SUM(mi.input_tokens) as total_input_tokens")
+                select_fields.append("SUM(ifact.input_tokens) as total_input_tokens")
             elif metric == "total_output_tokens":
-                select_fields.append("SUM(mi.output_tokens) as total_output_tokens")
+                select_fields.append("SUM(ifact.output_tokens) as total_output_tokens")
             elif metric == "avg_tokens":
-                select_fields.append("AVG(mi.input_tokens + mi.output_tokens) as avg_tokens")
+                select_fields.append("AVG(ifact.input_tokens + ifact.output_tokens) as avg_tokens")
             elif metric == "total_cost":
-                select_fields.append("SUM(mid.cost) as total_cost")
+                select_fields.append("SUM(ifact.cost) as total_cost")
             elif metric == "avg_cost":
-                select_fields.append("AVG(mid.cost) as avg_cost")
+                select_fields.append("AVG(ifact.cost) as avg_cost")
             elif metric == "ttft_avg":
-                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+                select_fields.append("AVG(ifact.ttft_ms) as ttft_avg")
             elif metric == "ttft_p95":
-                select_fields.append("quantile(0.95)(mi.ttft_ms) as ttft_p95")
+                select_fields.append("quantile(0.95)(ifact.ttft_ms) as ttft_p95")
             elif metric == "ttft_p99":
-                select_fields.append("quantile(0.99)(mi.ttft_ms) as ttft_p99")
+                select_fields.append("quantile(0.99)(ifact.ttft_ms) as ttft_p99")
             elif metric == "cache_hit_rate":
-                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+                select_fields.append("AVG(CASE WHEN ifact.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
             elif metric == "throughput_avg":
                 select_fields.append(
-                    "AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput_avg"
+                    "AVG(ifact.output_tokens * 1000.0 / NULLIF(ifact.response_time_ms, 0)) as throughput_avg"
                 )
             elif metric == "error_rate":
-                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+                select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
             elif metric == "unique_users":
-                select_fields.append("uniqExact(ga.user_id) as unique_users")
-
-        # Build FROM clause with joins
-        from_clause = """
-        FROM ModelInferenceDetails mid
-        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        LEFT JOIN GatewayAnalytics ga ON mid.inference_id = ga.inference_id
-        """
+                select_fields.append("uniqExact(ifact.user_id) as unique_users")
 
         # Build WHERE clause
-        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+        where_conditions = [
+            "ifact.request_arrival_time >= %(from_date)s",
+            "ifact.request_arrival_time <= %(to_date)s",
+        ]
 
         params = {
             "from_date": request.from_date,
-            "to_date": request.to_date or datetime.now(),
+            "to_date": to_date,
         }
 
         # Add filters
@@ -2282,34 +2957,33 @@ class ObservabilityMetricsService:
                 if filter_key == "project_id":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"ifact.project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        where_conditions.append("mid.project_id = %(project_id)s")
+                        where_conditions.append("ifact.project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
-                    # Support filtering by api_key_project_id for CLIENT users
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
-                    where_conditions.append("mid.model_id = %(model_id)s")
+                    where_conditions.append("ifact.model_id = %(model_id)s")
                     params["model_id"] = filter_value
                 elif filter_key == "endpoint_id":
-                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
-        # Build final query
+        # Build final query (no JOINs - all data in InferenceFact)
         order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
         query = f"""
         SELECT {", ".join(select_fields)}
-        {from_clause}
+        FROM InferenceFact ifact
         WHERE {" AND ".join(where_conditions)}
         {f"GROUP BY {', '.join(group_by_fields)}" if group_by_fields else ""}
         ORDER BY {order_by}
@@ -2317,6 +2991,16 @@ class ObservabilityMetricsService:
 
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_aggregated_metrics_results(results, request, to_date)
+
+    def _process_aggregated_metrics_results(self, results, request, to_date: datetime) -> dict:
+        """Process aggregated metrics query results into response format."""
+        from budmetrics.observability.schemas import (
+            AggregatedMetricsGroup,
+            AggregatedMetricsResponse,
+            AggregatedMetricValue,
+        )
 
         # Process results
         groups = []
@@ -2327,7 +3011,7 @@ class ObservabilityMetricsService:
                 groups=[],
                 summary={},
                 total_groups=0,
-                date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+                date_range={"from": request.from_date, "to": to_date},
             )
 
         # If no grouping, create summary from single result
@@ -2396,40 +3080,41 @@ class ObservabilityMetricsService:
             groups=groups,
             summary=overall_summary,
             total_groups=len(groups),
-            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            date_range={"from": request.from_date, "to": to_date},
         )
 
     async def get_time_series_data(self, request) -> dict:
-        """Get time-series data with efficient bucketing."""
-        from budmetrics.observability.schemas import (
-            TimeSeriesGroup,
-            TimeSeriesPoint,
-            TimeSeriesResponse,
-        )
+        """Get time-series data with efficient bucketing.
 
-        # Map interval to ClickHouse interval functions
-        # For simple functions, we'll add the column parameter later
-        # For toStartOfInterval, include the full expression
-        if request.interval == "1m":
-            time_bucket_expr = "toStartOfMinute(mid.request_arrival_time)"
-        elif request.interval == "5m":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 5 minute)"
-        elif request.interval == "15m":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 15 minute)"
-        elif request.interval == "30m":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 30 minute)"
-        elif request.interval == "1h":
-            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
-        elif request.interval == "6h":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 6 hour)"
-        elif request.interval == "12h":
-            time_bucket_expr = "toStartOfInterval(mid.request_arrival_time, INTERVAL 12 hour)"
-        elif request.interval == "1d":
-            time_bucket_expr = "toStartOfDay(mid.request_arrival_time)"
-        elif request.interval == "1w":
-            time_bucket_expr = "toStartOfWeek(mid.request_arrival_time)"
+        Strategy:
+        - Uses rollup tables for metrics that don't require raw data (pre-aggregated)
+        - Falls back to InferenceFact for percentile metrics (p95_latency, p99_latency)
+
+        Rollup Compatible: requests, success_rate, avg_latency, tokens, cost,
+                          ttft_avg, cache_hit_rate, throughput, error_rate
+        Requires Raw Data: p95_latency, p99_latency (quantile functions need raw values)
+        """
+        to_date = request.to_date or datetime.now()
+
+        # Metrics that require raw data for percentile calculations
+        raw_data_metrics = {"p95_latency", "p99_latency"}
+        needs_raw_data = any(m in raw_data_metrics for m in request.metrics)
+
+        if needs_raw_data:
+            return await self._get_time_series_from_inference_fact(request, to_date)
         else:
-            time_bucket_expr = "toStartOfHour(mid.request_arrival_time)"
+            return await self._get_time_series_from_rollup(request, to_date)
+
+    async def _get_time_series_from_rollup(self, request, to_date: datetime) -> dict:
+        """Get time-series data from rollup tables (pre-aggregated).
+
+        Uses InferenceMetrics5m/1h/1d based on time range for better performance.
+        """
+        # Select rollup table based on time range
+        table = self.query_builder._select_rollup_table(request.from_date, to_date)
+
+        # Map interval to ClickHouse time bucket expression
+        time_bucket_expr = self._get_rollup_time_bucket_expr(request.interval)
 
         # Build select fields
         select_fields = [f"{time_bucket_expr} as time_bucket"]
@@ -2439,49 +3124,47 @@ class ObservabilityMetricsService:
         if request.group_by:
             for group in request.group_by:
                 if group == "model":
-                    group_by_fields.extend(["mid.model_id", "mi.model_name"])
-                    select_fields.extend(["mid.model_id", "mi.model_name"])
+                    group_by_fields.extend(["model_id", "model_name"])
+                    select_fields.extend(["model_id", "model_name"])
                 elif group == "project":
-                    group_by_fields.append("mid.project_id")
-                    select_fields.append("mid.project_id")
+                    group_by_fields.append("project_id")
+                    select_fields.append("project_id")
                 elif group == "endpoint":
-                    group_by_fields.append("mid.endpoint_id")
-                    select_fields.append("mid.endpoint_id")
+                    group_by_fields.append("endpoint_id")
+                    select_fields.append("endpoint_id")
                 elif group == "user_project":
-                    group_by_fields.append("mid.api_key_project_id")
-                    select_fields.append("mid.api_key_project_id")
+                    group_by_fields.append("api_key_project_id")
+                    select_fields.append("api_key_project_id")
 
-        # Add metric calculations
+        # Add metric calculations using rollup aggregations
         for metric in request.metrics:
             if metric == "requests":
-                select_fields.append("COUNT(*) as requests")
+                select_fields.append("SUM(request_count) as requests")
             elif metric == "success_rate":
-                select_fields.append("AVG(CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+                select_fields.append("SUM(success_count) * 100.0 / NULLIF(SUM(request_count), 0) as success_rate")
             elif metric == "avg_latency":
-                select_fields.append("AVG(mi.response_time_ms) as avg_latency")
-            elif metric == "p95_latency":
-                select_fields.append("quantile(0.95)(mi.response_time_ms) as p95_latency")
-            elif metric == "p99_latency":
-                select_fields.append("quantile(0.99)(mi.response_time_ms) as p99_latency")
+                select_fields.append("SUM(sum_response_time_ms) / NULLIF(SUM(request_count), 0) as avg_latency")
             elif metric == "tokens":
-                select_fields.append("SUM(mi.input_tokens + mi.output_tokens) as tokens")
+                select_fields.append("SUM(total_input_tokens + total_output_tokens) as tokens")
             elif metric == "cost":
-                select_fields.append("SUM(mid.cost) as cost")
+                select_fields.append("SUM(total_cost) as cost")
             elif metric == "ttft_avg":
-                select_fields.append("AVG(mi.ttft_ms) as ttft_avg")
+                select_fields.append("SUM(sum_ttft_ms) / NULLIF(SUM(request_count), 0) as ttft_avg")
             elif metric == "cache_hit_rate":
-                select_fields.append("AVG(CASE WHEN mi.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+                select_fields.append("SUM(cached_count) * 100.0 / NULLIF(SUM(request_count), 0) as cache_hit_rate")
             elif metric == "throughput":
-                select_fields.append("AVG(mi.output_tokens * 1000.0 / NULLIF(mi.response_time_ms, 0)) as throughput")
+                select_fields.append(
+                    "SUM(total_output_tokens) * 1000.0 / NULLIF(SUM(sum_response_time_ms), 0) as throughput"
+                )
             elif metric == "error_rate":
-                select_fields.append("AVG(CASE WHEN NOT mid.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+                select_fields.append("SUM(error_count) * 100.0 / NULLIF(SUM(request_count), 0) as error_rate")
 
         # Build WHERE clause
-        where_conditions = ["mid.request_arrival_time >= %(from_date)s", "mid.request_arrival_time <= %(to_date)s"]
+        where_conditions = ["time_bucket >= %(from_date)s", "time_bucket <= %(to_date)s"]
 
         params = {
             "from_date": request.from_date,
-            "to_date": request.to_date or datetime.now(),
+            "to_date": to_date,
         }
 
         # Add filters
@@ -2490,41 +3173,227 @@ class ObservabilityMetricsService:
                 if filter_key == "project_id":
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        where_conditions.append("mid.project_id = %(project_id)s")
+                        where_conditions.append("project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
-                    # Support filtering by api_key_project_id for CLIENT users
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        where_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        where_conditions.append("api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "model_id":
-                    where_conditions.append("mid.model_id = %(model_id)s")
+                    where_conditions.append("model_id = %(model_id)s")
                     params["model_id"] = filter_value
                 elif filter_key == "endpoint_id":
-                    where_conditions.append("mid.endpoint_id = %(endpoint_id)s")
+                    where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
-        # Build query
+        # Build WITH FILL expression for time gap filling
+        fill_expr = ""
+        if request.fill_gaps:
+            step = self._get_interval_step(request.interval)
+            fill_expr = (
+                f"WITH FILL FROM toDateTime('{request.from_date.strftime('%Y-%m-%d %H:%M:%S')}') "
+                f"TO toDateTime('{to_date.strftime('%Y-%m-%d %H:%M:%S')}') STEP {step}"
+            )
+
+        # Build query using rollup table
         query = f"""
         SELECT {", ".join(select_fields)}
-        FROM ModelInferenceDetails mid
-        INNER JOIN ModelInference mi ON mid.inference_id = mi.inference_id
+        FROM {table}
         WHERE {" AND ".join(where_conditions)}
         GROUP BY {", ".join(group_by_fields)}
-        ORDER BY time_bucket ASC
+        ORDER BY time_bucket ASC {fill_expr}
         """
 
         # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_time_series_results(results, request)
+
+    async def _get_time_series_from_inference_fact(self, request, to_date: datetime) -> dict:
+        """Get time-series data from InferenceFact (for percentile metrics).
+
+        Uses InferenceFact when raw data is needed for quantile calculations.
+        No JOINs required - all data in one denormalized table.
+        """
+        # Map interval to ClickHouse time bucket expression using ifact alias
+        time_bucket_expr = self._get_inference_fact_time_bucket_expr(request.interval)
+
+        # Build select fields
+        select_fields = [f"{time_bucket_expr} as time_bucket"]
+
+        # Add grouping fields
+        group_by_fields = ["time_bucket"]
+        if request.group_by:
+            for group in request.group_by:
+                if group == "model":
+                    group_by_fields.extend(["ifact.model_id", "ifact.model_name"])
+                    select_fields.extend(["ifact.model_id", "ifact.model_name"])
+                elif group == "project":
+                    group_by_fields.append("ifact.project_id")
+                    select_fields.append("ifact.project_id")
+                elif group == "endpoint":
+                    group_by_fields.append("ifact.endpoint_id")
+                    select_fields.append("ifact.endpoint_id")
+                elif group == "user_project":
+                    group_by_fields.append("ifact.api_key_project_id")
+                    select_fields.append("ifact.api_key_project_id")
+
+        # Add metric calculations
+        for metric in request.metrics:
+            if metric == "requests":
+                select_fields.append("COUNT(*) as requests")
+            elif metric == "success_rate":
+                select_fields.append("AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate")
+            elif metric == "avg_latency":
+                select_fields.append("AVG(ifact.response_time_ms) as avg_latency")
+            elif metric == "p95_latency":
+                select_fields.append("quantile(0.95)(ifact.response_time_ms) as p95_latency")
+            elif metric == "p99_latency":
+                select_fields.append("quantile(0.99)(ifact.response_time_ms) as p99_latency")
+            elif metric == "tokens":
+                select_fields.append("SUM(ifact.input_tokens + ifact.output_tokens) as tokens")
+            elif metric == "cost":
+                select_fields.append("SUM(ifact.cost) as cost")
+            elif metric == "ttft_avg":
+                select_fields.append("AVG(ifact.ttft_ms) as ttft_avg")
+            elif metric == "cache_hit_rate":
+                select_fields.append("AVG(CASE WHEN ifact.cached THEN 1.0 ELSE 0.0 END) * 100 as cache_hit_rate")
+            elif metric == "throughput":
+                select_fields.append(
+                    "AVG(ifact.output_tokens * 1000.0 / NULLIF(ifact.response_time_ms, 0)) as throughput"
+                )
+            elif metric == "error_rate":
+                select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+
+        # Build WHERE clause
+        where_conditions = [
+            "ifact.request_arrival_time >= %(from_date)s",
+            "ifact.request_arrival_time <= %(to_date)s",
+        ]
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": to_date,
+        }
+
+        # Add filters
+        if hasattr(request, "filters") and request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
+                elif filter_key == "model_id":
+                    where_conditions.append("ifact.model_id = %(model_id)s")
+                    params["model_id"] = filter_value
+                elif filter_key == "endpoint_id":
+                    where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
+                    params["endpoint_id"] = filter_value
+
+        # Build WITH FILL expression for time gap filling
+        fill_expr = ""
+        if request.fill_gaps:
+            step = self._get_interval_step(request.interval)
+            fill_expr = (
+                f"WITH FILL FROM toDateTime('{request.from_date.strftime('%Y-%m-%d %H:%M:%S')}') "
+                f"TO toDateTime('{to_date.strftime('%Y-%m-%d %H:%M:%S')}') STEP {step}"
+            )
+
+        # Build query (no JOINs - all data in InferenceFact)
+        query = f"""
+        SELECT {", ".join(select_fields)}
+        FROM InferenceFact ifact
+        WHERE {" AND ".join(where_conditions)}
+        GROUP BY {", ".join(group_by_fields)}
+        ORDER BY time_bucket ASC {fill_expr}
+        """
+
+        # Execute query
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        return self._process_time_series_results(results, request)
+
+    # Time bucket expression mappings for rollup tables
+    _ROLLUP_TIME_BUCKET_EXPRS = {
+        "1m": "toStartOfMinute(time_bucket)",
+        "5m": "toStartOfInterval(time_bucket, INTERVAL 5 minute)",
+        "15m": "toStartOfInterval(time_bucket, INTERVAL 15 minute)",
+        "30m": "toStartOfInterval(time_bucket, INTERVAL 30 minute)",
+        "1h": "toStartOfHour(time_bucket)",
+        "6h": "toStartOfInterval(time_bucket, INTERVAL 6 hour)",
+        "12h": "toStartOfInterval(time_bucket, INTERVAL 12 hour)",
+        "1d": "toStartOfDay(time_bucket)",
+        # Wrap with toDateTime to ensure DateTime type for comparison
+        "1w": "toDateTime(toStartOfWeek(time_bucket))",
+    }
+
+    # Time bucket expression mappings for InferenceFact table
+    _INFERENCE_FACT_TIME_BUCKET_EXPRS = {
+        "1m": "toStartOfMinute(ifact.request_arrival_time)",
+        "5m": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 5 minute)",
+        "15m": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 15 minute)",
+        "30m": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 30 minute)",
+        "1h": "toStartOfHour(ifact.request_arrival_time)",
+        "6h": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 6 hour)",
+        "12h": "toStartOfInterval(ifact.request_arrival_time, INTERVAL 12 hour)",
+        "1d": "toStartOfDay(ifact.request_arrival_time)",
+        # Wrap with toDateTime to ensure DateTime type for comparison
+        "1w": "toDateTime(toStartOfWeek(ifact.request_arrival_time))",
+    }
+
+    def _get_rollup_time_bucket_expr(self, interval: str) -> str:
+        """Get time bucket expression for rollup tables."""
+        return self._ROLLUP_TIME_BUCKET_EXPRS.get(interval, "toStartOfHour(time_bucket)")
+
+    def _get_inference_fact_time_bucket_expr(self, interval: str) -> str:
+        """Get time bucket expression for InferenceFact table."""
+        return self._INFERENCE_FACT_TIME_BUCKET_EXPRS.get(interval, "toStartOfHour(ifact.request_arrival_time)")
+
+    def _get_interval_step(self, interval: str) -> str:
+        """Convert interval string to ClickHouse INTERVAL syntax for WITH FILL."""
+        interval_map = {
+            "1m": "INTERVAL 1 MINUTE",
+            "5m": "INTERVAL 5 MINUTE",
+            "15m": "INTERVAL 15 MINUTE",
+            "30m": "INTERVAL 30 MINUTE",
+            "1h": "INTERVAL 1 HOUR",
+            "6h": "INTERVAL 6 HOUR",
+            "12h": "INTERVAL 12 HOUR",
+            "1d": "INTERVAL 1 DAY",
+            "1w": "INTERVAL 1 WEEK",
+        }
+        return interval_map.get(interval, "INTERVAL 1 HOUR")
+
+    def _process_time_series_results(self, results, request) -> dict:
+        """Process time series query results into response format."""
+        from budmetrics.observability.schemas import (
+            TimeSeriesGroup,
+            TimeSeriesPoint,
+            TimeSeriesResponse,
+        )
 
         # Process results into groups
         groups_dict = defaultdict(list)
@@ -2536,6 +3405,7 @@ class ObservabilityMetricsService:
             group_key = "default"
             group_info = {}
             field_idx = 1
+            is_gap_filled_row = False
 
             if request.group_by:
                 group_key_parts = []
@@ -2543,25 +3413,42 @@ class ObservabilityMetricsService:
                     if group == "model":
                         model_id = row[field_idx]
                         model_name = row[field_idx + 1]
+                        # Skip gap-filled rows with zero UUID or NULL (created by WITH FILL)
+                        if model_id == self._ZERO_UUID or model_id is None:
+                            is_gap_filled_row = True
+                            break
                         group_info["model_id"] = model_id
                         group_info["model_name"] = model_name
-                        group_key_parts.append(f"model:{model_id}")
+                        group_key_parts.append(f"model:{model_id}|{model_name}")
                         field_idx += 2
                     elif group == "project":
                         project_id = row[field_idx]
+                        if project_id == self._ZERO_UUID or project_id is None:
+                            is_gap_filled_row = True
+                            break
                         group_info["project_id"] = project_id
                         group_key_parts.append(f"project:{project_id}")
                         field_idx += 1
                     elif group == "endpoint":
                         endpoint_id = row[field_idx]
+                        if endpoint_id == self._ZERO_UUID or endpoint_id is None:
+                            is_gap_filled_row = True
+                            break
                         group_info["endpoint_id"] = endpoint_id
                         group_key_parts.append(f"endpoint:{endpoint_id}")
                         field_idx += 1
                     elif group == "user_project":
                         api_key_project_id = row[field_idx]
+                        if api_key_project_id == self._ZERO_UUID or api_key_project_id is None:
+                            is_gap_filled_row = True
+                            break
                         group_info["api_key_project_id"] = api_key_project_id
                         group_key_parts.append(f"api_key_project:{api_key_project_id}")
                         field_idx += 1
+
+                # Skip gap-filled phantom rows
+                if is_gap_filled_row:
+                    continue
 
                 group_key = "|".join(group_key_parts)
 
@@ -2592,9 +3479,7 @@ class ObservabilityMetricsService:
 
             groups.append(group)
 
-        # Fill gaps if requested
-        if request.fill_gaps and groups:
-            groups = self._fill_time_series_gaps(groups, request)
+        # Gap filling is now handled by ClickHouse WITH FILL clause in the query
 
         return TimeSeriesResponse(
             groups=groups,
@@ -2603,184 +3488,285 @@ class ObservabilityMetricsService:
         )
 
     async def get_geographic_data(self, request) -> dict:
-        """Get geographic distribution data from GatewayAnalytics table.
+        """Get geographic distribution data using rollup tables or InferenceFact.
 
-        Note: Currently inference_id in GatewayAnalytics is not populated,
-        so success_rate and avg_latency_ms will be NULL until that is fixed.
-        Geographic data (country, region, city, lat/long) is directly available.
+        Strategy:
+        - Country-level queries use rollup tables (InferenceMetrics5m/1h/1d) for performance
+        - Region/City queries use InferenceFact (rollup doesn't have these columns)
+
+        All geographic data is now available in InferenceFact, eliminating JOIN issues.
+        """
+        to_date = request.to_date or datetime.now()
+
+        # Country-level can use rollup tables for better performance
+        if request.group_by == "country":
+            return await self._get_geographic_data_from_rollup(request, to_date)
+        else:
+            # Region/City require InferenceFact (not in rollup tables)
+            return await self._get_geographic_data_from_inference_fact(request, to_date)
+
+    async def _get_geographic_data_from_rollup(self, request, to_date: datetime) -> dict:
+        """Get country-level geographic data from rollup tables.
+
+        Uses pre-aggregated data for better performance on large time ranges.
+        Rollup tables have country_code as a dimension column.
         """
         from budmetrics.observability.schemas import (
             GeographicDataPoint,
             GeographicDataResponse,
         )
 
-        # Build query based on group_by parameter
-        # Note: success_rate and avg_latency_ms require inference_id to be populated
-        # For now, we use NULL-safe expressions that return NULL when no match
-        # Success rate calculation that handles NULL inference_id (returns NULL when no match)
-        success_rate_expr = (
-            "AVG(CASE WHEN mid.is_success IS NOT NULL "
-            "THEN (CASE WHEN mid.is_success THEN 1.0 ELSE 0.0 END) "
-            "ELSE NULL END) * 100 as success_rate"
-        )
-
-        if request.group_by == "country":
-            select_fields = [
-                "ga.country_code",
-                "COUNT(*) as request_count",
-                success_rate_expr,
-                "AVG(mi.response_time_ms) as avg_latency_ms",
-                "uniqExact(ga.user_id) as unique_users",
-                "any(ga.latitude) as latitude",
-                "any(ga.longitude) as longitude",
-            ]
-            group_by_clause = "ga.country_code"
-            having_clause = "ga.country_code IS NOT NULL AND ga.country_code != ''"
-        elif request.group_by == "region":
-            select_fields = [
-                "ga.country_code",
-                "ga.region",
-                "COUNT(*) as request_count",
-                success_rate_expr,
-                "AVG(mi.response_time_ms) as avg_latency_ms",
-                "uniqExact(ga.user_id) as unique_users",
-            ]
-            group_by_clause = "ga.country_code, ga.region"
-            having_clause = "ga.region IS NOT NULL AND ga.region != ''"
-        else:  # city
-            select_fields = [
-                "ga.country_code",
-                "ga.region",
-                "ga.city",
-                "COUNT(*) as request_count",
-                success_rate_expr,
-                "AVG(mi.response_time_ms) as avg_latency_ms",
-                "uniqExact(ga.user_id) as unique_users",
-                "any(ga.latitude) as latitude",
-                "any(ga.longitude) as longitude",
-            ]
-            group_by_clause = "ga.country_code, ga.region, ga.city"
-            having_clause = "ga.city IS NOT NULL AND ga.city != ''"
-
-        # Build WHERE conditions (only for GatewayAnalytics table)
-        where_conditions = ["ga.timestamp >= %(from_date)s", "ga.timestamp <= %(to_date)s"]
-
-        # Build JOIN conditions for project filtering (applied in JOIN, not WHERE)
-        join_conditions = ["ga.inference_id = mid.inference_id"]
+        # Select appropriate rollup table based on time range
+        table = self.query_builder._select_rollup_table(request.from_date, to_date)
 
         params = {
             "from_date": request.from_date,
-            "to_date": request.to_date or datetime.now(),
+            "to_date": to_date,
+            "limit": request.limit,
         }
 
-        # Add filters - project filters go in JOIN condition, others in WHERE
+        # Build WHERE conditions
+        where_conditions = [
+            "time_bucket >= %(from_date)s",
+            "time_bucket <= %(to_date)s",
+            "country_code IS NOT NULL",
+            "country_code != ''",
+        ]
+
+        # Add filters
         if request.filters:
             for filter_key, filter_value in request.filters.items():
                 if filter_key == "project_id":
-                    # Move project filter to JOIN condition to preserve LEFT JOIN semantics
                     if isinstance(filter_value, list):
                         placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
-                        join_conditions.append(f"mid.project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"project_{i}"] = val
                     else:
-                        join_conditions.append("mid.project_id = %(project_id)s")
+                        where_conditions.append("project_id = %(project_id)s")
                         params["project_id"] = filter_value
                 elif filter_key == "api_key_project_id":
-                    # Support filtering by api_key_project_id for CLIENT users
-                    # Move to JOIN condition to preserve LEFT JOIN semantics
                     if isinstance(filter_value, list):
                         placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
-                        join_conditions.append(f"mid.api_key_project_id IN ({','.join(placeholders)})")
+                        where_conditions.append(f"api_key_project_id IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"api_key_project_{i}"] = val
                     else:
-                        join_conditions.append("mid.api_key_project_id = %(api_key_project_id)s")
+                        where_conditions.append("api_key_project_id = %(api_key_project_id)s")
                         params["api_key_project_id"] = filter_value
                 elif filter_key == "country_code":
-                    # Country filter stays in WHERE clause
                     if isinstance(filter_value, list):
                         placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
-                        where_conditions.append(f"ga.country_code IN ({','.join(placeholders)})")
+                        where_conditions.append(f"country_code IN ({','.join(placeholders)})")
                         for i, val in enumerate(filter_value):
                             params[f"country_{i}"] = val
                     else:
-                        where_conditions.append("ga.country_code = %(country_code)s")
+                        where_conditions.append("country_code = %(country_code)s")
                         params["country_code"] = filter_value
 
-        # Build main query with JOIN conditions in the ON clause
-        join_clause = " AND ".join(join_conditions)
+        where_clause = " AND ".join(where_conditions)
+
+        # Query with pre-aggregated metrics
+        # Note: Use different alias names to avoid ClickHouse confusing column vs alias
         query = f"""
-        WITH total_requests AS (
-            SELECT COUNT(*) as total
-            FROM GatewayAnalytics ga
-            LEFT JOIN ModelInferenceDetails mid ON {join_clause}
-            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-            WHERE {" AND ".join(where_conditions)}
-        )
+        WITH
+            total_cte AS (
+                SELECT SUM(request_count) as total
+                FROM {table}
+                WHERE {where_clause}
+            )
         SELECT
-            {", ".join(select_fields)},
-            (request_count * 100.0 / NULLIF((SELECT total FROM total_requests), 0)) as percentage
-        FROM GatewayAnalytics ga
-        LEFT JOIN ModelInferenceDetails mid ON {join_clause}
-        LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-        WHERE {" AND ".join(where_conditions)}
-        GROUP BY {group_by_clause}
-        HAVING {having_clause}
-        ORDER BY request_count DESC
+            country_code,
+            SUM(request_count) as total_requests,
+            SUM(success_count) * 100.0 / NULLIF(SUM(request_count), 0) as success_rate,
+            SUM(sum_response_time_ms) / NULLIF(SUM(request_count), 0) as avg_latency_ms,
+            uniqMerge(unique_users) as unique_users,
+            (SUM(request_count) * 100.0 / NULLIF((SELECT total FROM total_cte), 0)) as percentage
+        FROM {table}
+        WHERE {where_clause}
+        GROUP BY country_code
+        ORDER BY 2 DESC
         LIMIT %(limit)s
         """
 
-        params["limit"] = request.limit
-        # Execute query
         results = await self.clickhouse_client.execute_query(query, params)
 
-        # Get total count for summary (only from GatewayAnalytics, no need to join)
+        # Get total requests
         total_query = f"""
-        SELECT COUNT(*) as total_requests
-        FROM GatewayAnalytics ga
-        WHERE {" AND ".join(where_conditions)}
+        SELECT SUM(request_count) as total_requests
+        FROM {table}
+        WHERE {where_clause}
         """
         total_result = await self.clickhouse_client.execute_query(
             total_query, {k: v for k, v in params.items() if k != "limit"}
         )
-        total_requests = total_result[0][0] if total_result else 0
+        total_requests = int(total_result[0][0] or 0) if total_result else 0
+
         # Process results
         locations = []
         for row in results:
-            if request.group_by == "country":
-                location = GeographicDataPoint(
-                    country_code=row[0],
-                    request_count=row[1],
-                    success_rate=row[2] if len(row) > 2 else 0.0,
-                    avg_latency_ms=row[3] if len(row) > 3 else None,
-                    unique_users=row[4] if len(row) > 4 else None,
-                    latitude=row[5] if len(row) > 5 else None,
-                    longitude=row[6] if len(row) > 6 else None,
-                    percentage=row[7] if len(row) > 7 else 0.0,
-                )
-            elif request.group_by == "region":
+            location = GeographicDataPoint(
+                country_code=row[0],
+                request_count=int(row[1] or 0),
+                success_rate=float(row[2]) if row[2] is not None else 0.0,
+                avg_latency_ms=float(row[3]) if row[3] is not None else None,
+                unique_users=int(row[4] or 0) if row[4] is not None else None,
+                latitude=None,  # Not available in rollup tables
+                longitude=None,  # Not available in rollup tables
+                percentage=float(row[5]) if row[5] is not None else 0.0,
+            )
+            locations.append(location)
+
+        return GeographicDataResponse(
+            locations=locations,
+            total_requests=total_requests,
+            total_locations=len(locations),
+            date_range={"from": request.from_date, "to": to_date},
+            group_by=request.group_by,
+        )
+
+    async def _get_geographic_data_from_inference_fact(self, request, to_date: datetime) -> dict:
+        """Get region/city-level geographic data from InferenceFact.
+
+        Uses InferenceFact for queries that need region, city, latitude, longitude.
+        No JOINs required - all data is in one denormalized table.
+        """
+        from budmetrics.observability.schemas import (
+            GeographicDataPoint,
+            GeographicDataResponse,
+        )
+
+        params = {
+            "from_date": request.from_date,
+            "to_date": to_date,
+            "limit": request.limit,
+        }
+
+        # Build WHERE conditions using ifact alias (avoid conflict with ClickHouse inf constant)
+        where_conditions = [
+            "ifact.timestamp >= %(from_date)s",
+            "ifact.timestamp <= %(to_date)s",
+        ]
+
+        # Build select fields and group by based on group_by parameter
+        if request.group_by == "region":
+            select_fields = [
+                "ifact.country_code",
+                "ifact.region",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(ifact.response_time_ms) as avg_latency_ms",
+                "uniqExact(ifact.user_id) as unique_users",
+            ]
+            group_by_clause = "ifact.country_code, ifact.region"
+            having_clause = "ifact.region IS NOT NULL AND ifact.region != ''"
+            request_count_pos = 3  # Position of COUNT(*) in SELECT (1-indexed)
+        else:  # city
+            select_fields = [
+                "ifact.country_code",
+                "ifact.region",
+                "ifact.city",
+                "COUNT(*) as request_count",
+                "AVG(CASE WHEN ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as success_rate",
+                "AVG(ifact.response_time_ms) as avg_latency_ms",
+                "uniqExact(ifact.user_id) as unique_users",
+                "any(ifact.latitude) as latitude",
+                "any(ifact.longitude) as longitude",
+            ]
+            group_by_clause = "ifact.country_code, ifact.region, ifact.city"
+            having_clause = "ifact.city IS NOT NULL AND ifact.city != ''"
+            request_count_pos = 4  # Position of COUNT(*) in SELECT (1-indexed)
+
+        # Add filters
+        if request.filters:
+            for filter_key, filter_value in request.filters.items():
+                if filter_key == "project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.project_id = %(project_id)s")
+                        params["project_id"] = filter_value
+                elif filter_key == "api_key_project_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(api_key_project_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.api_key_project_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"api_key_project_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.api_key_project_id = %(api_key_project_id)s")
+                        params["api_key_project_id"] = filter_value
+                elif filter_key == "country_code":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(country_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.country_code IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"country_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.country_code = %(country_code)s")
+                        params["country_code"] = filter_value
+
+        where_clause = " AND ".join(where_conditions)
+
+        # Build query (no JOINs - InferenceFact has all data)
+        query = f"""
+        WITH
+            total_cte AS (
+                SELECT COUNT(*) as total
+                FROM InferenceFact ifact
+                WHERE {where_clause}
+            )
+        SELECT
+            {", ".join(select_fields)},
+            (COUNT(*) * 100.0 / NULLIF((SELECT total FROM total_cte), 0)) as percentage
+        FROM InferenceFact ifact
+        WHERE {where_clause}
+        GROUP BY {group_by_clause}
+        HAVING {having_clause}
+        ORDER BY {request_count_pos} DESC
+        LIMIT %(limit)s
+        """
+
+        results = await self.clickhouse_client.execute_query(query, params)
+
+        # Get total count
+        total_query = f"""
+        SELECT COUNT(*) as total_requests
+        FROM InferenceFact ifact
+        WHERE {where_clause}
+        """
+        total_result = await self.clickhouse_client.execute_query(
+            total_query, {k: v for k, v in params.items() if k != "limit"}
+        )
+        total_requests = int(total_result[0][0] or 0) if total_result else 0
+
+        # Process results
+        locations = []
+        for row in results:
+            if request.group_by == "region":
                 location = GeographicDataPoint(
                     country_code=row[0],
                     region=row[1],
-                    request_count=row[2],
-                    success_rate=row[3] if len(row) > 3 else 0.0,
-                    avg_latency_ms=row[4] if len(row) > 4 else None,
-                    unique_users=row[5] if len(row) > 5 else None,
-                    percentage=row[6] if len(row) > 6 else 0.0,
+                    request_count=int(row[2] or 0),
+                    success_rate=float(row[3]) if row[3] is not None else 0.0,
+                    avg_latency_ms=float(row[4]) if row[4] is not None else None,
+                    unique_users=int(row[5] or 0) if row[5] is not None else None,
+                    percentage=float(row[6]) if row[6] is not None else 0.0,
                 )
             else:  # city
                 location = GeographicDataPoint(
                     country_code=row[0],
                     region=row[1],
                     city=row[2],
-                    request_count=row[3],
-                    success_rate=row[4] if len(row) > 4 else 0.0,
-                    avg_latency_ms=row[5] if len(row) > 5 else None,
-                    unique_users=row[6] if len(row) > 6 else None,
-                    latitude=row[7] if len(row) > 7 else None,
-                    longitude=row[8] if len(row) > 8 else None,
-                    percentage=row[9] if len(row) > 9 else 0.0,
+                    request_count=int(row[3] or 0),
+                    success_rate=float(row[4]) if row[4] is not None else 0.0,
+                    avg_latency_ms=float(row[5]) if row[5] is not None else None,
+                    unique_users=int(row[6] or 0) if row[6] is not None else None,
+                    latitude=float(row[7]) if row[7] is not None else None,
+                    longitude=float(row[8]) if row[8] is not None else None,
+                    percentage=float(row[9]) if row[9] is not None else 0.0,
                 )
 
             locations.append(location)
@@ -2789,7 +3775,7 @@ class ObservabilityMetricsService:
             locations=locations,
             total_requests=total_requests,
             total_locations=len(locations),
-            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            date_range={"from": request.from_date, "to": to_date},
             group_by=request.group_by,
         )
 
@@ -2799,6 +3785,8 @@ class ObservabilityMetricsService:
         This method calculates latency distribution by creating histogram buckets
         and counting requests that fall into each bucket. It supports custom buckets
         and grouping by various dimensions.
+
+        Uses InferenceFact table (denormalized) - no JOINs required.
 
         Args:
             request: The latency distribution request parameters.
@@ -2831,10 +3819,10 @@ class ObservabilityMetricsService:
         from_date_str = request.from_date.strftime("%Y-%m-%d %H:%M:%S")
         to_date_str = (request.to_date or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
 
-        # Build filters
+        # Build filters using ifact alias (avoid conflict with ClickHouse inf constant)
         filter_conditions = [
-            f"toDateTime('{from_date_str}') <= request_arrival_time",
-            f"request_arrival_time < toDateTime('{to_date_str}')",
+            f"toDateTime('{from_date_str}') <= ifact.request_arrival_time",
+            f"ifact.request_arrival_time < toDateTime('{to_date_str}')",
         ]
 
         if request.filters:
@@ -2843,7 +3831,7 @@ class ObservabilityMetricsService:
                 if isinstance(project_ids, str):
                     project_ids = [project_ids]
                 project_filter = "', '".join(str(pid) for pid in project_ids)
-                filter_conditions.append(f"toString(project_id) IN ('{project_filter}')")
+                filter_conditions.append(f"toString(ifact.project_id) IN ('{project_filter}')")
 
             if "api_key_project_id" in request.filters:
                 # Support filtering by api_key_project_id for CLIENT users
@@ -2851,27 +3839,26 @@ class ObservabilityMetricsService:
                 if isinstance(api_key_project_ids, str):
                     api_key_project_ids = [api_key_project_ids]
                 api_key_project_filter = "', '".join(str(pid) for pid in api_key_project_ids)
-                filter_conditions.append(f"toString(api_key_project_id) IN ('{api_key_project_filter}')")
+                filter_conditions.append(f"toString(ifact.api_key_project_id) IN ('{api_key_project_filter}')")
 
             if "endpoint_id" in request.filters:
                 endpoint_ids = request.filters["endpoint_id"]
                 if isinstance(endpoint_ids, str):
                     endpoint_ids = [endpoint_ids]
                 endpoint_filter = "', '".join(str(eid) for eid in endpoint_ids)
-                filter_conditions.append(f"toString(endpoint_id) IN ('{endpoint_filter}')")
+                filter_conditions.append(f"toString(ifact.endpoint_id) IN ('{endpoint_filter}')")
 
             if "model_id" in request.filters:
                 model_ids = request.filters["model_id"]
                 if isinstance(model_ids, str):
                     model_ids = [model_ids]
                 model_filter = "', '".join(str(mid) for mid in model_ids)
-                filter_conditions.append(f"toString(model_id) IN ('{model_filter}')")
+                filter_conditions.append(f"toString(ifact.model_id) IN ('{model_filter}')")
 
         where_clause = " AND ".join(filter_conditions)
 
-        # Calculate latency from ModelInference table's response_time_ms column
-        # We need to join with ModelInference table to get the actual response time
-        latency_expr = "COALESCE(mid.response_time_ms, 0)"
+        # Latency from InferenceFact's response_time_ms column (no JOIN needed)
+        latency_expr = "COALESCE(ifact.response_time_ms, 0)"
 
         # Build bucket case expressions for distribution
         bucket_cases = []
@@ -2886,32 +3873,25 @@ class ObservabilityMetricsService:
         if not request.group_by:
             bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
 
+            # Build dynamic ORDER BY based on actual number of buckets
+            order_cases = [f"WHEN '{bucket['label']}' THEN {i + 1}" for i, bucket in enumerate(buckets)]
+            order_case_expr = f"CASE bucket {' '.join(order_cases)} ELSE {len(buckets) + 1} END"
+
             query = f"""
                 SELECT
                     {bucket_case_expr} as bucket,
                     count() as request_count,
                     avg({latency_expr}) as avg_latency_in_bucket
-                FROM ModelInferenceDetails mdi
-                LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id
+                FROM InferenceFact ifact
                 WHERE {where_clause}
                 GROUP BY bucket
-                ORDER BY
-                    CASE bucket
-                        WHEN '{buckets[0]["label"]}' THEN 1
-                        WHEN '{buckets[1]["label"]}' THEN 2
-                        WHEN '{buckets[2]["label"]}' THEN 3
-                        WHEN '{buckets[3]["label"]}' THEN 4
-                        WHEN '{buckets[4]["label"]}' THEN 5
-                        WHEN '{buckets[5]["label"]}' THEN 6
-                        WHEN '{buckets[6]["label"]}' THEN 7
-                        ELSE 8
-                    END
+                ORDER BY {order_case_expr}
             """
 
             result = await self.clickhouse_client.execute_query(query)
 
-            # Get total count for percentage calculation
-            total_query = f"SELECT count() FROM ModelInferenceDetails mdi LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id WHERE {where_clause}"
+            # Get total count for percentage calculation (no JOIN needed)
+            total_query = f"SELECT count() FROM InferenceFact ifact WHERE {where_clause}"
             total_result = await self.clickhouse_client.execute_query(total_query)
             total_requests = total_result[0][0] if total_result else 0
 
@@ -2934,49 +3914,51 @@ class ObservabilityMetricsService:
                     )
                 )
 
+            # Clean up bucket definitions for response (replace inf with large number for JSON serialization)
+            clean_buckets = [
+                {
+                    "min": bucket["min"],
+                    "max": 999999999 if bucket["max"] == float("inf") else bucket["max"],
+                    "label": bucket["label"],
+                }
+                for bucket in buckets
+            ]
+
             return LatencyDistributionResponse(
                 groups=[],
                 overall_distribution=overall_buckets,
                 total_requests=total_requests,
                 date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
-                bucket_definitions=buckets,
+                bucket_definitions=clean_buckets,
             )
 
         # Handle grouped queries
         groups = []
         total_requests = 0
 
-        # Determine grouping columns and joins needed
+        # Determine grouping columns (all from InferenceFact - no JOINs needed)
         group_columns = []
-        join_tables = []
-
-        # Always join with ModelInference to get response_time_ms
-        join_tables.append("LEFT JOIN ModelInference mid ON mid.inference_id = mdi.inference_id")
 
         if "model" in request.group_by:
-            group_columns.extend(["toString(mdi.model_id) as model_id", "mid.model_name as model_name"])
+            group_columns.extend(["toString(ifact.model_id) as model_id", "ifact.model_name as model_name"])
 
         if "project" in request.group_by:
-            # We have project_id in ModelInferenceDetails, but might need project name
-            group_columns.extend(["toString(mdi.project_id) as project_id", "'Unknown' as project_name"])
+            group_columns.extend(["toString(ifact.project_id) as project_id", "'Unknown' as project_name"])
 
         if "endpoint" in request.group_by:
-            group_columns.extend(["toString(mdi.endpoint_id) as endpoint_id", "'Unknown' as endpoint_name"])
+            group_columns.extend(["toString(ifact.endpoint_id) as endpoint_id", "'Unknown' as endpoint_name"])
 
         if "user" in request.group_by:
-            # User info would need additional joins - for now use project as proxy
-            group_columns.extend(["toString(mdi.project_id) as user_id"])
+            group_columns.extend(["toString(ifact.user_id) as user_id"])
 
         if "user_project" in request.group_by:
-            group_columns.extend(["toString(mdi.api_key_project_id) as api_key_project_id"])
+            group_columns.extend(["toString(ifact.api_key_project_id) as api_key_project_id"])
 
         group_by_clause = ", ".join([col.split(" as ")[1] if " as " in col else col for col in group_columns])
         select_columns = ", ".join(group_columns)
 
-        # Build grouped query with bucket distribution
+        # Build grouped query with bucket distribution (no JOINs needed)
         bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
-
-        joins_clause = " ".join(join_tables) if join_tables else ""
 
         query = f"""
             WITH grouped_data AS (
@@ -2985,8 +3967,7 @@ class ObservabilityMetricsService:
                     {bucket_case_expr} as bucket,
                     count() as request_count,
                     avg({latency_expr}) as avg_latency_in_bucket
-                FROM ModelInferenceDetails mdi
-                {joins_clause}
+                FROM InferenceFact ifact
                 WHERE {where_clause}
                 GROUP BY {group_by_clause}, bucket
             )
@@ -2999,8 +3980,8 @@ class ObservabilityMetricsService:
 
         result = await self.clickhouse_client.execute_query(query)
 
-        # Get overall total for percentage calculations
-        total_query = f"SELECT count() FROM ModelInferenceDetails mdi {joins_clause} WHERE {where_clause}"
+        # Get overall total for percentage calculations (no JOIN needed)
+        total_query = f"SELECT count() FROM InferenceFact ifact WHERE {where_clause}"
         total_result = await self.clickhouse_client.execute_query(total_query)
         total_requests = total_result[0][0] if total_result else 0
 
@@ -3214,14 +4195,12 @@ class ObservabilityMetricsService:
         else:
             return f"{value:.2f}", ""
 
-    def _fill_time_series_gaps(self, groups: list, request) -> list:
-        """Fill gaps in time series data with zero values."""
-        # This is a simplified implementation - in production you'd want more sophisticated gap filling
-        # For now, just return the groups as-is
-        return groups
-
     async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
-        """Get comprehensive blocking rule statistics from ClickHouse.
+        """Get comprehensive blocking rule statistics from InferenceFact table.
+
+        This method queries the unified InferenceFact table which contains blocking event data
+        from both the main inference MV (for requests that reached inference) and the blocking MV
+        (for blocked-only requests that never reached inference).
 
         Args:
             from_date: Start date for the query
@@ -3230,23 +4209,9 @@ class ObservabilityMetricsService:
             rule_id: Optional specific rule filter
 
         Returns:
-            Dictionary with blocking statistics
+            GatewayBlockingRuleStats with blocking statistics
         """
         self._ensure_initialized()
-
-        # Check if GatewayBlockingEvents table exists
-        try:
-            table_exists_query = "EXISTS TABLE GatewayBlockingEvents"
-            table_exists_result = await self.clickhouse_client.execute_query(table_exists_query)
-            blocking_table_exists = table_exists_result and table_exists_result[0][0] == 1
-        except Exception as e:
-            logger.warning(f"Failed to check GatewayBlockingEvents table existence: {e}")
-            # Fallback to basic statistics from ModelInferenceDetails
-            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
-
-        if not blocking_table_exists:
-            logger.info("GatewayBlockingEvents table not found, using fallback")
-            return await self._get_blocking_stats_fallback(from_date, to_date, project_id)
 
         # Build parameters
         params = {
@@ -3254,8 +4219,12 @@ class ObservabilityMetricsService:
             "to_date": to_date or datetime.now(),
         }
 
-        # Build base where conditions
-        where_conditions = ["blocked_at >= %(from_date)s", "blocked_at <= %(to_date)s"]
+        # Build WHERE conditions - filter on is_blocked = true
+        where_conditions = [
+            "is_blocked = true",
+            "timestamp >= %(from_date)s",
+            "timestamp <= %(to_date)s",
+        ]
 
         if project_id:
             where_conditions.append("project_id = %(project_id)s")
@@ -3267,20 +4236,20 @@ class ObservabilityMetricsService:
 
         where_clause = " AND ".join(where_conditions)
 
-        # Get total blocked count and rule breakdown
+        # Query 1: Total stats
         stats_query = f"""
             SELECT
                 COUNT(*) as total_blocked,
                 uniqExact(rule_id) as unique_rules,
                 uniqExact(client_ip) as unique_ips
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
         """
 
         stats_result = await self.clickhouse_client.execute_query(stats_query, params)
         total_blocked = stats_result[0][0] if stats_result else 0
 
-        # Get blocks by rule type and name
+        # Query 2: Rule breakdown
         rule_breakdown_query = f"""
             SELECT
                 rule_type,
@@ -3288,7 +4257,7 @@ class ObservabilityMetricsService:
                 rule_id,
                 COUNT(*) as block_count,
                 uniqExact(client_ip) as unique_ips_blocked
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
             GROUP BY rule_type, rule_name, rule_id
             ORDER BY block_count DESC
@@ -3304,33 +4273,35 @@ class ObservabilityMetricsService:
             rule_name = row[1]
             block_count = row[3]
 
-            blocked_by_rule[rule_name] = block_count
-            if rule_type in blocked_by_type:
-                blocked_by_type[rule_type] += block_count
-            else:
-                blocked_by_type[rule_type] = block_count
+            if rule_name:
+                blocked_by_rule[rule_name] = block_count
+            if rule_type:
+                if rule_type in blocked_by_type:
+                    blocked_by_type[rule_type] += block_count
+                else:
+                    blocked_by_type[rule_type] = block_count
 
-        # Get blocks by reason
+        # Query 3: Block reason breakdown (using block_reason_detail for detailed reason)
         reason_query = f"""
             SELECT
-                block_reason,
+                coalesce(block_reason_detail, block_reason, 'unknown') as reason,
                 COUNT(*) as count
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
-            GROUP BY block_reason
+            GROUP BY reason
             ORDER BY count DESC
         """
 
         reason_result = await self.clickhouse_client.execute_query(reason_query, params)
-        blocked_by_reason = {row[0]: row[1] for row in reason_result}
+        blocked_by_reason = {row[0]: row[1] for row in reason_result if row[0]}
 
-        # Get top blocked IPs with country info
+        # Query 4: Top blocked IPs
         top_ips_query = f"""
             SELECT
-                client_ip,
+                toString(client_ip) as ip,
                 any(country_code) as country_code,
                 COUNT(*) as block_count
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
             GROUP BY client_ip
             ORDER BY block_count DESC
@@ -3338,14 +4309,16 @@ class ObservabilityMetricsService:
         """
 
         top_ips_result = await self.clickhouse_client.execute_query(top_ips_query, params)
-        top_blocked_ips = [{"ip": row[0], "country": row[1] or "Unknown", "count": row[2]} for row in top_ips_result]
+        top_blocked_ips = [
+            {"ip": row[0] or "Unknown", "country": row[1] or "Unknown", "count": row[2]} for row in top_ips_result
+        ]
 
-        # Get time series data (hourly buckets)
+        # Query 5: Time series (hourly)
         time_series_query = f"""
             SELECT
-                toStartOfHour(blocked_at) as hour,
+                toStartOfHour(timestamp) as hour,
                 COUNT(*) as blocked_count
-            FROM GatewayBlockingEvents
+            FROM InferenceFact
             WHERE {where_clause}
             GROUP BY hour
             ORDER BY hour
@@ -3354,12 +4327,12 @@ class ObservabilityMetricsService:
         time_series_result = await self.clickhouse_client.execute_query(time_series_query, params)
         time_series = [{"timestamp": row[0].isoformat(), "blocked_count": row[1]} for row in time_series_result]
 
-        # Calculate block rate (need total requests in same period)
+        # Calculate block rate (total requests from InferenceFact in same period)
         total_requests_query = f"""
             SELECT COUNT(*)
-            FROM ModelInferenceDetails
-            WHERE request_arrival_time >= %(from_date)s
-            AND request_arrival_time <= %(to_date)s
+            FROM InferenceFact
+            WHERE timestamp >= %(from_date)s
+            AND timestamp <= %(to_date)s
             {"AND project_id = %(project_id)s" if project_id else ""}
         """
 
@@ -3370,7 +4343,6 @@ class ObservabilityMetricsService:
         except Exception:
             # If we can't get total requests, set block rate to 0
             block_rate = 0.0
-            total_requests = 0
 
         # Import the response model
         from .schemas import GatewayBlockingRuleStats
@@ -3495,9 +4467,9 @@ class ObservabilityMetricsService:
         self,
         request: CredentialUsageRequest,
     ) -> CredentialUsageResponse:
-        """Get credential usage statistics from ModelInferenceDetails.
+        """Get credential usage statistics from InferenceFact.
 
-        This method queries the ModelInferenceDetails table to find the most recent
+        This method queries the InferenceFact table to find the most recent
         usage for each credential (api_key_id) within the specified time window.
 
         Args:
@@ -3515,7 +4487,7 @@ class ObservabilityMetricsService:
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
                 COUNT(*) as request_count
-            FROM ModelInferenceDetails
+            FROM InferenceFact
             WHERE request_arrival_time >= %(since)s
                 AND api_key_id IS NOT NULL
             """
@@ -3651,13 +4623,13 @@ class ObservabilityMetricsService:
     async def _get_sync_credential_data(self, sync_mode: str, threshold_minutes: int) -> list[CredentialUsageItem]:
         """Get credential usage data for sync based on mode."""
         try:
-            # Base query for credential usage
+            # Base query for credential usage from InferenceFact
             query = """
             SELECT
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
                 COUNT(*) as request_count
-            FROM ModelInferenceDetails
+            FROM InferenceFact
             WHERE api_key_id IS NOT NULL
             """
 
@@ -3707,18 +4679,17 @@ class ObservabilityMetricsService:
             from datetime import datetime, timezone
 
             logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
-            # Base query for user usage - need to join with ModelInference for token data
+            # Base query for user usage from InferenceFact (denormalized, no JOIN needed)
             query = """
             SELECT
-                mid.user_id,
-                MAX(mid.request_arrival_time) as last_activity_at,
-                SUM(COALESCE(mi.input_tokens, 0) + COALESCE(mi.output_tokens, 0)) as total_tokens,
-                SUM(COALESCE(mid.cost, 0)) as total_cost,
+                user_id,
+                MAX(request_arrival_time) as last_activity_at,
+                SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) as total_tokens,
+                SUM(COALESCE(cost, 0)) as total_cost,
                 COUNT(*) as request_count,
-                AVG(CASE WHEN mid.is_success THEN 1 ELSE 0 END) as success_rate
-            FROM ModelInferenceDetails mid
-            LEFT JOIN ModelInference mi ON mid.inference_id = mi.inference_id
-            WHERE mid.user_id IS NOT NULL
+                AVG(CASE WHEN is_success THEN 1 ELSE 0 END) as success_rate
+            FROM InferenceFact
+            WHERE user_id IS NOT NULL
             """
 
             params = {}
@@ -3726,12 +4697,12 @@ class ObservabilityMetricsService:
             if sync_mode == "incremental":
                 # Only users with activity within threshold
                 since_time = datetime.now() - timedelta(minutes=threshold_minutes)
-                query += " AND mid.request_arrival_time >= %(since)s"
+                query += " AND request_arrival_time >= %(since)s"
                 params["since"] = since_time
             # For full sync, get ALL users with any activity (no time filter, no user filter)
 
             query += """
-            GROUP BY mid.user_id
+            GROUP BY user_id
             ORDER BY last_activity_at DESC
             """
 

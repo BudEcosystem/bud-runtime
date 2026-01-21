@@ -19,7 +19,7 @@ data:
     geoip_db_path = "/app/geo/GeoLite2-City.mmdb"
 
     [gateway.observability]
-    enabled = true
+    enabled = false
     async_writes = true
 
     [gateway.observability.kafka]
@@ -89,8 +89,9 @@ spec:
           env:
             - name: TENSORZERO_REDIS_URL
               value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/2"
-            - name: TENSORZERO_CLICKHOUSE_URL
-              value: "http://{{ .Values.clickhouse.auth.username }}:{{ .Values.clickhouse.auth.password }}@{{ .Release.Name }}-clickhouse:8123/budproxy"
+            # NOTE: Disabled tensorzero clickhouse db write
+            # - name: TENSORZERO_CLICKHOUSE_URL
+            #   value: "http://{{ .Values.clickhouse.auth.username }}:{{ .Values.clickhouse.auth.password }}@{{ .Release.Name }}-clickhouse:8123/budproxy"
             - name: TENSORZERO_RSA_PRIVATE_KEY_PATH
               value: /app/keys/rsa-private-key.pem
             - name: TENSORZERO_RSA_PRIVATE_KEY_PASSWORD

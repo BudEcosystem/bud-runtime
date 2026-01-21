@@ -41,6 +41,7 @@ import { CustomBreadcrumb } from "@/components/ui/bud/card/DrawerBreadCrumbNavig
 import BackButton from "@/components/ui/bud/drawer/BackButton";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
+import { errorToast } from "@/components/toast";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -178,15 +179,6 @@ const ObservabilityDetailPage: React.FC = () => {
         `/metrics/inferences/${inferenceId}`,
       );
       if (response.data) {
-        console.log("Inference data:", response.data);
-        console.log("Endpoint type:", response.data.endpoint_type);
-        console.log(
-          "Type of endpoint_type:",
-          typeof response.data.endpoint_type,
-        );
-        console.log("Is chat?", response.data.endpoint_type === "chat");
-        console.log("Is undefined?", response.data.endpoint_type === undefined);
-        console.log("Is null?", response.data.endpoint_type === null);
         setInferenceData(response.data);
       }
     } catch (error: any) {
@@ -194,7 +186,7 @@ const ObservabilityDetailPage: React.FC = () => {
         error?.response?.data?.message ||
         error?.message ||
         "Failed to fetch observability details";
-      message.error(errorMsg);
+      errorToast(errorMsg);
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -209,7 +201,7 @@ const ObservabilityDetailPage: React.FC = () => {
           setCopiedId(null);
         }, 2000);
       },
-      onError: () => message.error("Failed to copy to clipboard"),
+      onError: () => errorToast("Failed to copy to clipboard"),
     });
   };
 

@@ -447,6 +447,12 @@ class SimplePromptExecutor_V4:
         if extra_settings:
             openai_settings["extra_body"] = extra_settings
 
+        # Inject budprompt User-Agent into extra_headers
+        # This overrides pydantic-ai's default User-Agent
+        extra_headers = openai_settings.get("extra_headers", {})
+        extra_headers["User-Agent"] = "budprompt v.4.0"
+        openai_settings["extra_headers"] = extra_headers
+
         return OpenAIModelSettings(**openai_settings)
 
     async def _create_agent(

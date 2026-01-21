@@ -807,7 +807,7 @@ minio:
     requests:
       memory: 512Mi
     limits:
-      memory: 1024Mi
+      memory: 1536Mi
   provisioning:
     enabled: true
     buckets:
