@@ -421,6 +421,7 @@ async def determine_modality_endpoints(
     This function accepts two input formats:
     1. Comma-separated modality values: "text_input, text_output", "text_input, image_input, text_output", etc.
     2. Legacy category keywords: "llm", "mllm", "image", etc. (for backward compatibility)
+       - Optional suffixes like "_classification" are supported for category keywords.
 
     Args:
         input_modality: The modality to determine the endpoints for.
@@ -447,17 +448,24 @@ async def determine_modality_endpoints(
         ModalityEnum.AUDIO_OUTPUT,
     ]
 
+    raw_modality = input_modality
+    normalized_modality = input_modality
+    has_classification = False
+    if "_classification" in normalized_modality:
+        has_classification = True
+        normalized_modality = normalized_modality.replace("_classification", "")
+
     # Parse input to modality enums
-    if "," in input_modality:
+    if "," in normalized_modality:
         # Comma-separated: parse directly to enums
-        logger.debug(f"Parsing comma-separated modality string: {input_modality}")
-        modality_values = [val.strip().lower() for val in input_modality.split(",")]
+        logger.debug(f"Parsing comma-separated modality string: {normalized_modality}")
+        modality_values = [val.strip().lower() for val in normalized_modality.split(",")]
         try:
             modality_enums = [ModalityEnum(val) for val in modality_values]
             # Sort by defined order for consistency with category mappings
             modality_enums = sorted(modality_enums, key=lambda m: modality_order.index(m))
         except ValueError as e:
-            raise ValueError(f"Invalid modality value in: {input_modality}") from e
+            raise ValueError(f"Invalid modality value in: {raw_modality}") from e
     else:
         # Legacy category keywords - map to enums for backward compatibility
         category_mapping = {
@@ -495,9 +503,9 @@ async def determine_modality_endpoints(
                 ModalityEnum.AUDIO_OUTPUT,
             ],
         }
-        if input_modality not in category_mapping:
-            raise ValueError(f"Invalid modality: {input_modality}")
-        modality_enums = category_mapping[input_modality]
+        if normalized_modality not in category_mapping:
+            raise ValueError(f"Invalid modality: {raw_modality}")
+        modality_enums = category_mapping[normalized_modality]
 
     # For consistent endpoint mapping, we use frozenset (order-independent)
 
@@ -509,13 +517,13 @@ async def determine_modality_endpoints(
     # We check for specific category keywords to distinguish
     if modality_set == frozenset(["text_input", "text_output"]):
         # Determine if it's embedding or chat based on input format
-        if input_modality in ["embedding", "llm_embedding"]:
+        if normalized_modality in ["embedding", "llm_embedding"]:
             endpoints = [ModelEndpointEnum.EMBEDDING]
         else:
             endpoints = [ModelEndpointEnum.CHAT]
     elif modality_set == frozenset(["text_input", "text_output", "image_input"]):
         # MLLM can be chat+document or mllm_embedding
-        if input_modality == "mllm_embedding":
+        if normalized_modality == "mllm_embedding":
             endpoints = [ModelEndpointEnum.EMBEDDING]
         else:
             endpoints = [ModelEndpointEnum.CHAT, ModelEndpointEnum.DOCUMENT]
@@ -565,7 +573,10 @@ async def determine_modality_endpoints(
             ModelEndpointEnum.TEXT_TO_SPEECH,
         ]
     else:
-        raise ValueError(f"No endpoints defined for modality combination: {input_modality}")
+        raise ValueError(f"No endpoints defined for modality combination: {raw_modality}")
+
+    if has_classification and ModelEndpointEnum.CLASSIFY not in endpoints:
+        endpoints = [*endpoints, ModelEndpointEnum.CLASSIFY]
 
     return {"modality": modality_enums, "endpoints": endpoints}
 

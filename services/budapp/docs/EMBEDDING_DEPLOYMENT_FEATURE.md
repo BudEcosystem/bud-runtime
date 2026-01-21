@@ -60,7 +60,7 @@ supported_endpoints: Mapped[List[str]] = mapped_column(
 
 ## Supported Endpoint Types
 
-The system supports 15 different endpoint types via `ModelEndpointEnum`:
+The system supports 16 different endpoint types via `ModelEndpointEnum`:
 
 ### Currently Supported
 1. **CHAT** (`/v1/chat/completions`) - Chat completions
@@ -80,6 +80,7 @@ The system supports 15 different endpoint types via `ModelEndpointEnum`:
 11. **RESPONSES** (`/v1/responses`) - Async response retrieval
 12. **RERANK** (`/v1/rerank`) - Reranking functionality
 13. **MODERATION** (`/v1/moderations`) - Content moderation
+14. **CLASSIFY** (`/v1/classify`) - Classification
 
 ## Benefits
 

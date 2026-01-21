@@ -117,6 +117,7 @@ class ModelArchitecture(BaseModel):
     vision_config: Optional[VisionConfig] = None
     audio_config: Optional[AudioConfig] = None
     embedding_config: Optional[EmbeddingConfig] = None
+    classifier_config: Optional[ClassifierConfig] = None
 
 
 class ModelInfoBase(BaseModel):

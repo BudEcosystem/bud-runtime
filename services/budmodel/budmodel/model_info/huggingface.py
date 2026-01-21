@@ -498,6 +498,8 @@ class HuggingFaceModelInfo(BaseModelInfo):
             return False
 
         return False
+
+    @staticmethod
     def parse_classifier_model_config(config: Dict[str, Any]) -> Dict[str, Any] | None:
         """Parse classifier model configuration from config."""
         architectures = config.get("architectures", [])
@@ -517,14 +519,48 @@ class HuggingFaceModelInfo(BaseModelInfo):
         flags = {k: v in arch_text for k, v in task_map.items()}
 
         # 2. Robust Label Extraction
-        # Priority: label2id length -> num_labels key -> Default to 2 (binary)
-        label2id = config.get("label2id", {})
-        id2label = config.get("id2label", {})
+        # Use explicit signals only; do not infer classification from num_labels alone.
+        label2id = config.get("label2id") or {}
+        id2label = config.get("id2label") or {}
+        problem_type = config.get("problem_type")
 
-        if not (any(flags.values()) or len(label2id) or len(id2label)):
+        has_label_map = bool(label2id) or bool(id2label)
+        has_task_flag = any(flags.values())
+        has_problem_type = bool(problem_type)
+
+        if not (has_task_flag or has_label_map or has_problem_type):
             return None
 
-        num_labels = len(label2id) if label2id else config.get("num_labels") or config.get("_num_labels", 2)
+        if id2label:
+            normalized_id2label = {}
+            for key, value in id2label.items():
+                try:
+                    normalized_id2label[int(key)] = value
+                except (TypeError, ValueError):
+                    normalized_id2label[key] = value
+            id2label = normalized_id2label
+
+        if label2id:
+            normalized_label2id = {}
+            for key, value in label2id.items():
+                try:
+                    normalized_label2id[key] = int(value)
+                except (TypeError, ValueError):
+                    normalized_label2id[key] = value
+            label2id = normalized_label2id
+
+        if not label2id and id2label:
+            label2id = {label: idx for idx, label in id2label.items()}
+        elif label2id and not id2label:
+            id2label = {idx: label for label, idx in label2id.items()}
+
+        num_labels = (
+            len(label2id)
+            if label2id
+            else len(id2label)
+            if id2label
+            else config.get("num_labels") or config.get("_num_labels", 2)
+        )
 
         # Ensure consistency: if we have num_labels but no map, generate a dummy map
         if not label2id and num_labels > 0:
@@ -533,6 +569,8 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
         task = [k for k, v in flags.items() if v]
         task = task[0] if len(task) > 0 else None
+        if not task and has_problem_type:
+            task = "sequence_classification"
 
         audio_models = ("Wav2Vec2", "Hubert", "WavLM", "SEW", "UniSpeech", "UniSpeechSat")
         task = (
