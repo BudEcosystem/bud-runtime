@@ -1040,7 +1040,7 @@ class DeploymentTemplateCreate(BaseModel):
     """Deployment template request schema."""
 
     concurrent_requests: int = Field(gt=0)
-    avg_sequence_length: int = Field(ge=0, le=10000)
+    avg_sequence_length: int = Field(ge=0)
     avg_context_length: int = Field(ge=0, le=200000)
     per_session_tokens_per_sec: Optional[list[int]] = None
     ttft: Optional[list[int]] = None
