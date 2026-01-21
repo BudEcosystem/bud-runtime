@@ -338,6 +338,12 @@ impl DiclConfig {
         let embedding_request = EmbeddingRequest {
             input: crate::embeddings::EmbeddingInput::Single(serialized_input.to_string()),
             encoding_format: None,
+            user: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
         };
 
         // Embed the input via an API request

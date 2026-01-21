@@ -2120,6 +2120,12 @@ mod tests {
         let request = EmbeddingRequest {
             input: single_input,
             encoding_format: None,
+            user: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
         };
         let together_request =
             TogetherEmbeddingRequest::new("BAAI/bge-base-en-v1.5", &request.input);
@@ -2136,6 +2142,12 @@ mod tests {
         let request = EmbeddingRequest {
             input: batch_input,
             encoding_format: Some("float".to_string()),
+            user: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
         };
         let together_request = TogetherEmbeddingRequest::new(
             "togethercomputer/m2-bert-80M-8k-retrieval",
