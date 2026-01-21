@@ -65,6 +65,7 @@ import MetricsTab from "./MetricsTab";
 import RulesTab from "./RulesTab";
 import type { RangePickerProps } from "antd/es/date-picker";
 import dayjs from "dayjs";
+import { errorToast, successToast } from "@/components/toast";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -123,8 +124,8 @@ const ObservabilityPage: React.FC = () => {
   // Copy inference ID to clipboard
   const copyToClipboard = async (text: string) => {
     await copyText(text, {
-      onSuccess: () => message.success("Copied to clipboard"),
-      onError: () => message.error("Failed to copy to clipboard"),
+      onSuccess: () => successToast("Copied to clipboard"),
+      onError: () => errorToast("Failed to copy to clipboard"),
     });
   };
 
