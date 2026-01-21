@@ -139,6 +139,35 @@ class EndpointService(SessionMixin):
         base["engine_configs"] = merged_engine
         return base
 
+    @staticmethod
+    def _get_model_max_context_length(model) -> Optional[int]:
+        """Get the model's maximum context length from architecture config.
+
+        For text models, returns context_length from architecture_text_config.
+        For audio models, returns sum of max_source_positions and max_target_positions.
+
+        Args:
+            model: The model object with architecture configs.
+
+        Returns:
+            The model's max context length, or None if not available.
+        """
+        # Try text config first (most common)
+        if model.architecture_text_config:
+            context_length = model.architecture_text_config.get("context_length")
+            if context_length:
+                return context_length
+
+        # Try audio config
+        if model.architecture_audio_config:
+            max_source = model.architecture_audio_config.get("max_source_positions", 0)
+            max_target = model.architecture_audio_config.get("max_target_positions", 0)
+            total = max_source + max_target
+            if total > 0:
+                return total
+
+        return None
+
     async def get_all_endpoints(
         self,
         current_user_id: UUID,
@@ -1279,6 +1308,7 @@ class EndpointService(SessionMixin):
                 "workflow_id": str(db_workflow.id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            "model_max_context_length": self._get_model_max_context_length(db_endpoint.model),
         }
         if db_endpoint.model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
             payload["target_ttft"] = 0
@@ -1399,6 +1429,7 @@ class EndpointService(SessionMixin):
                 "workflow_id": str(db_workflow.id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            "model_max_context_length": self._get_model_max_context_length(db_endpoint.model),
         }
 
         # Perform add worker to deployment request
@@ -1836,6 +1867,7 @@ class EndpointService(SessionMixin):
                 "workflow_id": str(db_workflow.id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            "model_max_context_length": self._get_model_max_context_length(db_endpoint.model),
         }
         logger.debug(f"Adapter deployment payload: {payload}")
         # Perform adapter deployment request
@@ -2109,6 +2141,7 @@ class EndpointService(SessionMixin):
                 "workflow_id": str(db_workflow.id),
             },
             "source_topic": f"{app_settings.source_topic}",
+            "model_max_context_length": self._get_model_max_context_length(db_endpoint.model),
         }
         try:
             # Perform delete adapter request to bud_cluster app

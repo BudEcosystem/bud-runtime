@@ -11,6 +11,8 @@
     - name: model-registry
       mountPath: /data/models-registry
       readOnly: false
+    - name: shm
+      mountPath: "/dev/shm"
   resources:
     requests:
       memory: "{{ .device.memory }}Gi"

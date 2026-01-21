@@ -98,6 +98,9 @@ class HuggingFaceModelInfo(BaseModelInfo):
         if language and not isinstance(language, list):
             language = [language]
 
+        # Filter out non-string values (some models have boolean values in languages list)
+        language = [lang for lang in language if isinstance(lang, str)]
+
         tasks = model_card.data.get("pipeline_tag") or []
         if tasks and not isinstance(tasks, list):
             tasks = [tasks]
@@ -332,6 +335,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
             modality = "llm"
 
         # Check for embedding capability
+        # Method 1: Sentence-transformers style with pooling config
         filepath = cls.download_hf_repo_file(
             pretrained_model_name_or_path, filename="1_Pooling/config.json", token=token
         )
@@ -341,6 +345,16 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
             model_architecture.embedding_config = cls.parse_embedding_model_config(pooling_config)
             modality += "_embedding"
+        else:
+            # Method 2: Detect encoder-only architectures (BERT, RoBERTa, ModernBERT, etc.)
+            # These are embedding/classification models, not generative LLMs
+            architectures = config.get("architectures", [])
+            is_encoder_only = cls._is_encoder_only_model(config, architectures)
+            if is_encoder_only and modality == "llm":
+                # Create embedding config from model's hidden size
+                hidden_size = config.get("hidden_size") or config.get("d_model")
+                model_architecture.embedding_config = EmbeddingConfig(embedding_dimension=hidden_size)
+                modality = "llm_embedding"
 
         # Add TTS suffix if model has audio output capability
         if has_audio_output:
@@ -350,19 +364,30 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
     @staticmethod
     def parse_llm_model_config(config: Dict[str, Any]) -> LLMConfig:
-        """Parse the LLM model configuration."""
-        num_attention_heads = config.get("num_attention_heads") or config.get("num_heads")
+        """Parse the LLM model configuration.
+
+        For multi-modal models (audio-LLM, vision-LLM), text config may be nested
+        inside 'text_config' key. This method checks for nested config first,
+        then falls back to root level.
+        """
+        # Check for nested text_config (common in audio-LLM and vision-LLM hybrids)
+        _config = config.get("text_config", {}) or config
+
+        num_attention_heads = _config.get("num_attention_heads") or _config.get("num_heads")
+        torch_dtype = _config.get("torch_dtype")
+        if torch_dtype is not None and not isinstance(torch_dtype, str):
+            torch_dtype = str(torch_dtype)
 
         return LLMConfig(
-            num_layers=config.get("num_hidden_layers") or config.get("num_layers"),
-            hidden_size=config.get("hidden_size") or config.get("d_model"),
-            intermediate_size=config.get("intermediate_size") or config.get("d_ff"),
-            context_length=config.get("max_position_embeddings") or config.get("n_positions"),
-            vocab_size=config.get("vocab_size"),
-            torch_dtype=config.get("torch_dtype"),
+            num_layers=_config.get("num_hidden_layers") or _config.get("num_layers"),
+            hidden_size=_config.get("hidden_size") or _config.get("d_model"),
+            intermediate_size=_config.get("intermediate_size") or _config.get("d_ff"),
+            context_length=_config.get("max_position_embeddings") or _config.get("n_positions"),
+            vocab_size=_config.get("vocab_size"),
+            torch_dtype=torch_dtype,
             num_attention_heads=num_attention_heads,
-            num_key_value_heads=config.get("num_key_value_heads") or num_attention_heads,
-            rope_scaling=config.get("rope_scaling"),
+            num_key_value_heads=_config.get("num_key_value_heads") or num_attention_heads,
+            rope_scaling=_config.get("rope_scaling"),
         )
 
     @staticmethod
@@ -406,6 +431,66 @@ class HuggingFaceModelInfo(BaseModelInfo):
     def parse_embedding_model_config(pooling_config: Dict[str, Any]) -> Dict[str, Any]:
         """Parse embedding model configuration from pooling config."""
         return EmbeddingConfig(embedding_dimension=pooling_config.get("word_embedding_dimension"))
+
+    @staticmethod
+    def _is_encoder_only_model(config: Dict[str, Any], architectures: List[str]) -> bool:
+        """Detect if model is an encoder-only architecture (BERT-style).
+
+        Encoder-only models are used for embeddings, classification, NER, etc.
+        They are NOT generative LLMs and should be classified as embedding models.
+
+        Detection criteria:
+        1. Architecture name ends with 'Model' (base encoder) vs 'ForCausalLM' (decoder)
+        2. Known encoder-only model families
+        3. No decoder-specific configuration
+        """
+        # Known encoder-only model type families
+        encoder_only_families = {
+            "bert",
+            "roberta",
+            "distilbert",
+            "albert",
+            "electra",
+            "deberta",
+            "xlm-roberta",
+            "camembert",
+            "flaubert",
+            "xlm",
+            "longformer",
+            "modernbert",
+            "nomic_bert",
+            "jina_bert",
+            "gte",
+            "bge",
+            "e5",
+            "snowflake_arctic_embed",
+            "mxbai_embed",
+            "stella_en",
+        }
+
+        model_type = config.get("model_type", "").lower().replace("-", "_")
+        if model_type in encoder_only_families:
+            return True
+
+        # Check architectures - encoder-only models typically end with just "Model"
+        # while decoder/causal LLMs end with "ForCausalLM", "LMHeadModel", etc.
+        encoder_arch_suffixes = ("Model", "ForMaskedLM", "ForSequenceClassification", "ForTokenClassification")
+        decoder_arch_suffixes = ("ForCausalLM", "LMHeadModel", "ForConditionalGeneration")
+
+        for arch in architectures:
+            # If it has decoder architecture, it's not encoder-only
+            if any(arch.endswith(suffix) for suffix in decoder_arch_suffixes):
+                return False
+            # If it has encoder-only architecture suffix, mark as encoder
+            if any(arch.endswith(suffix) for suffix in encoder_arch_suffixes):
+                return True
+
+        # Check for decoder-specific config keys that indicate generative model
+        decoder_indicators = ["num_decoder_layers", "decoder_start_token_id", "is_decoder"]
+        if any(config.get(key) for key in decoder_indicators):
+            return False
+
+        return False
 
     @staticmethod
     def detect_audio_modality(config: Dict[str, Any]) -> Tuple[bool, bool]:
@@ -527,8 +612,22 @@ class HuggingFaceModelInfo(BaseModelInfo):
         elif config.get("thinker_config", {}).get("audio_config"):
             _audio_config = config["thinker_config"]["audio_config"]
         # Priority 6: Root level for Whisper-style models
-        elif config.get("model_type", "").lower() == "whisper":
+        elif config.get("model_type", "").lower() == "whisper" or config.get("model_type", "").lower() in [
+            "wav2vec2",
+            "hubert",
+            "wavlm",
+            "unispeech",
+            "unispeech-sat",
+        ]:
             _audio_config = config
+        # Priority 8: Seamless M4T models with speech_encoder_* fields
+        elif config.get("speech_encoder_layers"):
+            # Create a normalized config from speech_encoder_* fields
+            _audio_config = {
+                "encoder_layers": config.get("speech_encoder_layers"),
+                "hidden_size": config.get("speech_encoder_intermediate_size"),
+                "num_attention_heads": config.get("speech_encoder_attention_heads"),
+            }
 
         # Extract common audio parameters
         audio_config.num_layers = (
@@ -557,6 +656,8 @@ class HuggingFaceModelInfo(BaseModelInfo):
         audio_config.sample_rate = _audio_config.get("sample_rate")
 
         audio_config.max_source_positions = _audio_config.get("max_source_positions")
+
+        audio_config.max_target_positions = _audio_config.get("max_target_positions")
 
         torch_dtype = _audio_config.get("torch_dtype")
         if torch_dtype is not None and not isinstance(torch_dtype, str):

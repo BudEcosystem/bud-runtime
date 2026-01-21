@@ -830,9 +830,17 @@ class KubernetesHandler(BaseClusterHandler):
                     response = requests.get(url, headers=headers, timeout=10)
 
                 # Check if endpoint is supported (200 OK or other success codes)
-                supported_endpoints[endpoint] = response.status_code in [200, 201, 202, 204]
-                logger.debug(f"Endpoint {endpoint} returned  {response.text}")
-                logger.debug(f"Endpoint {endpoint} returned status code {response.status_code}")
+                is_success = response.status_code in [200, 201, 202, 204]
+                supported_endpoints[endpoint] = is_success
+
+                if is_success:
+                    logger.debug(f"Endpoint {endpoint} returned status code {response.status_code}")
+                else:
+                    # Log non-success responses at INFO level for debugging deployment failures
+                    response_text = response.text[:500] if response.text else ""
+                    logger.info(
+                        f"Endpoint {endpoint} returned non-success status {response.status_code}: {response_text}"
+                    )
 
             except requests.RequestException as err:
                 logger.debug(f"Endpoint {endpoint} failed with error: {err}")
