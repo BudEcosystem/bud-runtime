@@ -424,6 +424,7 @@ class CreateDeploymentWorkflow:
                 chat_template=chat_template,
                 default_storage_class=getattr(deploy_engine_request_json, "default_storage_class", None),
                 default_access_mode=getattr(deploy_engine_request_json, "default_access_mode", None),
+                model_max_context_length=getattr(deploy_engine_request_json, "model_max_context_length", None),
             )
             update_workflow_data_in_statestore(
                 str(workflow_id),

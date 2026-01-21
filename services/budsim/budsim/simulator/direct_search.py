@@ -74,12 +74,14 @@ class DirectSearchOptimizer:
         hardware_mode: str = "dedicated",  # Hardware utilization mode
         is_quantization: bool = False,
         supports_lora: bool = False,
+        model_max_context_length: Optional[int] = None,
     ):
         """Initialize DirectSearchOptimizer."""
         self.model = model
         self.model_uri = model_uri  # Store the HuggingFace model identifier for reference
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+        self.model_max_context_length = model_max_context_length
         self.max_concurrency = max_concurrency
         self.target_ttft = target_ttft
         self.target_throughput_per_user = target_throughput_per_user
@@ -613,6 +615,7 @@ class DirectSearchOptimizer:
                 "device_name": self.device_config.get("device_name", ""),
                 "raw_name": self.device_config.get("raw_name", ""),
                 "quantization": self.dtype or "",  # Default to empty string if dtype is None
+                "model_max_context_length": self.model_max_context_length,  # Required for KV cache capping
             }
             # Calculate KV cache memory using heuristic calculator
             kv_cache_memory_per_gpu = self.heuristic_calculator.get_kv_cache_memory(data)
@@ -645,6 +648,7 @@ class DirectSearchOptimizer:
             concurrency=config["concurrency"],
             tp_size=config["tensor_parallel_size"],
             pp_size=config.get("pipeline_parallel_size", 1),
+            model_max_context_length=self.model_max_context_length,
         )
 
         model_data = model_analysis.analyze()

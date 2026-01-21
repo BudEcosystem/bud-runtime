@@ -7,7 +7,58 @@ from transformers import AutoConfig
 from ..commons.config import app_settings
 
 
+# Try to import llm-memory-calculator for param count calculation
+try:
+    from llm_memory_calculator import calculate_memory
+
+    LLM_CALC_AVAILABLE = True
+except ImportError:
+    LLM_CALC_AVAILABLE = False
+
+
 logger = logging.get_logger(__name__)
+
+# Threshold for switching engine priority (5 billion parameters)
+LARGE_MODEL_PARAM_THRESHOLD = 5_000_000_000
+
+
+def get_model_param_count(model_uri: str) -> Optional[int]:
+    """Get model parameter count using llm-memory-calculator.
+
+    This is a lightweight function to get param count for engine prioritization.
+    For models >= 5B params, vllm is preferred over latentbud for embedding models.
+
+    Args:
+        model_uri: HuggingFace model name/path (e.g., "BAAI/bge-large-en-v1.5")
+
+    Returns:
+        Number of parameters, or None if calculation fails
+    """
+    if not LLM_CALC_AVAILABLE:
+        logger.warning("llm-memory-calculator not available, cannot get param count for prioritization")
+        return None
+
+    try:
+        memory_report = calculate_memory(
+            model_id_or_config=model_uri,
+            batch_size=1,
+            seq_length=512,  # Minimal sequence length for param counting
+            precision="bf16",
+            tensor_parallel=1,
+        )
+
+        # Try different attribute names for parameter count
+        for attr in ["parameter_count", "total_parameters", "parameters", "model_parameters"]:
+            if hasattr(memory_report, attr):
+                param_count = getattr(memory_report, attr)
+                logger.info(f"Model {model_uri} has {param_count:,} parameters")
+                return param_count
+
+        logger.warning(f"Could not extract param count from memory report for {model_uri}")
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to get param count for {model_uri}: {e}")
+        return None
 
 
 def get_hf_config_sliding_window(model: str) -> Union[Optional[int], List[Optional[int]]]:
@@ -21,31 +72,52 @@ def get_hf_config_sliding_window(model: str) -> Union[Optional[int], List[Option
     return getattr(config, "sliding_window", None)
 
 
-def _prioritize_engines(engines: List[dict]) -> List[dict]:
+def _prioritize_engines(engines: List[dict], model_uri: Optional[str] = None) -> List[dict]:
     """Prioritize engines by preference for the same device type.
 
-    For embedding models, latentbud is preferred over vllm when both are available
-    for the same device type. This ensures optimized embedding inference.
-
-    Engine priority order (highest to lowest):
-    1. latentbud - Optimized for embedding models
-    2. sglang - Alternative high-performance engine
-    3. vllm - General purpose LLM engine
-    4. litellm - Proxy engine
+    For embedding models, engine priority depends on model parameter size:
+    - Models < 5B params: latentbud is preferred (optimized for smaller embeddings)
+    - Models >= 5B params: vllm is preferred (better for larger models)
 
     Args:
         engines: List of compatible engine configurations.
+        model_uri: HuggingFace model URI for param count lookup (optional).
 
     Returns:
         List of engines with duplicates removed, keeping higher priority engines.
     """
+    # Check if both latentbud and vllm are in the compatible engines
+    engine_names = {e["engine_name"] for e in engines}
+    has_latentbud = "latentbud" in engine_names
+    has_vllm = "vllm" in engine_names
+
+    # Determine priority based on model param size when both engines are available
+    use_large_model_priority = False
+    if has_latentbud and has_vllm and model_uri:
+        num_params = get_model_param_count(model_uri)
+        if num_params is not None and num_params >= LARGE_MODEL_PARAM_THRESHOLD:
+            use_large_model_priority = True
+            logger.info(f"Model {model_uri} has {num_params:,} params (>= 5B), prioritizing vllm over latentbud")
+        elif num_params is not None:
+            logger.info(f"Model {model_uri} has {num_params:,} params (< 5B), prioritizing latentbud over vllm")
+
     # Engine priority (lower number = higher priority)
-    ENGINE_PRIORITY = {
-        "latentbud": 1,  # Preferred for embeddings
-        "sglang": 2,
-        "vllm": 3,
-        "litellm": 4,
-    }
+    if use_large_model_priority:
+        # Large models (>= 5B): prefer vllm over latentbud
+        ENGINE_PRIORITY = {
+            "vllm": 1,
+            "sglang": 2,
+            "latentbud": 3,
+            "litellm": 4,
+        }
+    else:
+        # Small models (< 5B) or unknown: prefer latentbud
+        ENGINE_PRIORITY = {
+            "latentbud": 1,
+            "sglang": 2,
+            "vllm": 3,
+            "litellm": 4,
+        }
 
     # Group engines by device type (normalized to lowercase)
     device_engines: dict = {}
@@ -67,10 +139,8 @@ def _prioritize_engines(engines: List[dict]) -> List[dict]:
         # Log if we're preferring one engine over another
         if len(sorted_engines) > 1:
             skipped = [e["engine_name"] for e in sorted_engines[1:]]
-            logger.info(
-                f"Device {device}: Selected '{best_engine['engine_name']}' over {skipped} "
-                f"(priority-based selection for embedding models)"
-            )
+            priority_reason = "large model (>= 5B params)" if use_large_model_priority else "small model (< 5B params)"
+            logger.info(f"Device {device}: Selected '{best_engine['engine_name']}' over {skipped} ({priority_reason})")
 
     return prioritized
 
@@ -125,8 +195,8 @@ def fetch_compatible_engines(
                 }
             )
         if compatible_engines:
-            # Prioritize engines (latentbud over vllm for same device)
-            return _prioritize_engines(compatible_engines)
+            # Prioritize engines based on model param size
+            return _prioritize_engines(compatible_engines, model_uri=model_uri)
         else:
             return None
     except requests.RequestException as e:

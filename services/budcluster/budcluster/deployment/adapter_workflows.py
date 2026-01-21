@@ -71,6 +71,7 @@ class AdapterWorkflow:
                 delete_on_failure=False,
                 input_tokens=deploy_adapter_request_json.input_tokens,
                 output_tokens=deploy_adapter_request_json.output_tokens,
+                model_max_context_length=getattr(deploy_adapter_request_json, "model_max_context_length", None),
             )
 
             update_workflow_data_in_statestore(
@@ -263,6 +264,7 @@ class AdapterWorkflow:
             ingress_url=add_adapter_request_json.ingress_url,
             input_tokens=add_adapter_request_json.input_tokens,
             output_tokens=add_adapter_request_json.output_tokens,
+            model_max_context_length=getattr(add_adapter_request_json, "model_max_context_length", None),
         )
         deploy_adapter_result = yield ctx.call_activity(
             AdapterWorkflow.deploy_adapter, input=deploy_adapter_activity_request.model_dump_json()
@@ -469,6 +471,7 @@ class DeleteAdapterWorkflow:
             ingress_url=delete_adapter_request_json.ingress_url,
             input_tokens=delete_adapter_request_json.input_tokens,
             output_tokens=delete_adapter_request_json.output_tokens,
+            model_max_context_length=getattr(delete_adapter_request_json, "model_max_context_length", None),
         )
         deploy_adapter_result = yield ctx.call_activity(
             AdapterWorkflow.deploy_adapter, input=deploy_adapter_activity_request.model_dump_json()

@@ -127,6 +127,7 @@ from .schemas import (
     LeaderboardTable,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
+    ModelArchitectureAudioConfig,
     ModelArchitectureLLMConfig,
     ModelArchitectureVisionConfig,
     ModelCreate,
@@ -887,6 +888,35 @@ class CloudModelWorkflowService(SessionMixin):
 class LocalModelWorkflowService(SessionMixin):
     """Local model workflow service."""
 
+    @staticmethod
+    def _get_model_max_context_length(model) -> Optional[int]:
+        """Get the model's maximum context length from architecture config.
+
+        For text models, returns context_length from architecture_text_config.
+        For audio models, returns sum of max_source_positions and max_target_positions.
+
+        Args:
+            model: The model object with architecture configs.
+
+        Returns:
+            The model's max context length, or None if not available.
+        """
+        # Try text config first (most common)
+        if model.architecture_text_config:
+            context_length = model.architecture_text_config.get("context_length")
+            if context_length:
+                return context_length
+
+        # Try audio config
+        if model.architecture_audio_config:
+            max_source = model.architecture_audio_config.get("max_source_positions", 0)
+            max_target = model.architecture_audio_config.get("max_target_positions", 0)
+            total = max_source + max_target
+            if total > 0:
+                return total
+
+        return None
+
     async def add_local_model_workflow(self, current_user_id: UUID, request: CreateLocalModelWorkflowRequest) -> None:
         """Add a local model workflow."""
         # Get request data
@@ -1176,6 +1206,22 @@ class LocalModelWorkflowService(SessionMixin):
                 )
             else:
                 vision_config = None
+
+            # Audio Config
+            model_info_audio_config = model_info_architecture.get("audio_config", {})
+            if model_info_audio_config is not None:
+                audio_config = ModelArchitectureAudioConfig(
+                    num_layers=normalize_value(model_info_audio_config.get("num_layers", None)),
+                    hidden_size=normalize_value(model_info_audio_config.get("hidden_size", None)),
+                    num_attention_heads=normalize_value(model_info_audio_config.get("num_attention_heads", None)),
+                    num_mel_bins=normalize_value(model_info_audio_config.get("num_mel_bins", None)),
+                    sample_rate=normalize_value(model_info_audio_config.get("sample_rate", None)),
+                    max_source_positions=normalize_value(model_info_audio_config.get("max_source_positions", None)),
+                    max_target_positions=normalize_value(model_info_audio_config.get("max_target_positions", None)),
+                    torch_dtype=normalize_value(model_info_audio_config.get("torch_dtype", None)),
+                )
+            else:
+                audio_config = None
         else:
             model_size = None
             model_type = None
@@ -1184,6 +1230,7 @@ class LocalModelWorkflowService(SessionMixin):
             kv_cache_size = None
             text_config = None
             vision_config = None
+            audio_config = None
 
         # Get base model relation
         base_model = None
@@ -1285,6 +1332,7 @@ class LocalModelWorkflowService(SessionMixin):
             kv_cache_size=kv_cache_size,
             architecture_text_config=text_config,
             architecture_vision_config=vision_config,
+            architecture_audio_config=audio_config,
         )
 
         # Create model
@@ -2112,6 +2160,35 @@ class CloudModelService(SessionMixin):
 
 class ModelService(SessionMixin):
     """Model service."""
+
+    @staticmethod
+    def _get_model_max_context_length(model) -> Optional[int]:
+        """Get the model's maximum context length from architecture config.
+
+        For text models, returns context_length from architecture_text_config.
+        For audio models, returns sum of max_source_positions and max_target_positions.
+
+        Args:
+            model: The model object with architecture configs.
+
+        Returns:
+            The model's max context length, or None if not available.
+        """
+        # Try text config first (most common)
+        if model.architecture_text_config:
+            context_length = model.architecture_text_config.get("context_length")
+            if context_length:
+                return context_length
+
+        # Try audio config
+        if model.architecture_audio_config:
+            max_source = model.architecture_audio_config.get("max_source_positions", 0)
+            max_target = model.architecture_audio_config.get("max_target_positions", 0)
+            total = max_source + max_target
+            if total > 0:
+                return total
+
+        return None
 
     async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
@@ -3796,6 +3873,7 @@ class ModelService(SessionMixin):
             enable_reasoning=enable_reasoning,
             default_storage_class=default_storage_class,
             default_access_mode=default_access_mode,
+            model_max_context_length=self._get_model_max_context_length(db_model),
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"

@@ -38,7 +38,8 @@ from .schemas import GetDeploymentConfigRequest, WorkerInfo
 logger = get_logger(__name__)
 
 # CPU deployment memory and resource constants
-CPU_MEMORY_MULTIPLIER = 1.7  # Accounts for runtime overhead, activation memory, safety margin
+CPU_MEMORY_MULTIPLIER = 2  # Accounts for runtime overhead, activation memory, safety margin
+CPU_KV_CACHE_MULTIPLIER = 2  # Accounts for KV cache overhead on CPU (vLLM CPU backend inefficiency)
 CPU_MIN_MEMORY_GB = 10  # Minimum memory allocation for CPU nodes
 SHARED_MODE_CORE_RATIO = 0.1  # CPU request ratio for shared mode (10% of limit)
 
@@ -294,6 +295,7 @@ class DeploymentHandler:
         chat_template: Optional[str] = None,
         default_storage_class: Optional[str] = None,
         default_access_mode: Optional[str] = None,
+        model_max_context_length: Optional[int] = None,
     ):
         """Deploy nodes using Helm.
 
@@ -316,6 +318,7 @@ class DeploymentHandler:
             enable_tool_calling (Optional[bool], optional): Enable tool calling feature. Defaults to None.
             enable_reasoning (Optional[bool], optional): Enable reasoning feature. Defaults to None.
             default_storage_class (Optional[str], optional): Default storage class for PVCs. Defaults to None.
+            model_max_context_length (Optional[int], optional): Model's max context length to cap max_model_len. Defaults to None.
 
         Raises:
             ValueError: If the device configuration is missing required keys or if ingress_url is not provided.
@@ -442,15 +445,17 @@ class DeploymentHandler:
 
                 # If we have the detailed memory components, use the new formula
                 if weight_memory_gb > 0 and kv_cache_memory_gb > 0:
-                    # Formula: memory_allocation = total_memory * multiplier + kv_cache_memory
-                    # Here "total_memory" is interpreted as model weights
-                    raw_memory_gb = (weight_memory_gb * CPU_MEMORY_MULTIPLIER) + kv_cache_memory_gb
+                    # Formula: memory_allocation = (weights * multiplier) + (kv_cache * kv_multiplier) + buffer
+                    # CPU deployments need extra overhead for both weights and KV cache
+                    raw_memory_gb = (weight_memory_gb * CPU_MEMORY_MULTIPLIER) + (
+                        kv_cache_memory_gb * CPU_KV_CACHE_MULTIPLIER
+                    )
                     allocation_memory_gb = raw_memory_gb + buffer_gb
                     # Ensure a minimum allocation for CPU nodes
                     allocation_memory_gb = max(allocation_memory_gb, CPU_MIN_MEMORY_GB)
                     logger.info(
                         f"CPU Node {node.get('name')}: Calculated memory using formula "
-                        f"({weight_memory_gb:.2f} * {CPU_MEMORY_MULTIPLIER} + {kv_cache_memory_gb:.2f}) + {buffer_gb} = {allocation_memory_gb:.2f} GB"
+                        f"({weight_memory_gb:.2f} * {CPU_MEMORY_MULTIPLIER} + {kv_cache_memory_gb:.2f} * {CPU_KV_CACHE_MULTIPLIER}) + {buffer_gb} = {allocation_memory_gb:.2f} GB"
                     )
 
                     # Update node memory for consistency
@@ -497,6 +502,7 @@ class DeploymentHandler:
                 "concurrency": node_concurrency,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
+                "model_max_context_length": model_max_context_length,
                 "enable_tool_calling": enable_tool_calling,
                 "tool_calling_parser_type": tool_calling_parser_type,
                 "enable_reasoning": enable_reasoning,

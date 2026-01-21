@@ -3,7 +3,7 @@ import { BudFormContext } from "../context/BudFormContext";
 import { useForm } from "src/hooks/useForm";
 import DrawerBreadCrumbNavigation from "../card/DrawerBreadCrumbNavigation";
 import { useDrawer } from "src/hooks/useDrawer";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { BudDrawerFooter } from "./BudDrawerFooter";
 import { PrimaryButton, SecondaryButton } from "../form/Buttons";
 import BudStepAlert from "src/flows/components/BudStepAlert";
@@ -80,13 +80,24 @@ export function BudForm(props: BudFormProps) {
   // Use passed form or context form
   const form = props.form || contextForm;
 
+  // Track the previous data JSON to avoid resetting form on every render
+  const prevDataJsonRef = useRef<string>('');
+
   useEffect(() => {
-    // Only set form values on initial mount
+    // Set form values when actual data values change (not just object reference)
+    // This is important for:
+    // 1. Initial mount - set form values from props.data
+    // 2. Reopening from task island - set saved workflow values
+    // But NOT for:
+    // - Re-renders from user interactions (which would reset their changes)
     if (props.data && Object.keys(props.data).length > 0) {
-      form.setFieldsValue(props.data);
+      const dataJson = JSON.stringify(props.data);
+      if (prevDataJsonRef.current !== dataJson) {
+        form.setFieldsValue(props.data);
+        prevDataJsonRef.current = dataJson;
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array - only run once on mount
+  }, [form, props.data]);
 
   // Don't reset fields on unmount - we want to preserve form data when navigating
   // The form will be properly initialized with data prop when remounting

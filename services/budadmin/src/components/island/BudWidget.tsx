@@ -189,8 +189,15 @@ export function BudWidget({
         workflow.workflow_steps.model || workflow.workflow_steps.cloud_model,
       );
       setDeploymentSpecification({
-        deployment_name: workflow.workflow_steps.endpoint_name,
+        // Provide defaults for all required fields first, then spread saved config
+        concurrent_requests: 0,
+        avg_context_length: 0,
+        avg_sequence_length: 0,
+        per_session_tokens_per_sec: [],
+        ttft: [],
+        e2e_latency: [],
         ...workflow.workflow_steps.deploy_config,
+        deployment_name: workflow.workflow_steps.endpoint_name || "",
       });
       setCloudModelDetails({
         ...workflow.workflow_steps.model,

@@ -77,6 +77,7 @@ class AudioConfig(BaseModel):
     num_mel_bins: Optional[int] = None
     sample_rate: Optional[int] = None
     max_source_positions: Optional[int] = None
+    max_target_positions: Optional[int] = None
     torch_dtype: Optional[str] = None
 
 

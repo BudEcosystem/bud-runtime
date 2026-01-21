@@ -26,6 +26,7 @@ class ModelAnalysis:
         concurrency: int,
         tp_size: int,
         pp_size: int = 1,
+        model_max_context_length: Optional[int] = None,
     ):
         """Initialize ModelAnalysis.
 
@@ -37,6 +38,7 @@ class ModelAnalysis:
             concurrency (int): Number of concurrent requests.
             tp_size (int): Tensor parallelism size.
             pp_size (int): Pipeline parallelism size (default 1).
+            model_max_context_length (int, optional): Model's max context length to cap seq_length.
         """
         self.model = model
         self.input_tokens = input_tokens
@@ -44,6 +46,7 @@ class ModelAnalysis:
         self.tp_size = tp_size
         self.pp_size = pp_size
         self.concurrency = concurrency
+        self.model_max_context_length = model_max_context_length
 
         # Store original device config before transformation (for llm-memory-calculator)
         self._original_device_config = device_config.copy()
@@ -172,6 +175,20 @@ class ModelAnalysis:
 
         return int(max_concurrency)
 
+    def _get_capped_seq_length(self) -> int:
+        """Calculate seq_length with 10% buffer, capped by model's max context length.
+
+        Returns:
+            int: Sequence length capped by model's max context length if provided.
+        """
+        seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
+        if self.model_max_context_length and seq_length > self.model_max_context_length:
+            logger.info(
+                f"Capping seq_length from {seq_length} to model max context length {self.model_max_context_length}"
+            )
+            seq_length = self.model_max_context_length
+        return seq_length
+
     def get_model_parameters(self) -> Optional[int]:
         """Get model parameter count using llm-memory-calculator.
 
@@ -184,8 +201,8 @@ class ModelAnalysis:
 
         try:
             # Use calculate_memory to get model memory report
-            # Add 10% safety margin to match deployment configuration
-            seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
+            # Add 10% safety margin, capped by model's max context length
+            seq_length = self._get_capped_seq_length()
             memory_report = calculate_memory(
                 model_id_or_config=self.model,
                 batch_size=1,  # Use 1 for parameter counting
@@ -238,8 +255,8 @@ class ModelAnalysis:
 
             # Calculate memory requirements using calculate_memory
             # Use actual concurrency for accurate KV cache calculation
-            # Add 10% safety margin to match deployment configuration
-            seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
+            # Add 10% safety margin, capped by model's max context length
+            seq_length = self._get_capped_seq_length()
             memory_report = calculate_memory(
                 model_id_or_config=self.model,
                 batch_size=self.concurrency,  # Use actual concurrency for total KV cache
@@ -347,8 +364,8 @@ class ModelAnalysis:
                 precision = "bf16"
 
             # Calculate total memory requirements
-            # Add 10% safety margin to match deployment configuration
-            seq_length = int((self.input_tokens + self.output_tokens) * 1.1)
+            # Add 10% safety margin, capped by model's max context length
+            seq_length = self._get_capped_seq_length()
             memory_report = calculate_memory(
                 model_id_or_config=self.model,
                 batch_size=self.concurrency,
