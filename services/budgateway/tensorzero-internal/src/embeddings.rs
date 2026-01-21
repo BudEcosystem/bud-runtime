@@ -28,6 +28,7 @@ use crate::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -240,9 +241,6 @@ pub struct EmbeddingRequest {
     pub input: EmbeddingInput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoding_format: Option<String>,
-    /// User identifier - forwarded to provider, logged for observability
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user: Option<String>,
     /// Matryoshka dimensions - forwarded to provider
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimensions: Option<u32>,
@@ -258,6 +256,9 @@ pub struct EmbeddingRequest {
     /// Chunking configuration - forwarded to provider
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunking: Option<ChunkingConfig>,
+    /// Extra fields to pass through to providers
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -593,12 +594,12 @@ mod tests {
         let request = EmbeddingRequest {
             input: EmbeddingInput::Batch(vec!["Text 1".to_string(), "Text 2".to_string()]),
             encoding_format: None,
-            user: None,
             dimensions: None,
             modality: None,
             priority: None,
             include_input: None,
             chunking: None,
+            extra: HashMap::new(),
         };
 
         assert_eq!(request.input.len(), 2);
@@ -679,12 +680,12 @@ mod tests {
         let request = EmbeddingRequest {
             input: EmbeddingInput::Single("Hello, world!".to_string()),
             encoding_format: None,
-            user: None,
             dimensions: None,
             modality: None,
             priority: None,
             include_input: None,
             chunking: None,
+            extra: HashMap::new(),
         };
         let response = fallback_embedding_model
             .embed(

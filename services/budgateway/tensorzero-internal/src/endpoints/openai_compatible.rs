@@ -3245,9 +3245,6 @@ pub struct OpenAICompatibleEmbeddingParams {
     /// Encoding format for embeddings (float or base64)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     encoding_format: Option<String>,
-    /// User identifier - forwarded to provider, logged for observability
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    user: Option<String>,
     /// Matryoshka dimensions - forwarded to provider
     #[serde(default, skip_serializing_if = "Option::is_none")]
     dimensions: Option<u32>,
@@ -3320,6 +3317,98 @@ struct OpenAICompatibleEmbeddingResponse {
     /// Extra fields from provider for forward compatibility
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Default)]
+struct ParsedEmbeddingData {
+    text: Option<String>,
+    chunk_text: Option<String>,
+    chunk_info: Option<Value>,
+    extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Default)]
+struct ParsedEmbeddingResponseMetadata {
+    id: Option<String>,
+    created: Option<u64>,
+    chunking_info: Option<Value>,
+    extra: HashMap<String, Value>,
+    data: Vec<ParsedEmbeddingData>,
+}
+
+fn parse_embedding_response_metadata(raw_response: &str) -> Option<ParsedEmbeddingResponseMetadata> {
+    let value: Value = serde_json::from_str(raw_response).ok()?;
+    let object = value.as_object()?;
+
+    let id = object
+        .get("id")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let created = object.get("created").and_then(|value| value.as_u64());
+    let chunking_info = object
+        .get("chunking_info")
+        .and_then(|value| (!value.is_null()).then(|| value.clone()));
+
+    let data = object
+        .get("data")
+        .and_then(|value| value.as_array())
+        .map(|items| items.iter().map(parse_embedding_data).collect())
+        .unwrap_or_default();
+
+    let mut extra = HashMap::new();
+    for (key, value) in object {
+        if matches!(
+            key.as_str(),
+            "object" | "data" | "model" | "usage" | "id" | "created" | "chunking_info"
+        ) {
+            continue;
+        }
+        extra.insert(key.clone(), value.clone());
+    }
+
+    Some(ParsedEmbeddingResponseMetadata {
+        id,
+        created,
+        chunking_info,
+        extra,
+        data,
+    })
+}
+
+fn parse_embedding_data(value: &Value) -> ParsedEmbeddingData {
+    let Some(object) = value.as_object() else {
+        return ParsedEmbeddingData::default();
+    };
+
+    let text = object
+        .get("text")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let chunk_text = object
+        .get("chunk_text")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let chunk_info = object
+        .get("chunk_info")
+        .and_then(|value| (!value.is_null()).then(|| value.clone()));
+
+    let mut extra = HashMap::new();
+    for (key, value) in object {
+        if matches!(
+            key.as_str(),
+            "object" | "embedding" | "index" | "text" | "chunk_text" | "chunk_info"
+        ) {
+            continue;
+        }
+        extra.insert(key.clone(), value.clone());
+    }
+
+    ParsedEmbeddingData {
+        text,
+        chunk_text,
+        chunk_info,
+        extra,
+    }
 }
 
 /// Response for a single model in the list
@@ -3421,11 +3510,6 @@ pub async fn embedding_handler(
         );
     }
 
-    // Log user parameter for observability
-    if let Some(ref user) = openai_compatible_params.user {
-        tracing::info!(user = %user, "Embedding request with user identifier");
-    }
-
     // Resolve the model name based on authentication state
     let model_resolution = model_resolution::resolve_model_name(
         Some(&openai_compatible_params.model),
@@ -3460,15 +3544,17 @@ pub async fn embedding_handler(
     let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
 
     // Create embedding request with all extended parameters
+    let mut extra = openai_compatible_params.extra.clone();
+    extra.remove("user");
     let embedding_request = EmbeddingRequest {
         input: internal_input,
         encoding_format: openai_compatible_params.encoding_format.clone(),
-        user: openai_compatible_params.user.clone(),
         dimensions: openai_compatible_params.dimensions,
         modality: openai_compatible_params.modality.clone(),
         priority: openai_compatible_params.priority.clone(),
         include_input: openai_compatible_params.include_input,
         chunking: openai_compatible_params.chunking.clone(),
+        extra,
     };
 
     // Extract model configuration
@@ -3511,9 +3597,8 @@ pub async fn embedding_handler(
         .embed(&embedding_request, &original_model_name, &clients)
         .await?;
 
-    // Convert to OpenAI-compatible format
-    // Note: chunking_info, chunk_text, chunk_info would come from provider raw_response
-    // For full pass-through, we'd need to parse provider response and extract these fields
+    // Convert to OpenAI-compatible format, including provider pass-through metadata when present
+    let parsed_metadata = parse_embedding_response_metadata(&response.raw_response);
     let openai_response = OpenAICompatibleEmbeddingResponse {
         object: "list".to_string(),
         data: response
@@ -3524,10 +3609,23 @@ pub async fn embedding_handler(
                 object: "embedding".to_string(),
                 embedding: embedding.clone(),
                 index,
-                text: None,       // Would come from provider if include_input=true
-                chunk_text: None, // Would come from provider if chunking enabled
-                chunk_info: None, // Would come from provider if chunking enabled
-                extra: HashMap::new(),
+                text: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .and_then(|metadata| metadata.text.clone()),
+                chunk_text: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .and_then(|metadata| metadata.chunk_text.clone()),
+                chunk_info: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .and_then(|metadata| metadata.chunk_info.clone()),
+                extra: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .map(|metadata| metadata.extra.clone())
+                    .unwrap_or_default(),
             })
             .collect(),
         model: original_model_name.clone(),
@@ -3535,11 +3633,22 @@ pub async fn embedding_handler(
             prompt_tokens: response.usage.input_tokens,
             total_tokens: response.usage.input_tokens,
         },
-        // Include response metadata from the gateway
-        id: Some(response.id.to_string()),
-        created: Some(response.created),
-        chunking_info: None, // Would come from provider if chunking enabled
-        extra: HashMap::new(),
+        // Include response metadata from provider when available
+        id: parsed_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.id.clone())
+            .or_else(|| Some(response.id.to_string())),
+        created: parsed_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.created)
+            .or(Some(response.created)),
+        chunking_info: parsed_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.chunking_info.clone()),
+        extra: parsed_metadata
+            .as_ref()
+            .map(|metadata| metadata.extra.clone())
+            .unwrap_or_default(),
     };
 
     // Capture the gateway response (without null values)
@@ -8212,13 +8321,12 @@ mod tests {
         assert_eq!(cache_options.max_age_s, Some(3600));
         assert_eq!(cache_options.enabled, CacheEnabledMode::On);
 
-        // Test with known extended fields (encoding_format, dimensions, user are now explicit fields)
+        // Test with known extended fields (encoding_format, dimensions are explicit fields)
         let json_extended = json!({
             "input": "Test",
             "model": "embedding-model",
             "encoding_format": "float",
             "dimensions": 1536,
-            "user": "test-user",
             "modality": "text",
             "priority": "high",
             "include_input": true,
@@ -8233,7 +8341,6 @@ mod tests {
             serde_json::from_value(json_extended).unwrap();
         assert_eq!(params.encoding_format, Some("float".to_string()));
         assert_eq!(params.dimensions, Some(1536));
-        assert_eq!(params.user, Some("test-user".to_string()));
         assert_eq!(params.modality, Some("text".to_string()));
         assert_eq!(params.priority, Some("high".to_string()));
         assert_eq!(params.include_input, Some(true));

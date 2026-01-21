@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::OnceLock, time::Duration};
+use std::{borrow::Cow, collections::HashMap, sync::OnceLock, time::Duration};
 
 use futures::StreamExt;
 use lazy_static::lazy_static;
@@ -6,6 +6,7 @@ use reqwest::StatusCode;
 use reqwest_eventsource::{Event, EventSource, RequestBuilderExt};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::time::Instant;
 use url::Url;
 use uuid::Uuid;
@@ -796,6 +797,18 @@ struct MistralEmbeddingRequest<'a> {
     input: Vec<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     encoding_format: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dimensions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modality: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_input: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunking: Option<&'a crate::embeddings::ChunkingConfig>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -866,6 +879,12 @@ impl EmbeddingProvider for MistralProvider {
             model: &self.model_name,
             input: input_texts,
             encoding_format: request.encoding_format.as_deref(),
+            dimensions: request.dimensions,
+            modality: request.modality.as_deref(),
+            priority: request.priority.as_deref(),
+            include_input: request.include_input,
+            chunking: request.chunking.as_ref(),
+            extra: request.extra.clone(),
         };
 
         let request_url = get_embedding_url(&MISTRAL_API_BASE)?;
@@ -1742,6 +1761,12 @@ mod tests {
             model: "mistral-embed",
             input: vec!["Hello, world!", "How are you?"],
             encoding_format: Some("float"),
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         let serialized = serde_json::to_value(&request).unwrap();
