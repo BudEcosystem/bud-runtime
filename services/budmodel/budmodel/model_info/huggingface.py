@@ -42,6 +42,7 @@ from .parser import (
 )
 from .schemas import (
     AudioConfig,
+    ClassifierConfig,
     EmbeddingConfig,
     LicenseInfo,
     LLMConfig,
@@ -356,6 +357,12 @@ class HuggingFaceModelInfo(BaseModelInfo):
                 model_architecture.embedding_config = EmbeddingConfig(embedding_dimension=hidden_size)
                 modality = "llm_embedding"
 
+        # Check for classifier capability
+        classifier_config = cls.parse_classifier_model_config(config)
+        if classifier_config:
+            model_architecture.classifier_config = classifier_config
+            modality += "_classification"
+
         # Add TTS suffix if model has audio output capability
         if has_audio_output:
             modality += "_tts"
@@ -491,6 +498,51 @@ class HuggingFaceModelInfo(BaseModelInfo):
             return False
 
         return False
+    def parse_classifier_model_config(config: Dict[str, Any]) -> Dict[str, Any] | None:
+        """Parse classifier model configuration from config."""
+        architectures = config.get("architectures", [])
+        # Map the substring signature to the variable name
+        task_map = {
+            "sequence_classification": "ForSequenceClassification",
+            "token_classification": "ForTokenClassification",
+            "object_detection": "ForObjectDetection",
+            "question_answering": "ForQuestionAnswering",
+            "image_classification": "ForImageClassification",
+            "audio_classification": "ForAudioClassification",
+            "semantic_segmentation": "ForSemanticSegmentation",
+        }
+        # 1. Identify Mode: Check all architectures at once
+        # We join the architectures into one string for a single search pass (faster/cleaner)
+        arch_text = " ".join(architectures)
+        flags = {k: v in arch_text for k, v in task_map.items()}
+
+        # 2. Robust Label Extraction
+        # Priority: label2id length -> num_labels key -> Default to 2 (binary)
+        label2id = config.get("label2id", {})
+        id2label = config.get("id2label", {})
+
+        if not (any(flags.values()) or len(label2id) or len(id2label)):
+            return None
+
+        num_labels = len(label2id) if label2id else config.get("num_labels") or config.get("_num_labels", 2)
+
+        # Ensure consistency: if we have num_labels but no map, generate a dummy map
+        if not label2id and num_labels > 0:
+            label2id = {f"LABEL_{i}": i for i in range(num_labels)}
+            id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
+
+        task = [k for k, v in flags.items() if v]
+        task = task[0] if len(task) > 0 else None
+
+        audio_models = ("Wav2Vec2", "Hubert", "WavLM", "SEW", "UniSpeech", "UniSpeechSat")
+        task = (
+            "audio_classification"
+            if task == "sequence_classification"
+            and any(arch.replace("ForSequenceClassification", "") in audio_models for arch in architectures)
+            else task
+        )
+
+        return ClassifierConfig(num_labels=num_labels, label2id=label2id, id2label=id2label, task=task)
 
     @staticmethod
     def detect_audio_modality(config: Dict[str, Any]) -> Tuple[bool, bool]:
