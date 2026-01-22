@@ -469,6 +469,7 @@ const AgentDrawer: React.FC = () => {
                         ? activeSessions.map(session => session.name).filter(Boolean) as string[]
                         : activeSessions.map(session => session.promptId).filter(Boolean) as string[]
                     }
+                    version={isEditVersionMode ? editVersionData?.versionNumber : undefined}
                     typeFormMessage={typeFormMessage}
                   />
                 </div>

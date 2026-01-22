@@ -21,6 +21,8 @@ interface ToolsHomeProps {
 
 export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
   const getSessionByPromptId = useAgentStore((state) => state.getSessionByPromptId);
+  const isEditMode = useAgentStore((state) => state.isEditMode);
+  const isEditVersionMode = useAgentStore((state) => state.isEditVersionMode);
 
   // Validate and get the effective promptId
   // Priority: 1. Validated session prompt ID, 2. Prop prompt ID
@@ -36,6 +38,15 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     // Fallback to prop promptId
     return propPromptId;
   }, [propPromptId, getSessionByPromptId]);
+
+  const promptIdForConnectors = useMemo(() => {
+    if (!promptId) return undefined;
+    const session = getSessionByPromptId(promptId);
+    if ((isEditMode || isEditVersionMode) && session?.name) {
+      return session.name;
+    }
+    return promptId;
+  }, [promptId, getSessionByPromptId, isEditMode, isEditVersionMode]);
 
   // Get store actions via selectors so their references stay stable
   const fetchConnectedTools = useConnectors((state) => state.fetchConnectedTools);
@@ -56,19 +67,19 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
 
   // Use per-session selectors for data (isolated per agent box)
   const connectors = useConnectors((state) =>
-    promptId ? state.connectorsByPromptId[promptId] ?? EMPTY_CONNECTOR_LIST : state.connectors
+    promptIdForConnectors ? state.connectorsByPromptId[promptIdForConnectors] ?? EMPTY_CONNECTOR_LIST : state.connectors
   );
 
   const connectedTools = useConnectors((state) =>
-    promptId ? state.connectedToolsByPromptId[promptId] ?? EMPTY_CONNECTED_TOOL_LIST : state.connectedTools
+    promptIdForConnectors ? state.connectedToolsByPromptId[promptIdForConnectors] ?? EMPTY_CONNECTED_TOOL_LIST : state.connectedTools
   );
 
   const pagination = useConnectors((state) =>
-    promptId ? state.paginationByPromptId[promptId] : null
+    promptIdForConnectors ? state.paginationByPromptId[promptIdForConnectors] : null
   );
 
   const loadingState = useConnectors((state) =>
-    promptId ? state.loadingStatesByPromptId[promptId] : null
+    promptIdForConnectors ? state.loadingStatesByPromptId[promptIdForConnectors] : null
   );
 
   // Atomic selectors for global state to prevent object identity churn
@@ -84,11 +95,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
 
   // Use proper Zustand selectors for stable references
   const selectedConnectorDetails = useConnectors((state) =>
-    promptId ? state.connectorDetailsByPromptId[promptId] || null : null
+    promptIdForConnectors ? state.connectorDetailsByPromptId[promptIdForConnectors] || null : null
   );
 
   const isLoadingDetails = useConnectors((state) =>
-    promptId ? state.loadingDetailsByPromptId[promptId] || false : false
+    promptIdForConnectors ? state.loadingDetailsByPromptId[promptIdForConnectors] || false : false
   );
 
   const [connectedExpanded, setConnectedExpanded] = useState(true);
@@ -108,16 +119,16 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
   const hasFetchedListsRef = useRef<string | null>(null); // Track if we've fetched lists for this promptId
   // Initial load - Fetch both connected and unregistered tools (ONCE per promptId)
   useEffect(() => {
-    if (!promptId || hasFetchedListsRef.current === promptId) {
+    if (!promptIdForConnectors || hasFetchedListsRef.current === promptIdForConnectors) {
       return;
     }
-    hasFetchedListsRef.current = promptId;
+    hasFetchedListsRef.current = promptIdForConnectors;
     // Fetch connected tools (is_registered: true)
-    fetchConnectedTools({ page: 1, prompt_id: promptId });
+    fetchConnectedTools({ page: 1, prompt_id: promptIdForConnectors });
     // Fetch unregistered tools (is_registered: false)
-    fetchUnregisteredTools({ page: 1, prompt_id: promptId });
+    fetchUnregisteredTools({ page: 1, prompt_id: promptIdForConnectors });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptId]); // Only depend on promptId, NOT on functions
+  }, [promptIdForConnectors]); // Only depend on promptIdForConnectors, NOT on functions
 
   // Restore connector state from URL on initial load (or from OAuth state)
   // This effect runs ONCE on mount to restore connector from URL
@@ -180,13 +191,13 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     hasRestoredFromUrl.current = true;
 
     // Fetch connector details from API with session scope
-    fetchConnectorDetails(connectorId, promptId).catch(() => {
+    fetchConnectorDetails(connectorId, promptIdForConnectors).catch(() => {
       // Reset on error so we can retry
       fetchedConnectorRef.current = null;
       hasRestoredFromUrl.current = false;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptId, sessionIndex]); // Only depend on identity props, NOT on loading state or functions
+  }, [promptId, promptIdForConnectors, sessionIndex]); // Only depend on identity props, NOT on loading state or functions
 
   // Set selected connector when details are fetched
   useEffect(() => {
@@ -252,7 +263,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
         : window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [selectedConnectorDetails, promptId, sessionIndex, connectedTools]);
+  }, [selectedConnectorDetails, promptIdForConnectors, sessionIndex, connectedTools]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -270,19 +281,19 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     setIsSearching(true);
 
     searchTimeoutRef.current = setTimeout(async () => {
-      if (promptId) {
+      if (promptIdForConnectors) {
         // Refetch both lists with search query
         await Promise.all([
           fetchConnectedToolsRef.current({
             page: 1,
-            prompt_id: promptId,
+            prompt_id: promptIdForConnectors,
             name: localSearchQuery,
             search: !!localSearchQuery,
             force: true
           }),
           fetchUnregisteredToolsRef.current({
             page: 1,
-            prompt_id: promptId,
+            prompt_id: promptIdForConnectors,
             name: localSearchQuery,
             search: !!localSearchQuery,
             force: true
@@ -300,7 +311,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [localSearchQuery, promptId]);
+  }, [localSearchQuery, promptIdForConnectors]);
 
   // Handle scroll for lazy loading
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -311,10 +322,10 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     if (scrollHeight - scrollTop <= clientHeight + 50 &&
       !isLoadingMore &&
       currentPage < totalPages &&
-      promptId) {
-      fetchUnregisteredTools({ page: currentPage + 1, prompt_id: promptId });
+      promptIdForConnectors) {
+      fetchUnregisteredTools({ page: currentPage + 1, prompt_id: promptIdForConnectors });
     }
-  }, [currentPage, totalPages, isLoadingMore, promptId, fetchUnregisteredTools]);
+  }, [currentPage, totalPages, isLoadingMore, promptIdForConnectors, fetchUnregisteredTools]);
 
   // Filter tools based on local search (for instant feedback)
   const filterTools = (tools: typeof connectors) => {
@@ -360,8 +371,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     fetchedConnectorRef.current = null;
 
     // Clear session-scoped connector details from store
-    if (promptId) {
-      clearConnectorDetailsForPromptId(promptId);
+    if (promptIdForConnectors) {
+      clearConnectorDetailsForPromptId(promptIdForConnectors);
     }
 
     // Clear OAuth localStorage state (does not affect URL)
@@ -374,9 +385,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     }
 
     // Refresh both lists when coming back
-    if (promptId) {
-      fetchConnectedTools({ page: 1, prompt_id: promptId, force: true });
-      fetchUnregisteredTools({ page: 1, prompt_id: promptId, force: true });
+    if (promptIdForConnectors) {
+      fetchConnectedTools({ page: 1, prompt_id: promptIdForConnectors, force: true });
+      fetchUnregisteredTools({ page: 1, prompt_id: promptIdForConnectors, force: true });
     }
 
     // Reset back navigation flag after effects have settled

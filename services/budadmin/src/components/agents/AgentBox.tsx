@@ -118,7 +118,8 @@ function AgentBoxInner({
     try {
       isFetchingConfigRef.current = true;
 
-      const response = await getPromptConfig(session.name);
+      const versionKey = isEditVersionMode ? editVersionData?.versionNumber : undefined;
+      const response = await getPromptConfig(session.name, versionKey);
 
       if (response?.data) {
         const configData = response.data;
@@ -180,7 +181,8 @@ function AgentBoxInner({
         }
 
         // Update the cache after successful fetch
-        hasLoadedConfigRef.current = session.name;
+        const versionKey = isEditVersionMode ? editVersionData?.versionNumber : undefined;
+        hasLoadedConfigRef.current = versionKey ? `${session.name}:${versionKey}` : session.name;
       }
     } catch (error) {
       console.error("Error refreshing prompt config:", error);
@@ -191,7 +193,7 @@ function AgentBoxInner({
   // to avoid unnecessary callback recreations. They're only used to preserve existing values
   // when updating the session, not to determine when the callback should change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id, session?.promptId, session?.name, updateSession, getPromptConfig]);
+  }, [session?.id, session?.promptId, session?.name, isEditVersionMode, editVersionData?.versionNumber, updateSession, getPromptConfig]);
 
   // Ensure session has a promptId (migration for old sessions)
   React.useEffect(() => {
@@ -211,16 +213,24 @@ function AgentBoxInner({
       // New sessions have locally generated promptIds starting with 'prompt_'
       if (session.promptId.startsWith('prompt_')) return;
 
-      // Skip only if we've already loaded for this exact prompt name in this component instance
+      const versionKey = isEditVersionMode ? editVersionData?.versionNumber : undefined;
+      const configKey = versionKey ? `${session.name}:${versionKey}` : session.name;
+
+      if (session.promptConfigKey && session.promptConfigKey === configKey) {
+        hasLoadedConfigRef.current = configKey;
+        return;
+      }
+
+      // Skip only if we've already loaded for this exact prompt name/version in this component instance
       // This allows reloading when returning from playground (component remounts)
-      if (hasLoadedConfigRef.current === session.name) return;
+      if (hasLoadedConfigRef.current === configKey) return;
 
       // Skip if another fetch is already in progress (prevents race conditions with refreshPromptConfig)
       if (isFetchingConfigRef.current) return;
 
       try {
         isFetchingConfigRef.current = true;
-        const response = await getPromptConfig(session.name);
+        const response = await getPromptConfig(session.name, versionKey);
 
         if (response?.data) {
           const configData = response.data;
@@ -282,12 +292,12 @@ function AgentBoxInner({
           }
         }
 
-        // Mark as loaded for this prompt name
-        hasLoadedConfigRef.current = session.name;
+        // Mark as loaded for this prompt name/version
+        hasLoadedConfigRef.current = configKey;
       } catch (error) {
         // Silently fail - config may not exist yet for new prompts
         console.debug("Could not load prompt config:", error);
-        hasLoadedConfigRef.current = session.name;
+        hasLoadedConfigRef.current = configKey;
       } finally {
         isFetchingConfigRef.current = false;
       }
@@ -295,7 +305,7 @@ function AgentBoxInner({
 
     loadPromptConfig();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id, session?.promptId]);
+  }, [session?.id, session?.promptId, isEditVersionMode, editVersionData?.versionNumber]);
 
   const [localSystemPrompt, setLocalSystemPrompt] = useState(session?.systemPrompt || "");
   // Ensure promptMessages is always a string, even if it comes as an array from corrupted data
@@ -309,6 +319,7 @@ function AgentBoxInner({
   const [isSavingOutput, setIsSavingOutput] = useState(false);
   const [isSavingSystemPrompt, setIsSavingSystemPrompt] = useState(false);
   const [isSavingPromptMessages, setIsSavingPromptMessages] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   // Initialize from session for OAuth restoration, fallback to false
   const [structuredInputEnabled, setStructuredInputEnabled] = useState(session?.structuredInputEnabled ?? false);
@@ -620,8 +631,8 @@ function AgentBoxInner({
       return;
     }
 
-    // Check if prompt_id exists
-    if (!session.promptId) {
+    // Check if prompt identifier exists
+    if (!session.promptId && !session.name) {
       errorToast("Prompt ID is missing");
       return;
     }
@@ -643,8 +654,15 @@ function AgentBoxInner({
       };
 
       // Make the API call using the correct PATCH endpoint
+      const promptIdForDefault =
+        (isEditMode || isEditVersionMode) && session.name
+          ? session.name
+          : session.promptId;
+
+      const versionIdForDefault = editVersionData.versionNumber;
+
       await AppRequest.Patch(
-        `${tempApiBaseUrl}/prompts/${session.promptId}/versions/${editVersionData.versionId}`,
+        `${tempApiBaseUrl}/prompts/${promptIdForDefault}/versions/${versionIdForDefault}`,
         payload
       );
     } catch (error: any) {
@@ -738,14 +756,36 @@ function AgentBoxInner({
   // Get current stream setting
   const getStreamSetting = () => streamEnabled;
 
+  const buildModelSettingsPayload = (session: AgentSession) => {
+    const baseSettings = getDefaultModelSettings(session);
+    const sessionSettings = session.modelSettings || {};
+
+    const mergedSettings: Record<string, any> = {
+      ...baseSettings,
+      ...sessionSettings,
+    };
+
+    delete mergedSettings.id;
+    delete mergedSettings.name;
+    delete mergedSettings.created_at;
+    delete mergedSettings.modified_at;
+    delete mergedSettings.modifiedFields;
+
+    return mergedSettings;
+  };
+
   // Helper function to create base schema payload
   const createSchemaPayload = (
     type: 'input' | 'output',
     schema: { schema: any; validations: any } | null,
     triggerWorkflow: boolean
   ) => {
+    const promptIdForSchema =
+      (isEditMode || isEditVersionMode) && session?.name
+        ? session.name
+        : session.promptId;
     const payload: any = {
-      prompt_id: session.promptId,
+      prompt_id: promptIdForSchema,
       version: 1,
       set_default: false,
       permanent: false,
@@ -797,6 +837,10 @@ function AgentBoxInner({
       const type = "input";
 
       let payload: any;
+      const promptIdForSchema =
+        (isEditMode || isEditVersionMode) && session.name
+          ? session.name
+          : session.promptId;
 
       // Check if structured input is disabled - if so, send null schema
       if (!structuredInputEnabled) {
@@ -818,9 +862,8 @@ function AgentBoxInner({
         }
       }
 
-      // In edit mode, use the prompt name instead of ID for the prompt_id field
-      if (isEditMode && session.name) {
-        payload.prompt_id = session.name;
+      if (promptIdForSchema) {
+        payload.prompt_id = promptIdForSchema;
       }
 
       // Start workflow status tracking
@@ -878,6 +921,10 @@ function AgentBoxInner({
 
     try {
       let payload: any;
+      const promptIdForSchema =
+        (isEditMode || isEditVersionMode) && session.name
+          ? session.name
+          : session.promptId;
 
       // Check if structured output is disabled - if so, send null schema
       if (!structuredOutputEnabled) {
@@ -899,9 +946,8 @@ function AgentBoxInner({
         }
       }
 
-      // In edit mode, use the prompt name instead of ID for the prompt_id field
-      if (isEditMode && session.name) {
-        payload.prompt_id = session.name;
+      if (promptIdForSchema) {
+        payload.prompt_id = promptIdForSchema;
       }
 
       // Start workflow status tracking for output
@@ -963,6 +1009,74 @@ function AgentBoxInner({
     if (!session) return;
     // Only update local state - API call will be made on Update button click
     updateSession(session.id, { outputVariables: [createDefaultVariable('output')] });
+  };
+
+  const handleSaveChanges = async () => {
+    if (!session) {
+      errorToast("No session data available");
+      return;
+    }
+
+    if (!session.selectedDeployment?.name) {
+      errorToast("Please select a deployment model first");
+      return;
+    }
+
+    if (!session.name) {
+      errorToast("Prompt name not found");
+      return;
+    }
+
+    let messages: any[] = [];
+    try {
+      if (session.promptMessages && typeof session.promptMessages === 'string') {
+        messages = JSON.parse(session.promptMessages);
+      }
+    } catch (e) {
+      errorToast("Invalid prompt messages format");
+      return;
+    }
+
+    const filteredMessages = messages
+      .filter((msg: { content?: string }) => msg.content?.trim())
+      .map((msg: { role: string; content: string }) => ({ role: msg.role, content: msg.content }));
+
+    setIsSavingChanges(true);
+
+    try {
+      const payload: any = {
+        prompt_id: session.name,
+        version: 1,
+        set_default: false,
+        deployment_name: session.selectedDeployment.name,
+        model_settings: buildModelSettingsPayload(session),
+        stream: getStreamSetting(),
+        messages: filteredMessages,
+        llm_retry_limit: session.llm_retry_limit ?? 0,
+        enable_tools: true,
+        allow_multiple_calls: session.allowMultipleCalls ?? true,
+        system_prompt_role: "system",
+        system_prompt: session.systemPrompt?.trim() || "",
+        permanent: true,
+      };
+
+      await AppRequest.Post(
+        `${tempApiBaseUrl}/prompts/prompt-config`,
+        payload
+      );
+
+      closeAgentDrawer();
+    } catch (error: any) {
+      console.error("Error saving prompt config:", error);
+      if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+        const firstError = error.response.data.detail[0];
+        errorToast(firstError.msg || "Failed to save changes");
+      } else {
+        errorToast(error?.response?.data?.detail || "Failed to save changes");
+      }
+    } finally {
+      setIsSavingChanges(false);
+    }
   };
 
   const handleSaveSystemPrompt = async () => {
@@ -1249,6 +1363,8 @@ function AgentBoxInner({
 
       // Trigger a custom event to notify the versions tab to refresh
       window.dispatchEvent(new CustomEvent('versionCreated'));
+    } else if (isEditMode) {
+      handleSaveChanges();
     } else {
       closeAgentDrawer();
     }
@@ -1323,7 +1439,7 @@ function AgentBoxInner({
           {isHovering && (
             <PrimaryButton
               onClick={handleSaveClick}
-              disabled={!session?.selectedDeployment?.name}
+              disabled={!session?.selectedDeployment?.name || isSavingChanges}
               classNames={`h-[1.375rem] rounded-[0.375rem] min-w-[3rem] !border-[#479d5f] !bg-[#479d5f1a] group ${
                 !session?.selectedDeployment?.name
                   ? 'opacity-50 cursor-not-allowed'
@@ -1349,18 +1465,6 @@ function AgentBoxInner({
 
         {/* Right Section - Action Buttons */}
         <div className="flex items-center gap-1">
-          {/* Set as Default Toggle - Only visible in Edit Version Mode */}
-          {isEditVersionMode && (
-            <div className="flex items-center gap-2 mr-2 px-2 py-1 bg-[#1A1A1A] rounded-md border border-[#2F2F2F]">
-              <span className="text-[#B3B3B3] text-xs whitespace-nowrap">Set as Default</span>
-              <Switch
-                size="small"
-                checked={setAsDefault}
-                onChange={handleSetAsDefaultToggle}
-              />
-            </div>
-          )}
-
           {/* Model Settings Button - Works as toggle */}
           <button
             className={`w-[1.475rem] height-[1.475rem] p-[.2rem] rounded-[6px] flex justify-center items-center cursor-pointer transition-none ${isModelSettingsOpen ? 'bg-[#965CDE] bg-opacity-20' : ''

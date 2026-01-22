@@ -81,6 +81,7 @@ export interface AgentSession {
   structuredOutputEnabled?: boolean;
   // Per-session model settings (isolated per agent box)
   modelSettings?: AgentSettings;
+  promptConfigKey?: string;
 }
 
 interface AgentStore {
