@@ -9,6 +9,20 @@
   },
   "favicon": "/images/favicon.ico",
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Blog",
+          "icon": "newspaper",
+          "href": "https://budecosystem.com/blog/"
+        },
+        {
+          "anchor": "API Reference",
+          "icon": "code",
+          "href": "https://budecosystem-b7b14df4.mintlify.app/developer-docs/openai-api/chat"
+        }
+      ]
+    },
     "tabs": [
       {
         "tab": "Product Guide",
@@ -123,6 +137,12 @@
               "user-management/roles-permissions",
               "user-management/user-activity",
               "user-management/sso-integration"
+            ]
+          },
+          {
+            "group": "Customer Dashboard",
+            "pages": [
+              "product-guide/customer-dashboard/customer-portal"
             ]
           },
           {
@@ -256,21 +276,7 @@
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Blog",
-          "href": "https://budecosystem.com/blog/",
-          "icon": "newspaper"
-        },
-        {
-          "anchor": "API Reference",
-          "href": "https://budecosystem-b7b14df4.mintlify.app/developer-docs/openai-api/chat",
-          "icon": "code"
-        }
-      ]
-    }
+    ]
   },
   "logo": "/images/bud-icon.png",
   "navbar": {
