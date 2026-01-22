@@ -31,7 +31,7 @@ const MODALITY_TEXT_INPUT = "text_input";
 const MODALITY_TEXT_OUTPUT = "text_output";
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
-  const { updateSession, sessions } = useAgentStore();
+  const { updateSession, sessions, isEditMode, isEditVersionMode } = useAgentStore();
   const { selectedProject } = useAddAgent();
   const router = useRouter();
   const projectIdFromRoute =
@@ -196,8 +196,12 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
     try {
       // Call the prompt-config API with the deployment name and prompt_id
+      const promptIdForConfig =
+        (isEditMode || isEditVersionMode) && session?.name
+          ? session.name
+          : session?.promptId;
       const payload = {
-        prompt_id: session?.promptId,
+        prompt_id: promptIdForConfig,
         deployment_name: deploymentName,
         stream: session?.settings?.stream ?? false
       };

@@ -1091,8 +1091,13 @@ function AgentBoxInner({
       return;
     }
 
+    const promptIdForConfig =
+      (isEditMode || isEditVersionMode) && session.name
+        ? session.name
+        : session.promptId;
+
     // Check if prompt_id exists (it should be auto-generated)
-    if (!session.promptId) {
+    if (!promptIdForConfig) {
       console.error("promptId is missing from session! This should not happen.");
       errorToast("Session error: promptId is missing. Please try creating a new agent.");
       return;
@@ -1103,7 +1108,7 @@ function AgentBoxInner({
     try {
       // Build the payload for prompt-config endpoint
       const payload: any = {
-        prompt_id: session.promptId,
+        prompt_id: promptIdForConfig,
         version: 1,
         set_default: isEditVersionMode ? setAsDefault : false,
         deployment_name: session.selectedDeployment.name,
@@ -1122,12 +1127,9 @@ function AgentBoxInner({
         payload.permanent = true;
       }
 
-      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      // Add permanent: true when in edit mode (editing from agents list)
       if (isEditMode) {
         payload.permanent = true;
-        if (session.name) {
-          payload.prompt_id = session.name;
-        }
       }
 
       // Start workflow status tracking
@@ -1190,8 +1192,13 @@ function AgentBoxInner({
       return;
     }
 
+    const promptIdForConfig =
+      (isEditMode || isEditVersionMode) && session.name
+        ? session.name
+        : session.promptId;
+
     // Check if prompt_id exists (it should be auto-generated)
-    if (!session.promptId) {
+    if (!promptIdForConfig) {
       console.error("promptId is missing from session! This should not happen.");
       errorToast("Session error: promptId is missing. Please try creating a new agent.");
       return;
@@ -1218,7 +1225,7 @@ function AgentBoxInner({
     try {
       // Build the payload for prompt-config endpoint
       const payload: any = {
-        prompt_id: session.promptId,
+        prompt_id: promptIdForConfig,
         version: 1,
         set_default: isEditVersionMode ? setAsDefault : false,
         deployment_name: session.selectedDeployment.name,
@@ -1237,12 +1244,9 @@ function AgentBoxInner({
         payload.permanent = true;
       }
 
-      // Add permanent: true and use prompt name when in edit mode (editing from agents list)
+      // Add permanent: true when in edit mode (editing from agents list)
       if (isEditMode) {
         payload.permanent = true;
-        if (session.name) {
-          payload.prompt_id = session.name;
-        }
       }
 
       // Start workflow status tracking

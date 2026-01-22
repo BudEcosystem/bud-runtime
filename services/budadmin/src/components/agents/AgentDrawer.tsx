@@ -465,7 +465,7 @@ const AgentDrawer: React.FC = () => {
                   <AgentIframe
                     sessionId={activeSessions[0]?.id}
                     promptIds={
-                      isEditMode
+                      (isEditMode || isEditVersionMode)
                         ? activeSessions.map(session => session.name).filter(Boolean) as string[]
                         : activeSessions.map(session => session.promptId).filter(Boolean) as string[]
                     }

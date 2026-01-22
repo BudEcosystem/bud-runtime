@@ -236,7 +236,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       }
     }
 
-    if (!effectivePromptId) return;
+    const promptIdForTools =
+      (isEditMode || isEditVersionMode) && promptId
+        ? getSessionByPromptId(promptId)?.name || effectivePromptId
+        : effectivePromptId;
+
+    if (!promptIdForTools) return;
 
     setIsLoadingTools(true);
     try {
@@ -254,13 +259,13 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       if (shouldFetchOAuthTools) {
         try {
           console.log('[ConnectorDetails] Calling fetchOAuthTools with:', {
-            prompt_id: effectivePromptId,
+            prompt_id: promptIdForTools,
             connector_id: connector.id,
             isOAuthCallback,
             authType
           });
           const oauthResponse = await ConnectorService.fetchOAuthTools({
-            prompt_id: effectivePromptId,
+            prompt_id: promptIdForTools,
             connector_id: connector.id,
             version: 1,
           });
@@ -277,7 +282,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         // Also call GET /prompts/tools to get regular tools
         try {
           const regularResponse = await ConnectorService.fetchTools({
-            prompt_id: effectivePromptId,
+            prompt_id: promptIdForTools,
             connector_id: connector.id,
             page: 1,
             limit: 100,
@@ -301,7 +306,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       } else {
         // auth_type is "Open" or not set (and not OAuth callback), only call GET /prompts/tools
         const response = await ConnectorService.fetchTools({
-          prompt_id: effectivePromptId,
+          prompt_id: promptIdForTools,
           connector_id: connector.id,
           page: 1,
           limit: 100,
@@ -581,6 +586,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       return;
     }
 
+    const currentSession = promptId ? getSessionByPromptId(promptId) : undefined;
+
     setIsRegistering(true);
 
     try {
@@ -604,7 +611,15 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       };
 
       // Step 1: Register the connector first
-      const response = await ConnectorService.registerConnector(promptId, connector.id, payload);
+      const promptIdForRegister =
+        (isEditMode || isEditVersionMode) && currentSession?.name
+          ? currentSession.name
+          : promptId;
+      if (!promptIdForRegister) {
+        errorToast('Prompt ID is missing');
+        return;
+      }
+      const response = await ConnectorService.registerConnector(promptIdForRegister, connector.id, payload);
 
       if (response.status === 200 || response.status === 201) {
         // Step 2: Check if OAuth authentication is required
@@ -612,8 +627,12 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
         if (authType?.toLowerCase() === 'oauth') {
           try {
+            const oauthPromptId =
+              (isEditMode || isEditVersionMode) && currentSession?.name
+                ? currentSession.name
+                : promptId;
             const oauthPayload = {
-              prompt_id: promptId,
+              prompt_id: oauthPromptId,
               connector_id: connector.id,
               workflow_id: workflowId,
               version: 1
@@ -626,8 +645,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
             if (authorizationUrl) {
               // Get current session data to preserve model selection and other settings
-              const currentSession = promptId ? getSessionByPromptId(promptId) : undefined;
-
               // Get agent ID from URL to preserve it across OAuth redirect
               const urlParams = new URLSearchParams(window.location.search);
               const agentId = urlParams.get('agent') || undefined;
