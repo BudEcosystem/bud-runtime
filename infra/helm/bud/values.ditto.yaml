@@ -47,3 +47,10 @@ storage:
 # Disable prometheus-adapter to avoid ClusterRole conflict with bud-dev
 prometheus-adapter:
   enabled: false
+onyx:
+  enabled: false
+  ingress:
+    hosts:
+      root: ditto.bud.studio
+  global:
+    version: "nightly"

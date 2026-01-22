@@ -253,6 +253,7 @@ class CommonDeploymentParams(BaseModel):
     concurrency: int
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+    model_max_context_length: Optional[int] = None
     # BudAIScaler configuration
     budaiscaler: BudAIScalerConfig | dict | None = None
 
@@ -584,6 +585,7 @@ class AdapterRequest(CloudEventBase):
     adapter_id: Optional[UUID] = None
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+    model_max_context_length: Optional[int] = None
 
 
 class DeployAdapterActivityRequest(BaseModel):
@@ -596,6 +598,7 @@ class DeployAdapterActivityRequest(BaseModel):
     ingress_url: str
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+    model_max_context_length: Optional[int] = None
 
 
 class UpdateAdapterStatusRequest(AdapterRequest):

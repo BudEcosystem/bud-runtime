@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -338,6 +338,12 @@ impl DiclConfig {
         let embedding_request = EmbeddingRequest {
             input: crate::embeddings::EmbeddingInput::Single(serialized_input.to_string()),
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         // Embed the input via an API request

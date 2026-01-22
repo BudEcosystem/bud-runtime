@@ -602,6 +602,7 @@ class SimulationService:
         supports_lora: bool = False,
         supports_pipeline_parallelism: bool = False,
         hardware_mode: str = "dedicated",
+        model_max_context_length: Optional[int] = None,
         **kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate the top K deployment configurations based on the provided parameters.
@@ -616,6 +617,7 @@ class SimulationService:
             target_ttft (int): The target time to first token (TTFT).
             target_throughput_per_user (int): The target throughput per user.
             device_config (Dict[str, Any]): Configuration details for the device.
+            model_max_context_length (int, optional): Model's max context length to cap seq_length.
             **kwargs (Dict[str, Any]): Additional keyword arguments.
 
         Returns:
@@ -643,6 +645,7 @@ class SimulationService:
                     hardware_mode=hardware_mode,
                     is_quantization=bool(quantization_type),
                     supports_lora=supports_lora,
+                    model_max_context_length=model_max_context_length,
                 )
                 top_k_configs = optimizer.search()
                 # Convert SearchResult dataclasses to dicts for JSON serialization in workflow mode
@@ -666,6 +669,7 @@ class SimulationService:
                     dtype=quantization_type,
                     use_heuristic=False,  # Evolution uses ML regressor
                     supports_pipeline_parallelism=supports_pipeline_parallelism,
+                    model_max_context_length=model_max_context_length,
                 )
                 top_k_configs = evolution.evolve()
                 # Convert EvaluationResult dataclasses to dicts for JSON serialization in workflow mode
@@ -2670,6 +2674,7 @@ class SimulationService:
             model_uri=request.model_uri,
             input_tokens=request.input_tokens,
             output_tokens=request.output_tokens,
+            model_max_context_length=request.model_max_context_length,
             device_groups=device_groups,
         )
 
@@ -2702,6 +2707,7 @@ class SimulationService:
         input_tokens: int,
         output_tokens: int,
         device_groups: Dict[str, Any],
+        model_max_context_length: Optional[int] = None,
     ) -> ModelMemoryInfo:
         """Calculate model memory requirements for configuration options.
 
@@ -2710,6 +2716,7 @@ class SimulationService:
             input_tokens: Expected input tokens
             output_tokens: Expected output tokens
             device_groups: Device groups from _group_devices_by_type_across_cluster
+            model_max_context_length: Model's max context length to cap seq_length
 
         Returns:
             ModelMemoryInfo with estimated memory requirements
@@ -2722,7 +2729,13 @@ class SimulationService:
                 # Try to use llm-memory-calculator for accurate estimation
                 from llm_memory_calculator import calculate_memory
 
+                # Add 10% safety margin, capped by model's max context length
                 seq_length = int((input_tokens + output_tokens) * 1.1)
+                if model_max_context_length and seq_length > model_max_context_length:
+                    logger.info(
+                        f"Capping seq_length from {seq_length} to model max context length {model_max_context_length}"
+                    )
+                    seq_length = model_max_context_length
                 memory_report = calculate_memory(
                     model_id_or_config=model_uri,
                     batch_size=1,
@@ -3015,7 +3028,13 @@ class SimulationService:
             try:
                 from llm_memory_calculator import calculate_memory
 
+                # Add 10% safety margin, capped by model's max context length
                 seq_length = int((request.input_tokens + request.output_tokens) * 1.1)
+                if request.model_max_context_length and seq_length > request.model_max_context_length:
+                    logger.info(
+                        f"Capping seq_length from {seq_length} to model max context length {request.model_max_context_length}"
+                    )
+                    seq_length = request.model_max_context_length
                 memory_report = calculate_memory(
                     model_id_or_config=request.model_uri,
                     batch_size=request.concurrency,

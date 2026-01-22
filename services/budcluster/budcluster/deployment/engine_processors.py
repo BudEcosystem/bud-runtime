@@ -18,6 +18,9 @@ from budmicroframe.commons.logging import get_logger
 
 logger = get_logger(__name__)
 
+# CPU KV cache multiplier to account for vLLM CPU backend overhead
+CPU_KV_CACHE_MULTIPLIER = 2  # Must match handler.py
+
 # CPU deployment memory and resource constants
 CPU_MEMORY_MULTIPLIER = 1.7  # Accounts for runtime overhead, activation memory, safety margin
 CPU_MIN_MEMORY_GB = 10  # Minimum memory allocation for CPU nodes
@@ -106,8 +109,15 @@ class VLLMConfigProcessor(EngineConfigProcessor):
         # Calculate max_model_len dynamically
         input_tokens = context.get("input_tokens")
         output_tokens = context.get("output_tokens")
+        model_max_context_length = context.get("model_max_context_length")
         if input_tokens and output_tokens:
             max_model_len = int((input_tokens + output_tokens) * 1.1)  # Add 10% safety margin
+            # Cap with model's max context length to prevent deployment failures
+            if model_max_context_length and max_model_len > model_max_context_length:
+                logger.info(
+                    f"Capping max_model_len from {max_model_len} to model max context length {model_max_context_length}"
+                )
+                max_model_len = model_max_context_length
             args["max-model-len"] = max_model_len
         else:
             args["max-model-len"] = 8192  # Default fallback
@@ -161,6 +171,7 @@ class VLLMConfigProcessor(EngineConfigProcessor):
 
         # Logging level
         envs["VLLM_LOGGING_LEVEL"] = "INFO"
+        envs["VLLM_ALLOW_LONG_MAX_MODEL_LEN"] = "1"
 
         # Enable runtime LoRA updating if supported
         supports_lora = node.get("supports_lora", False)
@@ -173,10 +184,12 @@ class VLLMConfigProcessor(EngineConfigProcessor):
         if device_type == "cpu_high":
             kv_cache_memory_gb = node.get("kv_cache_memory_gb", 0)
             if kv_cache_memory_gb > 0:
-                kv_cache_memory_gb_int = math.ceil(kv_cache_memory_gb)
+                # Apply multiplier to account for vLLM CPU backend overhead
+                kv_cache_with_overhead = kv_cache_memory_gb * CPU_KV_CACHE_MULTIPLIER
+                kv_cache_memory_gb_int = math.ceil(kv_cache_with_overhead)
                 envs["VLLM_CPU_KVCACHE_SPACE"] = str(kv_cache_memory_gb_int)
                 logger.info(
-                    f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb_int} GB (ceiled from {kv_cache_memory_gb:.2f})"
+                    f"Set VLLM_CPU_KVCACHE_SPACE to {kv_cache_memory_gb_int} GB (from {kv_cache_memory_gb:.2f} * {CPU_KV_CACHE_MULTIPLIER})"
                 )
 
         node["envs"] = envs
@@ -236,6 +249,9 @@ class LatentBudConfigProcessor(EngineConfigProcessor):
         container_port = context.get("container_port", "8000")
         args["port"] = str(container_port)
 
+        args["engine"] = "torch"
+        args["vector-disk-cache"] = "true"
+
         # Note: LatentBud doesn't use these vLLM-specific args:
         # - gpu-memory-utilization (handled differently)
         # - max-num-seqs (uses max-batch-tokens instead)
@@ -262,6 +278,19 @@ class LatentBudConfigProcessor(EngineConfigProcessor):
             envs["LATENTBUD_DEVICE"] = "cpu"
         elif device_type == "hpu":
             envs["LATENTBUD_DEVICE"] = "hpu"
+
+        envs["INFINITY_FLASH_ATTENTION"] = "true"
+        envs["INFINITY_FLASH_ATTENTION_BACKEND"] = "auto"  # or flash_attn_cuda, triton, sdpa
+
+        # CUDA Streams
+        envs["INFINITY_CUDA_STREAMS"] = "true"
+        envs["INFINITY_CUDA_STREAMS_MODE"] = "adaptive"  # or stream, direct, legacy
+
+        # Compile (torch.compile)
+        envs["INFINITY_COMPILE"] = "true"
+        envs["INFINITY_RAM_DISK_CACHE"] = "true"
+
+        envs["INFINITY_HOME"] = "/data/models-registry"
 
         node["envs"] = envs
         return envs

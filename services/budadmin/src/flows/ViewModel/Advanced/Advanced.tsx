@@ -221,6 +221,12 @@ const Advanced: React.FC<GeneralProps> = ({ data }) => {
     .map(mapDynamicArray)
     ?.filter(filterEmpty);
 
+  const architectureAudioArray = Object.entries(
+    data?.architecture_audio_config || {},
+  )
+    .map(mapDynamicArray)
+    ?.filter(filterEmpty);
+
   return (
     <div className="pt-[.45rem]">
       <div>
@@ -288,6 +294,32 @@ const Advanced: React.FC<GeneralProps> = ({ data }) => {
             </div>
             <div className="mt-[.8rem] flex flex-col gap-y-[1.15rem] mb-[1.1rem]">
               {architectureVisionArray
+                .filter(
+                  (item) =>
+                    Array.isArray(item.value) &&
+                    item.value.length > 0 &&
+                    item.value.some(Boolean),
+                )
+                .map((item, index) => (
+                  <SpecificationTableItem key={index} item={item} />
+                ))}
+            </div>
+            <div className="hR"></div>
+          </>
+        )}
+        {architectureAudioArray.length > 0 && (
+          <>
+            <div>
+              <Text_14_400_EEEEEE>
+                Audio Architecture Specifications
+              </Text_14_400_EEEEEE>
+              <Text_12_400_757575 className="mt-[.55rem]">
+                Below are the audio architecture specifications of the selected
+                model
+              </Text_12_400_757575>
+            </div>
+            <div className="mt-[.8rem] flex flex-col gap-y-[1.15rem] mb-[1.1rem]">
+              {architectureAudioArray
                 .filter(
                   (item) =>
                     Array.isArray(item.value) &&

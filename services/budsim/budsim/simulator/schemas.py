@@ -120,6 +120,9 @@ class ClusterRecommendationRequest(CloudEventBase):
     model_endpoints: Optional[str] = Field(
         None, description="Model endpoint type for engine selection (e.g., 'EMBEDDING', 'LLM', 'EMBEDDING,LLM')"
     )
+    model_max_context_length: Optional[int] = Field(
+        None, description="Model's maximum context length to cap seq_length calculations"
+    )
 
     @model_validator(mode="before")
     def validate_pretrained_model_uri(cls, values):
@@ -394,6 +397,9 @@ class NodeConfigurationRequest(BaseModel):
     output_tokens: int = Field(default=512, description="Expected output token count")
     concurrency: int = Field(default=10, description="Expected concurrent requests")
     model_uri: Optional[str] = Field(None, description="Model URI for memory calculation")
+    model_max_context_length: Optional[int] = Field(
+        None, description="Model's maximum context length to cap seq_length calculations"
+    )
 
     @model_validator(mode="before")
     def validate_model_uri(cls, values):
@@ -474,6 +480,9 @@ class BenchmarkConfigRequest(BaseModel):
     concurrency: int = Field(default=10, description="Expected concurrent requests")
     hardware_mode: HardwareMode = Field(
         default=HardwareMode.DEDICATED, description="Hardware mode: dedicated or shared"
+    )
+    model_max_context_length: Optional[int] = Field(
+        None, description="Model's maximum context length to cap seq_length calculations"
     )
 
     @model_validator(mode="before")

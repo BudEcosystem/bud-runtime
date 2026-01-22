@@ -1,0 +1,237 @@
+---
+title: "Customer Dashboard Portal"
+description: "Customer-facing dashboard for models, observability, usage, billing, API keys, and projects"
+---
+
+## 1. Description
+
+The Customer Dashboard portal is the end-user console for Bud customers to discover models, test prompts, monitor inference traffic, manage API credentials, and track usage and billing in one workspace. It provides a guided, drawer-based experience for viewing model details, project metadata, and API key security while surfacing observability and audit insights for operational trust.
+
+This portal balances self-service and governance: teams can browse models and pricing, generate secure credentials scoped to projects, review usage and billing alerts, and trace inference requests down to raw gateway payloads. Deployments published from Bud AI Foundry appear in the models listing so teams can immediately use them without leaving the portal.
+
+## 2. USPs (Unique Selling Propositions)
+
+### 1. One console for discovery, execution, and governance
+
+From model discovery to inference observability, users manage the entire lifecycle in a single dashboard without context switching.
+
+### 2. Playground-first validation
+
+Instant, in-portal testing means teams can validate prompts, latency, and responses before shipping to production.
+
+### 3. Foundry-controlled pricing and quotas
+
+Bud AI Foundry admins can set model token pricing (including zero-cost access) and define user-level custom token and cost quotas to control usage in the Customer Dashboard.
+
+### 4. Actionable observability with deep request detail
+
+Metrics charts, request filtering, and trace-level detail pages let teams troubleshoot latency, token usage, and failures with precision.
+
+### 5. Secure-by-default API key workflows
+
+API key creation, revocation, and encrypted display workflows are built into project context to minimize credential sprawl.
+
+### 6. Usage transparency with proactive billing alerts
+
+Real-time spend and token analytics plus threshold-based alerts provide immediate clarity on costs and guardrails.
+
+### 7. Role-friendly navigation and shortcuts
+
+A consistent sidebar, quick keyboard shortcuts, and collapse/expand views keep navigation efficient for daily operations.
+
+## 3. Features
+
+### 3.1 Global navigation & layout
+
+- Collapsible left sidebar with shortcuts for Models, Playground, Logs, Usage & Billing, Audit, API Keys, and Projects.
+- Theme toggle in the header area for light/dark switching.
+- Task Island widget for notification and user profile with logout for quick operational control.
+
+### 3.2 Models catalog
+
+- Deployments published from Bud AI Foundry appear in the models catalog.
+- Search by model name and browse a grid of cards with description, tags, and pricing hints.
+- Model detail drawer with General and Use Model tabs.
+
+#### 3.2.1 Model detail: General tab
+
+- Description with expand/collapse, basic metadata, provider type, and model size.
+- Modalities shown for input/output (text, image, audio).
+- Supported endpoints list with endpoint paths.
+- Model URI with copy-to-clipboard action.
+- Tags, strengths, and limitations sections.
+
+#### 3.2.2 Model detail: Use Model tab
+
+- Code snippets for Curl, Python, and JavaScript with endpoint-aware payloads.
+- One-click copy to clipboard for the selected code snippet.
+
+### 3.3 Playground
+
+- Embedded playground experience for testing prompts and model interactions.
+- Open the new chat window workflow to place two or more models side-by-side.
+- Send the same prompt to each model and review outputs together to judge quality or latency differences.
+
+### 3.4 Logs (Observability)
+
+- End-to-end metrics include request volumes, latency distributions, token usage, throughput (RPS), TTFT, and geographic breakdowns rendered as cards and charts.
+- Dual tabs for Metrics and Requests to separate aggregated insights from raw inferences.
+
+#### 3.4.1 Metrics tab
+
+- View-by segmentation (Model, Project) with time-range selection.
+- Preset time ranges (Last 1h, 6h, 24h) and custom date range picker.
+- Refresh button to fetch updated metrics.
+- Multi-chart analytics for latency, tokens, success/failure rates, request volume, and geographic distribution.
+
+#### 3.4.2 Requests tab
+
+- Rich filters for date range, endpoint type, model, token thresholds, and max latency.
+- Quick time buttons (last 1h/6h/24h/7d/30d) and success-only toggle.
+- Sortable inference table for timestamp and response time.
+- Refresh and Export (CSV) actions for operational workflows.
+- Click-through to inference request detail page for full request context.
+
+#### 3.4.3 Requests detail page
+
+- Overview summary with inference ID, model, endpoint, project, timestamp, cached status, finish reason, and success/failure state.
+- Copy-to-clipboard actions for inference IDs and request payloads.
+- Request metadata (client IP, method, path, device, location, auth method, user agent) when available.
+- Performance metrics (latency, TTFT, token counts) and error details for failed requests.
+- Conversation view for chat requests with copy and download actions per message.
+- Raw request and response panels with copy/download actions.
+
+### 3.5 Usage & Billing
+
+- Summary cards for total spend, total tokens, and total requests against quotas.
+- Current plan visibility with billing period metadata.
+- Project and time-range selectors (1d/7d/30d/90d).
+- Export usage data to JSON.
+- Billing alerts list with enable/disable toggles and delete actions.
+- Drawer-based flow to create new billing alerts with type and threshold validation.
+- Usage table with paginated daily records for tokens, requests, and cost.
+
+### 3.6 API Keys
+
+- Table with sortable columns: credential name, project, expiry, created, last used.
+- Pagination controls with page-size selection.
+- Create new key flow (credential name, project selection, expiry).
+- Row actions: revoke key, open detail drawer.
+
+#### 3.6.1 API key detail drawer
+
+- View key metadata (project, created, expiry, last used).
+- Show/hide key with copy-to-clipboard action.
+- Edit or delete key actions via menu.
+
+### 3.7 Projects
+
+- Search across projects and view cards with API key counts.
+- Create new project drawer.
+- Edit and delete actions via per-card menu.
+- Deletion guardrails when active resources exist.
+
+#### 3.7.1 Project detail drawer
+
+- Project metadata (name, description, tags, project type).
+- API key count and list of available keys with last-used timestamps.
+
+### 3.8 Audit
+
+- Summary cards for total events, failed actions, and resources modified.
+- Search by resource name/user/ID, action filter, resource filter, and date range filter.
+- Clear filters control and export-to-CSV action.
+- Paginated audit table with action tags, resource details, IP address, and status.
+
+## 4. How-to Guides
+
+### 4.1 Access the Customer Dashboard
+
+1. Log in to the Bud Customer portal with your credentials.
+2. Use the side menu to navigate between Models, Playground, Logs, Usage & Billing, Audit, API Keys, and Projects.
+3. Expand or collapse the sidebar using the chevron control to optimize workspace space.
+
+### 4.2 Search and filter models
+
+1. Open **Models** from the side menu.
+2. Use the search bar to filter by model name.
+3. (Optional) Open filters to set modality and model size range.
+4. Select a model card to open the detail drawer.
+
+### 4.3 Use a model in your app
+
+1. From the model detail drawer, select **Use Model**.
+2. Choose Curl, Python, or JavaScript from the snippet dropdown.
+3. Copy the snippet and replace the API key placeholder.
+4. Send the request to validate connectivity and model responses.
+
+### 4.4 Inspect logs and metrics
+
+1. Open **Logs** from the side menu.
+2. Use the **Metrics** tab to select View by (Model/Project) and a time range.
+3. Click **Refresh** to update analytics.
+4. Switch to **Requests** to filter by date, endpoint type, model, tokens, or latency.
+5. Export CSV to share results or click a row to open Observability Details.
+
+### 4.5 Review an observability detail
+
+1. From **Logs → Requests**, click an inference row.
+2. Copy the Inference ID or raw request/response as needed.
+3. Review request metadata, performance metrics, and error details.
+4. Download conversation or payload JSON for offline analysis.
+
+### 4.6 Track usage and configure billing alerts
+
+1. Open **Usage & Billing** from the side menu.
+2. Pick a project and time range to update charts and the usage table.
+3. Click **Export** to download the usage JSON.
+4. Select **Add Alert** and set the alert name, type, and threshold.
+5. Toggle alerts on/off or delete them from the list.
+
+### 4.7 Create or revoke API keys
+
+1. Open **API Keys** from the side menu.
+2. Click **Create New Key**.
+3. Enter a credential name, choose a project, and set expiry.
+4. Open a row to view the key and copy it securely.
+5. Use **Revoke** to disable compromised keys.
+
+### 4.8 Manage projects
+
+1. Open **Projects** from the side menu.
+2. Click **Project** to create a new project record.
+3. Use the card menu to edit or delete.
+4. Open a project card to review tags and available API keys.
+
+### 4.9 Review audit activity
+
+1. Open **Audit** from the side menu.
+2. Filter by action, resource, or date range.
+3. Search for users or resources to isolate events.
+4. Export CSV when you need a compliance-ready activity log.
+
+## 5. FAQ
+
+**Q1. What can I do from the Customer Dashboard portal?**
+
+Browse models, test interactions in the playground, manage API keys and projects, monitor usage, configure billing alerts, and review observability and audit logs in one place.
+
+**Q2. Which filters are available in Logs?**
+
+You can filter by date range, endpoint type, model, token thresholds, max latency, and success-only status. Quick presets speed up time-based filtering.
+
+**Q3. How do I access a model’s API snippet?**
+
+Open the model detail drawer, go to **Use Model**, pick a language, and copy the snippet for the model’s supported endpoint.
+
+**Q4. How are API keys secured?**
+
+Keys are generated per project, shown once in detail drawers with show/hide controls, and can be revoked immediately when needed.
+
+**Q5. Can I export usage data and logs?**
+
+Yes. Usage exports download JSON data, and Logs/Observability exports provide CSV or JSON for detailed analysis.
+
+**Q6. Where do I see request-level troubleshooting details?**
+
+Open **Logs → Requests**, select an inference, and review the Observability Details view for metadata, errors, and raw payloads.

@@ -17,14 +17,30 @@ Models are registered artifacts or managed APIs that power inference. Bud AI Fou
 
 Clusters represent the infrastructure where models run. They can be cloud-managed Kubernetes clusters or on-prem hardware pools, and they define the compute profiles available to deployments.
 
-## 4. Endpoints
-
-Endpoints expose deployed models to applications through OpenAI-compatible APIs. They can include routing rules, fallback strategies, and access policies.
-
-## 5. Deployments
+## 4. Deployments
 
 Deployments are the runtime instances of models attached to clusters. They include configuration details like hardware settings, scaling policies, and safety controls.
 
-## 6. Evaluations
+## 5. Endpoints
+
+Endpoints expose deployed models to applications through OpenAI-compatible APIs. They can include routing rules, fallback strategies, and access policies.
+
+## 6. API keys
+
+API keys authenticate application calls to Bud AI Foundry endpoints. Keys are project-scoped, support rotation, and can be segmented by environment.
+
+## 7. Observability
+
+Observability covers metrics, logs, and traces for latency, token usage, and error rates so teams can monitor reliability and cost.
+
+## 8. Evaluations
 
 Evaluations measure quality, latency, and safety using datasets and benchmarks so teams can choose the best model and configuration before promoting to production.
+
+## 9. Guardrails and Bud Sentinel
+
+Guardrails enforce safety policies during inference, while Bud Sentinel adds evaluation and runtime trust checks to validate models and responses.
+
+## 10. Playgrounds
+
+Playgrounds provide a safe environment for prompt iteration, model comparison, and quick prototyping before integrating APIs.

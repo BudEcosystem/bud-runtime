@@ -81,6 +81,7 @@ class Model(Base, TimestampMixin):
     kv_cache_size: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     architecture_text_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
     architecture_vision_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    architecture_audio_config: Mapped[dict] = mapped_column(JSONB, nullable=True)
     website_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
         Enum(

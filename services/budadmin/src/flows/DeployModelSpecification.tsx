@@ -10,8 +10,20 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useDeployModel } from "src/stores/useDeployModel";
 
 export default function DeployModelSpecification() {
-  const { selectedTemplate } = useDeployModel()
+  const { selectedTemplate, selectedModel } = useDeployModel()
   const { deploymentSpecifcation, updateDeploymentSpecification, updateDeploymentSpecificationAndDeploy, currentWorkflow } = useDeployModel()
+
+  // Check if model is embedding or audio type (these skip template selection)
+  const isEmbeddingModel = selectedModel?.supported_endpoints?.embedding?.enabled;
+  const hasAudioTranscription = selectedModel?.supported_endpoints?.audio_transcription?.enabled;
+  const hasAudioSpeech = selectedModel?.supported_endpoints?.audio_speech?.enabled;
+  const hasChatEndpoint = selectedModel?.supported_endpoints?.chat?.enabled;
+  const hasCompletionEndpoint = selectedModel?.supported_endpoints?.completion?.enabled;
+
+  const isAudioModel = hasAudioTranscription || hasAudioSpeech;
+  const skipTemplateStep = isEmbeddingModel || isAudioModel;
+  // Hide for pure audio models (transcription/TTS) that don't have chat/completion
+  const hideContextSequence = isAudioModel && !hasChatEndpoint && !hasCompletionEndpoint;
   const { openDrawer, openDrawerWithStep, closeDrawer } = useDrawer();
   const {form} = useContext(BudFormContext);
 
@@ -26,7 +38,12 @@ export default function DeployModelSpecification() {
         ttft: deploymentSpecifcation.ttft,
         e2e_latency: deploymentSpecifcation.e2e_latency,
       }}
-      disableNext={!deploymentSpecifcation.deployment_name || !deploymentSpecifcation.concurrent_requests || !deploymentSpecifcation.avg_sequence_length }
+      disableNext={
+        !deploymentSpecifcation.deployment_name ||
+        !deploymentSpecifcation.concurrent_requests ||
+        // Only require sequence length when context/sequence fields are visible
+        (!hideContextSequence && !deploymentSpecifcation.avg_sequence_length)
+      }
       onNext={async (values) => {
         // form.submit();
         if (currentWorkflow) {
@@ -49,7 +66,12 @@ export default function DeployModelSpecification() {
         openDrawer("deploy-model");
       }}
       onBack={() => {
-        openDrawerWithStep("deploy-model-template");
+        // Skip template step for embedding/audio models
+        if (skipTemplateStep) {
+          openDrawerWithStep("deploy-model-hardware-mode");
+        } else {
+          openDrawerWithStep("deploy-model-template");
+        }
       }}
       backText="Back"
       nextText="Next"
