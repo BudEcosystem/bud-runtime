@@ -603,7 +603,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             className="flex flex-col h-full w-full py-24 mx-auto stretch px-[1rem] max-w-5xl  gap-[1rem]"
             id="chat-container"
           >
-            {(promptIds.length === 0 && chat?.selectedDeployment?.name && messages.length < 1 && (typeof chat?.selectedDeployment?.model === 'object' && chat?.selectedDeployment?.model?.id)) && <ModelInfo deployment={chat?.selectedDeployment} />}
+            {(chat?.selectedDeployment?.name && messages.length < 1 && (typeof chat?.selectedDeployment?.model === 'object' && chat?.selectedDeployment?.model?.id)) && <ModelInfo deployment={chat?.selectedDeployment} />}
             <Messages chatId={chat.id} messages={messages} reload={reload} onEdit={handleEdit} />
             {(!chat?.selectedDeployment?.name) &&
               (!messages || messages.length === 0) && (
