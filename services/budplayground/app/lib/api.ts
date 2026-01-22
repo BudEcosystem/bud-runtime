@@ -40,7 +40,12 @@ export const getEndpoints = async (page = 1, limit = 25, apiKey = "", accessKey 
       }
 }
 
-export const getPromptConfig = async (promptId: string, apiKey = "", accessKey = "") => {
+export const getPromptConfig = async (
+  promptId: string,
+  apiKey = "",
+  accessKey = "",
+  version?: string
+) => {
   const headers: any = {
     'Content-Type': 'application/json'
   };
@@ -60,7 +65,8 @@ export const getPromptConfig = async (promptId: string, apiKey = "", accessKey =
   }
 
   try {
-    const result = await AppRequest.Get(`api/prompts/${promptId}`, {
+    const versionQuery = version ? `?version=${encodeURIComponent(version)}` : '';
+    const result = await AppRequest.Get(`api/prompts/${promptId}${versionQuery}`, {
       headers
     }).then((res) => {
       return res.data;

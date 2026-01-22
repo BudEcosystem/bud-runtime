@@ -1,5 +1,6 @@
 import { tempApiBaseUrl } from '@/app/lib/environment';
 import { Logger, extractErrorMessage, categorizeError } from '@/app/lib/logger';
+import { parsePositiveIntParam } from '@/app/lib/query';
 import axios from 'axios';
 import { NextResponse } from 'next/server';
 
@@ -34,9 +35,12 @@ export async function GET(
   }
 
   // Log sanitized headers
-  logger.logRequest({ prompt_id }, headers);
+  const requestUrl = new URL(req.url);
+  const versionParam = parsePositiveIntParam(requestUrl.searchParams.get('version'));
+  logger.logRequest({ prompt_id, ...(versionParam ? { version: versionParam } : {}) }, headers);
 
-  const backendUrl = `${tempApiBaseUrl}/prompts/prompt-config/${prompt_id}`;
+  const versionQuery = versionParam ? `?version=${encodeURIComponent(versionParam)}` : '';
+  const backendUrl = `${tempApiBaseUrl}/prompts/prompt-config/${prompt_id}${versionQuery}`;
   logger.info(`Backend URL: ${backendUrl}`);
 
   try {
