@@ -14,13 +14,9 @@ Bud AI Foundry connects model onboarding, deployment, routing, observability, an
 ### 2.1 Core components
 
 - **API Gateway:** Single entry point for client requests, authentication, and request routing.
-
 - **Model servers:** Runtime services for model loading, batch inference, and GPU/CPU management.
-
 - **Storage layer:** Model artifacts, evaluation datasets, and deployment metadata.
-
 - **Observability stack:** Metrics, logs, and traces for latency, throughput, and errors.
-
 - **Control plane services:** Projects, RBAC, API keys, guardrails, and policy enforcement.
 
 ### 2.2 Component details
@@ -28,21 +24,15 @@ Bud AI Foundry connects model onboarding, deployment, routing, observability, an
 #### 2.2.1 API Gateway
 
 - **Load balancing:** Distributes requests across model servers.
-
 - **Authentication:** Validates API keys and JWT tokens.
-
 - **Rate limiting:** Enforces usage quotas and throttling rules.
-
 - **Request routing:** Selects the optimal deployment or fallback target.
 
 #### 2.2.2 Model servers
 
 - **Model loading:** Efficient caching and warm starts for deployments.
-
 - **Batch processing:** Groups requests to maximize throughput.
-
 - **GPU management:** Optimizes memory utilization across replicas.
-
 - **Health monitoring:** Regular health checks and auto-recovery.
 
 #### 2.2.3 Storage layer
@@ -54,21 +44,15 @@ Stores model artifacts, deployment configuration, evaluation datasets, and runti
 ### 3.1 Text generation request
 
 1. Client sends a request to the API Gateway.
-
 2. Gateway authenticates credentials and checks rate limits.
-
 3. Routing selects the optimal deployment.
-
 4. Model server loads or reuses the model, runs inference, and returns a response.
 
 ### 3.2 Image generation request
 
 1. Preprocess the prompt and select an image model.
-
 2. Run diffusion-based generation.
-
 3. Post-process and store the image output.
-
 4. Return an accessible URL to the client.
 
 ## 4. Scaling architecture
@@ -86,11 +70,8 @@ Scale up by assigning larger hardware profiles to improve throughput and latency
 ### 5.1 Redundancy
 
 - Multi-zone deployment to spread risk across availability zones.
-
 - Model replication with multiple copies of each model.
-
 - Database replication for metadata and audit trails.
-
 - Gateway redundancy for uninterrupted request handling.
 
 ### 5.2 Failover strategy
@@ -116,11 +97,8 @@ Network policies isolate control plane services from data plane traffic, with in
 ### 7.2 Data security
 
 - **Encryption at rest:** All stored data is encrypted.
-
 - **Encryption in transit:** TLS for all communications.
-
 - **Key management:** Integrated with KMS providers.
-
 - **Access control:** RBAC with fine-grained permissions.
 
 ## 8. Monitoring architecture
@@ -146,13 +124,8 @@ Local and staging environments mirror production configurations to validate perf
 ## 10. Related guides
 
 - [Projects](/projects/creating-projects)
-
 - [Models management](/models/models)
-
 - [Clusters](/clusters/cluster-management)
-
 - [Deployments](/deployments/deploy-first-model)
-
 - [API integration](/api-integration/api-integration)
-
 - [Observability](/observability/observability)
