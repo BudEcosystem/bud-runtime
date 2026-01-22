@@ -66,6 +66,8 @@ from budapp.guardrails.models import (
 )
 from budapp.guardrails.schemas import (
     BudSentinelConfig,
+    GuardrailCustomProbeCreate,
+    GuardrailCustomProbeUpdate,
     GuardrailDeploymentCreate,
     GuardrailDeploymentDetailResponse,
     GuardrailDeploymentResponse,
@@ -958,6 +960,75 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             )
 
         return db_workflow_step
+
+    async def get_deployment_progress(
+        self,
+        deployment_id: UUID,
+        detail: str = "summary",
+    ) -> dict:
+        """Get progress of a guardrail deployment via BudPipeline.
+
+        Args:
+            deployment_id: ID of the guardrail deployment
+            detail: Detail level - 'summary', 'steps', or 'full'
+
+        Returns:
+            Progress information dict with status, progress percentage, and optionally steps/events
+
+        Raises:
+            ClientException: If deployment not found
+        """
+        # Retrieve the deployment to get its execution info
+        db_deployment = await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
+            GuardrailDeployment,
+            {"id": deployment_id},
+            exclude_fields={"status": GuardrailDeploymentStatusEnum.DELETED},
+        )
+        if not db_deployment:
+            raise ClientException(
+                message="Deployment not found",
+                status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+            )
+
+        # Build progress response
+        progress = {
+            "deployment_id": str(deployment_id),
+            "status": db_deployment.status.value,
+            "progress_percentage": 0,
+        }
+
+        # Calculate progress based on deployment status
+        if db_deployment.status == GuardrailDeploymentStatusEnum.COMPLETED:
+            progress["progress_percentage"] = 100
+        elif db_deployment.status == GuardrailDeploymentStatusEnum.FAILED:
+            progress["progress_percentage"] = 0
+            progress["error"] = "Deployment failed"
+        elif db_deployment.status == GuardrailDeploymentStatusEnum.IN_PROGRESS:
+            # For in-progress, estimate based on rule deployments if available
+            rule_deployments = await GuardrailsDeploymentDataManager(self.session).get_rule_deployments_for_guardrail(
+                deployment_id
+            )
+            if rule_deployments:
+                completed = sum(1 for rd in rule_deployments if rd.status.value == "completed")
+                progress["progress_percentage"] = int((completed / len(rule_deployments)) * 100)
+            else:
+                progress["progress_percentage"] = 50  # Default estimate
+
+        # Add steps detail if requested
+        if detail in ("steps", "full"):
+            rule_deployments = await GuardrailsDeploymentDataManager(self.session).get_rule_deployments_for_guardrail(
+                deployment_id
+            )
+            progress["steps"] = [
+                {
+                    "rule_id": str(rd.rule_id),
+                    "status": rd.status.value,
+                    "error_message": rd.error_message,
+                }
+                for rd in rule_deployments
+            ]
+
+        return progress
 
 
 class GuardrailProbeRuleService(SessionMixin):
@@ -1967,3 +2038,168 @@ class GuardrailProfileDeploymentService(SessionMixin):
             code=HTTPStatus.HTTP_200_OK,
             object="guardrail.deployment.delete",
         )
+
+
+class GuardrailCustomProbeService(SessionMixin):
+    """Service for managing custom model-based guardrail probes."""
+
+    async def create_custom_probe(
+        self,
+        request: GuardrailCustomProbeCreate,
+        project_id: UUID,
+        user_id: UUID,
+    ) -> GuardrailProbe:
+        """Create a custom model-based probe with a single rule.
+
+        Args:
+            request: Custom probe creation request
+            project_id: Project ID for the probe
+            user_id: User ID of the creator
+
+        Returns:
+            The created GuardrailProbe instance
+
+        Raises:
+            ClientException: If model not found or validation fails
+        """
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.models import Model
+
+        # Get the model to extract URI and other details
+        model_data_manager = ModelDataManager(self.session)
+        db_model = await model_data_manager.retrieve_by_fields(Model, {"id": request.model_id})
+        if not db_model:
+            raise ClientException(
+                message=f"Model {request.model_id} not found",
+                status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+            )
+
+        # Get the BudSentinel provider for custom probes
+        provider = await ProviderDataManager(self.session).retrieve_by_fields(
+            Provider, {"provider_type": GuardrailProviderTypeEnum.BUD_SENTINEL}
+        )
+        if not provider:
+            raise ClientException(
+                message="BudSentinel provider not found",
+                status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+            )
+
+        # Extract model config as dict
+        model_config = request.model_config_data.model_dump()
+
+        # Create the custom probe with its rule
+        probe = await GuardrailsDeploymentDataManager(self.session).create_custom_probe_with_rule(
+            name=request.name,
+            description=request.description,
+            scanner_type=request.scanner_type.value,
+            model_id=request.model_id,
+            model_config=model_config,
+            model_uri=db_model.uri or f"model://{db_model.id}",
+            model_provider_type=db_model.provider_type or "custom",
+            is_gated=db_model.is_gated or False,
+            project_id=project_id,
+            user_id=user_id,
+            provider_id=provider.id,
+        )
+
+        return probe
+
+    async def update_custom_probe(
+        self,
+        probe_id: UUID,
+        request: GuardrailCustomProbeUpdate,
+        user_id: UUID,
+    ) -> GuardrailProbe:
+        """Update a custom probe (user must be owner).
+
+        Args:
+            probe_id: ID of the probe to update
+            request: Update request with fields to modify
+            user_id: User ID making the request
+
+        Returns:
+            The updated GuardrailProbe instance
+
+        Raises:
+            ClientException: If probe not found or user not authorized
+        """
+        data_manager = GuardrailsDeploymentDataManager(self.session)
+
+        # Retrieve the probe
+        db_probe = await data_manager.retrieve_by_fields(
+            GuardrailProbe, {"id": probe_id, "status": GuardrailStatusEnum.ACTIVE}
+        )
+        if not db_probe:
+            raise ClientException(
+                message="Custom probe not found",
+                status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+            )
+
+        # Check ownership
+        if db_probe.created_by != user_id:
+            raise ClientException(
+                message="You do not have permission to update this probe",
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN,
+            )
+
+        # Prepare update data
+        update_data = {}
+        if request.name is not None:
+            update_data["name"] = request.name
+        if request.description is not None:
+            update_data["description"] = request.description
+
+        # Update probe
+        if update_data:
+            db_probe = await data_manager.update_by_fields(db_probe, update_data)
+
+        # Update the rule's model_config if provided
+        if request.model_config_data is not None:
+            rule_stmt = select(GuardrailRule).where(GuardrailRule.probe_id == probe_id)
+            db_rule = self.session.scalars(rule_stmt).first()
+            if db_rule:
+                db_rule.model_config_json = request.model_config_data.model_dump()
+                if request.name is not None:
+                    db_rule.name = request.name
+                if request.description is not None:
+                    db_rule.description = request.description
+                self.session.add(db_rule)
+                self.session.commit()
+
+        return db_probe
+
+    async def delete_custom_probe(
+        self,
+        probe_id: UUID,
+        user_id: UUID,
+    ) -> None:
+        """Delete a custom probe (soft delete, user must be owner).
+
+        Args:
+            probe_id: ID of the probe to delete
+            user_id: User ID making the request
+
+        Raises:
+            ClientException: If probe not found or user not authorized
+        """
+        data_manager = GuardrailsDeploymentDataManager(self.session)
+
+        # Retrieve the probe
+        db_probe = await data_manager.retrieve_by_fields(
+            GuardrailProbe, {"id": probe_id, "status": GuardrailStatusEnum.ACTIVE}
+        )
+        if not db_probe:
+            raise ClientException(
+                message="Custom probe not found",
+                status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+            )
+
+        # Check ownership
+        if db_probe.created_by != user_id:
+            raise ClientException(
+                message="You do not have permission to delete this probe",
+                status_code=HTTPStatus.HTTP_403_FORBIDDEN,
+            )
+
+        # Soft delete the probe and its rules
+        await GuardrailsProbeRulesDataManager(self.session).soft_delete_deprecated_probes([str(probe_id)])
