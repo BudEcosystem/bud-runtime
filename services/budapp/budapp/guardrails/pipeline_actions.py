@@ -1,0 +1,335 @@
+#  -----------------------------------------------------------------------------
+#  Copyright (c) 2024 Bud Ecosystem Inc.
+#  #
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  #
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  #
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#  -----------------------------------------------------------------------------
+
+"""BudPipeline actions for guardrail deployment workflow."""
+
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import select
+
+from budapp.commons.constants import GuardrailRuleDeploymentStatusEnum
+from budapp.commons.db_utils import SessionMixin
+from budapp.guardrails.crud import GuardrailsDeploymentDataManager
+from budapp.guardrails.models import GuardrailProbe, GuardrailRule
+
+
+class GuardrailPipelineActions(SessionMixin):
+    """Pipeline action handlers for guardrail deployment.
+
+    These actions are designed to be called from BudPipeline steps:
+    - guardrail.validate: Validate deployment request
+    - guardrail.identify_models: Identify models needing onboarding/deployment
+    - guardrail.build_config: Build guardrail config with endpoint URLs
+    - guardrail.save_deployment: Save deployment and update Redis cache
+    """
+
+    async def validate_deployment(
+        self,
+        profile_id: UUID | None,
+        probe_selections: list[dict],
+        cluster_id: UUID | None,
+        credential_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Validate deployment request and return validated data.
+
+        Checks:
+        - Model probes require cluster_id
+        - Gated models require credential_id
+
+        Returns:
+            dict with 'success' bool, 'errors' list (if failed), or 'probe_selections' and 'model_probes' (if success)
+        """
+        errors = []
+        data_manager = GuardrailsDeploymentDataManager(self.session)
+
+        # Get probe IDs from selections
+        probe_ids = [
+            UUID(s["probe_id"]) if isinstance(s["probe_id"], str) else s["probe_id"] for s in probe_selections
+        ]
+
+        # Check for model probes (model_scanner or custom types)
+        model_probes = await data_manager.get_model_probes_from_selections(probe_ids)
+
+        if model_probes:
+            if not cluster_id:
+                errors.append("cluster_id required when deploying model-based probes")
+
+            # Check gated models that need credentials
+            gated_probes = []
+            for probe in model_probes:
+                # Eagerly load rules to check gated status
+                stmt = (
+                    select(GuardrailProbe)
+                    .where(GuardrailProbe.id == probe.id)
+                    .options(selectinload(GuardrailProbe.rules))
+                )
+                probe_with_rules = self.session.execute(stmt).scalar_one_or_none()
+                if probe_with_rules and probe_with_rules.rules:
+                    for rule in probe_with_rules.rules:
+                        if rule.is_gated:
+                            gated_probes.append(probe.name)
+                            break
+
+            if gated_probes and not credential_id:
+                errors.append(f"credential_id required for gated models: {', '.join(gated_probes)}")
+
+        if errors:
+            return {"success": False, "errors": errors}
+
+        return {
+            "success": True,
+            "probe_selections": probe_selections,
+            "model_probes": [{"id": str(p.id), "name": p.name} for p in model_probes],
+            "has_model_probes": len(model_probes) > 0,
+        }
+
+    async def identify_model_requirements(
+        self,
+        probe_selections: list[dict],
+        cluster_id: UUID,
+    ) -> dict[str, Any]:
+        """Identify which models need onboarding and deployment.
+
+        For each model-based probe:
+        - If model_id is None, the model needs onboarding first
+        - If model_id exists, check if already deployed to target cluster
+
+        Returns:
+            dict with 'models_to_onboard' and 'models_to_deploy' lists
+        """
+        data_manager = GuardrailsDeploymentDataManager(self.session)
+
+        probe_ids = [
+            UUID(s["probe_id"]) if isinstance(s["probe_id"], str) else s["probe_id"] for s in probe_selections
+        ]
+        model_probes = await data_manager.get_model_probes_from_selections(probe_ids)
+
+        models_to_onboard = []
+        models_to_deploy = []
+
+        for probe in model_probes:
+            # Load rules for this probe
+            stmt = (
+                select(GuardrailProbe).where(GuardrailProbe.id == probe.id).options(selectinload(GuardrailProbe.rules))
+            )
+            probe_with_rules = self.session.execute(stmt).scalar_one_or_none()
+
+            if not probe_with_rules or not probe_with_rules.rules:
+                continue
+
+            # Model probes have a single rule with model info
+            rule = probe_with_rules.rules[0]
+            selection = next((s for s in probe_selections if str(s.get("probe_id")) == str(probe.id)), {})
+
+            if rule.model_id is None:
+                # Model not onboarded yet - needs onboarding first
+                models_to_onboard.append(
+                    {
+                        "rule_id": str(rule.id),
+                        "probe_id": str(probe.id),
+                        "probe_name": probe.name,
+                        "model_uri": rule.model_uri,
+                        "provider_type": rule.model_provider_type,
+                        "is_gated": rule.is_gated,
+                        "cluster_config": selection.get("cluster_config_override"),
+                    }
+                )
+            else:
+                # Model is onboarded - needs deployment to cluster
+                # TODO: Check if already deployed to target cluster via endpoint lookup
+                models_to_deploy.append(
+                    {
+                        "rule_id": str(rule.id),
+                        "probe_id": str(probe.id),
+                        "probe_name": probe.name,
+                        "model_id": str(rule.model_id),
+                        "model_uri": rule.model_uri,
+                        "cluster_config": selection.get("cluster_config_override"),
+                    }
+                )
+
+        return {
+            "models_to_onboard": models_to_onboard,
+            "models_to_deploy": models_to_deploy,
+            "total_models": len(models_to_onboard) + len(models_to_deploy),
+        }
+
+    async def build_guardrail_config(
+        self,
+        profile_id: UUID,
+        rule_deployments: list[dict],
+    ) -> dict[str, Any]:
+        """Build guardrail configuration with deployed endpoint URLs.
+
+        This creates the config structure to be stored in Redis guardrail_table:{profile_id}
+
+        Args:
+            profile_id: The guardrail profile ID
+            rule_deployments: List of dicts with rule_id, endpoint_url, endpoint_id
+
+        Returns:
+            dict with 'custom_rules' list and 'metadata_json' with scanner URLs
+        """
+        metadata: dict[str, Any] = {}
+        custom_rules = []
+
+        for rd in rule_deployments:
+            rule_id = UUID(rd["rule_id"]) if isinstance(rd["rule_id"], str) else rd["rule_id"]
+            rule = self.session.get(GuardrailRule, rule_id)
+
+            if not rule:
+                continue
+
+            endpoint_url = rd.get("endpoint_url", "")
+
+            if rule.scanner_type == "llm":
+                # LLM scanner uses /v1 endpoint for chat completions
+                metadata["llm"] = {
+                    "url": f"{endpoint_url}/v1",
+                    "api_key_header": "Authorization",
+                    "timeout_ms": 30000,
+                }
+                custom_rules.append(
+                    {
+                        "id": rule.uri,
+                        "scanner": "llm",
+                        "scanner_config_json": {
+                            "model_id": rule.model_uri,
+                            "handler": rule.model_config_json.get("handler", "gpt_safeguard")
+                            if rule.model_config_json
+                            else "gpt_safeguard",
+                            "handler_config": rule.model_config_json,
+                        },
+                    }
+                )
+            elif rule.scanner_type == "classifier":
+                # Classifier scanner uses direct endpoint
+                metadata["latentbud"] = {
+                    "url": endpoint_url,
+                    "api_key_header": "Authorization",
+                    "timeout_ms": 30000,
+                }
+                custom_rules.append(
+                    {
+                        "id": rule.uri,
+                        "scanner": "latentbud",
+                        "scanner_config_json": {
+                            "model_id": rule.model_uri,
+                            **(rule.model_config_json if rule.model_config_json else {}),
+                        },
+                    }
+                )
+
+        return {
+            "custom_rules": custom_rules,
+            "metadata_json": metadata,
+        }
+
+    async def update_rule_deployment_status(
+        self,
+        rule_deployment_id: UUID,
+        status: str,
+        endpoint_id: UUID | None = None,
+        error_message: str | None = None,
+    ) -> dict[str, Any]:
+        """Update the status of a rule deployment.
+
+        Args:
+            rule_deployment_id: The rule deployment record ID
+            status: New status (pending, deploying, ready, failed)
+            endpoint_id: Optional endpoint ID if deployment succeeded
+            error_message: Optional error message if deployment failed
+
+        Returns:
+            dict with updated deployment info
+        """
+        data_manager = GuardrailsDeploymentDataManager(self.session)
+
+        status_enum = GuardrailRuleDeploymentStatusEnum(status)
+        deployment = await data_manager.update_rule_deployment_status(
+            rule_deployment_id=rule_deployment_id,
+            status=status_enum,
+            error_message=error_message,
+        )
+
+        return {
+            "id": str(deployment.id),
+            "rule_id": str(deployment.rule_id),
+            "status": deployment.status.value if hasattr(deployment.status, "value") else deployment.status,
+            "error_message": deployment.error_message,
+        }
+
+    async def get_pipeline_progress(
+        self,
+        guardrail_deployment_id: UUID,
+    ) -> dict[str, Any]:
+        """Get overall pipeline progress for a guardrail deployment.
+
+        Calculates progress based on rule deployment statuses.
+
+        Returns:
+            dict with progress percentage and status breakdown
+        """
+        data_manager = GuardrailsDeploymentDataManager(self.session)
+
+        rule_deployments = await data_manager.get_rule_deployments_for_guardrail(
+            guardrail_deployment_id=guardrail_deployment_id
+        )
+
+        if not rule_deployments:
+            return {
+                "progress_percentage": 100.0,
+                "status": "no_models",
+                "breakdown": {},
+            }
+
+        status_counts: dict[str, int] = {
+            "pending": 0,
+            "deploying": 0,
+            "ready": 0,
+            "failed": 0,
+        }
+
+        for rd in rule_deployments:
+            status_value = rd.status.value if hasattr(rd.status, "value") else rd.status
+            if status_value in status_counts:
+                status_counts[status_value] += 1
+
+        total = len(rule_deployments)
+        completed = status_counts["ready"] + status_counts["failed"]
+        in_progress = status_counts["deploying"]
+
+        # Calculate progress: ready + failed = complete, deploying = partial
+        progress = ((completed + (in_progress * 0.5)) / total) * 100 if total > 0 else 100.0
+
+        # Determine overall status
+        if status_counts["failed"] > 0:
+            overall_status = "partial_failure" if status_counts["ready"] > 0 else "failed"
+        elif completed == total:
+            overall_status = "ready"
+        elif in_progress > 0:
+            overall_status = "deploying"
+        else:
+            overall_status = "pending"
+
+        return {
+            "progress_percentage": round(progress, 2),
+            "status": overall_status,
+            "breakdown": status_counts,
+            "total_models": total,
+        }
