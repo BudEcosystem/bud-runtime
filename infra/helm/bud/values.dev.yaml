@@ -1,10 +1,13 @@
 imagePullSecrets:
     - name: harbor-bud
 
+global:
+    ingress:
+        hosts:
+            root: "dev.bud.studio"
+
 ingress:
     https: internal
-    hosts:
-        root: "dev.bud.studio"
 
 storage:
     budmodelRegistry:
@@ -52,6 +55,8 @@ microservices:
         image: budstudio/budprompt:nightly
         env:
             LOG_LEVEL: DEBUG
+    budpipeline:
+        image: budstudio/budpipeline:nightly
 
 imagePullPolicy: "Always"
 deploymentAnnotations:

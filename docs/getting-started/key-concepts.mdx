@@ -1,28 +1,46 @@
 ---
 title: "Key Concepts"
-description: "Understanding core concepts in Bud Stack"
+description: "Understanding core concepts in Bud AI Foundry"
 ---
 
-# Key Concepts
+Use these definitions to navigate the Bud AI Foundry platform and documentation.
 
-Essential terminology and concepts you need to know.
+## 1. Projects
 
-## Projects
+Projects are the primary workspace for teams. Each project contains its own models, deployments, endpoints, and API keys so you can isolate workloads by application or business unit.
 
-*Content to be added*
+## 2. Models
 
-## Models
+Models are registered artifacts or managed APIs that power inference. Bud AI Foundry supports cloud providers, Hugging Face repositories, URL-based imports, and disk-mounted checkpoints, all governed under a single catalog.
 
-*Content to be added*
+## 3. Clusters
 
-## Clusters
+Clusters represent the infrastructure where models run. They can be cloud-managed Kubernetes clusters or on-prem hardware pools, and they define the compute profiles available to deployments.
 
-*Content to be added*
+## 4. Deployments
 
-## Endpoints
+Deployments are the runtime instances of models attached to clusters. They include configuration details like hardware settings, scaling policies, and safety controls.
 
-*Content to be added*
+## 5. Endpoints
 
-## Deployments
+Endpoints expose deployed models to applications through OpenAI-compatible APIs. They can include routing rules, fallback strategies, and access policies.
 
-*Content to be added*
+## 6. API keys
+
+API keys authenticate application calls to Bud AI Foundry endpoints. Keys are project-scoped, support rotation, and can be segmented by environment.
+
+## 7. Observability
+
+Observability covers metrics, logs, and traces for latency, token usage, and error rates so teams can monitor reliability and cost.
+
+## 8. Evaluations
+
+Evaluations measure quality, latency, and safety using datasets and benchmarks so teams can choose the best model and configuration before promoting to production.
+
+## 9. Guardrails and Bud Sentinel
+
+Guardrails enforce safety policies during inference, while Bud Sentinel adds evaluation and runtime trust checks to validate models and responses.
+
+## 10. Playgrounds
+
+Playgrounds provide a safe environment for prompt iteration, model comparison, and quick prototyping before integrating APIs.

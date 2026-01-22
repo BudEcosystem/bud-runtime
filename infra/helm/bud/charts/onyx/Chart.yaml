@@ -1,0 +1,31 @@
+apiVersion: v2
+name: onyx
+description: A Helm chart for Kubernetes
+home: https://www.onyx.app/
+sources:
+  - "https://github.com/onyx-dot-app/onyx"
+type: application
+version: 0.4.4
+appVersion: latest
+annotations:
+  category: Productivity
+  licenses: MIT
+  images: |
+    - name: webserver
+      image: docker.io/onyxdotapp/onyx-web-server:latest
+    - name: background
+      image: docker.io/onyxdotapp/onyx-backend:latest
+    - name: vespa
+      image: vespaengine/vespa:8.526.15
+dependencies:
+  # Note: postgresql, valkey, and minio are provided by parent bud chart
+  # These shared dependencies are disabled in onyx values and secrets are passed from parent
+  - name: vespa
+    version: 0.2.24
+    repository: https://onyx-dot-app.github.io/vespa-helm-charts
+    condition: vespa.enabled
+  - name: ingress-nginx
+    version: 4.13.3
+    repository: https://kubernetes.github.io/ingress-nginx
+    condition: nginx.enabled
+    alias: nginx

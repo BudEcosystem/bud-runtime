@@ -142,6 +142,53 @@ spec:
         - {{ include "bud.ingress.hosts.budask" $ }}
       secretName: {{ .Release.Name }}-budask-acme-cert
 ---
+{{- if .Values.onyx.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-onyx-strip-api
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-onyx
+  annotations:
+    {{- if eq .Values.ingress.https "internal" }}
+    kubernetes.io/tls-acme: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-https-redirect@kubernetescrd,{{ .Release.Namespace }}-{{ .Release.Name }}-onyx-strip-api@kubernetescrd
+    {{- else }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Release.Name }}-onyx-strip-api@kubernetescrd
+    {{- end }}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ include "bud.ingress.hosts.onyx" $ }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-onyx-api-service
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-onyx-webserver
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - {{ include "bud.ingress.hosts.onyx" $ }}
+      secretName: {{ .Release.Name }}-onyx-acme-cert
+{{- end }}
+---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:

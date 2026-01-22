@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { AppRequest } from "../pages/api/requests";
 import { message } from "antd";
+import { errorToast } from "@/components/toast";
 
 // Gateway metadata interfaces for components
 export interface RequestMetadata {
@@ -351,7 +352,7 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         error?.response?.data?.message ||
         error?.message ||
         "Failed to fetch inferences";
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ error: errorMsg, isLoading: false });
     }
   },
@@ -380,7 +381,7 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         error?.response?.data?.message ||
         error?.message ||
         "Failed to fetch observability details";
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ error: errorMsg, isLoadingDetail: false });
     }
   },
@@ -409,7 +410,7 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         error?.response?.data?.message ||
         error?.message ||
         "Failed to fetch inference feedback";
-      message.error(errorMsg);
+      errorToast(errorMsg);
       set({ error: errorMsg, isLoadingFeedback: false });
     }
   },
@@ -485,7 +486,7 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         `Exported ${inferences.length} inferences to ${format.toUpperCase()}`,
       );
     } catch (error: any) {
-      message.error("Failed to export data");
+      errorToast("Failed to export data");
       console.error("Export error:", error);
     }
   },

@@ -542,7 +542,18 @@ class KubernetesHandler(BaseClusterHandler):
 
         transfer_status = {"status": "inprogress"}
 
-        # Check if pod exists and its status
+        # Check ConfigMap completion FIRST - handles case where pod completed and was garbage collected
+        # but the transfer was successful (ConfigMap persists after pod deletion)
+        if configmap_data and configmap_data.get("status") == "completed":
+            transfer_status["status"] = configmap_data["status"]
+            transfer_status["total_files"] = configmap_data.get("total_files")
+            transfer_status["completed_files"] = configmap_data.get("completed_files")
+            transfer_status["total_size"] = configmap_data.get("total_size")
+            transfer_status["completed_size"] = configmap_data.get("completed_size")
+            transfer_status["eta"] = configmap_data.get("eta")
+            return transfer_status
+
+        # Check if pod exists and its status (only after confirming transfer isn't already complete)
         if not pod_status:
             transfer_status["status"] = "failed"
             transfer_status["reason"] = "Pod not found"
@@ -819,9 +830,17 @@ class KubernetesHandler(BaseClusterHandler):
                     response = requests.get(url, headers=headers, timeout=10)
 
                 # Check if endpoint is supported (200 OK or other success codes)
-                supported_endpoints[endpoint] = response.status_code in [200, 201, 202, 204]
-                logger.debug(f"Endpoint {endpoint} returned  {response.text}")
-                logger.debug(f"Endpoint {endpoint} returned status code {response.status_code}")
+                is_success = response.status_code in [200, 201, 202, 204]
+                supported_endpoints[endpoint] = is_success
+
+                if is_success:
+                    logger.debug(f"Endpoint {endpoint} returned status code {response.status_code}")
+                else:
+                    # Log non-success responses at INFO level for debugging deployment failures
+                    response_text = response.text[:500] if response.text else ""
+                    logger.info(
+                        f"Endpoint {endpoint} returned non-success status {response.status_code}: {response_text}"
+                    )
 
             except requests.RequestException as err:
                 logger.debug(f"Endpoint {endpoint} failed with error: {err}")

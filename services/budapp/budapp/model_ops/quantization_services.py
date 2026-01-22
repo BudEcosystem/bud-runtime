@@ -506,6 +506,7 @@ class QuantizationService(SessionMixin):
             kv_cache_size=model_info.kv_cache_size,
             architecture_text_config=model_info.architecture_text_config,
             architecture_vision_config=model_info.architecture_vision_config,
+            architecture_audio_config=model_info.architecture_audio_config,
             tasks=model_info.tasks,
             tags=model_info.tags,
             model_type=model_info.model_type,

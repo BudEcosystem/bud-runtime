@@ -3,6 +3,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: "{{ .Release.Name }}-clickhouse-db-create-script"
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
 data:
   script.sh: |-
     ch_isready() {
@@ -18,13 +22,17 @@ data:
           break
         else
           echo "Waiting for clickhouse"
+          sleep 2
           continue
         fi
       done
     }
 
+    echo "Waiting for ClickHouse to be ready..."
     ch_isready
+    echo "ClickHouse is ready"
 
+    echo "Creating databases..."
     clickhouse-client \
       --host {{ .Release.Name }}-clickhouse\
       --user {{ .Values.clickhouse.auth.username }} \
@@ -33,12 +41,19 @@ data:
       CREATE DATABASE IF NOT EXISTS {{ . }};
     {{- end }}
     EOF
+    echo "Database initialization complete"
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: "{{ .Release.Name }}-clickhouse-db-create"
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-4"
+    "helm.sh/hook-delete-policy": before-hook-creation
+    checksum/databases: "{{ join "-" $.Values.clickhouseExtra.autoCreateDB | sha256sum }}"
 spec:
+  ttlSecondsAfterFinished: 300
   template:
     spec:
       volumes:

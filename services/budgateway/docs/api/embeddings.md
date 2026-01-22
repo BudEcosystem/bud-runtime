@@ -33,10 +33,23 @@ Authorization: Bearer <YOUR_API_KEY>
   "model": "string",
   "input": "string" | ["array", "of", "strings"],
   "encoding_format": "float",
+  "dimensions": 1536,
+  "modality": "text",
+  "priority": "high",
+  "include_input": true,
+  "chunking": {
+    "enabled": true,
+    "strategy": "token",
+    "chunk_size": 512,
+    "chunk_overlap": 50,
+    "tokenizer": "cl100k_base",
+    "return_chunk_text": true
+  },
   "tensorzero::cache_options": {
     "enabled": "on" | "off",
     "max_age_s": 3600
-  }
+  },
+  "provider_specific_param": "value"
 }
 ```
 
@@ -47,9 +60,21 @@ Authorization: Bearer <YOUR_API_KEY>
 | `model` | string | Yes | The model identifier to use for embeddings. Can be a simple model name (e.g., `text-embedding-3-small`) or prefixed with `tensorzero::` (e.g., `tensorzero::my-embedding-model::`) |
 | `input` | string \| string[] | Yes | The text(s) to generate embeddings for. Can be a single string or an array of strings for batch processing |
 | `encoding_format` | string | No | The format of the embeddings. Currently only `"float"` is supported (default) |
+| `dimensions` | integer | No | Matryoshka dimensions to request from providers that support it |
+| `modality` | string | No | Input modality (e.g., `"text"`, `"image"`, `"audio"`) for providers that support multimodal embeddings |
+| `priority` | string | No | Priority hint (e.g., `"high"`, `"normal"`, `"low"`) forwarded to the provider |
+| `include_input` | boolean | No | Request that the provider include input text in the response |
+| `chunking` | object | No | Chunking configuration forwarded to the provider |
+| `chunking.enabled` | boolean | No | Enable provider-side chunking |
+| `chunking.strategy` | string | No | Chunking strategy (e.g., `"token"`, `"sentence"`, `"recursive"`) |
+| `chunking.chunk_size` | integer | No | Chunk size for provider-side chunking |
+| `chunking.chunk_overlap` | integer | No | Overlap between chunks |
+| `chunking.tokenizer` | string | No | Tokenizer identifier for provider-side chunking |
+| `chunking.return_chunk_text` | boolean | No | Request that the provider return chunk text |
 | `tensorzero::cache_options` | object | No | Caching configuration for the request |
 | `tensorzero::cache_options.enabled` | string | No | Enable (`"on"`) or disable (`"off"`) caching for this request |
 | `tensorzero::cache_options.max_age_s` | integer | No | Maximum age in seconds for cached embeddings |
+| `provider_specific_param` | any | No | Additional provider-specific parameters are accepted and passed through unchanged |
 
 ## Response Format
 
@@ -62,13 +87,25 @@ Authorization: Bearer <YOUR_API_KEY>
     {
       "object": "embedding",
       "embedding": [0.0023064255, -0.009327292, ...],
-      "index": 0
+      "index": 0,
+      "text": "original input",
+      "chunk_text": "chunk text",
+      "chunk_info": {
+        "start": 0,
+        "end": 512
+      }
     }
   ],
   "model": "text-embedding-3-small",
   "usage": {
     "prompt_tokens": 8,
     "total_tokens": 8
+  },
+  "id": "infinity-123456",
+  "created": 1700000000,
+  "chunking_info": {
+    "strategy": "token",
+    "chunk_size": 512
   }
 }
 ```
@@ -82,10 +119,18 @@ Authorization: Bearer <YOUR_API_KEY>
 | `data[].object` | string | Always `"embedding"` |
 | `data[].embedding` | float[] | The embedding vector as an array of floats |
 | `data[].index` | integer | The index of this embedding in the batch (0-based) |
+| `data[].text` | string | Original input text when the provider returns it |
+| `data[].chunk_text` | string | Chunk text when provider-side chunking is enabled |
+| `data[].chunk_info` | object | Provider-specific chunk metadata |
 | `model` | string | The model used to generate the embeddings |
 | `usage` | object | Token usage information |
 | `usage.prompt_tokens` | integer | Number of tokens in the input |
 | `usage.total_tokens` | integer | Total tokens used (same as prompt_tokens for embeddings) |
+| `id` | string | Provider response ID when available |
+| `created` | integer | Provider response timestamp (Unix seconds) when available |
+| `chunking_info` | object | Provider-specific chunking metadata when available |
+
+Additional provider-specific fields may appear at the top level or within `data[]` entries; the gateway forwards them unchanged when returned by the provider.
 
 ## Error Responses
 

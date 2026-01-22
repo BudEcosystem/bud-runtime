@@ -1105,6 +1105,12 @@ async fn test_embedding_request() {
             "This is a test input".to_string(),
         ),
         encoding_format: None,
+        dimensions: None,
+        modality: None,
+        priority: None,
+        include_input: None,
+        chunking: None,
+        extra: HashMap::new(),
     };
     let api_keys = InferenceCredentials::default();
     let response = model_config
@@ -1208,6 +1214,12 @@ async fn test_embedding_sanity_check() {
             "Joe Biden is the president of the United States".to_string(),
         ),
         encoding_format: None,
+        dimensions: None,
+        modality: None,
+        priority: None,
+        include_input: None,
+        chunking: None,
+        extra: HashMap::new(),
     };
 
     let embedding_request_b = EmbeddingRequest {
@@ -1215,6 +1227,12 @@ async fn test_embedding_sanity_check() {
             "Kamala Harris is the vice president of the United States".to_string(),
         ),
         encoding_format: None,
+        dimensions: None,
+        modality: None,
+        priority: None,
+        include_input: None,
+        chunking: None,
+        extra: HashMap::new(),
     };
 
     let embedding_request_c = EmbeddingRequest {
@@ -1222,6 +1240,12 @@ async fn test_embedding_sanity_check() {
             "My favorite systems programming language is Rust".to_string(),
         ),
         encoding_format: None,
+        dimensions: None,
+        modality: None,
+        priority: None,
+        include_input: None,
+        chunking: None,
+        extra: HashMap::new(),
     };
     let api_keys = InferenceCredentials::default();
 

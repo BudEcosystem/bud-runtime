@@ -1,0 +1,9 @@
+dependencies:
+- name: vespa
+  repository: https://onyx-dot-app.github.io/vespa-helm-charts
+  version: 0.2.24
+- name: ingress-nginx
+  repository: https://kubernetes.github.io/ingress-nginx
+  version: 4.13.3
+digest: sha256:36484e0e95341ccc2bd87da1486c340531a49ab79e96e69d4aa313cf9b574d11
+generated: "2025-12-02T12:37:54.428501284Z"

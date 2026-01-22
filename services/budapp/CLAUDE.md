@@ -25,7 +25,7 @@ Key modules:
 - `cluster_ops/` - Cluster management and workflows
 - `model_ops/` - Model management (cloud and local)
 - `endpoint_ops/` - Endpoint deployments
-- `workflow_ops/` - Dapr workflow definitions
+- `workflow_ops/` - Dapr workflow definitions and BudPipeline proxy routes
 - `commons/` - Shared utilities, config, and dependencies
 
 ## Development Commands
@@ -270,3 +270,122 @@ assert tampered[0]["verification_message"] == "message"
 3. **Create complete mocks** - Include all required fields for Pydantic schemas
 4. **Use consistent serialization** - Compact JSON, lowercase booleans
 5. **Verify return structures** - Check actual service methods for correct keys
+
+## BudPipeline Integration
+
+BudApp provides authenticated proxy routes to the BudPipeline service for pipeline management and execution monitoring. All routes are prefixed with `/budpipeline` and require authentication.
+
+### User Isolation
+
+Pipelines support user-scoped ownership via the `user_id` field:
+- Each pipeline is owned by the user who created it (extracted from JWT)
+- Users can only see/modify pipelines they own
+- System-owned pipelines (`system_owned=true`) are visible to all users when using `include_system=true`
+
+### Execution Monitoring Routes (002-pipeline-event-persistence)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/executions` | List executions with filters (pipeline_id, status, initiator, date range) and pagination |
+| `GET` | `/budpipeline/executions/{id}` | Get execution details with step statuses |
+| `GET` | `/budpipeline/executions/{id}/progress` | Get detailed progress including steps, events, and aggregated progress |
+
+### Pipeline Management Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/budpipeline` | Create a new pipeline (user_id extracted from JWT) |
+| `GET` | `/budpipeline` | List user's pipelines (add `?include_system=true` to include system pipelines) |
+| `GET` | `/budpipeline/{id}` | Get pipeline details (user must own or system_owned) |
+| `PUT` | `/budpipeline/{id}` | Update pipeline (user must own) |
+| `DELETE` | `/budpipeline/{id}` | Delete pipeline (user must own) |
+| `POST` | `/budpipeline/{id}/execute` | Start execution (supports `callback_topics` for real-time updates) |
+| `POST` | `/budpipeline/validate` | Validate DAG definition |
+| `POST` | `/budpipeline/run` | Execute pipeline inline without saving the definition (ephemeral execution) |
+
+### Schedule Management Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/schedules` | List schedules |
+| `POST` | `/budpipeline/schedules` | Create schedule |
+| `GET` | `/budpipeline/schedules/{id}` | Get schedule details |
+| `PUT` | `/budpipeline/schedules/{id}` | Update schedule |
+| `DELETE` | `/budpipeline/schedules/{id}` | Delete schedule |
+| `POST` | `/budpipeline/schedules/{id}/pause` | Pause schedule |
+| `POST` | `/budpipeline/schedules/{id}/resume` | Resume schedule |
+| `POST` | `/budpipeline/schedules/{id}/trigger` | Trigger immediately |
+
+### Webhook Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/webhooks` | List webhooks |
+| `POST` | `/budpipeline/webhooks` | Create webhook |
+| `DELETE` | `/budpipeline/webhooks/{id}` | Delete webhook |
+| `POST` | `/budpipeline/webhooks/{id}/rotate-secret` | Rotate webhook secret |
+
+### Event Trigger Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/event-triggers` | List event triggers |
+| `POST` | `/budpipeline/event-triggers` | Create event trigger |
+| `DELETE` | `/budpipeline/event-triggers/{id}` | Delete event trigger |
+
+### Actions API Routes (Pluggable Action Architecture)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/budpipeline/actions` | List all available pipeline actions with metadata |
+| `GET` | `/budpipeline/actions/{action_type}` | Get metadata for a specific action type |
+| `POST` | `/budpipeline/actions/validate` | Validate parameters for an action type |
+
+### Key Files
+
+- `workflow_ops/budpipeline_routes.py` - FastAPI route definitions
+- `workflow_ops/budpipeline_service.py` - Service layer with Dapr invocation to budpipeline
+- `workflow_ops/schemas.py` - Pydantic schemas for execution responses
+
+### Usage Example
+
+```python
+# Create a pipeline (user_id automatically set from JWT)
+response = await client.post(
+    "/budpipeline",
+    json={
+        "dag": {"name": "my-pipeline", "version": "1.0", "steps": [...]},
+        "name": "My Pipeline"
+    }
+)
+pipeline_id = response.json()["id"]
+
+# List user's pipelines (excluding system pipelines)
+pipelines = await client.get("/budpipeline")
+
+# List including system pipelines
+pipelines = await client.get("/budpipeline?include_system=true")
+
+# Start execution with callback topics for real-time progress
+response = await client.post(
+    f"/budpipeline/{pipeline_id}/execute",
+    json={
+        "params": {"input": "data"},
+        "callback_topics": ["my-progress-topic"]
+    }
+)
+execution_id = response.json()["execution_id"]
+
+# Ephemeral execution (pipeline definition is not saved)
+response = await client.post(
+    "/budpipeline/run",
+    json={
+        "pipeline_definition": {"name": "temp", "version": "1.0", "steps": [...]},
+        "params": {"input": "data"}
+    }
+)
+
+# Poll for progress
+progress = await client.get(f"/budpipeline/executions/{execution_id}/progress")
+# Returns: execution details, step progress, aggregated progress %, ETA
+```

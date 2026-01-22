@@ -14,6 +14,7 @@ import ProjectTags from 'src/flows/components/ProjectTags';
 import { SortIcon } from './SortIcon';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { ClientTimestamp } from '../../ClientTimestamp';
+import { errorToast, successToast } from '@/components/toast';
 
 
 interface InferenceListTableProps {
@@ -61,8 +62,8 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   // Copy inference ID to clipboard
   const copyToClipboard = async (text: string) => {
     await copyText(text, {
-      onSuccess: () => message.success('Copied to clipboard'),
-      onError: () => message.error('Failed to copy'),
+      onSuccess: () => successToast('Copied to clipboard'),
+      onError: () => errorToast('Failed to copy'),
     });
   };
 
@@ -145,7 +146,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
             icon={<EyeOutlined />}
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/home/projects/${projectId}/inferences/${record.inference_id}`);
+              router.push(`/projects/${projectId}/inferences/${record.inference_id}`);
             }}
           />
           <Button
@@ -226,7 +227,7 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
         onRow={(record) => ({
           onClick: (e) => {
             e.preventDefault();
-            router.push(`/home/projects/${projectId}/inferences/${record.inference_id}`);
+            router.push(`/projects/${projectId}/inferences/${record.inference_id}`);
           },
           className: 'cursor-pointer hover:bg-gray-900',
         })}

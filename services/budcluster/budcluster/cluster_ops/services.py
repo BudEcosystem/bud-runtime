@@ -67,11 +67,13 @@ from .schemas import (
     ClusterCreate,
     ClusterCreateRequest,
     ClusterDeleteRequest,
+    ClusterHealthResponse,
     ClusterNodeInfo,
     ClusterNodeInfoResponse,
     ClusterStatusUpdate,
     ConfigureCluster,
     FetchClusterInfo,
+    HealthCheckStatus,
     NodeEventsCountSuccessResponse,
     NodeEventsResponse,
     VerifyClusterConnection,
@@ -2229,3 +2231,291 @@ class ClusterService(SessionMixin):
         except Exception as e:
             logger.error(f"Error fetching storage classes for cluster {cluster_id}: {e}")
             return ErrorResponse(message=f"Failed to fetch storage classes: {str(e)}")
+
+    async def get_cluster_health(
+        self, cluster_id: UUID, checks: List[str] = None
+    ) -> Union[SuccessResponse, ErrorResponse]:
+        """Get cluster health status for specified checks.
+
+        Args:
+            cluster_id: The ID of the cluster to check health for.
+            checks: List of health checks to perform. Valid values are:
+                    'nodes', 'api', 'storage', 'network', 'gpu'.
+                    If None, all checks are performed.
+
+        Returns:
+            SuccessResponse: A response object containing health status for each check.
+            ErrorResponse: A response object containing the error message.
+        """
+        valid_checks = {"nodes", "api", "storage", "network", "gpu"}
+
+        # Default to all checks if not specified
+        if checks is None:
+            checks = list(valid_checks)
+        else:
+            # Validate requested checks
+            invalid_checks = set(checks) - valid_checks
+            if invalid_checks:
+                return ErrorResponse(
+                    message=f"Invalid health checks: {invalid_checks}. Valid checks are: {valid_checks}"
+                )
+
+        try:
+            # Get cluster details from database
+            db_cluster = await ClusterDataManager(self.session).retrieve_cluster_by_fields(
+                {"id": cluster_id}, missing_ok=False
+            )
+            if db_cluster is None:
+                return ErrorResponse(message="Cluster not found")
+
+            # Get cluster handler
+            from .kubernetes import KubernetesHandler
+
+            k8s_handler = KubernetesHandler(db_cluster.config_file_dict, db_cluster.ingress_url)
+
+            health_results = {}
+
+            # Perform requested health checks
+            if "nodes" in checks:
+                health_results["nodes"] = await self._check_nodes_health(k8s_handler)
+
+            if "api" in checks:
+                health_results["api"] = await self._check_api_health(k8s_handler)
+
+            if "storage" in checks:
+                health_results["storage"] = await self._check_storage_health(k8s_handler)
+
+            if "network" in checks:
+                health_results["network"] = await self._check_network_health(k8s_handler)
+
+            if "gpu" in checks:
+                health_results["gpu"] = await self._check_gpu_health(k8s_handler, cluster_id)
+
+            return ClusterHealthResponse(
+                message="Cluster health check completed",
+                data=health_results,
+            )
+
+        except Exception as e:
+            logger.error(f"Error checking cluster health for {cluster_id}: {e}")
+            return ErrorResponse(message=f"Failed to check cluster health: {str(e)}")
+
+    async def _check_nodes_health(self, k8s_handler) -> HealthCheckStatus:
+        """Check the health of cluster nodes."""
+        from kubernetes import client
+
+        try:
+            v1 = client.CoreV1Api(api_client=k8s_handler.api_client)
+            nodes = v1.list_node()
+
+            total_nodes = len(nodes.items)
+            ready_nodes = 0
+            not_ready_nodes = []
+
+            for node in nodes.items:
+                node_ready = False
+                for condition in node.status.conditions:
+                    if condition.type == "Ready" and condition.status == "True":
+                        node_ready = True
+                        ready_nodes += 1
+                        break
+                if not node_ready:
+                    not_ready_nodes.append(node.metadata.name)
+
+            if ready_nodes == total_nodes:
+                return HealthCheckStatus(healthy=True, message="All nodes ready", count=total_nodes)
+            else:
+                return HealthCheckStatus(
+                    healthy=False,
+                    message=f"{ready_nodes}/{total_nodes} nodes ready",
+                    count=total_nodes,
+                    details={"not_ready_nodes": not_ready_nodes},
+                )
+
+        except Exception as e:
+            logger.error(f"Error checking nodes health: {e}")
+            return HealthCheckStatus(healthy=False, message=f"Failed to check nodes: {str(e)}")
+
+    async def _check_api_health(self, k8s_handler) -> HealthCheckStatus:
+        """Check the health of the Kubernetes API server."""
+        try:
+            # Try to verify cluster connection - this tests API server responsiveness
+            is_connected = k8s_handler.verify_cluster_connection()
+
+            if is_connected:
+                return HealthCheckStatus(healthy=True, message="API server responding")
+            else:
+                return HealthCheckStatus(healthy=False, message="API server not responding")
+
+        except Exception as e:
+            logger.error(f"Error checking API health: {e}")
+            return HealthCheckStatus(healthy=False, message=f"API server error: {str(e)}")
+
+    async def _check_storage_health(self, k8s_handler) -> HealthCheckStatus:
+        """Check the health of cluster storage (PVCs)."""
+        from kubernetes import client
+
+        try:
+            v1 = client.CoreV1Api(api_client=k8s_handler.api_client)
+            pvcs = v1.list_persistent_volume_claim_for_all_namespaces()
+
+            total_pvcs = len(pvcs.items)
+            bound_pvcs = 0
+            pending_pvcs = []
+            failed_pvcs = []
+
+            for pvc in pvcs.items:
+                if pvc.status.phase == "Bound":
+                    bound_pvcs += 1
+                elif pvc.status.phase == "Pending":
+                    pending_pvcs.append(f"{pvc.metadata.namespace}/{pvc.metadata.name}")
+                else:
+                    failed_pvcs.append(f"{pvc.metadata.namespace}/{pvc.metadata.name}")
+
+            if total_pvcs == 0:
+                return HealthCheckStatus(healthy=True, message="No PVCs in cluster", count=0)
+            elif bound_pvcs == total_pvcs:
+                return HealthCheckStatus(healthy=True, message="All PVCs bound", count=total_pvcs)
+            else:
+                details = {}
+                if pending_pvcs:
+                    details["pending_pvcs"] = pending_pvcs[:10]  # Limit to first 10
+                if failed_pvcs:
+                    details["failed_pvcs"] = failed_pvcs[:10]
+                return HealthCheckStatus(
+                    healthy=False,
+                    message=f"{bound_pvcs}/{total_pvcs} PVCs bound",
+                    count=total_pvcs,
+                    details=details if details else None,
+                )
+
+        except Exception as e:
+            logger.error(f"Error checking storage health: {e}")
+            return HealthCheckStatus(healthy=False, message=f"Failed to check storage: {str(e)}")
+
+    async def _check_network_health(self, k8s_handler) -> HealthCheckStatus:
+        """Check the health of cluster networking."""
+        from kubernetes import client
+
+        try:
+            # Check for NetworkPolicy resources to verify network policies are active
+            networking_v1 = client.NetworkingV1Api(api_client=k8s_handler.api_client)
+            network_policies = networking_v1.list_network_policy_for_all_namespaces()
+
+            policy_count = len(network_policies.items)
+
+            # Also check core DNS service
+            v1 = client.CoreV1Api(api_client=k8s_handler.api_client)
+            dns_healthy = False
+            dns_message = "CoreDNS not found"
+
+            try:
+                # Check for kube-dns or coredns service
+                dns_services = v1.list_namespaced_service(namespace="kube-system")
+                for svc in dns_services.items:
+                    if "dns" in svc.metadata.name.lower():
+                        dns_healthy = True
+                        dns_message = f"DNS service '{svc.metadata.name}' active"
+                        break
+            except Exception as dns_err:
+                logger.warning(f"Could not check DNS service: {dns_err}")
+                dns_message = "Could not verify DNS service"
+
+            if dns_healthy:
+                return HealthCheckStatus(
+                    healthy=True,
+                    message="Network policies active" if policy_count > 0 else "Network operational (no policies)",
+                    count=policy_count,
+                    details={"dns_status": dns_message},
+                )
+            else:
+                return HealthCheckStatus(
+                    healthy=False,
+                    message=dns_message,
+                    count=policy_count,
+                    details={"network_policies": policy_count},
+                )
+
+        except Exception as e:
+            logger.error(f"Error checking network health: {e}")
+            return HealthCheckStatus(healthy=False, message=f"Failed to check network: {str(e)}")
+
+    async def _check_gpu_health(self, k8s_handler, cluster_id: UUID) -> HealthCheckStatus:
+        """Check the health of GPU resources in the cluster."""
+        from kubernetes import client
+
+        try:
+            v1 = client.CoreV1Api(api_client=k8s_handler.api_client)
+            nodes = v1.list_node()
+
+            total_gpus = 0
+            allocatable_gpus = 0
+            gpu_nodes = []
+
+            for node in nodes.items:
+                node_gpus = 0
+                node_allocatable_gpus = 0
+
+                # Check for NVIDIA GPUs
+                if node.status.capacity:
+                    nvidia_capacity = node.status.capacity.get("nvidia.com/gpu", "0")
+                    node_gpus = int(nvidia_capacity) if nvidia_capacity else 0
+
+                if node.status.allocatable:
+                    nvidia_allocatable = node.status.allocatable.get("nvidia.com/gpu", "0")
+                    node_allocatable_gpus = int(nvidia_allocatable) if nvidia_allocatable else 0
+
+                if node_gpus > 0:
+                    total_gpus += node_gpus
+                    allocatable_gpus += node_allocatable_gpus
+                    gpu_nodes.append(
+                        {
+                            "name": node.metadata.name,
+                            "total": node_gpus,
+                            "allocatable": node_allocatable_gpus,
+                        }
+                    )
+
+            if total_gpus == 0:
+                return HealthCheckStatus(healthy=True, message="No GPU resources in cluster", count=0)
+
+            # Check for GPU device plugin daemonset
+            apps_v1 = client.AppsV1Api(api_client=k8s_handler.api_client)
+            gpu_driver_detected = False
+            try:
+                daemonsets = apps_v1.list_daemon_set_for_all_namespaces()
+                for ds in daemonsets.items:
+                    if "nvidia" in ds.metadata.name.lower() and "device-plugin" in ds.metadata.name.lower():
+                        gpu_driver_detected = True
+                        break
+                    if "gpu-operator" in ds.metadata.name.lower():
+                        gpu_driver_detected = True
+                        break
+            except Exception as ds_err:
+                logger.warning(f"Could not check GPU daemonsets: {ds_err}")
+
+            if allocatable_gpus == total_gpus and gpu_driver_detected:
+                return HealthCheckStatus(
+                    healthy=True,
+                    message="GPU drivers detected",
+                    count=total_gpus,
+                    details={"gpu_nodes": gpu_nodes, "driver_detected": gpu_driver_detected},
+                )
+            elif allocatable_gpus < total_gpus:
+                return HealthCheckStatus(
+                    healthy=False,
+                    message=f"{allocatable_gpus}/{total_gpus} GPUs allocatable",
+                    count=total_gpus,
+                    details={"gpu_nodes": gpu_nodes, "driver_detected": gpu_driver_detected},
+                )
+            else:
+                return HealthCheckStatus(
+                    healthy=gpu_driver_detected,
+                    message="GPU drivers detected" if gpu_driver_detected else "GPU drivers not detected",
+                    count=total_gpus,
+                    details={"gpu_nodes": gpu_nodes, "driver_detected": gpu_driver_detected},
+                )
+
+        except Exception as e:
+            logger.error(f"Error checking GPU health: {e}")
+            return HealthCheckStatus(healthy=False, message=f"Failed to check GPU: {str(e)}")

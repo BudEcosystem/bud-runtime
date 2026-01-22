@@ -61,6 +61,7 @@ from .schemas import (
     MessageResponse,
     NoteResponse,
     PlaygroundInitializeResponse,
+    PlaygroundInitializeWithAccessTokenResponse,
 )
 
 
@@ -492,6 +493,235 @@ class PlaygroundService(SessionMixin):
             raise
         except Exception as e:
             logger.error(f"Failed to initialize playground session with refresh token: {e}")
+            raise ClientException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=f"Failed to initialize playground session: {str(e)}",
+            )
+
+    async def initialize_session_with_access_token(
+        self, access_token: str
+    ) -> PlaygroundInitializeWithAccessTokenResponse:
+        """Initialize playground session with access token authentication (cross-app SSO).
+
+        This method enables cross-app SSO by accepting access tokens from any OAuth client
+        in the same Keycloak realm. Unlike refresh tokens, access tokens can be validated
+        using Keycloak's public keys without requiring client-specific credentials.
+
+        This method:
+        1. Validates the access token signature using Keycloak's public keys
+        2. Extracts user ID (sub claim) from the token
+        3. Fetches user's available endpoints/deployments
+        4. Stores data in Redis with appropriate TTL
+        5. Returns initialization response (without new tokens - no refresh performed)
+
+        Args:
+            access_token: The access token to validate and use for session initialization
+
+        Returns:
+            PlaygroundInitializeWithAccessTokenResponse with session info
+        """
+        try:
+            # Step 1: Get tenant and client for token validation
+            tenant = await UserDataManager(self.session).retrieve_by_fields(
+                Tenant, {"realm_name": app_settings.default_realm_name, "is_active": True}, missing_ok=True
+            )
+            if not tenant:
+                raise ClientException(status_code=status.HTTP_401_UNAUTHORIZED, message="Tenant not found")
+
+            tenant_client = await UserDataManager(self.session).retrieve_by_fields(
+                TenantClient, {"tenant_id": tenant.id}, missing_ok=True
+            )
+            if not tenant_client:
+                raise ClientException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, message="Tenant client configuration not found"
+                )
+
+            # Step 2: Validate access token using Keycloak's public keys
+            keycloak_manager = KeycloakManager()
+            decrypted_secret = await tenant_client.get_decrypted_client_secret()
+            credentials = TenantClientSchema(
+                id=tenant_client.id,
+                client_id=tenant_client.client_id,
+                client_named_id=tenant_client.client_named_id,
+                client_secret=decrypted_secret,
+            )
+
+            try:
+                # validate_token uses Keycloak's public keys to verify signature
+                # This works for any token from the same realm, regardless of issuing client
+                decoded = await keycloak_manager.validate_token(
+                    access_token, app_settings.default_realm_name, credentials
+                )
+            except Exception as e:
+                logger.error(f"Failed to validate access token: {e}")
+                raise ClientException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, message="Invalid or expired access token"
+                )
+
+            # Step 3: Extract auth_id (Keycloak user ID) from validated token
+            auth_id = decoded.get("sub")
+            if not auth_id:
+                raise ClientException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, message="No subject found in access token"
+                )
+
+            # Step 4: Get user details using auth_id
+            db_user = await UserDataManager(self.session).retrieve_by_fields(
+                UserModel, {"auth_id": auth_id}, missing_ok=True
+            )
+
+            if not db_user:
+                logger.error(f"User not found for auth_id: {auth_id}")
+                raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="User not found")
+
+            # Set the access token for permission checks
+            db_user.raw_token = access_token
+
+            # Step 5: Get user's accessible projects
+            project_service = ProjectService(self.session)
+
+            # CLIENT users see published models, ADMIN users see all
+            filter_published_only = db_user.user_type == UserTypeEnum.CLIENT
+
+            # Get project IDs based on user type
+            if filter_published_only:
+                user_projects, _ = await project_service.get_all_active_projects(
+                    current_user=db_user,
+                    offset=0,
+                    limit=1,
+                )
+
+                if not user_projects:
+                    raise ClientException(
+                        status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+                    )
+
+                project = user_projects[0]
+                project_ids = None
+            else:
+                all_projects, _ = await project_service.get_all_active_projects(
+                    current_user=db_user,
+                    offset=0,
+                    limit=1000,
+                )
+
+                if not all_projects:
+                    raise ClientException(
+                        status_code=status.HTTP_404_NOT_FOUND, message="No active projects found for user"
+                    )
+
+                project = all_projects[0]
+                project_ids = [p.project.id for p in all_projects]
+
+            # Step 6: Hash the access token for Redis storage
+            hashed_access_token = await self.hash_jwt_token(access_token)
+
+            # Step 7: Prepare filters for endpoint retrieval
+            endpoint_filters = {"status": EndpointStatusEnum.RUNNING}
+            if filter_published_only:
+                endpoint_filters["is_published"] = True
+
+            db_endpoints, _ = await EndpointDataManager(self.session).get_all_playground_deployments(
+                project_ids=project_ids,
+                offset=0,
+                limit=1000,
+                filters=endpoint_filters,
+                order_by=[],
+                search=False,
+            )
+
+            db_prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects(
+                project_ids=project_ids
+            )
+
+            # Step 8: Prepare cache data
+            cache_data = {}
+
+            for db_endpoint_tuple in db_endpoints:
+                endpoint, input_cost, output_cost, context_length = db_endpoint_tuple
+                cache_data[endpoint.name] = {
+                    "endpoint_id": str(endpoint.id),
+                    "model_id": str(endpoint.model.id),
+                    "project_id": str(endpoint.project_id),
+                }
+
+            for db_prompt in db_prompts:
+                prompt_cache_key = f"prompt:{db_prompt.name}"
+                cache_data[prompt_cache_key] = {
+                    "prompt_id": str(db_prompt.id),
+                    "project_id": str(db_prompt.project_id),
+                }
+
+            # Add draft prompts from Redis
+            draft_prompt_count = 0
+            try:
+                redis_service = RedisService()
+                draft_pattern = f"draft_prompt:{db_user.id}:*"
+                draft_keys = await redis_service.keys(draft_pattern)
+
+                for draft_key in draft_keys:
+                    key_str = draft_key.decode() if isinstance(draft_key, bytes) else draft_key
+                    draft_data_str = await redis_service.get(key_str)
+
+                    if draft_data_str:
+                        draft_data = json.loads(draft_data_str)
+                        draft_prompt_id = draft_data.get("prompt_id")
+
+                        if draft_prompt_id:
+                            draft_cache_key = f"prompt:{draft_prompt_id}"
+                            cache_data[draft_cache_key] = {"prompt_id": draft_prompt_id}
+                            draft_prompt_count += 1
+
+                logger.debug(f"Added {draft_prompt_count} draft prompts to cache for user {db_user.id}")
+            except Exception as e:
+                logger.error(f"Failed to fetch draft prompts: {e}")
+
+            # Add metadata to cache
+            cache_data["__metadata__"] = {
+                "api_key_id": None,
+                "user_id": str(db_user.id),
+                "api_key_project_id": str(project.project.id),
+            }
+
+            # Step 9: Calculate TTL based on access token expiry
+            ttl = None
+            expires_in = None
+            try:
+                access_token_expiry = decoded.get("exp")
+                if access_token_expiry:
+                    current_time = int(time.time())
+                    ttl = max(access_token_expiry - current_time, 0)
+                    expires_in = ttl
+            except Exception:
+                ttl = 3600  # Default 1 hour if unable to determine expiry
+
+            # Step 10: Store in Redis with same key format as API keys
+            redis_service = RedisService()
+            redis_key = f"api_key:{hashed_access_token}"
+
+            await redis_service.set(
+                redis_key,
+                json.dumps(cache_data),
+                ex=ttl,
+            )
+
+            logger.info(
+                f"Initialized playground session (access token) for user {db_user.id} with "
+                f"{len(db_endpoints)} endpoints, {len(db_prompts)} prompts, and {draft_prompt_count} draft prompts"
+            )
+
+            return PlaygroundInitializeWithAccessTokenResponse(
+                user_id=db_user.id,
+                initialization_status="success",
+                ttl=ttl,
+                message="Playground session initialized successfully with access token (cross-app SSO)",
+                expires_in=expires_in,
+            )
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to initialize playground session with access token: {e}")
             raise ClientException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message=f"Failed to initialize playground session: {str(e)}",

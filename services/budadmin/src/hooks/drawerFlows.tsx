@@ -5013,6 +5013,70 @@ const editAgent: DrawerFlowType = {
   ],
 };
 
+// Flow For New Workflow
+const newPipeline: DrawerFlowType = {
+  title: "New Workflow",
+  description: "Create a new DAG workflow",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Workflows", "New Workflow"],
+      id: "new-pipeline",
+      step: 1,
+      component: StepComponents["new-pipeline"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Create Workflow",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const pipelineExecutionDetails: DrawerFlowType = {
+  title: "Execution Details",
+  description: "View workflow execution details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Workflows", "Execution Details"],
+      id: "pipeline-execution-details",
+      step: 1,
+      component: StepComponents["pipeline-execution-details"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Execution Details",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const pipelineCreateSchedule: DrawerFlowType = {
+  title: "Create Schedule",
+  description: "Create a workflow schedule",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Workflows", "Create Schedule"],
+      id: "pipeline-create-schedule",
+      step: 1,
+      component: StepComponents["pipeline-create-schedule"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Create Schedule",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -5084,6 +5148,10 @@ const flows = {
   // agent
   "add-agent": addAgent,
   "edit-agent": editAgent,
+  // workflows
+  "new-pipeline": newPipeline,
+  "pipeline-execution-details": pipelineExecutionDetails,
+  "pipeline-create-schedule": pipelineCreateSchedule,
 };
 
 export const flowMapping: {

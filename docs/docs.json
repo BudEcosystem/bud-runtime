@@ -9,6 +9,20 @@
   },
   "favicon": "/images/favicon.ico",
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Blog",
+          "icon": "newspaper",
+          "href": "https://budecosystem.com/blog/"
+        },
+        {
+          "anchor": "API Reference",
+          "icon": "code",
+          "href": "https://budecosystem-b7b14df4.mintlify.app/developer-docs/openai-api/chat"
+        }
+      ]
+    },
     "tabs": [
       {
         "tab": "Product Guide",
@@ -28,97 +42,49 @@
             "group": "Projects",
             "icon": "folder-tree",
             "pages": [
-              "projects/projects",
-              "projects/creating-projects",
-              "projects/project-dashboard",
-              "projects/project-settings"
+              "projects/projects"
             ]
           },
           {
             "group": "Models",
             "icon": "brain",
             "pages": [
-              "models/models",
-              "models/model-repository",
-              "models/model-cards",
-              "models/model-selection-guide",
-              "models/model-leaderboards",
-              "models/supported-model-types"
+              "models/models"
             ]
           },
           {
             "group": "Deployments",
             "icon": "rocket",
             "pages": [
-              "deployments/deploy-first-model",
-              "deployments/deployment-configuration",
-              "deployments/deployment-management",
-              "deployments/multi-lora-support",
-              "deployments/deployment-strategies",
-              "deployments/troubleshooting"
+              "deployments/deployments"
             ]
           },
           {
             "group": "Clusters",
             "icon": "server",
             "pages": [
-              "clusters/cluster",
-              "clusters/cluster-overview",
-              "clusters/cluster-types",
-              "clusters/registering-clusters",
-              "clusters/cluster-management",
-              "clusters/multi-cloud-strategy"
-            ]
-          },
-          {
-            "group": "Endpoints",
-            "icon": "plug",
-            "pages": [
-              "endpoints/creating-endpoints",
-              "endpoints/endpoint-configuration",
-              "endpoints/using-endpoints",
-              "endpoints/openai-compatible",
-              "endpoints/endpoint-monitoring"
+              "clusters/cluster"
             ]
           },
           {
             "group": "API Integration",
             "icon": "code",
             "pages": [
-              "api-integration/authentication",
-              "api-integration/api-overview",
-              "api-integration/chat-completions",
-              "api-integration/embeddings",
-              "api-integration/image-generation",
-              "api-integration/audio-processing",
-              "api-integration/batch-processing",
-              "api-integration/streaming-responses",
-              "api-integration/error-handling"
+              "api-integration/api-integration"
             ]
           },
           {
             "group": "Playground",
             "icon": "flask",
             "pages": [
-              "playground/playground",
-              "playground/using-playground",
-              "playground/model-comparison",
-              "playground/prompt-engineering",
-              "playground/saving-conversations"
+              "playground/playground"
             ]
           },
           {
             "group": "Observability",
             "icon": "chart-line",
             "pages": [
-              "observability/observability",
-              "observability/dashboard-overview",
-              "observability/request-analytics",
-              "observability/performance-monitoring",
-              "observability/cost-tracking",
-              "observability/inference-history",
-              "observability/custom-dashboards",
-              "observability/alerts-notifications"
+              "observability/observability"
             ]
           },
           {
@@ -132,23 +98,14 @@
             "group": "Prompts & Agents",
             "icon": "wand-magic-sparkles",
             "pages": [
-              "prompts-agents/agents",
-              "prompts-agents/prompt-management",
-              "prompts-agents/prompt-templates",
-              "prompts-agents/agent-configuration",
-              "prompts-agents/agent-workflows"
+              "prompts-agents/agents"
             ]
           },
           {
             "group": "Evaluations",
             "icon": "chart-bar",
             "pages": [
-              "evaluations/evaluations",
-              "evaluations/evaluation-overview",
-              "evaluations/creating-evaluation-sets",
-              "evaluations/running-evaluations",
-              "evaluations/evaluation-metrics",
-              "evaluations/comparing-models"
+              "evaluations/evaluations"
             ]
           },
           {
@@ -164,24 +121,10 @@
             ]
           },
           {
-            "group": "Performance Optimization",
-            "icon": "gauge-high",
-            "pages": [
-              "performance/simulation-overview",
-              "performance/hardware-recommendations",
-              "performance/optimization-strategies",
-              "performance/scaling-guide"
-            ]
-          },
-          {
             "group": "API Keys & Security",
             "icon": "key",
             "pages": [
-              "api-keys/creating-api-keys",
-              "api-keys/api-key-permissions",
-              "api-keys/security-best-practices",
-              "api-keys/rotating-keys",
-              "api-keys/rate-limiting"
+              "api-keys/api-keys"
             ]
           },
           {
@@ -197,25 +140,16 @@
             ]
           },
           {
-            "group": "Settings",
-            "icon": "gear",
+            "group": "Customer Dashboard",
             "pages": [
-              "settings/account-settings",
-              "settings/organization-settings",
-              "settings/billing-settings",
-              "settings/notification-preferences",
-              "settings/api-configuration"
+              "product-guide/customer-dashboard/customer-portal"
             ]
           },
           {
-            "group": "Billing & Usage",
-            "icon": "credit-card",
+            "group": "Settings",
+            "icon": "gear",
             "pages": [
-              "billing/understanding-pricing",
-              "billing/monitoring-usage",
-              "billing/billing-cycles",
-              "billing/usage-optimization",
-              "billing/invoice-management"
+              "settings/account-settings"
             ]
           }
         ]
@@ -342,29 +276,11 @@
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Blog",
-          "href": "https://bud.studio/content/blog",
-          "icon": "newspaper"
-        },
-        {
-          "anchor": "API Reference",
-          "href": "https://api.bud.studio/docs",
-          "icon": "code"
-        }
-      ]
-    }
+    ]
   },
   "logo": "/images/bud-icon.png",
   "navbar": {
     "links": [
-      {
-        "label": "Dashboard",
-        "href": "https://app.bud.studio"
-      },
       {
         "label": "Support",
         "href": "mailto:contact@bud.studio"

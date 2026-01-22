@@ -113,6 +113,7 @@ class RetrieveWorkflowStepData(BaseModel):
     bud_prompt_id: str | None = None
     bud_prompt_version: int | str | None = None
     discarded_prompt_ids: list[dict] | None = None
+    client_metadata: dict | None = None
     prompt_schema_events: dict | None = None
     # Hardware resource mode (dedicated vs shared/time-slicing)
     hardware_mode: str | None = None
@@ -195,3 +196,104 @@ class WorkflowUtilCreate(BaseModel):
     total_steps: int | None = None
     tag: str | None = None
     visibility: VisibilityEnum = VisibilityEnum.PUBLIC
+
+
+# =============================================================================
+# Pipeline Execution Persistence Schemas (002-pipeline-event-persistence)
+# =============================================================================
+
+
+class ExecutionStatusEnum(str):
+    """Execution status enumeration matching budpipeline ExecutionStatus."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class StepStatusEnum(str):
+    """Step status enumeration matching budpipeline StepStatus."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    RETRYING = "retrying"
+
+
+class PipelineExecutionStatusResponse(BaseModel):
+    """Pipeline execution status response schema.
+
+    Matches the budpipeline API contract for GET /executions/{id}.
+    """
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    status: str
+    progress_percentage: float
+    current_step: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    initiator: str | None = None
+    error_message: str | None = None
+
+
+class StepExecutionProgressResponse(BaseModel):
+    """Step execution progress response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    step_name: str
+    handler_type: str
+    status: str
+    progress_percentage: float
+    sequence_number: int
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    error_message: str | None = None
+    retry_count: int = 0
+
+
+class ProgressEventResponse(BaseModel):
+    """Progress event response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID4
+    event_type: str
+    progress_percentage: float
+    eta_seconds: int | None = None
+    current_step_desc: str | None = None
+    created_at: datetime
+
+
+class AggregatedProgressResponse(BaseModel):
+    """Aggregated progress response schema."""
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    overall_progress: float
+    eta_seconds: int | None = None
+    completed_steps: int
+    total_steps: int
+    current_step: str | None = None
+
+
+class ExecutionProgressResponse(BaseModel):
+    """Full execution progress response including steps, events, and aggregated progress.
+
+    Matches the budpipeline API contract for GET /executions/{id}/progress.
+    """
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    execution: PipelineExecutionStatusResponse
+    steps: list[StepExecutionProgressResponse] = Field(default_factory=list)
+    recent_events: list[ProgressEventResponse] = Field(default_factory=list)
+    aggregated_progress: AggregatedProgressResponse

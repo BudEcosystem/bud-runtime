@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Input, Spin, Empty } from 'antd';
 import { useConnectors, Connector } from '@/stores/useConnectors';
+import { useAgentStore } from '@/stores/useAgentStore';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
-import { getOAuthState, isOAuthCallback, clearOAuthState } from '@/hooks/useOAuthCallback';
+import { getOAuthState, isOAuthCallback, clearOAuthState, getOAuthPromptId } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl, getConnectorFromUrlByPosition } from '@/utils/urlUtils';
 
 interface ToolsHomeProps {
@@ -15,7 +16,28 @@ interface ToolsHomeProps {
   totalSessions?: number; // Total number of active sessions
 }
 
-export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
+export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, workflowId, sessionIndex = 0, totalSessions = 1 }) => {
+  const { getSessionByPromptId } = useAgentStore();
+
+  // Validate and get the effective promptId
+  // Priority: 1. OAuth prompt ID (for OAuth callbacks), 2. Validated session prompt ID, 3. Prop prompt ID
+  const promptId = useMemo(() => {
+    // First check for OAuth prompt ID
+    const oauthPromptId = getOAuthPromptId();
+    if (oauthPromptId) return oauthPromptId;
+
+    // Validate prop promptId against the store
+    if (propPromptId) {
+      const session = getSessionByPromptId(propPromptId);
+      if (session) {
+        return session.promptId;
+      }
+    }
+
+    // Fallback to prop promptId
+    return propPromptId;
+  }, [propPromptId, getSessionByPromptId]);
+
   const {
     connectors,
     connectedTools,
@@ -71,27 +93,58 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
     fetchConnectedTools({ page: 1, prompt_id: promptId });
     // Fetch unregistered tools (is_registered: false)
     fetchUnregisteredTools({ page: 1, prompt_id: promptId });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptId]); // Only depend on promptId, NOT on functions
 
   // Restore connector state from URL on initial load (or from OAuth state)
   // This effect runs ONCE on mount to restore connector from URL
+  // CRITICAL: Only auto-open tools if this is an OAuth callback, NOT a manual page refresh
   useEffect(() => {
     // Skip if user explicitly navigated back or no promptId
     if (isBackNavigationRef.current || !promptId) {
       return;
     }
 
-    // Check if this is an OAuth callback - get connector ID from saved state
-    const oauthState = getOAuthState();
+    // Check if this is an OAuth callback - multiple indicators:
+    // 1. code/state params in URL (OAuth redirect just happened)
+    // 2. authentication=true param in URL (set before OAuth redirect)
     const isOAuthReturn = isOAuthCallback();
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasAuthenticationParam = urlParams?.get('authentication') === 'true';
 
-    // Get connector ID for THIS session from URL using positional lookup
-    let connectorId = getConnectorFromUrlByPosition(sessionIndex);
+    // Get OAuth state from localStorage
+    const oauthState = getOAuthState();
 
-    // If OAuth callback and we have saved connector ID for this promptId, use that
-    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId && !connectorId) {
+    // CRITICAL: If there's OAuth state but NO code/state params and NO authentication param,
+    // this means the OAuth flow was started but not completed (user refreshed manually)
+    // Clear the stale OAuth state to prevent auto-opening on manual refresh
+    if (oauthState && !isOAuthReturn && !hasAuthenticationParam) {
+      clearOAuthState();
+    }
+
+    // CRITICAL: Only auto-restore connector if this is a VALID OAuth callback
+    // Must have EITHER code/state params OR authentication=true param
+    // OAuth state alone is NOT sufficient (could be stale from incomplete OAuth)
+    const isValidOAuthCallback = isOAuthReturn || hasAuthenticationParam;
+
+    console.log('[ToolsHome] OAuth check:', { isOAuthReturn, hasAuthenticationParam, isValidOAuthCallback, oauthState: !!oauthState });
+
+    if (!isValidOAuthCallback) {
+      // Not a valid OAuth callback - don't auto-open tools on manual page refresh
+      console.log('[ToolsHome] Not a valid OAuth callback - skipping auto-open');
+      return;
+    }
+
+    // Get connector ID - PRIORITIZE OAuth state's connector ID for OAuth callbacks
+    // This ensures the connector that triggered the OAuth flow is opened, not the positional one
+    let connectorId: string | null = null;
+    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId) {
+      // OAuth callback - use the connector that initiated the OAuth flow
       connectorId = oauthState.connectorId;
+      console.log('[ToolsHome] Using OAuth state connector:', connectorId);
+    } else {
+      // Fallback to positional lookup from URL
+      connectorId = getConnectorFromUrlByPosition(sessionIndex);
     }
 
     // Prevent duplicate fetch - use ref to track what we've already fetched
@@ -109,7 +162,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
       fetchedConnectorRef.current = null;
       hasRestoredFromUrl.current = false;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptId, sessionIndex]); // Only depend on identity props, NOT on loading state or functions
 
   // Set selected connector when details are fetched
@@ -119,16 +172,30 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
       return;
     }
 
-    // Check if this is an OAuth callback
-    const oauthState = getOAuthState();
+    // Check if this is a valid OAuth callback
     const isOAuthReturn = isOAuthCallback();
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasAuthenticationParam = urlParams?.get('authentication') === 'true';
+    const oauthState = getOAuthState();
 
-    // Get connector ID for THIS session from URL using positional lookup
-    let connectorId = getConnectorFromUrlByPosition(sessionIndex);
+    // CRITICAL: Only auto-open if this is a VALID OAuth callback
+    // Must have EITHER code/state params OR authentication=true param
+    const isValidOAuthCallback = isOAuthReturn || hasAuthenticationParam;
 
-    // If OAuth callback and we have saved connector ID for this promptId, use that
-    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId && !connectorId) {
+    if (!isValidOAuthCallback) {
+      // Not a valid OAuth callback - don't auto-open tools on manual page refresh
+      return;
+    }
+
+    // Get connector ID - PRIORITIZE OAuth state's connector ID for OAuth callbacks
+    // This ensures the connector that triggered the OAuth flow is selected, not the positional one
+    let connectorId: string | null = null;
+    if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId) {
+      // OAuth callback - use the connector that initiated the OAuth flow
       connectorId = oauthState.connectorId;
+    } else {
+      // Fallback to positional lookup from URL
+      connectorId = getConnectorFromUrlByPosition(sessionIndex);
     }
 
     // Only proceed if we have connector ID and details loaded
@@ -151,6 +218,17 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
       isFromConnectedSection: isConnected
     } as Connector);
     setViewMode('details');
+
+    // CRITICAL: Remove authentication param from URL after successfully opening tools
+    // This ensures that subsequent page refreshes won't auto-open tools
+    if (hasAuthenticationParam && typeof window !== 'undefined') {
+      const newUrlParams = new URLSearchParams(window.location.search);
+      newUrlParams.delete('authentication');
+      const newUrl = newUrlParams.toString()
+        ? `${window.location.pathname}?${newUrlParams.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
   }, [selectedConnectorDetails, promptId, sessionIndex, connectedTools]);
 
   // Handle search with debounce
@@ -173,8 +251,20 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
       if (promptId) {
         // Refetch both lists with search query
         await Promise.all([
-          fetchConnectedTools({ page: 1, prompt_id: promptId }),
-          fetchUnregisteredTools({ page: 1, prompt_id: promptId })
+          fetchConnectedTools({
+            page: 1,
+            prompt_id: promptId,
+            name: localSearchQuery,
+            search: !!localSearchQuery,
+            force: true
+          }),
+          fetchUnregisteredTools({
+            page: 1,
+            prompt_id: promptId,
+            name: localSearchQuery,
+            search: !!localSearchQuery,
+            force: true
+          })
         ]);
         // Hide loading indicator after search completes
         setIsSearching(false);
@@ -197,9 +287,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
 
     // Check if scrolled to bottom
     if (scrollHeight - scrollTop <= clientHeight + 50 &&
-        !isLoadingMore &&
-        currentPage < totalPages &&
-        promptId) {
+      !isLoadingMore &&
+      currentPage < totalPages &&
+      promptId) {
       fetchUnregisteredTools({ page: currentPage + 1, prompt_id: promptId });
     }
   }, [currentPage, totalPages, isLoadingMore, promptId, fetchUnregisteredTools]);
@@ -238,6 +328,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
 
     setSelectedConnector(null);
     setViewMode('list');
+    setLocalSearchQuery('');
+    setSearchQuery('');
+    setIsSearching(false);
 
     // Reset all URL restoration flags
     hasRestoredFromUrl.current = false;
@@ -260,8 +353,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId, workflowId, sess
 
     // Refresh both lists when coming back
     if (promptId) {
-      fetchConnectedTools({ page: 1, prompt_id: promptId });
-      fetchUnregisteredTools({ page: 1, prompt_id: promptId });
+      fetchConnectedTools({ page: 1, prompt_id: promptId, force: true });
+      fetchUnregisteredTools({ page: 1, prompt_id: promptId, force: true });
     }
 
     // Reset back navigation flag after effects have settled

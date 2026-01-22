@@ -131,9 +131,20 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   // Reusable function to fetch tools
   const fetchTools = React.useCallback(async () => {
-    // CRITICAL: Use saved OAuth prompt ID if available (for OAuth callback scenarios)
-    // The promptId prop might be stale during OAuth redirect
-    const effectivePromptId = getOAuthPromptId() || promptId;
+    // CRITICAL: Determine the correct prompt ID to use
+    // Priority: 1. OAuth prompt ID (for OAuth callbacks), 2. Validated session prompt ID, 3. Prop prompt ID
+    let effectivePromptId = getOAuthPromptId();
+
+    if (!effectivePromptId && promptId) {
+      // Verify the promptId exists in the store (session was properly restored)
+      const session = getSessionByPromptId(promptId);
+      if (session) {
+        effectivePromptId = session.promptId;
+      } else {
+        // Fallback to prop promptId if session not found (shouldn't happen with persist)
+        effectivePromptId = promptId;
+      }
+    }
 
     if (!effectivePromptId) return;
 
@@ -220,7 +231,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     } finally {
       setIsLoadingTools(false);
     }
-  }, [promptId, connector.id, selectedConnectorDetails?.auth_type]);
+  }, [promptId, connector.id, selectedConnectorDetails?.auth_type, getSessionByPromptId]);
 
   // Fetch connector details on mount (only if not already loaded)
   useEffect(() => {
@@ -267,19 +278,30 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
       // Helper function to clean up OAuth-specific URL params (preserves connector, agent and prompt params)
       const cleanupOAuthParams = () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.delete('code');
-        urlParams.delete('state');
-
-        // Update connector URL using positional format (matches prompt IDs order)
+        // Update connector URL FIRST using positional format (matches prompt IDs order)
         // This ensures the connector is properly mapped to the correct session position
         if (savedState.connectorId && savedState.sessionIndex !== undefined) {
           updateConnectorInUrl(savedState.sessionIndex, savedState.connectorId, savedState.totalSessions ?? 1);
         }
 
-        // Clean URL from OAuth params
-        const cleanUrl = urlParams.toString()
-          ? `${window.location.pathname}?${urlParams.toString()}`
+        // Now read the updated URL params (after updateConnectorInUrl has modified it)
+        const cleanUrlParams = new URLSearchParams(window.location.search);
+        cleanUrlParams.delete('code');
+        cleanUrlParams.delete('state');
+        cleanUrlParams.delete('authentication'); // Also remove authentication param after OAuth callback
+
+        // Build URL manually to avoid encoding commas in connector param
+        const cleanQueryParts: string[] = [];
+        cleanUrlParams.forEach((value, key) => {
+          if (key === 'connector' || key === 'agent' || key === 'prompt') {
+            // Don't encode these params (they may contain commas)
+            cleanQueryParts.push(`${key}=${value}`);
+          } else {
+            cleanQueryParts.push(`${key}=${encodeURIComponent(value)}`);
+          }
+        });
+        const cleanUrl = cleanQueryParts.length > 0
+          ? `${window.location.pathname}?${cleanQueryParts.join('&')}`
           : window.location.pathname;
 
         window.history.replaceState({}, document.title, cleanUrl);
@@ -563,6 +585,30 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
                 totalSessions: totalSessions,
               });
 
+              // CRITICAL: Add authentication=true param to URL before OAuth redirect
+              // This marks the URL so ToolsHome knows to auto-open tools only after OAuth callback
+              // Without this param, manual page refresh won't auto-open tools (correct behavior)
+              updateConnectorInUrl(sessionIndex, connector.id, totalSessions);
+
+              // Add authentication param without URL-encoding (to preserve comma-separated connector values)
+              // Don't use new URL().toString() as it URL-encodes special characters like commas
+              const authUrlParams = new URLSearchParams(window.location.search);
+              authUrlParams.set('authentication', 'true');
+              // Build URL manually to avoid encoding commas in connector param
+              const queryParts: string[] = [];
+              authUrlParams.forEach((value, key) => {
+                if (key === 'connector' || key === 'agent' || key === 'prompt') {
+                  // Don't encode these params (they may contain commas)
+                  queryParts.push(`${key}=${value}`);
+                } else {
+                  queryParts.push(`${key}=${encodeURIComponent(value)}`);
+                }
+              });
+              const authNewUrl = queryParts.length > 0
+                ? `${window.location.pathname}?${queryParts.join('&')}`
+                : window.location.pathname;
+              window.history.replaceState({}, '', authNewUrl);
+
               // Redirect to OAuth provider
               window.location.href = authorizationUrl;
             } else {
@@ -630,6 +676,8 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
         });
         // Refresh tools list to show updated is_added status
         await fetchTools();
+        // Go back to the tools list
+        onBack({ removeConnectorFromUrl: false });
       }
     } catch (error: any) {
       errorToast(error?.response?.data?.message || 'Failed to connect tools');

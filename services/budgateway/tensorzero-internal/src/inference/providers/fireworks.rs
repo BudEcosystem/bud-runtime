@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::OnceLock};
+use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
 
 use futures::StreamExt;
 use lazy_static::lazy_static;
@@ -377,6 +377,16 @@ struct FireworksEmbeddingRequest {
     encoding_format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     dimensions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modality: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_input: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunking: Option<crate::embeddings::ChunkingConfig>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -403,7 +413,12 @@ impl EmbeddingProvider for FireworksProvider {
             model: self.model_name.clone(),
             input: request.input.clone(),
             encoding_format: request.encoding_format.clone(),
-            dimensions: None, // Can be added based on model support
+            dimensions: request.dimensions,
+            modality: request.modality.clone(),
+            priority: request.priority.clone(),
+            include_input: request.include_input,
+            chunking: request.chunking.clone(),
+            extra: request.extra.clone(),
         };
 
         // Serialize request body
@@ -1983,6 +1998,11 @@ mod tests {
             input: EmbeddingInput::Single("test input".to_string()),
             encoding_format: None,
             dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         let serialized = serde_json::to_value(&request).unwrap();
@@ -2000,6 +2020,11 @@ mod tests {
             input: EmbeddingInput::Batch(vec!["input1".to_string(), "input2".to_string()]),
             encoding_format: Some("base64".to_string()),
             dimensions: Some(512),
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         let serialized = serde_json::to_value(&request).unwrap();

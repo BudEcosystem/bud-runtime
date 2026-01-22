@@ -74,5 +74,5 @@ class NotificationActivityRequest(BaseModel):
     notification_request: NotificationRequest
     activity_event: str
     content: NotificationContent
-    source_topic: str | None
+    source_topic: str | list[str] | None  # Supports multi-topic notification (D-001)
     source: str | None

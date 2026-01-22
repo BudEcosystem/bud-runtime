@@ -84,7 +84,6 @@ export default function UserManagement() {
     }
   >(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
-  const [filterReset, setFilterReset] = useState(false);
   const { openDrawer } = useDrawer();
 
   type ColumnsType<T extends object> = TableProps<T>['columns'];
@@ -100,12 +99,11 @@ export default function UserManagement() {
 
   const resetFilter = () => {
     setCurrentPage(1);
-    setFilterReset(true);
     setTempFilter(defaultFilter);
     setFilter(defaultFilter);
+    setFilterOpen(false);
   };
   const applyFilter = () => {
-    setFilterReset(false);
     setFilter(tempFilter);
     setCurrentPage(1);
     load(tempFilter);
@@ -138,12 +136,6 @@ export default function UserManagement() {
     }
     // load(filter);
   }, [activeTab, adminCurrentPage, clientCurrentPage, pageSize, getUsers, isMounted, filter, load]);
-
-  useEffect(() => {
-    if (filterReset) {
-      applyFilter()
-    }
-  }, [filterReset, applyFilter]);
 
 
 

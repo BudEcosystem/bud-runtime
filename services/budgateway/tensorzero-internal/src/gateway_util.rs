@@ -352,6 +352,13 @@ pub async fn setup_redis_and_rate_limiter(
         None
     };
 
+    // Add blocking manager to app_state BEFORE creating auth Redis client
+    // so that the pub/sub event loop can access it
+    let mut app_state = app_state;
+    if let Some(ref manager) = blocking_manager {
+        app_state.blocking_manager = Some(manager.clone());
+    }
+
     // Setup Redis client for authentication/models/blocking if needed
     if let Some(auth) = auth_info {
         if let Some(ref url) = redis_url {
@@ -421,14 +428,8 @@ pub async fn setup_redis_and_rate_limiter(
         app_state
     };
 
-    // Add blocking manager to app_state if it was created
-    let app_state = if let Some(manager) = blocking_manager {
-        let mut app_state = app_state;
-        app_state.blocking_manager = Some(manager);
-        app_state
-    } else {
-        app_state
-    };
+    // Note: blocking_manager is already added to app_state earlier (before creating auth Redis client)
+    // so that the pub/sub event loop can access it for real-time updates
 
     // Initialize usage limiter if authentication is enabled
     let app_state = if matches!(

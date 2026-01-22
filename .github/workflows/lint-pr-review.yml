@@ -10,7 +10,7 @@ env:
 jobs:
   detect-changes:
     name: Detect Changed Files
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       python: ${{ steps.filter.outputs.python }}
       frontend: ${{ steps.filter.outputs.frontend }}

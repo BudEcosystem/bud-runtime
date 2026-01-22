@@ -198,8 +198,12 @@ class HeuristicCalculator:
         if not model_uri:
             raise ValueError("Model URI not provided in model_params")
         batch_size = model_params.get("concurrent_requests")
-        # Add 10% safety margin to match deployment configuration
+        # Add 10% safety margin, capped by model's max context length
         seq_length = int((model_params.get("mean_input_tokens") + model_params.get("mean_output_tokens")) * 1.1)
+        model_max_context_length = model_params.get("model_max_context_length")
+        if model_max_context_length and seq_length > model_max_context_length:
+            logger.info(f"Capping seq_length from {seq_length} to model max context length {model_max_context_length}")
+            seq_length = model_max_context_length
 
         # Account for parallelism
         tp_size = model_params.get("tensor_parallel_size", 1)
@@ -383,8 +387,14 @@ class HeuristicCalculator:
                 )
                 return 0.0
 
-            # Add 10% safety margin to match deployment configuration
+            # Add 10% safety margin, capped by model's max context length
             seq_length = int((input_tokens + output_tokens) * 1.1)
+            model_max_context_length = model_params.get("model_max_context_length")
+            if model_max_context_length and seq_length > model_max_context_length:
+                logger.info(
+                    f"Capping seq_length from {seq_length} to model max context length {model_max_context_length}"
+                )
+                seq_length = model_max_context_length
 
             # Account for parallelism
             tp_size = model_params.get("tensor_parallel_size", 1)

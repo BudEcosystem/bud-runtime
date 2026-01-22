@@ -21,7 +21,7 @@ from json.decoder import JSONDecodeError
 from typing import List, Literal, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Header, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Header, Query, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -31,6 +31,7 @@ from budapp.commons import logging
 from budapp.commons.constants import ModalityEnum, ModelEndpointEnum, PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
+    get_current_active_user_or_internal,
     get_session,
     parse_ordering_fields,
 )
@@ -40,7 +41,7 @@ from budapp.user_ops.schemas import User
 from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 from budapp.workflow_ops.services import WorkflowService
 
-from ..commons.permission_handler import require_permissions
+from ..commons.permission_handler import require_permissions, require_permissions_or_internal
 from .quantization_services import QuantizationService
 from .schemas import (
     CancelDeploymentWorkflowRequest,
@@ -297,13 +298,17 @@ async def list_providers(
     },
     description="Add cloud model workflow",
 )
-@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.MODEL_MANAGE])
 async def add_cloud_model_workflow(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     request: CreateCloudModelWorkflowRequest,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
-    """Add cloud model workflow."""
+    """Add cloud model workflow.
+
+    This endpoint supports both JWT authentication (for external API calls)
+    and internal Dapr service-to-service calls (using dapr-api-token header).
+    """
     try:
         db_workflow = await CloudModelWorkflowService(session).add_cloud_model_workflow(
             current_user_id=current_user.id,
@@ -339,9 +344,9 @@ async def add_cloud_model_workflow(
     },
     description="Add local model workflow",
 )
-@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.MODEL_MANAGE])
 async def add_local_model_workflow(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     request: CreateLocalModelWorkflowRequest,
 ) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
@@ -1033,9 +1038,9 @@ async def cancel_model_deployment(
     },
     description="Delete an active model from the database",
 )
-@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.MODEL_MANAGE])
 async def delete_model(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     model_id: UUID,
 ) -> Union[SuccessResponse, ErrorResponse]:
@@ -1194,9 +1199,9 @@ async def cancel_model_quantization(
     },
     description="Deploy a model in server for a specified project by step",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def deploy_model_by_step(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     deploy_request: ModelDeployStepRequest,
     x_resource_type: Annotated[Optional[str], Header()] = None,

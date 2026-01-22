@@ -48,7 +48,7 @@ pub fn record_metadata(metadata: &InferenceDatabaseInsertMetadata) {
 
     span.record(
         "chat_inference.function_name",
-        metadata.function_name.as_str(),
+        "budgateway::default",
     );
     span.record(
         "chat_inference.variant_name",
@@ -195,6 +195,95 @@ pub fn record_model_inference(
     }
 }
 
+/// Records model inference span attributes for error scenarios
+/// Provides complete parity with ClickHouse ModelInference table
+pub fn record_error_model_inference(
+    model_inference: &crate::inference::types::ModelInferenceDatabaseInsert,
+) {
+    let span = Span::current();
+
+    // Record all 20 fields (matching record_model_inference() structure)
+    span.record("model_inference.id", model_inference.id.to_string().as_str());
+    span.record(
+        "model_inference.inference_id",
+        model_inference.inference_id.to_string().as_str(),
+    );
+    span.record(
+        "model_inference.raw_request",
+        model_inference.raw_request.as_str(),
+    );
+    span.record(
+        "model_inference.raw_response",
+        model_inference.raw_response.as_str(),
+    );
+    span.record(
+        "model_inference.model_name",
+        model_inference.model_name.as_str(),
+    );
+    span.record(
+        "model_inference.model_provider_name",
+        model_inference.model_provider_name.as_str(),
+    );
+
+    // Optional fields - only record if present (Empty/null if not)
+    if let Some(input_tokens) = model_inference.input_tokens {
+        span.record("model_inference.input_tokens", input_tokens as i64);
+    }
+    if let Some(output_tokens) = model_inference.output_tokens {
+        span.record("model_inference.output_tokens", output_tokens as i64);
+    }
+    if let Some(response_time_ms) = model_inference.response_time_ms {
+        span.record("model_inference.response_time_ms", response_time_ms as i64);
+    }
+    if let Some(ttft_ms) = model_inference.ttft_ms {
+        span.record("model_inference.ttft_ms", ttft_ms as i64);
+    }
+
+    // Timestamp
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+
+    if let Some(ref system) = model_inference.system {
+        span.record("model_inference.system", system.as_str());
+    }
+
+    span.record(
+        "model_inference.input_messages",
+        model_inference.input_messages.as_str(),
+    );
+    span.record("model_inference.output", model_inference.output.as_str());
+    span.record("model_inference.cached", model_inference.cached);
+
+    if let Some(ref finish_reason) = model_inference.finish_reason {
+        let fr_str = match finish_reason {
+            crate::inference::types::FinishReason::Stop => "stop",
+            crate::inference::types::FinishReason::Length => "length",
+            crate::inference::types::FinishReason::ToolCall => "tool_call",
+            crate::inference::types::FinishReason::ContentFilter => "content_filter",
+            crate::inference::types::FinishReason::Unknown => "unknown",
+        };
+        span.record("model_inference.finish_reason", fr_str);
+    }
+
+    if let Some(ref gateway_req) = model_inference.gateway_request {
+        span.record("model_inference.gateway_request", gateway_req.as_str());
+    }
+    if let Some(ref gateway_resp) = model_inference.gateway_response {
+        span.record("model_inference.gateway_response", gateway_resp.as_str());
+    }
+
+    span.record(
+        "model_inference.endpoint_type",
+        model_inference.endpoint_type.as_str(),
+    );
+
+    if let Some(ref guardrail_summary) = model_inference.guardrail_scan_summary {
+        span.record(
+            "model_inference.guardrail_scan_summary",
+            guardrail_summary.as_str(),
+        );
+    }
+}
+
 /// Records error information on the current span using OpenTelemetry conventions.
 /// Sets OTEL span status to Error with message, records error details, and emits exception event.
 pub fn record_error(error: &Error) {
@@ -212,9 +301,11 @@ pub fn record_error(error: &Error) {
 
     // Create OTEL exception event via tracing::error!
     // The OpenTelemetryLayer::on_event will convert this to an OTEL span event
+    // Using target: "budgateway_internal::endpoints::openai_compatible" to avoid exposing internal module path
     span.in_scope(|| {
         tracing::error!(
-            otel.exception = true,
+            // otel.exception = true, Commenting out cannot use otel.exception with target: due to macro parsing
+            target: "budgateway_internal::endpoints::openai_compatible",
             error_type = %error_type,
             error_message = %error_message,
             "Exception: {}", error_type

@@ -248,6 +248,9 @@ class Model(ModelBase):
     modified_at: datetime
     provider: Provider | None = None
     supported_endpoints: list[ModelEndpointEnum]
+    architecture_text_config: "ModelArchitectureLLMConfig | None" = None
+    architecture_vision_config: "ModelArchitectureVisionConfig | None" = None
+    architecture_audio_config: "ModelArchitectureAudioConfig | None" = None
 
     @field_serializer("modality")
     def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
@@ -283,6 +286,19 @@ class ModelArchitectureVisionConfig(BaseModel):
     torch_dtype: str | None = None
 
 
+class ModelArchitectureAudioConfig(BaseModel):
+    """Audio encoder architecture configuration for speech/audio models."""
+
+    num_layers: int | None = None
+    hidden_size: int | None = None
+    num_attention_heads: int | None = None
+    num_mel_bins: int | None = None
+    sample_rate: int | None = None
+    max_source_positions: int | None = None
+    max_target_positions: int | None = None
+    torch_dtype: str | None = None
+
+
 class ModelCreate(ModelBase):
     """Schema for creating a new AI Model."""
 
@@ -309,6 +325,7 @@ class ModelCreate(ModelBase):
     kv_cache_size: int | None = None
     architecture_text_config: ModelArchitectureLLMConfig | None = None
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
+    architecture_audio_config: ModelArchitectureAudioConfig | None = None
     scan_verified: bool | None = None
     icon: str | None = None
     supported_endpoints: list[ModelEndpointEnum]
@@ -346,6 +363,7 @@ class ModelDetailResponse(BaseModel):
     kv_cache_size: int | None = None
     architecture_text_config: ModelArchitectureLLMConfig | None = None
     architecture_vision_config: ModelArchitectureVisionConfig | None = None
+    architecture_audio_config: ModelArchitectureAudioConfig | None = None
     modality: List[ModalityEnum]
     source: str
     provider_type: ModelProviderTypeEnum
@@ -488,6 +506,7 @@ class CreateLocalModelWorkflowRequest(BaseModel):
     tags: list[Tag] | None = None
     icon: str | None = None
     add_model_modality: list[AddModelModalityEnum] | None = None
+    callback_topic: str | None = None  # For budpipeline integration
 
     @model_validator(mode="after")
     def validate_fields(self) -> "CreateLocalModelWorkflowRequest":
@@ -671,6 +690,8 @@ class ModelResponse(BaseModel):
     is_present_in_model: bool | None = None
     model_cluster_recommended: ModelClusterRecommended | None = None
     supported_endpoints: list[ModelEndpointEnum]
+    architecture_text_config: ModelArchitectureLLMConfig | None = None
+    architecture_audio_config: ModelArchitectureAudioConfig | None = None
 
     @field_serializer("modality")
     def serialized_modality(self, modalities: List[ModalityEnum], _info) -> Dict[str, Any]:
@@ -1019,7 +1040,7 @@ class DeploymentTemplateCreate(BaseModel):
     """Deployment template request schema."""
 
     concurrent_requests: int = Field(gt=0)
-    avg_sequence_length: int = Field(ge=0, le=10000)
+    avg_sequence_length: int = Field(ge=0)
     avg_context_length: int = Field(ge=0, le=200000)
     per_session_tokens_per_sec: Optional[list[int]] = None
     ttft: Optional[list[int]] = None
@@ -1301,7 +1322,7 @@ class ModelDeploymentRequest(BaseModel):
     input_tokens: int
     output_tokens: int
     notification_metadata: BudNotificationMetadata
-    source_topic: str
+    source_topic: str | list[str]  # Supports multi-topic notification (D-001)
     credential_id: UUID4 | None = None
     # BudAIScaler specification
     budaiscaler: BudAIScalerSpecification | None = None
@@ -1311,6 +1332,8 @@ class ModelDeploymentRequest(BaseModel):
     enable_reasoning: bool | None = None
     default_storage_class: str | None = None
     default_access_mode: str | None = None
+    # Model's max context length to cap max_model_len
+    model_max_context_length: int | None = None
 
 
 class TopLeaderboardRequest(BaseModel):

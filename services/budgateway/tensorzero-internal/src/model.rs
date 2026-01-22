@@ -5025,6 +5025,12 @@ mod tests {
         let request = crate::embeddings::EmbeddingRequest {
             input: crate::embeddings::EmbeddingInput::Single("test".to_string()),
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         let http_client = Client::new();
@@ -5067,6 +5073,12 @@ mod tests {
         let request = crate::embeddings::EmbeddingRequest {
             input: crate::embeddings::EmbeddingInput::Single("test input".to_string()),
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         let http_client = Client::new();
@@ -5107,6 +5119,12 @@ mod tests {
             let _request = crate::embeddings::EmbeddingRequest {
                 input: crate::embeddings::EmbeddingInput::Single("test".to_string()),
                 encoding_format: None,
+                dimensions: None,
+                modality: None,
+                priority: None,
+                include_input: None,
+                chunking: None,
+                extra: HashMap::new(),
             };
 
             // Create a mock response that simulates unsupported capability
@@ -5129,6 +5147,12 @@ mod tests {
         let request = crate::embeddings::EmbeddingRequest {
             input: crate::embeddings::EmbeddingInput::Single("test".to_string()),
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
 
         let http_client = Client::new();

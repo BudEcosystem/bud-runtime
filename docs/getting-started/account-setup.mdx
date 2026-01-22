@@ -1,10 +1,41 @@
 ---
 title: "Account Setup"
-description: "Setting up your Bud Stack account and organization"
+description: "Setting up your Bud AI Foundry account and organization"
 ---
 
-# Account Setup
+Set up your Bud AI Foundry workspace so you can manage projects, deployments, and access controls from day one.
 
-Learn how to set up your account and configure your organization.
+## 1. Description
 
-*Content to be added*
+Bud AI Foundry accounts are structured around workspaces and projects. Workspaces manage billing, identity, and security settings, while projects organize models, deployments, and API keys for each team or application.
+
+## 2. Create your workspace
+
+1. Sign in to the Bud AI Foundry console with SSO or email credentials.
+2. Open User Management from the workspace settings menu.
+2. Invite teammates by email and assign their roles (viewer, editor, admin etc).
+3. Save changes to provision access across projects and models.
+
+## 3. Create your first project
+
+1. Go to Projects and select Create Project.
+2. Enter a project name, description, and tags.
+3. Assign owners and define default guardrail policies.
+
+## 4. Set up API keys
+
+1. Go to API Keys and select the project that will call model endpoints.
+2. Generate project-scoped keys for production and staging environments.
+3. Store keys in a secure secret manager and plan rotation schedules.
+
+## 5. Review billing and notifications
+
+1. Confirm billing details and usage thresholds for the workspace.
+2. Configure notifications for quota alerts, deployment events, and evaluation results.
+3. Align cost centers with project tags for chargeback reporting.
+
+## 6. Next steps
+
+- [Key concepts](/getting-started/key-concepts) to understand the core objects used in Bud AI Foundry.
+- [Quick start](/getting-started/quickstart) to deploy your first model and test an API call.
+- [RBAC](/user-management/RBAC) for detailed role guidance.

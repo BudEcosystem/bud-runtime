@@ -61,6 +61,7 @@ jobs:
           gh workflow run budmetrics-release-image.yml -f release_tag=$VERSION
           gh workflow run budmodel-release-image.yml -f release_tag=$VERSION
           gh workflow run budnotify-release-image.yml -f release_tag=$VERSION
+          gh workflow run budpipeline-release-image.yml -f release_tag=$VERSION
           gh workflow run budplayground-release-image.yml -f release_tag=$VERSION
           gh workflow run budprompt-release-image.yml -f release_tag=$VERSION
           gh workflow run budsim-release-image.yml -f release_tag=$VERSION
@@ -88,6 +89,7 @@ jobs:
             "budmetrics-release-image.yml"
             "budmodel-release-image.yml"
             "budnotify-release-image.yml"
+            "budpipeline-release-image.yml"
             "budplayground-release-image.yml"
             "budprompt-release-image.yml"
             "budsim-release-image.yml"
@@ -193,6 +195,7 @@ jobs:
           yq -i ".microservices.budsim.image = \"budstudio/budsim:$VERSION\"" infra/helm/bud/values.yaml
           yq -i ".microservices.buddoc.image = \"budstudio/buddoc:$VERSION\"" infra/helm/bud/values.yaml
           yq -i ".microservices.budnotify.image = \"budstudio/budnotify:$VERSION\"" infra/helm/bud/values.yaml
+          yq -i ".microservices.budpipeline.image = \"budstudio/budpipeline:$VERSION\"" infra/helm/bud/values.yaml
           yq -i ".microservices.budprompt.image = \"budstudio/budprompt:$VERSION\"" infra/helm/bud/values.yaml
 
           echo "✅ Updated all service images to version $VERSION"
@@ -260,12 +263,12 @@ jobs:
           - Updated all service image tags in \\\`values.yaml\\\` to \\\`$VERSION\\\`
 
           ### Services Released
-          All 13 services have been built and published to DockerHub with tags:
+          All 15 services have been built and published to DockerHub with tags:
           - \\\`$VERSION\\\`
           - \\\`latest\\\`
 
           **Backend Services (Python/FastAPI):**
-          - budapp, budcluster, budsim, budmodel, budmetrics, budnotify, askbud, budeval, buddoc, budprompt
+          - budapp, budcluster, budsim, budmodel, budmetrics, budnotify, budpipeline, askbud, budeval, buddoc, budprompt
 
           **Backend Services (Rust):**
           - budgateway
@@ -325,6 +328,7 @@ jobs:
           - budmodel
           - budmetrics
           - budnotify
+          - budpipeline
           - askbud
           - budeval
           - buddoc

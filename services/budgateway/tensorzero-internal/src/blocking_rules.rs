@@ -289,6 +289,75 @@ impl BlockingRulesManager {
         }
     }
 
+    /// Invalidate the cache and reload blocking rules from Redis
+    ///
+    /// This method is called when a Redis keyspace notification indicates
+    /// that blocking rules have been updated. It resets the loaded flag
+    /// and triggers an immediate reload from Redis.
+    ///
+    /// # Arguments
+    /// * `key_suffix` - The key suffix (e.g., "global", "endpoint:uuid") to reload,
+    ///   or None to reload all rules
+    pub async fn invalidate_and_reload(&self, key_suffix: Option<&str>) {
+        if let Some(suffix) = key_suffix {
+            if suffix.starts_with("endpoint:") {
+                // For endpoint-specific rules, we currently don't cache them separately
+                // They are loaded on-demand, so just log the update
+                info!(
+                    "Blocking rules updated for endpoint: {}",
+                    suffix.strip_prefix("endpoint:").unwrap_or(suffix)
+                );
+                // Note: Endpoint rules are loaded on-demand in should_block()
+                // so no explicit cache invalidation is needed here
+                return;
+            } else if suffix == "global" || suffix.is_empty() {
+                info!("Invalidating global blocking rules cache due to Redis update");
+            } else {
+                // Unknown suffix - invalidate global rules as a fallback
+                info!(
+                    "Unknown blocking rules key suffix '{}', invalidating global rules",
+                    suffix
+                );
+            }
+        } else {
+            // Invalidate all rules
+            info!("Invalidating all blocking rules cache");
+        }
+
+        // Common logic for reloading global rules
+        self.global_rules_loaded.store(false, Ordering::Release);
+        if let Err(e) = self.load_rules("global").await {
+            warn!("Failed to reload global blocking rules: {}", e);
+        } else {
+            info!("Successfully reloaded global blocking rules from Redis");
+        }
+    }
+
+    /// Clear the blocking rules cache (used for rule deletion)
+    ///
+    /// This method clears the cached rules and resets the loaded flag.
+    pub async fn clear_rules_cache(&self, key_suffix: Option<&str>) {
+        if let Some(suffix) = key_suffix {
+            if suffix == "global" || suffix.is_empty() {
+                info!("Clearing global blocking rules cache due to Redis deletion");
+            } else {
+                info!("Blocking rules deleted for key: {}", suffix);
+                // For endpoint-specific rules, they're loaded on-demand
+                // so clearing isn't strictly necessary
+                return;
+            }
+        } else {
+            info!("Clearing all blocking rules cache");
+        }
+
+        // Common logic for clearing global rules
+        self.global_rules_loaded.store(false, Ordering::Release);
+        let mut rules = self.global_rules.write().await;
+        rules.clear();
+        gauge!("blocking_rules_cached").set(0.0);
+        info!("Global blocking rules cache cleared");
+    }
+
     /// Compile a rule for efficient evaluation
     fn compile_rule(rule: BlockingRule) -> Result<CompiledRule, String> {
         let mut compiled = CompiledRule {
@@ -581,6 +650,12 @@ impl BlockingRulesManager {
         client_ip: &str,
         country_code: Option<&str>,
         user_agent: Option<&str>,
+        request_path: &str,
+        request_method: &str,
+        api_key_id: Option<String>,
+        project_id: Option<Uuid>,
+        endpoint_id: Option<Uuid>,
+        model_name: Option<String>,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
         debug!(
             "should_block called with: ip={}, country={:?}, user_agent={:?}",
@@ -702,7 +777,19 @@ impl BlockingRulesManager {
                     debug!("MATCH FOUND: Global rule '{}' matched!", rule.name);
                     // Record metrics and return blocked result
                     return self
-                        .handle_rule_match(rule, client_ip, country_code, "global")
+                        .handle_rule_match(
+                            rule,
+                            client_ip,
+                            country_code,
+                            user_agent,
+                            request_path,
+                            request_method,
+                            api_key_id.clone(),
+                            project_id,
+                            endpoint_id,
+                            model_name.clone(),
+                            "global",
+                        )
                         .await;
                 } else {
                     debug!("No match for global rule '{}'", rule.name);
@@ -726,6 +813,13 @@ impl BlockingRulesManager {
         rule: &BlockingRule,
         client_ip: &str,
         country_code: Option<&str>,
+        user_agent: Option<&str>,
+        request_path: &str,
+        request_method: &str,
+        api_key_id: Option<String>,
+        project_id: Option<Uuid>,
+        endpoint_id: Option<Uuid>,
+        model_name: Option<String>,
         scope: &str,
     ) -> Result<Option<(BlockingRule, String)>, Error> {
         counter!("blocking_rules_matched",
@@ -785,19 +879,28 @@ impl BlockingRulesManager {
             let rule_clone = rule.clone();
             let client_ip_clone = client_ip.to_string();
             let country_code_clone = country_code.map(|s| s.to_string());
+            let user_agent_clone = user_agent.map(|s| s.to_string());
+            let request_path_clone = request_path.to_string();
+            let request_method_clone = request_method.to_string();
             let reason_clone = reason.clone();
 
             tokio::spawn(async move {
-                let blocking_event = GatewayBlockingEventDatabaseInsert::new(
+                let mut blocking_event = GatewayBlockingEventDatabaseInsert::new(
                     rule_clone.id,
                     &rule_clone,
                     client_ip_clone,
                     country_code_clone,
-                    None,                  // user_agent: TODO - need to pass from caller
-                    "unknown".to_string(), // request_path: TODO - need to pass from caller
-                    "unknown".to_string(), // request_method: TODO - need to pass from caller
+                    user_agent_clone,      // Now populated (was TODO)
+                    request_path_clone,    // Now populated (was TODO)
+                    request_method_clone,  // Now populated (was TODO)
                     reason_clone,
                 );
+
+                // Set optional fields if available
+                blocking_event.api_key_id = api_key_id;
+                blocking_event.project_id = project_id;
+                blocking_event.endpoint_id = endpoint_id;
+                blocking_event.model_name = model_name;
 
                 if let Err(e) =
                     write_blocking_event_to_clickhouse(&clickhouse, blocking_event).await

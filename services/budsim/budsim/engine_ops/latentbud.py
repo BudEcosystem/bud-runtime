@@ -160,7 +160,7 @@ class EngineCompatibility(BaseEngineCompatibility):
 
     def check_cpu_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check if the engine args are compatible with CPU."""
-        return False
+        return True
 
     def check_gpu_compatibility(self, engine_args: Dict[str, Any]) -> bool:
         """Check if the engine args are compatible with GPU."""

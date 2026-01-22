@@ -254,7 +254,7 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
-  const { openAgentDrawer, createSession, updateSession, restoreSessionWithPromptId } = useAgentStore();
+  const { openAgentDrawer, createSession, updateSession, restoreSessionWithPromptId, getSessionByPromptId } = useAgentStore();
 
   // Handle OAuth callback
   // Note: We don't open the drawer here anymore. Instead, the URL parameter
@@ -377,6 +377,26 @@ export default function PromptsAgents() {
       // Prevent processing URL params multiple times
       if (hasProcessedUrlRef.current) {
         return;
+      }
+
+      // CRITICAL: Wait for Zustand persist middleware to finish rehydrating from localStorage
+      // This ensures persisted session data is available before we try to restore sessions
+      const store = useAgentStore;
+      if (store.persist?.hasHydrated) {
+        if (!store.persist.hasHydrated()) {
+          // Store hasn't hydrated yet, wait for it with a timeout
+          await Promise.race([
+            new Promise<void>((resolve) => {
+              const unsub = store.persist.onFinishHydration(() => {
+                unsub();
+                resolve();
+              });
+            }),
+            // Timeout after 2 seconds to prevent hanging
+            new Promise<void>((resolve) => setTimeout(resolve, 2000))
+          ]);
+        }
+        // If already hydrated, continue immediately
       }
 
       let { agent: agentId, prompt: promptParam } = router.query;
@@ -551,34 +571,80 @@ export default function PromptsAgents() {
 
           if (workflowResponse?.data) {
 
-            // Open the add agent drawer
-            openDrawer("add-agent");
-
-            // If prompt parameter exists, handle AgentDrawer opening
+            // CRITICAL: Restore sessions FIRST before opening the drawer
+            // This prevents AgentDrawer from creating new sessions with different prompt IDs
             if (promptParam && typeof promptParam === 'string') {
               // Parse comma-separated prompt IDs
               const promptIds = promptParam.split(',').map(id => id.trim());
 
-              // Create sessions for each prompt ID
+              // Create sessions for each prompt ID BEFORE opening drawer
               for (const promptId of promptIds) {
+                // Check if session already exists with full data from persistence
+                const existingSession = getSessionByPromptId(promptId);
+                if (existingSession && existingSession.systemPrompt !== undefined) {
+                  // Session already has full data from persistence, just ensure it's selected
+                  continue;
+                }
                 // Use restoreSessionWithPromptId to preserve the exact prompt ID
                 restoreSessionWithPromptId(promptId, {
                   name: `Agent ${promptIds.indexOf(promptId) + 1}`,
                 });
               }
+            }
 
+            // Open the add agent drawer AFTER sessions are restored
+            openDrawer("add-agent");
+
+            // If prompt parameter exists, open AgentDrawer
+            if (promptParam && typeof promptParam === 'string') {
               // Use requestAnimationFrame to ensure React has rendered the state updates
               requestAnimationFrame(() => {
-                openAgentDrawer();
+                // Pass skipSessionCreation=true since sessions were restored from URL params
+                openAgentDrawer(undefined, undefined, true);
               });
             }
 
             // Mark as processed
             hasProcessedUrlRef.current = true;
+          } else if (promptParam && typeof promptParam === 'string') {
+            // Workflow fetch succeeded but returned empty data - still try to open with prompt
+            console.warn('Workflow returned empty data, falling back to prompt-based restoration');
+            const promptIds = promptParam.split(',').map(id => id.trim());
+            for (const promptId of promptIds) {
+              const existingSession = getSessionByPromptId(promptId);
+              if (existingSession && existingSession.systemPrompt !== undefined) {
+                continue;
+              }
+              restoreSessionWithPromptId(promptId, {
+                name: `Agent ${promptIds.indexOf(promptId) + 1}`,
+              });
+            }
+            requestAnimationFrame(() => {
+              openAgentDrawer(undefined, undefined, true);
+            });
+            hasProcessedUrlRef.current = true;
           }
         } catch (error) {
           console.error('Error fetching workflow details:', error);
-          errorToast('Failed to load agent workflow');
+          // Fallback: If workflow fetch fails but we have a prompt parameter, still try to open AgentDrawer
+          if (promptParam && typeof promptParam === 'string') {
+            const promptIds = promptParam.split(',').map(id => id.trim());
+            for (const promptId of promptIds) {
+              const existingSession = getSessionByPromptId(promptId);
+              if (existingSession && existingSession.systemPrompt !== undefined) {
+                continue;
+              }
+              restoreSessionWithPromptId(promptId, {
+                name: `Agent ${promptIds.indexOf(promptId) + 1}`,
+              });
+            }
+            requestAnimationFrame(() => {
+              openAgentDrawer(undefined, undefined, true);
+            });
+            hasProcessedUrlRef.current = true;
+          } else {
+            errorToast('Failed to load agent workflow');
+          }
         } finally {
           hideLoader();
         }
@@ -593,6 +659,12 @@ export default function PromptsAgents() {
 
           // Create sessions for each prompt ID
           for (const promptId of promptIds) {
+            // Check if session already exists with full data from persistence
+            const existingSession = getSessionByPromptId(promptId);
+            if (existingSession && existingSession.systemPrompt !== undefined) {
+              // Session already has full data from persistence, just ensure it's selected
+              continue;
+            }
             // Use restoreSessionWithPromptId to preserve the exact prompt ID
             restoreSessionWithPromptId(promptId, {
               name: `Agent ${promptIds.indexOf(promptId) + 1}`,
@@ -601,7 +673,8 @@ export default function PromptsAgents() {
 
           // Use requestAnimationFrame to ensure React has rendered the state updates
           requestAnimationFrame(() => {
-            openAgentDrawer();
+            // Pass skipSessionCreation=true since sessions were restored from URL params
+            openAgentDrawer(undefined, undefined, true);
           });
 
           // Mark as processed

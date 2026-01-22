@@ -67,6 +67,10 @@ export default {
           '/home/projects/[projectId]/endpoint/[endpointId]/[scoreType]',
       },
       {
+        source: '/projects/:projectId/inferences/:inferenceId',
+        destination: '/home/projects/[projectId]/inferences/[inferenceId]',
+      },
+      {
         source: '/projects/:projectId/deployments/:deploymentId/:scoreType',
         destination:
           // '/home/projects/[projectId]/PromptList',
@@ -164,6 +168,20 @@ export default {
       {
         source: '/agents',
         destination: '/home/agents',
+      },
+
+      // DAG Pipelines
+      {
+        source: '/pipelines',
+        destination: '/home/budpipelines',
+      },
+      {
+        source: '/pipelines/new',
+        destination: '/home/budpipelines/new',
+      },
+      {
+        source: '/pipelines/:id',
+        destination: '/home/budpipelines/:id',
       },
     ];
   },

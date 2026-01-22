@@ -1,0 +1,101 @@
+{{- if gt (int .Values.celery_worker_docprocessing.replicaCount) 0 }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "onyx.fullname" . }}-celery-worker-docprocessing
+  labels:
+    {{- include "onyx.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.celery_worker_docprocessing.autoscaling.enabled }}
+  replicas: {{ .Values.celery_worker_docprocessing.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "onyx.selectorLabels" . | nindent 6 }}
+      {{- if .Values.celery_worker_docprocessing.deploymentLabels }}
+      {{- toYaml .Values.celery_worker_docprocessing.deploymentLabels | nindent 6 }}
+      {{- end }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.celery_worker_docprocessing.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "onyx.labels" . | nindent 8 }}
+        {{- with .Values.celery_worker_docprocessing.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "onyx.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.celery_shared.podSecurityContext | nindent 8 }}
+      {{- with .Values.celery_worker_docprocessing.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: celery-worker-docprocessing
+          securityContext:
+            {{- toYaml .Values.celery_shared.securityContext | nindent 12 }}
+          image: "{{ .Values.celery_shared.image.repository }}:{{ .Values.celery_shared.image.tag | default .Values.global.version }}"
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          command:
+            [
+              "celery",
+              "-A",
+              "onyx.background.celery.versioned_apps.docprocessing",
+              "worker",
+              "--pool=threads",
+              "--concurrency=6",
+              "--prefetch-multiplier=1",
+              "--loglevel=INFO",
+              "--hostname=docprocessing@%n",
+              "-Q",
+              "docprocessing",
+            ]
+          resources:
+            {{- toYaml .Values.celery_worker_docprocessing.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.config.envConfigMapName }}
+          env:
+            - name: ENABLE_MULTIPASS_INDEXING
+              value: "{{ .Values.celery_worker_docprocessing.enableMiniChunk }}"
+            {{- include "onyx.envSecrets" . | nindent 12}}
+          {{- with .Values.celery_worker_docprocessing.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            {{ .Values.celery_shared.startupProbe | toYaml | nindent 12}}
+          readinessProbe:
+            {{ .Values.celery_shared.readinessProbe | toYaml | nindent 12}}
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - >
+                    python onyx/background/celery/celery_k8s_probe.py
+                    --probe readiness
+                    --filename /tmp/onyx_k8s_docprocessing_readiness.txt
+          livenessProbe:
+            {{ .Values.celery_shared.livenessProbe | toYaml | nindent 12}}
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - >
+                    python onyx/background/celery/celery_k8s_probe.py
+                    --probe liveness
+                    --filename /tmp/onyx_k8s_docprocessing_liveness.txt
+      {{- with .Values.celery_worker_docprocessing.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

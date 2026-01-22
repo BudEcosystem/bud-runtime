@@ -1,8 +1,14 @@
 imagePullPolicy: Always
+deploymentAnnotations:
+  keel.sh/policy: force
+  keel.sh/trigger: poll
+  keel.sh/match-tag: true
+  keel.sh/pollSchedule: "@every 1m"
 
-ingress:
-  hosts:
-    root: sinan.bud.studio
+global:
+  ingress:
+    hosts:
+      root: sinan.bud.studio
 
 microservices:
   budprompt:

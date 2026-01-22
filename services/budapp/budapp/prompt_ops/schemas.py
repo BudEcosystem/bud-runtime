@@ -346,6 +346,9 @@ class CreatePromptWorkflowRequest(BaseModel):
     discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
         None, description="List of temporary prompt IDs discarded by user that need cleanup"
     )
+    client_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Arbitrary metadata from client for UI state preservation"
+    )
 
     @field_validator("name")
     @classmethod
@@ -407,6 +410,9 @@ class CreatePromptWorkflowSteps(BaseModel):
     bud_prompt_id: str | None = None
     discarded_prompt_ids: Optional[List[PromptCleanupItem]] = Field(
         None, description="List of temporary prompt IDs to cleanup"
+    )
+    client_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Arbitrary metadata from client for UI state preservation"
     )
 
 
@@ -618,6 +624,10 @@ class PromptConfigRequest(BaseModel):
         default=False,
         description="Store configuration permanently without expiration (default: False, uses configured TTL)",
     )
+    client_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client-provided metadata for custom tracking and identification",
+    )
 
 
 class PromptConfigResponse(SuccessResponse):
@@ -686,6 +696,10 @@ class PromptConfigurationData(BaseModel):
     )
     system_prompt: Optional[str] = Field(None, description="System prompt with Jinja2 template support")
     tools: List[MCPToolConfig] = Field(default_factory=list, description="MCP tool configurations")
+    client_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Client-provided metadata for custom tracking and identification",
+    )
 
 
 class GetPromptVersionResponse(SuccessResponse):

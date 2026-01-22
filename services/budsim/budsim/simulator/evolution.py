@@ -56,6 +56,7 @@ class Evolution:
         convergence_generations: int = 10,
         use_heuristic: bool = False,
         supports_pipeline_parallelism: bool = False,
+        model_max_context_length: Optional[int] = None,
     ):
         """Initialize the Evolution class.
 
@@ -77,10 +78,12 @@ class Evolution:
             error_threshold (float, optional): The error threshold. Defaults to 0.01.
             convergence_generations (int, optional): The number of generations to wait for convergence. Defaults to 10.
             use_heuristic (bool, optional): Whether to use heuristic calculations instead of ML predictions. Defaults to False.
+            model_max_context_length (int, optional): Model's max context length to cap seq_length. Defaults to None.
         """
         self.model = model
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+        self.model_max_context_length = model_max_context_length
         self.max_concurrency = max_concurrency
         self.target_e2e_latency = target_e2e_latency
         self.target_ttft = target_ttft
@@ -366,6 +369,7 @@ class Evolution:
             concurrency=1,
             tp_size=1,
             pp_size=1,  # Start with PP=1 for boundary initialization
+            model_max_context_length=self.model_max_context_length,
         )
         max_concurrency = model_analysis.get_max_concurrency(self.device_config["mem_per_GPU_in_GB"])
         self.max_concurrency = min(max_concurrency, self.max_concurrency)
@@ -594,6 +598,7 @@ class Evolution:
             concurrency=ind_config["concurrency"],
             tp_size=ind_config["tensor_parallel_size"],
             pp_size=ind_config.get("pipeline_parallel_size", 1),  # Include PP size
+            model_max_context_length=self.model_max_context_length,
         )
         logger.info("Calling model_analysis.analyze()")
         model_data = model_analysis.analyze()

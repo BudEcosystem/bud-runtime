@@ -1,8 +1,9 @@
 imagePullPolicy: "Always"
 
-ingress:
-    hosts:
-        root: varun.bud.studio
+global:
+    ingress:
+        hosts:
+            root: varun.bud.studio
 
 microservices:
     budprompt:

@@ -127,6 +127,7 @@ from .schemas import (
     LeaderboardTable,
     LocalModelScanRequest,
     LocalModelScanWorkflowStepData,
+    ModelArchitectureAudioConfig,
     ModelArchitectureLLMConfig,
     ModelArchitectureVisionConfig,
     ModelCreate,
@@ -585,6 +586,19 @@ class CloudModelWorkflowService(SessionMixin):
         if extracted_metadata.get("website_url"):
             update_fields["website_url"] = extracted_metadata["website_url"]
 
+        if extracted_metadata.get("modality"):
+            try:
+                model_details = await determine_modality_endpoints(extracted_metadata["modality"])
+                update_fields["modality"] = model_details["modality"]
+                update_fields["supported_endpoints"] = model_details["endpoints"]
+            except ValueError as exc:
+                logger.warning(
+                    "Skipping modality update for model %s due to invalid modality %s: %s",
+                    model.id,
+                    extracted_metadata.get("modality"),
+                    exc,
+                )
+
         # Calculate and update storage size from MinIO if local_path is available
         if model.local_path:
             storage_size_gib = await calculate_and_get_storage_size(model.id, model.local_path)
@@ -887,6 +901,35 @@ class CloudModelWorkflowService(SessionMixin):
 class LocalModelWorkflowService(SessionMixin):
     """Local model workflow service."""
 
+    @staticmethod
+    def _get_model_max_context_length(model) -> Optional[int]:
+        """Get the model's maximum context length from architecture config.
+
+        For text models, returns context_length from architecture_text_config.
+        For audio models, returns sum of max_source_positions and max_target_positions.
+
+        Args:
+            model: The model object with architecture configs.
+
+        Returns:
+            The model's max context length, or None if not available.
+        """
+        # Try text config first (most common)
+        if model.architecture_text_config:
+            context_length = model.architecture_text_config.get("context_length")
+            if context_length:
+                return context_length
+
+        # Try audio config
+        if model.architecture_audio_config:
+            max_source = model.architecture_audio_config.get("max_source_positions", 0)
+            max_target = model.architecture_audio_config.get("max_target_positions", 0)
+            total = max_source + max_target
+            if total > 0:
+                return total
+
+        return None
+
     async def add_local_model_workflow(self, current_user_id: UUID, request: CreateLocalModelWorkflowRequest) -> None:
         """Add a local model workflow."""
         # Get request data
@@ -976,6 +1019,10 @@ class LocalModelWorkflowService(SessionMixin):
             add_model_modality=add_model_modality,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
 
+        # Store callback_topic for budpipeline integration
+        if request.callback_topic:
+            workflow_step_data["callback_topic"] = request.callback_topic
+
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
             {"workflow_id": db_workflow.id}
@@ -1037,6 +1084,7 @@ class LocalModelWorkflowService(SessionMixin):
                 "proprietary_credential_id",  # Only required for HuggingFace (Optional)
                 "name",
                 "uri",
+                "callback_topic",  # For direct budpipeline notification (D-001)
             ]
 
             # from workflow steps extract necessary information
@@ -1171,6 +1219,22 @@ class LocalModelWorkflowService(SessionMixin):
                 )
             else:
                 vision_config = None
+
+            # Audio Config
+            model_info_audio_config = model_info_architecture.get("audio_config", {})
+            if model_info_audio_config is not None:
+                audio_config = ModelArchitectureAudioConfig(
+                    num_layers=normalize_value(model_info_audio_config.get("num_layers", None)),
+                    hidden_size=normalize_value(model_info_audio_config.get("hidden_size", None)),
+                    num_attention_heads=normalize_value(model_info_audio_config.get("num_attention_heads", None)),
+                    num_mel_bins=normalize_value(model_info_audio_config.get("num_mel_bins", None)),
+                    sample_rate=normalize_value(model_info_audio_config.get("sample_rate", None)),
+                    max_source_positions=normalize_value(model_info_audio_config.get("max_source_positions", None)),
+                    max_target_positions=normalize_value(model_info_audio_config.get("max_target_positions", None)),
+                    torch_dtype=normalize_value(model_info_audio_config.get("torch_dtype", None)),
+                )
+            else:
+                audio_config = None
         else:
             model_size = None
             model_type = None
@@ -1179,6 +1243,7 @@ class LocalModelWorkflowService(SessionMixin):
             kv_cache_size = None
             text_config = None
             vision_config = None
+            audio_config = None
 
         # Get base model relation
         base_model = None
@@ -1280,6 +1345,7 @@ class LocalModelWorkflowService(SessionMixin):
             kv_cache_size=kv_cache_size,
             architecture_text_config=text_config,
             architecture_vision_config=vision_config,
+            architecture_audio_config=audio_config,
         )
 
         # Create model
@@ -1346,6 +1412,7 @@ class LocalModelWorkflowService(SessionMixin):
             .build()
         )
         await BudNotifyService().send_notification(notification_request)
+        # NOTE: budpipeline notification is handled directly by budmodel via multi-topic source_topic (D-001)
 
     async def _verify_provider_type_uri_duplication(
         self,
@@ -1417,8 +1484,11 @@ class LocalModelWorkflowService(SessionMixin):
         self, current_step_number: int, data: Dict, current_user_id: UUID, db_workflow: WorkflowModel
     ) -> None:
         """Perform model extraction."""
-        # Perform model extraction request
-        model_extraction_response = await self._perform_model_extraction_request(db_workflow.id, data, current_user_id)
+        # Perform model extraction request with callback_topic for direct budpipeline notification
+        callback_topic = data.get("callback_topic")
+        model_extraction_response = await self._perform_model_extraction_request(
+            db_workflow.id, data, current_user_id, callback_topic
+        )
 
         # Add payload dict to response
         for step in model_extraction_response["steps"]:
@@ -1443,7 +1513,13 @@ class LocalModelWorkflowService(SessionMixin):
             db_workflow, {"progress": model_extraction_response, "current_step": workflow_current_step}
         )
 
-    async def _perform_model_extraction_request(self, workflow_id: UUID, data: Dict, current_user_id: UUID) -> None:
+    async def _perform_model_extraction_request(
+        self,
+        workflow_id: UUID,
+        data: Dict,
+        current_user_id: UUID,
+        callback_topic: str | None = None,
+    ) -> None:
         """Perform model extraction request."""
         model_extraction_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_model_app_id}/method/model-info/extract"
@@ -1465,6 +1541,11 @@ class LocalModelWorkflowService(SessionMixin):
                 logger.error(f"Failed to decrypt token: {e}")
                 raise ClientException("Invalid credential found while adding model") from e
 
+        # Build source_topic - include callback_topic for direct budpipeline notification (D-001)
+        source_topics: str | list[str] = app_settings.source_topic
+        if callback_topic:
+            source_topics = [app_settings.source_topic, callback_topic]
+
         model_extraction_request = {
             "model_name": data["name"],
             "model_uri": data["uri"],
@@ -1475,7 +1556,7 @@ class LocalModelWorkflowService(SessionMixin):
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
-            "source_topic": f"{app_settings.source_topic}",
+            "source_topic": source_topics,  # Multi-topic: budapp + budpipeline
         }
 
         try:
@@ -2092,6 +2173,35 @@ class CloudModelService(SessionMixin):
 
 class ModelService(SessionMixin):
     """Model service."""
+
+    @staticmethod
+    def _get_model_max_context_length(model) -> Optional[int]:
+        """Get the model's maximum context length from architecture config.
+
+        For text models, returns context_length from architecture_text_config.
+        For audio models, returns sum of max_source_positions and max_target_positions.
+
+        Args:
+            model: The model object with architecture configs.
+
+        Returns:
+            The model's max context length, or None if not available.
+        """
+        # Try text config first (most common)
+        if model.architecture_text_config:
+            context_length = model.architecture_text_config.get("context_length")
+            if context_length:
+                return context_length
+
+        # Try audio config
+        if model.architecture_audio_config:
+            max_source = model.architecture_audio_config.get("max_source_positions", 0)
+            max_target = model.architecture_audio_config.get("max_target_positions", 0)
+            total = max_source + max_target
+            if total > 0:
+                return total
+
+        return None
 
     async def retrieve_model(self, model_id: UUID) -> ModelDetailSuccessResponse:
         """Retrieve model details by model ID."""
@@ -3398,6 +3508,7 @@ class ModelService(SessionMixin):
                 "tool_calling_parser_type",
                 "reasoning_parser_type",
                 "chat_template",
+                "callback_topic",  # For direct budpipeline notification (D-001)
             ]
 
             # from workflow steps extract necessary information
@@ -3521,6 +3632,7 @@ class ModelService(SessionMixin):
                     budaiscaler_specification=required_data.get("budaiscaler_specification"),
                     enable_tool_calling=required_data.get("enable_tool_calling"),
                     enable_reasoning=required_data.get("enable_reasoning"),
+                    callback_topic=required_data.get("callback_topic"),  # For direct budpipeline notification
                 )
                 model_deployment_events = {
                     "budserve_cluster_events": model_deployment_response,
@@ -3666,6 +3778,7 @@ class ModelService(SessionMixin):
         budaiscaler_specification: Optional[BudAIScalerSpecification] = None,
         enable_tool_calling: Optional[bool] = None,
         enable_reasoning: Optional[bool] = None,
+        callback_topic: Optional[str] = None,  # For direct budpipeline notification (D-001)
     ) -> Dict[str, Any]:
         """Trigger model deployment by step."""
         logger.debug("Triggering model deployment")
@@ -3745,6 +3858,11 @@ class ModelService(SessionMixin):
                 default_access_mode,
             )
 
+        # Build source_topic - include callback_topic for direct budpipeline notification (D-001)
+        source_topics: str | list[str] = app_settings.source_topic
+        if callback_topic:
+            source_topics = [app_settings.source_topic, callback_topic]
+
         # Perform model deployment
         model_deployment_request = ModelDeploymentRequest(
             cluster_id=cluster_id,
@@ -3760,7 +3878,7 @@ class ModelService(SessionMixin):
             input_tokens=deploy_config.avg_context_length,
             output_tokens=deploy_config.avg_sequence_length,
             notification_metadata=notification_metadata,
-            source_topic=app_settings.source_topic,
+            source_topic=source_topics,  # Multi-topic: budapp + budpipeline
             credential_id=credential_id,
             budaiscaler=budaiscaler_specification,
             provider=db_model.source,
@@ -3768,6 +3886,7 @@ class ModelService(SessionMixin):
             enable_reasoning=enable_reasoning,
             default_storage_class=default_storage_class,
             default_access_mode=default_access_mode,
+            model_max_context_length=self._get_model_max_context_length(db_model),
         )
         model_deployment_endpoint = (
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment"
