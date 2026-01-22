@@ -166,15 +166,17 @@ A consistent sidebar, quick keyboard shortcuts, and collapse/expand views keep n
 
 ### 4.4 Inspect logs and metrics
 
-1. Open **Logs** from the side menu.
-2. Use the **Metrics** tab to select View by (Model/Project) and a time range.
-3. Click **Refresh** to update analytics.
-4. Switch to **Requests** to filter by date, endpoint type, model, tokens, or latency.
-5. Export CSV to share results or click a row to open Observability Details.
+1. Open Logs from the side menu.
+2. Use the Metrics tab to select View by (Model/Project) and a time range.
+3. Click Refresh to update analytics.
+4. Charts for request volume over time, latency distribution, geographic origin, token usage, requests per second, and TTFT with series colored per selected view dimension.
+4. Switch to Requests to filter by date, endpoint type, model, tokens, or latency.
+4. Inference request table with timestamp, project, deployment, prompt preview, response time, tokens, and success/failure status columns plus sortable fields for timestamp and response time.
+5. Export CSV to share results or click a row to open Request Details.
 
-### 4.5 Review an observability detail
+### 4.5 Review an inference request detail
 
-1. From **Logs → Requests**, click an inference row.
+1. From Logs → Requests, click an inference row.
 2. Copy the Inference ID or raw request/response as needed.
 3. Review request metadata, performance metrics, and error details.
 4. Download conversation or payload JSON for offline analysis.
