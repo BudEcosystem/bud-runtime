@@ -18,6 +18,7 @@ import PromptForm from './PromptForm';
 import UnstructuredPromptInput from './UnstructuredPromptInput';
 import { getPromptConfig } from '@/app/lib/api';
 import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
+import { parsePositiveIntParam } from '@/app/lib/query';
 
 
 
@@ -54,6 +55,10 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const contentRef = useRef<HTMLDivElement>(null);
 
   const promptIds = getPromptIds();
+  const promptVersionParam = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return parsePositiveIntParam(params.get('version'));
+  }, []);
   const [promptData, setPromptData] = useState<any>(null);
 
   const body = useMemo(() => {
@@ -192,7 +197,12 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       setIsDeploymentReady(false); // Start loading
 
       try {
-        const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
+        const config = await getPromptConfig(
+          promptIds[0],
+          apiKey || '',
+          accessKey || '',
+          promptVersionParam
+        );
 
         if (config && config.data) {
           setPromptConfig(config.data);
@@ -247,7 +257,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
     fetchPromptConfiguration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getPromptIds, apiKey, accessKey, refreshTrigger]);
+  }, [getPromptIds, apiKey, accessKey, refreshTrigger, promptVersionParam]);
 
   // Fetch endpoints when prompt config has deployment_name (for unstructured prompts)
   // Note: Structured prompts handle this in PromptForm
