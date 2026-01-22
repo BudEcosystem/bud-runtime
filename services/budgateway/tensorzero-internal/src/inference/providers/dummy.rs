@@ -821,8 +821,7 @@ impl ModerationProvider for DummyProvider {
                 category_applied_input_types: None,
                 hallucination_details: None,
                 ip_violation_details: None,
-                unknown_categories: Default::default(),
-                other_score: 0.0,
+                other_categories: Default::default(),
             });
         }
 

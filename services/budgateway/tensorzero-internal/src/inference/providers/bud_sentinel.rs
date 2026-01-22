@@ -360,11 +360,11 @@ fn map_categories(categories: &HashMap<String, bool>) -> ModerationCategories {
     mapped
 }
 
-fn map_scores_with_unknowns(
+fn map_scores_with_other_categories(
     scores: &HashMap<String, f64>,
 ) -> (ModerationCategoryScores, HashMap<String, f32>, f32) {
     let mut mapped = ModerationCategoryScores::default();
-    let mut unknown_categories = HashMap::new();
+    let mut other_categories = HashMap::new();
     let mut other_score = 0.0_f32;
 
     for (key, value) in scores {
@@ -392,7 +392,7 @@ fn map_scores_with_unknowns(
             "pii" => mapped.pii = v,
             "secrets" => mapped.secrets = v,
             _ => {
-                unknown_categories.insert(key.clone(), v);
+                other_categories.insert(key.clone(), v);
                 if v > other_score {
                     other_score = v;
                 }
@@ -400,13 +400,15 @@ fn map_scores_with_unknowns(
         }
     }
 
-    (mapped, unknown_categories, other_score)
+    mapped.other = other_score;
+    (mapped, other_categories, other_score)
 }
 
 fn map_result(result: &BudModerationResult) -> ModerationResult {
-    let categories = map_categories(&result.categories);
-    let (scores, unknown_categories, other_score) =
-        map_scores_with_unknowns(&result.category_scores);
+    let mut categories = map_categories(&result.categories);
+    let (scores, other_categories, _other_score) =
+        map_scores_with_other_categories(&result.category_scores);
+    categories.other = !other_categories.is_empty();
 
     ModerationResult {
         flagged: result.flagged,
@@ -415,8 +417,7 @@ fn map_result(result: &BudModerationResult) -> ModerationResult {
         category_applied_input_types: None,
         hallucination_details: None,
         ip_violation_details: None,
-        unknown_categories,
-        other_score,
+        other_categories,
     }
 }
 
@@ -535,7 +536,7 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn bud_sentinel_maps_unknown_categories() {
+    fn bud_sentinel_maps_other_categories() {
         let mut categories = HashMap::new();
         categories.insert("high_risk_spam".to_string(), true);
 
@@ -550,7 +551,8 @@ mod tests {
         };
 
         let mapped = map_result(&result);
-        assert_eq!(mapped.unknown_categories.get("high_risk_spam"), Some(&1.0));
-        assert!((mapped.other_score - 1.0).abs() < 1e-6);
+        assert_eq!(mapped.other_categories.get("high_risk_spam"), Some(&1.0));
+        assert!((mapped.category_scores.other - 1.0).abs() < 1e-6);
+        assert!(mapped.categories.other);
     }
 }

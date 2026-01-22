@@ -43,8 +43,7 @@ pub async fn execute_guardrail<'a>(
             merged_categories: crate::moderation::ModerationCategories::default(),
             merged_scores: crate::moderation::ModerationCategoryScores::default(),
             merged_category_applied_input_types: None,
-            merged_unknown_categories: Default::default(),
-            merged_other_score: 0.0,
+            merged_other_categories: Default::default(),
             hallucination_details: None,
             ip_violation_details: None,
         });
@@ -92,8 +91,7 @@ pub async fn execute_guardrail<'a>(
         merged_categories,
         merged_scores,
         merged_category_applied_input_types,
-        merged_unknown_categories,
-        merged_other_score,
+        merged_other_categories,
     ) = merge_moderation_results(moderation_results);
 
     // Extract special details from provider results
@@ -125,8 +123,7 @@ pub async fn execute_guardrail<'a>(
         merged_categories,
         merged_scores,
         merged_category_applied_input_types,
-        merged_unknown_categories,
-        merged_other_score,
+        merged_other_categories,
         hallucination_details,
         ip_violation_details,
     })
@@ -450,8 +447,7 @@ async fn execute_azure_content_safety_probe<'a>(
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
-                    unknown_categories: Default::default(),
-                    other_score: 0.0,
+                    other_categories: Default::default(),
                 });
 
             // Apply threshold check for Azure Content Safety
@@ -498,8 +494,7 @@ async fn execute_azure_content_safety_probe<'a>(
                 category_applied_input_types: None,
                 hallucination_details: None,
                 ip_violation_details: None,
-                unknown_categories: Default::default(),
-                other_score: 0.0,
+                other_categories: Default::default(),
             },
             error: Some(e.to_string()),
         }),
@@ -556,8 +551,7 @@ async fn execute_openai_probe<'a>(
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
-                    unknown_categories: Default::default(),
-                    other_score: 0.0,
+                    other_categories: Default::default(),
                 });
 
             // Apply threshold check for OpenAI
@@ -610,8 +604,7 @@ async fn execute_openai_probe<'a>(
                 category_applied_input_types: None,
                 hallucination_details: None,
                 ip_violation_details: None,
-                unknown_categories: Default::default(),
-                other_score: 0.0,
+                other_categories: Default::default(),
             },
             error: Some(e.to_string()),
         }),
@@ -1034,15 +1027,11 @@ async fn execute_bud_sentinel_probe<'a>(
                             category_applied_input_types: None,
                             hallucination_details: None,
                             ip_violation_details: None,
-                            unknown_categories: Default::default(),
-                            other_score: 0.0,
+                            other_categories: Default::default(),
                         });
 
-                let flagged = if result.category_scores.has_non_zero_scores()
-                    || result.other_score > 0.0
-                {
-                    let max_score =
-                        get_max_score(&result.category_scores).max(result.other_score as f64);
+                let flagged = if result.category_scores.has_non_zero_scores() {
+                    let max_score = get_max_score(&result.category_scores);
                     max_score >= guardrail_severity
                 } else {
                     result.flagged
@@ -1134,8 +1123,7 @@ async fn execute_bud_sentinel_probe<'a>(
                         category_applied_input_types: None,
                         hallucination_details: None,
                         ip_violation_details: None,
-                        unknown_categories: Default::default(),
-                        other_score: 0.0,
+                        other_categories: Default::default(),
                     },
                     error: Some(err.to_string()),
                 });
@@ -1166,6 +1154,7 @@ fn get_max_score(scores: &crate::moderation::ModerationCategoryScores) -> f64 {
         scores.malicious,
         scores.pii,
         scores.secrets,
+        scores.other,
     ]
     .into_iter()
     .fold(0.0_f64, |max, val| max.max(val as f64))
@@ -1199,6 +1188,7 @@ fn get_max_score_for_categories(
             "malicious" => scores.malicious,
             "pii" => scores.pii,
             "secrets" => scores.secrets,
+            "other" => scores.other,
             _ => 0.0,
         };
         max_score = max_score.max(score as f64);

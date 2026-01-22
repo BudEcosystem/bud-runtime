@@ -4036,8 +4036,7 @@ pub async fn moderation_handler(
                 .clone(),
             hallucination_details: guardrail_result.hallucination_details.clone(),
             ip_violation_details: guardrail_result.ip_violation_details.clone(),
-            unknown_categories: guardrail_result.merged_unknown_categories.clone(),
-            other_score: guardrail_result.merged_other_score,
+            other_categories: guardrail_result.merged_other_categories.clone(),
         }];
 
         let provider_response = crate::moderation::ModerationProviderResponse {
@@ -7782,16 +7781,14 @@ mod tests {
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
-                    unknown_categories: Default::default(),
-                    other_score: 0.0,
+                    other_categories: Default::default(),
                 },
                 error: Some("boom".to_string()),
             }],
             merged_categories: crate::moderation::ModerationCategories::default(),
             merged_scores: crate::moderation::ModerationCategoryScores::default(),
             merged_category_applied_input_types: None,
-            merged_unknown_categories: Default::default(),
-            merged_other_score: 0.0,
+            merged_other_categories: Default::default(),
             hallucination_details: None,
             ip_violation_details: None,
         };

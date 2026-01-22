@@ -128,9 +128,7 @@ pub struct GuardrailResult {
     pub merged_scores: crate::moderation::ModerationCategoryScores,
     pub merged_category_applied_input_types: Option<crate::moderation::CategoryAppliedInputTypes>,
     #[serde(default)]
-    pub merged_unknown_categories: HashMap<String, f32>,
-    #[serde(default)]
-    pub merged_other_score: f32,
+    pub merged_other_categories: HashMap<String, f32>,
 
     /// Additional details from providers
     pub hallucination_details: Option<crate::moderation::HallucinationDetails>,
@@ -210,7 +208,6 @@ pub fn merge_moderation_results(
     crate::moderation::ModerationCategoryScores,
     Option<crate::moderation::CategoryAppliedInputTypes>,
     HashMap<String, f32>,
-    f32,
 ) {
     use crate::moderation::{
         CategoryAppliedInputTypes, ModerationCategories, ModerationCategoryScores,
@@ -219,8 +216,7 @@ pub fn merge_moderation_results(
     let mut merged_categories = ModerationCategories::default();
     let mut merged_scores = ModerationCategoryScores::default();
     let mut merged_applied_input_types: Option<CategoryAppliedInputTypes> = None;
-    let mut merged_unknown_categories = HashMap::new();
-    let mut merged_other_score = 0.0_f32;
+    let mut merged_other_categories = HashMap::new();
 
     // For categories: OR operation (flagged if any provider flags it)
     // For scores: MAX operation (highest score wins)
@@ -289,15 +285,15 @@ pub fn merge_moderation_results(
             .max(result.category_scores.malicious);
         merged_scores.pii = merged_scores.pii.max(result.category_scores.pii);
         merged_scores.secrets = merged_scores.secrets.max(result.category_scores.secrets);
+        merged_scores.other = merged_scores.other.max(result.category_scores.other);
 
-        for (key, score) in &result.unknown_categories {
-            let entry = merged_unknown_categories.entry(key.clone()).or_insert(0.0);
+        merged_categories.other |= result.categories.other;
+
+        for (key, score) in &result.other_categories {
+            let entry = merged_other_categories.entry(key.clone()).or_insert(0.0);
             if *entry < *score {
                 *entry = *score;
             }
-        }
-        if result.other_score > merged_other_score {
-            merged_other_score = result.other_score;
         }
 
         // Merge category applied input types
@@ -349,8 +345,7 @@ pub fn merge_moderation_results(
         merged_categories,
         merged_scores,
         merged_applied_input_types,
-        merged_unknown_categories,
-        merged_other_score,
+        merged_other_categories,
     )
 }
 
@@ -361,41 +356,47 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn merge_moderation_results_preserves_unknown_categories() {
+    fn merge_moderation_results_preserves_other_categories() {
         let mut unknown_a = HashMap::new();
         unknown_a.insert("high_risk_spam".to_string(), 1.0);
         let mut unknown_b = HashMap::new();
         unknown_b.insert("high_risk_spam".to_string(), 0.4);
         unknown_b.insert("new_category".to_string(), 0.7);
 
+        let mut first_categories = ModerationCategories::default();
+        first_categories.other = true;
+        let mut first_scores = ModerationCategoryScores::default();
+        first_scores.other = 1.0;
         let first = ModerationResult {
             flagged: false,
-            categories: ModerationCategories::default(),
-            category_scores: ModerationCategoryScores::default(),
+            categories: first_categories,
+            category_scores: first_scores,
             category_applied_input_types: None,
             hallucination_details: None,
             ip_violation_details: None,
-            unknown_categories: unknown_a,
-            other_score: 1.0,
+            other_categories: unknown_a,
         };
 
+        let mut second_categories = ModerationCategories::default();
+        second_categories.other = true;
+        let mut second_scores = ModerationCategoryScores::default();
+        second_scores.other = 0.7;
         let second = ModerationResult {
             flagged: false,
-            categories: ModerationCategories::default(),
-            category_scores: ModerationCategoryScores::default(),
+            categories: second_categories,
+            category_scores: second_scores,
             category_applied_input_types: None,
             hallucination_details: None,
             ip_violation_details: None,
-            unknown_categories: unknown_b,
-            other_score: 0.7,
+            other_categories: unknown_b,
         };
 
-        let (_categories, _scores, _applied, unknown_categories, other_score) =
+        let (_categories, scores, _applied, other_categories) =
             merge_moderation_results(vec![first, second]);
 
-        assert_eq!(unknown_categories.get("high_risk_spam"), Some(&1.0));
-        assert_eq!(unknown_categories.get("new_category"), Some(&0.7));
-        assert!((other_score - 1.0).abs() < 1e-6);
+        assert_eq!(other_categories.get("high_risk_spam"), Some(&1.0));
+        assert_eq!(other_categories.get("new_category"), Some(&0.7));
+        assert!((scores.other - 1.0).abs() < 1e-6);
     }
 }
 

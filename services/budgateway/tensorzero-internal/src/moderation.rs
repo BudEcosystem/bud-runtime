@@ -203,6 +203,8 @@ pub struct ModerationCategories {
     pub ip_violation: bool,
     #[serde(default)]
     pub hallucination: bool,
+    #[serde(default)]
+    pub other: bool,
 }
 
 /// Confidence scores for each moderation category
@@ -246,6 +248,8 @@ pub struct ModerationCategoryScores {
     pub pii: f32,
     #[serde(default)]
     pub secrets: f32,
+    #[serde(default)]
+    pub other: f32,
 }
 
 impl ModerationCategoryScores {
@@ -272,6 +276,7 @@ impl ModerationCategoryScores {
             || self.malicious > 0.0
             || self.pii > 0.0
             || self.secrets > 0.0
+            || self.other > 0.0
     }
 }
 
@@ -360,9 +365,7 @@ pub struct ModerationResult {
     pub hallucination_details: Option<HallucinationDetails>,
     pub ip_violation_details: Option<IPViolationDetails>,
     #[serde(default)]
-    pub unknown_categories: HashMap<String, f32>,
-    #[serde(default)]
-    pub other_score: f32,
+    pub other_categories: HashMap<String, f32>,
 }
 
 /// Provider-specific moderation response
@@ -562,6 +565,7 @@ mod tests {
         assert!(!categories.secrets);
         assert!(!categories.ip_violation);
         assert!(!categories.hallucination);
+        assert!(!categories.other);
     }
 
     #[test]
@@ -586,31 +590,36 @@ mod tests {
         assert_eq!(scores.malicious, 0.0);
         assert_eq!(scores.pii, 0.0);
         assert_eq!(scores.secrets, 0.0);
+        assert_eq!(scores.other, 0.0);
     }
 
     #[test]
-    fn moderation_result_serializes_unknown_categories() {
+    fn moderation_result_serializes_other_categories() {
         let mut unknown = std::collections::HashMap::new();
         unknown.insert("new-category".to_string(), 0.72);
 
+        let mut categories = ModerationCategories::default();
+        categories.other = true;
+        let mut scores = ModerationCategoryScores::default();
+        scores.other = 0.72;
+
         let result = ModerationResult {
             flagged: false,
-            categories: ModerationCategories::default(),
-            category_scores: ModerationCategoryScores::default(),
+            categories,
+            category_scores: scores,
             category_applied_input_types: None,
             hallucination_details: None,
             ip_violation_details: None,
-            unknown_categories: unknown,
-            other_score: 0.72,
+            other_categories: unknown,
         };
 
         let value = serde_json::to_value(&result).unwrap();
-        assert!(value.get("unknown_categories").is_some());
-        let unknown_score = value["unknown_categories"]["new-category"]
+        assert!(value.get("other_categories").is_some());
+        let other_category_score = value["other_categories"]["new-category"]
             .as_f64()
             .unwrap();
-        let other_score = value["other_score"].as_f64().unwrap();
-        assert!((unknown_score - 0.72).abs() < 1e-6);
+        let other_score = value["category_scores"]["other"].as_f64().unwrap();
+        assert!((other_category_score - 0.72).abs() < 1e-6);
         assert!((other_score - 0.72).abs() < 1e-6);
     }
 
