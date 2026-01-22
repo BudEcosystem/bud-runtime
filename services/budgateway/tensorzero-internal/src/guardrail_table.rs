@@ -127,6 +127,10 @@ pub struct GuardrailResult {
     pub merged_categories: crate::moderation::ModerationCategories,
     pub merged_scores: crate::moderation::ModerationCategoryScores,
     pub merged_category_applied_input_types: Option<crate::moderation::CategoryAppliedInputTypes>,
+    #[serde(default)]
+    pub merged_unknown_categories: HashMap<String, f32>,
+    #[serde(default)]
+    pub merged_other_score: f32,
 
     /// Additional details from providers
     pub hallucination_details: Option<crate::moderation::HallucinationDetails>,
@@ -205,6 +209,8 @@ pub fn merge_moderation_results(
     crate::moderation::ModerationCategories,
     crate::moderation::ModerationCategoryScores,
     Option<crate::moderation::CategoryAppliedInputTypes>,
+    HashMap<String, f32>,
+    f32,
 ) {
     use crate::moderation::{
         CategoryAppliedInputTypes, ModerationCategories, ModerationCategoryScores,
@@ -213,6 +219,8 @@ pub fn merge_moderation_results(
     let mut merged_categories = ModerationCategories::default();
     let mut merged_scores = ModerationCategoryScores::default();
     let mut merged_applied_input_types: Option<CategoryAppliedInputTypes> = None;
+    let mut merged_unknown_categories = HashMap::new();
+    let mut merged_other_score = 0.0_f32;
 
     // For categories: OR operation (flagged if any provider flags it)
     // For scores: MAX operation (highest score wins)
@@ -282,6 +290,16 @@ pub fn merge_moderation_results(
         merged_scores.pii = merged_scores.pii.max(result.category_scores.pii);
         merged_scores.secrets = merged_scores.secrets.max(result.category_scores.secrets);
 
+        for (key, score) in &result.unknown_categories {
+            let entry = merged_unknown_categories.entry(key.clone()).or_insert(0.0);
+            if *entry < *score {
+                *entry = *score;
+            }
+        }
+        if result.other_score > merged_other_score {
+            merged_other_score = result.other_score;
+        }
+
         // Merge category applied input types
         if let Some(applied_types) = result.category_applied_input_types {
             let merged_types =
@@ -327,7 +345,58 @@ pub fn merge_moderation_results(
         }
     }
 
-    (merged_categories, merged_scores, merged_applied_input_types)
+    (
+        merged_categories,
+        merged_scores,
+        merged_applied_input_types,
+        merged_unknown_categories,
+        merged_other_score,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::merge_moderation_results;
+    use crate::moderation::{ModerationCategories, ModerationCategoryScores, ModerationResult};
+    use std::collections::HashMap;
+
+    #[test]
+    fn merge_moderation_results_preserves_unknown_categories() {
+        let mut unknown_a = HashMap::new();
+        unknown_a.insert("high_risk_spam".to_string(), 1.0);
+        let mut unknown_b = HashMap::new();
+        unknown_b.insert("high_risk_spam".to_string(), 0.4);
+        unknown_b.insert("new_category".to_string(), 0.7);
+
+        let first = ModerationResult {
+            flagged: false,
+            categories: ModerationCategories::default(),
+            category_scores: ModerationCategoryScores::default(),
+            category_applied_input_types: None,
+            hallucination_details: None,
+            ip_violation_details: None,
+            unknown_categories: unknown_a,
+            other_score: 1.0,
+        };
+
+        let second = ModerationResult {
+            flagged: false,
+            categories: ModerationCategories::default(),
+            category_scores: ModerationCategoryScores::default(),
+            category_applied_input_types: None,
+            hallucination_details: None,
+            ip_violation_details: None,
+            unknown_categories: unknown_b,
+            other_score: 0.7,
+        };
+
+        let (_categories, _scores, _applied, unknown_categories, other_score) =
+            merge_moderation_results(vec![first, second]);
+
+        assert_eq!(unknown_categories.get("high_risk_spam"), Some(&1.0));
+        assert_eq!(unknown_categories.get("new_category"), Some(&0.7));
+        assert!((other_score - 1.0).abs() < 1e-6);
+    }
 }
 
 /// Redis format for guardrail configuration (matches model table structure)

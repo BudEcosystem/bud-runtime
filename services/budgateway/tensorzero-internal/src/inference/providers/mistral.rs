@@ -1221,6 +1221,8 @@ impl ModerationProvider for MistralProvider {
                         category_applied_input_types: None, // Mistral doesn't provide this information
                         hallucination_details: None,
                         ip_violation_details: None,
+                        unknown_categories: Default::default(),
+                        other_score: 0.0,
                     }
                 })
                 .collect();

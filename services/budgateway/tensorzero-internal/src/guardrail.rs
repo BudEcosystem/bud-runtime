@@ -43,6 +43,8 @@ pub async fn execute_guardrail<'a>(
             merged_categories: crate::moderation::ModerationCategories::default(),
             merged_scores: crate::moderation::ModerationCategoryScores::default(),
             merged_category_applied_input_types: None,
+            merged_unknown_categories: Default::default(),
+            merged_other_score: 0.0,
             hallucination_details: None,
             ip_violation_details: None,
         });
@@ -86,8 +88,13 @@ pub async fn execute_guardrail<'a>(
         })
         .collect();
 
-    let (merged_categories, merged_scores, merged_category_applied_input_types) =
-        merge_moderation_results(moderation_results);
+    let (
+        merged_categories,
+        merged_scores,
+        merged_category_applied_input_types,
+        merged_unknown_categories,
+        merged_other_score,
+    ) = merge_moderation_results(moderation_results);
 
     // Extract special details from provider results
     let mut hallucination_details = None;
@@ -118,6 +125,8 @@ pub async fn execute_guardrail<'a>(
         merged_categories,
         merged_scores,
         merged_category_applied_input_types,
+        merged_unknown_categories,
+        merged_other_score,
         hallucination_details,
         ip_violation_details,
     })
@@ -441,6 +450,8 @@ async fn execute_azure_content_safety_probe<'a>(
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
+                    unknown_categories: Default::default(),
+                    other_score: 0.0,
                 });
 
             // Apply threshold check for Azure Content Safety
@@ -487,6 +498,8 @@ async fn execute_azure_content_safety_probe<'a>(
                 category_applied_input_types: None,
                 hallucination_details: None,
                 ip_violation_details: None,
+                unknown_categories: Default::default(),
+                other_score: 0.0,
             },
             error: Some(e.to_string()),
         }),
@@ -543,6 +556,8 @@ async fn execute_openai_probe<'a>(
                     category_applied_input_types: None,
                     hallucination_details: None,
                     ip_violation_details: None,
+                    unknown_categories: Default::default(),
+                    other_score: 0.0,
                 });
 
             // Apply threshold check for OpenAI
@@ -595,6 +610,8 @@ async fn execute_openai_probe<'a>(
                 category_applied_input_types: None,
                 hallucination_details: None,
                 ip_violation_details: None,
+                unknown_categories: Default::default(),
+                other_score: 0.0,
             },
             error: Some(e.to_string()),
         }),
@@ -1017,10 +1034,15 @@ async fn execute_bud_sentinel_probe<'a>(
                             category_applied_input_types: None,
                             hallucination_details: None,
                             ip_violation_details: None,
+                            unknown_categories: Default::default(),
+                            other_score: 0.0,
                         });
 
-                let flagged = if result.category_scores.has_non_zero_scores() {
-                    let max_score = get_max_score(&result.category_scores);
+                let flagged = if result.category_scores.has_non_zero_scores()
+                    || result.other_score > 0.0
+                {
+                    let max_score =
+                        get_max_score(&result.category_scores).max(result.other_score as f64);
                     max_score >= guardrail_severity
                 } else {
                     result.flagged
@@ -1112,6 +1134,8 @@ async fn execute_bud_sentinel_probe<'a>(
                         category_applied_input_types: None,
                         hallucination_details: None,
                         ip_violation_details: None,
+                        unknown_categories: Default::default(),
+                        other_score: 0.0,
                     },
                     error: Some(err.to_string()),
                 });

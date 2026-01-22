@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -358,6 +359,10 @@ pub struct ModerationResult {
     pub category_applied_input_types: Option<CategoryAppliedInputTypes>,
     pub hallucination_details: Option<HallucinationDetails>,
     pub ip_violation_details: Option<IPViolationDetails>,
+    #[serde(default)]
+    pub unknown_categories: HashMap<String, f32>,
+    #[serde(default)]
+    pub other_score: f32,
 }
 
 /// Provider-specific moderation response
@@ -581,6 +586,32 @@ mod tests {
         assert_eq!(scores.malicious, 0.0);
         assert_eq!(scores.pii, 0.0);
         assert_eq!(scores.secrets, 0.0);
+    }
+
+    #[test]
+    fn moderation_result_serializes_unknown_categories() {
+        let mut unknown = std::collections::HashMap::new();
+        unknown.insert("new-category".to_string(), 0.72);
+
+        let result = ModerationResult {
+            flagged: false,
+            categories: ModerationCategories::default(),
+            category_scores: ModerationCategoryScores::default(),
+            category_applied_input_types: None,
+            hallucination_details: None,
+            ip_violation_details: None,
+            unknown_categories: unknown,
+            other_score: 0.72,
+        };
+
+        let value = serde_json::to_value(&result).unwrap();
+        assert!(value.get("unknown_categories").is_some());
+        let unknown_score = value["unknown_categories"]["new-category"]
+            .as_f64()
+            .unwrap();
+        let other_score = value["other_score"].as_f64().unwrap();
+        assert!((unknown_score - 0.72).abs() < 1e-6);
+        assert!((other_score - 0.72).abs() < 1e-6);
     }
 
     // Tests for ModerationModelConfig have been removed as moderation
