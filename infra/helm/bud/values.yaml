@@ -979,8 +979,10 @@ onyx:
         KEYCLOAK_ADMIN_PASSWORD: keycloak_admin_password
         # Cookie secret for session encryption
         OAUTH_COOKIE_SECRET: oauth_cookie_secret
-        # NOTE: OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are NOT set here.
-        # Onyx auto-provisions 'onyx-client' at startup with directAccessGrantsEnabled.
+        # Explicitly disable these - Onyx auto-provisions 'onyx-client' at startup
+        # Setting to empty string prevents Helm deep-merge from including defaults
+        OAUTH_CLIENT_ID: ""
+        OAUTH_CLIENT_SECRET: ""
     smtp:
       enabled: false
   # ConfigMap overrides (template expressions are evaluated via tpl function)
