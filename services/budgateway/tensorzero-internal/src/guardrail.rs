@@ -14,7 +14,8 @@ use crate::guardrail_table::{
     GuardrailResult, GuardrailTable, ProviderGuardrailResult,
 };
 use crate::inference::providers::bud_sentinel::{
-    generated::Profile as BudSentinelProfile, BudSentinelProvider,
+    generated::{CustomRule as BudSentinelCustomRule, Profile as BudSentinelProfile},
+    BudSentinelProvider,
 };
 use crate::model::CredentialLocation;
 use crate::moderation::{ModerationInput, ModerationProvider, ModerationRequest, ModerationResult};
@@ -317,6 +318,52 @@ async fn execute_single_probe<'a>(
         _ => Err(Error::new(ErrorDetails::Config {
             message: format!("Unsupported provider type: {}", task.provider_type),
         })),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_profile_with_custom_rules() {
+        let provider_config = serde_json::json!({
+            "profile_id": "test-profile",
+            "strategy_id": "strategy-1",
+            "description": "Test profile",
+            "version": "v1",
+            "metadata_json": "{\"llm\":{}}",
+            "rule_overrides_json": "",
+            "custom_rules": [
+                {
+                    "id": "custom_spam_detector",
+                    "scanner": "llm",
+                    "scanner_config_json": "{\"model_id\":\"foo\"}",
+                    "target_labels": ["spam"],
+                    "severity_threshold": 0.5,
+                    "probe": "pii",
+                    "name": "Spam",
+                    "description": "Detect spam",
+                    "post_processing_json": "[]"
+                }
+            ]
+        });
+
+        let profile = build_bud_sentinel_profile(
+            "guardrail-1",
+            0.7,
+            &["pii".to_string()],
+            &HashMap::new(),
+            provider_config.as_object().expect("provider config object"),
+        )
+        .expect("profile build");
+
+        assert_eq!(profile.custom_rules.len(), 1);
+        let rule = &profile.custom_rules[0];
+        assert_eq!(rule.id, "custom_spam_detector");
+        assert_eq!(rule.scanner, "llm");
+        assert_eq!(rule.target_labels, vec!["spam"]);
+        assert_eq!(rule.probe.as_deref(), Some("pii"));
     }
 }
 
@@ -645,6 +692,7 @@ pub(crate) fn build_bud_sentinel_profile(
     enabled_rules_map: &HashMap<String, Vec<String>>,
     provider_config: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<BudSentinelProfile, Error> {
+    let custom_rules = parse_custom_rules(guardrail_id, provider_config)?;
     let profile_id = provider_config
         .get("profile_id")
         .and_then(|v| v.as_str())
@@ -710,6 +758,7 @@ pub(crate) fn build_bud_sentinel_profile(
         severity_threshold: profile_severity,
         metadata_json,
         rule_overrides_json,
+        custom_rules,
     })
 }
 
@@ -721,6 +770,99 @@ fn build_enabled_rules_map(probe_id: &str, rules: &[String]) -> HashMap<String, 
     let mut enabled = HashMap::new();
     enabled.insert(probe_id.to_string(), rules.to_vec());
     enabled
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CustomRuleConfig {
+    id: String,
+    scanner: String,
+    scanner_config_json: String,
+    #[serde(default)]
+    target_labels: Vec<String>,
+    #[serde(default)]
+    severity_threshold: Option<f32>,
+    #[serde(default)]
+    probe: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    post_processing_json: Option<String>,
+}
+
+impl From<CustomRuleConfig> for BudSentinelCustomRule {
+    fn from(config: CustomRuleConfig) -> Self {
+        BudSentinelCustomRule {
+            id: config.id,
+            scanner: config.scanner,
+            scanner_config_json: config.scanner_config_json,
+            target_labels: config.target_labels,
+            severity_threshold: config.severity_threshold,
+            probe: config.probe,
+            name: config.name,
+            description: config.description,
+            post_processing_json: config.post_processing_json,
+        }
+    }
+}
+
+impl From<BudSentinelCustomRule> for CustomRuleConfig {
+    fn from(rule: BudSentinelCustomRule) -> Self {
+        Self {
+            id: rule.id,
+            scanner: rule.scanner,
+            scanner_config_json: rule.scanner_config_json,
+            target_labels: rule.target_labels,
+            severity_threshold: rule.severity_threshold,
+            probe: rule.probe,
+            name: rule.name,
+            description: rule.description,
+            post_processing_json: rule.post_processing_json,
+        }
+    }
+}
+
+fn parse_custom_rules(
+    guardrail_id: &str,
+    provider_config: &serde_json::Map<String, serde_json::Value>,
+) -> Result<Vec<BudSentinelCustomRule>, Error> {
+    let Some(custom_rules) = provider_config.get("custom_rules") else {
+        return Ok(Vec::new());
+    };
+
+    let configs: Vec<CustomRuleConfig> =
+        serde_json::from_value(custom_rules.clone()).map_err(|e| {
+            Error::new(ErrorDetails::Config {
+                message: format!(
+                    "Invalid 'custom_rules' for Bud Sentinel guardrail '{guardrail_id}': {e}"
+                ),
+            })
+        })?;
+
+    Ok(configs
+        .into_iter()
+        .map(BudSentinelCustomRule::from)
+        .collect())
+}
+
+pub(crate) fn custom_rules_to_value(
+    custom_rules: &[BudSentinelCustomRule],
+    guardrail_id: &str,
+) -> Result<serde_json::Value, Error> {
+    let configs: Vec<CustomRuleConfig> = custom_rules
+        .iter()
+        .cloned()
+        .map(CustomRuleConfig::from)
+        .collect();
+
+    serde_json::to_value(configs).map_err(|e| {
+        Error::new(ErrorDetails::Config {
+            message: format!(
+                "Failed to serialize Bud Sentinel custom_rules for guardrail '{guardrail_id}': {e}"
+            ),
+        })
+    })
 }
 
 fn bud_sentinel_error_metadata(error: &Error) -> Option<(Code, String)> {

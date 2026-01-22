@@ -112,13 +112,26 @@ impl BudSentinelProvider {
         request: &mut Request<T>,
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<(), Error> {
+        if let Some(bearer_token) = dynamic_api_keys.get("authorization") {
+            let value = MetadataValue::try_from(format!(
+                "Bearer {}",
+                bearer_token.expose_secret()
+            ))
+            .map_err(|e| {
+                Error::new(ErrorDetails::Config {
+                    message: format!("Invalid Bud Sentinel bearer token metadata value: {e}"),
+                })
+            })?;
+            request.metadata_mut().insert("authorization", value);
+        }
+
         if let Some(api_key) = self.credentials.get_api_key(dynamic_api_keys)? {
             let value = MetadataValue::try_from(api_key.expose_secret()).map_err(|e| {
                 Error::new(ErrorDetails::Config {
                     message: format!("Invalid Bud Sentinel API key metadata value: {e}"),
                 })
             })?;
-            request.metadata_mut().insert("x-api-key", value);
+            request.metadata_mut().insert("x-api-token", value);
         }
 
         request.metadata_mut().insert(
@@ -432,6 +445,7 @@ impl ModerationProvider for BudSentinelProvider {
         let mut grpc_request = Request::new(BudModerationRequest {
             profile_id: profile_id.clone(),
             inputs: inputs.clone(),
+            conversations: Vec::new(),
             severity_threshold,
         });
 
