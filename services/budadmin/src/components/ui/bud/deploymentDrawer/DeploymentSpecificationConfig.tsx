@@ -68,8 +68,6 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
         avg_sequence_length: deploymentSpecifcation.avg_sequence_length,
       };
       form.setFieldsValue(values);
-      // Clear any existing validation errors after setting values
-      form.validateFields?.(['deployment_name', 'concurrent_requests']).catch(() => {});
     }
   }, [form, deploymentSpecifcation.deployment_name, deploymentSpecifcation.concurrent_requests]);
 
