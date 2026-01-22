@@ -3,13 +3,13 @@ title: "Platform Overview"
 description: "High-level architecture and concepts of the Bud AI Foundry platform"
 ---
 
-Bud AI Foundry is organized as a secure control plane for governance and a flexible data plane for inference workloads. This structure lets platform teams standardize policies while still giving application teams the flexibility to ship models quickly.
+Bud AI Foundry blends a secure control plane for governance with a scalable data plane for inference workloads. The architecture emphasizes consistent policy enforcement, predictable scaling, and observable performance across cloud and on-prem deployments.
 
 ## 1. Description
 
-Bud AI Foundry brings together model onboarding, deployment, routing, observability, and evaluation into a single platform. It supports hybrid environments so teams can run cloud APIs, local checkpoints, and private model endpoints under the same governance and monitoring framework.
+Bud AI Foundry connects model onboarding, deployment, routing, observability, and evaluation into a unified platform. It supports hybrid environments so teams can run cloud APIs, local checkpoints, and private endpoints under the same governance and monitoring framework.
 
-## 2. Architecture Flow
+## 2. System architecture
 
 1. **Model onboarding:** Register cloud models or import local checkpoints into the Model Hub with metadata and approvals.
 2. **Deployment:** Configure clusters, runtime settings, and safety controls, then deploy models to cloud or on-prem infrastructure.
