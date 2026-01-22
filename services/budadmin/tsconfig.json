@@ -38,6 +38,12 @@
       ],
       "@/constants/*": [
         "src/constants/*"
+      ],
+      "@/types/*": [
+        "src/types/*"
+      ],
+      "@/services/*": [
+        "src/services/*"
       ]
     }
   },
