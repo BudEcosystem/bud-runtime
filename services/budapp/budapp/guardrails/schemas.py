@@ -24,8 +24,11 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
+    GuardrailRuleDeploymentStatusEnum,
     GuardrailStatusEnum,
+    ProbeTypeEnum,
     ProxyProviderEnum,
+    ScannerTypeEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.endpoint_ops.schemas import ProviderConfig, ProxyModelPricing
@@ -44,6 +47,53 @@ class GuardrailFilter(BaseModel):
     name: str | None = None
     status: GuardrailStatusEnum | None = None
     provider_id: UUID4 | None = None
+
+
+# Model config schemas for custom rules
+class HeadMapping(BaseModel):
+    """Head mapping for classifier models."""
+
+    head_name: str = "default"
+    target_labels: list[str]
+
+
+class ClassifierConfig(BaseModel):
+    """Configuration for classifier-based rules."""
+
+    head_mappings: list[HeadMapping]
+    post_processing: list[dict] | None = None
+
+
+class CategoryDef(BaseModel):
+    """Category definition for LLM policy."""
+
+    id: str
+    description: str
+    violation: bool
+    escalate: bool | None = None
+
+
+class ExampleDef(BaseModel):
+    """Example for LLM policy."""
+
+    input: str
+    output: dict
+
+
+class PolicyConfig(BaseModel):
+    """Policy configuration for LLM-based rules."""
+
+    task: str
+    instructions: str
+    categories: list[CategoryDef]
+    examples: list[ExampleDef] | None = None
+
+
+class LLMConfig(BaseModel):
+    """Configuration for LLM-based rules."""
+
+    handler: str = "gpt_safeguard"
+    policy: PolicyConfig
 
 
 # Rule schemas
@@ -87,6 +137,13 @@ class GuardrailRuleResponse(BaseModel):
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
+    # Model-based rule fields
+    scanner_type: ScannerTypeEnum | None = None
+    model_uri: str | None = None
+    model_provider_type: str | None = None
+    is_gated: bool = False
+    model_config_json: dict | None = None
+    model_id: UUID4 | None = None
     created_by: Optional[UUID4] = None
     created_at: datetime
     modified_at: datetime
@@ -124,6 +181,7 @@ class GuardrailProbeResponse(BaseModel):
     uri: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[list[Tag]] = None
+    probe_type: ProbeTypeEnum = ProbeTypeEnum.PROVIDER
     provider_type: GuardrailProviderTypeEnum
     provider: Provider
     status: GuardrailStatusEnum
@@ -147,6 +205,53 @@ class GuardrailProbeDetailResponse(SuccessResponse):
     probe: GuardrailProbeResponse
     rule_count: int
     object: str = "guardrail.probe.get"
+
+
+# Custom probe schemas
+class GuardrailCustomProbeCreate(BaseModel):
+    """Schema for creating a custom model probe."""
+
+    name: str
+    description: str | None = None
+    scanner_type: ScannerTypeEnum
+    model_id: UUID4  # User's onboarded model
+    model_config_data: ClassifierConfig | LLMConfig
+
+    @model_validator(mode="after")
+    def validate_config_type(self) -> "GuardrailCustomProbeCreate":
+        if self.scanner_type == ScannerTypeEnum.CLASSIFIER:
+            if not isinstance(self.model_config_data, ClassifierConfig):
+                raise ValueError("Classifier scanner requires ClassifierConfig")
+        elif self.scanner_type == ScannerTypeEnum.LLM:
+            if not isinstance(self.model_config_data, LLMConfig):
+                raise ValueError("LLM scanner requires LLMConfig")
+        return self
+
+
+class GuardrailCustomProbeUpdate(BaseModel):
+    """Schema for updating a custom model probe."""
+
+    name: str | None = None
+    description: str | None = None
+    model_config_data: ClassifierConfig | LLMConfig | None = None
+
+
+class GuardrailCustomProbeResponse(BaseModel):
+    """Response schema for custom probe."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str | None = None
+    probe_type: ProbeTypeEnum
+    scanner_type: ScannerTypeEnum | None = None
+    model_id: UUID4 | None = None
+    model_uri: str | None = None
+    model_config_json: dict | None = None
+    status: str
+    created_at: datetime
+    modified_at: datetime
 
 
 class GuardrailRulePaginatedResponse(PaginatedSuccessResponse):
@@ -197,6 +302,7 @@ class GuardrailProfileProbeSelection(BaseModel):
     rules: Optional[list[GuardrailProbeRuleSelection]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
+    cluster_config_override: dict | None = None
 
 
 class GuardrailProfileUpdateWithProbes(GuardrailProfileUpdate):
@@ -344,6 +450,23 @@ class GuardrailDeploymentDetailResponse(SuccessResponse):
     object: str = "guardrail.deployment"
 
 
+class GuardrailRuleDeploymentResponse(BaseModel):
+    """Response schema for rule deployment."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    rule_id: UUID4
+    model_id: UUID4
+    endpoint_id: UUID4
+    cluster_id: UUID4
+    status: GuardrailRuleDeploymentStatusEnum
+    error_message: str | None = None
+    config_override_json: dict | None = None
+    created_at: datetime
+    modified_at: datetime
+
+
 class GuardrailDeploymentWorkflowRequest(BaseModel):
     """Guardrail deployment workflow request schema."""
 
@@ -364,6 +487,10 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
     severity_threshold: float | None = None
+    # Model deployment fields
+    cluster_id: UUID4 | None = None
+    deployment_config: dict | None = None
+    callback_topics: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":
