@@ -176,8 +176,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
       // OAuth callback - use the connector that initiated the OAuth flow
       connectorId = oauthState.connectorId;
       console.log('[ToolsHome] Using OAuth state connector:', connectorId);
-    } else {
-      // Fallback to positional lookup from URL
+    } else if (hasAuthenticationParam) {
+      // Only read URL connector param for OAuth callback marker
       connectorId = getConnectorFromUrlByPosition(sessionIndex);
     }
 
@@ -227,8 +227,8 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     if (isOAuthReturn && oauthState?.connectorId && oauthState?.promptId === promptId) {
       // OAuth callback - use the connector that initiated the OAuth flow
       connectorId = oauthState.connectorId;
-    } else {
-      // Fallback to positional lookup from URL
+    } else if (hasAuthenticationParam) {
+      // Only read URL connector param for OAuth callback marker
       connectorId = getConnectorFromUrlByPosition(sessionIndex);
     }
 
@@ -351,8 +351,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
     setSelectedConnector({ ...connector, isFromConnectedSection: isConnected } as Connector);
     setViewMode('details');
 
-    // Add connector ID to URL using positional format (index matches prompt IDs position)
-    updateConnectorInUrl(sessionIndex, connector.id, totalSessions);
+    // Avoid URL connector param updates during normal navigation
   };
 
   const handleBackToList = (options?: { removeConnectorFromUrl?: boolean }) => {

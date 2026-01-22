@@ -1331,8 +1331,6 @@ function AgentBoxInner({
       );
 
       if (response && response.data) {
-        successToast("Version created successfully");
-
         // Remove prompt parameter from URL before closing
         removePromptFromUrl();
 
