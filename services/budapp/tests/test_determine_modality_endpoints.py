@@ -115,6 +115,22 @@ class TestDetermineModalityEndpoints:
         assert result["modality"] == [ModalityEnum.TEXT_INPUT, ModalityEnum.IMAGE_INPUT, ModalityEnum.TEXT_OUTPUT]
         assert result["endpoints"] == [ModelEndpointEnum.EMBEDDING]
 
+    @pytest.mark.asyncio
+    async def test_llm_classification_suffix(self):
+        """Test llm_classification adds classify endpoint."""
+        result = await determine_modality_endpoints("llm_classification")
+
+        assert result["modality"] == [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
+        assert result["endpoints"] == [ModelEndpointEnum.CHAT, ModelEndpointEnum.CLASSIFY]
+
+    @pytest.mark.asyncio
+    async def test_llm_embedding_classification_suffix(self):
+        """Test llm_embedding_classification adds classify endpoint."""
+        result = await determine_modality_endpoints("llm_embedding_classification")
+
+        assert result["modality"] == [ModalityEnum.TEXT_INPUT, ModalityEnum.TEXT_OUTPUT]
+        assert result["endpoints"] == [ModelEndpointEnum.EMBEDDING, ModelEndpointEnum.CLASSIFY]
+
     # Test comma-separated modality strings
     @pytest.mark.asyncio
     async def test_comma_separated_llm_modality(self):

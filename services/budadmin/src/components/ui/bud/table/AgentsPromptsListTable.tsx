@@ -19,8 +19,6 @@ import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { IconOnlyRender } from 'src/flows/components/BudIconRender';
 import { useAddAgent } from '@/stores/useAddAgent';
 import { updateQueryParams } from '@/utils/urlUtils';
-import { useAgentStore } from '@/stores/useAgentStore';
-import { loadPromptForEditing } from '@/utils/promptHelpers';
 
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
@@ -323,39 +321,6 @@ function AgentsPromptsListTable() {
                                                 View
                                             </PrimaryButton>
                                         </div> */}
-                                        <div className='ml-[.3rem] w-[1rem] h-auto block'>
-                                            <Button
-                                                className='bg-transparent px-[.2rem] border-none p-0 opacity-0 group-hover:opacity-100 hover:[&_svg_path]:fill-white transition-all'
-                                                onClick={async (event: React.MouseEvent) => {
-                                                    event.stopPropagation();
-                                                    if (!hasPermission(PermissionEnum.ProjectManage)) return;
-
-                                                    try {
-                                                        // Load prompt data for editing
-                                                        const sessionData = await loadPromptForEditing(
-                                                            record.id,
-                                                            projectId as string
-                                                        );
-
-                                                        // Get agent store methods
-                                                        const { loadPromptForEdit, openAgentDrawer } = useAgentStore.getState();
-
-                                                        // Load the prompt into a session
-                                                        loadPromptForEdit(record.id, sessionData);
-
-                                                        // Open the drawer
-                                                        openAgentDrawer();
-                                                    } catch (error) {
-                                                        console.error('Failed to load prompt for editing:', error);
-                                                        errorToast('Failed to load prompt for editing');
-                                                    }
-                                                }}
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width=".875rem" height=".875rem" viewBox="0 0 14 14" fill="none">
-                                                    <path d="M11.0871 1.04488C10.9933 0.951116 10.8661 0.898438 10.7335 0.898438C10.6009 0.898438 10.4737 0.951116 10.38 1.04488L3.44805 7.9768C3.35809 8.06675 3.28612 8.17305 3.23601 8.28998L1.87394 11.4681C1.7934 11.6561 1.83539 11.8741 1.97996 12.0187C2.12453 12.1632 2.34255 12.2052 2.53047 12.1247L5.70863 10.7626C5.82556 10.7125 5.93186 10.6405 6.02182 10.5506L12.9537 3.61866C13.149 3.4234 13.149 3.10681 12.9537 2.91155L11.0871 1.04488ZM4.15515 8.6839L10.7335 2.10554L11.8931 3.2651L5.31471 9.84346L3.91273 10.4443L3.5543 10.0859L4.15515 8.6839Z" fill="#B3B3B3" className="transition-all" />
-                                                </svg>
-                                            </Button>
-                                        </div>
                                         <div className='ml-[.3rem] w-[1rem] h-auto block'>
                                             <Button
                                                 className='bg-transparent px-[.2rem] border-none p-0 opacity-0 group-hover:opacity-100 [&_svg_path]:fill-[#B3B3B3] hover:[&_svg_path]:!fill-white [&_svg_path]:transition-all'

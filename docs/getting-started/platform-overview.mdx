@@ -3,44 +3,129 @@ title: "Platform Overview"
 description: "High-level architecture and concepts of the Bud AI Foundry platform"
 ---
 
-Bud AI Foundry is organized as a secure control plane for governance and a flexible data plane for inference workloads. This structure lets platform teams standardize policies while still giving application teams the flexibility to ship models quickly.
+Bud AI Foundry blends a secure control plane for governance with a scalable data plane for inference workloads. The architecture emphasizes consistent policy enforcement, predictable scaling, and observable performance across cloud and on-prem deployments.
 
 ## 1. Description
 
-Bud AI Foundry brings together model onboarding, deployment, routing, observability, and evaluation into a single platform. It supports hybrid environments so teams can run cloud APIs, local checkpoints, and private model endpoints under the same governance and monitoring framework.
+Bud AI Foundry connects model onboarding, deployment, routing, observability, and evaluation into a unified platform. It supports hybrid environments so teams can run cloud APIs, local checkpoints, and private endpoints under the same governance and monitoring framework.
 
-## 2. Architecture Flow
+## 2. System architecture
 
-1. **Model onboarding:** Register cloud models or import local checkpoints into the Model Hub with metadata and approvals.
-2. **Deployment:** Configure clusters, runtime settings, and safety controls, then deploy models to cloud or on-prem infrastructure.
-3. **Routing and endpoints:** Expose models through OpenAI-compatible endpoints and apply traffic rules across deployments.
-4. **Observability:** Monitor latency, tokens, cost, and safety metrics while capturing audit trails for compliance.
+### 2.1 Core components
 
-## 3. Key Components
+- **API Gateway:** Single entry point for client requests, authentication, and request routing.
+- **Model servers:** Runtime services for model loading, batch inference, and GPU/CPU management.
+- **Storage layer:** Model artifacts, evaluation datasets, and deployment metadata.
+- **Observability stack:** Metrics, logs, and traces for latency, throughput, and errors.
+- **Control plane services:** Projects, RBAC, API keys, guardrails, and policy enforcement.
 
-### 3.1 Model Hub
+### 2.2 Component details
 
-A governed catalog for cloud and local models with versioning, metadata, evaluation results, and approvals.
+#### 2.2.1 API Gateway
 
-### 3.2 Projects and workspaces
+- **Load balancing:** Distributes requests across model servers.
+- **Authentication:** Validates API keys and JWT tokens.
+- **Rate limiting:** Enforces usage quotas and throttling rules.
+- **Request routing:** Selects the optimal deployment or fallback target.
 
-Organize teams, workloads, and access controls so each project has its own models, deployments, and API keys.
+#### 2.2.2 Model servers
 
-### 3.3 Clusters and deployments
+- **Model loading:** Efficient caching and warm starts for deployments.
+- **Batch processing:** Groups requests to maximize throughput.
+- **GPU management:** Optimizes memory utilization across replicas.
+- **Health monitoring:** Regular health checks and auto-recovery.
 
-Connect Kubernetes or managed infrastructure, define runtime configurations, and deploy models to the right hardware.
+#### 2.2.3 Storage layer
 
-### 3.4 Endpoints and routing
+Stores model artifacts, deployment configuration, evaluation datasets, and runtime logs with encryption and access policies applied at rest.
 
-Publish OpenAI-compatible endpoints and control traffic splitting, fallback, and CPU/GPU placement policies.
+## 3. Request flow
 
-### 3.5 Observability and evaluation
+### 3.1 Text generation request
 
-Track inference performance, costs, and safety signals while running structured evaluations and benchmarks.
+1. Client sends a request to the API Gateway.
+2. Gateway authenticates credentials and checks rate limits.
+3. Routing selects the optimal deployment.
+4. Model server loads or reuses the model, runs inference, and returns a response.
 
-## 4. Related Guides
+### 3.2 Image generation request
+
+1. Preprocess the prompt and select an image model.
+2. Run diffusion-based generation.
+3. Post-process and store the image output.
+4. Return an accessible URL to the client.
+
+## 4. Scaling architecture
+
+### 4.1 Horizontal scaling
+
+Scale out by adding model replicas and gateway instances to handle higher request volumes.
+
+### 4.2 Vertical scaling
+
+Scale up by assigning larger hardware profiles to improve throughput and latency targets.
+
+## 5. High availability
+
+### 5.1 Redundancy
+
+- Multi-zone deployment to spread risk across availability zones.
+- Model replication with multiple copies of each model.
+- Database replication for metadata and audit trails.
+- Gateway redundancy for uninterrupted request handling.
+
+### 5.2 Failover strategy
+
+Failover policies reroute traffic when replicas or clusters degrade, ensuring continuity for critical applications.
+
+## 6. Performance architecture
+
+### 6.1 Caching strategy
+
+Cache frequently used models, prompt templates, and response artifacts to reduce cold starts and improve latency.
+
+### 6.2 Batch processing
+
+Batching reduces overhead per request and increases throughput during peak load.
+
+## 7. Security architecture
+
+### 7.1 Network security
+
+Network policies isolate control plane services from data plane traffic, with ingress controls enforced at the gateway layer.
+
+### 7.2 Data security
+
+- **Encryption at rest:** All stored data is encrypted.
+- **Encryption in transit:** TLS for all communications.
+- **Key management:** Integrated with KMS providers.
+- **Access control:** RBAC with fine-grained permissions.
+
+## 8. Monitoring architecture
+
+### 8.1 Metrics collection
+
+Collect latency, throughput, token usage, error rates, and cost signals across deployments.
+
+### 8.2 Key metrics
+
+Track request latency, error rates, model usage, token consumption, and cost per request to guide optimization.
+
+## 9. Development architecture
+
+### 9.1 CI/CD pipeline
+
+Build, test, scan, and deploy services with automated pipelines for consistent releases.
+
+### 9.2 Development environment
+
+Local and staging environments mirror production configurations to validate performance, scaling, and routing behavior before rollout.
+
+## 10. Related guides
 
 - [Projects](/projects/projects)
 - [Models management](/models/models)
-- [Deployments](/deployments/deploy-first-model)
+- [Clusters](/clusters/cluster)
+- [Deployments](/deployments/deployments)
+- [API integration](/api-integration/api-integration)
 - [Observability](/observability/observability)

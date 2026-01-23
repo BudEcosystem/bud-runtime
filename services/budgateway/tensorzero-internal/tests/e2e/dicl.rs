@@ -4,6 +4,7 @@ use futures::StreamExt;
 use reqwest::{Client, StatusCode};
 use reqwest_eventsource::{Event, RequestBuilderExt};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::time::Duration;
 use tensorzero_internal::{
     clickhouse::{test_helpers::select_json_inference_clickhouse, ClickHouseConnectionInfo},
@@ -370,6 +371,12 @@ async fn embed_insert_example(
             serde_json::to_string(&input).unwrap(),
         ),
         encoding_format: None,
+        dimensions: None,
+        modality: None,
+        priority: None,
+        include_input: None,
+        chunking: None,
+        extra: HashMap::new(),
     };
     let api_keys = InferenceCredentials::default();
     let response = provider_config

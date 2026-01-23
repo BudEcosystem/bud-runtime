@@ -1,6 +1,6 @@
 #![allow(clippy::allow_attributes)]
 
-use std::{borrow::Cow, sync::OnceLock, time::Duration};
+use std::{borrow::Cow, collections::HashMap, sync::OnceLock, time::Duration};
 
 use futures::StreamExt;
 use lazy_static::lazy_static;
@@ -827,6 +827,20 @@ struct TogetherChatChunk {
 struct TogetherEmbeddingRequest<'a> {
     model: &'a str,
     input: TogetherEmbeddingInput<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    encoding_format: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dimensions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modality: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_input: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunking: Option<&'a crate::embeddings::ChunkingConfig>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -837,14 +851,24 @@ enum TogetherEmbeddingInput<'a> {
 }
 
 impl<'a> TogetherEmbeddingRequest<'a> {
-    fn new(model: &'a str, input: &'a EmbeddingInput) -> Self {
-        let input = match input {
+    fn new(model: &'a str, request: &'a EmbeddingRequest) -> Self {
+        let input = match &request.input {
             EmbeddingInput::Single(text) => TogetherEmbeddingInput::Single(text),
             EmbeddingInput::Batch(texts) => {
                 TogetherEmbeddingInput::Batch(texts.iter().map(|s| s.as_str()).collect())
             }
         };
-        Self { model, input }
+        Self {
+            model,
+            input,
+            encoding_format: request.encoding_format.as_deref(),
+            dimensions: request.dimensions,
+            modality: request.modality.as_deref(),
+            priority: request.priority.as_deref(),
+            include_input: request.include_input,
+            chunking: request.chunking.as_ref(),
+            extra: request.extra.clone(),
+        }
     }
 }
 
@@ -980,7 +1004,7 @@ impl EmbeddingProvider for TogetherProvider {
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<EmbeddingProviderResponse, Error> {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
-        let request_body = TogetherEmbeddingRequest::new(&self.model_name, &request.input);
+        let request_body = TogetherEmbeddingRequest::new(&self.model_name, request);
 
         // Serialize request body once at the beginning
         let raw_request = serde_json::to_string(&request_body).map_err(|e| {
@@ -2120,9 +2144,14 @@ mod tests {
         let request = EmbeddingRequest {
             input: single_input,
             encoding_format: None,
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
-        let together_request =
-            TogetherEmbeddingRequest::new("BAAI/bge-base-en-v1.5", &request.input);
+        let together_request = TogetherEmbeddingRequest::new("BAAI/bge-base-en-v1.5", &request);
 
         assert_eq!(together_request.model, "BAAI/bge-base-en-v1.5");
         assert!(matches!(
@@ -2136,10 +2165,16 @@ mod tests {
         let request = EmbeddingRequest {
             input: batch_input,
             encoding_format: Some("float".to_string()),
+            dimensions: None,
+            modality: None,
+            priority: None,
+            include_input: None,
+            chunking: None,
+            extra: HashMap::new(),
         };
         let together_request = TogetherEmbeddingRequest::new(
             "togethercomputer/m2-bert-80M-8k-retrieval",
-            &request.input,
+            &request,
         );
 
         assert_eq!(

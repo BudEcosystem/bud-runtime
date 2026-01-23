@@ -3422,10 +3422,29 @@ pub async fn completion_handler(
 pub struct OpenAICompatibleEmbeddingParams {
     input: OpenAICompatibleEmbeddingInput,
     model: String,
+    /// Encoding format for embeddings (float or base64)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    encoding_format: Option<String>,
+    /// Matryoshka dimensions - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dimensions: Option<u32>,
+    /// Modality type (text/image/audio) - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    modality: Option<String>,
+    /// Priority level (high/normal/low) - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    priority: Option<String>,
+    /// Include original input text in response - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    include_input: Option<bool>,
+    /// Chunking configuration - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    chunking: Option<crate::embeddings::ChunkingConfig>,
     #[serde(rename = "tensorzero::cache_options")]
     tensorzero_cache_options: Option<CacheParamsOptions>,
+    /// Forward any unknown fields to provider for future compatibility
     #[serde(flatten)]
-    unknown_fields: HashMap<String, Value>,
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -3440,6 +3459,18 @@ struct OpenAICompatibleEmbeddingData {
     object: String,
     embedding: Vec<f32>,
     index: usize,
+    /// Original text - from provider when include_input=true or chunking enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+    /// Chunk text - from provider when chunking enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunk_text: Option<String>,
+    /// Chunk info - raw JSON from provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunk_info: Option<Value>,
+    /// Extra fields from provider for forward compatibility
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -3454,6 +3485,110 @@ struct OpenAICompatibleEmbeddingResponse {
     data: Vec<OpenAICompatibleEmbeddingData>,
     model: String,
     usage: OpenAICompatibleEmbeddingUsage,
+    /// Response ID - from provider (e.g., "infinity-{uuid}")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    /// Created timestamp - from provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    created: Option<u64>,
+    /// Chunking info - raw JSON from provider
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunking_info: Option<Value>,
+    /// Extra fields from provider for forward compatibility
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Default)]
+struct ParsedEmbeddingData {
+    text: Option<String>,
+    chunk_text: Option<String>,
+    chunk_info: Option<Value>,
+    extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Default)]
+struct ParsedEmbeddingResponseMetadata {
+    id: Option<String>,
+    created: Option<u64>,
+    chunking_info: Option<Value>,
+    extra: HashMap<String, Value>,
+    data: Vec<ParsedEmbeddingData>,
+}
+
+fn parse_embedding_response_metadata(raw_response: &str) -> Option<ParsedEmbeddingResponseMetadata> {
+    let value: Value = serde_json::from_str(raw_response).ok()?;
+    let object = value.as_object()?;
+
+    let id = object
+        .get("id")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let created = object.get("created").and_then(|value| value.as_u64());
+    let chunking_info = object
+        .get("chunking_info")
+        .and_then(|value| (!value.is_null()).then(|| value.clone()));
+
+    let data = object
+        .get("data")
+        .and_then(|value| value.as_array())
+        .map(|items| items.iter().map(parse_embedding_data).collect())
+        .unwrap_or_default();
+
+    let mut extra = HashMap::new();
+    for (key, value) in object {
+        if matches!(
+            key.as_str(),
+            "object" | "data" | "model" | "usage" | "id" | "created" | "chunking_info"
+        ) {
+            continue;
+        }
+        extra.insert(key.clone(), value.clone());
+    }
+
+    Some(ParsedEmbeddingResponseMetadata {
+        id,
+        created,
+        chunking_info,
+        extra,
+        data,
+    })
+}
+
+fn parse_embedding_data(value: &Value) -> ParsedEmbeddingData {
+    let Some(object) = value.as_object() else {
+        return ParsedEmbeddingData::default();
+    };
+
+    let text = object
+        .get("text")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let chunk_text = object
+        .get("chunk_text")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let chunk_info = object
+        .get("chunk_info")
+        .and_then(|value| (!value.is_null()).then(|| value.clone()));
+
+    let mut extra = HashMap::new();
+    for (key, value) in object {
+        if matches!(
+            key.as_str(),
+            "object" | "embedding" | "index" | "text" | "chunk_text" | "chunk_info"
+        ) {
+            continue;
+        }
+        extra.insert(key.clone(), value.clone());
+    }
+
+    ParsedEmbeddingData {
+        text,
+        chunk_text,
+        chunk_info,
+        extra,
+    }
 }
 
 /// Response for a single model in the list
@@ -3547,17 +3682,11 @@ pub async fn embedding_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleEmbeddingParams>,
 ) -> Result<Response<Body>, Error> {
-    let unknown_fields: Vec<&str> = openai_compatible_params
-        .unknown_fields
-        .keys()
-        .filter(|k| k.as_str() != "encoding_format")
-        .map(|k| k.as_str())
-        .collect();
-
-    if !unknown_fields.is_empty() {
-        tracing::warn!(
-            "Ignoring unknown fields in OpenAI-compatible embedding request: {:?}",
-            unknown_fields
+    // Log any extra/unknown fields that will be forwarded to provider
+    if !openai_compatible_params.extra.is_empty() {
+        tracing::debug!(
+            "Forwarding extra fields in embedding request to provider: {:?}",
+            openai_compatible_params.extra.keys().collect::<Vec<_>>()
         );
     }
 
@@ -3591,18 +3720,21 @@ pub async fn embedding_handler(
         }
     };
 
-    let encoding_format = openai_compatible_params
-        .unknown_fields
-        .get("encoding_format")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-
     // Capture the gateway request (without null values)
     let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
 
+    // Create embedding request with all extended parameters
+    let mut extra = openai_compatible_params.extra.clone();
+    extra.remove("user");
     let embedding_request = EmbeddingRequest {
         input: internal_input,
-        encoding_format,
+        encoding_format: openai_compatible_params.encoding_format.clone(),
+        dimensions: openai_compatible_params.dimensions,
+        modality: openai_compatible_params.modality.clone(),
+        priority: openai_compatible_params.priority.clone(),
+        include_input: openai_compatible_params.include_input,
+        chunking: openai_compatible_params.chunking.clone(),
+        extra,
     };
 
     // Extract model configuration
@@ -3645,7 +3777,8 @@ pub async fn embedding_handler(
         .embed(&embedding_request, &original_model_name, &clients)
         .await?;
 
-    // Convert to OpenAI-compatible format
+    // Convert to OpenAI-compatible format, including provider pass-through metadata when present
+    let parsed_metadata = parse_embedding_response_metadata(&response.raw_response);
     let openai_response = OpenAICompatibleEmbeddingResponse {
         object: "list".to_string(),
         data: response
@@ -3656,6 +3789,23 @@ pub async fn embedding_handler(
                 object: "embedding".to_string(),
                 embedding: embedding.clone(),
                 index,
+                text: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .and_then(|metadata| metadata.text.clone()),
+                chunk_text: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .and_then(|metadata| metadata.chunk_text.clone()),
+                chunk_info: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .and_then(|metadata| metadata.chunk_info.clone()),
+                extra: parsed_metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.data.get(index))
+                    .map(|metadata| metadata.extra.clone())
+                    .unwrap_or_default(),
             })
             .collect(),
         model: original_model_name.clone(),
@@ -3663,6 +3813,22 @@ pub async fn embedding_handler(
             prompt_tokens: response.usage.input_tokens,
             total_tokens: response.usage.input_tokens,
         },
+        // Include response metadata from provider when available
+        id: parsed_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.id.clone())
+            .or_else(|| Some(response.id.to_string())),
+        created: parsed_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.created)
+            .or(Some(response.created)),
+        chunking_info: parsed_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.chunking_info.clone()),
+        extra: parsed_metadata
+            .as_ref()
+            .map(|metadata| metadata.extra.clone())
+            .unwrap_or_default(),
     };
 
     // Capture the gateway response (without null values)
@@ -8414,20 +8580,45 @@ mod tests {
         assert_eq!(cache_options.max_age_s, Some(3600));
         assert_eq!(cache_options.enabled, CacheEnabledMode::On);
 
-        // Test with unknown fields (should be captured)
-        let json_unknown = json!({
+        // Test with known extended fields (encoding_format, dimensions are explicit fields)
+        let json_extended = json!({
             "input": "Test",
             "model": "embedding-model",
             "encoding_format": "float",
             "dimensions": 1536,
-            "user": "test-user"
+            "modality": "text",
+            "priority": "high",
+            "include_input": true,
+            "chunking": {
+                "enabled": true,
+                "strategy": "token",
+                "chunk_size": 512
+            }
+        });
+
+        let params: OpenAICompatibleEmbeddingParams =
+            serde_json::from_value(json_extended).unwrap();
+        assert_eq!(params.encoding_format, Some("float".to_string()));
+        assert_eq!(params.dimensions, Some(1536));
+        assert_eq!(params.modality, Some("text".to_string()));
+        assert_eq!(params.priority, Some("high".to_string()));
+        assert_eq!(params.include_input, Some(true));
+        assert!(params.chunking.is_some());
+        let chunking = params.chunking.unwrap();
+        assert_eq!(chunking.enabled, Some(true));
+        assert_eq!(chunking.strategy, Some("token".to_string()));
+        assert_eq!(chunking.chunk_size, Some(512));
+
+        // Test with extra/unknown fields (should be captured in extra for forward compatibility)
+        let json_unknown = json!({
+            "input": "Test",
+            "model": "embedding-model",
+            "unknown_future_param": "some_value"
         });
 
         let params: OpenAICompatibleEmbeddingParams = serde_json::from_value(json_unknown).unwrap();
-        assert!(!params.unknown_fields.is_empty());
-        assert!(params.unknown_fields.contains_key("encoding_format"));
-        assert!(params.unknown_fields.contains_key("dimensions"));
-        assert!(params.unknown_fields.contains_key("user"));
+        assert!(!params.extra.is_empty());
+        assert!(params.extra.contains_key("unknown_future_param"));
     }
 
     #[test]
@@ -8438,12 +8629,20 @@ mod tests {
                 object: "embedding".to_string(),
                 embedding: vec![0.1, 0.2, 0.3, -0.4],
                 index: 0,
+                text: None,
+                chunk_text: None,
+                chunk_info: None,
+                extra: HashMap::new(),
             }],
             model: "text-embedding-ada-002".to_string(),
             usage: OpenAICompatibleEmbeddingUsage {
                 prompt_tokens: 5,
                 total_tokens: 5,
             },
+            id: None,
+            created: None,
+            chunking_info: None,
+            extra: HashMap::new(),
         };
 
         let json_value = serde_json::to_value(&response).unwrap();
@@ -8462,6 +8661,60 @@ mod tests {
         let usage = &json_value["usage"];
         assert_eq!(usage["prompt_tokens"], 5);
         assert_eq!(usage["total_tokens"], 5);
+
+        // Verify optional fields are not present when None
+        assert!(json_value.get("id").is_none());
+        assert!(json_value.get("created").is_none());
+        assert!(json_value.get("chunking_info").is_none());
+        assert!(data.get("text").is_none());
+        assert!(data.get("chunk_text").is_none());
+        assert!(data.get("chunk_info").is_none());
+    }
+
+    #[test]
+    fn test_openai_compatible_embedding_response_with_extended_fields() {
+        let response = OpenAICompatibleEmbeddingResponse {
+            object: "list".to_string(),
+            data: vec![OpenAICompatibleEmbeddingData {
+                object: "embedding".to_string(),
+                embedding: vec![0.1, 0.2, 0.3],
+                index: 0,
+                text: Some("chunk text here".to_string()),
+                chunk_text: Some("chunk text here".to_string()),
+                chunk_info: Some(json!({
+                    "source_index": 0,
+                    "chunk_index": 0,
+                    "start_char": 0,
+                    "end_char": 100
+                })),
+                extra: HashMap::new(),
+            }],
+            model: "text-embedding-ada-002".to_string(),
+            usage: OpenAICompatibleEmbeddingUsage {
+                prompt_tokens: 5,
+                total_tokens: 5,
+            },
+            id: Some("infinity-12345".to_string()),
+            created: Some(1234567890),
+            chunking_info: Some(json!({
+                "chunk_size": 512,
+                "chunk_overlap": 50,
+                "chunks_per_source": [1]
+            })),
+            extra: HashMap::new(),
+        };
+
+        let json_value = serde_json::to_value(&response).unwrap();
+
+        // Verify extended fields are present
+        assert_eq!(json_value["id"], "infinity-12345");
+        assert_eq!(json_value["created"], 1234567890);
+        assert!(json_value["chunking_info"].is_object());
+
+        let data = &json_value["data"].as_array().unwrap()[0];
+        assert_eq!(data["text"], "chunk text here");
+        assert_eq!(data["chunk_text"], "chunk text here");
+        assert!(data["chunk_info"].is_object());
     }
 
     #[test]
@@ -8505,6 +8758,10 @@ mod tests {
             object: "embedding".to_string(),
             embedding: vec![1.0, -0.5, 0.0, 0.7],
             index: 42,
+            text: None,
+            chunk_text: None,
+            chunk_info: None,
+            extra: std::collections::HashMap::new(),
         };
 
         let json = serde_json::to_value(&embedding_data).unwrap();
@@ -8544,11 +8801,19 @@ mod tests {
                     object: "embedding".to_string(),
                     embedding: vec![0.1, 0.2],
                     index: 0,
+                    text: None,
+                    chunk_text: None,
+                    chunk_info: None,
+                    extra: std::collections::HashMap::new(),
                 },
                 OpenAICompatibleEmbeddingData {
                     object: "embedding".to_string(),
                     embedding: vec![0.3, 0.4],
                     index: 1,
+                    text: None,
+                    chunk_text: None,
+                    chunk_info: None,
+                    extra: std::collections::HashMap::new(),
                 },
             ],
             model: "test-model".to_string(),
@@ -8556,6 +8821,10 @@ mod tests {
                 prompt_tokens: 10,
                 total_tokens: 10,
             },
+            id: None,
+            created: None,
+            chunking_info: None,
+            extra: std::collections::HashMap::new(),
         };
 
         let json = serde_json::to_value(&response).unwrap();

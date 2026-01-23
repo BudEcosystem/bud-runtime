@@ -156,8 +156,17 @@ body {
   background-image: url(./../../public/images/evaluations/ui/bg.png);
   background-size: cover;
   background-repeat: no-repeat;
+  background-position: center;
+  position: relative;
 }
 
+.temp-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6); /* adjust opacity here */
+  pointer-events: none;
+}
 
 #container {
   background-color: #aaa;

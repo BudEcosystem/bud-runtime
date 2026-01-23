@@ -7,6 +7,7 @@ import InlineInput from "./input/InlineInput";
 import InlineSwitch from "./input/InlineSwitch";
 
 import { useAgentStore, AgentSettings } from "@/stores/useAgentStore";
+import { usePrompts } from "@/hooks/usePrompts";
 import { Text_16_400_EEEEEE } from '@/components/ui/text';
 
 interface SettingsListItemProps {
@@ -63,20 +64,112 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
     const {
         initializeSessionSettings,
         updateSessionSettings,
-        sessions
+        updateSession,
+        sessions,
+        isEditMode,
+        isEditVersionMode,
+        editVersionData
     } = useAgentStore();
+    const { getPromptConfig } = usePrompts();
     const [settings, setSettings] = useState<AgentSettings | null>(null);
     const [components, setComponents] = useState<SettingsListItemProps[]>([]);
     const [hasHydrated, setHasHydrated] = useState(false);
+    const hasLoadedConfigRef = React.useRef<string | null>(null);
 
     // Get current session to access its modelSettings
     const currentSession = sessions.find(s => s.id === sessionId);
+
+    const buildDefaultSettings = React.useCallback((id: string): AgentSettings => ({
+        id: `settings_${id}`,
+        name: "Default",
+        temperature: 0.7,
+        max_tokens: 2000,
+        top_p: 1.0,
+        frequency_penalty: 0,
+        presence_penalty: 0,
+        stop_sequences: [],
+        seed: 0,
+        timeout: 0,
+        parallel_tool_calls: true,
+        logprobs: false,
+        logit_bias: {},
+        extra_headers: {},
+        max_completion_tokens: 0,
+        stream_options: {},
+        response_format: {},
+        tool_choice: "auto",
+        chat_template: "",
+        chat_template_kwargs: {},
+        mm_processor_kwargs: {},
+        created_at: new Date().toISOString(),
+        modified_at: new Date().toISOString(),
+        modifiedFields: new Set<string>(),
+    }), []);
+
+    const buildSettingsFromConfig = React.useCallback(
+        (modelSettings: Record<string, unknown> | null | undefined, id: string) => {
+            const defaults = buildDefaultSettings(id);
+            if (!modelSettings || typeof modelSettings !== "object") {
+                return defaults;
+            }
+
+            const nextSettings: AgentSettings = { ...defaults };
+            Object.keys(defaults).forEach((key) => {
+                if (key in modelSettings) {
+                    (nextSettings as any)[key] = (modelSettings as any)[key];
+                }
+            });
+            nextSettings.modifiedFields = new Set<string>();
+            return nextSettings;
+        },
+        [buildDefaultSettings]
+    );
 
     useEffect(() => {
         if (typeof window !== "undefined") {
             setHasHydrated(true);
         }
     }, []);
+
+    useEffect(() => {
+        if (!hasHydrated || !currentSession?.name || !sessionId) return;
+        if (!isEditMode && !isEditVersionMode) return;
+
+        const version = isEditVersionMode ? editVersionData?.versionNumber : undefined;
+        const configKey = `${currentSession.name}:${version ?? 'latest'}`;
+
+        if (hasLoadedConfigRef.current === configKey) {
+            return;
+        }
+
+        const loadSettingsFromConfig = async () => {
+            try {
+                const response = await getPromptConfig(currentSession.name, version);
+                const configData = response?.data;
+                const mappedSettings = buildSettingsFromConfig(
+                    configData?.model_settings as Record<string, unknown> | undefined,
+                    sessionId
+                );
+                setSettings(mappedSettings);
+                updateSession(sessionId, { modelSettings: mappedSettings });
+                hasLoadedConfigRef.current = configKey;
+            } catch (error) {
+                console.warn("Failed to load prompt config for settings:", error);
+            }
+        };
+
+        loadSettingsFromConfig();
+    }, [
+        hasHydrated,
+        isEditMode,
+        isEditVersionMode,
+        editVersionData?.versionNumber,
+        currentSession?.name,
+        sessionId,
+        getPromptConfig,
+        buildSettingsFromConfig,
+        updateSession
+    ]);
 
     // Initialize session settings on mount and sync with session
     useEffect(() => {
@@ -89,38 +182,12 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
                 modifiedFields: currentSession.modelSettings.modifiedFields || new Set<string>()
             });
         } else {
-            // Create default settings locally and initialize in store
-            const defaultSettings: AgentSettings = {
-                id: `settings_${sessionId}`,
-                name: "Default",
-                temperature: 0.7,
-                max_tokens: 2000,
-                top_p: 1.0,
-                frequency_penalty: 0,
-                presence_penalty: 0,
-                stop_sequences: [],
-                seed: 0,
-                timeout: 0,
-                parallel_tool_calls: true,
-                logprobs: false,
-                logit_bias: {},
-                extra_headers: {},
-                max_completion_tokens: 0,
-                stream_options: {},
-                response_format: {},
-                tool_choice: "auto",
-                chat_template: "",
-                chat_template_kwargs: {},
-                mm_processor_kwargs: {},
-                created_at: new Date().toISOString(),
-                modified_at: new Date().toISOString(),
-                modifiedFields: new Set<string>(),
-            };
+            const defaultSettings = buildDefaultSettings(sessionId);
             setSettings(defaultSettings);
             // Also initialize in store for persistence
             initializeSessionSettings(sessionId);
         }
-    }, [hasHydrated, sessionId, currentSession?.modelSettings, initializeSessionSettings]);
+    }, [hasHydrated, sessionId, currentSession?.modelSettings, initializeSessionSettings, buildDefaultSettings]);
 
     const handleChange = useCallback((params: Partial<AgentSettings>) => {
         if (!settings || !sessionId) return;

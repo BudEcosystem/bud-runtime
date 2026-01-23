@@ -703,11 +703,7 @@ impl EmbeddingProvider for OpenAIProvider {
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<EmbeddingProviderResponse, Error> {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
-        let request_body = OpenAIEmbeddingRequest::new(
-            &self.model_name,
-            &request.input,
-            request.encoding_format.as_deref(),
-        );
+        let request_body = OpenAIEmbeddingRequest::new(&self.model_name, request);
         let request_url =
             get_embedding_url(self.api_base.as_ref().unwrap_or(&OPENAI_DEFAULT_BASE_URL))?;
         let start_time = Instant::now();
@@ -3118,6 +3114,18 @@ struct OpenAIEmbeddingRequest<'a> {
     input: OpenAIEmbeddingRequestInput<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     encoding_format: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dimensions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modality: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_input: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chunking: Option<&'a crate::embeddings::ChunkingConfig>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -3128,12 +3136,8 @@ enum OpenAIEmbeddingRequestInput<'a> {
 }
 
 impl<'a> OpenAIEmbeddingRequest<'a> {
-    fn new(
-        model: &'a str,
-        input: &'a crate::embeddings::EmbeddingInput,
-        encoding_format: Option<&'a str>,
-    ) -> Self {
-        let input = match input {
+    fn new(model: &'a str, request: &'a EmbeddingRequest) -> Self {
+        let input = match &request.input {
             crate::embeddings::EmbeddingInput::Single(text) => {
                 OpenAIEmbeddingRequestInput::Single(text)
             }
@@ -3144,7 +3148,13 @@ impl<'a> OpenAIEmbeddingRequest<'a> {
         Self {
             model,
             input,
-            encoding_format,
+            encoding_format: request.encoding_format.as_deref(),
+            dimensions: request.dimensions,
+            modality: request.modality.as_deref(),
+            priority: request.priority.as_deref(),
+            include_input: request.include_input,
+            chunking: request.chunking.as_ref(),
+            extra: request.extra.clone(),
         }
     }
 }

@@ -42,6 +42,7 @@ from .parser import (
 )
 from .schemas import (
     AudioConfig,
+    ClassifierConfig,
     EmbeddingConfig,
     LicenseInfo,
     LLMConfig,
@@ -356,6 +357,12 @@ class HuggingFaceModelInfo(BaseModelInfo):
                 model_architecture.embedding_config = EmbeddingConfig(embedding_dimension=hidden_size)
                 modality = "llm_embedding"
 
+        # Check for classifier capability
+        classifier_config = cls.parse_classifier_model_config(config)
+        if classifier_config:
+            model_architecture.classifier_config = classifier_config
+            modality += "_classification"
+
         # Add TTS suffix if model has audio output capability
         if has_audio_output:
             modality += "_tts"
@@ -491,6 +498,118 @@ class HuggingFaceModelInfo(BaseModelInfo):
             return False
 
         return False
+
+    @staticmethod
+    def parse_classifier_model_config(config: Dict[str, Any]) -> ClassifierConfig | None:
+        """Parse classifier model configuration from config."""
+        architectures = config.get("architectures", [])
+        # Map the substring signature to the variable name
+        task_map = {
+            "sequence_classification": "ForSequenceClassification",
+            "token_classification": "ForTokenClassification",
+            "object_detection": "ForObjectDetection",
+            "question_answering": "ForQuestionAnswering",
+            "image_classification": "ForImageClassification",
+            "audio_classification": "ForAudioClassification",
+            "semantic_segmentation": "ForSemanticSegmentation",
+        }
+        # 1. Identify Mode: Check all architectures at once
+        # We join the architectures into one string for a single search pass (faster/cleaner)
+        arch_text = " ".join(architectures)
+        flags = {k: v in arch_text for k, v in task_map.items()}
+
+        # 2. Robust Label Extraction
+        # Use explicit signals only; do not infer classification from num_labels alone.
+        def _normalize_map(
+            mapping: Dict[Any, Any], convert_keys: bool = False, convert_values: bool = False
+        ) -> Dict[Any, Any]:
+            if not mapping:
+                return {}
+            normalized: Dict[Any, Any] = {}
+            for key, value in mapping.items():
+                new_key = key
+                new_value = value
+                if convert_keys:
+                    try:
+                        new_key = int(key)
+                    except (TypeError, ValueError):
+                        new_key = key
+                if convert_values:
+                    try:
+                        new_value = int(value)
+                    except (TypeError, ValueError):
+                        new_value = value
+                normalized[new_key] = new_value
+            return normalized
+
+        def _is_default_label2id(mapping: Dict[Any, Any]) -> bool:
+            if not mapping:
+                return False
+            for label, idx in mapping.items():
+                if not isinstance(label, str) or not isinstance(idx, int):
+                    return False
+                if label != f"LABEL_{idx}":
+                    return False
+            return True
+
+        def _is_default_id2label(mapping: Dict[Any, Any]) -> bool:
+            if not mapping:
+                return False
+            for idx, label in mapping.items():
+                if not isinstance(idx, int) or not isinstance(label, str):
+                    return False
+                if label != f"LABEL_{idx}":
+                    return False
+            return True
+
+        label2id = _normalize_map(config.get("label2id") or {}, convert_values=True)
+        id2label = _normalize_map(config.get("id2label") or {}, convert_keys=True)
+        problem_type = config.get("problem_type")
+
+        has_label_map = bool(label2id) or bool(id2label)
+        has_task_flag = any(flags.values())
+        has_problem_type = bool(problem_type)
+
+        is_default_label_map = has_label_map and (
+            (not label2id or _is_default_label2id(label2id)) and (not id2label or _is_default_id2label(id2label))
+        )
+        has_explicit_label_map = has_label_map and not is_default_label_map
+
+        if not (has_task_flag or has_explicit_label_map or has_problem_type):
+            return None
+
+        if not label2id and id2label:
+            label2id = {label: idx for idx, label in id2label.items()}
+        elif label2id and not id2label:
+            id2label = {idx: label for label, idx in label2id.items()}
+
+        num_labels = (
+            len(label2id)
+            if label2id
+            else len(id2label)
+            if id2label
+            else config.get("num_labels") or config.get("_num_labels", 2)
+        )
+
+        # Ensure consistency: if we have num_labels but no map, generate a dummy map
+        if not label2id and num_labels > 0:
+            label2id = {f"LABEL_{i}": i for i in range(num_labels)}
+            id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
+
+        task = [k for k, v in flags.items() if v]
+        task = task[0] if len(task) > 0 else None
+        if not task and has_problem_type:
+            task = "sequence_classification"
+
+        audio_models = ("Wav2Vec2", "Hubert", "WavLM", "SEW", "UniSpeech", "UniSpeechSat")
+        task = (
+            "audio_classification"
+            if task == "sequence_classification"
+            and any(arch.replace("ForSequenceClassification", "") in audio_models for arch in architectures)
+            else task
+        )
+
+        return ClassifierConfig(num_labels=num_labels, label2id=label2id, id2label=id2label, task=task)
 
     @staticmethod
     def detect_audio_modality(config: Dict[str, Any]) -> Tuple[bool, bool]:

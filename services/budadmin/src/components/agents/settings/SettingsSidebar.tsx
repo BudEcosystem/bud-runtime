@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Settings from "./Settings";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import { AgentSession, AgentSettings } from "@/stores/useAgentStore";
+import { AgentSession, AgentSettings, useAgentStore } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
 
@@ -13,6 +13,7 @@ interface SettingsSidebarProps {
 
 export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const { isEditMode, isEditVersionMode, editVersionData } = useAgentStore();
 
   if (!isOpen) return null;
 
@@ -22,7 +23,12 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
   const handleUpdate = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (!session?.promptId) {
+    const promptIdForUpdate =
+      (isEditMode || isEditVersionMode) && session?.name
+        ? session.name
+        : session?.promptId;
+
+    if (!promptIdForUpdate) {
       errorToast("No prompt ID found for this session");
       return;
     }
@@ -51,10 +57,14 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
         }
       });
 
-      const payload = {
-        prompt_id: session.promptId,
+      const payload: Record<string, unknown> = {
+        prompt_id: promptIdForUpdate,
         model_settings: modelSettings,
       };
+
+      if (isEditVersionMode && editVersionData?.versionNumber) {
+        payload.version = editVersionData.versionNumber;
+      }
 
       await AppRequest.Post("/prompts/prompt-config", payload);
       // successToast("Model settings updated successfully"); // Removed: No toast needed

@@ -4,17 +4,19 @@ import { playGroundUrl } from "../environment";
 interface AgentIframeProps {
   sessionId?: string;
   promptIds?: string[];
+  version?: number;
   typeFormMessage?: { timestamp: number; value: boolean } | null;
 }
 
-const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], typeFormMessage = null }) => {
+const AgentIframe: React.FC<AgentIframeProps> = ({ sessionId, promptIds = [], version, typeFormMessage = null }) => {
   const [refreshToken, setRefreshToken] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Build iframe URL for agent playground with promptIds (safe fallback if playGroundUrl is undefined)
   const promptIdsParam = promptIds.filter(id => id).join(',');
+  const versionParam = typeof version === "number" ? `&version=${version}` : "";
   const iframeUrl = playGroundUrl
-    ? `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=false${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}`
+    ? `${playGroundUrl}/chat?embedded=true&refresh_token=${refreshToken}&is_single_chat=false${promptIdsParam ? `&promptIds=${promptIdsParam}` : ''}${versionParam}`
     : '';
   useEffect(() => {
     if (typeof window !== "undefined") {
