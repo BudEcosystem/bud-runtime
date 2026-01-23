@@ -52,6 +52,7 @@ const InferenceDetailModal: React.FC<InferenceDetailModalProps> = ({
   } = useInferences();
 
   useEffect(() => {
+    console.log("InferenceDetailModal visible:", visible, "inferenceId:", inferenceId);
     if (visible && inferenceId) {
       fetchInferenceDetail(inferenceId);
       fetchInferenceFeedback(inferenceId);

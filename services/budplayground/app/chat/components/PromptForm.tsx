@@ -14,9 +14,10 @@ interface PromptFormProps {
   chatId?: string;
   onSubmit: (data: any) => void;
   onClose?: () => void;
+  promptConfig?: any;
 }
 
-export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }: PromptFormProps) {
+export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose, promptConfig }: PromptFormProps) {
   const { apiKey, accessKey } = useAuth();
   const getChat = useChatStore((state) => state.getChat);
   const setDeployment = useChatStore((state) => state.setDeployment);
@@ -108,6 +109,118 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     };
   }, [promptIds]);
 
+  const applyPromptConfig = useCallback((configData: any) => {
+    const version =
+      configData?.version ?? configData?.prompt?.version ?? undefined;
+    setPromptVersion(
+      version !== undefined && version !== null ? String(version) : undefined
+    );
+
+    const newDeploymentName = typeof configData?.deployment_name === 'string'
+      ? configData.deployment_name
+      : undefined;
+
+    // Always update deployment name when API returns a value
+    setPromptDeployment(newDeploymentName);
+
+    // Handle JSON schema format - extract properties from $defs
+    let schemaToUse: any = configData.input_schema ?? null;
+    let requiredFields: string[] = [];
+
+    // If it's a JSON schema with $defs, flatten it for the form
+    // Check for both "Input" and "InputSchema" in $defs
+    if (schemaToUse && schemaToUse.$defs) {
+      if (schemaToUse.$defs.Input) {
+        const inputDef = schemaToUse.$defs.Input;
+        schemaToUse = inputDef.properties || {};
+        requiredFields = inputDef.required || [];
+      } else if (schemaToUse.$defs.InputSchema) {
+        const inputDef = schemaToUse.$defs.InputSchema;
+        schemaToUse = inputDef.properties || {};
+        requiredFields = inputDef.required || [];
+      }
+    }
+
+    if (
+      schemaToUse &&
+      typeof schemaToUse === 'object' &&
+      Object.keys(schemaToUse).length === 0
+    ) {
+      schemaToUse = null;
+    }
+
+    // Determine field order: required fields first, then any remaining properties
+    if (schemaToUse && typeof schemaToUse === 'object') {
+      const allKeys = Object.keys(schemaToUse);
+      const orderedFields = [
+        ...requiredFields.filter(key => allKeys.includes(key)),
+        ...allKeys.filter(key => !requiredFields.includes(key))
+      ];
+      setFieldOrder(orderedFields);
+    } else {
+      setFieldOrder([]);
+    }
+
+    setInputSchema(schemaToUse);
+
+    // Initialize form data with default values based on type
+    const initialData: Record<string, any> = {};
+    if (schemaToUse && typeof schemaToUse === 'object') {
+      Object.keys(schemaToUse).forEach((key: string) => {
+        const field = schemaToUse[key];
+        // Use type-appropriate default values
+        if (field?.default !== undefined) {
+          initialData[key] = field.default;
+        } else {
+          switch (field?.type) {
+            case 'array':
+              initialData[key] = [];
+              break;
+            case 'object':
+              // Initialize as empty object for both cases
+              // (with properties or using key-value pair UI)
+              initialData[key] = {};
+              break;
+            case 'boolean':
+              initialData[key] = false;
+              break;
+            case 'number':
+            case 'integer':
+              initialData[key] = null;
+              break;
+            default:
+              initialData[key] = '';
+          }
+        }
+      });
+    } else {
+      initialData['unstructuredSchema'] = '';
+    }
+
+    // Restore saved form data from sessionStorage (preserves user input across tab switches)
+    const savedData = getSavedFormData();
+    if (savedData) {
+      // Merge saved data with initial data, only for fields that exist in current schema
+      const mergedData = { ...initialData };
+      Object.keys(savedData).forEach(key => {
+        if (key in initialData) {
+          mergedData[key] = savedData[key];
+        }
+      });
+      setFormData(mergedData);
+    } else {
+      setFormData(initialData);
+    }
+  }, [getSavedFormData]);
+
+  const resetPromptConfigState = useCallback(() => {
+    setInputSchema(null);
+    setFieldOrder([]);
+    setFormData({ unstructuredSchema: '' });
+    setPromptVersion(undefined);
+    setPromptDeployment(undefined);
+  }, []);
+
   // Fetch prompt configurations - runs when dependencies change or refresh triggered
   useEffect(() => {
     const fetchPromptConfigs = async () => {
@@ -115,6 +228,14 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
         setLoading(false);
         return;
       }
+
+      if (promptConfig) {
+        applyPromptConfig(promptConfig);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
 
       try {
         const config = await getPromptConfig(
@@ -125,127 +246,20 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
         );
 
         if (config && config.data) {
-          const version =
-            config.data?.version ?? config.data?.prompt?.version ?? undefined;
-          setPromptVersion(
-            version !== undefined && version !== null ? String(version) : undefined
-          );
-
-          const newDeploymentName = typeof config.data?.deployment_name === 'string'
-            ? config.data.deployment_name
-            : undefined;
-
-          // Always update deployment name when API returns a value
-          setPromptDeployment(newDeploymentName);
-
-          // Handle JSON schema format - extract properties from $defs
-          let schemaToUse: any = config.data.input_schema ?? null;
-          let requiredFields: string[] = [];
-
-          // If it's a JSON schema with $defs, flatten it for the form
-          // Check for both "Input" and "InputSchema" in $defs
-          if (schemaToUse && schemaToUse.$defs) {
-            if (schemaToUse.$defs.Input) {
-              const inputDef = schemaToUse.$defs.Input;
-              schemaToUse = inputDef.properties || {};
-              requiredFields = inputDef.required || [];
-            } else if (schemaToUse.$defs.InputSchema) {
-              const inputDef = schemaToUse.$defs.InputSchema;
-              schemaToUse = inputDef.properties || {};
-              requiredFields = inputDef.required || [];
-            }
-          }
-
-          if (
-            schemaToUse &&
-            typeof schemaToUse === 'object' &&
-            Object.keys(schemaToUse).length === 0
-          ) {
-            schemaToUse = null;
-          }
-
-          // Determine field order: required fields first, then any remaining properties
-          if (schemaToUse && typeof schemaToUse === 'object') {
-            const allKeys = Object.keys(schemaToUse);
-            const orderedFields = [
-              ...requiredFields.filter(key => allKeys.includes(key)),
-              ...allKeys.filter(key => !requiredFields.includes(key))
-            ];
-            setFieldOrder(orderedFields);
-          } else {
-            setFieldOrder([]);
-          }
-
-          setInputSchema(schemaToUse);
-
-          // Initialize form data with default values based on type
-          const initialData: Record<string, any> = {};
-          if (schemaToUse && typeof schemaToUse === 'object') {
-            Object.keys(schemaToUse).forEach((key: string) => {
-              const field = schemaToUse[key];
-              // Use type-appropriate default values
-              if (field?.default !== undefined) {
-                initialData[key] = field.default;
-              } else {
-                switch (field?.type) {
-                  case 'array':
-                    initialData[key] = [];
-                    break;
-                  case 'object':
-                    // Initialize as empty object for both cases
-                    // (with properties or using key-value pair UI)
-                    initialData[key] = {};
-                    break;
-                  case 'boolean':
-                    initialData[key] = false;
-                    break;
-                  case 'number':
-                  case 'integer':
-                    initialData[key] = null;
-                    break;
-                  default:
-                    initialData[key] = '';
-                }
-              }
-            });
-          } else {
-            initialData['unstructuredSchema'] = '';
-          }
-
-          // Restore saved form data from sessionStorage (preserves user input across tab switches)
-          const savedData = getSavedFormData();
-          if (savedData) {
-            // Merge saved data with initial data, only for fields that exist in current schema
-            const mergedData = { ...initialData };
-            Object.keys(savedData).forEach(key => {
-              if (key in initialData) {
-                mergedData[key] = savedData[key];
-              }
-            });
-            setFormData(mergedData);
-          } else {
-            setFormData(initialData);
-          }
+          applyPromptConfig(config.data);
         } else {
-          setInputSchema(null);
-          setFieldOrder([]);
-          setFormData({ unstructuredSchema: '' });
-          setPromptVersion(undefined);
+          resetPromptConfigState();
         }
       } catch (error) {
         console.error('Error fetching prompt config:', error);
-        setInputSchema(null);
-        setFieldOrder([]);
-        setFormData({ unstructuredSchema: '' });
-        setPromptVersion(undefined);
-        setPromptDeployment(undefined);
+        resetPromptConfigState();
       } finally {
         setLoading(false);
       }
     };
 
     fetchPromptConfigs();
-  }, [promptIds, apiKey, accessKey, refreshTrigger, getSavedFormData, promptVersionParam]);
+  }, [promptIds, apiKey, accessKey, refreshTrigger, promptConfig, promptVersionParam, applyPromptConfig, resetPromptConfigState]);
 
   // Fetch endpoints when ready and deployment name is available
   useEffect(() => {
