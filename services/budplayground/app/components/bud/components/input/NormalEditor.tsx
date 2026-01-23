@@ -71,24 +71,26 @@ function NormalEditor({
           />
         </div>
         <div className="absolute flex justify-between items-end w-full bottom-0 left-0 right-0 pr-[.85rem] pl-[.25rem]">
-          <div className="toolbar pb-[.65rem]">
-            <button
-              type="button"
-              onClick={() => {}}
-              className={"toolbar-item spaced " + (false ? "active" : "")}
-              aria-label="Format Attachment"
-            >
-              <i className="format attachment" />
-            </button>
-            {/* <button
-              type="button"
-              onClick={() => {}}
-              className={"toolbar-item spaced " + (false ? "active" : "")}
-              aria-label="Format smiley"
-            >
-              <i className="format smiley" />
-            </button> */}
-          </div>
+          {!isPromptMode && (
+            <div className="toolbar pb-[.65rem]">
+              <button
+                type="button"
+                onClick={() => {}}
+                className={"toolbar-item spaced " + (false ? "active" : "")}
+                aria-label="Format Attachment"
+              >
+                <i className="format attachment" />
+              </button>
+              {/* <button
+                type="button"
+                onClick={() => {}}
+                className={"toolbar-item spaced " + (false ? "active" : "")}
+                aria-label="Format smiley"
+              >
+                <i className="format smiley" />
+              </button> */}
+            </div>
+          )}
           <div className="pb-[.95rem]">
             <button
               className="Open-Sans cursor-pointer text-[400] z-[999] text-[.75rem] text-[#EEEEEE] border-[#757575] border-[1px] rounded-[6px] p-[.2rem] hover:bg-[#1F1F1F4D] hover:text-[#FFFFFF]  flex items-center gap-[.5rem] px-[.8rem] py-[.15rem] bg-[#1F1F1F] hover:bg-[#965CDE] hover:text-[#FFFFFF] z-[99] absolute right-[.5rem] bottom-[1rem] "
