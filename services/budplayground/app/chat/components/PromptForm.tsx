@@ -7,6 +7,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useChatStore } from '@/app/store/chat';
 import { useEndPoints } from '@/app/components/bud/hooks/useEndPoint';
 import { Text_12_400_B3B3B3 } from '@/lib/text';
+import { parsePositiveIntParam } from '@/app/lib/query';
 
 interface PromptFormProps {
   promptIds?: string[];
@@ -29,6 +30,10 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
   const [promptVersion, setPromptVersion] = useState<string | undefined>();
   const [promptDeployment, setPromptDeployment] = useState<string | undefined>();
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const promptVersionParam = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return parsePositiveIntParam(params.get('version'));
+  }, []);
 
   // Storage key for persisting form data across tab switches
   const storageKey = useMemo(() => {
@@ -112,7 +117,12 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
       }
 
       try {
-        const config = await getPromptConfig(promptIds[0], apiKey || '', accessKey || '');
+        const config = await getPromptConfig(
+          promptIds[0],
+          apiKey || '',
+          accessKey || '',
+          promptVersionParam
+        );
 
         if (config && config.data) {
           const version =
@@ -235,7 +245,7 @@ export default function PromptForm({ promptIds = [], chatId, onSubmit, onClose }
     };
 
     fetchPromptConfigs();
-  }, [promptIds, apiKey, accessKey, refreshTrigger, getSavedFormData]);
+  }, [promptIds, apiKey, accessKey, refreshTrigger, getSavedFormData, promptVersionParam]);
 
   // Fetch endpoints when ready and deployment name is available
   useEffect(() => {
