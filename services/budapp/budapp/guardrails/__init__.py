@@ -26,13 +26,12 @@ from budapp.guardrails.models import (
     GuardrailRule,
     GuardrailRuleDeployment,
 )
-from budapp.guardrails.pipeline_actions import GuardrailPipelineActions
-from budapp.guardrails.services import (
-    GuardrailCustomProbeService,
-    GuardrailDeploymentWorkflowService,
-    GuardrailProbeRuleService,
-    GuardrailProfileDeploymentService,
-)
+
+
+# Note: Services and pipeline_actions are NOT imported here to avoid circular imports.
+# Import them directly where needed:
+#   from budapp.guardrails.services import GuardrailProbeRuleService, ...
+#   from budapp.guardrails.pipeline_actions import GuardrailPipelineActions
 
 
 __all__ = [
@@ -47,11 +46,4 @@ __all__ = [
     "GuardrailProfileRule",
     "GuardrailDeployment",
     "GuardrailRuleDeployment",
-    # Services
-    "GuardrailProbeRuleService",
-    "GuardrailProfileDeploymentService",
-    "GuardrailDeploymentWorkflowService",
-    "GuardrailCustomProbeService",
-    # Pipeline Actions
-    "GuardrailPipelineActions",
 ]
