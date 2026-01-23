@@ -3505,6 +3505,7 @@ impl ResponseProvider for OpenAIProvider {
         request: &OpenAIResponseCreateParams,
         client: &reqwest::Client,
         dynamic_api_keys: &InferenceCredentials,
+        _baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<ResponsesOpenAIResponse, Error> {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
         let request_url =
@@ -3583,6 +3584,7 @@ impl ResponseProvider for OpenAIProvider {
         request: &OpenAIResponseCreateParams,
         client: &reqwest::Client,
         dynamic_api_keys: &InferenceCredentials,
+        _baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<
         Box<dyn futures::Stream<Item = Result<ResponseStreamEvent, Error>> + Send + Unpin>,
         Error,

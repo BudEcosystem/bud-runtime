@@ -7,9 +7,9 @@ use axum::{
 };
 use chrono::Utc;
 use metrics::histogram;
+use opentelemetry::trace::Status as OtelStatus;
 use std::collections::HashMap;
 use std::sync::Arc;
-use opentelemetry::trace::Status as OtelStatus;
 use tracing::error;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -18,9 +18,16 @@ use uuid::Uuid;
 
 use crate::analytics::{GatewayAnalyticsDatabaseInsert, RequestAnalytics};
 use crate::analytics_batcher::AnalyticsBatcher;
+use crate::baggage::{keys, new_shared_baggage};
 use crate::clickhouse::ClickHouseConnectionInfo;
 use crate::error::Error;
 use crate::geoip::GeoIpService;
+
+/// Wrapper for storing parent span's OTel context in request extensions.
+/// This allows auth middleware to add baggage while preserving correct trace hierarchy.
+/// Using gateway_analytics.context() gives us the correct trace_id and span_id for parenting.
+#[derive(Clone)]
+pub struct ParentSpanContext(pub opentelemetry::Context);
 
 /// Middleware for collecting analytics data about gateway requests
 pub async fn analytics_middleware(
@@ -172,6 +179,16 @@ pub async fn analytics_middleware(
     // Store analytics in request extensions
     let analytics_arc = Arc::new(tokio::sync::Mutex::new(analytics));
     request.extensions_mut().insert(analytics_arc.clone());
+
+    // Create shared baggage container for auth middleware to populate
+    let baggage_arc = new_shared_baggage();
+    request.extensions_mut().insert(baggage_arc.clone());
+
+    // Store gateway_analytics span context for auth middleware to use when adding baggage.
+    // This preserves correct trace hierarchy: auth middleware can add baggage to this context
+    // and use it with set_parent() on child spans without causing self-referencing.
+    let ga_span_ctx = tracing::Span::current().context();
+    request.extensions_mut().insert(ParentSpanContext(ga_span_ctx));
 
     // Get ClickHouse connection before processing request
     let clickhouse_opt = request
@@ -385,6 +402,29 @@ pub async fn analytics_middleware(
 
         // Record post-response span attributes (after all response data is captured)
         record_post_response_span_attributes(&tracing::Span::current(), &analytics.record);
+    }
+
+    // Read baggage data from shared container (populated by auth middleware)
+    // and set attributes on the gateway_analytics span
+    if let Ok(baggage_guard) = baggage_arc.lock() {
+        if let Some(ref baggage_data) = *baggage_guard {
+            let span = tracing::Span::current();
+            if let Some(ref id) = baggage_data.project_id {
+                span.set_attribute(keys::PROJECT_ID, id.clone());
+            }
+            if let Some(ref id) = baggage_data.prompt_id {
+                span.set_attribute(keys::PROMPT_ID, id.clone());
+            }
+            if let Some(ref id) = baggage_data.endpoint_id {
+                span.set_attribute(keys::ENDPOINT_ID, id.clone());
+            }
+            if let Some(ref id) = baggage_data.api_key_id {
+                span.set_attribute(keys::API_KEY_ID, id.clone());
+            }
+            if let Some(ref id) = baggage_data.user_id {
+                span.set_attribute(keys::USER_ID, id.clone());
+            }
+        }
     }
 
     // Record Prometheus metrics for autoscaling

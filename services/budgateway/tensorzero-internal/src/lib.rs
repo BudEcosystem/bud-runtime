@@ -6,9 +6,10 @@
 pub mod analytics; // gateway analytics data structures
 pub mod analytics_batcher; // analytics batching for high-throughput ClickHouse writes
 pub mod analytics_middleware; // gateway analytics middleware
-pub mod inference_batcher; // inference batching for high-throughput ClickHouse writes
 pub mod audio; // audio transcription, translation, and text-to-speech
 pub mod auth;
+pub mod baggage; // W3C Baggage support for business context propagation
+pub mod baggage_processor; // SpanProcessor to copy baggage to span attributes
 pub mod blocking_middleware; // blocking rules enforcement middleware
 pub mod blocking_rules; // blocking rules management
 pub mod cache;
@@ -29,6 +30,7 @@ pub mod guardrail; // guardrail execution logic
 pub mod guardrail_table; // guardrail configurations for advanced moderation
 pub mod images; // image generation, editing, and variations
 pub mod inference; // model inference
+pub mod inference_batcher; // inference batching for high-throughput ClickHouse writes
 pub mod jsonl_processor; // JSONL processing for OpenAI batch API
 pub mod jsonschema_util; // utilities for working with JSON schemas
 pub mod kafka; // Kafka integration
