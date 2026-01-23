@@ -16,7 +16,7 @@
 
 """Guardrails module for managing guardrail probes, rules, profiles, and deployments."""
 
-from budapp.guardrails.crud import GuardrailsDataManager, GuardrailsDeploymentDataManager
+from budapp.guardrails.crud import GuardrailsDeploymentDataManager, GuardrailsProbeRulesDataManager
 from budapp.guardrails.models import (
     GuardrailDeployment,
     GuardrailProbe,
@@ -37,7 +37,7 @@ from budapp.guardrails.services import (
 
 __all__ = [
     # Data Managers
-    "GuardrailsDataManager",
+    "GuardrailsProbeRulesDataManager",
     "GuardrailsDeploymentDataManager",
     # Models
     "GuardrailProbe",
