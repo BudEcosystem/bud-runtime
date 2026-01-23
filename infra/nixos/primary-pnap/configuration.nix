@@ -1,7 +1,8 @@
 { lib, ... }:
 {
   imports = [
-    ../primary-disk/configuration.nix
+    ../primary/configuration.nix
+    ../disk/configuration.nix
     ./modules/network.nix
   ];
 
