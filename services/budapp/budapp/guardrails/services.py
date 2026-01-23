@@ -991,26 +991,32 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             )
 
         # Build progress response
-        progress = {
+        progress: dict[str, Any] = {
             "deployment_id": str(deployment_id),
             "status": db_deployment.status.value,
             "progress_percentage": 0,
         }
 
         # Calculate progress based on deployment status
-        if db_deployment.status == GuardrailDeploymentStatusEnum.COMPLETED:
+        if db_deployment.status == GuardrailDeploymentStatusEnum.RUNNING:
             progress["progress_percentage"] = 100
-        elif db_deployment.status == GuardrailDeploymentStatusEnum.FAILED:
+        elif db_deployment.status == GuardrailDeploymentStatusEnum.FAILURE:
             progress["progress_percentage"] = 0
             progress["error"] = "Deployment failed"
-        elif db_deployment.status == GuardrailDeploymentStatusEnum.IN_PROGRESS:
-            # For in-progress, estimate based on rule deployments if available
+        elif db_deployment.status == GuardrailDeploymentStatusEnum.DEPLOYING:
+            # For in-progress, estimate based on endpoint statuses from rule deployments
             rule_deployments = await GuardrailsDeploymentDataManager(self.session).get_rule_deployments_for_guardrail(
                 deployment_id
             )
             if rule_deployments:
-                completed = sum(1 for rd in rule_deployments if rd.status.value == "completed")
-                progress["progress_percentage"] = int((completed / len(rule_deployments)) * 100)
+                from budapp.endpoint_ops.models import Endpoint
+
+                running_count = 0
+                for rd in rule_deployments:
+                    endpoint = await self.session.get(Endpoint, rd.endpoint_id)
+                    if endpoint and endpoint.status == EndpointStatusEnum.RUNNING:
+                        running_count += 1
+                progress["progress_percentage"] = int((running_count / len(rule_deployments)) * 100)
             else:
                 progress["progress_percentage"] = 50  # Default estimate
 
@@ -1019,14 +1025,19 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             rule_deployments = await GuardrailsDeploymentDataManager(self.session).get_rule_deployments_for_guardrail(
                 deployment_id
             )
-            progress["steps"] = [
-                {
-                    "rule_id": str(rd.rule_id),
-                    "status": rd.status.value,
-                    "error_message": rd.error_message,
-                }
-                for rd in rule_deployments
-            ]
+            from budapp.endpoint_ops.models import Endpoint
+
+            steps = []
+            for rd in rule_deployments:
+                endpoint = await self.session.get(Endpoint, rd.endpoint_id)
+                steps.append(
+                    {
+                        "rule_id": str(rd.rule_id),
+                        "endpoint_id": str(rd.endpoint_id),
+                        "endpoint_status": endpoint.status.value if endpoint else "unknown",
+                    }
+                )
+            progress["steps"] = steps
 
         return progress
 

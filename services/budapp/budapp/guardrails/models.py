@@ -28,7 +28,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
-    GuardrailRuleDeploymentStatusEnum,
     GuardrailStatusEnum,
     ProbeTypeEnum,
     ScannerTypeEnum,
@@ -368,16 +367,6 @@ class GuardrailRuleDeployment(Base, TimestampMixin):
     )
     cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
     config_override_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    status: Mapped[str] = mapped_column(
-        Enum(
-            GuardrailRuleDeploymentStatusEnum,
-            name="guardrail_rule_deployment_status_enum",
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-        default=GuardrailRuleDeploymentStatusEnum.PENDING,
-    )
-    error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Relationships
     guardrail_deployment: Mapped["GuardrailDeployment"] = relationship(

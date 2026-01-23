@@ -24,7 +24,6 @@ from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model
 from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
-    GuardrailRuleDeploymentStatusEnum,
     GuardrailStatusEnum,
     ProbeTypeEnum,
     ProxyProviderEnum,
@@ -456,12 +455,11 @@ class GuardrailRuleDeploymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID4
+    guardrail_deployment_id: UUID4
     rule_id: UUID4
     model_id: UUID4
     endpoint_id: UUID4
     cluster_id: UUID4
-    status: GuardrailRuleDeploymentStatusEnum
-    error_message: str | None = None
     config_override_json: dict | None = None
     created_at: datetime
     modified_at: datetime

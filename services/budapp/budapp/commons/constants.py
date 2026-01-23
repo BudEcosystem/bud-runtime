@@ -3388,15 +3388,6 @@ class ScannerTypeEnum(str, Enum):
     LLM = "llm"  # LLM-based policy scanner
 
 
-class GuardrailRuleDeploymentStatusEnum(str, Enum):
-    """Status of a guardrail rule model deployment."""
-
-    PENDING = "pending"
-    DEPLOYING = "deploying"
-    READY = "ready"
-    FAILED = "failed"
-
-
 class ProviderCapabilityEnum(Enum):
     """Enumeration for identifying provider capabilities.
 

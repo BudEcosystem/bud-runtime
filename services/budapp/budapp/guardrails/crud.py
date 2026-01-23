@@ -29,7 +29,6 @@ from budapp.commons import logging
 from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
-    GuardrailRuleDeploymentStatusEnum,
     GuardrailStatusEnum,
     ProbeTypeEnum,
 )
@@ -1149,23 +1148,8 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
             endpoint_id=endpoint_id,
             cluster_id=cluster_id,
             config_override_json=config_override,
-            status=GuardrailRuleDeploymentStatusEnum.PENDING,
         )
         self.session.add(deployment)
-        await self.session.flush()
-        return deployment
-
-    async def update_rule_deployment_status(
-        self,
-        rule_deployment_id: UUID,
-        status: GuardrailRuleDeploymentStatusEnum,
-        error_message: str | None = None,
-    ) -> GuardrailRuleDeployment:
-        """Update rule deployment status."""
-        deployment = await self.retrieve_by_fields(GuardrailRuleDeployment, {"id": rule_deployment_id})
-        deployment.status = status
-        if error_message:
-            deployment.error_message = error_message
         await self.session.flush()
         return deployment
 

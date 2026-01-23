@@ -39,22 +39,18 @@ def upgrade() -> None:
     )
     scanner_type_enum.create(op.get_bind(), checkfirst=True)
 
-    rule_deployment_status_enum = postgresql.ENUM(
-        "pending",
-        "deploying",
-        "ready",
-        "failed",
-        name="guardrail_rule_deployment_status_enum",
-        create_type=False,
-    )
-    rule_deployment_status_enum.create(op.get_bind(), checkfirst=True)
-
     # Add probe_type to guardrail_probe
     op.add_column(
         "guardrail_probe",
         sa.Column(
             "probe_type",
-            sa.Enum("provider", "model_scanner", "custom", name="probe_type_enum"),
+            postgresql.ENUM(
+                "provider",
+                "model_scanner",
+                "custom",
+                name="probe_type_enum",
+                create_type=False,
+            ),
             nullable=False,
             server_default="provider",
         ),
@@ -65,7 +61,12 @@ def upgrade() -> None:
         "guardrail_rule",
         sa.Column(
             "scanner_type",
-            sa.Enum("classifier", "llm", name="scanner_type_enum"),
+            postgresql.ENUM(
+                "classifier",
+                "llm",
+                name="scanner_type_enum",
+                create_type=False,
+            ),
             nullable=True,
         ),
     )
@@ -137,23 +138,6 @@ def upgrade() -> None:
         sa.Column(
             "config_override_json",
             postgresql.JSONB(),
-            nullable=True,
-        ),
-        sa.Column(
-            "status",
-            sa.Enum(
-                "pending",
-                "deploying",
-                "ready",
-                "failed",
-                name="guardrail_rule_deployment_status_enum",
-            ),
-            nullable=False,
-            server_default="pending",
-        ),
-        sa.Column(
-            "error_message",
-            sa.Text(),
             nullable=True,
         ),
         sa.Column(
@@ -232,6 +216,5 @@ def downgrade() -> None:
     op.drop_column("guardrail_probe", "probe_type")
 
     # Drop enum types
-    op.execute("DROP TYPE IF EXISTS guardrail_rule_deployment_status_enum")
     op.execute("DROP TYPE IF EXISTS scanner_type_enum")
     op.execute("DROP TYPE IF EXISTS probe_type_enum")

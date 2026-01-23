@@ -22,7 +22,6 @@ from uuid import UUID
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import select
 
-from budapp.commons.constants import GuardrailRuleDeploymentStatusEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.guardrails.crud import GuardrailsDeploymentDataManager
 from budapp.guardrails.models import GuardrailProbe, GuardrailRule
@@ -240,51 +239,19 @@ class GuardrailPipelineActions(SessionMixin):
             "metadata_json": metadata,
         }
 
-    async def update_rule_deployment_status(
-        self,
-        rule_deployment_id: UUID,
-        status: str,
-        endpoint_id: UUID | None = None,
-        error_message: str | None = None,
-    ) -> dict[str, Any]:
-        """Update the status of a rule deployment.
-
-        Args:
-            rule_deployment_id: The rule deployment record ID
-            status: New status (pending, deploying, ready, failed)
-            endpoint_id: Optional endpoint ID if deployment succeeded
-            error_message: Optional error message if deployment failed
-
-        Returns:
-            dict with updated deployment info
-        """
-        data_manager = GuardrailsDeploymentDataManager(self.session)
-
-        status_enum = GuardrailRuleDeploymentStatusEnum(status)
-        deployment = await data_manager.update_rule_deployment_status(
-            rule_deployment_id=rule_deployment_id,
-            status=status_enum,
-            error_message=error_message,
-        )
-
-        return {
-            "id": str(deployment.id),
-            "rule_id": str(deployment.rule_id),
-            "status": deployment.status.value if hasattr(deployment.status, "value") else deployment.status,
-            "error_message": deployment.error_message,
-        }
-
-    async def get_pipeline_progress(
+    async def get_deployment_progress(
         self,
         guardrail_deployment_id: UUID,
     ) -> dict[str, Any]:
-        """Get overall pipeline progress for a guardrail deployment.
+        """Get overall deployment progress for a guardrail deployment.
 
-        Calculates progress based on rule deployment statuses.
+        Progress is derived from the linked endpoint statuses.
 
         Returns:
-            dict with progress percentage and status breakdown
+            dict with progress info and endpoint status breakdown
         """
+        from budapp.endpoint_ops.models import Endpoint
+
         data_manager = GuardrailsDeploymentDataManager(self.session)
 
         rule_deployments = await data_manager.get_rule_deployments_for_guardrail(
@@ -295,34 +262,43 @@ class GuardrailPipelineActions(SessionMixin):
             return {
                 "progress_percentage": 100.0,
                 "status": "no_models",
-                "breakdown": {},
+                "endpoints": [],
             }
 
-        status_counts: dict[str, int] = {
-            "pending": 0,
-            "deploying": 0,
-            "ready": 0,
-            "failed": 0,
-        }
-
+        # Get endpoint statuses
+        endpoint_statuses = []
         for rd in rule_deployments:
-            status_value = rd.status.value if hasattr(rd.status, "value") else rd.status
-            if status_value in status_counts:
-                status_counts[status_value] += 1
+            endpoint = self.session.get(Endpoint, rd.endpoint_id)
+            if endpoint:
+                endpoint_statuses.append(
+                    {
+                        "endpoint_id": str(endpoint.id),
+                        "endpoint_name": endpoint.name,
+                        "status": endpoint.status.value if hasattr(endpoint.status, "value") else str(endpoint.status),
+                        "rule_id": str(rd.rule_id),
+                    }
+                )
 
-        total = len(rule_deployments)
-        completed = status_counts["ready"] + status_counts["failed"]
-        in_progress = status_counts["deploying"]
+        # Calculate overall status from endpoints
+        status_counts: dict[str, int] = {}
+        for es in endpoint_statuses:
+            status = es["status"]
+            status_counts[status] = status_counts.get(status, 0) + 1
 
-        # Calculate progress: ready + failed = complete, deploying = partial
-        progress = ((completed + (in_progress * 0.5)) / total) * 100 if total > 0 else 100.0
+        total = len(endpoint_statuses)
+        running = status_counts.get("running", 0)
+        failed = status_counts.get("failure", 0)
+        deploying = status_counts.get("deploying", 0)
+
+        # Calculate progress
+        progress = ((running + failed) / total) * 100 if total > 0 else 100.0
 
         # Determine overall status
-        if status_counts["failed"] > 0:
-            overall_status = "partial_failure" if status_counts["ready"] > 0 else "failed"
-        elif completed == total:
-            overall_status = "ready"
-        elif in_progress > 0:
+        if failed > 0:
+            overall_status = "partial_failure" if running > 0 else "failed"
+        elif running == total:
+            overall_status = "running"
+        elif deploying > 0:
             overall_status = "deploying"
         else:
             overall_status = "pending"
@@ -330,6 +306,7 @@ class GuardrailPipelineActions(SessionMixin):
         return {
             "progress_percentage": round(progress, 2),
             "status": overall_status,
-            "breakdown": status_counts,
-            "total_models": total,
+            "status_breakdown": status_counts,
+            "total_endpoints": total,
+            "endpoints": endpoint_statuses,
         }
