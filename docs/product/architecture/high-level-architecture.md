@@ -65,61 +65,35 @@ This document describes the high-level architecture of Bud AI Foundry, including
 
 ### Layer 6: Infrastructure Layer
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Infrastructure Layer                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Kubernetes (Control Plane)                        │   │
-│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
-│  │  │  Helm Chart: infra/helm/bud/                                 │   │   │
-│  │  │                                                              │   │   │
-│  │  │  Dependencies:                                               │   │   │
-│  │  │  • PostgreSQL (Bitnami 16.7.18)                             │   │   │
-│  │  │  • Valkey/Redis (Bitnami 3.0.20)                            │   │   │
-│  │  │  • ClickHouse (Bitnami 9.3.9)                               │   │   │
-│  │  │  • MinIO (Bitnami 17.0.15)                                  │   │   │
-│  │  │  • Keycloak (Bitnami 24.7.7)                                │   │   │
-│  │  │  • Kafka (Bitnami 32.3.5)                                   │   │   │
-│  │  │  • MongoDB (Bitnami 16.5.31)                                │   │   │
-│  │  │  • Prometheus (prometheus-community 25.27.0)                │   │   │
-│  │  │  • Novu (local chart 0.1.6)                                 │   │   │
-│  │  │  • Onyx (local chart 0.4.4)                                 │   │   │
-│  │  └─────────────────────────────────────────────────────────────┘   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Observability Stack (LGTM)                        │   │
-│  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐        │   │
-│  │  │  Grafana  │  │   Loki    │  │   Tempo   │  │   Mimir   │        │   │
-│  │  │ Dashboards│  │   Logs    │  │  Traces   │  │  Metrics  │        │   │
-│  │  └───────────┘  └───────────┘  └───────────┘  └───────────┘        │   │
-│  │        │              │              │              │               │   │
-│  │        └──────────────┴──────────────┴──────────────┘               │   │
-│  │                              │                                       │   │
-│  │                    ┌─────────┴─────────┐                            │   │
-│  │                    │  OpenTelemetry    │                            │   │
-│  │                    │    Collector      │                            │   │
-│  │                    └───────────────────┘                            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Infrastructure as Code                            │   │
-│  │  ┌─────────────────────────┐  ┌─────────────────────────┐          │   │
-│  │  │   Terraform/OpenTofu    │  │        Ansible          │          │   │
-│  │  │   infra/tofu/           │  │   budcluster/playbooks/ │          │   │
-│  │  ├─────────────────────────┤  ├─────────────────────────┤          │   │
-│  │  │ • AWS EKS modules       │  │ • Runtime deployment    │          │   │
-│  │  │ • Azure AKS modules     │  │ • NFD installation      │          │   │
-│  │  │ • VPC/networking        │  │ • HAMI setup            │          │   │
-│  │  │ • IAM/security          │  │ • GPU Operator          │          │   │
-│  │  │ • Storage classes       │  │ • Prometheus stack      │          │   │
-│  │  └─────────────────────────┘  └─────────────────────────┘          │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Infrastructure Layer](../diagrams/infrastrucutre-layer.png)
+
+| Category | Capability | Details |
+|----------|------------|---------|
+| **Compute** | Container Orchestration | Kubernetes-native deployment with auto-scaling, rolling updates, and self-healing |
+| | GPU Node Pools | Dedicated GPU nodes with NVIDIA drivers, CUDA support, and resource isolation |
+| | Horizontal Pod Autoscaling | CPU/memory and custom metrics-based scaling via Prometheus adapter |
+| **Cloud Support** | AWS | Elastic Kubernetes Service (EKS) with managed node groups, VPC networking |
+| | Azure | Azure Kubernetes Service (AKS) with virtual network integration |
+| | On-Premises | Bare-metal and VM-based Kubernetes clusters with custom provisioning |
+| **Networking** | Ingress | NGINX/Traefik ingress controllers with TLS termination, path-based routing |
+| | Service Mesh | Dapr sidecar for service-to-service communication, retries, circuit breaking |
+| | Load Balancing | L4/L7 load balancing with health checks and session affinity |
+| **Storage** | Persistent Volumes | Dynamic provisioning with storage classes (SSD, HDD, NVMe) |
+| | Object Storage | S3-compatible storage (MinIO) for models, datasets, artifacts |
+| | Distributed Cache | Valkey/Redis for session state, pub/sub, and rate limiting |
+| **Security** | RBAC | Kubernetes role-based access control with namespace isolation |
+| | Secrets Management | Kubernetes secrets with optional external vault integration |
+| | Network Policies | Pod-to-pod traffic control and namespace segmentation |
+| | mTLS | Service mesh encryption for inter-service communication |
+| **High Availability** | Multi-Zone | Workload distribution across availability zones |
+| | Replica Sets | Minimum replica guarantees with pod disruption budgets |
+| | Failover | Automatic pod rescheduling and health-based traffic routing |
+| **GPU Infrastructure** | NVIDIA GPU Operator | Automated driver installation, device plugin, and monitoring |
+| | HAMI | GPU time-slicing for multi-tenant GPU sharing |
+| | Node Feature Discovery | Automatic hardware detection (GPU model, memory, capabilities) |
+| **Observability** | Metrics | Prometheus for metrics collection and alerting |
+| | Dashboards | Grafana for visualization and operational dashboards |
+| | Logging | Centralized log aggregation and search |
 
 ---
 
@@ -127,152 +101,46 @@ This document describes the high-level architecture of Bud AI Foundry, including
 
 ### 1. Model Deployment Flow
 
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ budadmin │───►│  budapp  │───►│ budsim   │───►│budcluster│───►│  Target  │
-│   UI     │    │   API    │    │Optimizer │    │ Deploy   │    │ Cluster  │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
-     │               │               │               │               │
-     │  1. Deploy    │  2. Get       │  3. Return    │  4. Deploy    │
-     │     Request   │    optimal    │    config     │    runtime    │
-     │               │    config     │               │               │
-     ▼               ▼               ▼               ▼               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Deployment Workflow                             │
-│                                                                          │
-│  1. User initiates deployment from dashboard                            │
-│  2. budapp validates request, checks permissions                        │
-│  3. budsim runs optimization (XGBoost + genetic algorithm)             │
-│     - Predicts TTFT, throughput, latency                               │
-│     - Optimizes TP/PP, batch size, GPU allocation                      │
-│  4. budcluster provisions runtime:                                      │
-│     - Transfers model to cluster storage                               │
-│     - Deploys Helm chart with optimized config                         │
-│     - Configures ingress/service                                       │
-│  5. budmetrics starts collecting inference metrics                     │
-│  6. Dashboard shows deployment status via WebSocket                    │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+![Model Deployment Flow](../diagrams/model-deployment-flow.png)
+
+**Deployment Steps:**
+1. User initiates deployment from budadmin dashboard
+2. budapp validates request and checks permissions
+3. budsim runs optimization (XGBoost + genetic algorithm)
+   - Predicts TTFT, throughput, latency
+   - Optimizes TP/PP, batch size, GPU allocation
+4. budcluster provisions runtime on target cluster
+   - Transfers model to cluster storage
+   - Deploys Helm chart with optimized config
+   - Configures ingress/service
+5. budmetrics starts collecting inference metrics
+6. Dashboard shows real-time deployment status
 
 ### 2. Inference Request Flow
 
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Client  │───►│budgateway│───►│  Model   │───►│budmetrics│
-│   App    │    │  Router  │    │ Runtime  │    │ Metrics  │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘
-     │               │               │               │
-     │  1. POST      │  2. Route to  │  3. Inference │
-     │  /v1/chat/    │    provider   │    response   │
-     │  completions  │               │               │
-     ▼               ▼               ▼               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Inference Flow                                  │
-│                                                                          │
-│  1. Client sends OpenAI-compatible request to budgateway               │
-│  2. Gateway authenticates via API key (optional RSA decryption)        │
-│  3. Gateway resolves model → provider routing                          │
-│  4. Request forwarded to:                                              │
-│     - Local vLLM/SGLang runtime on managed cluster                     │
-│     - External provider (OpenAI, Anthropic, Together, etc.)            │
-│  5. Response streamed back to client                                   │
-│  6. Metrics recorded in ClickHouse:                                    │
-│     - Token counts (input/output)                                      │
-│     - Latency (TTFT, total)                                           │
-│     - Cost calculation                                                 │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+![Inference Request Flow](../diagrams/inference-request-flow.png)
 
-### 3. Cluster Provisioning Flow
+**Inference Steps:**
+1. Client sends OpenAI-compatible request to budgateway (`POST /v1/chat/completions`)
+2. Gateway authenticates via API key (optional RSA decryption)
+3. Gateway resolves model → provider routing
+4. Request forwarded to:
+   - Inference Cluster: Model runtime on managed GPU cluster
+   - External providers: OpenAI, Anthropic, Azure, Together
+5. Response streamed back to client
+6. Metrics recorded in ClickHouse (token counts, latency, cost)
 
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ budadmin │───►│  budapp  │───►│budcluster│───►│  Cloud   │
-│   UI     │    │   API    │    │ Workflow │    │ Provider │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘
-     │               │               │               │
-     │  1. Create    │  2. Start     │  3. Terraform │
-     │    Cluster    │    workflow   │    apply      │
-     ▼               ▼               ▼               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      Cluster Provisioning Workflow                       │
-│                                                                          │
-│  1. User submits cluster configuration                                  │
-│  2. budapp creates cluster record, starts Dapr workflow                │
-│  3. budcluster executes provisioning:                                  │
-│                                                                          │
-│     AWS EKS:                      Azure AKS:                            │
-│     ┌────────────────────┐       ┌────────────────────┐                │
-│     │ Terraform apply    │       │ Terraform apply    │                │
-│     │ • VPC/subnets      │       │ • Resource group   │                │
-│     │ • EKS cluster      │       │ • AKS cluster      │                │
-│     │ • Node groups      │       │ • Node pools       │                │
-│     │ • IAM roles        │       │ • AAD integration  │                │
-│     └────────────────────┘       └────────────────────┘                │
-│                                                                          │
-│     On-Premises:                                                        │
-│     ┌────────────────────┐                                             │
-│     │ Ansible playbooks  │                                             │
-│     │ • Validate access  │                                             │
-│     │ • Install deps     │                                             │
-│     │ • Configure K8s    │                                             │
-│     └────────────────────┘                                             │
-│                                                                          │
-│  4. Post-provisioning setup:                                           │
-│     • Deploy NFD for hardware detection                                │
-│     • Install GPU Operator (if NVIDIA GPUs detected)                   │
-│     • Install HAMI for GPU time-slicing                               │
-│     • Deploy Prometheus stack                                          │
-│                                                                          │
-│  5. Kubeconfig encrypted and stored                                    │
-│  6. Cluster status updated, UI notified                                │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+### 3. Pipeline Execution Flow
 
-### 4. Pipeline Execution Flow
+![Pipeline Execution Flow](../diagrams/pipeline-execution-flow.png)
 
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ budadmin │───►│  budapp  │───►│budpipeline───►│ Target   │
-│   UI     │    │  Proxy   │    │ Executor │    │ Services │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘
-     │               │               │               │
-     │  1. Execute   │  2. Forward   │  3. Run DAG   │
-     │    pipeline   │    to pipeline│    steps      │
-     ▼               ▼               ▼               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Pipeline Execution Flow                          │
-│                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                        DAG Execution                             │   │
-│  │                                                                  │   │
-│  │   ┌───────┐     ┌───────┐     ┌───────┐     ┌───────┐          │   │
-│  │   │Step 1 │────►│Step 2 │────►│Step 3 │────►│Step 4 │          │   │
-│  │   │ Log   │     │ HTTP  │     │Model  │     │Notify │          │   │
-│  │   └───────┘     └───────┘     │Deploy │     └───────┘          │   │
-│  │                               └───┬───┘                         │   │
-│  │                                   │                              │   │
-│  │                          Awaiting Event                         │   │
-│  │                                   │                              │   │
-│  │                               ┌───┴───┐                         │   │
-│  │                               │Event  │◄──── budcluster         │   │
-│  │                               │Received│     (pub/sub)          │   │
-│  │                               └───────┘                         │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-│  Features:                                                              │
-│  • Parallel step execution                                             │
-│  • Event-driven completion for long-running ops                        │
-│  • Progress tracking with weighted averaging                           │
-│  • Callback topics for real-time updates                              │
-│  • Optimistic locking for concurrent updates                          │
-│  • Retry policies with exponential backoff                            │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+**Pipeline Features:**
+- Parallel step execution with DAG-based orchestration
+- Event-driven completion for long-running operations (via Dapr Pub/Sub)
+- Progress tracking with weighted averaging
+- Real-time updates via WebSocket callbacks
+- Optimistic locking for concurrent updates
+- Retry policies with exponential backoff
 
 ---
 
@@ -321,46 +189,20 @@ Topics:
 
 ## Security Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Security Architecture                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Identity & Access Management                      │   │
-│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
-│  │  │                      Keycloak                                │   │   │
-│  │  │  • Multi-realm multi-tenancy                                │   │   │
-│  │  │  • SAML 2.0 / OIDC federation                              │   │   │
-│  │  │  • Role-based access control                               │   │   │
-│  │  │  • JWT token issuance                                      │   │   │
-│  │  └─────────────────────────────────────────────────────────────┘   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Data Protection                                   │   │
-│  │                                                                      │   │
-│  │  At Rest:                      In Transit:                          │   │
-│  │  • AES-256 encryption          • TLS 1.3 everywhere                │   │
-│  │  • RSA-4096 for key wrap       • mTLS for service mesh             │   │
-│  │  • Encrypted kubeconfigs       • Certificate rotation              │   │
-│  │                                                                      │   │
-│  │  Secrets:                                                           │   │
-│  │  • K8s Secret Store            • HashiCorp Vault (optional)        │   │
-│  │  • Dapr secret component       • Never plain-text in DB            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Audit & Compliance                                │   │
-│  │                                                                      │   │
-│  │  • Tamper-proof audit trail (hash chain)                           │   │
-│  │  • All API actions logged with user context                        │   │
-│  │  • Retention policies configurable                                  │   │
-│  │  • Export for compliance reporting                                  │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+The platform follows the **4 C's of Cloud Native Security** model (CNCF), providing defense-in-depth where each layer builds on the security of layers below.
+
+![Security Architecture](../diagrams/security-arch.png)
+
+
+
+**Key Security Controls:**
+
+| Layer | Controls |
+|-------|----------|
+| **Code** | Keycloak SSO with SAML 2.0/OIDC, JWT tokens, input validation, API key authentication |
+| **Container** | Image scanning in CI/CD, minimal base images, read-only filesystems, non-root execution |
+| **Cluster** | RBAC with namespace isolation, network policies, pod security standards, Dapr secrets |
+| **Cloud** | VPC segmentation, IAM policies, AES-256 encryption at rest, audit logging |
 
 ---
 
@@ -378,31 +220,7 @@ Topics:
 
 ### Multi-Cluster Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Multi-Cluster Topology                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Control Plane Cluster                             │   │
-│  │                                                                      │   │
-│  │    All Bud services, databases, observability                       │   │
-│  │    Single point of management for all workload clusters             │   │
-│  └──────────────────────────────┬──────────────────────────────────────┘   │
-│                                 │                                           │
-│            ┌────────────────────┼────────────────────┐                     │
-│            ▼                    ▼                    ▼                     │
-│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐           │
-│  │ Workload Cluster │ │ Workload Cluster │ │ Workload Cluster │           │
-│  │   (AWS EKS)      │ │   (Azure AKS)    │ │   (On-Prem)      │           │
-│  ├──────────────────┤ ├──────────────────┤ ├──────────────────┤           │
-│  │ • Model runtimes │ │ • Model runtimes │ │ • Model runtimes │           │
-│  │ • Prometheus     │ │ • Prometheus     │ │ • Prometheus     │           │
-│  │ • NFD + HAMI     │ │ • NFD + HAMI     │ │ • NFD + HAMI     │           │
-│  └──────────────────┘ └──────────────────┘ └──────────────────┘           │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Mult-cluster Architecture](../diagrams/multi-cluster-arch.png)
 
 ---
 
