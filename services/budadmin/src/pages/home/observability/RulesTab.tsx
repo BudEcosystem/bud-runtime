@@ -159,8 +159,11 @@ const RulesTab: React.FC<RulesTabProps> = ({ timeRange, isActive }) => {
   };
 
   const handleEditRule = (rule: any) => {
-    setEditingRule(rule);
-    setIsFormModalOpen(true);
+    openDrawer("create-blocking-rule", {
+      editMode: true,
+      rule: rule,
+      ruleId: rule.id,
+    });
   };
 
   const handleDeleteRule = (ruleId: string) => {
