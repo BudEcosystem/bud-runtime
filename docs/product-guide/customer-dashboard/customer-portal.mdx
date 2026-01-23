@@ -164,50 +164,75 @@ A consistent sidebar, quick keyboard shortcuts, and collapse/expand views keep n
 3. Copy the snippet and replace the API key placeholder.
 4. Send the request to validate connectivity and model responses.
 
-### 4.4 Inspect logs and metrics
+### 4.4 Playground
 
-1. Open **Logs** from the side menu.
-2. Use the **Metrics** tab to select View by (Model/Project) and a time range.
-3. Click **Refresh** to update analytics.
-4. Switch to **Requests** to filter by date, endpoint type, model, tokens, or latency.
-5. Export CSV to share results or click a row to open Observability Details.
+1. Open Playground from the side menu.
+2. Select a model or endpoint you want to test.
+3. Enter a prompt and run it to review responses.
+4. Copy the output or iterate on the prompt before moving to production.
+5. Click the **\+** icon in the toolbar to open a new chat window.
+6. Load the desired model in the new pane; each window retains its own messages and settings.
+7. Use the kebab menu to close or delete a chat.
+8. Set presets, temperature, response length limit, repeat penalties, stop strings, optional notes and structured output options as needed in the settings panel.
 
-### 4.5 Review an observability detail
+### 4.5 Inspect logs and metrics
 
-1. From **Logs → Requests**, click an inference row.
+1. Open Logs from the side menu.
+2. Use the Metrics tab to select View by (Model/Project) and a time range.
+3. Click Refresh to update analytics.
+4. Charts for request volume over time, latency distribution, geographic origin, token usage, requests per second, and TTFT with series colored per selected view dimension.
+4. Switch to Requests to filter by date, endpoint type, model, tokens, or latency.
+4. Inference request table with timestamp, project, deployment, prompt preview, response time, tokens, and success/failure status columns plus sortable fields for timestamp and response time.
+5. Export CSV to share results or click a row to open Request Details.
+
+### 4.6 Review an inference request detail
+
+1. Click an inference request row to open the request detail page.
 2. Copy the Inference ID or raw request/response as needed.
 3. Review request metadata, performance metrics, and error details.
 4. Download conversation or payload JSON for offline analysis.
 
-### 4.6 Track usage and configure billing alerts
+### 4.7 Usage and Billing
 
-1. Open **Usage & Billing** from the side menu.
+1. Open Usage & Billing from the side menu.
 2. Pick a project and time range to update charts and the usage table.
-3. Click **Export** to download the usage JSON.
-4. Select **Add Alert** and set the alert name, type, and threshold.
+3. Click Export to download the usage JSON.
+4. Select Add Alert in the Billing Alerts section.
+5. Set the alert name, type (Cost Usage Alert or Token Usage Alert), and threshold.
 5. Toggle alerts on/off or delete them from the list.
 
-### 4.8 Create or revoke API keys
+### 4.8 API keys
 
-1. Open **API Keys** from the side menu.
-2. Click **Create New Key**.
+1. Open API Keys from the side menu.
+2. Click Create New Key.
 3. Enter a credential name, choose a project, and set expiry.
 4. Open a row to view the key and copy it securely.
-5. Use **Revoke** to disable compromised keys.
+5. Use Delete to remove a key.
 
 ### 4.9 Manage projects
 
-1. Open **Projects** from the side menu.
-2. Click **Project** to create a new project record.
-3. Use the card menu to edit or delete.
-4. Open a project card to review tags and available API keys.
+1. Open Projects from the side menu.
+2. Click Project to create a new project record.
+3. Enter a project name, tags and description.
+4. Submit to add the project to the catalog.
+3. Click on to edit or delete actions if needed.
+5. Click on a project to open the project detail page.
+3. Review tags and available API keys.
 
-### 4.10 Review audit activity
+### 4.10 Monitoring & Audit
 
-1. Open **Audit** from the side menu.
+1. Open Audit from the side menu.
+1. Review cards for total events, failed actions, and resources modified.
 2. Filter by action, resource, or date range.
 3. Search for users or resources to isolate events.
 4. Export CSV when you need a compliance-ready activity log.
+
+### 4.11 Task Island
+
+1. Click Task Island in the left sidebar to open the notification panel.
+2. Review notification cards with a title, message, timestamp, status, and icon.
+3. Use the list to track success confirmations, and failure alerts.
+4. Select Clear all to mark notifications as read and collapse the list.
 
 ## 5. FAQ
 
@@ -221,11 +246,11 @@ You can filter by date range, endpoint type, model, token thresholds, max latenc
 
 **Q3. How do I access a model’s API snippet?**
 
-Open the model detail drawer, go to **Use Model**, pick a language, and copy the snippet for the model’s supported endpoint.
+Open the model detail page and use the Use Model tab to copy Curl, Python, or JavaScript examples tailored to the model’s supported endpoint.
 
 **Q4. How are API keys secured?**
 
-Keys are generated per project, shown once in detail drawers with show/hide controls, and can be revoked immediately when needed.
+Keys are generated per project, shown once in detail page with show/hide controls, and can be revoked immediately when needed.
 
 **Q5. Can I export usage data and logs?**
 
@@ -233,4 +258,8 @@ Yes. Usage exports download JSON data, and Logs/Observability exports provide CS
 
 **Q6. Where do I see request-level troubleshooting details?**
 
-Open **Logs → Requests**, select an inference, and review the Observability Details view for metadata, errors, and raw payloads.
+Open Requests tab in the Logs page, select an inference, and review the Observability Details view for metadata, errors, and raw payloads.
+
+**Q7. Can token pricing be set to zero for shared access?**
+
+Yes. Admins can set input and output token costs to 0 so teams can use a published endpoint without cost limits.
