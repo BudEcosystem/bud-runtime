@@ -78,7 +78,7 @@ interface InferenceDetail {
 
 const InferenceDetailPage: React.FC = () => {
   const router = useRouter();
-  const { slug, inferenceId } = router.query;
+  const { slug, inferenceId, projectId } = router.query;
   const [inferenceData, setInferenceData] = useState<InferenceDetail | null>(
     null,
   );
@@ -93,11 +93,28 @@ const InferenceDetailPage: React.FC = () => {
     setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (inferenceId && typeof inferenceId === "string") {
-      fetchInferenceDetail(inferenceId);
+  const resolveInferenceId = () => {
+    if (typeof inferenceId === "string" && !inferenceId.includes("[")) {
+      return inferenceId;
     }
-  }, [inferenceId]);
+
+    const path = router.asPath.split("?")[0];
+    const parts = path.split("/").filter(Boolean);
+    const lastSegment = parts[parts.length - 1];
+
+    if (lastSegment && !lastSegment.includes("[")) {
+      return lastSegment;
+    }
+
+    return null;
+  };
+
+  useEffect(() => {
+    const resolvedInferenceId = resolveInferenceId();
+    if (resolvedInferenceId) {
+      fetchInferenceDetail(resolvedInferenceId);
+    }
+  }, [inferenceId, router.asPath]);
 
   const fetchInferenceDetail = async (id: string) => {
     try {
@@ -151,7 +168,10 @@ const InferenceDetailPage: React.FC = () => {
   };
 
   const goBack = () => {
-    router.push(`/projects/${slug}?tab=observability`);
+    const resolvedProjectId =
+      (typeof projectId === "string" && projectId) ||
+      (typeof slug === "string" && !slug.includes("[") ? slug : "");
+    router.push(`/projects/${resolvedProjectId}?tab=observability`);
   };
 
   const HeaderContent = () => {
@@ -201,7 +221,12 @@ const InferenceDetailPage: React.FC = () => {
                 </Text_12_400_EEEEEE>
                 <Button
                   type="primary"
-                  onClick={() => fetchInferenceDetail(inferenceId as string)}
+                  onClick={() => {
+                    const resolvedInferenceId = resolveInferenceId();
+                    if (resolvedInferenceId) {
+                      fetchInferenceDetail(resolvedInferenceId);
+                    }
+                  }}
                 >
                   Try Again
                 </Button>
