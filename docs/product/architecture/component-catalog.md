@@ -12,23 +12,23 @@ Complete catalog of all platform components including services, databases, infra
 
 ### Core Services (Python/FastAPI)
 
-| Component | App ID | Port | Description |
-|-----------|--------|------|-------------|
-| **budapp** | budapp | 9081 | Core API handling users, projects, models, endpoints, and Keycloak authentication |
-| **budcluster** | budcluster | 9082 | Cluster lifecycle management for AWS EKS, Azure AKS, and on-premises via Terraform/Ansible |
-| **budsim** | budsim | 9083 | Performance simulation using XGBoost + genetic algorithms for deployment optimization |
-| **budmodel** | budmodel | 9084 | Model registry for metadata, licensing, security scanning, and leaderboard data |
-| **budmetrics** | budmetrics | 9085 | Observability service for inference tracking and time-series analytics |
-| **budpipeline** | budpipeline | 9086 | Workflow orchestration for DAG execution, scheduling, and event-driven pipelines |
-| **budeval** | budeval | 9087 | Model evaluation and benchmarking service |
-| **budnotify** | budnotify | 9088 | Notification service wrapping Novu for email, SMS, push, and in-app notifications |
-| **ask-bud** | ask-bud | 9089 | AI assistant for cluster analysis, performance Q&A, and troubleshooting |
+| Component | App ID | Description |
+|-----------|--------|-------------|
+| **budapp** | budapp | Core API handling users, projects, models, endpoints, and Keycloak authentication |
+| **budcluster** | budcluster | Cluster lifecycle management for AWS EKS, Azure AKS, and on-premises via Terraform/Ansible |
+| **budsim** | budsim | Performance simulation using heuristic and XGBoost + genetic algorithms for deployment optimization |
+| **budmodel** | budmodel | Model registry for metadata, licensing, security scanning, and leaderboard data |
+| **budmetrics** | budmetrics | Observability service for inference tracking and time-series analytics |
+| **budpipeline** | budpipeline | Workflow orchestration for DAG execution, scheduling, and event-driven pipelines |
+| **budeval** | budeval | Model evaluation and benchmarking service |
+| **budnotify** | budnotify | Notification service wrapping Novu for email, SMS, push, and in-app notifications |
+| **ask-bud** | ask-bud | AI assistant for cluster analysis, performance Q&A, and troubleshooting |
 
 ### Gateway Service (Rust)
 
-| Component | Port | Description |
-|-----------|------|-------------|
-| **budgateway** | 3000 | High-performance API gateway for model inference routing, OpenAI-compatible API |
+| Component | Description |
+|-----------|-------------|
+| **budgateway** | High-performance API gateway for model inference routing, OpenAI-compatible API |
 
 ---
 
@@ -36,11 +36,11 @@ Complete catalog of all platform components including services, databases, infra
 
 ### Web Applications (TypeScript/Next.js)
 
-| Component | Port | Description |
-|-----------|------|-------------|
-| **budadmin** | 8007 | Main dashboard for deployments, clusters, models, and infrastructure management |
-| **budplayground** | 8008 | Interactive AI model testing interface for prompt experimentation |
-| **budCustomer** | 8009 | Customer-facing portal for usage dashboards, billing, and API key management |
+| Component | Description |
+|-----------|-------------|
+| **budadmin** | Main dashboard for deployments, clusters, models, and infrastructure management |
+| **budplayground** | Interactive AI model testing interface for prompt experimentation |
+| **budCustomer** | Customer-facing portal for usage dashboards, billing, and API key management |
 
 ---
 
@@ -114,14 +114,11 @@ Complete catalog of all platform components including services, databases, infra
 
 ---
 
-## Observability Stack (LGTM)
+## Observability Stack
 
 | Component | Purpose | Storage |
 |-----------|---------|---------|
 | **Grafana** | Dashboards, visualization, alerting | - |
-| **Loki** | Log aggregation and search | MinIO |
-| **Tempo** | Distributed tracing | MinIO |
-| **Mimir** | Long-term metrics storage | MinIO |
 | **Prometheus** | Metrics collection (per cluster) | Local |
 | **OpenTelemetry Collector** | Unified telemetry data ingestion | - |
 
@@ -215,23 +212,6 @@ Complete catalog of all platform components including services, databases, infra
 | **HuggingFace Hub** | Model download | Pre-trained model access |
 | **Custom S3/MinIO** | Model storage | Private model hosting |
 
-### Identity Providers
-
-| Provider | Protocol | Description |
-|----------|----------|-------------|
-| **LDAP** | LDAP | Directory services |
-| **Active Directory** | LDAP/SAML | Microsoft identity |
-| **Okta** | SAML 2.0/OIDC | Enterprise SSO |
-| **Azure AD** | SAML 2.0/OIDC | Microsoft cloud identity |
-
-### Monitoring Integrations
-
-| System | Integration | Description |
-|--------|-------------|-------------|
-| **Datadog** | OpenTelemetry | APM and infrastructure monitoring |
-| **Splunk** | Log forwarding | SIEM integration |
-| **PagerDuty** | Alertmanager | Incident management |
-| **Slack** | Webhooks | Alert notifications |
 
 ---
 
@@ -243,26 +223,7 @@ Complete catalog of all platform components including services, databases, infra
 |-----------|-------------|
 | **NFD (Node Feature Discovery)** | Detects hardware capabilities on cluster nodes |
 | **GPU Operator** | NVIDIA driver and runtime management |
-| **HAMI** | GPU time-slicing for multi-tenant workloads |
-
-### Supported GPUs
-
-| Vendor | Models |
-|--------|--------|
-| **NVIDIA** | A100, H100, L40S, A10G, T4, V100 |
-| **Intel** | Gaudi (HPU) |
-| **AMD** | MI300 (experimental) |
-
----
-
-## Model Runtimes
-
-| Runtime | Description |
-|---------|-------------|
-| **vLLM** | High-throughput LLM inference with PagedAttention |
-| **SGLang** | Structured generation with RadixAttention |
-| **TensorRT-LLM** | NVIDIA-optimized inference |
-| **ONNX Runtime** | Cross-platform inference |
+| **Bud FCSP** | GPU time-slicing for multi-tenant workloads |
 
 ---
 
