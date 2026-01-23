@@ -443,7 +443,7 @@ const AgentDrawer: React.FC = () => {
               </Tooltip>
 
               {/* Chat/Message Icon */}
-              <Tooltip title={(showPlayground || showChatHistory) ? "Chat History" : "Enable playground first"} placement="right">
+              {/* <Tooltip title={(showPlayground || showChatHistory) ? "Chat History" : "Enable playground first"} placement="right">
                 <button
                   onClick={handleChatHistoryClick}
                   className={`control-bar-icon w-8 h-8 flex items-center justify-center rounded-md transition-colors ${(showPlayground || showChatHistory) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
@@ -452,7 +452,7 @@ const AgentDrawer: React.FC = () => {
                 >
                   <MessageOutlined className={`text-lg ${showChatHistory ? 'text-[#EEEEEE]' : 'text-[#808080] hover:text-[#EEEEEE]'}`} />
                 </button>
-              </Tooltip>
+              </Tooltip> */}
             </div>
             <div></div>
           </div>
