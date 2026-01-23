@@ -1,0 +1,12 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+stateDiagram-v2
+    [*] --> DEPLOYING: Create deployment
+    DEPLOYING --> RUNNING: Deployment successful
+    DEPLOYING --> FAILED: Deployment error
+    RUNNING --> STOPPING: Stop requested
+    RUNNING --> FAILED: Runtime error
+    STOPPING --> STOPPED: Stop complete
+    FAILED --> DEPLOYING: Retry deployment
+    STOPPED --> DEPLOYING: Restart
+    STOPPED --> [*]: Delete deployment
+    FAILED --> [*]: Delete deployment

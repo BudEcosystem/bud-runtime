@@ -1,0 +1,21 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant H as Handler
+    participant R as Router
+    participant P1 as Provider 1 (Primary)
+    participant P2 as Provider 2 (Fallback)
+    participant M as Metrics
+
+    H->>R: Route Request
+    R->>R: Get Routing Chain
+
+    R->>P1: Try Primary Provider
+    P1--xR: Error (timeout/500)
+    R->>M: Log Provider 1 Failure
+
+    R->>P2: Try Fallback Provider
+    P2-->>R: Success
+    R->>M: Log Provider 2 Success
+
+    R-->>H: Return Response
+    H->>M: Record Latency/Tokens

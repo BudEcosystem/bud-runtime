@@ -1,0 +1,31 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant C as Client
+    participant BA as budapp
+    participant BP as budpipeline
+    participant DB as PostgreSQL
+    participant A as ActionExecutor
+    participant ES as External Service
+
+    C->>BA: POST /executions
+    BA->>BP: Dapr invoke
+    BP->>DB: Create PipelineExecution
+    BP->>DB: Create StepExecutions
+    BP-->>BA: Execution created (PENDING)
+    BA-->>C: 201 Created
+
+    loop For each step
+        BP->>A: execute(context)
+        alt Sync action
+            A-->>BP: ActionResult (success)
+            BP->>DB: Update step COMPLETED
+        else Event-driven action
+            A->>ES: Start external operation
+            ES-->>A: workflow_id
+            A-->>BP: ActionResult (awaiting_event)
+            BP->>DB: Update step (awaiting_event=true)
+        end
+        BP->>DB: Update execution progress
+    end
+
+    BP->>DB: Update execution COMPLETED

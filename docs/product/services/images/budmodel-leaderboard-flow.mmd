@@ -1,0 +1,31 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant Dapr as Dapr Cron
+    participant budmodel
+    participant Workflow as Dapr Workflow
+    participant PostgreSQL
+    participant Sources as Benchmark Sources
+
+    Note over Dapr,budmodel: Scheduled Trigger (every 7 days)
+    Dapr->>budmodel: POST /leaderboard/extraction-cron
+    budmodel->>Workflow: Start LeaderboardExtractionWorkflow
+    budmodel-->>Dapr: {status: triggered}
+
+    Note over Workflow,Sources: Background Execution
+    Workflow->>PostgreSQL: Get active sources
+    PostgreSQL-->>Workflow: [ChatbotArena, Berkeley, MTEB, ...]
+
+    loop For each source
+        Workflow->>Workflow: Check last_extracted_at
+        alt Stale (> 7 days)
+            Workflow->>Sources: Web crawl/API fetch
+            Sources-->>Workflow: {model_scores}
+            Workflow->>PostgreSQL: Match model URIs
+            Workflow->>PostgreSQL: Upsert leaderboard entries
+            Workflow->>PostgreSQL: Update source.last_extracted_at
+        else Fresh
+            Workflow->>Workflow: Skip source
+        end
+    end
+
+    Workflow->>Workflow: Complete workflow

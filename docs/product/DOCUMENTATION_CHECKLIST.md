@@ -34,7 +34,7 @@ Master checklist of all technical documentation for Bud AI Foundry. Use this to 
 |---|----------|-------------|----------|--------|----------|
 | 1.2.1 | Architecture Whitepaper | Comprehensive platform architecture | P0 | [x] | [architecture/architecture-whitepaper.md](architecture/architecture-whitepaper.md) |
 | 1.2.2 | High-Level Design (HLD) | Major components and interactions | P0 | [x] | [architecture/high-level-architecture.md](architecture/high-level-architecture.md) |
-| 1.2.3 | Low-Level Design (LLD) | Detailed technical design per service | P1 | [ ] | |
+| 1.2.3 | Low-Level Design (LLD) | Detailed technical design per service | P1 | [x] | [architecture/low-level-design.md](architecture/low-level-design.md) |
 | 1.2.4 | Component Catalog | All platform components with descriptions | P0 | [x] | [architecture/component-catalog.md](architecture/component-catalog.md) |
 | 1.2.5 | Technology Stack Reference | Technologies, frameworks, versions | P0 | [x] | [architecture/technology-stack-reference.md](architecture/technology-stack-reference.md) |
 

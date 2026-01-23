@@ -1,0 +1,40 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant Service as SimulationService
+    participant Evolution as Evolution (DEAP)
+    participant Predictor as BenchmarkPredictor/Heuristic
+    participant Memory as llm-memory-calculator
+
+    Service->>Evolution: Initialize(model, targets, device_config)
+    Evolution->>Evolution: Setup DEAP toolbox
+    Evolution->>Evolution: Define gene boundaries (TP, PP, etc.)
+
+    loop Generations (default: 30)
+        Evolution->>Evolution: Generate population
+
+        loop Evaluate each individual
+            Evolution->>Evolution: Decode genes to config
+            Evolution->>Memory: Validate memory requirements
+            Memory-->>Evolution: {valid, total_memory, breakdown}
+
+            alt Memory valid
+                Evolution->>Predictor: Predict(config)
+                Predictor-->>Evolution: {ttft, throughput, latency}
+                Evolution->>Evolution: Calculate fitness
+                Evolution->>Evolution: Update top_k configs
+            else Memory invalid
+                Evolution->>Evolution: Assign penalty fitness
+            end
+        end
+
+        Evolution->>Evolution: Select elite (top 20%)
+        Evolution->>Evolution: Crossover and mutation
+        Evolution->>Evolution: Check convergence
+
+        alt Converged (10 gens no improvement)
+            Evolution->>Service: Return top_k_configs
+        end
+    end
+
+    Evolution->>Service: Return top_k_configs
+    Service->>Service: Build deployment configuration

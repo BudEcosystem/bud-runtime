@@ -1,0 +1,14 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant Client
+    participant budapp
+    participant budsim
+    participant budcluster
+
+    Client->>budapp: POST /endpoints {model_id, cluster_id, config}
+    budapp->>budapp: Validate request, create endpoint record
+    budapp->>budsim: Request optimization config
+    budsim-->>budapp: {tp, pp, batch_size, replicas}
+    budapp->>budcluster: Deploy model with config
+    budcluster-->>budapp: {workflow_id, status: DEPLOYING}
+    budapp-->>Client: {endpoint_id, status: DEPLOYING}

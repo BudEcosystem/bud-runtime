@@ -1,0 +1,36 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant C as Client
+    participant BE as budeval API
+    participant WF as Dapr Workflow
+    participant AO as Ansible Orchestrator
+    participant CL as Target Cluster
+    participant OC as OpenCompass
+    participant CH as ClickHouse
+
+    C->>BE: POST /evals/start
+    BE->>WF: Start Evaluation Workflow
+    WF-->>C: Workflow ID
+
+    WF->>WF: Validate Request
+    WF->>WF: Generate OpenCompass Config
+    WF->>AO: Deploy Evaluation Job
+
+    AO->>CL: SSH Connect
+    AO->>CL: Deploy OpenCompass Container
+    CL->>OC: Run Benchmarks
+
+    loop For each dataset
+        OC->>OC: Load Dataset
+        OC->>OC: Run Evaluation
+        OC->>OC: Calculate Metrics
+    end
+
+    OC-->>CL: Results JSON
+    CL-->>AO: Job Completed
+    AO-->>WF: Results Available
+
+    WF->>CH: Store Results
+    WF->>WF: Publish Completion Event
+
+    Note over C,CH: Client polls /evals/{id} for results

@@ -1,0 +1,10 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant Client
+    participant budapp
+    participant Keycloak
+
+    Client->>budapp: POST /auth/login {email, password}
+    budapp->>Keycloak: Authenticate user
+    Keycloak--xbudapp: 401 Invalid credentials
+    budapp-->>Client: 401 {error: "Invalid credentials"}

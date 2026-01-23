@@ -1,0 +1,40 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant U as User
+    participant AB as ask-bud API
+    participant AS as AgentService
+    participant LLM as LLM Provider
+    participant T as Tools
+    participant BC as budcluster
+    participant BM as budmetrics
+
+    U->>AB: POST /v1/chat/completions
+    AB->>AS: process_chat_completion()
+    AS->>AS: Load session context
+
+    AS->>LLM: Send messages + tools
+    LLM-->>AS: Tool call request
+
+    alt Tool: get_cluster_info
+        AS->>T: Execute cluster tool
+        T->>BC: Get cluster info
+        BC-->>T: Cluster data
+        T-->>AS: Tool result
+    else Tool: get_metrics
+        AS->>T: Execute metrics tool
+        T->>BM: Query metrics
+        BM-->>T: Metrics data
+        T-->>AS: Tool result
+    end
+
+    AS->>LLM: Send tool results
+    LLM-->>AS: Final response
+
+    AS->>AS: Update session
+    AS-->>AB: ChatCompletionResponse
+
+    alt Streaming
+        AB-->>U: SSE chunks
+    else Non-streaming
+        AB-->>U: Complete response
+    end

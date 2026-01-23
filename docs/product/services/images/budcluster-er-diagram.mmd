@@ -1,0 +1,70 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+erDiagram
+    Cluster ||--o{ ClusterNodeInfo : "has nodes"
+    Cluster ||--o{ Deployment : "hosts"
+    Deployment ||--o{ WorkerInfo : "runs on"
+    Benchmark ||--|| BenchmarkResult : "produces"
+
+    Cluster {
+        uuid id PK
+        uuid project_id FK
+        string name
+        enum status
+        enum provider
+        string region
+        json credentials_encrypted
+        datetime created_at
+    }
+
+    ClusterNodeInfo {
+        uuid id PK
+        uuid cluster_id FK
+        string node_name
+        string instance_type
+        int gpu_count
+        string gpu_model
+        int cpu_cores
+        int memory_gb
+    }
+
+    Deployment {
+        uuid id PK
+        uuid cluster_id FK
+        uuid endpoint_id FK
+        string model_name
+        enum status
+        int replicas
+        json config
+        datetime created_at
+    }
+
+    WorkerInfo {
+        uuid id PK
+        uuid deployment_id FK
+        string pod_name
+        string node_name
+        enum status
+        int tp_size
+        int pp_size
+        datetime started_at
+    }
+
+    Benchmark {
+        uuid id PK
+        uuid cluster_id FK
+        string model_name
+        int input_tokens
+        int output_tokens
+        int concurrency
+        datetime created_at
+    }
+
+    BenchmarkResult {
+        uuid id PK
+        uuid benchmark_id FK
+        float throughput_tps
+        float latency_avg_ms
+        float latency_p99_ms
+        float ttft_ms
+        datetime completed_at
+    }

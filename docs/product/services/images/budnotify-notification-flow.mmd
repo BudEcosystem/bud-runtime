@@ -1,0 +1,37 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant S as Source Service
+    participant BN as budnotify API
+    participant V as Validator
+    participant NS as NotificationService
+    participant NV as Novu Backend
+    participant CH as Channels (Email/SMS/Push)
+    participant U as User
+
+    S->>BN: POST /notifications
+    BN->>V: Validate Request
+
+    alt Invalid Request
+        V-->>BN: Validation Error
+        BN-->>S: 400 Bad Request
+    else Valid Request
+        V-->>BN: OK
+        BN->>NS: trigger_novu_notification_event()
+        NS->>NV: Send via Novu API
+
+        NV->>NV: Process Workflow
+        NV->>NV: Resolve Subscribers
+
+        par Channel Delivery
+            NV->>CH: Email
+            NV->>CH: SMS
+            NV->>CH: Push
+            NV->>CH: In-App
+        end
+
+        CH-->>U: Notification Delivered
+
+        NV-->>NS: Acknowledged + Transaction ID
+        NS-->>BN: NotificationResponse
+        BN-->>S: 200 OK
+    end

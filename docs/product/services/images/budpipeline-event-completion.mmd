@@ -1,0 +1,25 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant ES as External Service
+    participant DS as Dapr Pub/Sub
+    participant BP as budpipeline
+    participant ER as EventRouter
+    participant A as ActionExecutor
+    participant DB as PostgreSQL
+
+    ES->>DS: Publish workflow_completed
+    DS->>BP: POST /workflow-events
+    BP->>ER: Route event
+    ER->>DB: Find step by external_workflow_id
+    DB-->>ER: StepExecution (awaiting_event)
+    ER->>A: on_event(context)
+    A-->>ER: EventResult (COMPLETE)
+    ER->>DB: Update step COMPLETED
+    ER->>DB: Update execution progress
+
+    alt All steps completed
+        ER->>DB: Update execution COMPLETED
+        ER->>DS: Publish to callback topics
+    else More steps pending
+        ER->>BP: Continue next step
+    end

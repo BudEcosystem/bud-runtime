@@ -1,0 +1,23 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant Client
+    participant budcluster
+    participant PostgreSQL
+    participant Redis
+    participant Cluster as Target Cluster
+
+    Client->>budcluster: POST /cluster {kubeconfig, metadata}
+    budcluster->>budcluster: Encrypt kubeconfig
+    budcluster->>PostgreSQL: Create cluster record (REGISTERING)
+    budcluster->>Redis: Start Dapr workflow
+    budcluster-->>Client: {workflow_id, steps}
+
+    Note over budcluster,Cluster: Workflow Execution
+    budcluster->>Cluster: Verify connection
+    Cluster-->>budcluster: Connection OK
+    budcluster->>Cluster: Deploy NFD
+    Cluster-->>budcluster: NFD Ready
+    budcluster->>Cluster: Collect node info
+    Cluster-->>budcluster: Node labels
+    budcluster->>PostgreSQL: Store node info
+    budcluster->>PostgreSQL: Update status (AVAILABLE)

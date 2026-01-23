@@ -1,0 +1,74 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+erDiagram
+    PipelineDefinition ||--o{ PipelineExecution : "instantiates"
+    PipelineExecution ||--o{ StepExecution : "contains"
+    PipelineExecution ||--o{ ProgressEvent : "emits"
+    PipelineExecution ||--o{ ExecutionSubscription : "has"
+
+    PipelineDefinition {
+        uuid id PK
+        int version
+        string name
+        json dag_definition
+        enum status
+        uuid user_id FK
+        boolean system_owned
+        int step_count
+        string created_by
+        datetime created_at
+        datetime updated_at
+    }
+
+    PipelineExecution {
+        uuid id PK
+        int version
+        uuid pipeline_id FK
+        json pipeline_definition
+        string initiator
+        datetime start_time
+        datetime end_time
+        enum status
+        int progress_percentage
+        json final_outputs
+        json error_info
+        datetime created_at
+        datetime updated_at
+    }
+
+    StepExecution {
+        uuid id PK
+        uuid execution_id FK
+        int version
+        string step_id
+        string step_name
+        enum status
+        int progress_percentage
+        json outputs
+        string error_message
+        int retry_count
+        int sequence_number
+        string awaiting_event
+        string external_workflow_id
+        string handler_type
+        datetime timeout_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    ProgressEvent {
+        uuid id PK
+        uuid execution_id FK
+        string step_id
+        string event_type
+        int progress
+        string message
+        datetime created_at
+    }
+
+    ExecutionSubscription {
+        uuid id PK
+        uuid execution_id FK
+        string topic
+        string callback_url
+        datetime created_at
+    }

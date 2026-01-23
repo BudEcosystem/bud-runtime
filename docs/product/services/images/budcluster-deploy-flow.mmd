@@ -1,0 +1,25 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant budapp
+    participant budcluster
+    participant budsim
+    participant Cluster as Target Cluster
+    participant PostgreSQL
+
+    budapp->>budcluster: POST /deployment {cluster_id, model}
+    budcluster->>budsim: Get optimization config
+    budsim-->>budcluster: {tp, pp, batch_size, replicas}
+    budcluster->>PostgreSQL: Create deployment record
+    budcluster-->>budapp: {workflow_id, steps}
+
+    Note over budcluster,Cluster: Workflow Execution
+    budcluster->>Cluster: Transfer model to storage
+    Cluster-->>budcluster: Transfer complete
+    budcluster->>Cluster: Helm install runtime
+    Cluster-->>budcluster: Release created
+    budcluster->>Cluster: Wait for pods ready
+    Cluster-->>budcluster: Pods running
+    budcluster->>Cluster: Health check /health
+    Cluster-->>budcluster: HTTP 200
+    budcluster->>PostgreSQL: Update status (RUNNING)
+    budcluster->>budapp: Notify deployment ready

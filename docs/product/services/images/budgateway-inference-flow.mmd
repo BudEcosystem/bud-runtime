@@ -1,0 +1,32 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant C as Client
+    participant GW as budgateway
+    participant A as Auth Middleware
+    participant RL as Rate Limiter
+    participant H as Handler
+    participant P as Provider
+
+    C->>GW: POST /v1/chat/completions
+    GW->>A: Validate API Key
+    A->>A: Lookup in Redis
+    A->>A: RSA Decrypt (if needed)
+    A-->>GW: Authenticated
+
+    GW->>RL: Check Rate Limit
+    RL->>RL: Token Bucket Check
+    RL-->>GW: Allowed
+
+    GW->>H: Process Request
+    H->>H: Resolve Model
+    H->>H: Verify Capability
+    H->>P: Forward to Provider
+    P-->>H: Provider Response
+
+    alt Streaming
+        H-->>C: SSE Stream Chunks
+    else Non-streaming
+        H-->>C: JSON Response
+    end
+
+    GW->>GW: Log Analytics

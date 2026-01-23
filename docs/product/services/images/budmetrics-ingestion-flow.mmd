@@ -1,0 +1,20 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant GW as budgateway
+    participant DS as Dapr Pub/Sub
+    participant BM as budmetrics
+    participant CH as ClickHouse
+    participant RU as Rollup Tables
+
+    GW->>DS: Publish inference metrics
+    DS->>BM: POST /observability/add
+    BM->>BM: Validate batch (max 1000)
+    BM->>BM: Check for duplicates
+    BM->>CH: INSERT INTO InferenceFact
+    CH-->>BM: Insert result
+    BM-->>DS: Success/partial success
+
+    Note over CH,RU: Materialized Views auto-aggregate
+    CH->>RU: Update InferenceMetrics5m
+    RU->>RU: Update InferenceMetrics1h
+    RU->>RU: Update InferenceMetrics1d

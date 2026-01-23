@@ -1,0 +1,13 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+stateDiagram-v2
+    [*] --> REGISTERING: Register cluster
+    REGISTERING --> AVAILABLE: Registration successful
+    REGISTERING --> ERROR: Registration failed
+    AVAILABLE --> NOT_AVAILABLE: Connection lost
+    NOT_AVAILABLE --> AVAILABLE: Connection restored
+    NOT_AVAILABLE --> ERROR: Max retries exceeded
+    ERROR --> REGISTERING: Retry registration
+    AVAILABLE --> DELETING: Delete requested
+    ERROR --> DELETING: Delete requested
+    NOT_AVAILABLE --> DELETING: Delete requested
+    DELETING --> [*]: Deletion complete

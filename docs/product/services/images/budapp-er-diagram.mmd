@@ -1,0 +1,69 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+erDiagram
+    Tenant ||--o{ TenantClient : "has"
+    Tenant ||--o{ Project : "owns"
+    TenantClient ||--o{ User : "authenticates"
+
+    User ||--o{ Permission : "has"
+    User ||--o| UserBilling : "has"
+    User ||--o{ AuditTrail : "creates"
+
+    Project ||--o{ Endpoint : "contains"
+    Project ||--o{ Credential : "stores"
+    Project ||--o{ Router : "defines"
+    Project ||--o{ Prompt : "manages"
+    Project ||--o{ GuardrailProfile : "configures"
+
+    Endpoint ||--o{ Adapter : "uses"
+    Endpoint ||--o| GuardrailDeployment : "protected by"
+
+    Router ||--o{ RouterEndpoint : "routes to"
+    RouterEndpoint }o--|| Endpoint : "targets"
+
+    Prompt ||--o{ PromptVersion : "versions"
+
+    GuardrailProfile ||--o{ GuardrailDeployment : "deployed as"
+
+    Tenant {
+        uuid id PK
+        string name
+        string slug UK
+        datetime created_at
+    }
+
+    User {
+        uuid id PK
+        uuid tenant_client_id FK
+        string email UK
+        string keycloak_id UK
+        enum role
+        boolean is_active
+    }
+
+    Project {
+        uuid id PK
+        uuid tenant_id FK
+        string name
+        string slug UK
+        datetime created_at
+    }
+
+    Endpoint {
+        uuid id PK
+        uuid project_id FK
+        string name
+        enum status
+        json config
+        datetime created_at
+    }
+
+    AuditTrail {
+        uuid id PK
+        uuid user_id FK
+        enum action
+        enum resource_type
+        uuid resource_id
+        string hash
+        string prev_hash
+        datetime created_at
+    }

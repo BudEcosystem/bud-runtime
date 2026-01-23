@@ -1,0 +1,12 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant Client
+    participant budapp
+    participant Keycloak
+    participant Redis
+
+    Client->>budapp: POST /auth/login {email, password}
+    budapp->>Keycloak: Authenticate user
+    Keycloak-->>budapp: {access_token, refresh_token}
+    budapp->>Redis: Store session
+    budapp-->>Client: {access_token, refresh_token, user}

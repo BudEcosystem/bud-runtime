@@ -1,0 +1,13 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+stateDiagram-v2
+    [*] --> PENDING: Create endpoint
+    PENDING --> DEPLOYING: Start deployment
+    DEPLOYING --> RUNNING: Deployment successful
+    DEPLOYING --> ERROR: Deployment failed
+    RUNNING --> STOPPING: Stop requested
+    STOPPING --> STOPPED: Stop complete
+    ERROR --> DEPLOYING: Retry deployment
+    STOPPED --> DEPLOYING: Restart
+    RUNNING --> ERROR: Runtime failure
+    STOPPED --> [*]: Delete endpoint
+    ERROR --> [*]: Delete endpoint

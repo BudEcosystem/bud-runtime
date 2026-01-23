@@ -1,0 +1,30 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant UI as Dashboard
+    participant BA as budapp
+    participant BM as budmetrics
+    participant QC as QueryCache
+    participant QB as QueryBuilder
+    participant CH as ClickHouse
+
+    UI->>BA: Analytics request
+    BA->>BM: POST /observability/analytics
+    BM->>QC: Check cache
+
+    alt Cache hit
+        QC-->>BM: Return cached result
+    else Cache miss
+        BM->>QB: Build query
+        QB->>QB: Select rollup vs raw table
+        QB->>QB: Build time buckets
+        QB->>QB: Build aggregations
+        QB-->>BM: SQL query
+        BM->>CH: Execute query
+        CH-->>BM: Query results
+        BM->>QC: Store in cache (TTL 10m)
+    end
+
+    BM->>BM: Calculate deltas
+    BM->>BM: Fill time gaps
+    BM-->>BA: MetricsResponse
+    BA-->>UI: JSON response

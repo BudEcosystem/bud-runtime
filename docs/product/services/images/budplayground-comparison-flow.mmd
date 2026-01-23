@@ -1,0 +1,27 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant U as User
+    participant BP as budplayground
+    participant GW1 as budgateway (Model A)
+    participant GW2 as budgateway (Model B)
+
+    U->>BP: Enter prompt
+    BP->>BP: Validate input
+
+    par Request to Model A
+        BP->>GW1: POST /v1/chat/completions (stream)
+        loop SSE Chunks
+            GW1-->>BP: data: {delta: {content: "token"}}
+        end
+        GW1-->>BP: data: [DONE]
+    and Request to Model B
+        BP->>GW2: POST /v1/chat/completions (stream)
+        loop SSE Chunks
+            GW2-->>BP: data: {delta: {content: "token"}}
+        end
+        GW2-->>BP: data: [DONE]
+    end
+
+    BP->>BP: Calculate metrics for both
+    BP->>BP: Update comparison view
+    BP-->>U: Display side-by-side results

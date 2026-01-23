@@ -1,0 +1,33 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+sequenceDiagram
+    participant budapp
+    participant budmodel
+    participant Dapr as Dapr Workflow
+    participant PostgreSQL
+    participant HuggingFace
+    participant OpenAI
+    participant MinIO
+
+    budapp->>budmodel: POST /model-info/extract {model_uri}
+    budmodel->>Dapr: Start extraction workflow
+    Dapr-->>budmodel: {workflow_id}
+    budmodel-->>budapp: {workflow_id, eta}
+
+    Note over budmodel,HuggingFace: Workflow Execution
+    budmodel->>PostgreSQL: Check existing model
+    alt Model cached
+        PostgreSQL-->>budmodel: Return cached model
+    else Model not found
+        budmodel->>HuggingFace: Fetch config.json
+        HuggingFace-->>budmodel: {config, readme}
+        budmodel->>budmodel: Extract architecture
+        budmodel->>OpenAI: Analyze README (LLM)
+        OpenAI-->>budmodel: {description, strengths, limitations}
+        budmodel->>HuggingFace: Get license info
+        HuggingFace-->>budmodel: {license_id, license_url}
+        budmodel->>OpenAI: Generate license FAQs
+        OpenAI-->>budmodel: {faqs}
+        budmodel->>PostgreSQL: Save model_info
+        budmodel->>MinIO: Store license docs
+    end
+    budmodel->>budapp: Notify extraction complete
