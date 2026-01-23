@@ -14,6 +14,7 @@ import ProjectTags from 'src/flows/components/ProjectTags';
 import { SortIcon } from './SortIcon';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
 import { ClientTimestamp } from '../../ClientTimestamp';
+import { errorToast, successToast } from '@/components/toast';
 
 
 interface InferenceListTableProps {
@@ -22,8 +23,8 @@ interface InferenceListTableProps {
 
 const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: propProjectId }) => {
   const router = useRouter();
-  const { slug } = router.query;
-  const projectId = propProjectId || (slug as string);
+  const { slug, projectId: queryProjectId } = router.query;
+  const projectId = propProjectId || (queryProjectId as string) || (slug as string);
   const [searchValue, setSearchValue] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -61,8 +62,26 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
   // Copy inference ID to clipboard
   const copyToClipboard = async (text: string) => {
     await copyText(text, {
-      onSuccess: () => message.success('Copied to clipboard'),
-      onError: () => message.error('Failed to copy'),
+      onSuccess: () => successToast('Copied to clipboard'),
+      onError: () => errorToast('Failed to copy'),
+    });
+  };
+
+  const getInferenceId = (record: InferenceListItem & { inferenceId?: string }) =>
+    record.inference_id || record.inferenceId;
+
+  const openInferenceDetail = (inferenceId: string) => {
+    if (!projectId) {
+      errorToast('Project ID missing for this row');
+      return;
+    }
+
+    router.push({
+      pathname: '/projects/[projectId]/inferences/[inferenceId]',
+      query: {
+        projectId,
+        inferenceId,
+      },
     });
   };
 
@@ -137,28 +156,40 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       title: '',
       key: 'actions',
       width: 100,
-      render: (_, record) => (
-        <div className="flex items-center gap-2 visible-on-hover">
-          <Button
-            type="text"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(`/home/projects/${projectId}/inferences/${record.inference_id}`);
-            }}
-          />
-          <Button
-            type="text"
-            size="small"
-            icon={<CopyOutlined />}
-            onClick={(e) => {
-              e.stopPropagation();
-              copyToClipboard(record.inference_id);
-            }}
-          />
-        </div>
-      ),
+      render: (_, record) => {
+        const inferenceId = getInferenceId(record);
+
+        return (
+          <div className="flex items-center gap-2 visible-on-hover">
+            <Button
+              type="text"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!inferenceId) {
+                  errorToast('Inference ID missing for this row');
+                  return;
+                }
+                openInferenceDetail(inferenceId);
+              }}
+            />
+            <Button
+              type="text"
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!inferenceId) {
+                  errorToast('Inference ID missing for this row');
+                  return;
+                }
+                copyToClipboard(inferenceId);
+              }}
+            />
+          </div>
+        );
+      },
     },
   ];
 
@@ -226,7 +257,12 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
         onRow={(record) => ({
           onClick: (e) => {
             e.preventDefault();
-            router.push(`/home/projects/${projectId}/inferences/${record.inference_id}`);
+            const inferenceId = getInferenceId(record);
+            if (!inferenceId) {
+              errorToast('Inference ID missing for this row');
+              return;
+            }
+            openInferenceDetail(inferenceId);
           },
           className: 'cursor-pointer hover:bg-gray-900',
         })}

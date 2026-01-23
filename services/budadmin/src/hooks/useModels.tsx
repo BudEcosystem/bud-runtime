@@ -180,6 +180,16 @@ export type Model = {
     num_layers: number;
     torch_dtype: string;
   };
+  architecture_audio_config?: {
+    num_layers: number;
+    hidden_size: number;
+    num_attention_heads: number;
+    num_mel_bins: number;
+    sample_rate: number;
+    max_source_positions: number;
+    max_target_positions: number;
+    torch_dtype: string;
+  };
   examples?: any[];
   bud_verified: boolean;
   scan_verified: boolean;

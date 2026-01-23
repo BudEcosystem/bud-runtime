@@ -3240,6 +3240,7 @@ class ModelEndpointEnum(Enum):
         RESPONSES (str): Response retrieval endpoint for asynchronous operations.
         RERANK (str): Reranking endpoint for relevance scoring.
         MODERATION (str): Content moderation endpoint.
+        CLASSIFY (str): Classification endpoint.
     """
 
     CHAT = "/v1/chat/completions"
@@ -3255,6 +3256,7 @@ class ModelEndpointEnum(Enum):
     IMAGE_VARIATION = "/v1/images/variations"
     RERANK = "/v1/rerank"  # https://docs.litellm.ai/docs/rerank
     MODERATION = "/v1/moderations"  # https://docs.litellm.ai/docs/moderation
+    CLASSIFY = "/v1/classify"
     # REALTIME_SESSION = "/v1/realtime/sessions"
     # REALTIME_TRANSCRIPTION = "/v1/realtime/transcription_sessions"
 
@@ -3288,6 +3290,7 @@ class ModelEndpointEnum(Enum):
             cls.RERANK: "Reranking",
             cls.MODERATION: "Moderation",
             cls.DOCUMENT: "Document",
+            cls.CLASSIFY: "Classification",
         }
 
         # Create result dictionary

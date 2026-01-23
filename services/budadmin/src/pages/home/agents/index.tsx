@@ -39,6 +39,8 @@ import { tempApiBaseUrl } from "@/components/environment";
 import { AppRequest } from "src/pages/api/requests";
 import { errorToast } from "@/components/toast";
 import { parseSchemaToVariables } from "@/utils/schemaParser";
+import { loadAgentMetadata } from "@/services/workflowMetadataService";
+import { WorkflowClientMetadata } from "@/types/agentWorkflow";
 
 
 function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) {
@@ -254,7 +256,7 @@ export default function PromptsAgents() {
   const { hasPermission, loadingUser } = useUser();
   const { showLoader, hideLoader } = useLoader();
   const { openDrawer } = useDrawer();
-  const { openAgentDrawer, createSession, updateSession, restoreSessionWithPromptId, getSessionByPromptId } = useAgentStore();
+  const { openAgentDrawer, createSession, updateSession, restoreSessionWithPromptId, getSessionByPromptId, restoreSessionsFromMetadata, sessions } = useAgentStore();
 
   // Handle OAuth callback
   // Note: We don't open the drawer here anymore. Instead, the URL parameter
@@ -432,120 +434,134 @@ export default function PromptsAgents() {
           oauthHandled = true;
           // Don't return here - still need to process agentId if present
         } else {
-          // OAuth callback detected - restore session with ORIGINAL prompt ID from dedicated storage
+          // OAuth callback detected - restore session
           oauthProcessedRef.current = true;
 
           try {
             showLoader();
 
-            // PRIORITY: Use prompt ID from dedicated localStorage (most reliable)
-            // This was saved right before OAuth redirect in ConnectorDetails
-            const effectivePromptId = savedPromptId || oauthState?.promptId;
+            // Use agent ID from URL or saved OAuth state
+            const effectiveAgentId = (agentId as string) || oauthState?.agentId;
 
-            if (!effectivePromptId) {
-              console.error('No prompt ID found for OAuth restoration');
-              errorToast('Failed to restore session - prompt ID not found');
-              hideLoader();
-              // Don't return - still try to process agentId if present
-            } else {
-              // Use agent ID from URL or saved OAuth state
-              const effectiveAgentId = (agentId as string) || oauthState?.agentId;
+            // PRIORITY 1: Try to restore from workflow API's client_metadata (reduces localStorage dependency)
+            let restoredFromApi = false;
+            if (effectiveAgentId) {
+              try {
+                const metadataResult = await loadAgentMetadata(effectiveAgentId);
+                if (metadataResult && metadataResult.sessions && metadataResult.sessions.length > 0) {
+                  console.log('[agents/index] OAuth: Restoring sessions from client_metadata:', metadataResult.sessions.length);
+                  restoreSessionsFromMetadata({
+                    sessions: metadataResult.sessions as any,
+                    activeSessionIds: metadataResult.activeSessionIds,
+                    selectedSessionId: metadataResult.selectedSessionId,
+                    lastUpdated: new Date().toISOString(),
+                    version: 1,
+                  });
+                  restoredFromApi = true;
 
-              // PRIORITY: Use session data from dedicated localStorage (most reliable)
-              // This includes model selection saved right before OAuth redirect
-              const effectiveSessionData = savedSessionData || oauthState?.sessionData;
+                  // Get the workflow next step
+                  const effectiveSessionData = savedSessionData || oauthState?.sessionData;
+                  const savedWorkflowNextStep = effectiveSessionData?.workflowNextStep;
+                  const workflowNextStep = savedWorkflowNextStep ||
+                    (effectiveAgentId ? "add-agent-configuration" : undefined);
 
-              // CRITICAL: Restore session FIRST before opening any drawers
-              // This ensures the session exists with correct prompt ID before AgentDrawer renders
-              restoreSessionWithPromptId(effectivePromptId, {
-                name: effectiveSessionData?.name || `Agent 1`,
-                modelId: effectiveSessionData?.modelId,
-                modelName: effectiveSessionData?.modelName,
-                systemPrompt: effectiveSessionData?.systemPrompt,
-                promptMessages: effectiveSessionData?.promptMessages,
-                selectedDeployment: effectiveSessionData?.selectedDeployment,
-                workflowId: oauthState?.workflowId,
-                // Restore schema variables from OAuth session data
-                inputVariables: effectiveSessionData?.inputVariables,
-                outputVariables: effectiveSessionData?.outputVariables,
-                // Restore session settings from OAuth session data
-                llm_retry_limit: effectiveSessionData?.llm_retry_limit,
-                settings: effectiveSessionData?.settings,
-                // Restore schema and settings flags from OAuth session data
-                allowMultipleCalls: effectiveSessionData?.allowMultipleCalls,
-                structuredInputEnabled: effectiveSessionData?.structuredInputEnabled,
-                structuredOutputEnabled: effectiveSessionData?.structuredOutputEnabled,
-              });
+                  // Open the agent drawer with workflow context
+                  setTimeout(() => {
+                    openAgentDrawer(oauthState?.workflowId || effectiveAgentId, workflowNextStep);
+                  }, 0);
 
-              // IMPORTANT: Fetch schema data from backend API to ensure input/output variables are restored
-              // This is more reliable than localStorage for complex nested objects
-              const promptName = effectiveSessionData?.name;
-              if (promptName) {
-                try {
-                  const configResponse = await AppRequest.Get(
-                    `${tempApiBaseUrl}/prompts/prompt-config/${promptName}`
-                  );
-
-                  if (configResponse?.data) {
-                    const configData = configResponse.data;
-                    const sessionUpdates: Record<string, unknown> = {};
-
-                    // Parse and update input schema variables
-                    if (configData.input_schema) {
-                      const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
-                      if (inputVars.length > 0) {
-                        sessionUpdates.inputVariables = inputVars;
-                        sessionUpdates.structuredInputEnabled = true;
-                      }
-                    }
-
-                    // Parse and update output schema variables
-                    if (configData.output_schema) {
-                      const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
-                      if (outputVars.length > 0) {
-                        sessionUpdates.outputVariables = outputVars;
-                        sessionUpdates.structuredOutputEnabled = true;
-                      }
-                    }
-
-                    // Update session with schema data if any was found
-                    if (Object.keys(sessionUpdates).length > 0) {
-                      updateSession(effectivePromptId, sessionUpdates);
-                    }
-                  }
-                } catch (error) {
-                  // Silently fail - new prompts won't have config saved yet
-                  // This is expected for new prompts that haven't been saved to backend
+                  // Mark as processed
+                  hasProcessedUrlRef.current = true;
+                  oauthHandled = true;
                 }
+              } catch (apiError) {
+                console.warn('[agents/index] OAuth: Failed to load from API, falling back to localStorage:', apiError);
               }
+            }
 
-              // Get the workflow next step from OAuth session data
-              // CRITICAL FALLBACK: If we have an agentId (workflow ID), we're in the add-agent flow.
-              // The next step after AgentDrawer should be "add-agent-configuration".
-              // We use effectiveSessionData?.workflowNextStep if available, otherwise fallback.
-              const savedWorkflowNextStep = effectiveSessionData?.workflowNextStep;
+            // PRIORITY 2: Fallback to localStorage-based restoration
+            if (!restoredFromApi) {
+              // Use prompt ID from dedicated localStorage (most reliable)
+              const effectivePromptId = savedPromptId || oauthState?.promptId;
 
-              // ROBUST FALLBACK: If agentId exists (we're in add-agent workflow),
-              // default to "add-agent-configuration" as the next step
-              const workflowNextStep = savedWorkflowNextStep ||
-                (effectiveAgentId ? "add-agent-configuration" : undefined);
+              if (!effectivePromptId) {
+                console.error('No prompt ID found for OAuth restoration');
+                errorToast('Failed to restore session - prompt ID not found');
+                hideLoader();
+                // Don't return - still try to process agentId if present
+              } else {
+                // PRIORITY: Use session data from dedicated localStorage (most reliable)
+                const effectiveSessionData = savedSessionData || oauthState?.sessionData;
 
-              // IMPORTANT: We do NOT call openDrawer("add-agent") here because it would:
-              // 1. Open at step 1 (SelectAgentType), which has a useEffect that resets workflowContext
-              // 2. This would reset nextStep to null, breaking the workflow continuation
-              // Instead, we just open the AgentDrawer with the correct workflowContext.
-              // When the user saves, closeAgentDrawer will call openDrawerWithStep(nextStep)
-              // which will open the workflow drawer at the correct step.
+                // CRITICAL: Restore session FIRST before opening any drawers
+                restoreSessionWithPromptId(effectivePromptId, {
+                  name: effectiveSessionData?.name || `Agent 1`,
+                  modelId: effectiveSessionData?.modelId,
+                  modelName: effectiveSessionData?.modelName,
+                  systemPrompt: effectiveSessionData?.systemPrompt,
+                  promptMessages: effectiveSessionData?.promptMessages,
+                  selectedDeployment: effectiveSessionData?.selectedDeployment,
+                  workflowId: oauthState?.workflowId,
+                  inputVariables: effectiveSessionData?.inputVariables,
+                  outputVariables: effectiveSessionData?.outputVariables,
+                  llm_retry_limit: effectiveSessionData?.llm_retry_limit,
+                  settings: effectiveSessionData?.settings,
+                  allowMultipleCalls: effectiveSessionData?.allowMultipleCalls,
+                  structuredInputEnabled: effectiveSessionData?.structuredInputEnabled,
+                  structuredOutputEnabled: effectiveSessionData?.structuredOutputEnabled,
+                });
 
-              // Open the agent drawer synchronously with the workflow context
-              // Using setTimeout with 0 to ensure state updates have settled
-              setTimeout(() => {
-                openAgentDrawer(oauthState?.workflowId, workflowNextStep);
-              }, 0);
+                // Fetch schema data from backend API
+                const promptName = effectiveSessionData?.name;
+                if (promptName) {
+                  try {
+                    const configResponse = await AppRequest.Get(
+                      `${tempApiBaseUrl}/prompts/prompt-config/${promptName}`
+                    );
 
-              // Mark as processed
-              hasProcessedUrlRef.current = true;
-              oauthHandled = true;
+                    if (configResponse?.data) {
+                      const configData = configResponse.data;
+                      const sessionUpdates: Record<string, unknown> = {};
+
+                      if (configData.input_schema) {
+                        const inputVars = parseSchemaToVariables(configData.input_schema, 'Input', 'input');
+                        if (inputVars.length > 0) {
+                          sessionUpdates.inputVariables = inputVars;
+                          sessionUpdates.structuredInputEnabled = true;
+                        }
+                      }
+
+                      if (configData.output_schema) {
+                        const outputVars = parseSchemaToVariables(configData.output_schema, 'Output', 'output');
+                        if (outputVars.length > 0) {
+                          sessionUpdates.outputVariables = outputVars;
+                          sessionUpdates.structuredOutputEnabled = true;
+                        }
+                      }
+
+                      if (Object.keys(sessionUpdates).length > 0) {
+                        updateSession(effectivePromptId, sessionUpdates);
+                      }
+                    }
+                  } catch (error) {
+                    // Silently fail - new prompts won't have config saved yet
+                  }
+                }
+
+                // Get the workflow next step
+                const savedWorkflowNextStep = effectiveSessionData?.workflowNextStep;
+                const workflowNextStep = savedWorkflowNextStep ||
+                  (effectiveAgentId ? "add-agent-configuration" : undefined);
+
+                // Open the agent drawer with workflow context
+                setTimeout(() => {
+                  openAgentDrawer(oauthState?.workflowId, workflowNextStep);
+                }, 0);
+
+                // Mark as processed
+                hasProcessedUrlRef.current = true;
+                oauthHandled = true;
+              }
             }
           } catch (error) {
             console.error('Error restoring OAuth session:', error);
@@ -564,16 +580,35 @@ export default function PromptsAgents() {
         try {
           showLoader();
 
-          // Fetch workflow details
+          // Fetch workflow details including client_metadata
           const workflowResponse = await AppRequest.Get(
             `${tempApiBaseUrl}/workflows/${agentId}`
           );
 
           if (workflowResponse?.data) {
+            const workflowData = workflowResponse.data;
+            const clientMetadata = workflowData.client_metadata as WorkflowClientMetadata | undefined;
 
-            // CRITICAL: Restore sessions FIRST before opening the drawer
-            // This prevents AgentDrawer from creating new sessions with different prompt IDs
-            if (promptParam && typeof promptParam === 'string') {
+            // PRIORITY: Try to restore sessions from client_metadata first (API-based restoration)
+            // This reduces dependency on localStorage and URL params
+            if (clientMetadata && clientMetadata.sessions && clientMetadata.sessions.length > 0) {
+              console.log('[agents/index] Restoring sessions from client_metadata:', clientMetadata.sessions.length);
+              restoreSessionsFromMetadata(clientMetadata);
+
+              // Open the add agent drawer AFTER sessions are restored
+              openDrawer("add-agent");
+
+              // Open AgentDrawer with restored sessions
+              requestAnimationFrame(() => {
+                // Pass skipSessionCreation=true since sessions were restored from API
+                openAgentDrawer(undefined, undefined, true);
+              });
+
+              // Mark as processed
+              hasProcessedUrlRef.current = true;
+            }
+            // FALLBACK: If no client_metadata, use URL prompt parameter
+            else if (promptParam && typeof promptParam === 'string') {
               // Parse comma-separated prompt IDs
               const promptIds = promptParam.split(',').map(id => id.trim());
 
@@ -590,22 +625,23 @@ export default function PromptsAgents() {
                   name: `Agent ${promptIds.indexOf(promptId) + 1}`,
                 });
               }
-            }
 
-            // Open the add agent drawer AFTER sessions are restored
-            openDrawer("add-agent");
+              // Open the add agent drawer AFTER sessions are restored
+              openDrawer("add-agent");
 
-            // If prompt parameter exists, open AgentDrawer
-            if (promptParam && typeof promptParam === 'string') {
               // Use requestAnimationFrame to ensure React has rendered the state updates
               requestAnimationFrame(() => {
                 // Pass skipSessionCreation=true since sessions were restored from URL params
                 openAgentDrawer(undefined, undefined, true);
               });
-            }
 
-            // Mark as processed
-            hasProcessedUrlRef.current = true;
+              // Mark as processed
+              hasProcessedUrlRef.current = true;
+            } else {
+              // Just open the add agent drawer without sessions
+              openDrawer("add-agent");
+              hasProcessedUrlRef.current = true;
+            }
           } else if (promptParam && typeof promptParam === 'string') {
             // Workflow fetch succeeded but returned empty data - still try to open with prompt
             console.warn('Workflow returned empty data, falling back to prompt-based restoration');

@@ -100,13 +100,39 @@ function HardwareModeCard({
 }
 
 export default function DeployModelHardwareMode() {
-  const { hardwareMode, setHardwareMode, updateHardwareMode } = useDeployModel();
+  const {
+    hardwareMode,
+    setHardwareMode,
+    updateHardwareMode,
+    selectedModel,
+    setDeploymentSpecification,
+    deploymentSpecifcation,
+  } = useDeployModel();
   const { openDrawerWithStep, openDrawer } = useDrawer();
 
   // Local state to manage selection before saving to store
   const [selectedMode, setSelectedMode] = useState<"dedicated" | "shared">(
     hardwareMode || "dedicated"
   );
+
+  // Check if model is embedding or audio type (skip template for these)
+  const isEmbeddingModel = selectedModel?.supported_endpoints?.embedding?.enabled;
+  const hasAudioTranscription = selectedModel?.supported_endpoints?.audio_transcription?.enabled;
+  const hasAudioSpeech = selectedModel?.supported_endpoints?.audio_speech?.enabled;
+  const isAudioModel = hasAudioTranscription || hasAudioSpeech;
+  const skipTemplateStep = isEmbeddingModel || isAudioModel;
+
+  // Get max context length for default values
+  const getMaxContextLength = () => {
+    const DEFAULT_MAX = 32000;
+    if (isAudioModel && selectedModel?.architecture_audio_config) {
+      const { max_source_positions, max_target_positions } =
+        selectedModel.architecture_audio_config;
+      const sum = (max_source_positions || 0) + (max_target_positions || 0);
+      return sum > 0 ? sum : DEFAULT_MAX;
+    }
+    return selectedModel?.architecture_text_config?.context_length || DEFAULT_MAX;
+  };
 
   return (
     <BudForm
@@ -119,8 +145,22 @@ export default function DeployModelHardwareMode() {
         // Persist hardware mode to backend
         await updateHardwareMode();
 
-        // Navigate to template selection
-        openDrawerWithStep("deploy-model-template");
+        // Skip template selection for embedding/audio models
+        if (skipTemplateStep) {
+          // Set default deployment specs since no template is selected
+          const maxContext = getMaxContextLength();
+          setDeploymentSpecification({
+            ...deploymentSpecifcation,
+            avg_context_length: maxContext,
+            avg_sequence_length: Math.min(maxContext, 2000), // Reasonable default
+            per_session_tokens_per_sec: [10, 50],
+            ttft: [50, 200],
+            e2e_latency: [100, 500],
+          });
+          openDrawerWithStep("deploy-model-specification");
+        } else {
+          openDrawerWithStep("deploy-model-template");
+        }
       }}
       onBack={() => {
         openDrawer("deploy-model");

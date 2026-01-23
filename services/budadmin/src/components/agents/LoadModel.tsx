@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/router";
 import { Button, Image, Empty, Spin } from "antd";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAgentStore } from "@/stores/useAgentStore";
@@ -30,8 +31,11 @@ const MODALITY_TEXT_INPUT = "text_input";
 const MODALITY_TEXT_OUTPUT = "text_output";
 
 export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) {
-  const { updateSession, sessions } = useAgentStore();
+  const { updateSession, sessions, isEditMode, isEditVersionMode } = useAgentStore();
   const { selectedProject } = useAddAgent();
+  const router = useRouter();
+  const projectIdFromRoute =
+    typeof router.query.projectId === "string" ? router.query.projectId : undefined;
   const session = sessions.find(s => s.id === sessionId);
 
   const modelIconUrl = useMemo(() => {
@@ -88,9 +92,11 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
         params.name = search;
       }
 
-      // Add project_id filter if selected project exists
+      // Add project_id filter if selected project exists or is in the route
       if (selectedProject?.id) {
         params.project_id = selectedProject.id;
+      } else if (projectIdFromRoute) {
+        params.project_id = projectIdFromRoute;
       }
 
       const response: any = await AppRequest.Get(`${tempApiBaseUrl}/playground/deployments`, {
@@ -190,8 +196,12 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
 
     try {
       // Call the prompt-config API with the deployment name and prompt_id
+      const promptIdForConfig =
+        (isEditMode || isEditVersionMode) && session?.name
+          ? session.name
+          : session?.promptId;
       const payload = {
-        prompt_id: session?.promptId,
+        prompt_id: promptIdForConfig,
         deployment_name: deploymentName,
         stream: session?.settings?.stream ?? false
       };

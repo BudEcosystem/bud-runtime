@@ -59,8 +59,29 @@ export interface ConnectorsListResponse {
   total_pages: number;
 }
 
+// Per-session pagination state
+interface PaginationState {
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+}
+
+// Per-session loading state
+interface LoadingState {
+  isLoading: boolean;
+  isLoadingMore: boolean;
+}
+
 interface ConnectorsStore {
-  // Data
+  // Per-session data (NEW - isolated per agent box)
+  connectorsByPromptId: Record<string, Connector[]>;
+  connectedToolsByPromptId: Record<string, Connector[]>;
+  paginationByPromptId: Record<string, PaginationState>;
+  loadingStatesByPromptId: Record<string, LoadingState>;
+  searchQueryByPromptId: Record<string, string>;
+
+  // Legacy global data (kept for backward compatibility)
   connectors: Connector[];
   connectedTools: Connector[];
   selectedConnectorDetails: Connector | null;
@@ -90,6 +111,19 @@ interface ConnectorsStore {
   getConnectorDetailsForPromptId: (promptId: string) => Connector | null;
   clearConnectorDetailsForPromptId: (promptId: string) => void;
   isLoadingDetailsForPromptId: (promptId: string) => boolean;
+
+  // NEW: Per-session getters
+  getConnectorsForPromptId: (promptId: string) => Connector[];
+  getConnectedToolsForPromptId: (promptId: string) => Connector[];
+  getPaginationForPromptId: (promptId: string) => PaginationState;
+  getLoadingStateForPromptId: (promptId: string) => LoadingState;
+  getSearchQueryForPromptId: (promptId: string) => string;
+
+  // NEW: Per-session setters
+  setSearchQueryForPromptId: (promptId: string, query: string) => void;
+
+  // NEW: Session cleanup
+  clearSessionData: (promptId: string) => void;
 }
 
 export const useConnectors = create<ConnectorsStore>((set, get) => {
@@ -114,9 +148,30 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
     }
 
     // Set loading state based on pagination
+    const promptId = params?.prompt_id;
+
     if (params?.page && params.page > 1) {
+      // Set per-session loading state if promptId provided
+      if (promptId) {
+        const currentLoadingState = get().loadingStatesByPromptId[promptId] || { isLoading: false, isLoadingMore: false };
+        set({
+          loadingStatesByPromptId: {
+            ...get().loadingStatesByPromptId,
+            [promptId]: { ...currentLoadingState, isLoadingMore: true },
+          },
+        });
+      }
       set({ isLoadingMore: true });
     } else {
+      // Set per-session loading state if promptId provided
+      if (promptId) {
+        set({
+          loadingStatesByPromptId: {
+            ...get().loadingStatesByPromptId,
+            [promptId]: { isLoading: true, isLoadingMore: false },
+          },
+        });
+      }
       set({ isLoading: true });
     }
 
@@ -156,8 +211,49 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
       if (response.data) {
         const tools = response.data.connectors || response.data.data || [];
         const isLoadMore = params?.page && params.page > 1;
+        const promptId = params?.prompt_id;
 
-        // Update state based on target and pagination
+        // Update per-session state if promptId is provided (NEW - isolated per agent box)
+        if (promptId) {
+          if (updateTarget === 'connectedTools') {
+            set({
+              connectedToolsByPromptId: {
+                ...get().connectedToolsByPromptId,
+                [promptId]: tools,
+              },
+              loadingStatesByPromptId: {
+                ...get().loadingStatesByPromptId,
+                [promptId]: { isLoading: false, isLoadingMore: false },
+              },
+            });
+          } else {
+            // For connectors, support pagination
+            const existingConnectors = get().connectorsByPromptId[promptId] || [];
+            const newConnectors = isLoadMore ? [...existingConnectors, ...tools] : tools;
+
+            set({
+              connectorsByPromptId: {
+                ...get().connectorsByPromptId,
+                [promptId]: newConnectors,
+              },
+              paginationByPromptId: {
+                ...get().paginationByPromptId,
+                [promptId]: {
+                  totalCount: response.data.total || tools.length,
+                  currentPage: response.data.page || params?.page || 1,
+                  totalPages: response.data.total_pages || Math.ceil((response.data.total || tools.length) / state.pageSize),
+                  pageSize: state.pageSize,
+                },
+              },
+              loadingStatesByPromptId: {
+                ...get().loadingStatesByPromptId,
+                [promptId]: { isLoading: false, isLoadingMore: false },
+              },
+            });
+          }
+        }
+
+        // ALSO update legacy global state for backward compatibility
         if (updateTarget === 'connectedTools') {
           set({
             connectedTools: tools,
@@ -185,6 +281,17 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
       }
     } catch (error) {
       console.error(`Error fetching ${isRegistered ? 'connected' : 'unregistered'} tools:`, error);
+      const promptId = params?.prompt_id;
+
+      // Clear per-session loading state on error
+      if (promptId) {
+        set({
+          loadingStatesByPromptId: {
+            ...get().loadingStatesByPromptId,
+            [promptId]: { isLoading: false, isLoadingMore: false },
+          },
+        });
+      }
       set({
         isLoading: false,
         isLoadingMore: false
@@ -198,7 +305,14 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
   };
 
   return {
-    // Initial state
+    // Per-session state (NEW - isolated per agent box)
+    connectorsByPromptId: {},
+    connectedToolsByPromptId: {},
+    paginationByPromptId: {},
+    loadingStatesByPromptId: {},
+    searchQueryByPromptId: {},
+
+    // Legacy global state (kept for backward compatibility)
     connectors: [],
     connectedTools: [],
     selectedConnectorDetails: null,
@@ -340,6 +454,95 @@ export const useConnectors = create<ConnectorsStore>((set, get) => {
 
     isLoadingDetailsForPromptId: (promptId: string) => {
       return get().loadingDetailsByPromptId[promptId] || false;
+    },
+
+    // NEW: Per-session getters
+    getConnectorsForPromptId: (promptId: string) => {
+      return get().connectorsByPromptId[promptId] || [];
+    },
+
+    getConnectedToolsForPromptId: (promptId: string) => {
+      return get().connectedToolsByPromptId[promptId] || [];
+    },
+
+    getPaginationForPromptId: (promptId: string) => {
+      return get().paginationByPromptId[promptId] || {
+        totalCount: 0,
+        currentPage: 1,
+        totalPages: 0,
+        pageSize: 10,
+      };
+    },
+
+    getLoadingStateForPromptId: (promptId: string) => {
+      return get().loadingStatesByPromptId[promptId] || {
+        isLoading: false,
+        isLoadingMore: false,
+      };
+    },
+
+    getSearchQueryForPromptId: (promptId: string) => {
+      return get().searchQueryByPromptId[promptId] || '';
+    },
+
+    // NEW: Per-session setters
+    setSearchQueryForPromptId: (promptId: string, query: string) => {
+      set({
+        searchQueryByPromptId: {
+          ...get().searchQueryByPromptId,
+          [promptId]: query,
+        },
+      });
+    },
+
+    // NEW: Session cleanup - call when agent box is closed
+    clearSessionData: (promptId: string) => {
+      const {
+        connectorsByPromptId,
+        connectedToolsByPromptId,
+        paginationByPromptId,
+        loadingStatesByPromptId,
+        searchQueryByPromptId,
+        connectorDetailsByPromptId,
+        loadingDetailsByPromptId,
+      } = get();
+
+      // Clear completed fetches for this promptId
+      const keysToDelete: string[] = [];
+      completedListFetches.forEach(key => {
+        if (key.includes(`:${promptId}:`)) {
+          keysToDelete.push(key);
+        }
+      });
+      keysToDelete.forEach(key => completedListFetches.delete(key));
+
+      // Clear connector details completed fetches
+      const detailKeysToDelete: string[] = [];
+      completedFetches.forEach(key => {
+        if (key.startsWith(`${promptId}:`)) {
+          detailKeysToDelete.push(key);
+        }
+      });
+      detailKeysToDelete.forEach(key => completedFetches.delete(key));
+
+      // Remove session data from all per-session maps
+      const { [promptId]: _c, ...restConnectors } = connectorsByPromptId;
+      const { [promptId]: _ct, ...restConnectedTools } = connectedToolsByPromptId;
+      const { [promptId]: _p, ...restPagination } = paginationByPromptId;
+      const { [promptId]: _l, ...restLoading } = loadingStatesByPromptId;
+      const { [promptId]: _s, ...restSearch } = searchQueryByPromptId;
+      const { [promptId]: _cd, ...restDetails } = connectorDetailsByPromptId;
+      const { [promptId]: _ld, ...restDetailsLoading } = loadingDetailsByPromptId;
+
+      set({
+        connectorsByPromptId: restConnectors,
+        connectedToolsByPromptId: restConnectedTools,
+        paginationByPromptId: restPagination,
+        loadingStatesByPromptId: restLoading,
+        searchQueryByPromptId: restSearch,
+        connectorDetailsByPromptId: restDetails,
+        loadingDetailsByPromptId: restDetailsLoading,
+      });
     },
   };
 });

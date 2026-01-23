@@ -33,7 +33,7 @@ fn internal_build_otel_layer<T: SpanExporter + 'static>(
             Resource::builder_empty()
                 .with_attribute(KeyValue::new(
                     opentelemetry_semantic_conventions::resource::SERVICE_NAME,
-                    "tensorzero-gateway",
+                    "budgateway",
                 ))
                 .build(),
         )
@@ -57,11 +57,12 @@ fn internal_build_otel_layer<T: SpanExporter + 'static>(
         );
     }
     let provider = provider.build();
-    let tracer = provider.tracer("tensorzero");
+    let tracer = provider.tracer("budgateway");
     opentelemetry::global::set_tracer_provider(provider.clone());
     Ok(tracing_opentelemetry::layer()
         .with_tracer(tracer)
-        .with_level(true))
+        .with_level(true)
+        .with_location(false))
 }
 
 /// Creates an OpenTelemetry export layer. This layer is disabled by default,
@@ -98,10 +99,12 @@ pub fn build_opentelemetry_layer<T: SpanExporter + 'static>(
             // Avoid exposing all of our internal spans, as we don't want customers to start depending on them.
             // We only expose spans that explicitly contain field prefixed with "http." or "otel."
             // For example, `#[instrument(fields(otel.name = "my_otel_name"))]` will be exported
+            // We also export events with target starting with "budgateway_internal" (used for exception events)
             let filter = filter::filter_fn(|metadata| {
-                metadata.fields().iter().any(|field| {
-                    field.name().starts_with("http.") || field.name().starts_with("otel.")
-                })
+                metadata.target().starts_with("budgateway_internal")
+                    || metadata.fields().iter().any(|field| {
+                        field.name().starts_with("http.") || field.name().starts_with("otel.")
+                    })
             });
 
             reload_handle

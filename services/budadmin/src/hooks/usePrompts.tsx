@@ -33,6 +33,7 @@ export interface IPrompt {
 export interface IPromptVersion {
   id: string;
   endpoint_name: string;
+  endpoint_id?: string;
   version: number;
   created_at: string;
   modified_at: string;
@@ -76,6 +77,7 @@ export interface PromptConfigData {
   system_prompt_role: string | null;
   system_prompt: string | null;
   tools: unknown[];
+  client_metadata?: Record<string, unknown> | null;
 }
 
 export interface PromptConfigResponse {
@@ -100,7 +102,7 @@ export const usePrompts = create<{
   createPrompt: (data: any, projectId?: string) => Promise<any>;
   deletePrompt: (promptId: string, projectId?: string) => Promise<any>;
   updatePrompt: (promptId: string, data: any, projectId?: string) => Promise<any>;
-  getPromptConfig: (promptId: string) => Promise<PromptConfigResponse | null>;
+  getPromptConfig: (promptId: string, version?: number) => Promise<PromptConfigResponse | null>;
 }>((set) => ({
   prompts: [],
   totalRecords: 0,
@@ -266,10 +268,12 @@ export const usePrompts = create<{
     }
   },
 
-  getPromptConfig: async (promptId: string): Promise<PromptConfigResponse | null> => {
+  getPromptConfig: async (promptId: string, version?: number): Promise<PromptConfigResponse | null> => {
     try {
       const url = `${tempApiBaseUrl}/prompts/prompt-config/${promptId}`;
-      const response = await AppRequest.Get(url);
+      const response = await AppRequest.Get(url, {
+        params: version ? { version } : undefined,
+      });
       return response.data as PromptConfigResponse;
     } catch (error) {
       // Silently fail - return null for new prompts without config

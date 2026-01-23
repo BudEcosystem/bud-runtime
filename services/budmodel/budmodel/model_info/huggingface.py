@@ -42,6 +42,7 @@ from .parser import (
 )
 from .schemas import (
     AudioConfig,
+    ClassifierConfig,
     EmbeddingConfig,
     LicenseInfo,
     LLMConfig,
@@ -97,6 +98,9 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
         if language and not isinstance(language, list):
             language = [language]
+
+        # Filter out non-string values (some models have boolean values in languages list)
+        language = [lang for lang in language if isinstance(lang, str)]
 
         tasks = model_card.data.get("pipeline_tag") or []
         if tasks and not isinstance(tasks, list):
@@ -332,6 +336,7 @@ class HuggingFaceModelInfo(BaseModelInfo):
             modality = "llm"
 
         # Check for embedding capability
+        # Method 1: Sentence-transformers style with pooling config
         filepath = cls.download_hf_repo_file(
             pretrained_model_name_or_path, filename="1_Pooling/config.json", token=token
         )
@@ -341,6 +346,22 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
             model_architecture.embedding_config = cls.parse_embedding_model_config(pooling_config)
             modality += "_embedding"
+        else:
+            # Method 2: Detect encoder-only architectures (BERT, RoBERTa, ModernBERT, etc.)
+            # These are embedding/classification models, not generative LLMs
+            architectures = config.get("architectures", [])
+            is_encoder_only = cls._is_encoder_only_model(config, architectures)
+            if is_encoder_only and modality == "llm":
+                # Create embedding config from model's hidden size
+                hidden_size = config.get("hidden_size") or config.get("d_model")
+                model_architecture.embedding_config = EmbeddingConfig(embedding_dimension=hidden_size)
+                modality = "llm_embedding"
+
+        # Check for classifier capability
+        classifier_config = cls.parse_classifier_model_config(config)
+        if classifier_config:
+            model_architecture.classifier_config = classifier_config
+            modality += "_classification"
 
         # Add TTS suffix if model has audio output capability
         if has_audio_output:
@@ -350,19 +371,30 @@ class HuggingFaceModelInfo(BaseModelInfo):
 
     @staticmethod
     def parse_llm_model_config(config: Dict[str, Any]) -> LLMConfig:
-        """Parse the LLM model configuration."""
-        num_attention_heads = config.get("num_attention_heads") or config.get("num_heads")
+        """Parse the LLM model configuration.
+
+        For multi-modal models (audio-LLM, vision-LLM), text config may be nested
+        inside 'text_config' key. This method checks for nested config first,
+        then falls back to root level.
+        """
+        # Check for nested text_config (common in audio-LLM and vision-LLM hybrids)
+        _config = config.get("text_config", {}) or config
+
+        num_attention_heads = _config.get("num_attention_heads") or _config.get("num_heads")
+        torch_dtype = _config.get("torch_dtype")
+        if torch_dtype is not None and not isinstance(torch_dtype, str):
+            torch_dtype = str(torch_dtype)
 
         return LLMConfig(
-            num_layers=config.get("num_hidden_layers") or config.get("num_layers"),
-            hidden_size=config.get("hidden_size") or config.get("d_model"),
-            intermediate_size=config.get("intermediate_size") or config.get("d_ff"),
-            context_length=config.get("max_position_embeddings") or config.get("n_positions"),
-            vocab_size=config.get("vocab_size"),
-            torch_dtype=config.get("torch_dtype"),
+            num_layers=_config.get("num_hidden_layers") or _config.get("num_layers"),
+            hidden_size=_config.get("hidden_size") or _config.get("d_model"),
+            intermediate_size=_config.get("intermediate_size") or _config.get("d_ff"),
+            context_length=_config.get("max_position_embeddings") or _config.get("n_positions"),
+            vocab_size=_config.get("vocab_size"),
+            torch_dtype=torch_dtype,
             num_attention_heads=num_attention_heads,
-            num_key_value_heads=config.get("num_key_value_heads") or num_attention_heads,
-            rope_scaling=config.get("rope_scaling"),
+            num_key_value_heads=_config.get("num_key_value_heads") or num_attention_heads,
+            rope_scaling=_config.get("rope_scaling"),
         )
 
     @staticmethod
@@ -406,6 +438,178 @@ class HuggingFaceModelInfo(BaseModelInfo):
     def parse_embedding_model_config(pooling_config: Dict[str, Any]) -> Dict[str, Any]:
         """Parse embedding model configuration from pooling config."""
         return EmbeddingConfig(embedding_dimension=pooling_config.get("word_embedding_dimension"))
+
+    @staticmethod
+    def _is_encoder_only_model(config: Dict[str, Any], architectures: List[str]) -> bool:
+        """Detect if model is an encoder-only architecture (BERT-style).
+
+        Encoder-only models are used for embeddings, classification, NER, etc.
+        They are NOT generative LLMs and should be classified as embedding models.
+
+        Detection criteria:
+        1. Architecture name ends with 'Model' (base encoder) vs 'ForCausalLM' (decoder)
+        2. Known encoder-only model families
+        3. No decoder-specific configuration
+        """
+        # Known encoder-only model type families
+        encoder_only_families = {
+            "bert",
+            "roberta",
+            "distilbert",
+            "albert",
+            "electra",
+            "deberta",
+            "xlm-roberta",
+            "camembert",
+            "flaubert",
+            "xlm",
+            "longformer",
+            "modernbert",
+            "nomic_bert",
+            "jina_bert",
+            "gte",
+            "bge",
+            "e5",
+            "snowflake_arctic_embed",
+            "mxbai_embed",
+            "stella_en",
+        }
+
+        model_type = config.get("model_type", "").lower().replace("-", "_")
+        if model_type in encoder_only_families:
+            return True
+
+        # Check architectures - encoder-only models typically end with just "Model"
+        # while decoder/causal LLMs end with "ForCausalLM", "LMHeadModel", etc.
+        encoder_arch_suffixes = ("Model", "ForMaskedLM", "ForSequenceClassification", "ForTokenClassification")
+        decoder_arch_suffixes = ("ForCausalLM", "LMHeadModel", "ForConditionalGeneration")
+
+        for arch in architectures:
+            # If it has decoder architecture, it's not encoder-only
+            if any(arch.endswith(suffix) for suffix in decoder_arch_suffixes):
+                return False
+            # If it has encoder-only architecture suffix, mark as encoder
+            if any(arch.endswith(suffix) for suffix in encoder_arch_suffixes):
+                return True
+
+        # Check for decoder-specific config keys that indicate generative model
+        decoder_indicators = ["num_decoder_layers", "decoder_start_token_id", "is_decoder"]
+        if any(config.get(key) for key in decoder_indicators):
+            return False
+
+        return False
+
+    @staticmethod
+    def parse_classifier_model_config(config: Dict[str, Any]) -> ClassifierConfig | None:
+        """Parse classifier model configuration from config."""
+        architectures = config.get("architectures", [])
+        # Map the substring signature to the variable name
+        task_map = {
+            "sequence_classification": "ForSequenceClassification",
+            "token_classification": "ForTokenClassification",
+            "object_detection": "ForObjectDetection",
+            "question_answering": "ForQuestionAnswering",
+            "image_classification": "ForImageClassification",
+            "audio_classification": "ForAudioClassification",
+            "semantic_segmentation": "ForSemanticSegmentation",
+        }
+        # 1. Identify Mode: Check all architectures at once
+        # We join the architectures into one string for a single search pass (faster/cleaner)
+        arch_text = " ".join(architectures)
+        flags = {k: v in arch_text for k, v in task_map.items()}
+
+        # 2. Robust Label Extraction
+        # Use explicit signals only; do not infer classification from num_labels alone.
+        def _normalize_map(
+            mapping: Dict[Any, Any], convert_keys: bool = False, convert_values: bool = False
+        ) -> Dict[Any, Any]:
+            if not mapping:
+                return {}
+            normalized: Dict[Any, Any] = {}
+            for key, value in mapping.items():
+                new_key = key
+                new_value = value
+                if convert_keys:
+                    try:
+                        new_key = int(key)
+                    except (TypeError, ValueError):
+                        new_key = key
+                if convert_values:
+                    try:
+                        new_value = int(value)
+                    except (TypeError, ValueError):
+                        new_value = value
+                normalized[new_key] = new_value
+            return normalized
+
+        def _is_default_label2id(mapping: Dict[Any, Any]) -> bool:
+            if not mapping:
+                return False
+            for label, idx in mapping.items():
+                if not isinstance(label, str) or not isinstance(idx, int):
+                    return False
+                if label != f"LABEL_{idx}":
+                    return False
+            return True
+
+        def _is_default_id2label(mapping: Dict[Any, Any]) -> bool:
+            if not mapping:
+                return False
+            for idx, label in mapping.items():
+                if not isinstance(idx, int) or not isinstance(label, str):
+                    return False
+                if label != f"LABEL_{idx}":
+                    return False
+            return True
+
+        label2id = _normalize_map(config.get("label2id") or {}, convert_values=True)
+        id2label = _normalize_map(config.get("id2label") or {}, convert_keys=True)
+        problem_type = config.get("problem_type")
+
+        has_label_map = bool(label2id) or bool(id2label)
+        has_task_flag = any(flags.values())
+        has_problem_type = bool(problem_type)
+
+        is_default_label_map = has_label_map and (
+            (not label2id or _is_default_label2id(label2id)) and (not id2label or _is_default_id2label(id2label))
+        )
+        has_explicit_label_map = has_label_map and not is_default_label_map
+
+        if not (has_task_flag or has_explicit_label_map or has_problem_type):
+            return None
+
+        if not label2id and id2label:
+            label2id = {label: idx for idx, label in id2label.items()}
+        elif label2id and not id2label:
+            id2label = {idx: label for label, idx in label2id.items()}
+
+        num_labels = (
+            len(label2id)
+            if label2id
+            else len(id2label)
+            if id2label
+            else config.get("num_labels") or config.get("_num_labels", 2)
+        )
+
+        # Ensure consistency: if we have num_labels but no map, generate a dummy map
+        if not label2id and num_labels > 0:
+            label2id = {f"LABEL_{i}": i for i in range(num_labels)}
+            id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
+
+        task = [k for k, v in flags.items() if v]
+        task = task[0] if len(task) > 0 else None
+        if not task and has_problem_type:
+            task = "sequence_classification"
+
+        audio_models = ("Wav2Vec2", "Hubert", "WavLM", "SEW", "UniSpeech", "UniSpeechSat")
+        task = (
+            "audio_classification"
+            if task == "sequence_classification"
+            and any(arch.replace("ForSequenceClassification", "") in audio_models for arch in architectures)
+            else task
+        )
+
+        return ClassifierConfig(num_labels=num_labels, label2id=label2id, id2label=id2label, task=task)
 
     @staticmethod
     def detect_audio_modality(config: Dict[str, Any]) -> Tuple[bool, bool]:
@@ -527,8 +731,22 @@ class HuggingFaceModelInfo(BaseModelInfo):
         elif config.get("thinker_config", {}).get("audio_config"):
             _audio_config = config["thinker_config"]["audio_config"]
         # Priority 6: Root level for Whisper-style models
-        elif config.get("model_type", "").lower() == "whisper":
+        elif config.get("model_type", "").lower() == "whisper" or config.get("model_type", "").lower() in [
+            "wav2vec2",
+            "hubert",
+            "wavlm",
+            "unispeech",
+            "unispeech-sat",
+        ]:
             _audio_config = config
+        # Priority 8: Seamless M4T models with speech_encoder_* fields
+        elif config.get("speech_encoder_layers"):
+            # Create a normalized config from speech_encoder_* fields
+            _audio_config = {
+                "encoder_layers": config.get("speech_encoder_layers"),
+                "hidden_size": config.get("speech_encoder_intermediate_size"),
+                "num_attention_heads": config.get("speech_encoder_attention_heads"),
+            }
 
         # Extract common audio parameters
         audio_config.num_layers = (
@@ -557,6 +775,8 @@ class HuggingFaceModelInfo(BaseModelInfo):
         audio_config.sample_rate = _audio_config.get("sample_rate")
 
         audio_config.max_source_positions = _audio_config.get("max_source_positions")
+
+        audio_config.max_target_positions = _audio_config.get("max_target_positions")
 
         torch_dtype = _audio_config.get("torch_dtype")
         if torch_dtype is not None and not isinstance(torch_dtype, str):

@@ -9,25 +9,26 @@ Deploy your first model and make an API request in minutes.
 
 - Bud AI Foundry account with access to the platform.
 - A project created in your workspace.
-- API key with permission to call endpoints.
+- Deploy model in the project.
+- API key with permission to call endpoint.
 
 ## 2. Step 1: Create an account
 
 1. Sign in or create a Bud AI Foundry account.
 2. Complete workspace setup and verify your organization details.
-3. Invite teammates if needed.
+3. Invite teammates if needed and assign roles.
 
 ## 3. Step 2: Create your first project
 
 1. Navigate to Projects and click Create Project.
-2. Name the project.
+2. Name the project, add tags and description.
 3. Generate an API key for the project.
 
 ## 4. Step 3: Add a model
 
 1. Go to Models and select +Model.
 2. Choose a model source (Cloud, Hugging Face, URL, or Disk).
-3. Provide metadata and save the model to the catalog.
+3. Provide metadata, tags, and approval details, then save the model.
 
 ## 5. Step 4: Deploy the model
 
@@ -49,3 +50,16 @@ curl https://api.bud.studio/v1/chat/completions \
     "messages": [{"role": "user", "content": "Hello from Bud AI Foundry"}]
   }'
 ```
+
+## 7. Step 6: Monitor and iterate
+
+1. Open Observability to review latency, token usage, and error trends.
+2. Run evaluations or benchmarks to compare models and configurations.
+3. Update routing or scaling policies based on usage patterns.
+
+## 8. Next steps
+
+- [Model management](/models/models)
+- [Deployment Management](/deployments/deployments)
+- [API Integration](/api-integration/api-integration)
+- [Observability](/observability/observability)

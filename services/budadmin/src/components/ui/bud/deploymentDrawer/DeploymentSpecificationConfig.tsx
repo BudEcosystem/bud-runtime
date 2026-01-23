@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 
 import {
   Text_14_400_EEEEEE,
@@ -19,10 +19,82 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
     setDeploymentSpecification,
     currentWorkflow,
     hardwareMode,
+    selectedModel,
   } = useDeployModel();
 
   const isCloudModelFlow =
     currentWorkflow?.workflow_steps.model.provider_type === "cloud_model";
+
+  // Hide context/sequence for models that don't need token-based configuration
+  // (audio transcription, TTS, embedding models without chat capability)
+  const hasChatEndpoint = selectedModel?.supported_endpoints?.chat?.enabled;
+  const hasCompletionEndpoint = selectedModel?.supported_endpoints?.completion?.enabled;
+  const hasAudioTranscription = selectedModel?.supported_endpoints?.audio_transcription?.enabled;
+  const hasAudioSpeech = selectedModel?.supported_endpoints?.audio_speech?.enabled;
+  const hasEmbeddingEndpoint = selectedModel?.supported_endpoints?.embedding?.enabled;
+
+  // Hide for pure audio models (transcription/TTS) or embedding models that don't have chat/completion
+  const hideContextSequence = (hasAudioTranscription || hasAudioSpeech || hasEmbeddingEndpoint) && !hasChatEndpoint && !hasCompletionEndpoint;
+
+  // Compute max context length based on model architecture
+  const getMaxContextLength = () => {
+    const DEFAULT_MAX = 32000;
+
+    // Check if audio model (has audio input capability)
+    const isAudioModel = selectedModel?.modality?.audio?.input;
+
+    if (isAudioModel && selectedModel?.architecture_audio_config) {
+      const { max_source_positions, max_target_positions } =
+        selectedModel.architecture_audio_config;
+      // Sum both positions for total context
+      const sum = (max_source_positions || 0) + (max_target_positions || 0);
+      return sum > 0 ? sum : DEFAULT_MAX;
+    }
+
+    // Use text config context_length for text models
+    return selectedModel?.architecture_text_config?.context_length || DEFAULT_MAX;
+  };
+
+  const maxContextLength = getMaxContextLength();
+
+  // Sync form values with store when component mounts or store values change
+  // This is needed when reopening the flow from task island
+  useEffect(() => {
+    if (form?.setFieldsValue && deploymentSpecifcation) {
+      const values = {
+        deployment_name: deploymentSpecifcation.deployment_name,
+        concurrent_requests: deploymentSpecifcation.concurrent_requests,
+        avg_context_length: deploymentSpecifcation.avg_context_length,
+        avg_sequence_length: deploymentSpecifcation.avg_sequence_length,
+      };
+      form.setFieldsValue(values);
+    }
+  }, [form, deploymentSpecifcation.deployment_name, deploymentSpecifcation.concurrent_requests]);
+
+  // Clamp values when maxContextLength changes (e.g., when model is selected)
+  useEffect(() => {
+    if (!selectedModel || maxContextLength === 32000) return;
+
+    const currentContext = deploymentSpecifcation.avg_context_length || 0;
+    const currentSequence = deploymentSpecifcation.avg_sequence_length || 0;
+
+    const updates: Partial<typeof deploymentSpecifcation> = {};
+
+    if (currentContext > maxContextLength) {
+      updates.avg_context_length = maxContextLength;
+    }
+
+    if (currentSequence > maxContextLength) {
+      updates.avg_sequence_length = maxContextLength;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setDeploymentSpecification({
+        ...deploymentSpecifcation,
+        ...updates,
+      });
+    }
+  }, [maxContextLength, selectedModel?.id]);
 
   return (
     <div className="flex flex-col	justify-start items-center w-full">
@@ -109,8 +181,13 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                   message: "Please enter concurrent requests",
                 },
                 {
-                  min: 1,
-                  message: "Concurrent requests should be greater than 0",
+                  validator: (_, value) => {
+                    const num = Number(value);
+                    if (isNaN(num) || num < 1) {
+                      return Promise.reject("Concurrent requests should be greater than 0");
+                    }
+                    return Promise.resolve();
+                  },
                 },
               ]}
               className={`flex items-start rounded-[6px] relative !bg-[transparent] mb-[0]`}
@@ -145,6 +222,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
             </Form.Item>
           </div>
         </div>
+        {!hideContextSequence && (
         <div className="flex gap-[1rem] w-full flex-row">
           <div className="w-full relative">
             <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1">
@@ -166,7 +244,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                 <Slider
                   className="budSlider mt-10 w-full"
                   min={30}
-                  max={32000}
+                  max={maxContextLength}
                   step={1}
                   value={deploymentSpecifcation.avg_context_length}
                   onChange={(value) => {
@@ -191,14 +269,13 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                   }}
                 />
                 <div className="text-[#757575] text-[.75rem] h-[1.6rem]">
-                  32000
+                  {maxContextLength.toLocaleString()}
                 </div>
                 <div className="mb-[.1rem]">
                   <Input
-                    defaultValue={deploymentSpecifcation.avg_context_length}
                     name="ContextLength"
                     style={{
-                      width: "3.125rem",
+                      width: "4.5rem",
                       height: "2rem",
                     }}
                     value={deploymentSpecifcation.avg_context_length}
@@ -211,7 +288,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         if (
                           true ||
                           value === "" ||
-                          (val >= 30 && val <= 32000)
+                          (val >= 30 && val <= maxContextLength)
                         ) {
                           setDeploymentSpecification({
                             ...deploymentSpecifcation,
@@ -232,13 +309,15 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                       }
                     }}
                     type="text"
-                    className={`inputClass border border-[#EEEEEE] px-[.5rem] pt-[.3rem] pb-[.15rem] rounded-[0.31275rem] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] text-[#EEE] text-[0.75rem] font-[400] leading-[100%]`}
+                    className={`inputClass border border-[#EEEEEE] px-[.5rem] text-center pt-[.3rem] pb-[.15rem] rounded-[0.31275rem] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] text-[#EEE] text-[0.75rem] font-[400] leading-[100%]`}
                   />
                 </div>
               </div>
             </Form.Item>
           </div>
         </div>
+        )}
+        {!hideContextSequence && (
         <div className="flex gap-[1rem] w-full flex-row">
           <div className="w-full relative">
             <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1">
@@ -260,7 +339,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                 <Slider
                   className="budSlider mt-10 w-full"
                   min={10}
-                  max={2000}
+                  max={maxContextLength}
                   step={1}
                   value={deploymentSpecifcation.avg_sequence_length}
                   onChange={(value) => {
@@ -285,13 +364,13 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                   }}
                 />
                 <div className="text-[#757575] text-[.75rem] h-[1.6rem]">
-                  2000
+                  {maxContextLength.toLocaleString()}
                 </div>
                 <div className="mb-[.1rem]">
                   <Input
                     name="SequenceLength"
                     style={{
-                      width: "3.125rem",
+                      width: "4.5rem",
                       height: "2rem",
                     }}
                     value={deploymentSpecifcation.avg_sequence_length}
@@ -304,7 +383,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
                         if (
                           true ||
                           value === "" ||
-                          (val >= 10 && val <= 2000)
+                          (val >= 10 && val <= maxContextLength)
                         ) {
                           setDeploymentSpecification({
                             ...deploymentSpecifcation,
@@ -332,7 +411,8 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
             </Form.Item>
           </div>
         </div>
-        {!isCloudModelFlow && hardwareMode === "dedicated" && (
+        )}
+        {!isCloudModelFlow && hardwareMode === "dedicated" && !hideContextSequence && (
           <>
             <div className="flex gap-[1rem] w-full flex-row">
               <div className="w-full">

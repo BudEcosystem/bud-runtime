@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { Spin } from "antd";
 import {
@@ -11,12 +11,13 @@ import {
 } from "@/components/ui/text";
 import { formatDate } from "src/utils/formatDate";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import Tags from "src/flows/components/DrawerTags";
 import { usePrompts, IPromptVersion } from "src/hooks/usePrompts";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 import { errorToast } from "@/components/toast";
+import { loadPromptForEditing } from "@/utils/promptHelpers";
+import { parseSchemaToVariables } from "@/utils/schemaParser";
 
 interface VersionsTabProps {
   agentData?: any;
@@ -24,7 +25,11 @@ interface VersionsTabProps {
 
 const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
   const router = useRouter();
-  const { id, projectId } = router.query;
+  const { id, projectId, name } = router.query;
+  const promptName = useMemo(
+    () => (typeof name === "string" ? name : undefined),
+    [name]
+  );
 
   // Use the prompts service for version management
   const {
@@ -33,6 +38,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
     versionsLoading,
     getPromptVersions,
     getPromptById,
+    getPromptConfig,
   } = usePrompts();
 
   // Use agent store for opening drawer in add version mode and edit version mode
@@ -41,6 +47,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
     loadPromptForAddVersion,
     loadPromptForEditVersion,
   } = useAgentStore();
+  const [settingDefaultVersionId, setSettingDefaultVersionId] = useState<string | null>(null);
 
   // Fetch data when component mounts or agentId changes
   useEffect(() => {
@@ -115,15 +122,36 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
         return;
       }
 
-      // Fetch endpoint/deployment details based on endpoint_name
+      const resolvedPromptName = promptName || promptData.name || promptData.prompt_name;
+
+      // Load baseline session data from prompt
+      const sessionData = await loadPromptForEditing(id, projectId as string);
+      if (resolvedPromptName) {
+        sessionData.name = resolvedPromptName;
+      }
+
+      const promptConfigKey = resolvedPromptName
+        ? `${resolvedPromptName}:${versionData.version}`
+        : undefined;
+
+      // Fetch prompt config for the specific version
+      const configResponse = resolvedPromptName
+        ? await getPromptConfig(resolvedPromptName, versionData.version)
+        : null;
+      const configData = configResponse?.data;
+
+      // Fetch endpoint/deployment details based on deployment name
       let selectedDeployment = null;
-      if (versionData.endpoint_name) {
+      const deploymentName =
+        configData?.deployment_name ||
+        versionData.endpoint_name;
+      if (deploymentName) {
         try {
           const endpointResponse: any = await AppRequest.Get(
             `${tempApiBaseUrl}/playground/deployments`,
             {
               params: {
-                name: versionData.endpoint_name,
+                name: deploymentName,
                 project_id: projectId,
                 page: 1,
                 limit: 1,
@@ -150,13 +178,62 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
         }
       }
 
-      // Prepare session data from prompt
-      const sessionData: any = {
-        name: promptData.name || promptData.prompt_name || `Edit Version ${versionData.version}`,
-        systemPrompt: "", // Will be loaded from version data if available
-        promptMessages: "",
-        // Additional fields can be populated if available in promptData
-      };
+      if (configData) {
+        if (configData.system_prompt != null) {
+          sessionData.systemPrompt = configData.system_prompt;
+        }
+        if (configData.messages && Array.isArray(configData.messages)) {
+          sessionData.promptMessages = JSON.stringify(configData.messages);
+        }
+        if (configData.stream != null) {
+          sessionData.settings = {
+            ...sessionData.settings,
+            stream: configData.stream,
+          };
+        }
+        if (configData.llm_retry_limit != null) {
+          sessionData.llm_retry_limit = configData.llm_retry_limit;
+        }
+        if (configData.allow_multiple_calls != null) {
+          sessionData.allowMultipleCalls = configData.allow_multiple_calls;
+        }
+        if (configData.model_settings && typeof configData.model_settings === "object") {
+          const settings = { ...sessionData.settings };
+          if ("temperature" in configData.model_settings) {
+            settings.temperature = Number(configData.model_settings.temperature);
+          }
+          if ("max_tokens" in configData.model_settings) {
+            settings.maxTokens = Number(configData.model_settings.max_tokens);
+          }
+          if ("top_p" in configData.model_settings) {
+            settings.topP = Number(configData.model_settings.top_p);
+          }
+          sessionData.settings = settings;
+        }
+        if (configData.input_schema) {
+          const inputVars = parseSchemaToVariables(configData.input_schema, "Input", "input");
+          if (inputVars.length > 0) {
+            sessionData.inputVariables = inputVars;
+          }
+        }
+        if (configData.output_schema) {
+          const outputVars = parseSchemaToVariables(configData.output_schema, "Output", "output");
+          if (outputVars.length > 0) {
+            sessionData.outputVariables = outputVars;
+          }
+        }
+        if (configData.deployment_name) {
+          sessionData.selectedDeployment = {
+            id: configData.deployment_id || "",
+            name: configData.deployment_name,
+            model: sessionData.selectedDeployment?.model || {},
+          };
+        }
+      }
+
+      if (promptConfigKey) {
+        sessionData.promptConfigKey = promptConfigKey;
+      }
 
       // Add selected deployment if found
       if (selectedDeployment) {
@@ -178,6 +255,67 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
     } catch (error) {
       console.error("Error loading prompt for edit version:", error);
       errorToast("Failed to load prompt for editing version");
+    }
+  };
+
+  const handleSetDefaultVersion = async (versionData: IPromptVersion) => {
+    if (!id || typeof id !== "string") {
+      errorToast("Invalid prompt ID");
+      return;
+    }
+
+    if (versionData.is_default_version) {
+      return;
+    }
+
+    setSettingDefaultVersionId(versionData.id);
+
+    try {
+      let endpointId = versionData.endpoint_id;
+
+      if (!endpointId && versionData.endpoint_name) {
+        try {
+          const endpointResponse: any = await AppRequest.Get(
+            `${tempApiBaseUrl}/playground/deployments`,
+            {
+              params: {
+                name: versionData.endpoint_name,
+                project_id: projectId,
+                page: 1,
+                limit: 1,
+                search: true
+              }
+            }
+          );
+
+          if (endpointResponse?.data?.endpoints && endpointResponse.data.endpoints.length > 0) {
+            endpointId = endpointResponse.data.endpoints[0].id;
+          }
+        } catch (endpointError) {
+          console.warn("Failed to fetch endpoint id for set default:", endpointError);
+        }
+      }
+
+      if (!endpointId) {
+        errorToast("Endpoint ID not found for this version");
+        return;
+      }
+
+      const payload = {
+        endpoint_id: endpointId,
+        set_as_default: true,
+      };
+
+      await AppRequest.Patch(
+        `${tempApiBaseUrl}/prompts/${id}/versions/${versionData.id}`,
+        payload
+      );
+      await getPromptVersions(id, projectId as string);
+    } catch (error) {
+      console.error("Error setting default version:", error);
+      errorToast("Failed to set default version");
+    } finally {
+      setSettingDefaultVersionId(null);
     }
   };
 
@@ -220,6 +358,17 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
+        {!versionData.is_default_version && (
+          <PrimaryButton
+            className="px-[.1rem]"
+            onClick={() => handleSetDefaultVersion(versionData)}
+            disabled={settingDefaultVersionId === versionData.id}
+          >
+            <div className="flex justify-center items-center gap-1">
+              Set as Default
+            </div>
+          </PrimaryButton>
+        )}
         <PrimaryButton
           className="px-[.1rem]"
           onClick={() => handleEditVersion(versionData)}
