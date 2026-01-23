@@ -629,57 +629,91 @@ class TestGuardrailPipelineActions:
             assert result["custom_rules"][0]["scanner"] == "llm"
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_progress_all_ready(self, pipeline_actions, mock_session):
-        """Test pipeline progress when all deployments are ready."""
+    async def test_get_deployment_progress_all_running(self, pipeline_actions, mock_session):
+        """Test deployment progress when all endpoints are running."""
         guardrail_deployment_id = uuid4()
+        endpoint_id_1 = uuid4()
+        endpoint_id_2 = uuid4()
+        rule_id_1 = uuid4()
+        rule_id_2 = uuid4()
 
         mock_deployment_1 = Mock()
-        mock_deployment_1.status = Mock(value="ready")
+        mock_deployment_1.endpoint_id = endpoint_id_1
+        mock_deployment_1.rule_id = rule_id_1
 
         mock_deployment_2 = Mock()
-        mock_deployment_2.status = Mock(value="ready")
+        mock_deployment_2.endpoint_id = endpoint_id_2
+        mock_deployment_2.rule_id = rule_id_2
+
+        mock_endpoint_1 = Mock()
+        mock_endpoint_1.id = endpoint_id_1
+        mock_endpoint_1.name = "endpoint-1"
+        mock_endpoint_1.status = Mock(value="running")
+
+        mock_endpoint_2 = Mock()
+        mock_endpoint_2.id = endpoint_id_2
+        mock_endpoint_2.name = "endpoint-2"
+        mock_endpoint_2.status = Mock(value="running")
 
         with patch("budapp.guardrails.pipeline_actions.GuardrailsDeploymentDataManager") as MockDM:
             mock_dm = MockDM.return_value
             mock_dm.get_rule_deployments_for_guardrail = AsyncMock(return_value=[mock_deployment_1, mock_deployment_2])
+            mock_session.get = Mock(side_effect=[mock_endpoint_1, mock_endpoint_2])
 
-            result = await pipeline_actions.get_pipeline_progress(guardrail_deployment_id)
+            result = await pipeline_actions.get_deployment_progress(guardrail_deployment_id)
 
-            assert result["status"] == "ready"
+            assert result["status"] == "running"
             assert result["progress_percentage"] == 100.0
-            assert result["breakdown"]["ready"] == 2
+            assert result["status_breakdown"]["running"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_progress_partial_failure(self, pipeline_actions, mock_session):
-        """Test pipeline progress with some failures."""
+    async def test_get_deployment_progress_partial_failure(self, pipeline_actions, mock_session):
+        """Test deployment progress with some endpoint failures."""
         guardrail_deployment_id = uuid4()
+        endpoint_id_1 = uuid4()
+        endpoint_id_2 = uuid4()
+        rule_id_1 = uuid4()
+        rule_id_2 = uuid4()
 
         mock_deployment_1 = Mock()
-        mock_deployment_1.status = Mock(value="ready")
+        mock_deployment_1.endpoint_id = endpoint_id_1
+        mock_deployment_1.rule_id = rule_id_1
 
         mock_deployment_2 = Mock()
-        mock_deployment_2.status = Mock(value="failed")
+        mock_deployment_2.endpoint_id = endpoint_id_2
+        mock_deployment_2.rule_id = rule_id_2
+
+        mock_endpoint_1 = Mock()
+        mock_endpoint_1.id = endpoint_id_1
+        mock_endpoint_1.name = "endpoint-1"
+        mock_endpoint_1.status = Mock(value="running")
+
+        mock_endpoint_2 = Mock()
+        mock_endpoint_2.id = endpoint_id_2
+        mock_endpoint_2.name = "endpoint-2"
+        mock_endpoint_2.status = Mock(value="failure")
 
         with patch("budapp.guardrails.pipeline_actions.GuardrailsDeploymentDataManager") as MockDM:
             mock_dm = MockDM.return_value
             mock_dm.get_rule_deployments_for_guardrail = AsyncMock(return_value=[mock_deployment_1, mock_deployment_2])
+            mock_session.get = Mock(side_effect=[mock_endpoint_1, mock_endpoint_2])
 
-            result = await pipeline_actions.get_pipeline_progress(guardrail_deployment_id)
+            result = await pipeline_actions.get_deployment_progress(guardrail_deployment_id)
 
             assert result["status"] == "partial_failure"
-            assert result["breakdown"]["ready"] == 1
-            assert result["breakdown"]["failed"] == 1
+            assert result["status_breakdown"]["running"] == 1
+            assert result["status_breakdown"]["failure"] == 1
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_progress_no_models(self, pipeline_actions, mock_session):
-        """Test pipeline progress when no model deployments exist."""
+    async def test_get_deployment_progress_no_models(self, pipeline_actions, mock_session):
+        """Test deployment progress when no model deployments exist."""
         guardrail_deployment_id = uuid4()
 
         with patch("budapp.guardrails.pipeline_actions.GuardrailsDeploymentDataManager") as MockDM:
             mock_dm = MockDM.return_value
             mock_dm.get_rule_deployments_for_guardrail = AsyncMock(return_value=[])
 
-            result = await pipeline_actions.get_pipeline_progress(guardrail_deployment_id)
+            result = await pipeline_actions.get_deployment_progress(guardrail_deployment_id)
 
             assert result["status"] == "no_models"
             assert result["progress_percentage"] == 100.0
