@@ -98,37 +98,6 @@ curl -X POST /api/models \
 
 ---
 
-## Versioning
-
-### Version Naming
-
-Models use semantic versioning: `major.minor.patch`
-
-- **Major**: Breaking changes (architecture, vocab)
-- **Minor**: Fine-tuning, new capabilities
-- **Patch**: Bug fixes, small improvements
-
-### Version Management
-
-```bash
-# List versions
-curl /api/models/{id}/versions
-
-# Create new version
-curl -X POST /api/models/{id}/versions \
-  -d '{
-    "version": "2.0.0",
-    "storage_path": "s3://bud-models/my-model-v2/",
-    "changelog": "Updated fine-tuning"
-  }'
-
-# Set default version
-curl -X PUT /api/models/{id}/default-version \
-  -d '{"version": "2.0.0"}'
-```
-
----
-
 ## License Management
 
 ### License Types
@@ -141,19 +110,12 @@ curl -X PUT /api/models/{id}/default-version \
 | Mistral-Research | No | No | Research only |
 | OpenAI-TOS | Yes | No | API only |
 
-### Enforcement
-
-- License checks during deployment
-- Warnings for restricted usage
-- Audit log of license acknowledgments
-
 ---
 
 ## Security Scanning
 
-### Automatic Scanning
 
-All uploaded models are scanned with ClamAV:
+All uploaded models can be scanned with ClamAV:
 
 1. Upload triggers scan job
 2. Scan checks for malware signatures
@@ -163,11 +125,6 @@ All uploaded models are scanned with ClamAV:
    - `FAILED`: Issues found
    - `SKIPPED`: Scan disabled
 
-### Manual Rescan
-
-```bash
-curl -X POST /api/models/{id}/scan
-```
 
 ---
 

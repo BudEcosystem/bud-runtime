@@ -24,10 +24,10 @@ budcluster manages the lifecycle of Kubernetes clusters across AWS EKS, Azure AK
 
 - Provision new Kubernetes clusters via Terraform (AWS EKS, Azure AKS)
 - Onboard existing clusters via Ansible
-- Deploy model runtimes (vLLM, SGLang, TensorRT-LLM)
+- Deploy model runtimes
 - Manage cluster credentials with RSA encryption
 - Hardware detection via Node Feature Discovery (NFD)
-- GPU time-slicing via HAMI
+- GPU time-slicing
 - Monitor cluster health and resource usage
 
 ---
@@ -281,5 +281,4 @@ pytest --dapr-http-port 3510 --dapr-api-token TOKEN
 ## Related Documents
 
 - [Cluster Onboarding Runbook](../operations/cluster-onboarding.md)
-- [GPU Support Guide](../ai-ml/gpu-support.md)
 - [High-Level Architecture](../architecture/high-level-architecture.md)

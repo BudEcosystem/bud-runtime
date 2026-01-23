@@ -4,42 +4,124 @@
 
 ## Overview
 
-This guide covers model deployment patterns, versioning strategies, and scaling approaches in Bud AI Foundry.
+This guide covers the end-to-end model deployment workflow in Bud AI Foundry, from model selection through deployment, versioning, scaling, and monitoring.
 
 ---
 
-## Deployment Patterns
+## Deployment Flow
 
-### Single Endpoint
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   Select     │───►│  Configure   │───►│   Deploy     │───►│   Monitor    │
+│   Model      │    │   & Optimize │    │   Runtime    │    │   & Scale    │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+       │                   │                   │                   │
+       ▼                   ▼                   ▼                   ▼
+   budmodel            budsim            budcluster          budmetrics
+   (Registry)       (Optimizer)        (Deployment)        (Observability)
+```
 
-Standard deployment for most use cases:
+---
+
+## Stage 1: Model Selection
+
+### From Model Registry
+
+1. Browse available models in budadmin dashboard
+2. Filter by:
+   - Architecture (Llama, Mistral, Qwen, etc.)
+   - Size (7B, 13B, 70B, 405B parameters)
+   - License type (Apache, commercial, etc.)
+   - Performance benchmarks
+
+### Custom Model Registration
+
+1. Upload model artifacts to MinIO storage
+2. Register model metadata via API:
+   ```json
+   {
+     "name": "my-custom-model",
+     "architecture": "llama",
+     "parameter_count": 7000000000,
+     "context_length": 8192,
+     "source_path": "s3://models/my-custom-model"
+   }
+   ```
+3. Security scan triggers automatically (ClamAV)
+4. Model appears in registry after scan passes
+
+---
+
+## Stage 2: Configuration & Optimization
+
+### Automatic Optimization (Recommended)
+
+budsim analyzes model and hardware to recommend optimal configuration:
+
+1. Select target cluster
+2. Define performance targets:
+   - Maximum latency (TTFT, total)
+   - Minimum throughput (tokens/sec)
+   - Budget constraints
+3. budsim runs optimization:
+   - XGBoost predicts performance for configurations
+   - Genetic algorithm finds optimal parameters
+4. Review recommended configuration:
+   - Tensor Parallelism (TP)
+   - Pipeline Parallelism (PP)
+   - Batch size
+   - Max sequences
+   - Replica count
+
+### Manual Configuration
+
+For advanced users who want direct control:
+
+```yaml
+deployment:
+  runtime: vllm
+  config:
+    tensor_parallel_size: 4
+    pipeline_parallel_size: 1
+    max_model_len: 8192
+    max_num_seqs: 256
+    gpu_memory_utilization: 0.9
+  replicas: 2
+  resources:
+    gpu_type: nvidia-a100-80gb
+    gpu_count: 4
+```
+
+---
+
+## Stage 3: Deployment
+
+### Deployment Patterns
+
+**Single Endpoint** - Standard deployment for most use cases:
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Client    │────►│ budgateway  │────►│  vLLM Pod   │
+│   Client    │────►│ budgateway  │────►│  Model Pod   │
 │             │     │             │     │  (Model A)  │
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-### Multi-Replica (High Availability)
-
-Multiple replicas for load distribution:
+**Multi-Replica (High Availability)** - Multiple replicas for load distribution:
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Client    │────►│ budgateway  │──┬──│  vLLM Pod 1 │
+│   Client    │────►│ budgateway  │──┬──│  Model Pod 1 │
 │             │     │             │  │  └─────────────┘
 └─────────────┘     └─────────────┘  │  ┌─────────────┐
-                                     ├──│  vLLM Pod 2 │
+                                     ├──│  Model Pod 2 │
                                      │  └─────────────┘
                                      │  ┌─────────────┐
-                                     └──│  vLLM Pod 3 │
+                                     └──│  Model Pod 3 │
                                         └─────────────┘
 ```
 
-### Multi-Model (Router Pattern)
-
-Single gateway routing to multiple models:
+**Multi-Model (Router Pattern)** - Single gateway routing to multiple models:
 
 ```
                                         ┌─────────────┐
@@ -53,11 +135,9 @@ Single gateway routing to multiple models:
                                         └─────────────┘
 ```
 
----
+### Deployment Steps
 
-## Deployment Steps
-
-### 1. Create Endpoint
+**1. Create Endpoint**
 
 ```bash
 curl -X POST /api/endpoints \
@@ -70,7 +150,7 @@ curl -X POST /api/endpoints \
   }'
 ```
 
-### 2. Configure Deployment
+**2. Configure Deployment**
 
 ```bash
 curl -X PUT /api/endpoints/{id}/config \
@@ -84,16 +164,15 @@ curl -X PUT /api/endpoints/{id}/config \
   }'
 ```
 
-### 3. Deploy
+**3. Deploy**
 
 ```bash
 curl -X POST /api/endpoints/{id}/deploy
 ```
 
-### 4. Monitor Status
+**4. Monitor Status**
 
 ```bash
-# Check deployment status
 curl /api/endpoints/{id}
 
 # Response
@@ -108,6 +187,28 @@ curl /api/endpoints/{id}
   "inference_url": "https://inference.example.com/v1"
 }
 ```
+
+### Deployment Process (Internal)
+
+1. **Validation**
+   - Verify cluster has required resources
+   - Check model compatibility with runtime
+   - Validate configuration parameters
+
+2. **Model Transfer**
+   - Transfer model from registry to cluster storage
+   - Uses efficient streaming for large models
+
+3. **Runtime Deployment**
+   - Generate Helm values from configuration
+   - Deploy vLLM/SGLang pod with Helm
+   - Configure service and ingress
+
+4. **Health Checks**
+   - Wait for pod readiness
+   - Verify model loads successfully
+   - Test inference endpoint
+
 
 ---
 
@@ -134,33 +235,11 @@ traffic_weight: 0
 # After validation, swap weights
 ```
 
-### Canary Deployment
-
-Gradual traffic shift:
-
-```
-Day 1: v1=95%, v2=5%
-Day 2: v1=90%, v2=10%
-Day 3: v1=50%, v2=50%
-Day 4: v1=0%, v2=100%
-```
-
-### Shadow Deployment
-
-Test new version without affecting production:
-
-```
-All traffic → v1 (production)
-Copy traffic → v2 (shadow, responses discarded)
-```
-
 ---
 
-## Scaling
+## Stage 4: Scaling
 
-### Horizontal Scaling
-
-Add/remove replicas:
+### Horizontal Scaling (Replicas)
 
 ```bash
 # Scale up
@@ -195,28 +274,32 @@ autoscaling:
           value: 100
 ```
 
-### Vertical Scaling
+---
 
-Change resource allocation (requires re-deployment):
+## Stage 5: Monitoring
 
-```bash
-curl -X PUT /api/endpoints/{id}/config \
-  -d '{
-    "resources": {
-      "gpu_type": "nvidia-h100-80gb",
-      "gpu_count": 8
-    }
-  }'
+### Metrics Collected
 
-# Re-deploy with new configuration
-curl -X POST /api/endpoints/{id}/deploy
-```
+| Metric | Description | Alert Threshold |
+|--------|-------------|-----------------|
+| `inference_latency_p99` | 99th percentile latency | >2s |
+| `ttft_p99` | Time to first token | >500ms |
+| `throughput` | Tokens per second | <target |
+| `gpu_utilization` | GPU compute usage | >95% sustained |
+| `queue_depth` | Pending requests | >100 |
+
+### Continuous Optimization
+
+1. budmetrics collects performance data
+2. Compare actual vs predicted performance
+3. budsim refines model with real-world data
+4. Recommendations surface in dashboard
 
 ---
 
 ## Configuration Reference
 
-### Runtime Options
+### Runtime Parameters
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
@@ -235,6 +318,44 @@ curl -X POST /api/endpoints/{id}/deploy
 | `gpu_count` | Number of GPUs |
 | `cpu_cores` | CPU cores |
 | `memory_gb` | Memory in GB |
+
+---
+
+## Common Workflows
+
+### New Model Deployment
+
+```
+1. Select model from registry
+2. Choose target cluster
+3. Run optimization (budsim)
+4. Review and approve configuration
+5. Deploy endpoint
+6. Verify with test traffic
+7. Update DNS/routing
+8. Monitor performance
+```
+
+### Model Update (A/B Testing)
+
+```
+1. Deploy new model version as separate endpoint
+2. Configure traffic split (90/10)
+3. Monitor both versions
+4. Gradually shift traffic
+5. Remove old version when confident
+```
+
+### Performance Troubleshooting
+
+```
+1. Check metrics in Grafana
+2. Identify bottleneck (GPU, memory, network)
+3. Review configuration parameters
+4. Re-run optimization with updated constraints
+5. Apply new configuration
+6. Verify improvement
+```
 
 ---
 
@@ -260,8 +381,33 @@ curl -X POST /api/endpoints/{id}/deploy
 
 ---
 
+## Best Practices
+
+### Model Selection
+- Start with smaller models for evaluation
+- Consider license restrictions for production
+- Validate model on representative workloads
+
+### Configuration
+- Use automatic optimization for initial deployment
+- Monitor actual performance before manual tuning
+- Leave 10-20% GPU memory headroom
+
+### Deployment
+- Deploy to staging cluster first
+- Validate with production-like traffic
+- Use canary deployments for updates
+
+### Monitoring
+- Set up alerts for latency SLOs
+- Monitor token usage for cost management
+- Review metrics weekly for optimization opportunities
+
+---
+
 ## Related Documents
 
-- [MLOps Workflow Guide](./mlops-workflow.md)
+- [BudSim User Guide](./budsim-user-guide.md)
+- [Model Monitoring Guide](./model-monitoring.md)
 - [Resource Optimization Guide](./resource-optimization.md)
 - [Scaling Guidelines](./scaling-guidelines.md)

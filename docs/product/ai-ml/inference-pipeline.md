@@ -74,29 +74,6 @@ conditions = ["timeout", "rate_limit", "server_error"]
 
 ---
 
-## Batching
-
-### Runtime Batching (vLLM)
-
-vLLM implements continuous batching:
-
-- Requests queued as they arrive
-- Batched dynamically based on:
-  - Sequence length
-  - Available GPU memory
-  - Configured batch size
-- No fixed batch windows
-
-### Configuration
-
-```yaml
-batching:
-  max_num_seqs: 256        # Max concurrent sequences
-  max_num_batched_tokens: 4096  # Max tokens per batch
-  swap_space_gb: 4         # CPU offload space
-```
-
----
 
 ## Load Balancing
 

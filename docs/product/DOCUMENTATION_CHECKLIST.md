@@ -71,25 +71,23 @@ Master checklist of all technical documentation for Bud AI Foundry. Use this to 
 
 ## 2. AI/ML Capabilities
 
-### 2.1 MLOps & Lifecycle
+### 2.1 Model Deployment & Lifecycle
 
 | # | Document | Description | Priority | Status | Location |
 |---|----------|-------------|----------|--------|----------|
-| 2.1.1 | MLOps Workflow Guide | End-to-end: data → training → deployment → monitoring | P0 | [x] | [ai-ml/mlops-workflow.md](ai-ml/mlops-workflow.md) |
-| 2.1.2 | Model Deployment Guide | Deployment patterns, scaling, versioning | P0 | [x] | [ai-ml/model-deployment.md](ai-ml/model-deployment.md) |
-| 2.1.3 | Model Registry Documentation | Versioning, metadata, lineage tracking | P0 | [x] | [ai-ml/model-registry.md](ai-ml/model-registry.md) |
-| 2.1.4 | Inference Pipeline Architecture | Request routing, batching, load balancing | P0 | [x] | [ai-ml/inference-pipeline.md](ai-ml/inference-pipeline.md) |
-| 2.1.5 | Model Monitoring Guide | Metrics, drift detection, alerting | P0 | [x] | [ai-ml/model-monitoring.md](ai-ml/model-monitoring.md) |
+| 2.1.1 | Model Deployment Guide | End-to-end deployment flow, patterns, versioning, scaling, monitoring | P0 | [x] | [ai-ml/model-deployment.md](ai-ml/model-deployment.md) |
+| 2.1.2 | Model Registry Documentation | Versioning, metadata, lineage tracking | P0 | [x] | [ai-ml/model-registry.md](ai-ml/model-registry.md) |
+| 2.1.3 | Inference Pipeline Architecture | Request routing, batching, load balancing | P0 | [x] | [ai-ml/inference-pipeline.md](ai-ml/inference-pipeline.md) |
+| 2.1.4 | Model Monitoring Guide | Metrics, drift detection, alerting | P0 | [x] | [ai-ml/model-monitoring.md](ai-ml/model-monitoring.md) |
 
 ### 2.2 Supported Workloads
 
 | # | Document | Description | Priority | Status | Location |
 |---|----------|-------------|----------|--------|----------|
 | 2.2.1 | LLM Support Matrix | Supported models, frameworks, deployment patterns | P0 | [x] | [ai-ml/llm-support-matrix.md](ai-ml/llm-support-matrix.md) |
-| 2.2.2 | GPU/Accelerator Support | NVIDIA GPUs, HAMI time-slicing, NFD detection | P0 | [x] | [ai-ml/gpu-support.md](ai-ml/gpu-support.md) |
-| 2.2.3 | Framework Compatibility | PyTorch, TensorFlow, vLLM, TensorRT, ONNX | P0 | [ ] | |
-| 2.2.4 | Custom Model Onboarding | How to bring custom models to platform | P0 | [ ] | |
-| 2.2.5 | GenAI Workload Guide | LLM, NLP, TTS, avatar, embedding workloads | P1 | [ ] | |
+| 2.2.2 | Framework Compatibility | PyTorch, TensorFlow, vLLM, TensorRT, ONNX | P0 | [ ] | |
+| 2.2.3 | Custom Model Onboarding | How to bring custom models to platform | P0 | [ ] | |
+| 2.2.4 | GenAI Workload Guide | LLM, NLP, TTS, avatar, embedding workloads | P1 | [ ] | |
 
 ### 2.3 Performance & Optimization
 

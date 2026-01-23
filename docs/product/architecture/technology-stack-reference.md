@@ -101,7 +101,6 @@ Complete reference of all technologies, frameworks, libraries, and their version
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| **PostgreSQL** | 16.x | Primary relational database |
 | **pgvector** | 0.6+ | Vector similarity search (optional) |
 
 ### ClickHouse
@@ -226,28 +225,6 @@ Complete reference of all technologies, frameworks, libraries, and their version
 | **ClamAV** | 1.x | Model artifact scanning |
 | **Trivy** | 0.50+ | Container vulnerability scanning |
 
----
-
-## AI/ML Runtimes
-
-### Inference Engines
-
-| Runtime | Version | Purpose |
-|---------|---------|---------|
-| **vLLM** | 0.4+ | High-throughput LLM inference |
-| **SGLang** | 0.1+ | Structured generation |
-| **TensorRT-LLM** | 0.9+ | NVIDIA-optimized inference |
-| **ONNX Runtime** | 1.17+ | Cross-platform inference |
-
-### GPU Support
-
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| **NVIDIA GPU Operator** | 24.x | GPU driver management |
-| **CUDA** | 12.x | NVIDIA compute platform |
-| **cuDNN** | 8.x | Deep learning primitives |
-| **HAMI** | 2.x | GPU time-slicing |
-| **NFD** | 0.15+ | Node Feature Discovery |
 
 ---
 
