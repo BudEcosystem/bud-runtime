@@ -55,6 +55,11 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
   const contentRef = useRef<HTMLDivElement>(null);
 
   const promptIds = getPromptIds();
+  const promptId = useMemo(() => {
+    if (promptIds.length === 0) return null;
+    if (promptIds.includes(chat.id)) return chat.id;
+    return promptIds[0];
+  }, [promptIds, chat.id]);
   const promptVersionParam = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     return parsePositiveIntParam(params.get('version'));
@@ -146,7 +151,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         setRefreshTrigger(prev => prev + 1);
 
         // Also update showPromptForm to reopen the form if typeForm is true
-        if (typeFormValue && getPromptIds().length > 0) {
+        if (typeFormValue && promptId) {
           setShowPromptForm(true);
         } else {
           setShowPromptForm(false);
@@ -156,14 +161,14 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
     // Handler for visibility change (tab switch)
     const handleVisibilityChange = () => {
-      if (!document.hidden && getPromptIds().length > 0) {
+      if (!document.hidden && promptId) {
         setRefreshTrigger(prev => prev + 1);
       }
     };
 
     // Handler for window focus
     const handleFocus = () => {
-      if (getPromptIds().length > 0) {
+      if (promptId) {
         setRefreshTrigger(prev => prev + 1);
       }
     };
@@ -179,14 +184,15 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [getPromptIds]);
+  }, [getPromptIds, promptId]);
 
   // Fetch prompt configuration to determine if structured or unstructured
   useEffect(() => {
     const fetchPromptConfiguration = async () => {
       const promptIds = getPromptIds();
+      const promptIdForChat = promptId;
 
-      if (promptIds.length === 0 || (!apiKey && !accessKey)) {
+      if (!promptIdForChat || (!apiKey && !accessKey)) {
         // No promptIds - ensure deployment is not locked (clear any persisted lock state)
         setDeploymentLock(chat.id, false);
         setIsDeploymentReady(true);
@@ -198,7 +204,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
       try {
         const config = await getPromptConfig(
-          promptIds[0],
+          promptIdForChat,
           apiKey || '',
           accessKey || '',
           promptVersionParam
@@ -231,9 +237,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
             const version = config.data?.version ?? config.data?.prompt?.version ?? undefined;
             const promptPayload: any = {
               prompt: {
-                id: promptIds[0],
+                id: promptIdForChat,
               },
-              promptId: promptIds[0],
+              promptId: promptIdForChat,
             };
 
             if (version !== undefined && version !== null) {
@@ -257,7 +263,7 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
     fetchPromptConfiguration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getPromptIds, apiKey, accessKey, refreshTrigger, promptVersionParam]);
+  }, [getPromptIds, apiKey, accessKey, refreshTrigger, promptVersionParam, promptId]);
 
   // Fetch endpoints when prompt config has deployment_name (for unstructured prompts)
   // Note: Structured prompts handle this in PromptForm
@@ -710,9 +716,9 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
 
           {/* Unstructured prompt - show UnstructuredPromptInput */}
           {/* Show for unstructured prompts OR while loading (when not confirmed as structured) */}
-          {promptIds.length > 0 && isStructuredPrompt !== true && (
+          {promptId && promptIds.length > 0 && isStructuredPrompt !== true && (
             <UnstructuredPromptInput
-              promptId={promptIds[0]}
+              promptId={promptId}
               promptVersion={promptConfig?.version}
               deploymentName={promptConfig?.deployment_name}
               onSubmit={handleUnstructuredPromptSubmit}
@@ -739,13 +745,14 @@ export default function ChatWindow({ chat, isSingleChat }: { chat: Session, isSi
         {/* Show PromptForm only for structured prompts */}
         {enablePromptForm &&
          showPromptForm &&
-         getPromptIds().length > 0 &&
+         promptId &&
          isStructuredPrompt === true && (
           <PromptForm
-            promptIds={getPromptIds()}
+            promptIds={promptId ? [promptId] : []}
             chatId={chat.id}
             onSubmit={handlePromptFormSubmit}
             onClose={() => setShowPromptForm(false)}
+            promptConfig={promptConfig}
           />
         )}
       </Layout>
