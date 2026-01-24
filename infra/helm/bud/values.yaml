@@ -848,6 +848,10 @@ otelCollector:
     username: default
     password: ""
     ttl: 720h # 30 days - retention for raw OTel metrics (otel_metrics_*)
+  # Realtime streaming configuration (hot path to BudNotify)
+  realtime:
+    batchTimeout: 2s
+    batchSize: 10000
   # Optional node scheduling for OTel Collector
   nodeSelector: {}
   affinity: {}
