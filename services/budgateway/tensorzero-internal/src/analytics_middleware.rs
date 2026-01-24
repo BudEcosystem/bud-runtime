@@ -130,6 +130,16 @@ pub async fn analytics_middleware(
     // Extract parent context from incoming traceparent/tracestate headers
     let parent_ctx =
         tracing_opentelemetry_instrumentation_sdk::http::extract_context(&headers);
+
+    // Remove AUTH_PROCESSED marker from incoming baggage before setting parent.
+    // This prevents BaggageSpanProcessor from setting endpoint_id on gateway_analytics.
+    //
+    // Why: The incoming baggage may contain AUTH_PROCESSED from an upstream request
+    // (e.g., budprompt calling gateway). If we don't remove it, BaggageSpanProcessor
+    // would see the marker and set endpoint_id from the CALLER's baggage (wrong value).
+    // By removing the marker, BaggageSpanProcessor skips endpoint_id, and we set it
+    // correctly after auth resolves the endpoint for THIS request.
+    let parent_ctx = crate::baggage::remove_auth_marker_from_context(parent_ctx);
     span.set_parent(parent_ctx);
 
     // Run all middleware logic inside the span

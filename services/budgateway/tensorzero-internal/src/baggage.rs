@@ -23,23 +23,29 @@ pub mod keys {
     pub const API_KEY_ID: &str = "bud.api_key_id";
     /// User ID key for baggage
     pub const USER_ID: &str = "bud.user_id";
+    /// Marker indicating auth middleware has processed this request and set the correct endpoint_id.
+    /// BaggageSpanProcessor uses this to decide whether to set endpoint_id from baggage.
+    /// - If present: endpoint_id in baggage is from auth (correct value) → set it on span
+    /// - If absent: endpoint_id in baggage is from incoming headers (caller's value) → skip it
+    pub const AUTH_PROCESSED: &str = "bud.auth_processed";
 }
 
-/// Creates a new Context with baggage entries from the provided values.
+/// Creates a new Context with baggage entries merged from existing baggage and provided values.
 ///
-/// Only non-None values are added to baggage. The base context is preserved,
-/// allowing trace context to be maintained while adding business context.
+/// Existing baggage items are preserved unless explicitly overridden by new values.
+/// Only non-None values override existing baggage. This ensures that baggage from
+/// upstream services (e.g., prompt_id from budprompt) is preserved through nested calls.
 ///
 /// # Arguments
-/// * `base_context` - The existing context (typically with trace propagation)
-/// * `project_id` - Optional project identifier
-/// * `prompt_id` - Optional prompt identifier
-/// * `endpoint_id` - Optional endpoint identifier
-/// * `api_key_id` - Optional API key identifier
-/// * `user_id` - Optional user identifier
+/// * `base_context` - The existing context (typically with trace propagation and possibly existing baggage)
+/// * `project_id` - Optional project identifier (overrides existing if Some)
+/// * `prompt_id` - Optional prompt identifier (overrides existing if Some)
+/// * `endpoint_id` - Optional endpoint identifier (overrides existing if Some)
+/// * `api_key_id` - Optional API key identifier (overrides existing if Some)
+/// * `user_id` - Optional user identifier (overrides existing if Some)
 ///
 /// # Returns
-/// A new Context with baggage entries attached
+/// A new Context with merged baggage entries attached
 pub fn context_with_baggage(
     base_context: Context,
     project_id: Option<&str>,
@@ -48,8 +54,30 @@ pub fn context_with_baggage(
     api_key_id: Option<&str>,
     user_id: Option<&str>,
 ) -> Context {
-    let mut baggage_items: Vec<KeyValue> = Vec::with_capacity(5);
+    // Step 1: Read existing baggage from the base context
+    let existing_baggage = base_context.baggage();
+    let mut baggage_items: Vec<KeyValue> = Vec::new();
 
+    // Step 2: Collect existing baggage items, skipping keys that will be overridden
+    // iter() returns (Key, (StringValue, BaggageMetadata)) tuples
+    for (key, (string_value, _metadata)) in existing_baggage.iter() {
+        let key_str = key.as_str();
+        let will_override = match key_str {
+            k if k == keys::PROJECT_ID => project_id.is_some(),
+            k if k == keys::PROMPT_ID => prompt_id.is_some(),
+            k if k == keys::ENDPOINT_ID => endpoint_id.is_some(),
+            k if k == keys::API_KEY_ID => api_key_id.is_some(),
+            k if k == keys::USER_ID => user_id.is_some(),
+            // Always override AUTH_PROCESSED - we set it below
+            k if k == keys::AUTH_PROCESSED => true,
+            _ => false,
+        };
+        if !will_override {
+            baggage_items.push(KeyValue::new(key.clone(), string_value.as_str().to_string()));
+        }
+    }
+
+    // Step 3: Add new bud.* items (override existing if provided)
     if let Some(id) = project_id {
         baggage_items.push(KeyValue::new(keys::PROJECT_ID, id.to_string()));
     }
@@ -66,10 +94,44 @@ pub fn context_with_baggage(
         baggage_items.push(KeyValue::new(keys::USER_ID, id.to_string()));
     }
 
+    // Step 3.5: Add AUTH_PROCESSED marker to indicate auth has set the endpoint_id.
+    // BaggageSpanProcessor uses this to decide whether to copy endpoint_id to span attributes.
+    baggage_items.push(KeyValue::new(keys::AUTH_PROCESSED, "true".to_string()));
+
+    // Step 4: Apply combined baggage
     if baggage_items.is_empty() {
         base_context
     } else {
         base_context.with_baggage(baggage_items)
+    }
+}
+
+/// Removes the AUTH_PROCESSED marker from a context's baggage.
+///
+/// This is used by analytics_middleware to prevent BaggageSpanProcessor from
+/// setting endpoint_id on the gateway_analytics span based on incoming baggage.
+///
+/// When a request comes from an upstream service (like budprompt), the baggage
+/// may contain AUTH_PROCESSED from that service's auth. We need to remove it
+/// so that BaggageSpanProcessor doesn't treat the incoming endpoint_id as valid
+/// for this request.
+pub fn remove_auth_marker_from_context(ctx: Context) -> Context {
+    let existing_baggage = ctx.baggage();
+    let mut baggage_items: Vec<KeyValue> = Vec::new();
+
+    // Copy all baggage items except AUTH_PROCESSED
+    for (key, (string_value, _metadata)) in existing_baggage.iter() {
+        if key.as_str() != keys::AUTH_PROCESSED {
+            baggage_items.push(KeyValue::new(key.clone(), string_value.as_str().to_string()));
+        }
+    }
+
+    if baggage_items.is_empty() {
+        // If we removed everything, return context without baggage
+        // Note: There's no clear_baggage, so we create a new context with empty baggage
+        ctx.with_baggage(Vec::<KeyValue>::new())
+    } else {
+        ctx.with_baggage(baggage_items)
     }
 }
 
@@ -212,23 +274,52 @@ mod tests {
     }
 
     #[test]
-    fn test_context_with_baggage_replaces_existing() {
-        // Note: with_baggage replaces existing baggage rather than merging.
-        // This is fine for our use case since incoming requests won't have
-        // bud.* baggage - we set it fresh at the gateway.
-        let initial_baggage = vec![KeyValue::new("existing.key", "existing-value")];
+    fn test_context_with_baggage_merges_existing() {
+        // Verify that existing baggage is MERGED with new values, not replaced.
+        // This is critical for nested requests where upstream services set baggage
+        // (e.g., budprompt sets prompt_id) that must be preserved through gateway calls.
+        let initial_baggage = vec![
+            KeyValue::new(keys::PROJECT_ID, "existing-project"),
+            KeyValue::new(keys::PROMPT_ID, "existing-prompt"),
+            KeyValue::new("other.key", "other-value"),
+        ];
         let base_ctx = Context::new().with_baggage(initial_baggage);
 
-        let ctx = context_with_baggage(base_ctx, Some("proj-123"), None, None, None, None);
+        // Call context_with_baggage with only project_id (prompt_id is None)
+        let ctx = context_with_baggage(
+            base_ctx,
+            Some("new-project"), // Override existing
+            None,                // Keep existing prompt_id
+            Some("new-endpoint"), // Add new
+            None,                // Not set
+            None,                // Not set
+        );
 
         let baggage = ctx.baggage();
-        // New baggage should be present
+
+        // New project_id should override existing
         assert_eq!(
             baggage.get(keys::PROJECT_ID).map(|v| v.as_str()),
-            Some("proj-123")
+            Some("new-project")
         );
-        // Note: Existing baggage is replaced (OTel behavior), not merged
-        // This is acceptable for our use case
+
+        // Existing prompt_id should be PRESERVED (not replaced)
+        assert_eq!(
+            baggage.get(keys::PROMPT_ID).map(|v| v.as_str()),
+            Some("existing-prompt")
+        );
+
+        // New endpoint_id should be added
+        assert_eq!(
+            baggage.get(keys::ENDPOINT_ID).map(|v| v.as_str()),
+            Some("new-endpoint")
+        );
+
+        // Non-bud.* keys should also be preserved
+        assert_eq!(
+            baggage.get("other.key").map(|v| v.as_str()),
+            Some("other-value")
+        );
     }
 
     #[test]

@@ -29,15 +29,28 @@ impl SpanProcessor for BaggageSpanProcessor {
     fn on_start(&self, span: &mut Span, cx: &Context) {
         let baggage = cx.baggage();
 
-        // Copy each baggage key to span attributes if present
+        // Check if auth middleware has processed this request.
+        // - If AUTH_PROCESSED is present: baggage was set by auth with correct endpoint_id
+        // - If AUTH_PROCESSED is absent: baggage is from incoming headers (upstream caller's endpoint_id)
+        //
+        // This distinction is important for gateway_analytics span which is created BEFORE auth runs.
+        // Without this check, gateway_analytics would get the caller's endpoint_id instead of the
+        // resolved endpoint_id for this specific request.
+        let auth_processed = baggage.get(keys::AUTH_PROCESSED).is_some();
+
+        // Copy baggage keys to span attributes
         if let Some(value) = baggage.get(keys::PROJECT_ID) {
             span.set_attribute(KeyValue::new(keys::PROJECT_ID, value.as_str().to_string()));
         }
         if let Some(value) = baggage.get(keys::PROMPT_ID) {
             span.set_attribute(KeyValue::new(keys::PROMPT_ID, value.as_str().to_string()));
         }
-        if let Some(value) = baggage.get(keys::ENDPOINT_ID) {
-            span.set_attribute(KeyValue::new(keys::ENDPOINT_ID, value.as_str().to_string()));
+        // Only set endpoint_id if auth has processed the request (baggage has correct value).
+        // For spans created before auth (gateway_analytics), analytics_middleware sets endpoint_id.
+        if auth_processed {
+            if let Some(value) = baggage.get(keys::ENDPOINT_ID) {
+                span.set_attribute(KeyValue::new(keys::ENDPOINT_ID, value.as_str().to_string()));
+            }
         }
         if let Some(value) = baggage.get(keys::API_KEY_ID) {
             span.set_attribute(KeyValue::new(keys::API_KEY_ID, value.as_str().to_string()));
