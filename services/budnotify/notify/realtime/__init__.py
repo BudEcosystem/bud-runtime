@@ -37,6 +37,7 @@ except ImportError:
     socket_app = None  # type: ignore[assignment]
 
 __all__ = [
+    "auth",
     "ChannelManager",
     "Channel",
     "Subscription",
