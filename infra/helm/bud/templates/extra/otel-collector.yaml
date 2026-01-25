@@ -19,6 +19,10 @@ data:
         send_batch_size: {{ .Values.otelCollector.batchSize | default 10000 }}
         timeout: {{ .Values.otelCollector.batchTimeout | default "10s" }}
 
+      batch/realtime:
+        send_batch_size: {{ .Values.otelCollector.realtime.batchSize | default 10000 }}
+        timeout: {{ .Values.otelCollector.realtime.batchTimeout | default "2s" }}
+
       memory_limiter:
         check_interval: 1s
         limit_mib: {{ .Values.otelCollector.memoryLimit | default 2048 }}
@@ -56,6 +60,14 @@ data:
         sampling_initial: 5
         sampling_thereafter: 200
 
+      # Realtime exporter for hot path streaming to BudNotify
+      otlphttp/realtime:
+        encoding: json
+        endpoint: http://{{ .Release.Name }}-budnotify:3000
+        traces_endpoint: http://{{ .Release.Name }}-budnotify:3000/realtime/ingest/otlp
+        timeout: 2s
+        compression: none
+
     extensions:
       health_check:
         endpoint: 0.0.0.0:13133
@@ -67,11 +79,17 @@ data:
           processors: [memory_limiter, batch, resource]
           exporters: [clickhouse{{ if .Values.otelCollector.debug }}, debug{{ end }}]
 
-        # Future support for traces and logs
+        # Cold path: traces to ClickHouse for persistence
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch, resource]
           exporters: [clickhouse{{ if .Values.otelCollector.debug }}, debug{{ end }}]
+
+        # Hot path: realtime traces to BudNotify for live streaming
+        traces/realtime:
+          receivers: [otlp]
+          processors: [batch/realtime]
+          exporters: [otlphttp/realtime]
 
         logs:
           receivers: [otlp]

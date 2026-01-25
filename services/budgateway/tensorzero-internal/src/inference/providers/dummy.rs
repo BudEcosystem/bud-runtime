@@ -1176,6 +1176,7 @@ impl ResponseProvider for DummyProvider {
         request: &OpenAIResponseCreateParams,
         _client: &reqwest::Client,
         _dynamic_api_keys: &InferenceCredentials,
+        _baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<OpenAIResponse, Error> {
         // Generate a dummy response matching the actual OpenAI format
         let response = OpenAIResponse {
@@ -1248,6 +1249,7 @@ impl ResponseProvider for DummyProvider {
         _request: &OpenAIResponseCreateParams,
         _client: &reqwest::Client,
         _dynamic_api_keys: &InferenceCredentials,
+        _baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<
         Box<dyn futures::Stream<Item = Result<ResponseStreamEvent, Error>> + Send + Unpin>,
         Error,

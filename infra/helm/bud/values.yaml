@@ -444,6 +444,9 @@ microservices:
     image: budstudio/budnotify:0.5.0
     daprid: budnotify
     pubsubTopic: notificationMessages
+    env:
+      KEYCLOAK_URL: http://{{ .Release.Name }}-keycloak/
+      KEYCLOAK_REALM: "{{ .Values.keycloak.adminRealm }}"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration (fast scale-up for notifications)
@@ -845,6 +848,10 @@ otelCollector:
     username: default
     password: ""
     ttl: 720h # 30 days - retention for raw OTel metrics (otel_metrics_*)
+  # Realtime streaming configuration (hot path to BudNotify)
+  realtime:
+    batchTimeout: 2s
+    batchSize: 10000
   # Optional node scheduling for OTel Collector
   nodeSelector: {}
   affinity: {}

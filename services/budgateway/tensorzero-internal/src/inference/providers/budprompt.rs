@@ -1,3 +1,4 @@
+use crate::baggage::BaggageData;
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{DisplayOrDebugGateway, Error, ErrorDetails};
 use crate::model::{Credential, CredentialLocation};
@@ -131,6 +132,7 @@ impl ResponseProvider for BudPromptProvider {
         request: &OpenAIResponseCreateParams,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
+        baggage: Option<&BaggageData>,
     ) -> Result<OpenAIResponse, Error> {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
         let request_url = get_responses_url(&self.api_base)?;
@@ -145,6 +147,34 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         } else if let Some(static_key) = self.credentials.get_static_api_key() {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
+        }
+
+        // Inject OpenTelemetry trace context with baggage for distributed tracing
+        // The baggage data is passed explicitly to preserve span hierarchy
+        let base_context = tracing::Span::current().context();
+        let context = if let Some(baggage_data) = baggage {
+            baggage_data.attach_to_context(base_context)
+        } else {
+            base_context
+        };
+        let mut http_headers = http::HeaderMap::new();
+        tracing_opentelemetry_instrumentation_sdk::http::inject_context(&context, &mut http_headers);
+        if let Some(traceparent) = http_headers.get("traceparent") {
+            if let Ok(value) = traceparent.to_str() {
+                request_builder = request_builder.header("traceparent", value);
+            }
+        }
+        if let Some(tracestate) = http_headers.get("tracestate") {
+            if let Ok(value) = tracestate.to_str() {
+                request_builder = request_builder.header("tracestate", value);
+            }
+        }
+        // Forward baggage header (W3C Baggage propagation for business context)
+        if let Some(baggage_header) = http_headers.get("baggage") {
+            if let Ok(value) = baggage_header.to_str() {
+                request_builder = request_builder.header("baggage", value);
+                tracing::debug!("Forwarding baggage header to budprompt (create_response): {}", value);
+            }
         }
 
         let res = request_builder.json(&request).send().await.map_err(|e| {
@@ -195,6 +225,7 @@ impl ResponseProvider for BudPromptProvider {
         request: &OpenAIResponseCreateParams,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
+        baggage: Option<&BaggageData>,
     ) -> Result<Box<dyn Stream<Item = Result<ResponseStreamEvent, Error>> + Send + Unpin>, Error>
     {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
@@ -210,6 +241,34 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         } else if let Some(static_key) = self.credentials.get_static_api_key() {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
+        }
+
+        // Inject OpenTelemetry trace context with baggage for distributed tracing
+        // The baggage data is passed explicitly to preserve span hierarchy
+        let base_context = tracing::Span::current().context();
+        let context = if let Some(baggage_data) = baggage {
+            baggage_data.attach_to_context(base_context)
+        } else {
+            base_context
+        };
+        let mut http_headers = http::HeaderMap::new();
+        tracing_opentelemetry_instrumentation_sdk::http::inject_context(&context, &mut http_headers);
+        if let Some(traceparent) = http_headers.get("traceparent") {
+            if let Ok(value) = traceparent.to_str() {
+                request_builder = request_builder.header("traceparent", value);
+            }
+        }
+        if let Some(tracestate) = http_headers.get("tracestate") {
+            if let Ok(value) = tracestate.to_str() {
+                request_builder = request_builder.header("tracestate", value);
+            }
+        }
+        // Forward baggage header (W3C Baggage propagation for business context)
+        if let Some(baggage_header) = http_headers.get("baggage") {
+            if let Ok(value) = baggage_header.to_str() {
+                request_builder = request_builder.header("baggage", value);
+                tracing::debug!("Forwarding baggage header to budprompt (stream_response): {}", value);
+            }
         }
 
         // Make sure stream is enabled
@@ -570,6 +629,7 @@ impl ResponseProvider for BudPromptProvider {
         _model_name: &str,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
+        baggage: Option<&BaggageData>,
     ) -> Result<ResponseResult, Error> {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
         let request_url = get_responses_url(&self.api_base)?;
@@ -586,10 +646,19 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
         }
 
-        // Inject OpenTelemetry trace context for distributed tracing
-        let context = tracing::Span::current().context();
+        // Inject OpenTelemetry trace context with baggage for distributed tracing
+        // The baggage data is passed explicitly to preserve span hierarchy
+        let base_context = tracing::Span::current().context();
+        let context = if let Some(baggage_data) = baggage {
+            baggage_data.attach_to_context(base_context)
+        } else {
+            base_context
+        };
         let mut http_headers = http::HeaderMap::new();
-        tracing_opentelemetry_instrumentation_sdk::http::inject_context(&context, &mut http_headers);
+        tracing_opentelemetry_instrumentation_sdk::http::inject_context(
+            &context,
+            &mut http_headers,
+        );
         if let Some(traceparent) = http_headers.get("traceparent") {
             if let Ok(value) = traceparent.to_str() {
                 request_builder = request_builder.header("traceparent", value);
@@ -598,6 +667,13 @@ impl ResponseProvider for BudPromptProvider {
         if let Some(tracestate) = http_headers.get("tracestate") {
             if let Ok(value) = tracestate.to_str() {
                 request_builder = request_builder.header("tracestate", value);
+            }
+        }
+        // Forward baggage header (W3C Baggage propagation for business context)
+        if let Some(baggage_header) = http_headers.get("baggage") {
+            if let Ok(value) = baggage_header.to_str() {
+                request_builder = request_builder.header("baggage", value);
+                tracing::debug!("Forwarding baggage header to budprompt: {}", value);
             }
         }
 
