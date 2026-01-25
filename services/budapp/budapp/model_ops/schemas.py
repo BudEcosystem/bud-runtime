@@ -1229,6 +1229,10 @@ class ModelDeployStepRequest(BaseModel):
     # Engine capability flags from simulator
     supports_lora: bool | None = None
     supports_pipeline_parallelism: bool | None = None
+    # Callback topic for budpipeline integration (D-001)
+    callback_topic: str | None = None
+    # Simulator ID from budpipeline - if provided, skip simulation in budapp
+    simulator_id: UUID4 | None = None
 
     @field_validator("endpoint_name")
     @classmethod
@@ -1303,6 +1307,10 @@ class DeploymentWorkflowStepData(BaseModel):
     # Engine capability flags from simulator
     supports_lora: bool | None = None
     supports_pipeline_parallelism: bool | None = None
+    # Callback topic for pub/sub notifications (e.g., budpipelineEvents)
+    callback_topic: str | None = None
+    # Simulator ID for tracking the simulation that initiated this deployment
+    simulator_id: UUID4 | None = None
 
 
 class ModelDeploymentRequest(BaseModel):

@@ -100,6 +100,15 @@ class EndpointPaginatedResponse(PaginatedSuccessResponse):
     endpoints: list[EndpointListResponse] = []
 
 
+class EndpointDeleteResponse(SuccessResponse):
+    """Response schema for endpoint delete operation.
+
+    Includes the workflow_id for tracking the async delete workflow.
+    """
+
+    workflow_id: Optional[UUID] = None
+
+
 class WorkerInfoFilter(BaseModel):
     """Filter for worker info."""
 

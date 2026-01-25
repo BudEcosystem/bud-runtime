@@ -8,10 +8,6 @@ import pytest
 
 from budpipeline.actions.base import ActionContext
 from budpipeline.actions.cluster import (
-    ClusterCreateAction,
-    ClusterCreateExecutor,
-    ClusterDeleteAction,
-    ClusterDeleteExecutor,
     ClusterHealthAction,
     ClusterHealthExecutor,
 )
@@ -133,85 +129,19 @@ class TestClusterHealthAction:
         assert result.outputs["healthy"] is False
 
 
-class TestClusterCreateAction:
-    """Tests for ClusterCreateAction (placeholder)."""
-
-    def test_meta_attributes(self) -> None:
-        """Test action metadata attributes."""
-        meta = ClusterCreateAction.meta
-        assert meta.type == "cluster_create"
-        assert meta.name == "Create Cluster"
-        assert meta.category == "Cluster Operations"
-        assert meta.execution_mode.value == "event_driven"
-        assert meta.idempotent is False
-
-    def test_validate_params_missing_cluster_name(self) -> None:
-        """Test validation catches missing cluster_name."""
-        executor = ClusterCreateExecutor()
-        errors = executor.validate_params({})
-        assert any("cluster_name" in e for e in errors)
-
-    @pytest.mark.asyncio
-    async def test_execute_not_implemented(self) -> None:
-        """Test that execute returns not implemented error."""
-        executor = ClusterCreateExecutor()
-        context = make_context(cluster_name="test-cluster", provider="aws")
-
-        result = await executor.execute(context)
-
-        assert result.success is False
-        assert "not yet implemented" in result.error.lower()
-
-
-class TestClusterDeleteAction:
-    """Tests for ClusterDeleteAction (placeholder)."""
-
-    def test_meta_attributes(self) -> None:
-        """Test action metadata attributes."""
-        meta = ClusterDeleteAction.meta
-        assert meta.type == "cluster_delete"
-        assert meta.name == "Delete Cluster"
-        assert meta.category == "Cluster Operations"
-        assert meta.execution_mode.value == "event_driven"
-        assert meta.idempotent is True
-
-    def test_validate_params_missing_cluster_id(self) -> None:
-        """Test validation catches missing cluster_id."""
-        executor = ClusterDeleteExecutor()
-        errors = executor.validate_params({})
-        assert any("cluster_id" in e for e in errors)
-
-    @pytest.mark.asyncio
-    async def test_execute_not_implemented(self) -> None:
-        """Test that execute returns not implemented error."""
-        executor = ClusterDeleteExecutor()
-        context = make_context(cluster_id="cluster-123")
-
-        result = await executor.execute(context)
-
-        assert result.success is False
-        assert "not yet implemented" in result.error.lower()
-
-
 class TestClusterActionsRegistration:
     """Tests for action registration."""
 
-    def test_all_actions_have_executor_class(self) -> None:
-        """Test all cluster actions have executor_class defined."""
+    def test_health_action_has_executor_class(self) -> None:
+        """Test cluster health action has executor_class defined."""
         assert hasattr(ClusterHealthAction, "executor_class")
-        assert hasattr(ClusterCreateAction, "executor_class")
-        assert hasattr(ClusterDeleteAction, "executor_class")
 
-    def test_all_actions_have_meta(self) -> None:
-        """Test all cluster actions have meta defined."""
+    def test_health_action_has_meta(self) -> None:
+        """Test cluster health action has meta defined."""
         assert hasattr(ClusterHealthAction, "meta")
-        assert hasattr(ClusterCreateAction, "meta")
-        assert hasattr(ClusterDeleteAction, "meta")
 
-    def test_executor_classes_are_correct_type(self) -> None:
-        """Test executor classes are subclasses of BaseActionExecutor."""
+    def test_executor_class_is_correct_type(self) -> None:
+        """Test executor class is subclass of BaseActionExecutor."""
         from budpipeline.actions.base import BaseActionExecutor
 
         assert issubclass(ClusterHealthExecutor, BaseActionExecutor)
-        assert issubclass(ClusterCreateExecutor, BaseActionExecutor)
-        assert issubclass(ClusterDeleteExecutor, BaseActionExecutor)
