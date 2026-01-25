@@ -1,9 +1,11 @@
 # IAM Architecture
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-23
+> **Version:** 1.1
+> **Last Updated:** 2026-01-25
 > **Status:** Current Implementation
 > **Audience:** Security engineers, administrators, integration developers
+
+> **Implementation Status:** Core IAM functionality is implemented. External IdP federation (SAML 2.0/OIDC) is Keycloak capability but not configured. MFA, account lockout, and concurrent session limits are NOT enforced. See Section 10.2 for known limitations.
 
 ---
 
@@ -13,7 +15,7 @@ Bud AI Foundry uses Keycloak as its identity provider with a multi-tenant archit
 - JWT-based authentication
 - Role-based access control (RBAC)
 - OAuth 2.0 / OpenID Connect protocols
-- External IdP federation
+- External IdP federation (Keycloak capability, not configured)
 - Service-to-service authentication
 
 ---
@@ -88,7 +90,7 @@ Bud AI Foundry uses Keycloak as its identity provider with a multi-tenant archit
 ```python
 class User(Base):
     id: UUID                    # Internal unique identifier
-    keycloak_id: str            # Keycloak user ID (external)
+    auth_id: UUID               # Keycloak user ID (stored in auth_id field)
     email: str                  # Unique email address
     first_name: str             # Display name
     last_name: str              # Display name
@@ -98,6 +100,8 @@ class User(Base):
     created_at: datetime
     updated_at: datetime
 ```
+
+> **Note:** The Keycloak user ID is stored in the `auth_id` field (not `keycloak_id`).
 
 ### 3.2 Tenant Model
 
@@ -128,13 +132,24 @@ class TenantUserMapping(Base):
 
 ### 3.3 Role Definitions
 
+**Location:** `budapp/commons/constants.py` - `UserRoleEnum`
+
 | Role | Scope | Capabilities |
 |------|-------|--------------|
 | `SUPER_ADMIN` | Platform | Full platform access, tenant management |
-| `ADMIN` | Tenant | Tenant settings, all projects |
-| `PROJECT_ADMIN` | Project | Project management, deployments |
-| `USER` | Project | Use deployed models, view resources |
-| `VIEWER` | Project | Read-only access |
+| `ADMIN` | Tenant | Tenant settings, user management, all projects |
+| `DEVELOPER` | Project | Project development, model deployment, API usage |
+| `DEVOPS` | Tenant | Cluster management, infrastructure, deployments |
+| `TESTER` | Project | Testing, benchmarks, model evaluation |
+
+```python
+class UserRoleEnum(Enum):
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    DEVELOPER = "developer"
+    DEVOPS = "devops"
+    TESTER = "tester"
+```
 
 ---
 
@@ -344,26 +359,49 @@ class JWTBlacklistService:
 
 ### 6.1 Permission Model
 
-**Location:** `budapp/permissions/models.py`
+**Location:** `budapp/commons/constants.py` - `PermissionEnum`
+
+The permission system uses a `resource:action` format with two primary scopes:
 
 ```python
-class Permission(Base):
-    id: UUID
-    user_id: UUID               # Who has permission
-    resource_type: str          # "project", "cluster", "endpoint"
-    resource_id: UUID           # Specific resource
-    permission_level: PermissionEnum  # VIEW, EDIT, ADMIN
-    granted_by: UUID            # Who granted
-    granted_at: datetime
+class PermissionEnum(Enum):
+    # Model permissions
+    MODEL_VIEW = "model:view"
+    MODEL_MANAGE = "model:manage"
+    MODEL_BENCHMARK = "model:benchmark"
+
+    # Project permissions
+    PROJECT_VIEW = "project:view"
+    PROJECT_MANAGE = "project:manage"
+
+    # Endpoint permissions
+    ENDPOINT_VIEW = "endpoint:view"
+    ENDPOINT_MANAGE = "endpoint:manage"
+
+    # Cluster permissions
+    CLUSTER_VIEW = "cluster:view"
+    CLUSTER_MANAGE = "cluster:manage"
+
+    # User permissions
+    USER_VIEW = "user:view"
+    USER_MANAGE = "user:manage"
+
+    # Benchmark permissions
+    BENCHMARK_VIEW = "benchmark:view"
+    BENCHMARK_MANAGE = "benchmark:manage"
+
+    # Client access
+    CLIENT_ACCESS = "client:access"
 ```
 
-**Permission Levels:**
+**Permission Scopes:**
 
-| Level | Create | Read | Update | Delete | Manage Permissions |
-|-------|--------|------|--------|--------|-------------------|
-| VIEW | - | Yes | - | - | - |
-| EDIT | - | Yes | Yes | - | - |
-| ADMIN | Yes | Yes | Yes | Yes | Yes |
+| Scope | Description |
+|-------|-------------|
+| `view` | Read-only access to the resource |
+| `manage` | Full control (create, update, delete) |
+| `benchmark` | Execute benchmarks (model-specific) |
+| `access` | Client API access |
 
 ### 6.2 Permission Enforcement
 
@@ -462,7 +500,9 @@ async def verify_internal_token(request: Request) -> bool:
 
 ## 8. External IdP Integration
 
-### 8.1 SAML 2.0
+> **Implementation Status:** SAML 2.0 and OIDC federation are Keycloak capabilities but NOT currently configured in the platform. The configurations below are reference architecture for customer IdP integration.
+
+### 8.1 SAML 2.0 (NOT CONFIGURED)
 
 Keycloak supports SAML 2.0 identity provider federation:
 
@@ -473,7 +513,7 @@ Keycloak supports SAML 2.0 identity provider federation:
 | SLO URL | `https://keycloak.example.com/realms/{realm}/protocol/saml` |
 | Certificate | Download from Keycloak admin |
 
-### 8.2 OIDC Federation
+### 8.2 OIDC Federation (NOT CONFIGURED)
 
 For OIDC IdP integration:
 
@@ -585,3 +625,4 @@ See `TECH_DEBT.md` for detailed tracking.
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-23 | Documentation | Initial version |
+| 1.1 | 2026-01-25 | Documentation | Updated to reflect actual implementation - corrected field name (auth_id not keycloak_id), role names, permission format (resource:action), noted IdP federation not configured |

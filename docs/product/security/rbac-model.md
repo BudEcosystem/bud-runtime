@@ -1,7 +1,7 @@
 # RBAC Model
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-23
+> **Version:** 1.1
+> **Last Updated:** 2026-01-25
 > **Status:** Current Implementation
 > **Audience:** Administrators, security engineers
 
@@ -10,9 +10,9 @@
 ## 1. Overview
 
 Bud AI Foundry implements Role-Based Access Control (RBAC) with:
-- Hierarchical roles at platform, tenant, and project levels
-- Fine-grained permissions on individual resources
-- Permission inheritance within resource hierarchies
+- Hierarchical user roles (SUPER_ADMIN, ADMIN, DEVELOPER, DEVOPS, TESTER)
+- Resource-based permissions using scope format (resource:action)
+- Keycloak integration for realm-based role management
 
 ---
 
@@ -36,21 +36,22 @@ Bud AI Foundry implements Role-Based Access Control (RBAC) with:
 │  │   • All projects in tenant                             │  │
 │  └────────────────────────────────────────────────────────┘  │
 ├──────────────────────────────────────────────────────────────┤
-│                      PROJECT LEVEL                           │
+│                     OPERATIONAL LEVEL                        │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │                  PROJECT_ADMIN                         │  │
-│  │   • Project configuration                              │  │
-│  │   • Deploy/manage models                               │  │
-│  │   • Manage project users                               │  │
+│  │                     DEVOPS                             │  │
+│  │   • Cluster management                                 │  │
+│  │   • Infrastructure configuration                       │  │
+│  │   • Deployment operations                              │  │
 │  ├────────────────────────────────────────────────────────┤  │
-│  │                      USER                              │  │
-│  │   • Use deployed models                                │  │
-│  │   • View project resources                             │  │
-│  │   • Create credentials                                 │  │
+│  │                    DEVELOPER                           │  │
+│  │   • Project development                                │  │
+│  │   • Model deployment                                   │  │
+│  │   • API usage                                          │  │
 │  ├────────────────────────────────────────────────────────┤  │
-│  │                     VIEWER                             │  │
-│  │   • Read-only access                                   │  │
-│  │   • View configurations                                │  │
+│  │                     TESTER                             │  │
+│  │   • Testing and QA                                     │  │
+│  │   • Benchmark execution                                │  │
+│  │   • Model evaluation                                   │  │
 │  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -59,83 +60,93 @@ Bud AI Foundry implements Role-Based Access Control (RBAC) with:
 
 ## 3. Role Definitions
 
+**Location:** `budapp/commons/constants.py` - `UserRoleEnum`
+
+```python
+class UserRoleEnum(Enum):
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    DEVELOPER = "developer"
+    DEVOPS = "devops"
+    TESTER = "tester"
+```
+
 ### 3.1 SUPER_ADMIN
 
 **Scope:** Platform-wide
 
-| Resource | Create | Read | Update | Delete | Special |
-|----------|--------|------|--------|--------|---------|
-| Tenants | Yes | Yes | Yes | Yes | - |
-| Users (all) | Yes | Yes | Yes | Yes | Force password reset |
-| Projects (all) | Yes | Yes | Yes | Yes | - |
-| Clusters (all) | Yes | Yes | Yes | Yes | - |
-| Models (all) | Yes | Yes | Yes | Yes | - |
-| Endpoints (all) | Yes | Yes | Yes | Yes | - |
-| System Config | - | Yes | Yes | - | - |
-| Audit Logs | - | Yes | - | - | Export |
+| Resource | View | Manage | Special |
+|----------|------|--------|---------|
+| Tenants | Yes | Yes | - |
+| Users (all) | Yes | Yes | Force password reset |
+| Projects (all) | Yes | Yes | - |
+| Clusters (all) | Yes | Yes | - |
+| Models (all) | Yes | Yes | - |
+| Endpoints (all) | Yes | Yes | - |
+| System Config | Yes | Yes | - |
+| Audit Logs | Yes | - | Export |
 
 **Assignment:** Manual, by existing SUPER_ADMIN only
 
 ### 3.2 ADMIN
 
-**Scope:** Single tenant
+**Scope:** Single tenant (Keycloak realm)
 
-| Resource | Create | Read | Update | Delete | Special |
-|----------|--------|------|--------|--------|---------|
-| Tenant Settings | - | Yes | Yes | - | - |
-| Users (tenant) | Yes | Yes | Yes | Yes | Invite, deactivate |
-| Projects (tenant) | Yes | Yes | Yes | Yes | - |
-| Clusters (tenant) | Yes | Yes | Yes | Yes | - |
-| Models (tenant) | Yes | Yes | Yes | Yes | - |
-| Endpoints (tenant) | Yes | Yes | Yes | Yes | - |
-| Billing (tenant) | - | Yes | Yes | - | - |
-| Audit Logs (tenant) | - | Yes | - | - | Export |
+| Resource | View | Manage | Special |
+|----------|------|--------|---------|
+| Tenant Settings | Yes | Yes | - |
+| Users (tenant) | Yes | Yes | Invite, deactivate |
+| Projects (tenant) | Yes | Yes | - |
+| Clusters (tenant) | Yes | Yes | - |
+| Models (tenant) | Yes | Yes | - |
+| Endpoints (tenant) | Yes | Yes | - |
+| Billing (tenant) | Yes | Yes | - |
+| Audit Logs (tenant) | Yes | - | Export |
 
 **Assignment:** By SUPER_ADMIN or existing tenant ADMIN
 
-### 3.3 PROJECT_ADMIN
+### 3.3 DEVOPS
 
-**Scope:** Single project
+**Scope:** Tenant infrastructure
 
-| Resource | Create | Read | Update | Delete | Special |
-|----------|--------|------|--------|--------|---------|
-| Project Settings | - | Yes | Yes | - | - |
-| Project Users | - | Yes | Yes | - | Grant/revoke permissions |
-| Credentials | Yes | Yes | Yes | Yes | - |
-| Endpoints | Yes | Yes | Yes | Yes | Deploy, undeploy |
-| Routers | Yes | Yes | Yes | Yes | - |
-| Prompts | Yes | Yes | Yes | Yes | - |
-| Guardrails | Yes | Yes | Yes | Yes | - |
-| Models (project) | Yes | Yes | Yes | Yes | - |
+| Resource | View | Manage | Special |
+|----------|------|--------|---------|
+| Clusters | Yes | Yes | Register, delete |
+| Endpoints | Yes | Yes | Deploy, undeploy |
+| Infrastructure | Yes | Yes | - |
+| Projects | Yes | Limited | - |
+| Models | Yes | - | - |
 
-**Assignment:** By ADMIN or existing PROJECT_ADMIN
+**Assignment:** By ADMIN
 
-### 3.4 USER
+### 3.4 DEVELOPER
 
-**Scope:** Single project
+**Scope:** Project development
 
-| Resource | Create | Read | Update | Delete | Special |
-|----------|--------|------|--------|--------|---------|
-| Project Settings | - | Yes | - | - | - |
-| Credentials (own) | Yes | Yes | Yes | Yes | - |
-| Endpoints | - | Yes | - | - | Invoke |
-| Routers | - | Yes | - | - | Invoke |
-| Prompts | - | Yes | - | - | Use |
-| Guardrails | - | Yes | - | - | - |
-| Models | - | Yes | - | - | - |
-| Playground | - | Yes | - | - | Use |
+| Resource | View | Manage | Special |
+|----------|------|--------|---------|
+| Projects | Yes | Yes | Create, update |
+| Credentials | Yes | Yes | Create, rotate |
+| Endpoints | Yes | Yes | Deploy |
+| Models | Yes | Limited | - |
+| Playground | Yes | Yes | Use |
+| Routers | Yes | Yes | - |
 
-**Assignment:** By PROJECT_ADMIN or ADMIN
+**Assignment:** By ADMIN (default role for new users)
 
-### 3.5 VIEWER
+### 3.5 TESTER
 
-**Scope:** Single project
+**Scope:** Testing and benchmarks
 
-| Resource | Create | Read | Update | Delete | Special |
-|----------|--------|------|--------|--------|---------|
-| All project resources | - | Yes | - | - | - |
+| Resource | View | Manage | Special |
+|----------|------|--------|---------|
+| Projects | Yes | - | - |
+| Models | Yes | - | - |
+| Benchmarks | Yes | Yes | Execute |
+| Endpoints | Yes | - | Invoke |
+| Playground | Yes | Yes | Use |
 
-**Assignment:** By PROJECT_ADMIN or ADMIN
+**Assignment:** By ADMIN
 
 ---
 
@@ -143,42 +154,60 @@ Bud AI Foundry implements Role-Based Access Control (RBAC) with:
 
 ### 4.1 Permission Enum
 
+**Location:** `budapp/commons/constants.py` - `PermissionEnum`
+
+The permission system uses a `resource:action` format with two primary scopes:
+
 ```python
-class PermissionEnum(str, Enum):
-    VIEW = "view"       # Read-only access
-    EDIT = "edit"       # Read + modify
-    ADMIN = "admin"     # Full control including permission management
+class PermissionEnum(Enum):
+    # Model permissions
+    MODEL_VIEW = "model:view"
+    MODEL_MANAGE = "model:manage"
+    MODEL_BENCHMARK = "model:benchmark"
+
+    # Project permissions
+    PROJECT_VIEW = "project:view"
+    PROJECT_MANAGE = "project:manage"
+
+    # Endpoint permissions
+    ENDPOINT_VIEW = "endpoint:view"
+    ENDPOINT_MANAGE = "endpoint:manage"
+
+    # Cluster permissions
+    CLUSTER_VIEW = "cluster:view"
+    CLUSTER_MANAGE = "cluster:manage"
+
+    # User permissions
+    USER_VIEW = "user:view"
+    USER_MANAGE = "user:manage"
+
+    # Benchmark permissions
+    BENCHMARK_VIEW = "benchmark:view"
+    BENCHMARK_MANAGE = "benchmark:manage"
+
+    # Client access
+    CLIENT_ACCESS = "client:access"
 ```
 
-### 4.2 Permission Inheritance
+### 4.2 Permission Scopes
 
-```
-Project ADMIN
-    │
-    ├── Endpoint ADMIN (inherited)
-    │   └── Can manage all endpoints
-    │
-    ├── Credential ADMIN (inherited)
-    │   └── Can manage all credentials
-    │
-    ├── Router ADMIN (inherited)
-    │   └── Can manage all routers
-    │
-    └── Prompt ADMIN (inherited)
-        └── Can manage all prompts
-```
+| Scope | Description |
+|-------|-------------|
+| `view` | Read-only access to the resource |
+| `manage` | Full control (create, update, delete) |
+| `benchmark` | Execute benchmarks (model-specific) |
+| `access` | Client API access |
 
 ### 4.3 Resource Type Matrix
 
-| Resource Type | VIEW | EDIT | ADMIN |
-|---------------|------|------|-------|
-| `project` | View project | Modify settings | Full control, grant permissions |
-| `endpoint` | View endpoint | Deploy/undeploy | Delete, configure |
-| `cluster` | View cluster | Update config | Register/delete |
-| `credential` | View (masked) | Update | Delete |
-| `router` | View routes | Modify routing | Delete |
-| `prompt` | View prompts | Edit versions | Delete |
-| `guardrail` | View config | Modify rules | Delete profiles |
+| Resource Type | view | manage | Notes |
+|---------------|------|--------|-------|
+| `model` | View model details | Add, update, delete models | `benchmark` scope for evaluation |
+| `project` | View project | Create, update, delete projects | - |
+| `endpoint` | View endpoints | Deploy, undeploy, configure | - |
+| `cluster` | View clusters | Register, update, delete | - |
+| `user` | View users | Create, update, deactivate | - |
+| `benchmark` | View benchmarks | Run, manage benchmarks | - |
 
 ---
 
@@ -189,80 +218,84 @@ Project ADMIN
 | Endpoint | Method | Required Role/Permission |
 |----------|--------|--------------------------|
 | `/projects` | GET | Any authenticated |
-| `/projects` | POST | ADMIN |
-| `/projects/{id}` | GET | project:VIEW |
-| `/projects/{id}` | PUT | project:EDIT |
+| `/projects` | POST | ADMIN, DEVELOPER |
+| `/projects/{id}` | GET | project:view |
+| `/projects/{id}` | PUT | project:manage |
 | `/projects/{id}` | DELETE | ADMIN |
-| `/projects/{id}/endpoints` | GET | project:VIEW |
-| `/projects/{id}/endpoints` | POST | project:EDIT |
-| `/endpoints/{id}` | GET | endpoint:VIEW |
-| `/endpoints/{id}/deploy` | POST | endpoint:EDIT |
-| `/endpoints/{id}/undeploy` | POST | endpoint:EDIT |
-| `/endpoints/{id}` | DELETE | endpoint:ADMIN |
-| `/credentials` | GET | project:VIEW |
-| `/credentials` | POST | project:EDIT |
-| `/credentials/{id}` | DELETE | credential:ADMIN |
+| `/projects/{id}/endpoints` | GET | project:view |
+| `/projects/{id}/endpoints` | POST | endpoint:manage |
+| `/endpoints/{id}` | GET | endpoint:view |
+| `/endpoints/{id}/deploy` | POST | endpoint:manage |
+| `/endpoints/{id}/undeploy` | POST | endpoint:manage |
+| `/endpoints/{id}` | DELETE | endpoint:manage |
+| `/credentials` | GET | project:view |
+| `/credentials` | POST | project:manage |
+| `/credentials/{id}` | DELETE | project:manage |
 | `/users` | GET | ADMIN |
 | `/users` | POST | ADMIN |
-| `/permissions` | POST | resource:ADMIN |
-| `/permissions/{id}` | DELETE | resource:ADMIN |
+| `/clusters` | GET | cluster:view |
+| `/clusters` | POST | cluster:manage (ADMIN, DEVOPS) |
+| `/models` | GET | model:view |
+| `/models` | POST | model:manage |
 
 ### 5.2 UI Feature Access
 
-| Feature | SUPER_ADMIN | ADMIN | PROJECT_ADMIN | USER | VIEWER |
-|---------|-------------|-------|---------------|------|--------|
+| Feature | SUPER_ADMIN | ADMIN | DEVOPS | DEVELOPER | TESTER |
+|---------|-------------|-------|--------|-----------|--------|
 | Tenant Settings | Yes | Yes | - | - | - |
 | User Management | Yes | Yes | - | - | - |
-| Project Creation | Yes | Yes | - | - | - |
-| Project Settings | Yes | Yes | Yes | - | - |
-| Endpoint Deployment | Yes | Yes | Yes | - | - |
-| Model Testing (Playground) | Yes | Yes | Yes | Yes | - |
+| Project Creation | Yes | Yes | - | Yes | - |
+| Project Settings | Yes | Yes | - | Yes | - |
+| Cluster Management | Yes | Yes | Yes | - | - |
+| Endpoint Deployment | Yes | Yes | Yes | Yes | - |
+| Model Testing (Playground) | Yes | Yes | Yes | Yes | Yes |
 | API Key Creation | Yes | Yes | Yes | Yes | - |
 | View Dashboards | Yes | Yes | Yes | Yes | Yes |
-| View Audit Logs | Yes | Yes | Yes | - | - |
+| View Audit Logs | Yes | Yes | - | - | - |
+| Run Benchmarks | Yes | Yes | - | - | Yes |
 
 ---
 
 ## 6. Permission Assignment
 
-### 6.1 Grant Permission
+### 6.1 Role Assignment via Keycloak
+
+User roles are managed through Keycloak realm roles. When a user is created or updated, their role is synced with Keycloak:
 
 ```python
-# POST /permissions
-{
-    "user_id": "uuid",
-    "resource_type": "project",
-    "resource_id": "project-uuid",
-    "permission_level": "edit"
-}
+# Role assignment happens via Keycloak API
+keycloak.assign_realm_role(user_id, realm_name, role_name)
 ```
 
 **Requirements:**
-- Caller must have ADMIN permission on the resource
-- Cannot grant higher permission than caller has
-- User must belong to same tenant
+- Caller must be ADMIN or SUPER_ADMIN
+- Role must be a valid UserRoleEnum value
+- SUPER_ADMIN role can only be assigned by existing SUPER_ADMIN
 
-### 6.2 Revoke Permission
+### 6.2 Permission Check
+
+**Location:** `budapp/commons/permission_handler.py`
 
 ```python
-# DELETE /permissions/{permission_id}
+@require_permissions(roles=UserRoleEnum.ADMIN)
+async def admin_only_route():
+    pass
+
+@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
+async def project_manage_route():
+    pass
 ```
 
-**Requirements:**
-- Caller must have ADMIN permission on the resource
-- Cannot revoke own permission (prevents lockout)
-
-### 6.3 Bulk Permission Update
+### 6.3 Role Hierarchy Check
 
 ```python
-# PUT /projects/{id}/permissions
-{
-    "permissions": [
-        {"user_id": "uuid1", "level": "edit"},
-        {"user_id": "uuid2", "level": "view"},
-        {"user_id": "uuid3", "level": null}  # revoke
-    ]
-}
+# Super admin bypasses all permission checks
+if current_user.role == UserRoleEnum.SUPER_ADMIN:
+    return True
+
+# Admin has tenant-wide access
+if current_user.role == UserRoleEnum.ADMIN:
+    return is_same_tenant(current_user, resource)
 ```
 
 ---
@@ -353,10 +386,10 @@ All permission changes are logged:
 |----------|------------------|
 | Platform administrator | SUPER_ADMIN |
 | Organization administrator | ADMIN |
-| Team lead / project owner | PROJECT_ADMIN |
-| Developer using APIs | USER |
-| Stakeholder needing visibility | VIEWER |
-| External auditor | VIEWER (time-limited) |
+| Infrastructure engineer | DEVOPS |
+| Software developer | DEVELOPER |
+| QA engineer | TESTER |
+| External auditor | TESTER (time-limited, read-only)
 
 ### 9.2 Principle of Least Privilege
 
@@ -439,3 +472,4 @@ async def get_user_permissions(
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-23 | Documentation | Initial version |
+| 1.1 | 2026-01-25 | Documentation | Updated to reflect actual implementation - corrected roles (SUPER_ADMIN, ADMIN, DEVELOPER, DEVOPS, TESTER), permission format (resource:action with view/manage scopes) |

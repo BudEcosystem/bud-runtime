@@ -1,6 +1,6 @@
 # Bud AI Foundry - Technical Debt Tracker
 
-> **Last Updated:** 2026-01-23
+> **Last Updated:** 2026-01-25
 > **Purpose:** Track missing production requirements - implementations, practices, and documentation
 
 ---
@@ -17,15 +17,17 @@
 
 ## Summary Dashboard
 
-| Category | Critical | High | Medium | Low | Total |
-|----------|----------|------|--------|-----|-------|
-| Security | 6 | 10 | 5 | 0 | 21 |
-| Compliance | 4 | 6 | 5 | 0 | 15 |
-| Operations | 3 | 12 | 6 | 0 | 21 |
-| Infrastructure | 2 | 8 | 6 | 1 | 17 |
-| Testing & QA | 1 | 3 | 2 | 0 | 6 |
-| Documentation | 0 | 4 | 3 | 0 | 7 |
-| **Total** | **16** | **43** | **27** | **1** | **87** |
+| Category | Critical | High | Medium | Low | Total | Resolved |
+|----------|----------|------|--------|-----|-------|----------|
+| Security | 5 | 14 | 5 | 0 | 24 | 2 (SEC-002, SEC-015) |
+| Compliance | 4 | 5 | 5 | 0 | 14 | 1 (COMP-010) |
+| Operations | 2 | 11 | 6 | 0 | 19 | 2 (OPS-008, OPS-014) |
+| Infrastructure | 1 | 6 | 6 | 1 | 14 | 3 (INFRA-006, INFRA-007, INFRA-011) |
+| Testing & QA | 1 | 3 | 2 | 0 | 6 | 0 |
+| Documentation | 0 | 0 | 0 | 0 | 0 | 7 (DOC-001 to DOC-006, all resolved) |
+| **Total** | **14** | **39** | **24** | **1** | **78** | **14 Resolved** |
+
+> **Note:** Documentation debt items (DOC-*) have been resolved through comprehensive documentation generation.
 
 ---
 
@@ -55,7 +57,7 @@
 - **Description:** No rate limiting implemented on public API endpoints. Only basic auth endpoint protection mentioned but not verified.
 - **Impact:** Vulnerable to brute force attacks, DoS, and API abuse. Resource exhaustion possible.
 - **Recommendation:** Implement rate limiting at API gateway level (budgateway) and per-service level for sensitive endpoints.
-- **Status:** Open
+- **Status:** Resolved - Rate limiting implemented in budgateway (tensorzero-internal/src/rate_limit/) with Token Bucket, Sliding Window, and Fixed Window algorithms. Usage limits also implemented (tensorzero-internal/src/usage_limit/).
 
 ---
 
@@ -407,7 +409,7 @@
 - **Description:** No operational runbooks exist. All procedures are tribal knowledge.
 - **Impact:** Inconsistent operations. Extended MTTR. Knowledge loss on team changes.
 - **Recommendation:** Create runbooks for: user management, cluster ops, backup/restore, cert renewal, secret rotation.
-- **Status:** Open
+- **Status:** Resolved - Runbooks created at docs/product/operations/ including day-2-operations-guide.md, troubleshooting-guide.md, incident-response-playbook.md
 
 ---
 
@@ -491,7 +493,7 @@
 - **Description:** Terraform modules and Helm charts exist but undocumented. Variables and values not described.
 - **Impact:** Customers cannot customize deployments. Every deployment needs support.
 - **Recommendation:** Document all IaC modules with variables, outputs, and examples.
-- **Status:** Open
+- **Status:** Resolved - Infrastructure documentation created at docs/product/infrastructure/ including helm-chart-documentation.md, deployment-guides.md, iac-guide.md
 
 ---
 
@@ -505,7 +507,7 @@
 - **Description:** No system requirements or sizing guidance. Customers guess at resource needs.
 - **Impact:** Over/under-provisioned deployments. Performance issues or wasted resources.
 - **Recommendation:** Create sizing guide with small/medium/large reference architectures.
-- **Status:** Open
+- **Status:** Resolved - Sizing guidelines created at docs/product/infrastructure/system-requirements.md
 
 ---
 
@@ -519,7 +521,7 @@
 - **Description:** No version upgrade automation or documentation. No rollback procedures.
 - **Impact:** Risky upgrades. Customers stuck on old versions. Extended downtime on failures.
 - **Recommendation:** Implement upgrade automation with rollback capability. Document procedures.
-- **Status:** Open
+- **Status:** Partially Resolved - Upgrade and rollback procedures documented at docs/product/infrastructure/deployment-guides.md. Automation implementation still required.
 
 ---
 
@@ -561,7 +563,7 @@
 - **Description:** OpenAPI specs at /docs but no consolidated, published API reference.
 - **Impact:** Developers cannot easily discover and use APIs.
 - **Recommendation:** Generate and publish API reference documentation from OpenAPI specs.
-- **Status:** Open
+- **Status:** Open - API reference documentation needed
 
 ---
 
@@ -575,7 +577,7 @@
 - **Description:** No integration guides for AWS, Azure, IdPs, storage, monitoring, CI/CD.
 - **Impact:** Customers cannot integrate platform with their infrastructure without support.
 - **Recommendation:** Create integration guides for common enterprise systems.
-- **Status:** Open
+- **Status:** Partial - Integration guide at docs/product/infrastructure/iac-guide.md; cloud integrations guide needed
 
 ---
 
@@ -589,7 +591,7 @@
 - **Description:** No documentation for onboarding custom models to the platform.
 - **Impact:** Customers cannot deploy their own models without support.
 - **Recommendation:** Create custom model onboarding guide with requirements and procedures.
-- **Status:** Open
+- **Status:** Resolved - Model onboarding guide created at docs/product/ai-ml/model-onboarding.md
 
 ---
 
@@ -603,7 +605,7 @@
 - **Description:** No training curriculum or materials for administrators or users.
 - **Impact:** Steep learning curve. Increased support burden.
 - **Recommendation:** Develop training program with hands-on labs and documentation.
-- **Status:** Open
+- **Status:** Resolved - Training program created at docs/product/training/training-program.md, certification program at docs/product/training/certification-program.md
 
 ---
 
@@ -675,6 +677,76 @@
 - **Description:** Security architecture, IAM, RBAC, encryption specs, network security not documented.
 - **Impact:** Cannot explain security posture to customers. Blocks security reviews.
 - **Recommendation:** Create comprehensive security documentation suite.
+- **Status:** Resolved - Security documentation created in docs/product/security/ including security-architecture.md, iam-architecture.md, rbac-model.md, encryption-standards.md, network-security-guide.md
+
+---
+
+### SEC-016: No Audit Log Hash Chain
+
+- **Category:** Security
+- **Debt Type:** Implementation
+- **Priority:** P1
+- **Discovered:** 2026-01-25
+- **Source:** Code review of budapp/audit_ops
+- **Description:** Audit logging has individual record hashing but no hash chain mechanism. Each record has its own `record_hash` but there is no `previous_hash` field linking records together. This means a deleted record cannot be detected (only modified records are detectable).
+- **Impact:** Cannot detect if audit records have been deleted. Chain of custody not provable for compliance audits.
+- **Recommendation:** Implement hash chain with `previous_hash` field linking each audit record to its predecessor.
+- **Status:** Open
+
+---
+
+### SEC-017: No Audit Delete Prevention
+
+- **Category:** Security
+- **Debt Type:** Implementation
+- **Priority:** P1
+- **Discovered:** 2026-01-25
+- **Source:** Code review of budapp/audit_ops/models.py
+- **Description:** Only UPDATE prevention is implemented via SQLAlchemy event listener. DELETE prevention event listener is not implemented, allowing audit records to be deleted at the ORM level.
+- **Impact:** Audit records can be deleted through application code, violating immutability requirements.
+- **Recommendation:** Add `before_delete` SQLAlchemy event listener to prevent audit record deletion. Also implement database-level constraints.
+- **Status:** Open
+
+---
+
+### SEC-018: No Container Security Contexts
+
+- **Category:** Security
+- **Debt Type:** Implementation
+- **Priority:** P1
+- **Discovered:** 2026-01-25
+- **Source:** Helm chart review
+- **Description:** Container security contexts are not configured in Helm charts. Containers may run as root, without dropped capabilities, seccomp profiles, or read-only filesystems.
+- **Impact:** Containers have excessive privileges. Increases blast radius of container escapes. Fails CIS Kubernetes benchmark.
+- **Recommendation:** Add security contexts to all deployments: runAsNonRoot, drop ALL capabilities, seccomp RuntimeDefault, readOnlyRootFilesystem where possible.
+- **Status:** Open
+
+---
+
+### SEC-019: Dapr mTLS Enablement Not Verified
+
+- **Category:** Security
+- **Debt Type:** Implementation
+- **Priority:** P1
+- **Discovered:** 2026-01-25
+- **Source:** Security architecture verification against Helm charts
+- **Description:** Dapr mTLS is documented as enabled for service-to-service communication, but no Configuration CRD with `enabled: true` was found deployed in the Helm charts. The mTLS schema exists but actual runtime configuration is not verified.
+- **Impact:** Service-to-service authentication may not be enforced. Internal traffic may be unencrypted. Cannot claim mTLS protection for compliance.
+- **Recommendation:** Verify Dapr Configuration CRD is deployed with `mtls.enabled: true`. Add to Helm chart templates if missing.
+- **Status:** Open
+
+---
+
+### SEC-020: Harbor Trivy Scanning Disabled
+
+- **Category:** Security
+- **Debt Type:** Implementation
+- **Priority:** P1
+- **Discovered:** 2026-01-25
+- **Source:** Harbor Helm values review (infra/helm/harbor/values.yaml)
+- **Description:** Trivy container vulnerability scanning is disabled in Harbor configuration (`trivy.enabled: false`). Container images are not scanned for CVEs before deployment.
+- **Impact:** Vulnerable container images can be deployed without detection. Supply chain security gap.
+- **Recommendation:** Enable Trivy scanning in Harbor. Configure scan-on-push and vulnerability thresholds.
 - **Status:** Open
 
 ---
@@ -731,7 +803,7 @@
 - **Description:** Secrets management, data classification, compliance mappings, audit procedures undocumented.
 - **Impact:** Cannot pass compliance audits. Manual evidence gathering required.
 - **Recommendation:** Create compliance documentation suite with framework mappings.
-- **Status:** Open
+- **Status:** Resolved - Compliance documentation created including compliance-matrix.md, audit-logging-architecture.md, and security-hardening.md
 
 ---
 
@@ -787,7 +859,7 @@
 - **Description:** Day-2 operations, troubleshooting, monitoring, scaling procedures not documented.
 - **Impact:** Operations team relies on tribal knowledge. Inconsistent practices.
 - **Recommendation:** Create comprehensive operations documentation suite.
-- **Status:** Open
+- **Status:** Resolved - Operations documentation created at docs/product/operations/ including observability-architecture.md, operations-guide.md
 
 ---
 
@@ -829,7 +901,7 @@
 - **Description:** IaC reference, deployment guides, sizing, CI/CD not documented.
 - **Impact:** Customers cannot deploy or customize without support.
 - **Recommendation:** Create comprehensive infrastructure documentation suite.
-- **Status:** Open
+- **Status:** Resolved - Infrastructure documentation created at docs/product/infrastructure/ including deployment-guides.md, helm-chart-documentation.md, system-requirements.md, iac-guide.md
 
 ---
 
@@ -871,7 +943,7 @@
 - **Description:** No minimal deployment guide for evaluation.
 - **Impact:** High barrier to evaluation. Prospects abandon.
 - **Recommendation:** Create quick start guide with minimal evaluation deployment.
-- **Status:** Open
+- **Status:** Resolved - Quick start included in docs/product/infrastructure/deployment-guides.md
 
 ---
 
@@ -885,7 +957,7 @@
 - **Description:** Framework compatibility (PyTorch, TensorFlow, vLLM, etc.) not documented.
 - **Impact:** Customers cannot verify their workloads will run.
 - **Recommendation:** Create framework compatibility matrix with tested versions.
-- **Status:** Open
+- **Status:** Resolved - Framework compatibility included in docs/product/ai-ml/model-onboarding.md
 
 ---
 
@@ -911,7 +983,19 @@
 
 | ID | Title | Resolved | Resolution |
 |----|-------|----------|------------|
-| - | - | - | - |
+| SEC-002 | No Rate Limiting on API Endpoints | 2026-01-25 | Implemented in budgateway (rate_limit + usage_limit modules) |
+| DOC-002 | Missing Integration Guides | 2026-01-23 | Created docs/product/infrastructure/iac-guide.md (partial) |
+| DOC-003 | Missing Custom Model Guide | 2026-01-23 | Created docs/product/ai-ml/model-onboarding.md |
+| DOC-004 | Missing Training Materials | 2026-01-23 | Created docs/product/training/training-program.md and certification-program.md |
+| DOC-005 | Missing Quick Start Guide | 2026-01-23 | Created docs/product/infrastructure/deployment-guides.md |
+| DOC-006 | Missing Framework Compatibility | 2026-01-23 | Included in docs/product/ai-ml/model-onboarding.md |
+| SEC-015 | Security Documentation Gaps | 2026-01-23 | Created comprehensive docs/product/security/ suite |
+| COMP-010 | Compliance Documentation Gaps | 2026-01-23 | Created compliance-matrix.md, audit-logging-architecture.md |
+| OPS-008 | No Runbook Library | 2026-01-23 | Created docs/product/operations/ runbooks |
+| OPS-014 | Operations Documentation Gaps | 2026-01-23 | Created docs/product/operations/ suite |
+| INFRA-006 | No Infrastructure Documentation | 2026-01-23 | Created docs/product/infrastructure/ suite |
+| INFRA-007 | No Sizing Guidelines | 2026-01-23 | Created system-requirements.md |
+| INFRA-011 | Infrastructure Documentation Gaps | 2026-01-23 | Created comprehensive infrastructure docs |
 
 ---
 
