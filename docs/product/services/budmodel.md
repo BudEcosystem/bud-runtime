@@ -18,9 +18,9 @@ This document provides the Low-Level Design (LLD) for the BudModel service, a mo
 - Security engineers reviewing model scanning workflows
 
 ### 1.4 Related Documents
-- [High-Level Architecture](../architecture/high-level.md)
-- [budapp LLD](./budapp-lld.md)
-- [budsim LLD](./budsim-lld.md)
+- [High-Level Architecture](../architecture/high-level-architecture.md)
+- [budapp LLD](./budapp.md)
+- [budsim LLD](./budsim.md)
 
 ---
 

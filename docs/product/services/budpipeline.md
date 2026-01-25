@@ -40,8 +40,8 @@ This LLD provides build-ready technical specifications for budpipeline, the pipe
 |----------|-------------|
 | [High-Level Architecture](../architecture/high-level-architecture.md) | System overview |
 | [Main LLD Index](../architecture/low-level-design.md) | Cross-cutting concerns |
-| [DAG Structure](./docs/DAG_STRUCTURE.md) | Pipeline DAG schema |
-| [Event Flow](./docs/EVENT_FLOW.md) | Event-driven architecture |
+| [Appendix A: DAG Structure](#appendix-a-dag-structure) | Pipeline DAG schema |
+| [Appendix B: Event Flow](#appendix-b-event-flow-architecture) | Event-driven architecture |
 
 ---
 
@@ -1034,3 +1034,407 @@ async def test_model_add_event_completion():
 | CLUSTER_REF | Cluster reference |
 | PROJECT_REF | Project reference |
 | ENDPOINT_REF | Endpoint reference |
+
+---
+
+## Appendix A: DAG Structure
+
+This appendix defines the Directed Acyclic Graph (DAG) structure used by budpipeline to represent multi-step workflows for model operations.
+
+### A.1 DAG Schema
+
+**Pipeline Definition:**
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "description": "string",
+  "version": "string",
+  "steps": [
+    {
+      "id": "string",
+      "name": "string",
+      "action": "string",
+      "params": {},
+      "dependencies": ["step_id"],
+      "retry_policy": {},
+      "timeout_seconds": 3600,
+      "weight": 1.0
+    }
+  ],
+  "metadata": {}
+}
+```
+
+**Step Definition:**
+```json
+{
+  "id": "step-001",
+  "name": "Download Model",
+  "action": "model.download",
+  "params": {
+    "model_id": "meta-llama/Llama-3.1-70B",
+    "destination": "/models/llama-70b"
+  },
+  "dependencies": [],
+  "retry_policy": {
+    "max_retries": 3,
+    "backoff_multiplier": 2,
+    "initial_delay_seconds": 10
+  },
+  "timeout_seconds": 7200,
+  "weight": 0.4
+}
+```
+
+### A.2 Example: Model Deployment Pipeline DAG
+
+```
+                    ┌─────────────────┐
+                    │  validate_model │
+                    │    (step-001)   │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+       ┌──────────┐   ┌──────────┐   ┌──────────┐
+       │ download │   │  check   │   │  reserve │
+       │  weights │   │ licenses │   │   gpus   │
+       │(step-002)│   │(step-003)│   │(step-004)│
+       └────┬─────┘   └────┬─────┘   └────┬─────┘
+            │              │              │
+            └──────────────┼──────────────┘
+                           │
+                           ▼
+                    ┌─────────────────┐
+                    │   run_budsim    │
+                    │    (step-005)   │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ deploy_endpoint │
+                    │    (step-006)   │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │  health_check   │
+                    │    (step-007)   │
+                    └─────────────────┘
+```
+
+**JSON Representation:**
+```json
+{
+  "id": "pipeline-model-deploy",
+  "name": "Model Deployment Pipeline",
+  "steps": [
+    {"id": "step-001", "name": "Validate Model", "action": "model.validate", "dependencies": [], "weight": 0.05},
+    {"id": "step-002", "name": "Download Weights", "action": "model.download", "dependencies": ["step-001"], "weight": 0.40},
+    {"id": "step-003", "name": "Check Licenses", "action": "model.check_license", "dependencies": ["step-001"], "weight": 0.05},
+    {"id": "step-004", "name": "Reserve GPUs", "action": "cluster.reserve_gpus", "dependencies": ["step-001"], "weight": 0.05},
+    {"id": "step-005", "name": "Run BudSim", "action": "optimization.simulate", "dependencies": ["step-002", "step-003", "step-004"], "weight": 0.15},
+    {"id": "step-006", "name": "Deploy Endpoint", "action": "endpoint.deploy", "dependencies": ["step-005"], "weight": 0.25},
+    {"id": "step-007", "name": "Health Check", "action": "endpoint.health_check", "dependencies": ["step-006"], "weight": 0.05}
+  ]
+}
+```
+
+### A.3 Dependency Rules
+
+| Rule | Description |
+|------|-------------|
+| Acyclic | No circular dependencies allowed |
+| Forward only | Dependencies must reference earlier steps |
+| Existing | All referenced step IDs must exist |
+
+**Dependency Validation:**
+```python
+def validate_dag(pipeline: Pipeline) -> ValidationResult:
+    graph = {step.id: step.dependencies for step in pipeline.steps}
+    visited = set()
+    rec_stack = set()
+
+    def has_cycle(node):
+        visited.add(node)
+        rec_stack.add(node)
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                if has_cycle(neighbor):
+                    return True
+            elif neighbor in rec_stack:
+                return True
+        rec_stack.remove(node)
+        return False
+
+    for step_id in graph:
+        if step_id not in visited:
+            if has_cycle(step_id):
+                return ValidationResult.CYCLE_DETECTED
+    return ValidationResult.VALID
+```
+
+### A.4 Built-in Actions
+
+| Action | Description | Service |
+|--------|-------------|---------|
+| `model.validate` | Validate model configuration | budmodel |
+| `model.download` | Download model weights | budmodel |
+| `model.check_license` | Verify licensing | budmodel |
+| `cluster.reserve_gpus` | Reserve GPU resources | budcluster |
+| `cluster.provision` | Provision cluster | budcluster |
+| `optimization.simulate` | Run BudSim optimization | budsim |
+| `endpoint.deploy` | Deploy inference endpoint | budcluster |
+| `endpoint.health_check` | Verify endpoint health | budcluster |
+| `notification.send` | Send notification | budnotify |
+
+### A.5 Progress Calculation
+
+**Weighted Progress Formula:**
+```
+Total Progress = Σ (step_weight × step_progress) / Σ step_weights
+
+Where:
+- step_progress: 0.0 (pending), 0.5 (in_progress), 1.0 (completed)
+- step_weight: Relative weight of the step
+```
+
+### A.6 Execution Order
+
+Steps are executed in topological order:
+1. All steps with no dependencies can run in parallel
+2. A step runs only after all its dependencies complete
+3. Failed dependencies block dependent steps
+
+```
+Level 0: [step-001]                     # No dependencies
+Level 1: [step-002, step-003, step-004] # Depend on step-001
+Level 2: [step-005]                     # Depends on 002, 003, 004
+Level 3: [step-006]                     # Depends on step-005
+Level 4: [step-007]                     # Depends on step-006
+```
+
+---
+
+## Appendix B: Event Flow Architecture
+
+This appendix describes the event-driven architecture used by budpipeline for step completion, progress tracking, and inter-service communication.
+
+### B.1 Event Flow Overview
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  budpipeline│     │    Dapr     │     │  External   │     │  budpipeline│
+│  (Producer) │────►│   Pub/Sub   │────►│  Services   │────►│  (Consumer) │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+      │                                       │                    │
+      │  1. Start step                        │  2. Process        │
+      │  2. Publish event                     │  3. Complete       │
+      │                                       │  4. Publish result │
+      │                                       │                    │
+      └───────────────────────────────────────┴────────────────────┘
+                           Event-driven loop
+```
+
+### B.2 Event Types
+
+| Event Type | Direction | Purpose |
+|------------|-----------|---------|
+| `step.started` | Out | Step execution began |
+| `step.progress` | Out | Step progress update |
+| `step.completed` | In/Out | Step finished successfully |
+| `step.failed` | In/Out | Step failed |
+| `pipeline.started` | Out | Pipeline execution began |
+| `pipeline.completed` | Out | Pipeline finished |
+| `pipeline.failed` | Out | Pipeline failed |
+
+### B.3 Event Schemas
+
+**Step Started Event:**
+```json
+{
+  "event_type": "step.started",
+  "event_id": "evt-uuid",
+  "timestamp": "2026-01-25T10:30:00Z",
+  "data": {
+    "execution_id": "exec-uuid",
+    "pipeline_id": "pipeline-uuid",
+    "step_id": "step-001",
+    "step_name": "Download Model",
+    "action": "model.download",
+    "params": {"model_id": "meta-llama/Llama-3.1-70B"}
+  }
+}
+```
+
+**Step Progress Event:**
+```json
+{
+  "event_type": "step.progress",
+  "event_id": "evt-uuid",
+  "timestamp": "2026-01-25T10:35:00Z",
+  "data": {
+    "execution_id": "exec-uuid",
+    "step_id": "step-001",
+    "progress": 0.45,
+    "message": "Downloading weights: 45% complete",
+    "details": {"bytes_downloaded": 45000000000, "bytes_total": 100000000000}
+  }
+}
+```
+
+**Step Completed Event:**
+```json
+{
+  "event_type": "step.completed",
+  "event_id": "evt-uuid",
+  "timestamp": "2026-01-25T10:45:00Z",
+  "data": {
+    "execution_id": "exec-uuid",
+    "step_id": "step-001",
+    "status": "SUCCESS",
+    "result": {"model_path": "/models/llama-70b", "checksum": "sha256:abc123..."},
+    "duration_seconds": 900
+  }
+}
+```
+
+**Step Failed Event:**
+```json
+{
+  "event_type": "step.failed",
+  "event_id": "evt-uuid",
+  "timestamp": "2026-01-25T10:45:00Z",
+  "data": {
+    "execution_id": "exec-uuid",
+    "step_id": "step-001",
+    "status": "FAILED",
+    "error": {"code": "DOWNLOAD_FAILED", "message": "Connection timeout", "retry_count": 3, "retriable": false},
+    "duration_seconds": 300
+  }
+}
+```
+
+### B.4 Pub/Sub Topics
+
+| Topic | Publisher | Subscribers | Purpose |
+|-------|-----------|-------------|---------|
+| `pipeline-events` | budpipeline | UI, notifications | Pipeline status |
+| `step-commands` | budpipeline | budmodel, budcluster, budsim | Step execution |
+| `step-results` | All services | budpipeline | Step completion |
+
+**Dapr Configuration:**
+```yaml
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pipeline-pubsub
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      value: redis:6379
+    - name: consumerID
+      value: budpipeline
+---
+apiVersion: dapr.io/v1alpha1
+kind: Subscription
+metadata:
+  name: step-results-sub
+spec:
+  pubsubname: pipeline-pubsub
+  topic: step-results
+  route: /api/v1/events/step-results
+```
+
+### B.5 Asynchronous Step Flow
+
+```
+budpipeline                     External Service
+     │                                │
+     │  1. Publish step.started       │
+     │────────────────────────────────►
+     │                                │
+     │  2. Return 202 Accepted        │
+     │◄────────────────────────────────
+     │                                │
+     │        [Processing...]         │
+     │                                │
+     │  3. (Optional) Progress events │
+     │◄────────────────────────────────
+     │                                │
+     │  4. Publish step.completed     │
+     │◄────────────────────────────────
+     │                                │
+     │  5. Update state, trigger next │
+     │                                │
+```
+
+### B.6 Callback Webhooks
+
+**Webhook Registration:**
+```json
+{
+  "pipeline_id": "pipeline-uuid",
+  "callbacks": [
+    {
+      "event_types": ["pipeline.completed", "pipeline.failed"],
+      "url": "https://api.example.com/webhooks/pipeline",
+      "headers": {"Authorization": "Bearer token123"},
+      "retry_policy": {"max_retries": 3, "backoff_seconds": 60}
+    }
+  ]
+}
+```
+
+**Webhook Payload:**
+```json
+{
+  "event_type": "pipeline.completed",
+  "timestamp": "2026-01-25T11:00:00Z",
+  "pipeline_id": "pipeline-uuid",
+  "execution_id": "exec-uuid",
+  "status": "SUCCESS",
+  "duration_seconds": 1800,
+  "results": {
+    "endpoint_id": "endpoint-uuid",
+    "endpoint_url": "https://api.bud.ai/v1/models/my-model"
+  }
+}
+```
+
+### B.7 Event Delivery Guarantees
+
+| Guarantee | Implementation |
+|-----------|----------------|
+| At-least-once | Dapr pub/sub with acknowledgment |
+| Idempotency | Event ID deduplication |
+| Ordering | Per-execution ordering via locks |
+
+### B.8 Dead Letter Queue
+
+```yaml
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pipeline-pubsub
+spec:
+  type: pubsub.redis
+  metadata:
+    - name: deadLetterTopic
+      value: pipeline-dlq
+    - name: maxDeliveryCount
+      value: "5"
+```
+
+### B.9 Event Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `pipeline_events_published_total` | Counter | Events published |
+| `pipeline_events_received_total` | Counter | Events received |
+| `pipeline_event_processing_seconds` | Histogram | Processing latency |
+| `pipeline_dlq_messages_total` | Counter | DLQ messages |

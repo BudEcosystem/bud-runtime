@@ -1,0 +1,41 @@
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
+flowchart TB
+    subgraph Init["Initialization"]
+        A[Create initial population]
+        B[Initialize DEAP toolbox]
+        C[Set fitness weights]
+    end
+
+    subgraph Eval["Evaluation"]
+        D[Validate TP/PP combination]
+        E{Valid?}
+        F[Prepare predictor data]
+        G[Predict performance]
+        H[Calculate fitness]
+        I[Assign worst fitness]
+    end
+
+    subgraph Select["Selection & Breeding"]
+        J[Select elite individuals]
+        K[NSGA-II selection]
+        L[Crossover CX blend]
+        M[Mutation]
+        N[Create offspring]
+    end
+
+    subgraph Converge["Convergence Check"]
+        O{Converged?}
+        P[Return top-k configs]
+        Q[Continue evolution]
+    end
+
+    A --> B --> C --> D
+    D --> E
+    E -->|Yes| F --> G --> H
+    E -->|No| I
+    H --> J
+    I --> J
+    J --> K --> L --> M --> N
+    N --> O
+    O -->|Yes| P
+    O -->|No| Q --> D

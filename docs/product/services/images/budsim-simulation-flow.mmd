@@ -1,30 +1,30 @@
 %%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff'}}}%%
 sequenceDiagram
-    participant budapp
-    participant budsim
-    participant Dapr as Dapr Workflow
-    participant PostgreSQL
-    participant budcluster
+    participant Client
+    participant Routes
+    participant Workflows
+    participant Services
+    participant Evolution
+    participant Regressor
 
-    budapp->>budsim: POST /simulator/run {model, tokens, targets}
-    budsim->>Dapr: Start simulation workflow
-    Dapr-->>budsim: {workflow_id, steps}
-    budsim-->>budapp: {workflow_id, eta}
+    Client->>Routes: POST /simulator/run
+    Routes->>Workflows: __call__(request)
 
-    Note over budsim,budcluster: Workflow Execution
-    budsim->>budcluster: Get available clusters
-    budcluster-->>budsim: {clusters, nodes, devices}
-    budsim->>budsim: Analyze cluster topology
-    budsim->>budsim: Group devices by type
-    budsim->>budsim: Get compatible engines
+    loop For each cluster/device
+        Workflows->>Services: run_simulation()
+        Services->>Evolution: evolve()
 
-    loop For each cluster/device/engine
-        budsim->>budsim: Run Evolution (GA) or Heuristic
-        budsim->>PostgreSQL: Store simulation results
+        loop GA Generations
+            Evolution->>Evolution: Generate population
+            Evolution->>Regressor: predict(features)
+            Regressor-->>Evolution: TTFT, throughput, latency
+            Evolution->>Evolution: Calculate fitness
+            Evolution->>Evolution: Select & crossover
+        end
+
+        Evolution-->>Services: Top-k configs
+        Services->>Services: Save to database
     end
 
-    budsim->>budsim: Aggregate recommendations
-    budsim->>budapp: Notify simulation complete
-    budapp->>budsim: GET /recommendations?workflow_id
-    budsim->>PostgreSQL: Fetch top-k configs
-    budsim-->>budapp: {recommendations}
+    Workflows-->>Routes: ClusterRecommendationResponse
+    Routes-->>Client: 200 OK + recommendations

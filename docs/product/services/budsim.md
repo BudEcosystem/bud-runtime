@@ -18,9 +18,9 @@ This document provides the Low-Level Design (LLD) for the BudSim service, a perf
 - ML engineers training and deploying prediction models
 
 ### 1.4 Related Documents
-- [High-Level Architecture](../architecture/high-level.md)
-- [budcluster LLD](./budcluster-lld.md)
-- [budapp LLD](./budapp-lld.md)
+- [High-Level Architecture](../architecture/high-level-architecture.md)
+- [budcluster LLD](./budcluster.md)
+- [budapp LLD](./budapp.md)
 
 ---
 
