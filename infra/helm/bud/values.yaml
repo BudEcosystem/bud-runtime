@@ -445,8 +445,8 @@ microservices:
     daprid: budnotify
     pubsubTopic: notificationMessages
     env:
-      KEYCLOAK_URL: http://{{ .Release.Name }}-keycloak/
-      KEYCLOAK_REALM: "{{ .Values.keycloak.adminRealm }}"
+      KEYCLOAK_URL: http://{{ .Release.Name }}-keycloak
+      KEYCLOAK_REALM: bud-keycloak
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration (fast scale-up for notifications)
@@ -826,7 +826,7 @@ otelCollector:
   enabled: true
   image:
     repository: otel/opentelemetry-collector-contrib
-    tag: 0.91.0
+    tag: 0.96.0
   replicas: 1
   logLevel: info
   debug: false
