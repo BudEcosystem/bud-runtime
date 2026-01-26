@@ -34,9 +34,10 @@ class TestActionsListEndpoint:
         assert "categories" in data
         assert "total" in data
 
-        # Should have at least the 16 built-in actions
-        assert data["total"] >= 16
-        assert len(data["actions"]) >= 16
+        # Should have at least the 19 built-in actions
+        # (7 control flow + 4 model + 1 cluster + 5 deployment + 2 integration)
+        assert data["total"] >= 19
+        assert len(data["actions"]) >= 19
 
     @pytest.mark.asyncio
     async def test_list_actions_includes_categories(self) -> None:

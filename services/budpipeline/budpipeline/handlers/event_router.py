@@ -7,7 +7,7 @@ and routes the event to the action executor's on_event() method.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -284,7 +284,7 @@ async def process_timeout(
             outputs = {
                 "waited": True,
                 "scheduled_wake_time": step.timeout_at.isoformat() if step.timeout_at else None,
-                "actual_wake_time": datetime.utcnow().isoformat(),
+                "actual_wake_time": datetime.now(timezone.utc).isoformat(),
                 "wait_duration_seconds": step_outputs.get("wait_duration_seconds"),
             }
             error_message = None
@@ -447,7 +447,7 @@ async def trigger_pipeline_continuation(
                 execution_id=execution_id,
                 expected_version=execution.version,
                 status=final_status,
-                end_time=datetime.utcnow(),
+                end_time=datetime.now(timezone.utc),
                 error_info={"failed_steps": failed_count, "total_steps": total_steps},
             )
         else:
@@ -468,7 +468,7 @@ async def trigger_pipeline_continuation(
                 expected_version=execution.version,
                 status=final_status,
                 progress_percentage=Decimal("100.00"),
-                end_time=datetime.utcnow(),
+                end_time=datetime.now(timezone.utc),
                 final_outputs=final_outputs,
             )
     else:
@@ -571,7 +571,7 @@ async def _check_and_finalize_execution(
             execution_id=execution_id,
             expected_version=execution.version,
             status=final_status,
-            end_time=datetime.utcnow(),
+            end_time=datetime.now(timezone.utc),
             error_info={"failed_steps": failed_count, "total_steps": total_steps},
         )
     else:
@@ -590,7 +590,7 @@ async def _check_and_finalize_execution(
             expected_version=execution.version,
             status=final_status,
             progress_percentage=Decimal("100.00"),
-            end_time=datetime.utcnow(),
+            end_time=datetime.now(timezone.utc),
             final_outputs=final_outputs,
         )
 
@@ -700,7 +700,7 @@ async def _continue_pipeline_execution(
             continue
 
         # Mark step as RUNNING using the fresh version
-        step_started_at = datetime.utcnow()
+        step_started_at = datetime.now(timezone.utc)
         try:
             updated_step = await step_crud.update_with_version(
                 step_uuid=fresh_step.id,
@@ -760,7 +760,7 @@ async def _continue_pipeline_execution(
                 from datetime import timedelta
 
                 timeout_secs = result.timeout_seconds or settings.default_async_step_timeout
-                timeout_at = datetime.utcnow() + timedelta(seconds=timeout_secs)
+                timeout_at = datetime.now(timezone.utc) + timedelta(seconds=timeout_secs)
 
                 from budpipeline.pipeline.persistence_service import persistence_service
 
