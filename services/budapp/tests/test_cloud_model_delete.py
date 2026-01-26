@@ -295,7 +295,7 @@ async def test_delete_regular_model_endpoint_workflow_deletion():
 
         # Verify bud_cluster delete was called with expected parameters
         service._perform_bud_cluster_delete_endpoint_request.assert_called_once_with(
-            cluster_id, mock_endpoint.namespace, user_id, workflow_id
+            cluster_id, mock_endpoint.namespace, user_id, workflow_id, callback_topic=None
         )
 
 
@@ -424,5 +424,5 @@ async def test_delete_cloud_model_endpoint_with_cluster_follows_workflow():
 
         # Verify bud_cluster delete was called with expected parameters
         service._perform_bud_cluster_delete_endpoint_request.assert_called_once_with(
-            cluster_id, mock_endpoint.namespace, user_id, workflow_id
+            cluster_id, mock_endpoint.namespace, user_id, workflow_id, callback_topic=None
         )
