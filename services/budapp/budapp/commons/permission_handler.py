@@ -1,4 +1,4 @@
-from functools import WRAPPER_ASSIGNMENTS, update_wrapper
+from functools import WRAPPER_ASSIGNMENTS, update_wrapper, wraps
 from typing import Callable, List, Optional, Union
 
 from fastapi import Depends, HTTPException, status
