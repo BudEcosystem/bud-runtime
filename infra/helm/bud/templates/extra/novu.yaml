@@ -41,7 +41,7 @@ spec:
           - name: REDIS_PORT
             value : "6379"
           - name: REDIS_DB_INDEX
-            value : "2"
+            value : {{ .Values.novu.api.env.REDIS_DB_INDEX | default "2" | quote }}
           - name: REDIS_PASSWORD
             value : "{{ .Values.valkey.auth.password }}"
           - name: MONGO_URL
