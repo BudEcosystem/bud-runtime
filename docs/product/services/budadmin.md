@@ -23,14 +23,6 @@ This LLD provides build-ready technical specifications for budadmin, the main da
 - Authentication logic (Keycloak)
 - Model inference (budgateway)
 
-### 1.3 Intended Audience
-
-| Audience | What They Need |
-|----------|----------------|
-| Frontend Developers | Component structure, state patterns |
-| UX Designers | UI capabilities, flow patterns |
-| Operations | Configuration, deployment |
-
 ---
 
 ## 2. System Context & Assumptions
@@ -59,84 +51,7 @@ This LLD provides build-ready technical specifications for budadmin, the main da
 
 ---
 
-## 3. Detailed Architecture
-
-### 3.1 Application Structure
-
-```
-src/
-├── pages/              # Next.js pages (routing)
-│   ├── api/            # API routes (BFF pattern)
-│   │   └── requests.ts # Centralized API client
-│   ├── clusters/       # Cluster management
-│   ├── endpoints/      # Model endpoints
-│   ├── models/         # Model registry
-│   ├── projects/       # Project management
-│   └── settings/       # Platform settings
-│
-├── components/         # Reusable UI components
-│   ├── common/         # Shared components
-│   ├── clusters/       # Cluster-specific
-│   ├── endpoints/      # Endpoint-specific
-│   └── layouts/        # Page layouts
-│
-├── flows/              # Multi-step workflows
-│   ├── DeploymentFlow/
-│   └── ClusterSetupFlow/
-│
-├── stores/             # Zustand state stores
-│   ├── useAuthStore.ts
-│   ├── useClusterStore.ts
-│   └── useEndpointStore.ts
-│
-├── hooks/              # Custom React hooks
-│   ├── useApi.ts
-│   ├── useWebSocket.ts
-│   └── usePolling.ts
-│
-└── styles/             # Global and component styles
-```
-
-### 3.2 State Management
-
-```typescript
-// useClusterStore.ts
-interface ClusterStore {
-  clusters: Cluster[];
-  selectedCluster: Cluster | null;
-  loading: boolean;
-  fetchClusters: () => Promise<void>;
-  selectCluster: (id: string) => void;
-  refreshCluster: (id: string) => Promise<void>;
-}
-```
-
 ---
-
-## 4. Data Design
-
-### 4.1 API Client Pattern
-
-```typescript
-// pages/api/requests.ts
-export const apiClient = {
-  clusters: {
-    list: () => fetch('/api/clusters'),
-    get: (id: string) => fetch(`/api/clusters/${id}`),
-    create: (data: CreateClusterRequest) => fetch('/api/clusters', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-  },
-  endpoints: {
-    list: (projectId: string) => fetch(`/api/projects/${projectId}/endpoints`),
-    deploy: (data: DeployRequest) => fetch('/api/endpoints', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-  },
-};
-```
 
 ---
 
@@ -153,63 +68,9 @@ export const apiClient = {
 
 ---
 
-## 6. Logic & Algorithm Details
+## 6. Configuration & Environment
 
-### 6.1 Deployment Flow
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Select    │────▶│   Select    │────▶│  Configure  │
-│    Model    │     │   Cluster   │     │  Parameters │
-└─────────────┘     └─────────────┘     └──────┬──────┘
-                                               │
-                    ┌──────────────────────────┘
-                    │
-                    ▼
-              ┌─────────────┐     ┌─────────────┐
-              │   Review    │────▶│   Deploy    │
-              │   Summary   │     │             │
-              └─────────────┘     └─────────────┘
-```
-
-### 6.2 Real-Time Updates
-
-```typescript
-// useWebSocket hook
-function useClusterStatus(clusterId: string) {
-  const [status, setStatus] = useState<ClusterStatus | null>(null);
-
-  useEffect(() => {
-    const ws = new WebSocket(`${WS_URL}/clusters/${clusterId}/status`);
-    ws.onmessage = (event) => {
-      setStatus(JSON.parse(event.data));
-    };
-    return () => ws.close();
-  }, [clusterId]);
-
-  return status;
-}
-```
-
----
-
-## 7. GenAI/ML-Specific Design
-
-### 7.1 Model Deployment UI
-
-| Step | Component | Data Collected |
-|------|-----------|----------------|
-| Model Selection | ModelSelector | model_id, version |
-| Cluster Selection | ClusterSelector | cluster_id |
-| Parameters | ParameterForm | replicas, resources |
-| Optimization | OptimizationPanel | optimization_level |
-| Review | ReviewSummary | All above |
-
----
-
-## 8. Configuration & Environment
-
-### 8.1 Environment Variables
+### 6.1 Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -221,9 +82,9 @@ function useClusterStatus(clusterId: string) {
 
 ---
 
-## 9. Security Design
+## 7. Security Design
 
-### 9.1 Authentication Flow
+### 7.1 Authentication Flow
 
 1. User accesses protected route
 2. Redirect to Keycloak login
@@ -231,7 +92,7 @@ function useClusterStatus(clusterId: string) {
 4. Store in secure cookie
 5. Attach to API requests
 
-### 9.2 Authorization
+### 7.2 Authorization
 
 - Role-based access control via Keycloak
 - UI elements hidden based on permissions
@@ -239,16 +100,16 @@ function useClusterStatus(clusterId: string) {
 
 ---
 
-## 10. Performance & Scalability
+## 8. Performance & Scalability
 
-### 10.1 Optimization Strategies
+### 8.1 Optimization Strategies
 
 - Server-side rendering for initial load
 - Code splitting by route
 - Image optimization via Next.js
 - Caching API responses
 
-### 10.2 Bundle Size
+### 8.2 Bundle Size
 
 - Tree-shaking Ant Design imports
 - Dynamic imports for large components
@@ -256,81 +117,6 @@ function useClusterStatus(clusterId: string) {
 
 ---
 
-## 11. Error Handling & Logging
+## 9. Deployment & Infrastructure
 
-### 11.1 Error Boundaries
-
-```typescript
-// ErrorBoundary component wraps major sections
-// Displays friendly error UI on React errors
-// Reports errors to monitoring service
-```
-
-### 11.2 API Error Handling
-
-- Toast notifications for user errors
-- Retry logic for transient failures
-- Redirect to login on 401
-
----
-
-## 12. Deployment & Infrastructure
-
-### 12.1 Build and Deploy
-
-```bash
-npm run build    # Build production bundle
-npm run start    # Start production server
-```
-
-### 12.2 Container
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build
-EXPOSE 8007
-CMD ["npm", "start"]
-```
-
----
-
-## 13. Testing Strategy
-
-- Unit tests: Jest + React Testing Library
-- E2E tests: Playwright
-- Visual regression: Chromatic (optional)
-
----
-
-## 14. Limitations & Future Enhancements
-
-### 14.1 Current Limitations
-
-- Desktop-focused responsive design
-- No offline support
-- Limited keyboard navigation
-
-### 14.2 Planned Improvements
-
-1. Mobile-responsive redesign
-2. Dark mode support
-3. Keyboard shortcuts
-4. Accessibility (a11y) audit
-
----
-
-## 15. Appendix
-
-### 15.1 Key Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| next | 14.x | React framework |
-| antd | 5.x | UI components |
-| zustand | 4.x | State management |
-| @ant-design/icons | 5.x | Icons |
-| axios | 1.x | HTTP client |
+### 10.2 Container

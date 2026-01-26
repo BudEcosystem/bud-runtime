@@ -225,7 +225,6 @@ Complete reference of all technologies, frameworks, libraries, and their version
 | **ClamAV** | 1.x | Model artifact scanning |
 | **Trivy** | 0.50+ | Container vulnerability scanning |
 
-
 ---
 
 ## Development Tools
@@ -298,11 +297,3 @@ Complete reference of all technologies, frameworks, libraries, and their version
 | Bud Version | PostgreSQL | ClickHouse | MongoDB | Valkey/Redis |
 |-------------|------------|------------|---------|--------------|
 | 1.0.x | 14+ | 23+ | 6+ | 7+ / 6+ |
-
----
-
-## Related Documents
-
-- [Component Catalog](./component-catalog.md) - Component descriptions
-- [Deployment Architecture](./deployment-architecture.md) - Infrastructure requirements
-- [Platform Datasheet](./platform-datasheet.md) - Quick specifications

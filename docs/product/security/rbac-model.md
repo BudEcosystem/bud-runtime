@@ -1,10 +1,5 @@
 # RBAC Model
 
-> **Version:** 1.1
-> **Last Updated:** 2026-01-25
-> **Status:** Current Implementation
-> **Audience:** Administrators, security engineers
-
 ---
 
 ## 1. Overview
@@ -16,60 +11,11 @@ Bud AI Foundry implements Role-Based Access Control (RBAC) with:
 
 ---
 
-## 2. Role Hierarchy
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                      PLATFORM LEVEL                          │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │                    SUPER_ADMIN                         │  │
-│  │   • Full platform access                               │  │
-│  │   • Manage all tenants                                 │  │
-│  │   • System configuration                               │  │
-│  └────────────────────────────────────────────────────────┘  │
-├──────────────────────────────────────────────────────────────┤
-│                       TENANT LEVEL                           │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │                      ADMIN                             │  │
-│  │   • Tenant settings                                    │  │
-│  │   • User management                                    │  │
-│  │   • All projects in tenant                             │  │
-│  └────────────────────────────────────────────────────────┘  │
-├──────────────────────────────────────────────────────────────┤
-│                     OPERATIONAL LEVEL                        │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │                     DEVOPS                             │  │
-│  │   • Cluster management                                 │  │
-│  │   • Infrastructure configuration                       │  │
-│  │   • Deployment operations                              │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │                    DEVELOPER                           │  │
-│  │   • Project development                                │  │
-│  │   • Model deployment                                   │  │
-│  │   • API usage                                          │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │                     TESTER                             │  │
-│  │   • Testing and QA                                     │  │
-│  │   • Benchmark execution                                │  │
-│  │   • Model evaluation                                   │  │
-│  └────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────┘
-```
-
 ---
 
 ## 3. Role Definitions
 
 **Location:** `budapp/commons/constants.py` - `UserRoleEnum`
-
-```python
-class UserRoleEnum(Enum):
-    ADMIN = "admin"
-    SUPER_ADMIN = "super_admin"
-    DEVELOPER = "developer"
-    DEVOPS = "devops"
-    TESTER = "tester"
-```
 
 ### 3.1 SUPER_ADMIN
 
@@ -158,37 +104,6 @@ class UserRoleEnum(Enum):
 
 The permission system uses a `resource:action` format with two primary scopes:
 
-```python
-class PermissionEnum(Enum):
-    # Model permissions
-    MODEL_VIEW = "model:view"
-    MODEL_MANAGE = "model:manage"
-    MODEL_BENCHMARK = "model:benchmark"
-
-    # Project permissions
-    PROJECT_VIEW = "project:view"
-    PROJECT_MANAGE = "project:manage"
-
-    # Endpoint permissions
-    ENDPOINT_VIEW = "endpoint:view"
-    ENDPOINT_MANAGE = "endpoint:manage"
-
-    # Cluster permissions
-    CLUSTER_VIEW = "cluster:view"
-    CLUSTER_MANAGE = "cluster:manage"
-
-    # User permissions
-    USER_VIEW = "user:view"
-    USER_MANAGE = "user:manage"
-
-    # Benchmark permissions
-    BENCHMARK_VIEW = "benchmark:view"
-    BENCHMARK_MANAGE = "benchmark:manage"
-
-    # Client access
-    CLIENT_ACCESS = "client:access"
-```
-
 ### 4.2 Permission Scopes
 
 | Scope | Description |
@@ -262,11 +177,6 @@ class PermissionEnum(Enum):
 
 User roles are managed through Keycloak realm roles. When a user is created or updated, their role is synced with Keycloak:
 
-```python
-# Role assignment happens via Keycloak API
-keycloak.assign_realm_role(user_id, realm_name, role_name)
-```
-
 **Requirements:**
 - Caller must be ADMIN or SUPER_ADMIN
 - Role must be a valid UserRoleEnum value
@@ -276,28 +186,6 @@ keycloak.assign_realm_role(user_id, realm_name, role_name)
 
 **Location:** `budapp/commons/permission_handler.py`
 
-```python
-@require_permissions(roles=UserRoleEnum.ADMIN)
-async def admin_only_route():
-    pass
-
-@require_permissions(permissions=[PermissionEnum.PROJECT_MANAGE])
-async def project_manage_route():
-    pass
-```
-
-### 6.3 Role Hierarchy Check
-
-```python
-# Super admin bypasses all permission checks
-if current_user.role == UserRoleEnum.SUPER_ADMIN:
-    return True
-
-# Admin has tenant-wide access
-if current_user.role == UserRoleEnum.ADMIN:
-    return is_same_tenant(current_user, resource)
-```
-
 ---
 
 ## 7. Special Access Patterns
@@ -306,43 +194,9 @@ if current_user.role == UserRoleEnum.ADMIN:
 
 The user who creates a project automatically receives ADMIN permission:
 
-```python
-async def create_project(self, request: ProjectCreate, user: User):
-    project = await self._create_project(request)
-
-    # Auto-grant admin to creator
-    await permission_service.grant(
-        user_id=user.id,
-        resource_type="project",
-        resource_id=project.id,
-        level=PermissionEnum.ADMIN
-    )
-
-    return project
-```
-
 ### 7.2 Inherited Access
 
 When a user has permission on a parent resource, they inherit access to children:
-
-```python
-async def check_permission(
-    user_id: UUID,
-    resource_type: str,
-    resource_id: UUID,
-    required: PermissionEnum
-) -> bool:
-    # Check direct permission
-    if await has_direct_permission(user_id, resource_type, resource_id, required):
-        return True
-
-    # Check parent permission (e.g., project for endpoint)
-    parent = await get_parent_resource(resource_type, resource_id)
-    if parent:
-        return await check_permission(user_id, parent.type, parent.id, required)
-
-    return False
-```
 
 ### 7.3 System Resources
 
@@ -359,22 +213,6 @@ Some resources are system-owned and have special access rules:
 ## 8. Audit Trail
 
 All permission changes are logged:
-
-```python
-{
-    "action": "GRANT_PERMISSION",
-    "resource_type": "permission",
-    "resource_id": "permission-uuid",
-    "user_id": "granter-uuid",
-    "details": {
-        "target_user": "grantee-uuid",
-        "resource_type": "project",
-        "resource_id": "project-uuid",
-        "permission_level": "edit"
-    },
-    "timestamp": "2026-01-23T10:00:00Z"
-}
-```
 
 ---
 
@@ -405,71 +243,3 @@ All permission changes are logged:
 - [ ] Remove access for departed users
 - [ ] Check for over-privileged service accounts
 - [ ] Audit permission grant/revoke history
-
----
-
-## 10. Implementation Details
-
-### 10.1 Permission Check Flow
-
-```python
-# budapp/commons/permission_handler.py
-
-async def require_permission(
-    resource_type: str,
-    resource_id: UUID,
-    required: PermissionEnum
-):
-    """Decorator for permission-protected routes."""
-
-    async def dependency(
-        current_user: User = Depends(get_current_user),
-        session: AsyncSession = Depends(get_session)
-    ):
-        # Super admin bypass
-        if current_user.role == UserRoleEnum.SUPER_ADMIN:
-            return True
-
-        # Check permission
-        has_perm = await check_permission(
-            session, current_user.id,
-            resource_type, resource_id, required
-        )
-
-        if not has_perm:
-            raise HTTPException(403, "Permission denied")
-
-        return True
-
-    return dependency
-```
-
-### 10.2 Permission Query
-
-```python
-# budapp/permissions/crud.py
-
-async def get_user_permissions(
-    session: AsyncSession,
-    user_id: UUID,
-    resource_type: Optional[str] = None
-) -> List[Permission]:
-    """Get all permissions for a user."""
-
-    query = select(Permission).where(Permission.user_id == user_id)
-
-    if resource_type:
-        query = query.where(Permission.resource_type == resource_type)
-
-    result = await session.execute(query)
-    return result.scalars().all()
-```
-
----
-
-## Document History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2026-01-23 | Documentation | Initial version |
-| 1.1 | 2026-01-25 | Documentation | Updated to reflect actual implementation - corrected roles (SUPER_ADMIN, ADMIN, DEVELOPER, DEVOPS, TESTER), permission format (resource:action with view/manage scopes) |

@@ -24,45 +24,12 @@ Bud AI Foundry supports three deployment models:
 
 ### Standard Environment Layout
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Environment Topology                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Development Environment                           │   │
-│  │                    (dev.bud.studio)                                  │   │
-│  │                                                                      │   │
-│  │  Purpose: Active development, nightly builds                        │   │
-│  │  Images: budstudio/*:nightly                                        │   │
-│  │  Features: Dev mode enabled, debug logging, hot reload              │   │
-│  │  Auto-deploy: Keel polling every 1 minute                          │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                     │                                       │
-│                                     ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Staging Environment                               │   │
-│  │                    (stage.bud.studio)                                │   │
-│  │                                                                      │   │
-│  │  Purpose: Pre-production validation, QA testing                     │   │
-│  │  Images: budstudio/*:staging                                        │   │
-│  │  Features: Production-like config, synthetic load testing           │   │
-│  │  Promotion: Manual approval from dev                                │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                     │                                       │
-│                                     ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Production Environment                            │   │
-│  │                    (app.bud.studio)                                  │   │
-│  │                                                                      │   │
-│  │  Purpose: Live customer traffic                                     │   │
-│  │  Images: budstudio/*:v{semver}                                      │   │
-│  │  Features: HA configuration, monitoring, alerting                   │   │
-│  │  Promotion: Manual approval from staging, rollback ready            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Environment Topology](../diagrams/env-topology.png)
+
+**Environment Configuration:**
+- **Development** (dev.bud.studio): Nightly builds, auto-deploy via Keel
+- **Staging** (stage.bud.studio): Pre-production validation, manual approval
+- **Production** (app.bud.studio): Live traffic, HA configuration
 
 ### Environment Configuration Matrix
 
@@ -84,112 +51,30 @@ Bud AI Foundry supports three deployment models:
 
 ### Control Plane Cluster
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Control Plane Cluster                                    │
-│                     (Single cluster hosting all Bud services)                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         Namespaces                                   │   │
-│  │                                                                      │   │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │   │
-│  │  │   bud-system  │  │  bud-infra    │  │   bud-obs     │           │   │
-│  │  │               │  │               │  │               │           │   │
-│  │  │ • budapp      │  │ • PostgreSQL  │  │ • Grafana     │           │   │
-│  │  │ • budcluster  │  │ • Valkey      │  │ • Loki        │           │   │
-│  │  │ • budsim      │  │ • ClickHouse  │  │ • Tempo       │           │   │
-│  │  │ • budmodel    │  │ • MinIO       │  │ • Mimir       │           │   │
-│  │  │ • budmetrics  │  │ • MongoDB     │  │ • Prometheus  │           │   │
-│  │  │ • budpipeline │  │ • Kafka       │  │ • AlertManager│           │   │
-│  │  │ • budeval     │  │               │  │               │           │   │
-│  │  │ • budnotify   │  │               │  │               │           │   │
-│  │  │ • askbud      │  │               │  │               │           │   │
-│  │  │ • budgateway  │  │               │  │               │           │   │
-│  │  └───────────────┘  └───────────────┘  └───────────────┘           │   │
-│  │                                                                      │   │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │   │
-│  │  │   bud-auth    │  │    dapr       │  │   bud-web     │           │   │
-│  │  │               │  │               │  │               │           │   │
-│  │  │ • Keycloak    │  │ • Dapr        │  │ • budadmin    │           │   │
-│  │  │               │  │   operator    │  │ • budplaygrnd │           │   │
-│  │  │               │  │ • Components  │  │ • budcustomer │           │   │
-│  │  └───────────────┘  └───────────────┘  └───────────────┘           │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         Node Pools                                   │   │
-│  │                                                                      │   │
-│  │  ┌───────────────────────────────────────────────────────────────┐ │   │
-│  │  │  System Pool (Primary)                                         │ │   │
-│  │  │  • SKU: Standard_D32als_v6 (Azure) / m6i.8xlarge (AWS)        │ │   │
-│  │  │  • Disk: 512GB OS + 4TB Data                                  │ │   │
-│  │  │  • Count: 1-3 nodes                                           │ │   │
-│  │  │  • Runs: All Bud services, databases                          │ │   │
-│  │  └───────────────────────────────────────────────────────────────┘ │   │
-│  │                                                                      │   │
-│  │  ┌───────────────────────────────────────────────────────────────┐ │   │
-│  │  │  Ingress Pool                                                  │ │   │
-│  │  │  • Disk: 256GB                                                │ │   │
-│  │  │  • Count: 2+ nodes (HA)                                       │ │   │
-│  │  │  • Runs: Ingress controllers, load balancers                  │ │   │
-│  │  └───────────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Control Plane Architecture](../diagrams/control-plane.png)
+
+**Namespaces:**
+- **bud-system**: Core services (budapp, budcluster, budsim, budmodel, etc.)
+- **bud-infra**: Databases (PostgreSQL, Valkey, ClickHouse, MinIO)
+- **bud-obs**: Observability (Grafana, Loki, Prometheus)
+- **bud-auth**: Keycloak identity provider
+- **dapr**: Service mesh components
 
 ### Workload Clusters (Managed by Bud)
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Workload Cluster Architecture                         │
-│                        (Customer's AI/ML compute)                            │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         Components Deployed                          │   │
-│  │                                                                      │   │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │   │
-│  │  │ Model Runtime │  │    NFD        │  │   HAMI        │           │   │
-│  │  │               │  │ (Node Feature │  │ (GPU Time-    │           │   │
-│  │  │ • vLLM        │  │  Discovery)   │  │  Slicing)     │           │   │
-│  │  │ • SGLang      │  │               │  │               │           │   │
-│  │  │ • TensorRT    │  │ Auto-detect:  │  │ Only if NVIDIA│           │   │
-│  │  │               │  │ • GPU type    │  │ GPUs detected │           │   │
-│  │  │               │  │ • CPU features│  │               │           │   │
-│  │  │               │  │ • Memory      │  │               │           │   │
-│  │  └───────────────┘  └───────────────┘  └───────────────┘           │   │
-│  │                                                                      │   │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │   │
-│  │  │ GPU Operator  │  │  Prometheus   │  │   Ingress     │           │   │
-│  │  │               │  │    Stack      │  │               │           │   │
-│  │  │ • Drivers     │  │               │  │ • NGINX       │           │   │
-│  │  │ • Toolkit     │  │ • Node export │  │ • Traefik     │           │   │
-│  │  │ • Device plugin│ │ • Metrics     │  │ • TLS term    │           │   │
-│  │  └───────────────┘  └───────────────┘  └───────────────┘           │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                     Node Types (Example)                             │   │
-│  │                                                                      │   │
-│  │  GPU Nodes:                                                         │   │
-│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
-│  │  │ • p4d.24xlarge (AWS) - 8x A100 40GB                         │   │   │
-│  │  │ • Standard_NC24ads_A100_v4 (Azure) - 1x A100 80GB           │   │   │
-│  │  │ • Standard_ND96amsr_A100_v4 (Azure) - 8x A100 80GB          │   │   │
-│  │  │ • g5.48xlarge (AWS) - 8x A10G 24GB                          │   │   │
-│  │  └─────────────────────────────────────────────────────────────┘   │   │
-│  │                                                                      │   │
-│  │  CPU Nodes:                                                         │   │
-│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
-│  │  │ • c6i.8xlarge (AWS) - 32 vCPU, 64GB RAM                     │   │   │
-│  │  │ • Standard_D32as_v5 (Azure) - 32 vCPU, 128GB RAM            │   │   │
-│  │  └─────────────────────────────────────────────────────────────┘   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+**Components Deployed:**
+- **Model Runtimes**: vLLM, SGLang, TensorRT
+- **NFD**: Node Feature Discovery for GPU/CPU detection
+- **HAMI**: GPU time-slicing (NVIDIA only)
+- **GPU Operator**: Drivers, toolkit, device plugin
+- **Monitoring**: Prometheus stack
+- **Ingress**: NGINX/Traefik
+
+**Node Types:**
+| Type | AWS | Azure |
+|------|-----|-------|
+| GPU | p4d.24xlarge (8x A100) | NC24ads_A100_v4 |
+| CPU | c6i.8xlarge (32 vCPU) | D32as_v5 |
 
 ---
 
@@ -283,52 +168,17 @@ infra/tofu/
 
 ### Azure Network Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Azure Network Topology                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  Resource Group: budk8s                                                     │
-│  Region: Configurable (default: eastus)                                     │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Virtual Network                                   │   │
-│  │                    10.177.0.0/16 (IPv4)                             │   │
-│  │                    fd12:babe:cafe::/48 (IPv6)                       │   │
-│  │                                                                      │   │
-│  │  ┌───────────────────────────────────────────────────────────────┐ │   │
-│  │  │  Subnet: budk8s-common                                         │ │   │
-│  │  │  10.177.2.0/24 (IPv4)                                         │ │   │
-│  │  │  fd12:babe:cafe:b00b::/64 (IPv6)                              │ │   │
-│  │  │                                                                │ │   │
-│  │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐          │ │   │
-│  │  │  │ Primary │  │ Ingress │  │ Ingress │  │ Worker  │          │ │   │
-│  │  │  │  Node   │  │ Node 1  │  │ Node 2  │  │  Nodes  │          │ │   │
-│  │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘          │ │   │
-│  │  └───────────────────────────────────────────────────────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Network Security Group                            │   │
-│  │                                                                      │   │
-│  │  Inbound Rules:                                                     │   │
-│  │  ┌────────────────────────────────────────────────────────────┐    │   │
-│  │  │ Priority │ Port      │ Protocol │ Source      │ Purpose    │    │   │
-│  │  │──────────┼───────────┼──────────┼─────────────┼────────────│    │   │
-│  │  │ 100      │ 22        │ TCP      │ *           │ SSH        │    │   │
-│  │  │ 200      │ 51820     │ UDP      │ *           │ WireGuard  │    │   │
-│  │  │ 300      │ 60000-61k │ UDP      │ *           │ Mosh       │    │   │
-│  │  │ 400      │ 80        │ TCP      │ *           │ HTTP       │    │   │
-│  │  │ 500      │ 443       │ TCP      │ *           │ HTTPS      │    │   │
-│  │  │ 600      │ *         │ *        │ 10.177.0.0/16│ Internal  │    │   │
-│  │  │ 700      │ *         │ *        │ fd12::/48   │ Internal   │    │   │
-│  │  └────────────────────────────────────────────────────────────┘    │   │
-│  │                                                                      │   │
-│  │  Outbound: Allow all                                                │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+**Virtual Network:** 10.177.0.0/16 (IPv4), fd12:babe:cafe::/48 (IPv6)
+
+**Subnet:** budk8s-common (10.177.2.0/24)
+
+| Priority | Port | Protocol | Source | Purpose |
+|----------|------|----------|--------|---------|
+| 100 | 22 | TCP | * | SSH |
+| 200 | 51820 | UDP | * | WireGuard |
+| 400 | 80 | TCP | * | HTTP |
+| 500 | 443 | TCP | * | HTTPS |
+| 600 | * | * | 10.177.0.0/16 | Internal |
 
 ---
 
@@ -336,41 +186,13 @@ infra/tofu/
 
 ### CI/CD Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         CI/CD Pipeline                                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐  │
-│  │  Push   │───►│  Build  │───►│  Test   │───►│ Publish │───►│ Deploy  │  │
-│  │ to Git  │    │  Image  │    │  Suite  │    │ to Reg  │    │ to K8s  │  │
-│  └─────────┘    └─────────┘    └─────────┘    └─────────┘    └─────────┘  │
-│                                                                              │
-│  Stages:                                                                    │
-│                                                                              │
-│  1. Build                                                                   │
-│     ├─ Python services: Docker build with pip install                      │
-│     ├─ Rust gateway: cargo build --release                                 │
-│     └─ Frontend: npm build with NEXT_PUBLIC_* args                         │
-│                                                                              │
-│  2. Test                                                                    │
-│     ├─ Unit tests: pytest / cargo test / jest                              │
-│     ├─ Lint: ruff / clippy / eslint                                        │
-│     ├─ Type check: mypy                                                    │
-│     └─ Security scan: trivy, modelscan                                     │
-│                                                                              │
-│  3. Publish                                                                 │
-│     ├─ Push to Harbor registry                                             │
-│     ├─ Tag: nightly (dev) / staging / v{semver} (prod)                     │
-│     └─ Sign images with cosign                                             │
-│                                                                              │
-│  4. Deploy                                                                  │
-│     ├─ Dev: Auto via Keel (poll every 1m)                                  │
-│     ├─ Staging: Manual approval                                            │
-│     └─ Production: Manual approval + rollback plan                         │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![CI/CD Pipeline](../diagrams/cicd-pipeline.png)
+
+**Pipeline Stages:**
+1. **Build**: Docker (Python), cargo (Rust), npm (Frontend)
+2. **Test**: Unit tests, lint, type check, security scan
+3. **Publish**: Push to Harbor, sign with cosign
+4. **Deploy**: Dev (auto), Staging (manual), Production (approval)
 
 ### Image Tagging Strategy
 
@@ -396,36 +218,7 @@ infra/tofu/
 
 ### Storage Tiers
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Storage Architecture                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Hot Storage (Fast Access)                         │   │
-│  │                                                                      │   │
-│  │  • Valkey (Redis): Session cache, Dapr state, rate limiting         │   │
-│  │  • Local NVMe: Active model weights on GPU nodes                    │   │
-│  │  • ClickHouse: Recent inference metrics (< 30 days)                 │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Warm Storage (Moderate Access)                    │   │
-│  │                                                                      │   │
-│  │  • PostgreSQL: Application data, model metadata                     │   │
-│  │  • MinIO: Model files, artifacts, datasets                          │   │
-│  │  • ClickHouse: Historical metrics (30-90 days)                      │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Cold Storage (Archive)                            │   │
-│  │                                                                      │   │
-│  │  • S3/Blob: Database backups, audit logs                            │   │
-│  │  • Glacier/Archive: Long-term compliance data                       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Storage Architecture](../diagrams/storage-arch.png)
 
 ---
 
@@ -463,40 +256,7 @@ data:
 
 ### Traffic Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Ingress Architecture                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│                              Internet                                        │
-│                                  │                                           │
-│                                  ▼                                           │
-│                     ┌────────────────────────┐                              │
-│                     │   Cloud Load Balancer  │                              │
-│                     │   (L4 - TCP/UDP)       │                              │
-│                     └───────────┬────────────┘                              │
-│                                 │                                            │
-│                                 ▼                                            │
-│           ┌─────────────────────────────────────────────┐                   │
-│           │              Ingress Controller              │                   │
-│           │              (NGINX / Traefik)               │                   │
-│           │                                              │                   │
-│           │  • TLS termination (Let's Encrypt)          │                   │
-│           │  • Path-based routing                       │                   │
-│           │  • Rate limiting                            │                   │
-│           │  • CORS handling                            │                   │
-│           └───────────────┬─────────────────────────────┘                   │
-│                           │                                                  │
-│         ┌─────────────────┼─────────────────┐                               │
-│         ▼                 ▼                 ▼                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                         │
-│  │  /api/*     │  │  /v1/*      │  │  /*         │                         │
-│  │  budapp     │  │ budgateway  │  │  budadmin   │                         │
-│  │  :9081      │  │  :3000      │  │  :8007      │                         │
-│  └─────────────┘  └─────────────┘  └─────────────┘                         │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Ingress Architecture](../diagrams/ingress-arch.png)
 
 ### Ingress Hosts
 
@@ -587,12 +347,3 @@ tofu apply plan.tfplan
 # Get kubeconfig
 tofu output -raw kubeconfig > ~/.kube/budk8s.yaml
 ```
-
----
-
-## Related Documents
-
-- [High-Level Architecture](./high-level-architecture.md)
-- [Network Topology](./network-topology.md)
-- [Disaster Recovery](../disaster-recovery/dr-architecture.md)
-- [Installation Guide](../infrastructure/installation-guide.md)

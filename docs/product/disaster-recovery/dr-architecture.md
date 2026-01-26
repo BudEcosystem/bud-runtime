@@ -1,10 +1,5 @@
 # Disaster Recovery Architecture
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-25
-> **Status:** Architecture Document
-> **Audience:** Architects, SREs, platform engineers
-
 ---
 
 ## 1. Overview
@@ -17,40 +12,7 @@ For operational procedures, see [DR Strategy](./dr-strategy.md) and [Failover Ru
 
 ## 2. DR Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PRIMARY REGION (Active)                            │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
-│  │ budadmin │  │ budapp   │  │budgateway│  │budcluster│  │  budsim  │     │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │
-│       │             │             │             │             │            │
-│  ┌────┴─────────────┴─────────────┴─────────────┴─────────────┴────┐      │
-│  │                        Kubernetes Cluster                        │      │
-│  └──────────────────────────────┬───────────────────────────────────┘      │
-│                                 │                                          │
-│  ┌──────────────────────────────┴───────────────────────────────────┐      │
-│  │  PostgreSQL (Primary)  │  Redis (Primary)  │  MinIO (Primary)    │      │
-│  └──────────┬─────────────┴────────┬──────────┴─────────┬───────────┘      │
-└─────────────┼──────────────────────┼────────────────────┼──────────────────┘
-              │                      │                    │
-              │   Streaming          │   Async            │   Bucket
-              │   Replication        │   Replication      │   Replication
-              │                      │                    │
-┌─────────────┼──────────────────────┼────────────────────┼──────────────────┐
-│             ▼                      ▼                    ▼                  │
-│  ┌──────────────────────────────────────────────────────────────────┐      │
-│  │  PostgreSQL (Standby) │  Redis (Replica)  │  MinIO (Replica)    │      │
-│  └──────────────────────────────────────────────────────────────────┘      │
-│                                 │                                          │
-│  ┌──────────────────────────────┴───────────────────────────────────┐      │
-│  │                    Kubernetes Cluster (Scaled Down)              │      │
-│  └──────────────────────────────────────────────────────────────────┘      │
-│                                                                            │
-├────────────────────────────────────────────────────────────────────────────┤
-│                           DR REGION (Standby)                              │
-└────────────────────────────────────────────────────────────────────────────┘
-```
+![DR Architecture Overview](../diagrams/dr-arch-overview.png)
 
 ---
 
@@ -87,64 +49,26 @@ For operational procedures, see [DR Strategy](./dr-strategy.md) and [Failover Ru
 
 ### 4.1 PostgreSQL Replication
 
-```
-PRIMARY REGION                           DR REGION
-┌─────────────────┐                     ┌─────────────────┐
-│   Patroni       │                     │   Patroni       │
-│   ┌─────────┐   │                     │   ┌─────────┐   │
-│   │ Leader  │───┼──── WAL Stream ────►│   │ Standby │   │
-│   └─────────┘   │                     │   └─────────┘   │
-│   ┌─────────┐   │                     │   ┌─────────┐   │
-│   │ Replica │   │                     │   │ Replica │   │
-│   └─────────┘   │                     │   └─────────┘   │
-│   ┌─────────┐   │                     │   ┌─────────┐   │
-│   │ Replica │   │                     │   │ Replica │   │
-│   └─────────┘   │                     │   └─────────┘   │
-└─────────────────┘                     └─────────────────┘
+![PostgreSQL Replication](../diagrams/pg-replication.png)
 
-Replication Mode: Asynchronous
-Target Lag: < 1 minute
-Failover: Manual promotion via patronictl
-```
+- **Replication Mode:** Asynchronous
+- **Target Lag:** < 1 minute
+- **Failover:** Manual promotion via patronictl
 
 ### 4.2 Redis Replication
 
-```
-PRIMARY REGION                           DR REGION
-┌─────────────────┐                     ┌─────────────────┐
-│  Redis Sentinel │                     │  Redis Sentinel │
-│   ┌─────────┐   │                     │   ┌─────────┐   │
-│   │ Master  │───┼──── Async Sync ────►│   │ Replica │   │
-│   └─────────┘   │                     │   └─────────┘   │
-│   ┌─────────┐   │                     │                 │
-│   │ Replica │   │                     │                 │
-│   └─────────┘   │                     │                 │
-└─────────────────┘                     └─────────────────┘
+![Redis Replication](../diagrams/redis-replication.png)
 
-Replication Mode: Asynchronous
-Target Lag: < 5 minutes
-Failover: Sentinel promotion
-```
+- **Replication Mode:** Asynchronous
+- **Target Lag:** < 5 minutes
+- **Failover:** Sentinel promotion
 
 ### 4.3 Object Storage Replication
 
-```
-PRIMARY REGION                           DR REGION
-┌─────────────────┐                     ┌─────────────────┐
-│      MinIO      │                     │      MinIO      │
-│   ┌─────────┐   │                     │   ┌─────────┐   │
-│   │ Bucket  │───┼── Bucket Repl. ───►│   │ Bucket  │   │
-│   │ models  │   │                     │   │ models  │   │
-│   └─────────┘   │                     │   └─────────┘   │
-│   ┌─────────┐   │                     │   ┌─────────┐   │
-│   │ Bucket  │───┼── Bucket Repl. ───►│   │ Bucket  │   │
-│   │ backups │   │                     │   │ backups │   │
-│   └─────────┘   │                     │   └─────────┘   │
-└─────────────────┘                     └─────────────────┘
+![Object Storage Replication](../diagrams/minio-replication.png)
 
-Replication Mode: Active-Active
-Target Lag: < 15 minutes
-```
+- **Replication Mode:** Active-Active
+- **Target Lag:** < 15 minutes
 
 ---
 
@@ -152,27 +76,7 @@ Target Lag: < 15 minutes
 
 ### 5.1 DNS Architecture
 
-```
-                    ┌─────────────────────┐
-                    │   Global DNS        │
-                    │   (Route53/CF)      │
-                    └──────────┬──────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-              ▼                ▼                ▼
-     ┌────────────────┐ ┌────────────┐ ┌────────────────┐
-     │ api.bud.ai     │ │ app.bud.ai │ │ status.bud.ai  │
-     │ (Primary)      │ │ (Primary)  │ │ (Independent)  │
-     └────────────────┘ └────────────┘ └────────────────┘
-              │                │
-              │  Failover      │  Failover
-              ▼                ▼
-     ┌────────────────┐ ┌────────────┐
-     │ api.bud.ai     │ │ app.bud.ai │
-     │ (DR)           │ │ (DR)       │
-     └────────────────┘ └────────────┘
-```
+![DNS Architecture](../diagrams/dns-arch.png)
 
 ### 5.2 DNS Configuration
 
@@ -188,20 +92,7 @@ Target Lag: < 15 minutes
 
 ### 6.1 Backup Flow
 
-```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│  PostgreSQL  │───►│   S3 Bucket  │───►│  S3 Bucket   │
-│  pg_basebackup    │  (Primary)   │    │  (DR Region) │
-└──────────────┘    └──────────────┘    └──────────────┘
-                           │
-                           │  Cross-region
-                           │  replication
-                           ▼
-                    ┌──────────────┐
-                    │  Glacier     │
-                    │  (Archive)   │
-                    └──────────────┘
-```
+![Backup Flow](../diagrams/backup-flow.png)
 
 ### 6.2 Backup Schedule
 
@@ -219,23 +110,7 @@ Target Lag: < 15 minutes
 
 ### 7.1 Cross-Region Monitoring
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    MONITORING REGION (Independent)               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │  Prometheus  │  │   Grafana    │  │ Alertmanager │          │
-│  │  (Federation)│  │              │  │              │          │
-│  └──────┬───────┘  └──────────────┘  └──────────────┘          │
-└─────────┼───────────────────────────────────────────────────────┘
-          │
-    ┌─────┴─────┐
-    │           │
-    ▼           ▼
-┌────────┐  ┌────────┐
-│Primary │  │  DR    │
-│Prom    │  │ Prom   │
-└────────┘  └────────┘
-```
+![Cross-Region Monitoring](../diagrams/monitoring-arch.png)
 
 ### 7.2 Health Checks
 
@@ -281,33 +156,3 @@ Target Lag: < 15 minutes
 | Object storage | 10 TB | 10 TB | 10 TB |
 
 ### 9.2 Scale-Up Automation
-
-```yaml
-# DR scale-up playbook triggers
-triggers:
-  - event: dr_failover_initiated
-    actions:
-      - scale_kubernetes_nodes: 10
-      - provision_gpu_nodes: 4  # Additional GPUs
-      - scale_application_replicas: production_levels
-```
-
----
-
-## 10. Related Documents
-
-| Document | Purpose |
-|----------|---------|
-| [DR Strategy](./dr-strategy.md) | Recovery objectives and procedures |
-| [Failover Runbook](./failover-runbook.md) | Failover procedures |
-| [Failback Runbook](./failback-runbook.md) | Failback procedures |
-| [Backup Strategy](./backup-strategy.md) | Backup details |
-| [Network Topology](../architecture/network-topology.md) | Network design |
-
----
-
-## 11. Revision History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2026-01-25 | Documentation | Initial version |

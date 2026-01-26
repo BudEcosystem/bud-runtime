@@ -1,8 +1,5 @@
 # Infrastructure as Code Guide
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-23
-> **Status:** Reference Documentation
 > **Audience:** DevOps, Platform Engineers
 
 ---

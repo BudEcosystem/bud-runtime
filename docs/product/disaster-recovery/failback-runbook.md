@@ -1,8 +1,5 @@
 # Failback Runbook
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-25
-> **Status:** Operational Runbook
 > **Audience:** On-call engineers, SREs, incident commanders
 
 ---
@@ -340,14 +337,3 @@ kubectl set env deployment/budapp MAINTENANCE_MODE=false -n bud --context=dr
 | Database Admin | PagerDuty |
 | Network/DNS | PagerDuty |
 | Cloud Provider | Support ticket |
-
----
-
-## 8. Related Documents
-
-| Document | Purpose |
-|----------|---------|
-| [DR Strategy](./dr-strategy.md) | Overall DR architecture |
-| [Failover Runbook](./failover-runbook.md) | Failover to DR |
-| [Backup Strategy](./backup-strategy.md) | Backup procedures |
-| [DR Drill Procedure](./dr-drill-procedure.md) | Testing methodology |

@@ -10,85 +10,13 @@ This document describes the network architecture for Bud AI Foundry deployments,
 
 ## Network Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            External Traffic                                  │
-│                                                                             │
-│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                   │
-│  │   Users     │     │   API       │     │  External   │                   │
-│  │ (Dashboard) │     │   Clients   │     │  AI Providers│                  │
-│  └──────┬──────┘     └──────┬──────┘     └──────┬──────┘                   │
-│         │                   │                   │                           │
-└─────────┼───────────────────┼───────────────────┼───────────────────────────┘
-          │ HTTPS (443)       │ HTTPS (443)       │ HTTPS (443)
-          ▼                   ▼                   ▲
-┌─────────────────────────────────────────────────┼───────────────────────────┐
-│                       Load Balancer / Ingress   │                           │
-│  ┌───────────────────────────────────────────┐  │                           │
-│  │           Ingress Controller               │  │                           │
-│  │  • TLS termination                        │  │                           │
-│  │  • Path-based routing                     │  │                           │
-│  │  • Rate limiting                          │  │                           │
-│  └───────────────────────────────────────────┘  │                           │
-└─────────────────────────────────────────────────┼───────────────────────────┘
-          │                                       │
-          ▼                                       │
-┌─────────────────────────────────────────────────┼───────────────────────────┐
-│                    Control Plane VPC            │                           │
-│                    (10.0.0.0/16)                │                           │
-│                                                 │                           │
-│  ┌───────────────────────────────────────────────────────────────────────┐ │
-│  │                    Public Subnet (10.0.1.0/24)                         │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                   │ │
-│  │  │   NAT GW    │  │   Bastion   │  │  Load       │                   │ │
-│  │  │             │  │   Host      │  │  Balancer   │                   │ │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                   │ │
-│  └───────────────────────────────────────────────────────────────────────┘ │
-│                              │                                              │
-│  ┌───────────────────────────┴───────────────────────────────────────────┐ │
-│  │                    Private Subnet - Apps (10.0.10.0/24)               │ │
-│  │                                                                        │ │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐             │ │
-│  │  │ budadmin │  │ budapp   │  │budgateway│  │ budsim   │  ...        │ │
-│  │  │ :8007    │  │ :9081    │  │ :3000    │  │ :9083    │             │ │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘             │ │
-│  │                                                                        │ │
-│  │  ┌────────────────────────────────────────────────────────────────┐  │ │
-│  │  │                    Dapr Service Mesh (mTLS)                     │  │ │
-│  │  │  Pod-to-Pod: Internal only, encrypted via Dapr Sentry          │  │ │
-│  │  └────────────────────────────────────────────────────────────────┘  │ │
-│  └───────────────────────────────────────────────────────────────────────┘ │
-│                              │                                              │
-│  ┌───────────────────────────┴───────────────────────────────────────────┐ │
-│  │                    Private Subnet - Data (10.0.20.0/24)               │ │
-│  │                                                                        │ │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐             │ │
-│  │  │PostgreSQL│  │ClickHouse│  │  Valkey  │  │  MinIO   │             │ │
-│  │  │ :5432    │  │ :9000    │  │ :6379    │  │ :9000    │             │ │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘             │ │
-│  └───────────────────────────────────────────────────────────────────────┘ │
-│                                                 │                           │
-│                                    Outbound     │ Provider APIs             │
-│                                    (NAT GW)     ▼                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-          │
-          │ VPC Peering / PrivateLink
-          ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    Workload Cluster VPC (10.1.0.0/16)                        │
-│                                                                              │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                    Private Subnet - Workloads (10.1.10.0/24)          │  │
-│  │                                                                        │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │  │
-│  │  │   vLLM       │  │   SGLang     │  │ TensorRT-LLM │                │  │
-│  │  │   Runtime    │  │   Runtime    │  │   Runtime    │                │  │
-│  │  │   (GPU)      │  │   (GPU)      │  │   (GPU)      │                │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘                │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Network Architecture](../diagrams/network-arch.png)
+
+**Subnets:**
+- **Public Subnet (10.0.1.0/24)**: NAT Gateway, Bastion, Load Balancer
+- **App Subnet (10.0.10.0/24)**: Application services with Dapr mTLS
+- **Data Subnet (10.0.20.0/24)**: Databases (PostgreSQL, ClickHouse, Valkey, MinIO)
+- **Workload Cluster (10.1.0.0/16)**: GPU runtimes (vLLM, SGLang, TensorRT)
 
 ---
 
@@ -113,129 +41,7 @@ This document describes the network architecture for Bud AI Foundry deployments,
 
 ---
 
-## Port Reference
-
-### External Ports (Ingress)
-
-| Port | Protocol | Service | Description |
-|------|----------|---------|-------------|
-| 443 | HTTPS | Ingress | All external traffic (TLS terminated) |
-| 22 | SSH | Bastion | Administrative access (restricted) |
-
-### Internal Service Ports
-
-| Port | Service | Protocol | Description |
-|------|---------|----------|-------------|
-| 8007 | budadmin | HTTP | Dashboard UI |
-| 9081 | budapp | HTTP | Core API |
-| 3000 | budgateway | HTTP | Inference gateway |
-| 9082 | budcluster | HTTP | Cluster management |
-| 9083 | budsim | HTTP | Optimization service |
-| 9084 | budmodel | HTTP | Model registry |
-| 9085 | budmetrics | HTTP | Observability |
-| 9086 | budpipeline | HTTP | Pipeline orchestration |
-| 9087 | budeval | HTTP | Model evaluation |
-| 9088 | budnotify | HTTP | Notifications |
-| 9089 | ask-bud | HTTP | AI assistant |
-
-### Dapr Sidecar Ports
-
-| Port | Purpose |
-|------|---------|
-| 3500 | Dapr HTTP API |
-| 50001 | Dapr gRPC API |
-| 9090 | Dapr metrics |
-
-### Database Ports
-
-| Port | Service | Protocol |
-|------|---------|----------|
-| 5432 | PostgreSQL | TCP |
-| 9000 | ClickHouse HTTP | TCP |
-| 8123 | ClickHouse Native | TCP |
-| 6379 | Valkey | TCP |
-| 9000 | MinIO API | TCP |
-| 9001 | MinIO Console | TCP |
-| 27017 | MongoDB | TCP |
-
-### Observability Ports
-
-| Port | Service | Purpose |
-|------|---------|---------|
-| 3000 | Grafana | Dashboards |
-| 3100 | Loki | Log ingestion |
-| 4317 | OTLP gRPC | OpenTelemetry |
-| 4318 | OTLP HTTP | OpenTelemetry |
-| 9090 | Prometheus | Metrics |
-
 ---
-
-## Security Groups / Network Policies
-
-### Ingress Controller
-
-```yaml
-Inbound:
-  - 443/tcp from 0.0.0.0/0  # HTTPS traffic
-  - 80/tcp from 0.0.0.0/0   # HTTP redirect
-Outbound:
-  - All to Private Subnets   # Route to services
-```
-
-### Application Services
-
-```yaml
-Inbound:
-  - Service ports from Ingress Controller
-  - 3500/tcp from Pod network (Dapr sidecar)
-  - 50001/tcp from Pod network (Dapr gRPC)
-Outbound:
-  - Database ports to Data subnet
-  - 3500/tcp to Pod network (Dapr)
-  - 443/tcp to NAT Gateway (external APIs)
-```
-
-### Database Tier
-
-```yaml
-Inbound:
-  - Database ports from Apps subnet only
-  - No direct external access
-Outbound:
-  - None (or backup destinations only)
-```
-
-### Kubernetes Network Policies
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-  namespace: bud-system
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dapr-sidecar
-  namespace: bud-system
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - podSelector: {}
-    ports:
-    - protocol: TCP
-      port: 3500
-    - protocol: TCP
-      port: 50001
-```
 
 ---
 
@@ -253,24 +59,7 @@ spec:
 
 ### Communication Pattern
 
-```
-Control Plane                          Workload Cluster
-┌─────────────┐                       ┌─────────────┐
-│ budcluster  │ ──── Kubeconfig ────► │ K8s API     │
-│             │      (encrypted)      │ Server      │
-└─────────────┘                       └─────────────┘
-                                              │
-┌─────────────┐                               ▼
-│ budgateway  │ ──── HTTP/gRPC ──────► ┌─────────────┐
-│             │      (inference)       │ Model       │
-└─────────────┘                        │ Runtime     │
-                                       └─────────────┘
-                                              │
-┌─────────────┐                               │
-│ budmetrics  │ ◄──── Prometheus ─────────────┘
-│             │       (scrape)
-└─────────────┘
-```
+![Cross-Cluster Communication](../diagrams/cross-cluster.png)
 
 ---
 
@@ -334,11 +123,3 @@ For air-gapped environments:
 | External | TLS 1.2 | ECDHE-RSA-AES256-GCM-SHA384 |
 | Internal (Dapr) | TLS 1.3 | Managed by Dapr |
 | Database | TLS 1.2 | AES256-GCM-SHA384 |
-
----
-
-## Related Documents
-
-- [Security Architecture](../security/security-architecture.md) - Security controls
-- [Deployment Architecture](./deployment-architecture.md) - Infrastructure topology
-- [High-Level Architecture](./high-level-architecture.md) - System overview

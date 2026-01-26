@@ -1,12 +1,5 @@
 # Encryption Standards
 
-> **Version:** 1.1
-> **Last Updated:** 2026-01-25
-> **Status:** Current Implementation
-> **Audience:** Security engineers, compliance officers, developers
-
-> **Implementation Status:** Core encryption standards are implemented. Note that AES key loading uses HEX encoding (not base64 as previously documented). RSA encryption is functional. See Section 7.2 for recommended improvements.
-
 ---
 
 ## 1. Overview
@@ -42,35 +35,6 @@ This document specifies the encryption standards implemented in Bud AI Foundry f
 
 **Implementation:**
 
-```python
-class RSAHandler:
-    @staticmethod
-    async def encrypt(message: str, public_key: PublicKeyTypes) -> str:
-        encoded_message = message.encode("utf-8")
-        encrypted_message = public_key.encrypt(
-            encoded_message,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None,
-            ),
-        )
-        return encrypted_message.hex()
-
-    @staticmethod
-    async def decrypt(message_encrypted: str, private_key: PrivateKeyTypes) -> str:
-        message_encrypted_bytes = bytes.fromhex(message_encrypted)
-        message_decrypted = private_key.decrypt(
-            message_encrypted_bytes,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None,
-            ),
-        )
-        return message_decrypted.decode("utf-8")
-```
-
 **Use Cases:**
 - Client secrets (Keycloak)
 - Short sensitive strings requiring key exchange
@@ -86,22 +50,6 @@ class RSAHandler:
 | Standard | FIPS 197 |
 
 **Implementation:**
-
-```python
-class AESHandler:
-    def __init__(self, key: bytes = secrets_settings.aes_key):
-        self.fernet = Fernet(key)
-
-    async def encrypt(self, message: str) -> str:
-        encoded_message = message.encode("utf-8")
-        encrypted_message = self.fernet.encrypt(encoded_message)
-        return encrypted_message.hex()
-
-    async def decrypt(self, encrypted_message: str) -> str:
-        encrypted_message_bytes = bytes.fromhex(encrypted_message)
-        decrypted_message = self.fernet.decrypt(encrypted_message_bytes)
-        return decrypted_message.decode("utf-8")
-```
 
 **Use Cases:**
 - API credentials
@@ -120,22 +68,6 @@ class AESHandler:
 | Key Storage | File-based or KMS |
 
 **Implementation:**
-
-```python
-# budcluster/cluster_ops/services.py
-configuration_encrypted = dapr_service.encrypt_data(
-    json.dumps(configure_cluster_request.config_dict)
-)
-
-# Store encrypted blob in PostgreSQL
-cluster = Cluster(
-    configuration=configuration_encrypted,
-    ...
-)
-```
-
-### 2.3 Database Encryption
-
 #### PostgreSQL
 
 | Method | Description | When Used |
@@ -169,24 +101,6 @@ cluster = Cluster(
 
 **Best Practice:** Enable etcd encryption at rest:
 
-```yaml
-# kube-apiserver configuration
---encryption-provider-config=/etc/kubernetes/encryption-config.yaml
-
-# encryption-config.yaml
-apiVersion: apiserver.config.k8s.io/v1
-kind: EncryptionConfiguration
-resources:
-  - resources:
-      - secrets
-    providers:
-      - aescbc:
-          keys:
-            - name: key1
-              secret: <base64-encoded-key>
-      - identity: {}
-```
-
 ---
 
 ## 3. Encryption in Transit
@@ -199,27 +113,7 @@ resources:
 | Preferred Version | TLS 1.3 |
 | Certificate Type | RSA 2048 or ECDSA P-256 |
 | Certificate Authority | Let's Encrypt or Enterprise CA |
-
-#### Supported Cipher Suites (TLS 1.2)
-
-```
-TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
-TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
-TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
-TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
-```
-
-#### Supported Cipher Suites (TLS 1.3)
-
-```
-TLS_AES_256_GCM_SHA384
-TLS_AES_128_GCM_SHA256
-TLS_CHACHA20_POLY1305_SHA256
-```
-
-### 3.2 Service-to-Service mTLS
+#### 3.2 Service-to-Service mTLS
 
 **Provider:** Dapr Sidecar
 
@@ -232,18 +126,6 @@ TLS_CHACHA20_POLY1305_SHA256
 
 **Configuration:**
 
-```yaml
-apiVersion: dapr.io/v1alpha1
-kind: Configuration
-metadata:
-  name: budconfig
-spec:
-  mtls:
-    enabled: true
-    workloadCertTTL: "24h"
-    allowedClockSkew: "15m"
-```
-
 ### 3.3 Database Connections
 
 | Database | Protocol | Certificate Verification |
@@ -254,10 +136,6 @@ spec:
 | MongoDB | TLS | Required in production |
 
 **Connection String Example (Recommended):**
-
-```
-postgresql://user:pass@host:5432/db?sslmode=verify-full&sslrootcert=/path/to/ca.crt
-```
 
 > **Implementation Note:** Current connection strings may not enforce TLS verification. Verify `sslmode` is set to `require` or `verify-full` in production deployments.
 
@@ -276,18 +154,6 @@ postgresql://user:pass@host:5432/db?sslmode=verify-full&sslrootcert=/path/to/ca.
 
 **Implementation:**
 
-```python
-class HashManager:
-    def __init__(self):
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-    async def get_hash(self, plain_string: str) -> str:
-        return self.pwd_context.hash(plain_string)
-
-    async def verify_hash(self, plain_string: str, hashed_string: str) -> bool:
-        return self.pwd_context.verify(plain_string, hashed_string)
-```
-
 ### 4.2 Integrity Hashing (SHA-256)
 
 | Property | Value |
@@ -302,14 +168,6 @@ class HashManager:
 - Token hashing
 
 **Implementation:**
-
-```python
-@staticmethod
-async def create_sha_256_hash(input_string: str) -> str:
-    input_bytes = input_string.encode("utf-8")
-    sha_256_hash = hashlib.sha256(input_bytes)
-    return sha_256_hash.hexdigest()
-```
 
 ---
 
@@ -330,79 +188,21 @@ async def create_sha_256_hash(input_string: str) -> str:
 
 **RSA Key Pair:**
 
-```bash
-# Generate 4096-bit RSA private key
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
-  -out crypto-keys/rsa-private-key.pem
-
-# Extract public key
-openssl rsa -in crypto-keys/rsa-private-key.pem -pubout \
-  -out crypto-keys/rsa-public-key.pem
-
-# Set permissions
-chmod 600 crypto-keys/rsa-private-key.pem
-chmod 644 crypto-keys/rsa-public-key.pem
-```
-
 **AES Key:**
-
-```bash
-# Generate 256-bit random key
-openssl rand -out crypto-keys/symmetric-key-256 32
-
-# Set permissions
-chmod 600 crypto-keys/symmetric-key-256
-```
 
 ### 5.3 Key Loading
 
 **Location:** `budapp/commons/config.py`
-
-```python
-# RSA keys loaded from PEM files
-@property
-def private_key(self) -> PrivateKeyTypes:
-    with open(PRIVATE_KEY_PATH, "rb") as f:
-        return serialization.load_pem_private_key(f.read(), password=None)
-
-@property
-def public_key(self) -> PublicKeyTypes:
-    with open(PUBLIC_KEY_PATH, "rb") as f:
-        return serialization.load_pem_public_key(f.read())
-
-# AES key loaded from HEX format (NOT base64)
-@property
-def aes_key(self) -> bytes:
-    """Return AES key loaded from HEX format."""
-    if not self.aes_key_hex:
-        raise RuntimeError("AES key is not set")
-    return bytes.fromhex(self.aes_key_hex)
-```
 
 > **Important:** The AES key is loaded from HEX encoding via the `AES_KEY_HEX` environment variable, not from a base64-encoded file. Ensure keys are stored in HEX format.
 
 ### 5.4 Key Rotation (Manual Process)
 
 1. **Generate new keys:**
-   ```bash
-   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
-     -out crypto-keys/rsa-private-key-new.pem
-   ```
 
 2. **Re-encrypt existing data:**
-   ```python
-   # Decrypt with old key, encrypt with new key
-   for credential in credentials:
-       plaintext = await old_handler.decrypt(credential.encrypted_key)
-       credential.encrypted_key = await new_handler.encrypt(plaintext)
-       await session.commit()
-   ```
 
 3. **Swap keys:**
-   ```bash
-   mv crypto-keys/rsa-private-key.pem crypto-keys/rsa-private-key-old.pem
-   mv crypto-keys/rsa-private-key-new.pem crypto-keys/rsa-private-key.pem
-   ```
 
 4. **Restart services**
 
@@ -469,8 +269,6 @@ def aes_key(self) -> bytes:
 | Restricted | Required (RSA+AES) | mTLS | Named individuals |
 
 ---
-
-## Document History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|

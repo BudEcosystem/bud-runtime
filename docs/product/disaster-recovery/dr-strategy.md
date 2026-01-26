@@ -1,10 +1,5 @@
 # Disaster Recovery Strategy
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-23
-> **Status:** Planning Document
-> **Audience:** SREs, architects, management
-
 ---
 
 ## 1. Executive Summary
@@ -54,56 +49,13 @@ This document defines the disaster recovery (DR) strategy for Bud AI Foundry, in
 
 ### 3.2 Recovery Order
 
-```
-Phase 1: Infrastructure (0-1 hour)
-├── DNS failover
-├── Load balancer activation
-└── Network connectivity
-
-Phase 2: Data Layer (1-2 hours)
-├── PostgreSQL restore/failover
-├── Redis restore
-└── MinIO restore
-
-Phase 3: Authentication (2-3 hours)
-├── Keycloak restore
-└── Verify SSO
-
-Phase 4: Core Services (3-4 hours)
-├── budapp
-├── budgateway
-└── budcluster
-
-Phase 5: Supporting Services (4-8 hours)
-├── budsim
-├── budmetrics
-├── Monitoring
-└── budnotify
-```
+![Recovery Order](../diagrams/recovery-order.png)
 
 ---
 
-## 4. DR Architecture
+## 4. Backup Strategy
 
-### 4.1 Architecture Overview
-
-![DR architecture overview](../diagrams/dr-arch-overview.png)
-
-### 4.2 Data Replication
-
-| Component | Method | Lag Target | Tool |
-|-----------|--------|------------|------|
-| PostgreSQL | Streaming replication | < 1 min | PostgreSQL native |
-| Redis | Async replication | < 5 min | Redis Sentinel |
-| MinIO | Bucket replication | < 15 min | MinIO replication |
-| etcd | Backup/restore | 1 hour | Velero |
-| Configs | GitOps | Real-time | Git |
-
----
-
-## 5. Backup Strategy
-
-### 5.1 Backup Schedule
+### 4.1 Backup Schedule
 
 | Component | Type | Frequency | Retention |
 |-----------|------|-----------|-----------|
@@ -116,7 +68,7 @@ Phase 5: Supporting Services (4-8 hours)
 | Kubernetes | Velero | Daily | 30 days |
 | Configs | Git | Every change | Indefinite |
 
-### 5.2 Backup Locations
+### 4.2 Backup Locations
 
 | Backup | Primary Storage | Secondary Storage |
 |--------|-----------------|-------------------|
@@ -125,7 +77,7 @@ Phase 5: Supporting Services (4-8 hours)
 | MinIO | S3 (DR region) | - |
 | Kubernetes | S3 (primary region) | S3 (DR region) |
 
-### 5.3 Backup Verification
+### 4.3 Backup Verification
 
 | Verification | Frequency | Procedure |
 |--------------|-----------|-----------|
@@ -135,9 +87,9 @@ Phase 5: Supporting Services (4-8 hours)
 
 ---
 
-## 6. Failover Procedures
+## 5. Failover Procedures
 
-### 6.1 Failover Types
+### 5.1 Failover Types
 
 | Type | Trigger | Automation | Downtime |
 |------|---------|------------|----------|
@@ -145,7 +97,7 @@ Phase 5: Supporting Services (4-8 hours)
 | **Planned** | Maintenance, upgrades | Scripted | < 30 min |
 | **Unplanned** | Disaster, region failure | Scripted | < 4 hours |
 
-### 6.2 Automatic Failover (Component Level)
+### 5.2 Automatic Failover (Component Level)
 
 **PostgreSQL:**
 - Patroni manages automatic leader election
@@ -157,7 +109,7 @@ Phase 5: Supporting Services (4-8 hours)
 - Automatic promotion of replica
 - Failover time: < 30 seconds
 
-### 6.3 Regional Failover (Full DR)
+### 5.3 Regional Failover (Full DR)
 
 See [Failover Runbook](./failover-runbook.md) for detailed steps.
 
@@ -171,9 +123,9 @@ See [Failover Runbook](./failover-runbook.md) for detailed steps.
 
 ---
 
-## 7. DR Site Requirements
+## 6. DR Site Requirements
 
-### 7.1 Infrastructure Parity
+### 6.1 Infrastructure Parity
 
 | Resource | Primary | DR | Notes |
 |----------|---------|-----|-------|
@@ -184,7 +136,7 @@ See [Failover Runbook](./failover-runbook.md) for detailed steps.
 
 **NOTE - this depends on the deployment scale
 
-### 7.2 Network Requirements
+### 6.2 Network Requirements
 
 | Requirement | Specification |
 |-------------|---------------|
@@ -195,9 +147,9 @@ See [Failover Runbook](./failover-runbook.md) for detailed steps.
 
 ---
 
-## 8. Testing Strategy
+## 7. Testing Strategy
 
-### 8.1 Test Types
+### 7.1 Test Types
 
 | Test | Frequency | Scope | Duration |
 |------|-----------|-------|----------|
@@ -206,7 +158,7 @@ See [Failover Runbook](./failover-runbook.md) for detailed steps.
 | **Tabletop exercise** | Quarterly | Full team walkthrough | 4 hours |
 | **Full DR drill** | Annually | Regional failover | 8 hours |
 
-### 8.2 Success Criteria
+### 7.2 Success Criteria
 
 | Metric | Target |
 |--------|--------|
@@ -216,7 +168,7 @@ See [Failover Runbook](./failover-runbook.md) for detailed steps.
 | All services operational | Yes |
 | Customer impact | Minimal |
 
-### 8.3 Test Documentation
+### 7.3 Test Documentation
 
 Each test must document:
 - Test date and participants
@@ -227,9 +179,9 @@ Each test must document:
 
 ---
 
-## 9. Communication Plan
+## 8. Communication Plan
 
-### 9.1 Internal Notification
+### 8.1 Internal Notification
 
 | Event | Notify | Channel | Template |
 |-------|--------|---------|----------|
@@ -238,7 +190,7 @@ Each test must document:
 | Failover complete | All | Email, Slack | FAILOVER-COMPLETE |
 | Failback starting | Engineering | Slack | FAILBACK-START |
 
-### 9.2 External Notification
+### 8.2 External Notification
 
 | Event | Notify | Channel | Timing |
 |-------|--------|---------|--------|
@@ -248,7 +200,7 @@ Each test must document:
 
 ---
 
-## 10. Roles and Responsibilities
+## 9. Roles and Responsibilities
 
 | Role | Primary | Backup | Responsibility |
 |------|---------|--------|----------------|
@@ -257,14 +209,3 @@ Each test must document:
 | Communications | [Name] | [Name] | Internal/external comms |
 | Database Admin | [Name] | [Name] | Data recovery |
 | Network Admin | [Name] | [Name] | Network/DNS changes |
-
----
-
-## 11. Related Documents
-
-| Document | Purpose |
-|----------|---------|
-| [Failover Runbook](./failover-runbook.md) | Step-by-step failover |
-| [Failback Runbook](./failback-runbook.md) | Return to primary |
-| [Backup Procedures](./backup-strategy.md) | Backup details |
-| [DR Drill Procedure](./dr-drill-procedure.md) | Testing methodology |

@@ -1,8 +1,5 @@
 # DR Drill Procedure
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-25
-> **Status:** Operational Procedure
 > **Audience:** SREs, platform engineers, DR team
 
 ---
@@ -464,16 +461,3 @@ For compliance audits, maintain:
 - Action item closure evidence
 - Runbook update history
 - Participant attendance records
-
----
-
-## 8. Related Documents
-
-| Document | Purpose |
-|----------|---------|
-| [DR Strategy](./dr-strategy.md) | Overall DR architecture |
-| [Failover Runbook](./failover-runbook.md) | Failover procedures |
-| [Failback Runbook](./failback-runbook.md) | Failback procedures |
-| [Backup Strategy](./backup-strategy.md) | Backup procedures |
-
----

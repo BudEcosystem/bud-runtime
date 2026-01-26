@@ -1,8 +1,5 @@
 # Failover Runbook
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-25
-> **Status:** Operational Runbook
 > **Audience:** On-call engineers, SREs, incident commanders
 
 ---
@@ -393,14 +390,3 @@ If both regions are impaired:
 | Database Admin | [Name] | [Name] | PagerDuty |
 | Network/DNS | [Name] | [Name] | PagerDuty |
 | Cloud Provider | - | - | Support ticket |
-
----
-
-## 8. Related Documents
-
-| Document | Purpose |
-|----------|---------|
-| [DR Strategy](./dr-strategy.md) | Overall DR architecture |
-| [Failback Runbook](./failback-runbook.md) | Return to primary |
-| [Backup Strategy](./backup-strategy.md) | Backup procedures |
-| [Incident Response](../operations/incident-response-playbook.md) | Incident handling |

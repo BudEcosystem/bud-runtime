@@ -148,33 +148,23 @@ This document describes the high-level architecture of Bud AI Foundry, including
 
 ### Synchronous (Dapr Service Invocation)
 
-```
-┌──────────┐         ┌──────────┐         ┌──────────┐
-│ Service  │ ──────► │   Dapr   │ ──────► │ Service  │
-│    A     │         │ Sidecar  │         │    B     │
-└──────────┘         └──────────┘         └──────────┘
+![Synchronous Communication Pattern](../diagrams/sync-comm.png)
 
-URL Pattern: {dapr_endpoint}/v1.0/invoke/{app_id}/method/{path}
+**URL Pattern:** `{dapr_endpoint}/v1.0/invoke/{app_id}/method/{path}`
 
-Examples:
-• budapp → budcluster: Get cluster status
-• budapp → budpipeline: Execute pipeline
-• budpipeline → budcluster: Deploy model
-```
+**Examples:**
+- budapp → budcluster: Get cluster status
+- budapp → budpipeline: Execute pipeline
+- budpipeline → budcluster: Deploy model
 
 ### Asynchronous (Dapr Pub/Sub)
 
-```
-┌──────────┐         ┌──────────┐         ┌──────────┐
-│ Publisher│ ──────► │  Valkey  │ ◄────── │Subscriber│
-│          │  topic  │ (Pub/Sub)│  topic  │          │
-└──────────┘         └──────────┘         └──────────┘
+![Async Pub/Sub Pattern](../diagrams/async-pubsub.png)
 
-Topics:
-• workflow-events    - Pipeline event completion
-• pipeline-notifications - Execution status updates
-• {callback_topics}  - Client-specified progress updates
-```
+**Topics:**
+- `workflow-events` - Pipeline event completion
+- `pipeline-notifications` - Execution status updates
+- `{callback_topics}` - Client-specified progress updates
 
 ### Authentication Layers
 
@@ -192,8 +182,6 @@ Topics:
 The platform follows the **4 C's of Cloud Native Security** model (CNCF), providing defense-in-depth where each layer builds on the security of layers below.
 
 ![Security Architecture](../diagrams/security-arch.png)
-
-
 
 **Key Security Controls:**
 
@@ -234,13 +222,3 @@ The platform follows the **4 C's of Cloud Native Security** model (CNCF), provid
 | State/Cache | Valkey (Redis-compatible) | Dapr integration, performance, open-source |
 | IaC | Terraform + Ansible | Terraform for cloud, Ansible for K8s-level config |
 | Frontend | Next.js + Zustand | SSR, modern React patterns, lightweight state |
-
----
-
-## Related Documents
-
-- [Product Overview](./product-overview.md)
-- [Low-Level Design](./low-level-design.md)
-- [Security Architecture](../security/security-architecture.md)
-- [Deployment Architecture](./deployment-architecture.md)
-- [Network Topology](./network-topology.md)

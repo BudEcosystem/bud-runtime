@@ -27,23 +27,6 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 - Performance optimization algorithms (handled by budsim)
 - Time-series metrics storage (handled by budmetrics)
 
-### 1.3 Intended Audience
-
-| Audience | What They Need |
-|----------|----------------|
-| Developers | Implementation details, API contracts, database schemas |
-| Reviewers | Architecture decisions, trade-offs, security model |
-| Security | Auth flows, encryption mechanisms, audit trail design |
-| Operations | Deployment config, monitoring hooks, runbooks |
-
-### 1.4 References
-
-| Document | Description |
-|----------|-------------|
-| [High-Level Architecture](../architecture/high-level-architecture.md) | System overview |
-| [Main LLD Index](../architecture/low-level-design.md) | Cross-cutting concerns |
-| [IAM Architecture](../security/iam-architecture.md) | Identity management |
-
 ---
 
 ## 2. System Context & Assumptions
@@ -93,9 +76,6 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 ### 3.1 Component Overview
 
 ![Budapp component overview](./images/buapp-comp-overview.png)
-
-### 3.2 Component Breakdown
-
 #### 3.2.1 Authentication Module (`auth/`)
 
 | Property | Value |
@@ -104,6 +84,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | **Owner Module** | `budapp/auth/` |
 
 **Inputs:**
+
 | Input | Source | Format | Validation |
 |-------|--------|--------|------------|
 | Login credentials | HTTP POST `/auth/login` | `{email, password}` | Email format, password min length |
@@ -111,6 +92,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | Refresh token | HTTP POST `/auth/refresh` | `{refresh_token}` | Token signature, expiry |
 
 **Outputs:**
+
 | Output | Destination | Format | Guarantees |
 |--------|-------------|--------|------------|
 | Access token | HTTP response | JWT | Valid for 15 minutes |
@@ -124,6 +106,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 - `services.py` - User authentication logic
 
 **Error Handling:**
+
 | Error Condition | Response | Recovery |
 |-----------------|----------|----------|
 | Invalid credentials | 401 Unauthorized | User retries with correct credentials |
@@ -143,12 +126,14 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | **Owner Module** | `budapp/audit_ops/` |
 
 **Inputs:**
+
 | Input | Source | Format | Validation |
 |-------|--------|--------|------------|
 | Audit event | Internal service calls | `AuditRecordCreate` schema | Required fields present |
 | Query filters | HTTP GET `/audit` | Query params | Date range, resource type |
 
 **Outputs:**
+
 | Output | Destination | Format | Guarantees |
 |--------|-------------|--------|------------|
 | Audit record | PostgreSQL | `audit_trail` table | Immutable, hash-chained |
@@ -161,6 +146,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 - `models.py` - AuditTrail SQLAlchemy model
 
 **Error Handling:**
+
 | Error Condition | Response | Recovery |
 |-----------------|----------|----------|
 | Hash chain broken | Verification returns tampered records | Manual investigation required |
@@ -179,6 +165,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | **Owner Module** | `budapp/billing_ops/` |
 
 **Inputs:**
+
 | Input | Source | Format | Validation |
 |-------|--------|--------|------------|
 | Usage data | budmetrics via Dapr | Token counts | Positive integers |
@@ -186,6 +173,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | Alert thresholds | HTTP POST `/billing/alerts` | Percentage values | 0-100 range |
 
 **Outputs:**
+
 | Output | Destination | Format | Guarantees |
 |--------|-------------|--------|------------|
 | Usage summary | HTTP response | JSON with totals | Eventually consistent |
@@ -198,6 +186,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 - `services.py` - Quota enforcement, alert triggering
 
 **Error Handling:**
+
 | Error Condition | Response | Recovery |
 |-----------------|----------|----------|
 | Usage sync failure | Log warning, retry | Background job retries |
@@ -207,9 +196,6 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 - Horizontal: Yes, usage counters in Redis
 - Vertical: Memory for batch usage aggregation
 - Bottlenecks: High-frequency usage updates
-
-### 3.3 Component Interaction Diagrams
-
 #### 3.3.1 User Authentication - Happy Path
 
 ![User Authentication - Happy Path](./images/budapp-auth-happy-path.png)
@@ -229,9 +215,6 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 ---
 
 ## 4. Data Design
-
-### 4.1 Data Models
-
 #### 4.1.1 Tenant
 
 **Table:** `tenant`
@@ -248,6 +231,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | `updated_at` | TIMESTAMP(tz) | NOT NULL | Last modification |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_tenant_alias` | `alias` | B-tree | Fast lookup by alias |
@@ -272,6 +256,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | `updated_at` | TIMESTAMP(tz) | NOT NULL | Last modification |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_user_email` | `email` | B-tree | Fast lookup by email |
@@ -294,6 +279,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | `updated_at` | TIMESTAMP(tz) | NOT NULL | Last modification |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_project_tenant_id` | `tenant_id` | B-tree | List projects by tenant |
@@ -322,6 +308,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | `updated_at` | TIMESTAMP(tz) | NOT NULL | Last modification |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_endpoint_project_id` | `project_id` | B-tree | List endpoints by project |
@@ -350,6 +337,7 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | `created_at` | TIMESTAMP(tz) | NOT NULL | Record creation time |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_audit_user_id` | `user_id` | B-tree | Filter by user |
@@ -361,9 +349,6 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 #### 4.1.6 Entity Relationship Diagram
 
 ![ER Diagram](./images/budapp-er-diagram.png)
-
-### 4.2 Data Flow
-
 #### 4.2.1 Data Lifecycle
 
 | Stage | Location | Retention | Transition Trigger |
@@ -377,26 +362,8 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 #### 4.2.2 Read/Write Paths
 
 **Write Path:**
-```
-1. Request received by FastAPI route
-2. Pydantic schema validates input
-3. Service layer applies business logic
-4. CRUD layer constructs SQLAlchemy query
-5. PostgreSQL executes transaction
-6. Audit record created (async)
-7. Cache invalidated (if applicable)
-8. Response returned
-```
 
 **Read Path:**
-```
-1. Request received by FastAPI route
-2. Check cache (Redis) for recent data
-3. If cache miss, query PostgreSQL
-4. Transform to Pydantic response schema
-5. Update cache (if cacheable)
-6. Return response
-```
 
 #### 4.2.3 Caching Strategy
 
@@ -410,9 +377,6 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 ---
 
 ## 5. API & Interface Design
-
-### 5.1 Internal APIs
-
 #### 5.1.1 Authentication
 
 **`POST /auth/login`**
@@ -424,31 +388,8 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | **Rate Limit** | 10 requests/minute per IP |
 | **Timeout** | 10 seconds |
 
-**Request:**
-```json
-{
-  "email": "string - user email address",
-  "password": "string - user password"
-}
-```
-
-**Response (Success):**
-```json
-{
-  "success": true,
-  "data": {
-    "access_token": "string - JWT access token",
-    "refresh_token": "string - JWT refresh token",
-    "user": {
-      "id": "uuid",
-      "email": "string",
-      "name": "string"
-    }
-  }
-}
-```
-
 **Response (Error):**
+
 | Status Code | Error Code | Description | Retry? |
 |-------------|------------|-------------|--------|
 | 400 | `VALIDATION_ERROR` | Invalid email format | No |
@@ -467,45 +408,14 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 | **Rate Limit** | 10 requests/minute per user |
 | **Timeout** | 30 seconds |
 
-**Request:**
-```json
-{
-  "name": "string - endpoint name",
-  "project_id": "uuid - parent project",
-  "model_id": "uuid - model to deploy",
-  "cluster_id": "uuid - target cluster (for self-hosted)",
-  "endpoint_type": "SELF_HOSTED | CLOUD_HOSTED",
-  "inference_config": {
-    "tensor_parallel": "integer - TP degree",
-    "pipeline_parallel": "integer - PP degree",
-    "max_batch_size": "integer - batch size"
-  }
-}
-```
-
-**Response (Success):**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid - endpoint ID",
-    "name": "string",
-    "status": "DEPLOYING",
-    "workflow_id": "uuid - deployment workflow"
-  }
-}
-```
-
 **Response (Error):**
+
 | Status Code | Error Code | Description | Retry? |
 |-------------|------------|-------------|--------|
 | 400 | `VALIDATION_ERROR` | Invalid configuration | No |
 | 404 | `NOT_FOUND` | Project, model, or cluster not found | No |
 | 409 | `CONFLICT` | Endpoint name already exists | No |
 | 500 | `INTERNAL_ERROR` | Deployment failed to start | Yes |
-
-### 5.2 External Integrations
-
 #### 5.2.1 Keycloak
 
 | Property | Value |
@@ -536,232 +446,9 @@ This LLD provides build-ready technical specifications for budapp, the core API 
 
 ---
 
-## 6. Logic & Algorithm Details
+## 6. Security Design
 
-### 6.1 Audit Hash Chain
-
-**Purpose:** Ensure audit records are tamper-evident by linking each record to the previous via cryptographic hash.
-
-**Inputs:**
-- `current_record`: Audit record data (action, resource, timestamp, etc.)
-- `previous_hash`: Hash of the previous audit record (or seed for first record)
-
-**Outputs:**
-- `record_hash`: SHA256 hash that becomes `previous_hash` for next record
-
-**Algorithm (Step-by-Step):**
-
-1. Serialize record fields to canonical JSON (sorted keys, no whitespace)
-2. Concatenate: `previous_hash + serialized_record`
-3. Compute SHA256 hash of concatenated string
-4. Store hash with record
-
-**Pseudocode:**
-```python
-def compute_audit_hash(record: AuditRecord, previous_hash: str) -> str:
-    # Canonical serialization
-    fields = {
-        "user_id": str(record.user_id),
-        "action": record.action,
-        "resource_type": record.resource_type,
-        "resource_id": str(record.resource_id),
-        "timestamp": record.timestamp.isoformat(),
-        "details": json.dumps(record.details, sort_keys=True)
-    }
-    serialized = json.dumps(fields, sort_keys=True, separators=(',', ':'))
-
-    # Chain with previous hash
-    data = previous_hash + serialized
-
-    # Compute hash
-    return hashlib.sha256(data.encode()).hexdigest()
-```
-
-**Decision Tree:**
-```
-Is this the first audit record?
-├── Yes → Use seed hash "0" * 64
-└── No → Fetch previous record's hash
-         └── Compute hash with previous_hash
-```
-
-**Edge Cases:**
-| Edge Case | Behavior | Rationale |
-|-----------|----------|-----------|
-| First record in database | Use zero-filled 64-char string as seed | Deterministic starting point |
-| Null user_id (system action) | Serialize as "null" | Consistent serialization |
-| Unicode in details | UTF-8 encode before hashing | Byte-level consistency |
-| Concurrent writes | Database transaction ensures ordering | SERIALIZABLE isolation |
-
-### 6.2 Billing Quota Enforcement
-
-**Purpose:** Prevent users from exceeding their token/cost quotas.
-
-**Inputs:**
-- `user_id`: User making the request
-- `requested_tokens`: Tokens for current request
-
-**Outputs:**
-- `allowed`: Boolean indicating if request can proceed
-- `remaining`: Tokens remaining in quota
-
-**Algorithm (Step-by-Step):**
-
-1. Fetch user's current billing period from `user_billing`
-2. Get usage from Redis or sync from budmetrics
-3. Calculate remaining = quota - used
-4. If requested > remaining, return denied
-5. If within 10% of quota, trigger warning alert
-6. Return allowed with remaining tokens
-
-**Pseudocode:**
-```python
-async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
-    billing = await get_user_billing(user_id)
-
-    if billing.is_suspended:
-        return QuotaResult(allowed=False, reason="Account suspended")
-
-    usage = await get_usage_from_cache(user_id)
-    if usage is None:
-        usage = await sync_usage_from_budmetrics(user_id)
-
-    quota = billing.custom_token_quota or billing.plan.monthly_token_quota
-    remaining = quota - usage.total_tokens
-
-    if requested_tokens > remaining:
-        return QuotaResult(allowed=False, remaining=remaining)
-
-    # Check alert thresholds
-    usage_percent = (usage.total_tokens / quota) * 100
-    for alert in billing.alerts:
-        if usage_percent >= alert.threshold and not alert.triggered:
-            await trigger_alert(alert)
-
-    return QuotaResult(allowed=True, remaining=remaining - requested_tokens)
-```
-
----
-
-## 7. GenAI/ML-Specific Design
-
-> *budapp primarily handles API management. GenAI-specific logic is delegated to specialized services.*
-
-### 7.1 Model Deployment Flow
-
-#### 7.1.1 Deployment Pipeline
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   budapp    │───▶│   budsim    │───▶│ budcluster  │───▶│   Runtime   │
-│  (create)   │    │ (optimize)  │    │  (deploy)   │    │  (verify)   │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-```
-
-| Stage | Duration | Rollback Point | Validation |
-|-------|----------|----------------|------------|
-| Create endpoint record | < 1s | Yes | Schema validation |
-| Request optimization | 5-30s | Yes | Config feasibility |
-| Deploy to cluster | 1-10min | Yes | Deployment healthy |
-| Verify runtime | 30s | Yes | Health check passes |
-
-#### 7.1.2 Model Configuration
-
-| Parameter | Source | Default | Constraints |
-|-----------|--------|---------|-------------|
-| `max_model_len` | Calculated | (input + output) * 1.1 | Min: 128, Max: model limit |
-| `tensor_parallel` | budsim | 1 | Must divide GPU count |
-| `pipeline_parallel` | budsim | 1 | TP * PP ≤ total GPUs |
-| `max_batch_size` | budsim | 32 | Memory constrained |
-
-### 7.2 Inference Request Handling
-
-> *Inference is handled by budgateway. budapp manages endpoint configuration.*
-
-#### 7.2.1 Request Routing Logic
-
-| Condition | Route To | Rationale |
-|-----------|----------|-----------|
-| Cloud-hosted endpoint | Provider API via budgateway | No cluster management |
-| Self-hosted endpoint | Cluster runtime via budgateway | Direct to deployed model |
-| Router configured | Multiple endpoints with weights | Load balancing |
-
-#### 7.2.2 Token Budget Management
-
-| Metric | Calculation | Limit Enforcement |
-|--------|-------------|-------------------|
-| Input tokens | Counted by budgateway | Reject if over budget |
-| Output tokens | Counted by budgateway | Stop generation at limit |
-| Total usage | Synced to budapp periodically | Billing quota enforcement |
-
-### 7.3 Safety & Guardrails
-
-#### 7.3.1 Guardrail Configuration (budapp responsibility)
-
-| Entity | Purpose | Managed By |
-|--------|---------|------------|
-| GuardrailProbe | Detection types (jailbreak, PII, etc.) | Seeded from provider |
-| GuardrailProfile | User-configured detection settings | User via API |
-| GuardrailDeployment | Active guardrail on endpoint | Linked to endpoint |
-
-#### 7.3.2 Guardrail Enforcement (budgateway responsibility)
-
-| Check | Configured In | Enforced By |
-|-------|---------------|-------------|
-| Input validation | GuardrailProfile | budgateway pre-processing |
-| Output filtering | GuardrailProfile | budgateway post-processing |
-| Severity threshold | GuardrailDeployment | budgateway decision |
-
----
-
-## 8. Configuration & Environment Design
-
-### 8.1 Environment Variables
-
-| Variable | Required | Default | Description | Sensitive |
-|----------|----------|---------|-------------|-----------|
-| `DATABASE_URL` | Yes | - | PostgreSQL connection string | Yes |
-| `KEYCLOAK_URL` | Yes | - | Keycloak server URL | No |
-| `KEYCLOAK_REALM` | Yes | `bud` | Keycloak realm name | No |
-| `KEYCLOAK_CLIENT_ID` | Yes | - | OAuth client ID | No |
-| `KEYCLOAK_CLIENT_SECRET` | Yes | - | OAuth client secret | Yes |
-| `DAPR_HTTP_ENDPOINT` | No | `http://localhost:3500` | Dapr sidecar endpoint | No |
-| `APP_API_TOKEN` | Yes | - | Internal service auth token | Yes |
-| `LOG_LEVEL` | No | `INFO` | Logging verbosity | No |
-| `MAX_SYNC_INTERVAL` | No | `300` | Config sync interval (seconds) | No |
-
-### 8.2 Feature Flags
-
-| Flag | Default | Description | Rollout Strategy |
-|------|---------|-------------|------------------|
-| `enable_billing_enforcement` | on | Enforce token quotas | Gradual per tenant |
-| `enable_audit_hash_chain` | on | Hash chain for audits | All or nothing |
-| `enable_guardrail_sync` | on | Sync guardrail definitions | Per environment |
-
-### 8.3 Secrets Management
-
-| Secret | Storage | Rotation | Access |
-|--------|---------|----------|--------|
-| Database password | Kubernetes Secret | 90 days | budapp pods only |
-| Keycloak client secret | Kubernetes Secret | 90 days | budapp pods only |
-| APP_API_TOKEN | Kubernetes Secret | On demand | All platform services |
-| RSA encryption keys | Dapr secret store | Annually | budcluster only |
-
-### 8.4 Environment Differences
-
-| Aspect | Development | Staging | Production |
-|--------|-------------|---------|------------|
-| Database | Local PostgreSQL | Shared PostgreSQL | HA PostgreSQL |
-| Keycloak | Local instance | Shared instance | HA cluster |
-| Replicas | 1 | 2 | 3+ |
-| Log level | DEBUG | INFO | INFO |
-| Rate limits | Disabled | Relaxed | Enforced |
-
----
-
-## 9. Security Design
-
-### 9.1 Authentication
+### 6.1 Authentication
 
 | Flow | Mechanism | Token Lifetime | Refresh Strategy |
 |------|-----------|----------------|------------------|
@@ -769,7 +456,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Service-to-service | Dapr API token | Indefinite | Manual rotation |
 | Internal API | APP_API_TOKEN header | Indefinite | Manual rotation |
 
-### 9.2 Authorization
+### 6.2 Authorization
 
 | Resource | Permission Model | Enforcement Point |
 |----------|------------------|-------------------|
@@ -778,7 +465,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Audit records | Admin only | Route middleware |
 | Billing | Self + admin | Route middleware |
 
-### 9.3 Encryption
+### 6.3 Encryption
 
 | Data Type | At Rest | In Transit | Key Management |
 |-----------|---------|------------|----------------|
@@ -787,7 +474,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Cloud credentials | RSA + AES hybrid | TLS 1.3 | budcluster crypto-keys |
 | Session data | Plaintext in Redis | TLS 1.3 | N/A |
 
-### 9.4 Input Validation
+### 6.4 Input Validation
 
 | Input | Validation Rules | Sanitization |
 |-------|------------------|--------------|
@@ -796,7 +483,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Names | 1-255 chars, no special chars | Trim whitespace |
 | JSON config | Schema validation | None |
 
-### 9.5 Threat Model (Basic)
+### 6.5 Threat Model (Basic)
 
 | Threat | Likelihood | Impact | Mitigation |
 |--------|------------|--------|------------|
@@ -808,9 +495,9 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 
 ---
 
-## 10. Performance & Scalability
+## 7. Performance & Scalability
 
-### 10.1 Expected Load
+### 7.1 Expected Load
 
 | Metric | Normal | Peak | Burst |
 |--------|--------|------|-------|
@@ -818,7 +505,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Concurrent users | 100 | 500 | 1000 |
 | Database connections | 10 | 50 | 100 |
 
-### 10.2 Bottlenecks
+### 7.2 Bottlenecks
 
 | Bottleneck | Trigger Condition | Symptom | Mitigation |
 |------------|-------------------|---------|------------|
@@ -826,7 +513,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Keycloak latency | Token validation spike | Auth delays | Cache JWKS, reduce validation |
 | Audit writes | High activity burst | Write queue grows | Batch inserts, async processing |
 
-### 10.3 Caching Strategy
+### 7.3 Caching Strategy
 
 | Cache | Hit Rate Target | Eviction Policy | Warming Strategy |
 |-------|-----------------|-----------------|------------------|
@@ -834,7 +521,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | User profile | 90% | TTL (5 min) | On first access |
 | JWKS public keys | 99% | TTL (1 hour) | On startup |
 
-### 10.4 Concurrency Handling
+### 7.4 Concurrency Handling
 
 | Resource | Concurrency Model | Lock Strategy | Deadlock Prevention |
 |----------|-------------------|---------------|---------------------|
@@ -842,7 +529,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Redis | Single-threaded | Atomic operations | N/A |
 | Audit chain | Sequential writes | Advisory lock | Single writer |
 
-### 10.5 Scaling Strategy
+### 7.5 Scaling Strategy
 
 | Dimension | Trigger | Target | Cooldown |
 |-----------|---------|--------|----------|
@@ -851,75 +538,9 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 
 ---
 
-## 11. Error Handling & Logging
+## 8. Deployment & Infrastructure
 
-### 11.1 Error Classification
-
-| Category | Severity | Retry | Alert |
-|----------|----------|-------|-------|
-| Validation errors | Low | No | No |
-| Auth failures | Low | No | After 10 failures/min |
-| Database errors | High | Yes (3x) | Immediately |
-| External service errors | Medium | Yes (3x) | After 5 failures |
-
-### 11.2 Retry Strategy
-
-| Error Type | Max Retries | Backoff | Circuit Breaker |
-|------------|-------------|---------|-----------------|
-| Database timeout | 3 | Exponential (100ms base) | 5 failures in 30s |
-| Keycloak timeout | 2 | Linear (500ms) | 3 failures in 10s |
-| Dapr invoke failure | 3 | Exponential (200ms base) | 10 failures in 60s |
-
-### 11.3 Logging Standards
-
-| Level | Usage | Example |
-|-------|-------|---------|
-| DEBUG | Request/response details | `Received request: POST /endpoints {...}` |
-| INFO | Business events | `Endpoint created: {id} by user {user_id}` |
-| WARNING | Recoverable issues | `Keycloak slow response: 2.5s` |
-| ERROR | Failures requiring attention | `Database connection failed: timeout` |
-
-### 11.4 Observability
-
-| Signal | Tool | Retention | Alert Threshold |
-|--------|------|-----------|-----------------|
-| Metrics | Prometheus | 30 days | Error rate > 1% |
-| Traces | Tempo | 7 days | P99 latency > 2s |
-| Logs | Loki | 14 days | ERROR count > 10/min |
-
----
-
-## 12. Deployment & Infrastructure
-
-### 12.1 Deployment Topology
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Kubernetes Cluster                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐                │
-│  │  budapp    │  │  budapp    │  │  budapp    │   (3 replicas) │
-│  │  + Dapr    │  │  + Dapr    │  │  + Dapr    │                │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘                │
-│        │               │               │                        │
-│        └───────────────┼───────────────┘                        │
-│                        │                                         │
-│                        ▼                                         │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Service Mesh (Dapr)                    │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                        │                                         │
-│        ┌───────────────┼───────────────┐                        │
-│        ▼               ▼               ▼                        │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐                    │
-│  │PostgreSQL│   │  Redis   │   │ Keycloak │                    │
-│  └──────────┘   └──────────┘   └──────────┘                    │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 12.2 Container Specification
+### 9.2 Container Specification
 
 | Property | Value |
 |----------|-------|
@@ -928,7 +549,7 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Resource Limits | CPU: 500m, Memory: 512Mi |
 | Health Checks | Liveness: `/health`, Readiness: `/ready` |
 
-### 12.3 CI/CD Pipeline
+### 9.3 CI/CD Pipeline
 
 | Stage | Trigger | Actions | Rollback |
 |-------|---------|---------|----------|
@@ -937,99 +558,10 @@ async def check_quota(user_id: UUID, requested_tokens: int) -> QuotaResult:
 | Deploy (staging) | Merge to main | Helm upgrade | `helm rollback` |
 | Deploy (prod) | Manual approval | Blue-green deploy | Switch to blue |
 
-### 12.4 Rollback Strategy
+### 9.4 Rollback Strategy
 
 | Scenario | Detection | Rollback Method | Recovery Time |
 |----------|-----------|-----------------|---------------|
 | Failed deployment | Health checks fail | Kubernetes rollback | < 2 minutes |
 | Performance degradation | P99 > threshold | Manual rollback | < 5 minutes |
 | Data corruption | Monitoring alerts | Restore from backup | < 30 minutes |
-
----
-
-## 13. Testing Strategy
-
-### 13.1 Unit Tests
-
-| Module | Coverage Target | Mocking Strategy |
-|--------|-----------------|------------------|
-| `auth/` | 90% | Mock Keycloak client |
-| `audit_ops/` | 95% | Mock database session |
-| `billing_ops/` | 90% | Mock Redis, budmetrics |
-| `services.py` | 85% | Mock CRUD layer |
-
-### 13.2 Integration Tests
-
-| Integration | Test Approach | Environment |
-|-------------|---------------|-------------|
-| Database | Real PostgreSQL | Docker Compose |
-| Keycloak | Real Keycloak | Docker Compose |
-| Dapr | Dapr sidecar | Docker Compose |
-| Other services | Mock via Dapr | Unit test mocks |
-
-### 13.3 Edge Case Coverage
-
-| Edge Case | Test | Expected Behavior |
-|-----------|------|-------------------|
-| First audit record | `test_audit_first_record` | Uses seed hash |
-| Concurrent audit writes | `test_audit_concurrent` | Sequential ordering |
-| Expired token | `test_auth_expired_token` | 401, refresh hint |
-| Over quota | `test_billing_over_quota` | 429, quota info |
-
-### 13.4 Performance Tests
-
-| Test | Metric | Threshold | Frequency |
-|------|--------|-----------|-----------|
-| Login latency | P95 response time | < 500ms | Weekly |
-| Endpoint CRUD | P95 response time | < 200ms | Weekly |
-| Audit write | Throughput | > 100 writes/sec | Monthly |
-
----
-
-## 14. Limitations & Future Enhancements
-
-### 14.1 Known Limitations
-
-| Limitation | Impact | Workaround |
-|------------|--------|------------|
-| Single region deployment | No geo-redundancy | Manual failover |
-| Audit hash chain is sequential | Write bottleneck under high load | Batch audit events |
-| No offline token support | Users must re-login frequently | Longer token lifetime |
-
-### 14.2 Technical Debt
-
-| Item | Priority | Effort | Tracking |
-|------|----------|--------|----------|
-| Migrate to async SQLAlchemy | Medium | 2 weeks | TBD |
-| Add OpenTelemetry tracing | Low | 1 week | TBD |
-| Refactor billing to event-driven | High | 3 weeks | TBD |
-
-### 14.3 Planned Improvements
-
-| Enhancement | Rationale | Target Version |
-|-------------|-----------|----------------|
-| Multi-region support | Disaster recovery | v2.0 |
-| GraphQL API | Better client flexibility | v2.0 |
-| Webhook notifications | Real-time integrations | v1.5 |
-
----
-
-## 15. Appendix
-
-### 15.1 Glossary
-
-| Term | Definition |
-|------|------------|
-| TTFT | Time to first token - latency before model starts generating |
-| TPOT | Time per output token - generation speed |
-| TP | Tensor Parallelism - splitting model across GPUs |
-| PP | Pipeline Parallelism - splitting layers across GPUs |
-| NFD | Node Feature Discovery - hardware detection in Kubernetes |
-
-### 15.2 Design Alternatives Considered
-
-| Alternative | Pros | Cons | Why Not Chosen |
-|-------------|------|------|----------------|
-| Session-based auth | Simpler implementation | Stateful, harder to scale | JWT is industry standard |
-| MongoDB for audit | Flexible schema | No relational integrity | Need joins for reporting |
-| gRPC for internal APIs | Better performance | More complex client code | REST + Dapr sufficient |

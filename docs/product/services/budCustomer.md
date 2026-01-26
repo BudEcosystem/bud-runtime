@@ -21,14 +21,6 @@ This LLD provides build-ready technical specifications for budCustomer, the cust
 - Internal administration (budadmin)
 - Model inference (budgateway)
 
-### 1.3 Intended Audience
-
-| Audience | What They Need |
-|----------|----------------|
-| Frontend Developers | Component architecture |
-| Product | Customer features |
-| Support | Portal capabilities |
-
 ---
 
 ## 2. System Context & Assumptions
@@ -57,101 +49,11 @@ This LLD provides build-ready technical specifications for budCustomer, the cust
 
 ---
 
-## 3. Detailed Architecture
-
-### 3.1 Application Structure
-
-```
-src/
-├── pages/
-│   ├── index.tsx          # Dashboard
-│   ├── usage.tsx          # Usage metrics
-│   ├── billing/
-│   │   ├── index.tsx      # Billing overview
-│   │   └── invoices.tsx   # Invoice history
-│   ├── api-keys/
-│   │   └── index.tsx      # Key management
-│   ├── support/
-│   │   └── index.tsx      # Support tickets
-│   └── settings/
-│       └── index.tsx      # Account settings
-│
-├── components/
-│   ├── UsageChart/        # Usage visualization
-│   ├── InvoiceList/       # Invoice display
-│   ├── ApiKeyTable/       # Key management
-│   └── TicketForm/        # Support form
-│
-└── hooks/
-    ├── useUsage.ts        # Usage data fetching
-    ├── useBilling.ts      # Billing data
-    └── useApiKeys.ts      # Key management
-```
-
 ---
-
-## 4. Data Design
-
-### 4.1 Usage Data
-
-```typescript
-interface UsageMetrics {
-  period: {
-    start: string;
-    end: string;
-  };
-  total_requests: number;
-  total_tokens: number;
-  by_model: {
-    [model: string]: {
-      requests: number;
-      input_tokens: number;
-      output_tokens: number;
-    };
-  };
-  by_endpoint: {
-    [endpoint: string]: {
-      requests: number;
-      tokens: number;
-    };
-  };
-}
-```
-
-### 4.2 API Key Schema
-
-```typescript
-interface ApiKey {
-  id: string;
-  name: string;
-  prefix: string;        // First 8 chars for display
-  created_at: string;
-  last_used_at: string;
-  expires_at: string | null;
-  permissions: string[];
-  status: 'active' | 'revoked' | 'expired';
-}
-```
 
 ---
 
 ## 5. API & Interface Design
-
-### 5.1 Usage Endpoint
-
-```typescript
-// GET /api/usage?period=monthly
-{
-  "data": {
-    "period": { "start": "2024-01-01", "end": "2024-01-31" },
-    "total_requests": 125000,
-    "total_tokens": 45000000,
-    "by_model": {
-      "llama-3.1-70b": { "requests": 100000, "input_tokens": 30000000, "output_tokens": 10000000 }
-    }
-  }
-}
-```
 
 ### 5.2 API Key Endpoints
 
@@ -164,41 +66,9 @@ interface ApiKey {
 
 ---
 
-## 6. Logic & Algorithm Details
+## 6. Configuration & Environment
 
-### 6.1 API Key Creation Flow
-
-```
-User → Create Key Form → Generate via API → Display Key Once → Store Prefix
-                                                    ↓
-                              ⚠️ Key shown only once - user must copy
-```
-
-### 6.2 Usage Aggregation
-
-- Daily: 24-hour rolling
-- Weekly: 7-day rolling
-- Monthly: Calendar month
-- Custom: User-defined range
-
----
-
-## 7. GenAI/ML-Specific Design
-
-### 7.1 Token Usage Display
-
-| Metric | Description |
-|--------|-------------|
-| Input Tokens | Tokens sent in requests |
-| Output Tokens | Tokens received in responses |
-| Total Tokens | Input + Output |
-| Cost | Calculated from token counts |
-
----
-
-## 8. Configuration & Environment
-
-### 8.1 Environment Variables
+### 6.1 Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -207,16 +77,16 @@ User → Create Key Form → Generate via API → Display Key Once → Store Pre
 
 ---
 
-## 9. Security Design
+## 7. Security Design
 
-### 9.1 API Key Security
+### 7.1 API Key Security
 
 - Full key shown only on creation
 - Only prefix stored for display
 - Keys encrypted at rest
 - Immediate revocation capability
 
-### 9.2 Authentication
+### 7.2 Authentication
 
 - Keycloak SSO integration
 - Session-based authentication
@@ -224,9 +94,9 @@ User → Create Key Form → Generate via API → Display Key Once → Store Pre
 
 ---
 
-## 10. Performance & Scalability
+## 8. Performance & Scalability
 
-### 10.1 Caching
+### 8.1 Caching
 
 - Usage data cached for 5 minutes
 - Invoice list cached for 1 hour
@@ -234,63 +104,10 @@ User → Create Key Form → Generate via API → Display Key Once → Store Pre
 
 ---
 
-## 11. Error Handling & Logging
+## 9. Deployment & Infrastructure
 
-| Error | User Impact | Handling |
-|-------|-------------|----------|
-| Usage fetch failed | No metrics | Show cached |
-| Key creation failed | No new key | Retry |
-| Billing error | No invoices | Support contact |
-
----
-
-## 12. Deployment & Infrastructure
-
-### 12.1 Build
-
-```bash
-npm run build
-npm run start
-```
-
-### 12.2 Resources
+### 10.2 Resources
 
 | Component | CPU | Memory |
 |-----------|-----|--------|
 | budCustomer | 250m | 256Mi |
-
----
-
-## 13. Testing Strategy
-
-- Unit tests for data formatting
-- Component tests for UI
-- E2E tests for key management
-
----
-
-## 14. Limitations & Future Enhancements
-
-### 14.1 Current Limitations
-
-- Basic usage visualization
-- External support system
-- Limited billing customization
-
-### 14.2 Planned Improvements
-
-1. Advanced usage analytics
-2. In-app support chat
-3. Usage alerts and notifications
-4. Team management
-
----
-
-## 15. Appendix
-
-### 15.1 Billing Integration
-
-```typescript
-// Stripe Elements integration for payment
-import { Elements, PaymentElement } from '@stripe/react-stripe-js';
-```

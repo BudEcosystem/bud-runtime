@@ -1,8 +1,5 @@
 # Deployment Guides
 
-> **Version:** 1.1
-> **Last Updated:** 2026-01-25
-> **Status:** Reference Documentation
 > **Audience:** DevOps engineers, platform administrators
 
 ---
@@ -992,7 +989,6 @@ module "eks" {
 
 ---
 
-## Document History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|

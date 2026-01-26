@@ -1,12 +1,5 @@
 # Security Architecture Document
 
-> **Version:** 1.1
-> **Last Updated:** 2026-01-25
-> **Status:** Reference Architecture (Partial Implementation)
-> **Audience:** Security engineers, architects, compliance auditors
-
-> **Implementation Status:** Core security controls are implemented. Some documented features are reference architecture or not verified as operational. Key gaps: Dapr mTLS enablement not verified, network policies not deployed, audit hash chain not implemented. See Section 12 for known gaps.
-
 ---
 
 ## 1. Executive Summary
@@ -27,39 +20,7 @@ Bud AI Foundry implements a defense-in-depth security architecture to protect AI
 
 ### 2.1 Security Layers
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     EXTERNAL BOUNDARY                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   WAF/CDN   │  │  API Gateway │  │ Load Balancer│              │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
-├─────────┼────────────────┼────────────────┼─────────────────────┤
-│         │     INGRESS LAYER (TLS Termination)                   │
-│         └────────────────┬────────────────┘                     │
-├──────────────────────────┼──────────────────────────────────────┤
-│              APPLICATION SECURITY LAYER                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │  Keycloak   │  │   budapp    │  │ budgateway  │              │
-│  │   (AuthN)   │  │   (AuthZ)   │  │ (Inference) │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-├─────────────────────────────────────────────────────────────────┤
-│                SERVICE MESH LAYER (Dapr)                        │
-│  ┌─────────────────────────────────────────────────────┐        │
-│  │  mTLS between sidecars │ Service-to-service auth   │        │
-│  └─────────────────────────────────────────────────────┘        │
-├─────────────────────────────────────────────────────────────────┤
-│                    DATA LAYER                                   │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │ PostgreSQL  │  │  ClickHouse │  │   MinIO     │              │
-│  │(Encrypted)  │  │   (TLS)     │  │  (TLS/SSE)  │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-├─────────────────────────────────────────────────────────────────┤
-│              INFRASTRUCTURE LAYER                               │
-│  ┌─────────────────────────────────────────────────────┐        │
-│  │  Kubernetes RBAC │ Network Policies │ Secrets Mgmt │        │
-│  └─────────────────────────────────────────────────────┘        │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Security Layers](../diagrams/security-layers.png)
 
 ### 2.2 Trust Boundaries
 
@@ -78,13 +39,7 @@ Bud AI Foundry implements a defense-in-depth security architecture to protect AI
 
 **Identity Provider:** Keycloak (self-hosted)
 
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   Client    │─────▶│   budapp    │─────▶│  Keycloak   │
-│  (Browser/  │ JWT  │  (Validate) │ OIDC │  (AuthN)    │
-│    API)     │◀─────│             │◀─────│             │
-└─────────────┘      └─────────────┘      └─────────────┘
-```
+![Authentication Flow](../diagrams/auth-flow.png)
 
 **Authentication Flows:**
 
@@ -104,42 +59,9 @@ Bud AI Foundry implements a defense-in-depth security architecture to protect AI
 | Refresh Token TTL | 30 minutes | Default, configurable |
 | Token Validation | Signature + Claims | budapp/auth |
 
-### 3.2 JWT Token Structure
-
-```python
-# Token validation in budapp/commons/dependencies.py
-{
-    "sub": "<user_id>",
-    "iss": "https://keycloak.example.com/realms/{realm}",
-    "aud": "bud-client",
-    "exp": 1700000000,
-    "iat": 1699999700,
-    "azp": "bud-client",
-    "realm_access": {
-        "roles": ["admin", "user"]
-    },
-    "resource_access": {
-        "bud-client": {
-            "roles": ["project-admin"]
-        }
-    }
-}
-```
-
 ### 3.3 Token Blacklisting
 
 **Implementation:** `budapp/shared/jwt_blacklist_service.py`
-
-```python
-class JWTBlacklistService:
-    """Manages JWT token blacklisting via Dapr state store."""
-
-    async def blacklist_token(self, jti: str, exp: int) -> None:
-        """Add token to blacklist until expiration."""
-
-    async def is_blacklisted(self, jti: str) -> bool:
-        """Check if token is blacklisted."""
-```
 
 - Blacklisted tokens stored in Redis via Dapr state store
 - TTL matches token expiration
@@ -174,32 +96,7 @@ class JWTBlacklistService:
 
 **Permission Model:**
 
-```python
-# budapp/commons/constants.py
-class PermissionEnum(Enum):
-    MODEL_VIEW = "model:view"
-    MODEL_MANAGE = "model:manage"
-    PROJECT_VIEW = "project:view"
-    PROJECT_MANAGE = "project:manage"
-    ENDPOINT_VIEW = "endpoint:view"
-    ENDPOINT_MANAGE = "endpoint:manage"
-    CLUSTER_VIEW = "cluster:view"
-    CLUSTER_MANAGE = "cluster:manage"
-    # etc.
-```
-
 ### 4.2 Permission Enforcement
-
-```python
-# budapp/commons/permission_handler.py
-async def check_permission(
-    user_id: UUID,
-    resource_type: str,
-    resource_id: UUID,
-    required_permission: PermissionEnum
-) -> bool:
-    """Check if user has required permission on resource."""
-```
 
 **Enforcement Points:**
 1. API route decorators
@@ -221,23 +118,6 @@ async def check_permission(
 | Password Hashing | bcrypt | - | `budapp/commons/security.py:HashManager` |
 
 **RSA Encryption Implementation:**
-
-```python
-# budapp/commons/security.py
-class RSAHandler:
-    @staticmethod
-    async def encrypt(message: str, public_key) -> str:
-        """Encrypt using RSA-OAEP with SHA-256."""
-        encrypted = public_key.encrypt(
-            message.encode(),
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-        return encrypted.hex()
-```
 
 **Cluster Credentials (budcluster):**
 
@@ -269,17 +149,6 @@ class RSAHandler:
 
 > **Implementation Note:** The configuration below shows the recommended mTLS settings. However, actual enablement has NOT been verified in the Helm chart deployments. The Dapr Configuration CRD exists but the `enabled: true` setting may not be deployed.
 
-```yaml
-# dapr-config.yaml (RECOMMENDED - verify deployment)
-apiVersion: dapr.io/v1alpha1
-kind: Configuration
-spec:
-  mtls:
-    enabled: true
-    workloadCertTTL: "24h"
-    allowedClockSkew: "15m"
-```
-
 ### 5.3 Key Management
 
 **Current Implementation:**
@@ -293,17 +162,6 @@ spec:
 
 **Key Generation:**
 
-```bash
-# RSA key pair (budcluster)
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
-  -out crypto-keys/rsa-private-key.pem
-openssl rsa -in crypto-keys/rsa-private-key.pem -pubout \
-  -out crypto-keys/rsa-public-key.pem
-
-# Symmetric key
-openssl rand -out crypto-keys/symmetric-key-256 32
-```
-
 ---
 
 ## 6. Audit Logging
@@ -312,37 +170,11 @@ openssl rand -out crypto-keys/symmetric-key-256 32
 
 **Implementation:** `budapp/audit_ops/`
 
-```python
-# budapp/audit_ops/models.py
-class AuditTrail(Base):
-    id: UUID
-    user_id: UUID
-    action: AuditActionEnum
-    resource_type: AuditResourceTypeEnum
-    resource_id: UUID
-    timestamp: datetime
-    ip_address: str
-    user_agent: str
-    details: JSON
-    record_hash: str      # SHA-256 hash of record contents
-```
-
 > **Note:** The model does NOT include `previous_hash` field. Each record is hashed individually, but there is no cryptographic chain linking records.
 
 ### 6.2 Record Hashing
 
 > **Implementation Note:** Individual records are hashed for integrity verification, but there is NO hash chain mechanism. This means deletions cannot be detected cryptographically. See TECH_DEBT.md SEC-016, SEC-017.
-
-```python
-# budapp/audit_ops/hash_utils.py
-def generate_audit_hash(
-    action: str, resource_type: str, resource_id: UUID,
-    user_id: UUID, timestamp: datetime, details: dict
-) -> str:
-    """Generate SHA-256 hash for individual audit record."""
-    # Hash includes all record fields for tamper detection
-    # Does NOT link to previous records
-```
 
 ### 6.3 Audited Events
 
@@ -373,38 +205,7 @@ def generate_audit_hash(
 
 ### 7.1 Network Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    INTERNET                                 │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-              ┌───────────┴───────────┐
-              │   Load Balancer       │
-              │   (TLS Termination)   │
-              └───────────┬───────────┘
-                          │
-┌─────────────────────────┼─────────────────────────────────┐
-│  DMZ Namespace          │                                 │
-│  ┌──────────────────────┴──────────────────────┐          │
-│  │           Ingress Controller                │          │
-│  └──────────────────────┬──────────────────────┘          │
-└─────────────────────────┼─────────────────────────────────┘
-                          │
-┌─────────────────────────┼─────────────────────────────────┐
-│  Application Namespace  │                                 │
-│  ┌─────────┐ ┌─────────┐│┌─────────┐ ┌─────────┐          │
-│  │ budapp  │ │budcluster││budgateway│ │budsim  │          │
-│  │ + Dapr  │ │ + Dapr  ││ (Rust)  │ │ + Dapr │          │
-│  └────┬────┘ └────┬────┘│└────┬────┘ └────┬───┘          │
-└───────┼───────────┼─────┼─────┼───────────┼───────────────┘
-        │           │     │     │           │
-┌───────┼───────────┼─────┼─────┼───────────┼───────────────┐
-│  Data Namespace   │     │     │           │               │
-│  ┌─────────┐ ┌────┴────┐│ ┌───┴─────┐ ┌───┴────┐          │
-│  │PostgreSQL│ │ Redis  ││ │ClickHouse│ │ MinIO │          │
-│  └─────────┘ └─────────┘│ └─────────┘ └────────┘          │
-└─────────────────────────┴─────────────────────────────────┘
-```
+![Network Security Architecture](../diagrams/network-security.png)
 
 ### 7.2 Service Communication Ports
 
@@ -427,35 +228,6 @@ def generate_audit_hash(
 **Current State:** Network policies are **documented but not enforced**.
 
 **Recommended Policy (not implemented):**
-
-```yaml
-# Example: budapp network policy
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: budapp-policy
-spec:
-  podSelector:
-    matchLabels:
-      app: budapp
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress
-      ports:
-        - port: 9081
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: postgresql
-      ports:
-        - port: 5432
-```
 
 ---
 
@@ -510,36 +282,7 @@ spec:
 
 **Application Secrets:**
 
-```python
-# budapp/commons/config.py
-class SecretsSettings:
-    private_key: PrivateKeyTypes = field(init=False)
-    public_key: PublicKeyTypes = field(init=False)
-    aes_key: bytes = field(init=False)
-
-    def __post_init__(self):
-        # Load from file or environment
-        self.private_key = load_private_key(PRIVATE_KEY_PATH)
-        self.public_key = load_public_key(PUBLIC_KEY_PATH)
-        self.aes_key = load_aes_key(AES_KEY_PATH)
-```
-
 **User Credentials:**
-
-```python
-# budapp/credential_ops/services.py
-async def create_credential(self, ...):
-    """Create encrypted credential."""
-    # Encrypt API key with AES
-    encrypted_key = await AESHandler().encrypt(api_key)
-
-    # Store in database
-    credential = Credential(
-        name=name,
-        encrypted_key=encrypted_key,
-        ...
-    )
-```
 
 ---
 
@@ -609,41 +352,3 @@ The following security controls are **not yet implemented** and tracked in TECH_
 - Usage limits: Implemented in budgateway (token quota, cost-based limits)
 
 See `docs/product/TECH_DEBT.md` for complete security debt tracking.
-
----
-
-## Appendix A: Security Configuration Reference
-
-### A.1 Keycloak Configuration
-
-| Setting | Value | Location |
-|---------|-------|----------|
-| Realm | `bud` | Keycloak admin |
-| Token algorithm | RS256 | Realm settings |
-| Session timeout | 30 minutes | Realm settings |
-| Password policy | 8 chars, mixed case, special | Realm settings |
-
-### A.2 TLS Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Minimum version | TLS 1.2 |
-| Cipher suites | AES256-GCM-SHA384, CHACHA20-POLY1305 |
-| Certificate type | RSA 2048 or ECDSA P-256 |
-
-### A.3 Encryption Key Specifications
-
-| Key | Algorithm | Size | Standard |
-|-----|-----------|------|----------|
-| RSA | RSA-OAEP | 4096-bit | PKCS#1 v2.1 |
-| AES | AES-256 | 256-bit | FIPS 197 |
-| Hash | SHA-256 | 256-bit | FIPS 180-4 |
-
----
-
-## Document History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2026-01-23 | Documentation | Initial version |
-| 1.1 | 2026-01-25 | Documentation | Updated to reflect verified implementation - corrected audit model (no hash chain, no previous_hash), added Dapr mTLS verification note, updated role names, expanded known gaps section |

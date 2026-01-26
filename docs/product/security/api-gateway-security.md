@@ -1,10 +1,5 @@
 # API Gateway Security
 
-> **Version:** 1.0
-> **Last Updated:** 2026-01-25
-> **Status:** Reference Document
-> **Audience:** Security engineers, platform engineers, architects
-
 ---
 
 ## 1. Overview
@@ -17,18 +12,6 @@ This document describes the security architecture and controls implemented in th
 
 ### 2.1 API Key Authentication
 
-```
-Request Flow:
-┌────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Client │────►│ Ingress  │────►│budgateway│────►│  Model   │
-│        │     │   TLS    │     │  Auth    │     │ Runtime  │
-└────────┘     └──────────┘     └──────────┘     └──────────┘
-     │              │                │
-     │  API Key     │   Validate     │
-     │  Header      │   Key + Perms  │
-     ▼              ▼                ▼
-```
-
 **API Key Format:**
 - Prefix: `bud_client_` (client credentials) or `bud_admin_` (admin credentials)
 - Random portion: 32 bytes (256 bits) of cryptographically secure random data
@@ -36,46 +19,14 @@ Request Flow:
 - Storage: RSA-encrypted at rest in PostgreSQL
 
 **Header Format:**
-```http
-Authorization: Bearer bud_client_<base64_encoded_random>
-```
 
 ### 2.2 Key Validation Process
 
 The validation process involves coordination between budgateway (Rust) and budapp (Python):
 
 **budgateway (Rust) - Request Time:**
-```rust
-// Pseudocode for gateway validation
-fn validate_api_key(key: &str) -> Result<APIConfig, StatusCode> {
-    // 1. Hash the API key with SHA256 (prefixed with "bud-")
-    let hashed_key = sha256(format!("bud-{}", key));
-
-    // 2. Lookup in Redis cache (keys have TTL matching expiry)
-    // If key not found, Redis may have expired it automatically
-    if let Some(config) = redis.get(f"api_key:{hashed_key}") {
-        return Ok(config);
-    }
-
-    // 3. Key not found in cache = unauthorized
-    Err(StatusCode::UNAUTHORIZED)
-}
-```
 
 **budapp (Python) - Cache Population:**
-```python
-# Pseudocode for credential caching
-async def update_proxy_cache(project_id, api_key, expiry):
-    # 1. Calculate TTL from expiry timestamp
-    if expiry:
-        ttl = (expiry - datetime.now()).total_seconds()
-        if ttl <= 0:
-            return  # Skip expired credentials
-
-    # 2. Hash key and store in Redis with TTL
-    hashed_key = sha256(f"bud-{api_key}")
-    await redis.set(f"api_key:{hashed_key}", config, ex=ttl)
-```
 
 **Expiry Enforcement:**
 - Redis TTL automatically removes keys when expiry time is reached
@@ -131,25 +82,6 @@ async def update_proxy_cache(project_id, api_key, expiry):
 | `stream` | Boolean | - |
 | Request body | JSON schema validation | 10 MB |
 
-### 4.2 Request Sanitization
-
-```rust
-// Rust pseudocode for request sanitization
-fn sanitize_request(req: &mut InferenceRequest) {
-    // Strip control characters from messages
-    for msg in &mut req.messages {
-        msg.content = strip_control_chars(&msg.content);
-    }
-
-    // Validate and clamp parameters
-    req.temperature = req.temperature.clamp(0.0, 2.0);
-    req.max_tokens = req.max_tokens.min(MAX_TOKENS_LIMIT);
-
-    // Remove unknown fields
-    req.strip_unknown_fields();
-}
-```
-
 ### 4.3 Prompt Injection Mitigations
 
 | Control | Description |
@@ -171,15 +103,6 @@ fn sanitize_request(req: &mut InferenceRequest) {
 | Standard | 100 | 200,000 | 10 |
 | Pro | 500 | 1,000,000 | 50 |
 | Enterprise | Custom | Custom | Custom |
-
-### 5.2 Rate Limit Headers
-
-```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1706140800
-Retry-After: 30  # Only on 429 responses
-```
 
 ### 5.3 Rate Limit Algorithm
 
@@ -229,34 +152,6 @@ In addition to request rate limiting, budgateway enforces usage limits:
 
 ## 7. Network Security
 
-### 7.1 Network Policies
-
-```yaml
-# Gateway ingress policy
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: budgateway-ingress
-spec:
-  podSelector:
-    matchLabels:
-      app: budgateway
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress-nginx
-      ports:
-        - port: 8080
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: model-runtime
-      ports:
-        - port: 8000
-```
-
 ### 7.2 Service Mesh Security
 
 - mTLS between all services via Dapr
@@ -281,14 +176,3 @@ spec:
 - Customer keys: User-initiated or 90-day recommendation
 - Internal keys: Automatic 30-day rotation
 - Encryption keys: Annual rotation with re-encryption
-
----
-
-## 9. Related Documents
-
-| Document | Purpose |
-|----------|---------|
-| [Security Architecture](./security-architecture.md) | Overall security design |
-| [Network Security Guide](./network-security-guide.md) | Network controls |
-| [Audit Logging Architecture](./audit-logging-architecture.md) | Logging design |
-| [Encryption Standards](./encryption-standards.md) | Cryptographic standards |

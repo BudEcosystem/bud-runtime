@@ -212,7 +212,6 @@ Complete catalog of all platform components including services, databases, infra
 | **HuggingFace Hub** | Model download | Pre-trained model access |
 | **Custom S3/MinIO** | Model storage | Private model hosting |
 
-
 ---
 
 ## GPU/Accelerator Support
@@ -243,11 +242,3 @@ Complete catalog of all platform components including services, databases, infra
 | * | Valkey | Redis protocol | State and pub/sub |
 | * | PostgreSQL | PostgreSQL | Data persistence |
 | * | Keycloak | OIDC/SAML | Authentication |
-
----
-
-## Related Documents
-
-- [High-Level Architecture](./high-level-architecture.md) - Component interactions
-- [Technology Stack Reference](./technology-stack-reference.md) - Framework versions
-- [Deployment Architecture](./deployment-architecture.md) - Environment topology

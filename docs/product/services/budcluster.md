@@ -26,24 +26,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 - Model registry metadata (handled by budmodel)
 - User authentication (handled by budapp)
 
-### 1.3 Intended Audience
-
-| Audience | What They Need |
-|----------|----------------|
-| Developers | Implementation details, workflow patterns, database schemas |
-| Reviewers | Architecture decisions, trade-offs, security model |
-| Security | Credential encryption, cluster access patterns |
-| Operations | Deployment topology, health checks, runbooks |
-
-### 1.4 References
-
-| Document | Description |
-|----------|-------------|
-| [High-Level Architecture](../architecture/high-level-architecture.md) | System overview |
-| [Main LLD Index](../architecture/low-level-design.md) | Cross-cutting concerns |
-| [budcluster Service Documentation](./budcluster.md) | Service summary |
-| [Model Deployment Flow](../architecture/model-deployment.md) | Deployment architecture |
-
 ---
 
 ## 2. System Context & Assumptions
@@ -92,9 +74,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 ### 3.1 Component Overview
 
 ![Budcluster component overview](./images/budcluster-overview.png)
-
-### 3.2 Component Breakdown
-
 #### 3.2.1 Cluster Operations Module (`cluster_ops/`)
 
 | Property | Value |
@@ -103,6 +82,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | **Owner Module** | `budcluster/cluster_ops/` |
 
 **Inputs:**
+
 | Input | Source | Format | Validation |
 |-------|--------|--------|------------|
 | Cluster config | HTTP POST `/cluster` | YAML kubeconfig + JSON metadata | Valid YAML, reachable API |
@@ -110,6 +90,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | Health checks | HTTP GET `/cluster/{id}/health` | Query params | Valid check types |
 
 **Outputs:**
+
 | Output | Destination | Format | Guarantees |
 |--------|-------------|--------|------------|
 | Workflow ID | HTTP response | UUID | Workflow trackable |
@@ -125,6 +106,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 - `nfd_handler.py` - NFD deployment and parsing
 
 **Error Handling:**
+
 | Error Condition | Response | Recovery |
 |-----------------|----------|----------|
 | Cluster unreachable | 503, mark ERROR status | Retry with backoff |
@@ -145,6 +127,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | **Owner Module** | `budcluster/deployment/` |
 
 **Inputs:**
+
 | Input | Source | Format | Validation |
 |-------|--------|--------|------------|
 | Deployment request | HTTP POST `/deployment` | DeploymentCreateRequest | Valid cluster, model |
@@ -152,6 +135,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | Autoscale config | HTTP PUT `/deployment/autoscale` | UpdateAutoscaleRequest | Valid ranges |
 
 **Outputs:**
+
 | Output | Destination | Format | Guarantees |
 |--------|-------------|--------|------------|
 | Workflow ID | HTTP response | UUID | Workflow trackable |
@@ -166,6 +150,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 - `quantization_workflows.py` - Model quantization handling
 
 **Error Handling:**
+
 | Error Condition | Response | Recovery |
 |-----------------|----------|----------|
 | Insufficient resources | 400, resource details | User scales cluster |
@@ -185,19 +170,18 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | **Owner Module** | `budcluster/benchmark_ops/` |
 
 **Inputs:**
+
 | Input | Source | Format | Validation |
 |-------|--------|--------|------------|
 | Benchmark request | Internal workflow | BenchmarkSchema | Valid cluster, model |
 | Query filters | HTTP GET `/benchmark` | Query params | Valid ranges |
 
 **Outputs:**
+
 | Output | Destination | Format | Guarantees |
 |--------|-------------|--------|------------|
 | Benchmark results | PostgreSQL | BenchmarkResultSchema | Persisted |
 | TTFT/TPOT metrics | HTTP response | Float values | Calculated |
-
-### 3.3 Component Interaction Diagrams
-
 #### 3.3.1 Cluster Registration - Happy Path
 
 ![Cluster Registration Flow](./images/budcluster-register-flow.png)
@@ -217,9 +201,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 ---
 
 ## 4. Data Design
-
-### 4.1 Data Models
-
 #### 4.1.1 Cluster
 
 **Table:** `cluster`
@@ -243,6 +224,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | `updated_at` | TIMESTAMP(tz) | NOT NULL | Last modification |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_cluster_status` | `status` | B-tree | Filter by status |
@@ -280,6 +262,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | `updated_at` | TIMESTAMP(tz) | NOT NULL | Last modification |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `uq_cluster_node_info_cluster_id_name` | `cluster_id, name` | Unique | Prevent duplicate nodes |
@@ -314,6 +297,7 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | `last_updated_datetime` | TIMESTAMP(tz) | NOT NULL | Last status update |
 
 **Indexes:**
+
 | Index Name | Columns | Type | Purpose |
 |------------|---------|------|---------|
 | `ix_worker_info_cluster_id` | `cluster_id` | B-tree | List workers by cluster |
@@ -386,9 +370,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 #### 4.1.6 Entity Relationship Diagram
 
 ![ER Diagram](./images/budcluster-er-diagram.png)
-
-### 4.2 Data Flow
-
 #### 4.2.1 Data Lifecycle
 
 | Stage | Location | Retention | Transition Trigger |
@@ -401,24 +382,8 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 #### 4.2.2 Read/Write Paths
 
 **Write Path (Cluster Registration):**
-```
-1. Request received at /cluster endpoint
-2. Kubeconfig validated and encrypted
-3. Cluster record created in PostgreSQL
-4. Dapr workflow started for registration
-5. NFD deployed to cluster
-6. Node info collected and stored
-7. Status updated to AVAILABLE
-```
 
 **Read Path (Worker Info):**
-```
-1. Request received at /deployment/worker-info
-2. Query PostgreSQL for cached worker data
-3. If refresh=true, query Kubernetes API
-4. Update cache in PostgreSQL
-5. Return paginated response
-```
 
 #### 4.2.3 Caching Strategy
 
@@ -431,9 +396,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 ---
 
 ## 5. API & Interface Design
-
-### 5.1 Internal APIs
-
 #### 5.1.1 Cluster Operations
 
 **`POST /cluster`**
@@ -445,27 +407,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | **Rate Limit** | 10 requests/minute |
 | **Timeout** | 60 seconds |
 
-**Request (multipart/form-data):**
-```json
-{
-  "cluster_create_request": "JSON string with cluster metadata",
-  "configuration": "YAML kubeconfig file"
-}
-```
-
-**Response (Success):**
-```json
-{
-  "success": true,
-  "workflow_id": "uuid",
-  "steps": [
-    {"name": "verify_connection", "status": "pending"},
-    {"name": "deploy_nfd", "status": "pending"},
-    {"name": "collect_node_info", "status": "pending"}
-  ]
-}
-```
-
 **`POST /deployment`**
 
 | Property | Value |
@@ -474,30 +415,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 | **Authentication** | Dapr API token |
 | **Rate Limit** | 5 requests/minute |
 | **Timeout** | 120 seconds |
-
-**Request:**
-```json
-{
-  "cluster_id": "uuid",
-  "simulator_id": "uuid - optimization config",
-  "model_name": "string",
-  "namespace": "string",
-  "credential_id": "uuid - optional"
-}
-```
-
-**Response (Success):**
-```json
-{
-  "success": true,
-  "workflow_id": "uuid",
-  "steps": [
-    {"name": "transfer_model", "status": "pending"},
-    {"name": "deploy_runtime", "status": "pending"},
-    {"name": "verify_health", "status": "pending"}
-  ]
-}
-```
 
 **`GET /deployment/worker-info`**
 
@@ -514,9 +431,6 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 - `refresh` (optional): boolean
 - `page` (optional): integer
 - `limit` (optional): integer
-
-### 5.2 External Integrations
-
 #### 5.2.1 Kubernetes Clusters
 
 | Property | Value |
@@ -546,243 +460,16 @@ This LLD provides build-ready technical specifications for budcluster, the clust
 
 ---
 
-## 6. Logic & Algorithm Details
+## 6. Security Design
 
-### 6.1 Credential Encryption
-
-**Purpose:** Securely store cluster kubeconfigs and credentials.
-
-**Inputs:**
-- `plaintext`: Raw credential data (kubeconfig YAML)
-- `rsa_public_key`: RSA-4096 public key
-
-**Outputs:**
-- `encrypted_data`: Base64-encoded encrypted credential
-
-**Algorithm (Step-by-Step):**
-
-1. Generate random AES-256 symmetric key
-2. Encrypt plaintext with AES-256-GCM
-3. Encrypt AES key with RSA-4096 public key
-4. Concatenate: encrypted_key + nonce + ciphertext + tag
-5. Base64 encode result
-
-**Pseudocode:**
-```python
-def encrypt_credential(plaintext: str) -> str:
-    # Generate symmetric key
-    aes_key = os.urandom(32)  # 256 bits
-    nonce = os.urandom(12)
-
-    # Encrypt data with AES-GCM
-    cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
-    ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode())
-
-    # Encrypt AES key with RSA
-    rsa_key = load_rsa_public_key()
-    encrypted_key = rsa_key.encrypt(aes_key, OAEP(MGF1(SHA256())))
-
-    # Combine and encode
-    result = encrypted_key + nonce + ciphertext + tag
-    return base64.b64encode(result).decode()
-```
-
-### 6.2 Max Model Length Calculation
-
-**Purpose:** Calculate optimal `--max-model-len` for deployments.
-
-**Inputs:**
-- `input_tokens`: Expected max input tokens
-- `output_tokens`: Expected max output tokens
-
-**Outputs:**
-- `max_model_len`: Calculated model context length
-
-**Algorithm:**
-```python
-def calculate_max_model_len(input_tokens: int, output_tokens: int) -> int:
-    # Add 10% safety margin
-    base_length = input_tokens + output_tokens
-    max_model_len = int(base_length * 1.1)
-
-    # Ensure minimum of 128
-    return max(max_model_len, 128)
-```
-
-### 6.3 NFD Hardware Detection
-
-**Purpose:** Detect hardware capabilities via Node Feature Discovery labels.
-
-**Inputs:**
-- `cluster_id`: Target cluster UUID
-- `timeout`: Detection timeout (default 30s)
-
-**Outputs:**
-- `hardware_info`: List of detected hardware per node
-
-**Algorithm (Step-by-Step):**
-
-1. Deploy NFD Helm chart to cluster
-2. Wait for NFD pods to be ready
-3. Query node labels starting with `feature.node.kubernetes.io/`
-4. Parse PCI vendor/device IDs
-5. Map to known hardware (NVIDIA GPU, Intel Gaudi)
-6. Return structured hardware info
-
-**Decision Tree:**
-```
-Does node have NFD labels?
-├── Yes → Parse labels
-│   ├── PCI vendor 10de (NVIDIA)?
-│   │   ├── Yes → Extract GPU model from device ID
-│   │   └── No → Check for 8086 (Intel)
-│   │       ├── Yes → Check for Gaudi accelerator
-│   │       └── No → Mark as CPU-only
-└── No → Log warning, use fallback detection
-```
-
----
-
-## 7. GenAI/ML-Specific Design
-
-### 7.1 Model Deployment Flow
-
-#### 7.1.1 Deployment Pipeline
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   budapp    │───▶│ budcluster  │───▶│   Cluster   │───▶│   Runtime   │
-│  (request)  │    │ (workflow)  │    │  (deploy)   │    │  (verify)   │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-```
-
-| Stage | Duration | Rollback Point | Validation |
-|-------|----------|----------------|------------|
-| Transfer model | 1-30 min | Yes | Model exists in storage |
-| Deploy Helm chart | 1-5 min | Yes | Release created |
-| Wait for pods | 1-10 min | Yes | Pods running |
-| Health check | 30s | Yes | HTTP 200 from /health |
-
-#### 7.1.2 Model Configuration
-
-| Parameter | Source | Default | Constraints |
-|-----------|--------|---------|-------------|
-| `max_model_len` | Calculated | (input + output) * 1.1 | Min: 128 |
-| `tensor_parallel` | budsim | 1 | Must divide GPU count |
-| `pipeline_parallel` | budsim | 1 | TP * PP ≤ total GPUs |
-| `gpu_memory_utilization` | budsim | 0.9 | 0.1-0.95 |
-| `max_num_seqs` | budsim | 256 | Memory constrained |
-
-### 7.2 Hardware Resource Allocation
-
-#### 7.2.1 GPU/Accelerator Selection
-
-| Hardware Type | Detection Method | Allocation Strategy |
-|---------------|------------------|---------------------|
-| NVIDIA GPU | NFD PCI vendor 10de | nvidia.com/gpu resource |
-| Intel Gaudi | NFD Gaudi labels | habana.ai/gaudi resource |
-| CPU | Default | Request CPU cores |
-
-#### 7.2.2 Resource Calculation
-
-**GPU Memory Formula:**
-```
-required_vram = model_params * bytes_per_param + kv_cache + overhead
-kv_cache = batch_size * seq_len * hidden_size * num_layers * 2 * dtype_size
-```
-
-**GPU Count Formula:**
-```
-gpu_count = ceil(required_vram / (gpu_memory * utilization)) * tensor_parallel
-```
-
-### 7.3 Performance Optimization
-
-#### 7.3.1 Benchmarking Metrics
-
-| Metric | Definition | Target |
-|--------|------------|--------|
-| TTFT | Time to first token (ms) | < 500ms |
-| TPOT | Time per output token (ms) | < 50ms |
-| Throughput | Output tokens/second | Model-dependent |
-| E2EL | End-to-end latency (ms) | Context-dependent |
-
-### 7.4 HAMI GPU Time-Slicing
-
-#### 7.4.1 Installation Flow
-
-```
-NFD detects NVIDIA GPUs
-        │
-        ▼
-GPU Operator deployed
-        │
-        ▼
-FCSP Helm chart installed
-        │
-        ▼
-FCSP scheduler available
-        │
-        ▼
-GPU time-slicing enabled
-```
-
-#### 7.4.2 Configuration
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `ENABLE_HAMI_METRICS` | false | Enable metrics collection |
-| `HAMI_SCHEDULER_PORT` | 31993 | Scheduler metrics port |
-| `HAMI_UTILIZATION_THRESHOLD` | 80 | GPU availability threshold |
-
----
-
-## 8. Configuration & Environment Design
-
-### 8.1 Environment Variables
-
-| Variable | Required | Default | Description | Sensitive |
-|----------|----------|---------|-------------|-----------|
-| `DATABASE_URL` | Yes | - | PostgreSQL connection string | Yes |
-| `DAPR_HTTP_ENDPOINT` | No | `http://localhost:3500` | Dapr sidecar endpoint | No |
-| `APP_API_TOKEN` | Yes | - | Internal service auth token | Yes |
-| `NFD_DETECTION_TIMEOUT` | No | `30` | NFD detection timeout (seconds) | No |
-| `NFD_NAMESPACE` | No | `node-feature-discovery` | NFD deployment namespace | No |
-| `ENABLE_HAMI_METRICS` | No | `false` | Enable HAMI metrics | No |
-| `HAMI_SCHEDULER_PORT` | No | `31993` | HAMI scheduler port | No |
-| `CRYPTO_KEY_PATH` | Yes | - | Path to encryption keys | No |
-
-### 8.2 Secrets Management
-
-| Secret | Storage | Rotation | Access |
-|--------|---------|----------|--------|
-| RSA private key | File (crypto-keys/) | Annually | budcluster only |
-| Symmetric key | File (crypto-keys/) | Annually | budcluster only |
-| Database password | Kubernetes Secret | 90 days | budcluster pods |
-| APP_API_TOKEN | Kubernetes Secret | On demand | All services |
-
-### 8.3 Environment Differences
-
-| Aspect | Development | Staging | Production |
-|--------|-------------|---------|------------|
-| Database | Local PostgreSQL | Shared PostgreSQL | HA PostgreSQL |
-| Redis | Local Redis | Shared Redis | HA Redis cluster |
-| Replicas | 1 | 2 | 3+ |
-| Log level | DEBUG | INFO | INFO |
-| Cluster access | Local clusters | Test clusters | Production clusters |
-
----
-
-## 9. Security Design
-
-### 9.1 Authentication
+### 6.1 Authentication
 
 | Flow | Mechanism | Token Lifetime | Refresh Strategy |
 |------|-----------|----------------|------------------|
 | Service-to-service | Dapr API token | Indefinite | Manual rotation |
 | Cluster access | Kubeconfig | Varies | Re-register cluster |
 
-### 9.2 Authorization
+### 6.2 Authorization
 
 | Resource | Permission Model | Enforcement Point |
 |----------|------------------|-------------------|
@@ -790,7 +477,7 @@ GPU time-slicing enabled
 | Deployments | Cluster access | budapp proxy |
 | Workers | Deployment access | budapp proxy |
 
-### 9.3 Encryption
+### 6.3 Encryption
 
 | Data Type | At Rest | In Transit | Key Management |
 |-----------|---------|------------|----------------|
@@ -798,7 +485,7 @@ GPU time-slicing enabled
 | Credentials | RSA + AES-256-GCM | TLS 1.3 | File-based keys |
 | Workflow state | Plaintext in Redis | TLS 1.3 | N/A |
 
-### 9.4 Threat Model (Basic)
+### 6.4 Threat Model (Basic)
 
 | Threat | Likelihood | Impact | Mitigation |
 |--------|------------|--------|------------|
@@ -809,9 +496,9 @@ GPU time-slicing enabled
 
 ---
 
-## 10. Performance & Scalability
+## 7. Performance & Scalability
 
-### 10.1 Expected Load
+### 7.1 Expected Load
 
 | Metric | Normal | Peak | Burst |
 |--------|--------|------|-------|
@@ -819,7 +506,7 @@ GPU time-slicing enabled
 | Deployments/hour | 20 | 100 | 200 |
 | Worker info queries/min | 100 | 500 | 1000 |
 
-### 10.2 Bottlenecks
+### 7.2 Bottlenecks
 
 | Bottleneck | Trigger Condition | Symptom | Mitigation |
 |------------|-------------------|---------|------------|
@@ -827,7 +514,7 @@ GPU time-slicing enabled
 | Helm operations | Many deployments | Slow deployments | Queue operations |
 | Model transfer | Large models | Long deploy times | Parallel transfers |
 
-### 10.3 Scaling Strategy
+### 7.3 Scaling Strategy
 
 | Dimension | Trigger | Target | Cooldown |
 |-----------|---------|--------|----------|
@@ -836,67 +523,9 @@ GPU time-slicing enabled
 
 ---
 
-## 11. Error Handling & Logging
+## 8. Deployment & Infrastructure
 
-### 11.1 Error Classification
-
-| Category | Severity | Retry | Alert |
-|----------|----------|-------|-------|
-| Cluster unreachable | High | Yes (3x) | After 3 failures |
-| Deployment failed | High | Yes (1x) | Immediately |
-| NFD timeout | Medium | Yes (2x) | After 5 failures |
-| Workflow failure | High | No | Immediately |
-
-### 11.2 Retry Strategy
-
-| Error Type | Max Retries | Backoff | Circuit Breaker |
-|------------|-------------|---------|-----------------|
-| Cluster connection | 3 | Exponential (30s base) | 5 failures in 5 min |
-| Helm operation | 2 | Linear (60s) | None |
-| Dapr invocation | 3 | Exponential (1s base) | 10 failures in 60s |
-
-### 11.3 Observability
-
-| Signal | Tool | Retention | Alert Threshold |
-|--------|------|-----------|-----------------|
-| Metrics | Prometheus | 30 days | Error rate > 5% |
-| Traces | Tempo | 7 days | P99 latency > 60s |
-| Logs | Loki | 14 days | ERROR count > 5/min |
-
----
-
-## 12. Deployment & Infrastructure
-
-### 12.1 Deployment Topology
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Kubernetes Cluster                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐                │
-│  │ budcluster │  │ budcluster │  │ budcluster │   (3 replicas) │
-│  │  + Dapr    │  │  + Dapr    │  │  + Dapr    │                │
-│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘                │
-│        │               │               │                        │
-│        └───────────────┼───────────────┘                        │
-│                        │                                         │
-│                        ▼                                         │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Service Mesh (Dapr)                    │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                        │                                         │
-│        ┌───────────────┼───────────────┐                        │
-│        ▼               ▼               ▼                        │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐                    │
-│  │PostgreSQL│   │  Redis   │   │ Target   │                    │
-│  └──────────┘   └──────────┘   │ Clusters │                    │
-│                                 └──────────┘                    │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 12.2 Container Specification
+### 9.2 Container Specification
 
 | Property | Value |
 |----------|-------|
@@ -905,88 +534,9 @@ GPU time-slicing enabled
 | Resource Limits | CPU: 1000m, Memory: 2Gi |
 | Health Checks | Liveness: `/health`, Readiness: `/ready` |
 
-### 12.3 Rollback Strategy
+### 9.3 Rollback Strategy
 
 | Scenario | Detection | Rollback Method | Recovery Time |
 |----------|-----------|-----------------|---------------|
 | Failed deployment | Health checks fail | Kubernetes rollback | < 2 minutes |
 | Workflow corruption | State inconsistency | Clear Redis state | < 5 minutes |
-
----
-
-## 13. Testing Strategy
-
-### 13.1 Unit Tests
-
-| Module | Coverage Target | Mocking Strategy |
-|--------|-----------------|------------------|
-| `cluster_ops/` | 80% | Mock Kubernetes client |
-| `deployment/` | 80% | Mock Helm, K8s client |
-| `benchmark_ops/` | 85% | Mock database |
-
-### 13.2 Integration Tests
-
-| Integration | Test Approach | Environment |
-|-------------|---------------|-------------|
-| PostgreSQL | Real database | Docker Compose |
-| Redis | Real Redis | Docker Compose |
-| Kubernetes | Kind cluster | CI/CD |
-
-### 13.3 Edge Case Coverage
-
-| Edge Case | Test | Expected Behavior |
-|-----------|------|-------------------|
-| Cluster unreachable | `test_cluster_unreachable` | Mark ERROR, retry |
-| NFD timeout | `test_nfd_timeout` | Continue with warning |
-| Concurrent deployments | `test_concurrent_deploys` | Queue properly |
-
----
-
-## 14. Limitations & Future Enhancements
-
-### 14.1 Known Limitations
-
-| Limitation | Impact | Workaround |
-|------------|--------|------------|
-| Single Helm per cluster | Concurrent deploy conflicts | Queue operations |
-| NFD required | No hardware detection without it | Manual node labeling |
-| No multi-region | Single control plane | Deploy multiple budclusters |
-
-### 14.2 Technical Debt
-
-| Item | Priority | Effort | Tracking |
-|------|----------|--------|----------|
-| Add OpenTelemetry tracing | Medium | 1 week | TBD |
-| Migrate to async K8s client | High | 2 weeks | TBD |
-| Add GKE support | Medium | 2 weeks | TBD |
-
-### 14.3 Planned Improvements
-
-| Enhancement | Rationale | Target Version |
-|-------------|-----------|----------------|
-| GKE cluster support | Multi-cloud expansion | v2.0 |
-| Cluster federation | Multi-cluster management | v2.5 |
-| GitOps integration | Declarative deployments | v2.0 |
-
----
-
-## 15. Appendix
-
-### 15.1 Glossary
-
-| Term | Definition |
-|------|------------|
-| NFD | Node Feature Discovery - Kubernetes component for hardware detection |
-| HAMI | HAMi GPU Device Plugin - GPU time-slicing support |
-| TP | Tensor Parallelism - model sharding across GPUs |
-| PP | Pipeline Parallelism - layer sharding across GPUs |
-| TTFT | Time to First Token - latency metric |
-| TPOT | Time Per Output Token - generation speed metric |
-
-### 15.2 Design Alternatives Considered
-
-| Alternative | Pros | Cons | Why Not Chosen |
-|-------------|------|------|----------------|
-| ArgoCD for deployments | GitOps native | Complex setup | Helm sufficient for now |
-| Crossplane for clusters | Declarative | Learning curve | Terraform more familiar |
-| Direct K8s client | No Helm dependency | More code | Helm charts standard |
