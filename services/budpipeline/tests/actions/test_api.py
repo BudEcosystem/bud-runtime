@@ -34,9 +34,9 @@ class TestActionsListEndpoint:
         assert "categories" in data
         assert "total" in data
 
-        # Should have at least the 17 built-in actions
-        assert data["total"] >= 17
-        assert len(data["actions"]) >= 17
+        # Should have at least the 16 built-in actions
+        assert data["total"] >= 16
+        assert len(data["actions"]) >= 16
 
     @pytest.mark.asyncio
     async def test_list_actions_includes_categories(self) -> None:
@@ -207,8 +207,8 @@ class TestActionsValidateEndpoint:
             response = await client.post(
                 "/actions/validate",
                 json={
-                    "actionType": "delay",
-                    "params": {"duration_seconds": -10},  # Invalid: negative duration
+                    "actionType": "wait_until",
+                    "params": {"duration_hours": -1},  # Invalid: negative duration
                 },
             )
 

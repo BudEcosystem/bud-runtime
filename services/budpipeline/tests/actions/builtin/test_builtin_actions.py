@@ -8,7 +8,6 @@ from budpipeline.actions.base import ActionContext
 from budpipeline.actions.builtin import (
     AggregateExecutor,
     ConditionalExecutor,
-    DelayExecutor,
     FailExecutor,
     LogExecutor,
     SetOutputExecutor,
@@ -63,54 +62,6 @@ class TestLogExecutor:
             result = await executor.execute(context)
             assert result.success is True
             assert result.outputs["level"] == level
-
-
-class TestDelayExecutor:
-    """Tests for DelayExecutor."""
-
-    @pytest.mark.asyncio
-    async def test_delay_default(self) -> None:
-        """Test delay with default duration."""
-        executor = DelayExecutor()
-        context = make_context()
-        result = await executor.execute(context)
-
-        assert result.success is True
-        assert result.outputs["delayed"] is True
-        assert result.outputs["duration_seconds"] == 1.0
-
-    @pytest.mark.asyncio
-    async def test_delay_custom_duration(self) -> None:
-        """Test delay with custom duration."""
-        executor = DelayExecutor()
-        context = make_context(duration_seconds=0.1, reason="Testing")
-        result = await executor.execute(context)
-
-        assert result.success is True
-        assert result.outputs["duration_seconds"] == 0.1
-        assert result.outputs["reason"] == "Testing"
-
-    @pytest.mark.asyncio
-    async def test_delay_negative_duration(self) -> None:
-        """Test delay fails with negative duration."""
-        executor = DelayExecutor()
-        context = make_context(duration_seconds=-1)
-        result = await executor.execute(context)
-
-        assert result.success is False
-        assert "non-negative" in result.error
-
-    def test_validate_params_invalid_duration(self) -> None:
-        """Test validation catches invalid duration."""
-        executor = DelayExecutor()
-        errors = executor.validate_params({"duration_seconds": "not_a_number"})
-        assert any("number" in e for e in errors)
-
-    def test_validate_params_too_long(self) -> None:
-        """Test validation catches duration over limit."""
-        executor = DelayExecutor()
-        errors = executor.validate_params({"duration_seconds": 5000})
-        assert any("3600" in e for e in errors)
 
 
 class TestConditionalExecutor:

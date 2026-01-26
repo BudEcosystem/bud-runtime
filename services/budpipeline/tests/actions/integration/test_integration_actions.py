@@ -13,8 +13,6 @@ from budpipeline.actions.integration import (
     HttpRequestExecutor,
     NotificationAction,
     NotificationExecutor,
-    WebhookAction,
-    WebhookExecutor,
 )
 
 
@@ -231,6 +229,78 @@ class TestHttpRequestAction:
         assert result.success is False
         assert "blocked" in result.error.lower()
 
+    @pytest.mark.asyncio
+    async def test_execute_with_metadata(self) -> None:
+        """Test HTTP request includes workflow metadata when enabled."""
+        executor = HttpRequestExecutor()
+        context = make_context(
+            url="https://webhook.example.com/trigger",
+            method="POST",
+            body={"data": "test"},
+            include_metadata=True,
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.is_success = True
+        mock_response.json.return_value = {"ok": True}
+        mock_response.headers = {"content-type": "application/json"}
+
+        captured_payload = None
+
+        async def capture_request(method, url, **kwargs):
+            nonlocal captured_payload
+            captured_payload = kwargs.get("json")
+            return mock_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_instance = MagicMock()
+            mock_instance.request = AsyncMock(side_effect=capture_request)
+            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            result = await executor.execute(context)
+
+        assert result.success is True
+        assert "_workflow_metadata" in captured_payload
+        assert captured_payload["_workflow_metadata"]["execution_id"] == "test_execution"
+        assert captured_payload["_workflow_metadata"]["step_id"] == "test_step"
+
+    @pytest.mark.asyncio
+    async def test_execute_without_metadata(self) -> None:
+        """Test HTTP request excludes metadata when disabled (default)."""
+        executor = HttpRequestExecutor()
+        context = make_context(
+            url="https://api.example.com/data",
+            method="POST",
+            body={"data": "test"},
+            include_metadata=False,
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.is_success = True
+        mock_response.json.return_value = {"ok": True}
+        mock_response.headers = {"content-type": "application/json"}
+
+        captured_payload = None
+
+        async def capture_request(method, url, **kwargs):
+            nonlocal captured_payload
+            captured_payload = kwargs.get("json")
+            return mock_response
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_instance = MagicMock()
+            mock_instance.request = AsyncMock(side_effect=capture_request)
+            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            result = await executor.execute(context)
+
+        assert result.success is True
+        assert "_workflow_metadata" not in captured_payload
+
 
 class TestNotificationAction:
     """Tests for NotificationAction."""
@@ -359,220 +429,6 @@ class TestNotificationAction:
         assert "timed out" in result.error.lower()
 
 
-class TestWebhookAction:
-    """Tests for WebhookAction."""
-
-    def test_meta_attributes(self) -> None:
-        """Test action metadata attributes."""
-        meta = WebhookAction.meta
-        assert meta.type == "webhook"
-        assert meta.name == "Trigger Webhook"
-        assert meta.category == "Integration"
-        assert meta.execution_mode.value == "sync"
-
-    def test_validate_params_missing_url(self) -> None:
-        """Test validation catches missing url."""
-        executor = WebhookExecutor()
-        errors = executor.validate_params({})
-        assert any("url" in e for e in errors)
-
-    def test_validate_params_invalid_url(self) -> None:
-        """Test validation catches invalid URL format."""
-        executor = WebhookExecutor()
-        errors = executor.validate_params({"url": "ftp://example.com"})
-        assert any("http://" in e or "https://" in e for e in errors)
-
-    def test_validate_params_invalid_method(self) -> None:
-        """Test validation catches invalid method."""
-        executor = WebhookExecutor()
-        errors = executor.validate_params({"url": "https://example.com", "method": "OPTIONS"})
-        assert any("method" in e for e in errors)
-
-    def test_validate_params_valid(self) -> None:
-        """Test validation passes with valid params."""
-        executor = WebhookExecutor()
-        errors = executor.validate_params(
-            {"url": "https://webhook.example.com/trigger", "method": "POST"}
-        )
-        assert len(errors) == 0
-
-    @pytest.mark.asyncio
-    async def test_execute_success(self) -> None:
-        """Test successful webhook trigger."""
-        executor = WebhookExecutor()
-        context = make_context(
-            url="https://webhook.example.com/trigger",
-            method="POST",
-            payload={"event": "test"},
-        )
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.is_success = True
-        mock_response.json.return_value = {"received": True}
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_instance = MagicMock()
-            mock_instance.request = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            result = await executor.execute(context)
-
-        assert result.success is True
-        assert result.outputs["success"] is True
-        assert result.outputs["status_code"] == 200
-
-    @pytest.mark.asyncio
-    async def test_execute_with_metadata(self) -> None:
-        """Test webhook includes workflow metadata when enabled."""
-        executor = WebhookExecutor()
-        context = make_context(
-            url="https://webhook.example.com/trigger",
-            payload={"data": "test"},
-            include_metadata=True,
-        )
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.is_success = True
-        mock_response.json.return_value = {"ok": True}
-
-        captured_payload = None
-
-        async def capture_request(method, url, **kwargs):
-            nonlocal captured_payload
-            captured_payload = kwargs.get("json")
-            return mock_response
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_instance = MagicMock()
-            mock_instance.request = AsyncMock(side_effect=capture_request)
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            result = await executor.execute(context)
-
-        assert result.success is True
-        assert "_workflow_metadata" in captured_payload
-        assert captured_payload["_workflow_metadata"]["execution_id"] == "test_execution"
-
-    @pytest.mark.asyncio
-    async def test_execute_without_metadata(self) -> None:
-        """Test webhook excludes metadata when disabled."""
-        executor = WebhookExecutor()
-        context = make_context(
-            url="https://webhook.example.com/trigger",
-            payload={"data": "test"},
-            include_metadata=False,
-        )
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.is_success = True
-        mock_response.json.return_value = {"ok": True}
-
-        captured_payload = None
-
-        async def capture_request(method, url, **kwargs):
-            nonlocal captured_payload
-            captured_payload = kwargs.get("json")
-            return mock_response
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_instance = MagicMock()
-            mock_instance.request = AsyncMock(side_effect=capture_request)
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            result = await executor.execute(context)
-
-        assert result.success is True
-        assert "_workflow_metadata" not in captured_payload
-
-    @pytest.mark.asyncio
-    async def test_execute_get_method_uses_params(self) -> None:
-        """Test GET requests use query params instead of body."""
-        executor = WebhookExecutor()
-        context = make_context(
-            url="https://webhook.example.com/trigger",
-            method="GET",
-            payload={"key": "value"},
-            include_metadata=True,
-        )
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.is_success = True
-        mock_response.json.return_value = {"ok": True}
-
-        captured_json = None
-        captured_params = None
-
-        async def capture_request(method, url, **kwargs):
-            nonlocal captured_json, captured_params
-            captured_json = kwargs.get("json")
-            captured_params = kwargs.get("params")
-            return mock_response
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_instance = MagicMock()
-            mock_instance.request = AsyncMock(side_effect=capture_request)
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            result = await executor.execute(context)
-
-        assert result.success is True
-        assert captured_json is None  # No JSON body for GET
-        assert captured_params is not None  # Params used instead
-
-    @pytest.mark.asyncio
-    async def test_execute_timeout(self) -> None:
-        """Test webhook timeout handling."""
-        executor = WebhookExecutor()
-        context = make_context(
-            url="https://webhook.example.com/slow",
-            timeout_seconds=5,
-        )
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_instance = MagicMock()
-            mock_instance.request = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            result = await executor.execute(context)
-
-        assert result.success is False
-        assert "timed out" in result.error.lower()
-        assert result.outputs["status_code"] == 0
-
-    @pytest.mark.asyncio
-    async def test_execute_webhook_failure(self) -> None:
-        """Test webhook failure response handling."""
-        executor = WebhookExecutor()
-        context = make_context(url="https://webhook.example.com/trigger")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.is_success = False
-        mock_response.text = "Internal Server Error"
-        mock_response.json.side_effect = Exception("Not JSON")
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_instance = MagicMock()
-            mock_instance.request = AsyncMock(return_value=mock_response)
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            result = await executor.execute(context)
-
-        assert result.success is False
-        assert result.outputs["status_code"] == 500
-        assert result.outputs["response"] == "Internal Server Error"
-
-
 class TestIntegrationActionsRegistration:
     """Tests for action registration."""
 
@@ -580,13 +436,11 @@ class TestIntegrationActionsRegistration:
         """Test all integration actions have executor_class defined."""
         assert hasattr(HttpRequestAction, "executor_class")
         assert hasattr(NotificationAction, "executor_class")
-        assert hasattr(WebhookAction, "executor_class")
 
     def test_all_actions_have_meta(self) -> None:
         """Test all integration actions have meta defined."""
         assert hasattr(HttpRequestAction, "meta")
         assert hasattr(NotificationAction, "meta")
-        assert hasattr(WebhookAction, "meta")
 
     def test_executor_classes_are_correct_type(self) -> None:
         """Test executor classes are subclasses of BaseActionExecutor."""
@@ -594,14 +448,12 @@ class TestIntegrationActionsRegistration:
 
         assert issubclass(HttpRequestExecutor, BaseActionExecutor)
         assert issubclass(NotificationExecutor, BaseActionExecutor)
-        assert issubclass(WebhookExecutor, BaseActionExecutor)
 
     def test_unique_action_types(self) -> None:
         """Test all actions have unique type identifiers."""
         types = [
             HttpRequestAction.meta.type,
             NotificationAction.meta.type,
-            WebhookAction.meta.type,
         ]
         assert len(types) == len(set(types))
 
@@ -609,10 +461,8 @@ class TestIntegrationActionsRegistration:
         """Test all actions have parameters defined."""
         assert len(HttpRequestAction.meta.params) > 0
         assert len(NotificationAction.meta.params) > 0
-        assert len(WebhookAction.meta.params) > 0
 
     def test_all_actions_have_outputs_defined(self) -> None:
         """Test all actions have outputs defined."""
         assert len(HttpRequestAction.meta.outputs) > 0
         assert len(NotificationAction.meta.outputs) > 0
-        assert len(WebhookAction.meta.outputs) > 0

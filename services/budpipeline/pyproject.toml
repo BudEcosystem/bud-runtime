@@ -64,7 +64,7 @@ dev = [
 [project.entry-points."budpipeline.actions"]
 # Built-in Control Flow Actions
 log = "budpipeline.actions.builtin.log:LogAction"
-delay = "budpipeline.actions.builtin.delay:DelayAction"
+wait_until = "budpipeline.actions.builtin.wait_until:WaitUntilAction"
 conditional = "budpipeline.actions.builtin.conditional:ConditionalAction"
 transform = "budpipeline.actions.builtin.transform:TransformAction"
 aggregate = "budpipeline.actions.builtin.aggregate:AggregateAction"
@@ -85,11 +85,11 @@ deployment_create = "budpipeline.actions.deployment.create:DeploymentCreateActio
 deployment_delete = "budpipeline.actions.deployment.delete:DeploymentDeleteAction"
 deployment_scale = "budpipeline.actions.deployment.scale:DeploymentScaleAction"
 deployment_ratelimit = "budpipeline.actions.deployment.ratelimit:DeploymentRateLimitAction"
+direct_deployment_scale = "budpipeline.actions.deployment.direct_scale:DirectDeploymentScaleAction"
 
 # Integration Actions
 http_request = "budpipeline.actions.integration.http_request:HttpRequestAction"
 notification = "budpipeline.actions.integration.notification:NotificationAction"
-webhook = "budpipeline.actions.integration.webhook:WebhookAction"
 
 [tool.hatch.metadata]
 allow-direct-references = true

@@ -239,6 +239,8 @@ class PipelineDefinitionCRUD:
             if hasattr(definition, field):
                 setattr(definition, field, value)
 
+        # Increment version for optimistic locking
+        definition.version = definition.version + 1
         definition.updated_at = datetime.utcnow()
         await self.session.flush()
         await self.session.refresh(definition)
@@ -380,6 +382,8 @@ class PipelineExecutionCRUD:
             if hasattr(execution, field):
                 setattr(execution, field, value)
 
+        # Increment version for optimistic locking
+        execution.version = execution.version + 1
         execution.updated_at = datetime.utcnow()
         await self.session.flush()
         await self.session.refresh(execution)
@@ -647,6 +651,8 @@ class StepExecutionCRUD:
             if hasattr(step, field):
                 setattr(step, field, value)
 
+        # Increment version for optimistic locking
+        step.version = step.version + 1
         step.updated_at = datetime.utcnow()
         await self.session.flush()
         await self.session.refresh(step)
