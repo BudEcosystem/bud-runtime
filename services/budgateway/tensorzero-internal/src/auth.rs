@@ -344,6 +344,68 @@ pub async fn require_api_key(
                 }
             }
         }
+
+        // Set baggage attributes on current span and propagate to child spans.
+        //
+        // We use the ParentSpanContext stored by analytics_middleware, which contains
+        // gateway_analytics span's context. This gives us:
+        // - Correct trace_id (preserved from gateway_analytics)
+        // - Correct parent_span_id (gateway_analytics's span_id)
+        // - Baggage propagates to ALL child spans via BaggageSpanProcessor
+        //
+        // Why not span.context()? It returns current span's SpanContext → self-referencing
+        // Why not Context::current()? Empty in async Rust → breaks trace continuity
+        {
+            use crate::analytics_middleware::ParentSpanContext;
+            use crate::baggage::{keys, BaggageData, SharedBaggageData};
+            use tracing_opentelemetry::OpenTelemetrySpanExt;
+
+            // Build BaggageData from available metadata
+            let auth_meta = auth.get_auth_metadata(&key);
+            let baggage_data = BaggageData {
+                project_id: metadata.project_id.clone(),
+                prompt_id: metadata.prompt_id.clone(),
+                endpoint_id: metadata.endpoint_id.clone(),
+                api_key_id: auth_meta.as_ref().and_then(|m| m.api_key_id.clone()),
+                user_id: auth_meta.as_ref().and_then(|m| m.user_id.clone()),
+            };
+
+            if baggage_data.has_data() {
+                // Set attributes on current span (POST /v1/responses or similar)
+                let span = tracing::Span::current();
+                if let Some(ref id) = baggage_data.project_id {
+                    span.set_attribute(keys::PROJECT_ID, id.clone());
+                }
+                if let Some(ref id) = baggage_data.prompt_id {
+                    span.set_attribute(keys::PROMPT_ID, id.clone());
+                }
+                if let Some(ref id) = baggage_data.endpoint_id {
+                    span.set_attribute(keys::ENDPOINT_ID, id.clone());
+                }
+                if let Some(ref id) = baggage_data.api_key_id {
+                    span.set_attribute(keys::API_KEY_ID, id.clone());
+                }
+                if let Some(ref id) = baggage_data.user_id {
+                    span.set_attribute(keys::USER_ID, id.clone());
+                }
+
+                // Attach baggage to parent span context for child spans to inherit.
+                // Use the stored gateway_analytics context (preserves trace hierarchy).
+                if let Some(ParentSpanContext(parent_ctx)) =
+                    request.extensions().get::<ParentSpanContext>()
+                {
+                    let ctx_with_baggage = baggage_data.attach_to_context(parent_ctx.clone());
+                    span.set_parent(ctx_with_baggage);
+                }
+
+                // Populate shared container for analytics_middleware to read
+                if let Some(shared_baggage) = request.extensions().get::<SharedBaggageData>() {
+                    if let Ok(mut guard) = shared_baggage.lock() {
+                        *guard = Some(baggage_data);
+                    }
+                }
+            }
+        }
     }
 
     Ok(next.run(request).await)

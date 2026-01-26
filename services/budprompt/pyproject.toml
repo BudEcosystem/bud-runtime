@@ -73,3 +73,9 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+
+[tool.pip-audit]
+# Ignore vulnerabilities where the fix is not yet reflected in the advisory database
+ignore-vulns = [
+    "GHSA-7gcm-g887-7qv7",  # protobuf CVE-2026-0994 - pinned to 6.31.1, awaiting DB update
+]

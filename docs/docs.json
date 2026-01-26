@@ -141,6 +141,7 @@
           },
           {
             "group": "Customer Dashboard",
+            "icon": "user",
             "pages": [
               "product-guide/customer-dashboard/customer-portal"
             ]

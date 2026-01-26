@@ -803,6 +803,10 @@ class ObservabilityMetricsService:
         where_conditions = []
         params = {}
 
+        # Exclude blocked requests (they have inference_id = NULL, only trace_id)
+        # These shouldn't appear in the inference list as they don't have actual inference data
+        where_conditions.append("ifact.inference_id IS NOT NULL")
+
         # Always filter by date range
         # Note: Using 'ifact' alias instead of 'inf' to avoid conflict with ClickHouse's infinity constant
         where_conditions.append("ifact.timestamp >= %(from_date)s")

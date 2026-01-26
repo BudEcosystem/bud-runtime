@@ -6466,6 +6466,10 @@ pub async fn response_create_handler(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
+    // Extract baggage data from headers for downstream propagation
+    // The auth middleware has already set x-tensorzero-* headers with business context
+    let baggage_data = crate::baggage::BaggageData::from_headers(&headers);
+
     // Capture usage tokens for analytics (will be populated inside async block)
     // Format: (input_tokens, output_tokens, total_tokens)
     let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
@@ -6571,6 +6575,7 @@ pub async fn response_create_handler(
                 &params,
                 &model_resolution.original_model_name,
                 &clients,
+                Some(&baggage_data),
             )
             .await?;
 
@@ -6663,7 +6668,7 @@ pub async fn response_create_handler(
 
             // Handle streaming response
             let stream = model
-                .stream_response(&params, &model_resolution.original_model_name, &clients)
+                .stream_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
 
             // Wrap stream to capture events and record observability after completion
@@ -6728,7 +6733,7 @@ pub async fn response_create_handler(
         } else {
             // Handle non-streaming response
             let response = model
-                .create_response(&params, &model_resolution.original_model_name, &clients)
+                .create_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
 
             // Log the response size for debugging

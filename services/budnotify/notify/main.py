@@ -40,6 +40,9 @@ from .core.settings_routes import settings_router
 from .core.subscriber_routes import subscriber_router
 from .core.topic_routes import topic_router
 from .integrations.integration_routes import integration_router
+from .realtime import ChannelManager, ingest_router
+from .realtime.services import WebSocketService
+from .realtime.websocket_routes import socket_app
 from .shared.novu_service import NovuService
 from .shared.seeder_service import (
     NovuInitialSeeder,
@@ -60,12 +63,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     of the maximum sync interval specified in the application settings. The task is canceled upon exiting the
     context.
 
+    Additionally manages the realtime ChannelManager for WebSocket telemetry streaming.
+
     Args:
         app (FastAPI): The FastAPI application instance.
 
     Yields:
         None: Yields control back to the context where the lifespan management is performed.
     """
+    # Initialize the ChannelManager for realtime telemetry
+    # Note: Batching is handled by OTEL Collector (2s), no buffering in this service
+    channel_manager = ChannelManager()
+    app.state.channel_manager = channel_manager
+    WebSocketService.set_channel_manager(channel_manager)
+    logger.info("Realtime ChannelManager initialized with Socket.IO")
 
     async def schedule_secrets_and_config_sync() -> None:
         from random import randint
@@ -135,6 +146,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    # Cleanup: ChannelManager is stateless, no cleanup needed
+    logger.info("Realtime ChannelManager cleanup complete")
+
     if task is not None:
         try:
             task.cancel()
@@ -164,6 +178,12 @@ app.include_router(notify_router)
 app.include_router(settings_router)
 app.include_router(subscriber_router)
 app.include_router(topic_router)
+
+# Realtime telemetry streaming routes
+# Socket.IO app is mounted at /ws for Socket.IO connections
+app.mount("/ws", socket_app)
+# Ingest router provides HTTP endpoints for OTEL data ingestion
+app.include_router(ingest_router)
 
 # Override schemas for Swagger documentation
 app.openapi_schema = None  # Clear the cached schema

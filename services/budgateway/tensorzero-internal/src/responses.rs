@@ -1,3 +1,4 @@
+use crate::baggage::BaggageData;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -313,19 +314,27 @@ pub enum ResponseEventType {
 #[async_trait::async_trait]
 pub trait ResponseProvider {
     /// Create a new response
+    ///
+    /// The `baggage` parameter contains business context (project_id, prompt_id, etc.)
+    /// that should be propagated to downstream services via W3C Baggage headers.
     async fn create_response(
         &self,
         request: &OpenAIResponseCreateParams,
         client: &reqwest::Client,
         api_keys: &crate::endpoints::inference::InferenceCredentials,
+        baggage: Option<&BaggageData>,
     ) -> Result<OpenAIResponse, crate::error::Error>;
 
     /// Stream a response
+    ///
+    /// The `baggage` parameter contains business context (project_id, prompt_id, etc.)
+    /// that should be propagated to downstream services via W3C Baggage headers.
     async fn stream_response(
         &self,
         request: &OpenAIResponseCreateParams,
         client: &reqwest::Client,
         api_keys: &crate::endpoints::inference::InferenceCredentials,
+        baggage: Option<&BaggageData>,
     ) -> Result<
         Box<
             dyn futures::Stream<Item = Result<ResponseStreamEvent, crate::error::Error>>
@@ -369,21 +378,27 @@ pub trait ResponseProvider {
 
     /// Execute response with automatic format detection (for providers like BudPrompt)
     /// Default implementation falls back to stream parameter
+    ///
+    /// The `baggage` parameter contains business context (project_id, prompt_id, etc.)
+    /// that should be propagated to downstream services via W3C Baggage headers.
     async fn execute_response_with_detection(
         &self,
         request: &OpenAIResponseCreateParams,
         _model_name: &str,
         client: &reqwest::Client,
         api_keys: &crate::endpoints::inference::InferenceCredentials,
+        baggage: Option<&BaggageData>,
     ) -> Result<ResponseResult, crate::error::Error> {
         // Default implementation: check stream parameter and call appropriate method
         if request.stream.unwrap_or(false) {
             Ok(ResponseResult::Streaming(
-                self.stream_response(request, client, api_keys).await?,
+                self.stream_response(request, client, api_keys, baggage)
+                    .await?,
             ))
         } else {
             Ok(ResponseResult::NonStreaming(
-                self.create_response(request, client, api_keys).await?,
+                self.create_response(request, client, api_keys, baggage)
+                    .await?,
             ))
         }
     }

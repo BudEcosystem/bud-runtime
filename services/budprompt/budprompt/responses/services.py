@@ -192,7 +192,8 @@ class ResponsesService:
         span = tracer.start_span("invoke_agent budprompt", context=parent_ctx)
 
         # Set span as current context so child spans (Pydantic AI) attach to it
-        ctx = trace.set_span_in_context(span)
+        # CRITICAL: Pass parent_ctx to preserve baggage for child spans
+        ctx = trace.set_span_in_context(span, parent_ctx)
         context_token = context.attach(ctx)
 
         # Set attributes using semantic conventions
