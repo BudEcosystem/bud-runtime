@@ -873,10 +873,16 @@ class PipelineService:
                                             f"Failed to persist step awaiting event: {e}"
                                         )
 
-                                # Step stays RUNNING, don't set completed_at
-                                # Continue to next step or return execution as RUNNING
+                                # IMPORTANT: Step is awaiting an event. Execution must pause here.
+                                # Do NOT continue to dependent steps until this step completes.
+                                # The event router will trigger continuation when the event arrives.
                                 self.execution_storage.save_execution(execution_id, execution_data)
-                                continue  # Continue to next step in batch
+                                logger.info(
+                                    f"Execution {execution_id} pausing: step {step.id} awaiting "
+                                    f"event. Dependent steps will not run until event completes step."
+                                )
+                                # Return early - execution stays in RUNNING state
+                                return execution_data
 
                             # Synchronous completion
                             step_state["status"] = StepStatus.COMPLETED.value

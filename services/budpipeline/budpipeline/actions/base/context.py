@@ -76,6 +76,9 @@ class ActionContext:
         dapr_token = os.environ.get("DAPR_API_TOKEN") or os.environ.get("APP_API_TOKEN")
         if dapr_token:
             headers["dapr-api-token"] = dapr_token
+            # Also add x-app-api-token which Dapr forwards to the target app
+            # (Dapr consumes dapr-api-token for auth but doesn't forward it)
+            headers["x-app-api-token"] = dapr_token
 
         # Use provided client or create a temporary one
         client = self._http_client
