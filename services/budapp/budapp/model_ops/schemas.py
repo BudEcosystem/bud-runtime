@@ -1185,12 +1185,22 @@ class BudScalerBehavior(BaseModel):
     )
 
 
+class BudScalerScaleToZeroConfig(BaseModel):
+    """Scale-to-zero configuration for BudAIScaler."""
+
+    enabled: bool = Field(default=True, description="Enable scale-to-zero functionality")
+    activationScale: int = Field(default=1, ge=1, description="Number of replicas to scale to when waking from zero")
+    gracePeriod: str = Field(
+        default="5m", description="Time to wait at zero demand before scaling to zero (e.g., '5m', '30s')"
+    )
+
+
 class BudAIScalerSpecification(BaseModel):
     """BudAIScaler specification schema for new autoscaling standard."""
 
     enabled: bool = Field(default=False)
     minReplicas: int = Field(default=1, ge=0)
-    maxReplicas: int = Field(default=10, ge=1)
+    maxReplicas: int = Field(default=10, ge=0)
     scalingStrategy: BudScalerStrategyEnum = Field(default=BudScalerStrategyEnum.BUD_SCALER)
     metricsSources: List[BudScalerMetricSource] = Field(default_factory=list)
     gpuConfig: BudScalerGPUConfig = Field(default_factory=BudScalerGPUConfig)
@@ -1199,6 +1209,10 @@ class BudAIScalerSpecification(BaseModel):
     scheduleHints: List[BudScalerScheduleHint] = Field(default_factory=list)
     multiCluster: BudScalerMultiClusterConfig = Field(default_factory=BudScalerMultiClusterConfig)
     behavior: BudScalerBehavior = Field(default_factory=BudScalerBehavior)
+    # Scale-to-zero configuration (requires minReplicas=0)
+    scaleToZeroConfig: BudScalerScaleToZeroConfig | None = Field(
+        default=None, description="Scale-to-zero configuration (only effective when minReplicas=0)"
+    )
 
 
 class ModelDeployStepRequest(BaseModel):

@@ -3393,14 +3393,18 @@ class EndpointService(SessionMixin):
             )
 
         # Validate endpoint is in a state that allows autoscale updates
+        # Allow FAILURE/UNHEALTHY status to support scaling up from zero replicas
+        # (scale-to-zero sets replicas=0, which causes FAILURE/UNHEALTHY status)
         if db_endpoint.status not in [
             EndpointStatusEnum.RUNNING,
             EndpointStatusEnum.DEPLOYING,
+            EndpointStatusEnum.FAILURE,
+            EndpointStatusEnum.UNHEALTHY,
         ]:
             raise ClientException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 message=f"Cannot update autoscale for endpoint in {db_endpoint.status} state. "
-                "Endpoint must be in RUNNING or DEPLOYING state.",
+                "Endpoint must be in RUNNING, DEPLOYING, FAILURE, or UNHEALTHY state.",
             )
 
         # Validate cluster is available

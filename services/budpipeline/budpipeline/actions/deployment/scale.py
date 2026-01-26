@@ -96,12 +96,11 @@ class DeploymentScaleExecutor(BaseActionExecutor):
             existing_budaiscaler = current_config.get("budaiscaler_config") or {}
 
             # Build the new specification preserving existing settings
-            # Note: maxReplicas must be >= 1 per BudAIScalerSpecification schema
-            # When scaling to 0, set minReplicas=0, maxReplicas=1 to allow scale-down
+            # Note: scaleToZeroConfig is auto-configured by budcluster when minReplicas=0
             budaiscaler_spec: dict[str, Any] = {
                 "enabled": True,  # Must be enabled for scaling to work
                 "minReplicas": target_replicas,
-                "maxReplicas": max(target_replicas, 1),  # Ensure maxReplicas >= 1
+                "maxReplicas": target_replicas,
             }
 
             # Preserve existing scaling strategy if present
