@@ -27,6 +27,7 @@ class ParamType(str, Enum):
     PROJECT_REF = "project_ref"  # Project reference
     ENDPOINT_REF = "endpoint_ref"  # Endpoint reference
     PROVIDER_REF = "provider_ref"  # Cloud provider reference
+    CREDENTIAL_REF = "credential_ref"  # API credential reference (for cloud models)
 
 
 class ExecutionMode(str, Enum):

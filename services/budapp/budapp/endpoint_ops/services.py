@@ -230,8 +230,17 @@ class EndpointService(SessionMixin):
             project_id, offset, limit, filters, order_by, search, status_filter
         )
 
-    async def delete_endpoint(self, endpoint_id: UUID, current_user_id: UUID) -> WorkflowModel:
-        """Delete an endpoint by its ID."""
+    async def delete_endpoint(
+        self, endpoint_id: UUID, current_user_id: UUID, callback_topic: Optional[str] = None
+    ) -> WorkflowModel:
+        """Delete an endpoint by its ID.
+
+        Args:
+            endpoint_id: The endpoint ID to delete.
+            current_user_id: The ID of the user initiating the delete.
+            callback_topic: Optional Dapr pub/sub topic for budpipeline integration.
+                           If provided, completion events will be published to this topic.
+        """
         db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
             EndpointModel, {"id": endpoint_id}, exclude_fields={"status": EndpointStatusEnum.DELETED}
         )
@@ -326,7 +335,11 @@ class EndpointService(SessionMixin):
             # Perform delete endpoint request to bud_cluster app
             if has_cluster:
                 bud_cluster_response = await self._perform_bud_cluster_delete_endpoint_request(
-                    db_endpoint.cluster.cluster_id, db_endpoint.namespace, current_user_id, db_workflow.id
+                    db_endpoint.cluster.cluster_id,
+                    db_endpoint.namespace,
+                    current_user_id,
+                    db_workflow.id,
+                    callback_topic=callback_topic,
                 )
             else:
                 # For cloud models without cluster, skip bud_cluster deletion
@@ -380,13 +393,22 @@ class EndpointService(SessionMixin):
         return db_workflow
 
     async def _perform_bud_cluster_delete_endpoint_request(
-        self, bud_cluster_id: Optional[UUID], namespace: str, current_user_id: UUID, workflow_id: UUID
+        self,
+        bud_cluster_id: Optional[UUID],
+        namespace: str,
+        current_user_id: UUID,
+        workflow_id: UUID,
+        callback_topic: Optional[str] = None,
     ) -> Dict:
         """Perform delete endpoint request to bud_cluster app.
 
         Args:
             bud_cluster_id: The ID of the cluster being served by the endpoint to delete.
             namespace: The namespace of the cluster endpoint to delete.
+            current_user_id: The ID of the user initiating the delete.
+            workflow_id: The workflow ID tracking this deletion.
+            callback_topic: Optional Dapr pub/sub topic for budpipeline integration.
+                           If provided, completion events will also be published to this topic.
         """
         if not bud_cluster_id:
             logger.warning(
@@ -397,6 +419,11 @@ class EndpointService(SessionMixin):
             f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_cluster_app_id}/method/deployment/delete"
         )
 
+        # Build source_topic - always use list for consistent type
+        source_topics = [app_settings.source_topic]
+        if callback_topic:
+            source_topics.append(callback_topic)
+
         payload = {
             "cluster_id": str(bud_cluster_id),
             "namespace": namespace,
@@ -405,7 +432,7 @@ class EndpointService(SessionMixin):
                 "subscriber_ids": str(current_user_id),
                 "workflow_id": str(workflow_id),
             },
-            "source_topic": f"{app_settings.source_topic}",
+            "source_topic": source_topics,
         }
 
         logger.debug(f"Performing delete endpoint request to budcluster {payload}")
@@ -3366,14 +3393,18 @@ class EndpointService(SessionMixin):
             )
 
         # Validate endpoint is in a state that allows autoscale updates
+        # Allow FAILURE/UNHEALTHY status to support scaling up from zero replicas
+        # (scale-to-zero sets replicas=0, which causes FAILURE/UNHEALTHY status)
         if db_endpoint.status not in [
             EndpointStatusEnum.RUNNING,
             EndpointStatusEnum.DEPLOYING,
+            EndpointStatusEnum.FAILURE,
+            EndpointStatusEnum.UNHEALTHY,
         ]:
             raise ClientException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 message=f"Cannot update autoscale for endpoint in {db_endpoint.status} state. "
-                "Endpoint must be in RUNNING or DEPLOYING state.",
+                "Endpoint must be in RUNNING, DEPLOYING, FAILURE, or UNHEALTHY state.",
             )
 
         # Validate cluster is available

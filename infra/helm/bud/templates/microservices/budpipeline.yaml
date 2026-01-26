@@ -40,7 +40,7 @@ spec:
       - name: budpipeline
         image: {{ .Values.microservices.budpipeline.image }}
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        command: ["sh", "-c", "uvicorn budpipeline.main:app --host 0.0.0.0 --port 8010"]
+        command: ["sh", "-c", "alembic upgrade head && uvicorn budpipeline.main:app --host 0.0.0.0 --port 8010"]
         ports:
         - containerPort: 8010
         envFrom:

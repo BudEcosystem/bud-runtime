@@ -159,14 +159,17 @@ class ClusterHealthExecutor(BaseActionExecutor):
                 timeout_seconds=timeout,
             )
 
-            # Parse response into results
-            health_data = response.get("health", response)
+            # Parse response - budcluster returns {"data": {check: HealthCheckStatus}}
+            health_data = response.get("data", {})
             for check in checks:
                 if check in health_data:
                     results[check] = health_data[check]
                 else:
-                    # Simulate check result if not in response
-                    results[check] = {"healthy": True, "message": f"{check} OK"}
+                    # Check not in response - mark as unknown, not assumed healthy
+                    results[check] = {
+                        "healthy": False,
+                        "message": f"{check} check not available",
+                    }
 
         except Exception as e:
             logger.warning(

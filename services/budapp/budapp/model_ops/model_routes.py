@@ -914,9 +914,9 @@ async def get_catalog_model_details(
     },
     description="Retrieve details of a model by ID",
 )
-@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+@require_permissions_or_internal(permissions=[PermissionEnum.MODEL_VIEW])
 async def retrieve_model(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     model_id: UUID,
 ) -> Union[ModelDetailSuccessResponse, ErrorResponse]:
@@ -1231,6 +1231,8 @@ async def deploy_model_by_step(
             chat_template=deploy_request.chat_template,
             supports_lora=deploy_request.supports_lora,
             supports_pipeline_parallelism=deploy_request.supports_pipeline_parallelism,
+            callback_topic=deploy_request.callback_topic,
+            simulator_id=deploy_request.simulator_id,
         )
 
         return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)

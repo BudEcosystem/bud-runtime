@@ -605,6 +605,10 @@ class RecommendedClusterRequest(BaseModel):
         default=None,
         description="Comma-separated model endpoint types (e.g., 'EMBEDDING', 'LLM') for engine selection",
     )
+    debug: bool = Field(
+        default=False,
+        description="If True, run simulation synchronously and wait for completion before returning",
+    )
 
 
 class GrafanaDashboardResponse(SuccessResponse):

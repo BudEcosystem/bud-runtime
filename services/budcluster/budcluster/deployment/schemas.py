@@ -184,12 +184,22 @@ class ScalingBehavior(BaseModel):
     )
 
 
+class ScaleToZeroConfig(BaseModel):
+    """Scale-to-zero configuration for BudAIScaler."""
+
+    enabled: bool = Field(default=True, description="Enable scale-to-zero functionality")
+    activationScale: int = Field(default=1, ge=1, description="Number of replicas to scale to when waking from zero")
+    gracePeriod: str = Field(
+        default="5m", description="Time to wait at zero demand before scaling to zero (e.g., '5m', '30s')"
+    )
+
+
 class BudAIScalerConfig(BaseModel):
     """Complete BudAIScaler configuration schema."""
 
     enabled: bool = False
     minReplicas: int = Field(default=1, ge=0)
-    maxReplicas: int = Field(default=10, ge=1)
+    maxReplicas: int = Field(default=10, ge=0)
     scalingStrategy: ScalingStrategyEnum = ScalingStrategyEnum.BUD_SCALER
 
     # Metrics sources - flexible dict list for polymorphic handling
@@ -202,6 +212,11 @@ class BudAIScalerConfig(BaseModel):
     scheduleHints: List[ScheduleHint] = Field(default_factory=list)
     multiCluster: MultiClusterConfig = Field(default_factory=MultiClusterConfig)
     behavior: ScalingBehavior = Field(default_factory=ScalingBehavior)
+
+    # Scale-to-zero configuration (requires minReplicas=0)
+    scaleToZeroConfig: ScaleToZeroConfig | None = Field(
+        default=None, description="Scale-to-zero configuration (only effective when minReplicas=0)"
+    )
 
 
 class TransferModelRequest(BaseModel):
