@@ -26,6 +26,8 @@ import { useCluster } from "src/hooks/useCluster";
 import { useModels } from "src/hooks/useModels";
 import { useCloudProviders } from "src/hooks/useCloudProviders";
 import { useProjects } from "src/hooks/useProjects";
+import { useProprietaryCredentials } from "src/stores/useProprietaryCredentials";
+import { useEndPoints } from "src/hooks/useEndPoint";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
@@ -121,6 +123,8 @@ const WorkflowDetail = () => {
   const { models, getGlobalModels } = useModels();
   const { providers, getProviders } = useCloudProviders();
   const { projects, getProjects } = useProjects();
+  const { credentials: proprietaryCredentials, getCredentials: getProprietaryCredentials } = useProprietaryCredentials();
+  const { endPoints, getEndPoints } = useEndPoints();
 
   const [activeTab, setActiveTab] = useState("dag");
   const [selectedStep, setSelectedStep] = useState<PipelineStep | null>(null);
@@ -144,11 +148,13 @@ const WorkflowDetail = () => {
     [executions]
   );
 
-  // Transform clusters, models, projects, and providers to SelectOption format for WorkflowEditor
+  // Transform clusters, models, projects, providers, credentials, and endpoints to SelectOption format for WorkflowEditor
+  // Note: clusters use cluster_id (budcluster UUID) as value, not id (budapp UUID),
+  // to match what deploy-workflow endpoint expects
   const dataSources = useMemo(() => ({
     clusters: clusters.map((c) => ({
       label: c.name,
-      value: c.id,
+      value: c.cluster_id,
     })),
     models: models.map((m) => ({
       label: m.name,
@@ -162,9 +168,17 @@ const WorkflowDetail = () => {
       label: p.name,
       value: p.id,
     })),
-  }), [clusters, models, projects, providers]);
+    credentials: proprietaryCredentials.map((c) => ({
+      label: `${c.name} (${c.type})`,
+      value: c.id,
+    })),
+    endpoints: endPoints.map((e) => ({
+      label: e.name || e.id || "",
+      value: e.id || "",
+    })),
+  }), [clusters, models, projects, providers, proprietaryCredentials, endPoints]);
 
-  // Fetch clusters, models, projects, and providers when entering edit mode
+  // Fetch clusters, models, projects, providers, credentials, and endpoints when entering edit mode
   useEffect(() => {
     if (isEditing) {
       const loadingSet = new Set<string>();
@@ -180,6 +194,12 @@ const WorkflowDetail = () => {
       }
       if (providers.length === 0) {
         loadingSet.add("providers");
+      }
+      if (proprietaryCredentials.length === 0) {
+        loadingSet.add("credentials");
+      }
+      if (endPoints.length === 0) {
+        loadingSet.add("endpoints");
       }
 
       if (loadingSet.size > 0) {
@@ -236,6 +256,33 @@ const WorkflowDetail = () => {
               setLoadingDataSources(prev => {
                 const next = new Set(prev);
                 next.delete("providers");
+                return next;
+              });
+            })()
+          );
+        }
+
+        if (proprietaryCredentials.length === 0) {
+          fetchPromises.push(
+            (async () => {
+              await getProprietaryCredentials({ page: 1, limit: 100 });
+              setLoadingDataSources(prev => {
+                const next = new Set(prev);
+                next.delete("credentials");
+                return next;
+              });
+            })()
+          );
+        }
+
+        if (endPoints.length === 0) {
+          fetchPromises.push(
+            (async () => {
+              // Fetch all endpoints (no project filter needed for pipeline actions)
+              await getEndPoints({ page: 1, limit: 100 });
+              setLoadingDataSources(prev => {
+                const next = new Set(prev);
+                next.delete("endpoints");
                 return next;
               });
             })()

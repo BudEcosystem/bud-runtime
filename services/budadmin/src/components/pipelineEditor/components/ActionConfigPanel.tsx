@@ -243,6 +243,7 @@ export interface ActionConfigPanelProps {
     projects?: SelectOption[];
     endpoints?: SelectOption[];
     providers?: SelectOption[];
+    credentials?: SelectOption[];
   };
   /** Whether data sources are loading */
   loadingDataSources?: Set<string>;
@@ -547,6 +548,8 @@ export function ActionConfigPanel({
           return dataSources.endpoints || [];
         case 'provider_ref':
           return dataSources.providers || [];
+        case 'credential_ref':
+          return dataSources.credentials || [];
         default:
           return [];
       }
@@ -664,8 +667,8 @@ export function ActionConfigPanel({
             </select>
           )}
 
-          {/* Ref types (model, cluster, provider, etc.) - with toggle for template mode */}
-          {['model_ref', 'cluster_ref', 'project_ref', 'endpoint_ref', 'provider_ref'].includes(param.type) && (
+          {/* Ref types (model, cluster, provider, credential, etc.) - with toggle for template mode */}
+          {['model_ref', 'cluster_ref', 'project_ref', 'endpoint_ref', 'provider_ref', 'credential_ref'].includes(param.type) && (
             <div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
                 <button

@@ -479,7 +479,7 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                 </label>
                 <InputNumber
                   value={config.minReplicas}
-                  onChange={(value) => updateConfig({ minReplicas: value || 1 })}
+                  onChange={(value) => updateConfig({ minReplicas: value ?? 1 })}
                   min={0}
                   max={config.maxReplicas}
                   style={{ ...inputStyle, width: "100%" }}
@@ -501,7 +501,7 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
                 </label>
                 <InputNumber
                   value={config.maxReplicas}
-                  onChange={(value) => updateConfig({ maxReplicas: value || 10 })}
+                  onChange={(value) => updateConfig({ maxReplicas: value ?? 10 })}
                   min={config.minReplicas}
                   max={100}
                   style={{ ...inputStyle, width: "100%" }}

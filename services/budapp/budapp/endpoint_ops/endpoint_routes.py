@@ -19,13 +19,14 @@
 from typing import List, Optional, Union
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 from typing_extensions import Annotated
 
 from budapp.commons import logging
 from budapp.commons.dependencies import (
     get_current_active_user,
+    get_current_active_user_or_internal,
     get_session,
     parse_ordering_fields,
 )
@@ -33,7 +34,7 @@ from budapp.commons.exceptions import ClientException
 from budapp.user_ops.schemas import User
 
 from ..commons.constants import PermissionEnum
-from ..commons.permission_handler import require_permissions
+from ..commons.permission_handler import require_permissions, require_permissions_or_internal
 from ..commons.schemas import ErrorResponse, SuccessResponse
 from ..workflow_ops.schemas import RetrieveWorkflowDataResponse
 from ..workflow_ops.services import WorkflowService
@@ -46,6 +47,7 @@ from .schemas import (
     DeleteWorkerRequest,
     DeploymentPricingResponse,
     DeploymentSettingsResponse,
+    EndpointDeleteResponse,
     EndpointFilter,
     EndpointPaginatedResponse,
     ModelClusterDetailResponse,
@@ -146,28 +148,37 @@ async def list_all_endpoints(
             "description": "Invalid request parameters",
         },
         status.HTTP_200_OK: {
-            "model": SuccessResponse,
+            "model": EndpointDeleteResponse,
             "description": "Successfully executed delete endpoint workflow",
         },
     },
     description="Delete an endpoint by ID",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def delete_endpoint(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     endpoint_id: UUID,
     x_resource_type: Annotated[Optional[str], Header()] = None,
     x_entity_id: Annotated[Optional[str], Header()] = None,
-) -> Union[SuccessResponse, ErrorResponse]:
-    """Delete a endpoint by its ID."""
+    callback_topic: Annotated[Optional[str], Body(embed=True)] = None,
+) -> Union[EndpointDeleteResponse, ErrorResponse]:
+    """Delete a endpoint by its ID.
+
+    Args:
+        callback_topic: Optional Dapr pub/sub topic for budpipeline integration.
+                       If provided, completion events will be published to this topic.
+    """
     try:
-        db_workflow = await EndpointService(session).delete_endpoint(endpoint_id, current_user.id)
+        db_workflow = await EndpointService(session).delete_endpoint(
+            endpoint_id, current_user.id, callback_topic=callback_topic
+        )
         logger.debug(f"Endpoint deleting initiated with workflow id: {db_workflow.id}")
-        return SuccessResponse(
+        return EndpointDeleteResponse(
             message="Deployment deleting initiated successfully",
             code=status.HTTP_200_OK,
             object="endpoint.delete",
+            workflow_id=db_workflow.id,
         )
     except ClientException as e:
         logger.exception(f"Failed to delete endpoint: {e}")
@@ -1018,10 +1029,10 @@ async def update_deployment_settings(
     },
     description="Get autoscale configuration for an endpoint",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+@require_permissions_or_internal(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def get_autoscale_config(
     endpoint_id: UUID,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     x_resource_type: Annotated[Optional[str], Header()] = None,
     x_entity_id: Annotated[Optional[str], Header()] = None,
@@ -1065,11 +1076,11 @@ async def get_autoscale_config(
     },
     description="Update autoscale configuration for an endpoint",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+@require_permissions_or_internal(permissions=[PermissionEnum.ENDPOINT_MANAGE])
 async def update_autoscale_config(
     endpoint_id: UUID,
     request: UpdateAutoscaleRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_current_active_user_or_internal)],
     session: Annotated[Session, Depends(get_session)],
     x_resource_type: Annotated[Optional[str], Header()] = None,
     x_entity_id: Annotated[Optional[str], Header()] = None,
