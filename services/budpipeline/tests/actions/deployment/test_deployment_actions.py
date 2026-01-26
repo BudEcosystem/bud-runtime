@@ -62,33 +62,49 @@ class TestDeploymentCreateAction:
         assert any("endpoint_name" in e for e in errors)
 
     def test_validate_params_valid(self) -> None:
-        """Test validation passes with required params."""
+        """Test validation passes with required params for local model."""
         executor = DeploymentCreateExecutor()
         errors = executor.validate_params(
             {
                 "model_id": "model-123",
                 "project_id": "proj-123",
                 "endpoint_name": "test-endpoint",
+                "cluster_id": "cluster-123",
+                "hardware_mode": "shared",  # shared mode doesn't require SLO targets
             }
         )
         assert len(errors) == 0
 
-    def test_validate_params_cluster_optional(self) -> None:
-        """Test that cluster_id is optional (for cloud models)."""
+    def test_validate_params_cloud_model(self) -> None:
+        """Test validation passes for cloud model with credential_id."""
         executor = DeploymentCreateExecutor()
         errors = executor.validate_params(
             {
                 "model_id": "model-123",
                 "project_id": "proj-123",
                 "endpoint_name": "test-endpoint",
-                # cluster_id intentionally omitted
+                "credential_id": "cred-123",  # cloud model uses credential instead of cluster
             }
         )
         assert len(errors) == 0
+
+    def test_validate_params_requires_cluster_or_credential(self) -> None:
+        """Test that either cluster_id or credential_id is required."""
+        executor = DeploymentCreateExecutor()
+        errors = executor.validate_params(
+            {
+                "model_id": "model-123",
+                "project_id": "proj-123",
+                "endpoint_name": "test-endpoint",
+                # Neither cluster_id nor credential_id provided
+            }
+        )
+        assert len(errors) == 1
+        assert "cluster_id" in errors[0] or "credential_id" in errors[0]
 
 
 class TestDeploymentDeleteAction:
-    """Tests for DeploymentDeleteAction (placeholder)."""
+    """Tests for DeploymentDeleteAction."""
 
     def test_meta_attributes(self) -> None:
         """Test action metadata attributes."""
@@ -99,28 +115,34 @@ class TestDeploymentDeleteAction:
         assert meta.execution_mode.value == "event_driven"
         assert meta.idempotent is True
 
-    def test_validate_params_missing_deployment_id(self) -> None:
-        """Test validation catches missing deployment_id."""
+    def test_validate_params_missing_endpoint_id(self) -> None:
+        """Test validation catches missing endpoint_id."""
         executor = DeploymentDeleteExecutor()
         errors = executor.validate_params({})
-        assert any("deployment_id" in e for e in errors)
+        assert any("endpoint_id" in e for e in errors)
 
     def test_validate_params_valid(self) -> None:
         """Test validation passes with required params."""
         executor = DeploymentDeleteExecutor()
-        errors = executor.validate_params({"deployment_id": "deploy-123"})
+        errors = executor.validate_params({"endpoint_id": "endpoint-123"})
         assert len(errors) == 0
 
     @pytest.mark.asyncio
-    async def test_execute_returns_not_implemented(self) -> None:
-        """Test that execute returns not implemented error."""
+    async def test_execute_success(self) -> None:
+        """Test successful delete execution."""
         executor = DeploymentDeleteExecutor()
-        context = make_context(deployment_id="deploy-123")
+        context = make_context(endpoint_id="endpoint-123")
+
+        # Mock the invoke_service method
+        context.invoke_service = AsyncMock(
+            return_value={"workflow_id": "workflow-123", "status": "started"}
+        )
 
         result = await executor.execute(context)
 
-        assert result.success is False
-        assert "not yet implemented" in result.error.lower()
+        assert result.success is True
+        assert result.awaiting_event is True
+        assert result.outputs["endpoint_id"] == "endpoint-123"
 
 
 class TestDeploymentScaleAction:
@@ -359,7 +381,7 @@ class TestDeploymentScaleAction:
 
 
 class TestDeploymentRateLimitAction:
-    """Tests for DeploymentRateLimitAction (placeholder)."""
+    """Tests for DeploymentRateLimitAction."""
 
     def test_meta_attributes(self) -> None:
         """Test action metadata attributes."""
@@ -370,36 +392,41 @@ class TestDeploymentRateLimitAction:
         assert meta.execution_mode.value == "sync"
         assert meta.idempotent is True
 
-    def test_validate_params_missing_deployment_id(self) -> None:
-        """Test validation catches missing deployment_id."""
+    def test_validate_params_missing_endpoint_id(self) -> None:
+        """Test validation catches missing endpoint_id."""
         executor = DeploymentRateLimitExecutor()
         errors = executor.validate_params({"requests_per_second": 100})
-        assert any("deployment_id" in e for e in errors)
+        assert any("endpoint_id" in e for e in errors)
 
     def test_validate_params_invalid_rps(self) -> None:
         """Test validation catches non-positive requests_per_second."""
         executor = DeploymentRateLimitExecutor()
-        errors = executor.validate_params({"deployment_id": "deploy-123", "requests_per_second": 0})
+        errors = executor.validate_params({"endpoint_id": "endpoint-123", "requests_per_second": 0})
         assert any("requests_per_second" in e for e in errors)
 
     def test_validate_params_valid(self) -> None:
         """Test validation passes with valid params."""
         executor = DeploymentRateLimitExecutor()
         errors = executor.validate_params(
-            {"deployment_id": "deploy-123", "requests_per_second": 100}
+            {"endpoint_id": "endpoint-123", "requests_per_second": 100}
         )
         assert len(errors) == 0
 
     @pytest.mark.asyncio
-    async def test_execute_returns_not_implemented(self) -> None:
-        """Test that execute returns not implemented error."""
+    async def test_execute_success(self) -> None:
+        """Test successful rate limit configuration."""
         executor = DeploymentRateLimitExecutor()
-        context = make_context(deployment_id="deploy-123", requests_per_second=100)
+        context = make_context(endpoint_id="endpoint-123", requests_per_second=100)
+
+        # Mock the invoke_service method
+        context.invoke_service = AsyncMock(
+            return_value={"status": "success", "rate_limit_config": {"requests_per_second": 100}}
+        )
 
         result = await executor.execute(context)
 
-        assert result.success is False
-        assert "not yet implemented" in result.error.lower()
+        assert result.success is True
+        assert result.outputs["endpoint_id"] == "endpoint-123"
 
 
 class TestDeploymentActionsRegistration:
