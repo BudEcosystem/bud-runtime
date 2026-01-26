@@ -175,6 +175,7 @@ interface ToolsState {
     tags?: string;
     team_id?: string;
     visibility?: string;
+    search?: string;
     page?: number;
     limit?: number;
     append?: boolean;
@@ -221,6 +222,7 @@ export const useTools = create<ToolsState>((set, get) => ({
           ...(params?.tags && { tags: params.tags }),
           ...(params?.team_id && { team_id: params.team_id }),
           ...(params?.visibility && { visibility: params.visibility }),
+          ...(params?.search && { search: params.search }),
         },
       });
 

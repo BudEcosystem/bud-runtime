@@ -21,40 +21,13 @@ interface ToolData {
   name: string;
   description: string;
   icon: string;
+  subTools?: SubTool[];
 }
 
 interface ExpandedToolProps {
   tool: ToolData;
   onToolsSelected?: (toolId: string, subToolIds: string[]) => void;
 }
-
-// Mock sub-tools data
-const mockSubTools: SubTool[] = [
-  {
-    id: "1",
-    name: "describe_cronjob",
-    description:
-      "Get detailed information about a kubernetes cronjob including the recent job history",
-  },
-  {
-    id: "2",
-    name: "describe_cronjob",
-    description:
-      "Get detailed information about a kubernetes cronjob including the recent job history",
-  },
-  {
-    id: "3",
-    name: "describe_cronjob",
-    description:
-      "Get detailed information about a kubernetes cronjob including the recent job history",
-  },
-  {
-    id: "4",
-    name: "describe_cronjob",
-    description:
-      "Get detailed information about a kubernetes cronjob including the recent job history",
-  },
-];
 
 export default function ToolDetailsExpanded() {
   const { expandedDrawerProps, closeExpandedStep } = useDrawer();
@@ -63,7 +36,9 @@ export default function ToolDetailsExpanded() {
     new Set()
   );
 
-  const subTools = mockSubTools;
+  // Use sub-tools from the tool prop if available
+  // Note: Sub-tools data should be fetched from the MCP Foundry API via the tool details endpoint
+  const subTools: SubTool[] = props?.tool?.subTools || [];
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -129,48 +104,58 @@ export default function ToolDetailsExpanded() {
                 </Text_17_600_FFFFFF>
               </div>
 
-              {/* Select All */}
-              <div className="flex items-center gap-[0.75rem] px-[1rem] py-[0.75rem] border-b border-[#1F1F1F]">
-                <Checkbox
-                  checked={isAllSelected}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                />
-                <Text_14_400_EEEEEE>Select All</Text_14_400_EEEEEE>
-              </div>
-
-              {/* Sub Tools List */}
-              <div className="max-h-[300px] overflow-y-auto">
-                {subTools.map((subTool) => (
-                  <div
-                    key={subTool.id}
-                    className="flex items-start gap-[0.75rem] px-[1rem] py-[1rem] border-b border-[#1F1F1F] last:border-b-0 cursor-pointer hover:bg-[#1F1F1F]/30"
-                    onClick={() =>
-                      handleSubToolSelect(
-                        subTool.id,
-                        !selectedSubTools.has(subTool.id)
-                      )
-                    }
-                  >
+              {subTools.length > 0 ? (
+                <>
+                  {/* Select All */}
+                  <div className="flex items-center gap-[0.75rem] px-[1rem] py-[0.75rem] border-b border-[#1F1F1F]">
                     <Checkbox
-                      checked={selectedSubTools.has(subTool.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleSubToolSelect(subTool.id, e.target.checked);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-[2px]"
+                      checked={isAllSelected}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
                     />
-                    <div className="flex-1">
-                      <Text_14_400_EEEEEE className="mb-[0.25rem]">
-                        {subTool.name}
-                      </Text_14_400_EEEEEE>
-                      <Text_12_400_B3B3B3 className="leading-[150%]">
-                        {subTool.description}
-                      </Text_12_400_B3B3B3>
-                    </div>
+                    <Text_14_400_EEEEEE>Select All</Text_14_400_EEEEEE>
                   </div>
-                ))}
-              </div>
+
+                  {/* Sub Tools List */}
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {subTools.map((subTool) => (
+                      <div
+                        key={subTool.id}
+                        className="flex items-start gap-[0.75rem] px-[1rem] py-[1rem] border-b border-[#1F1F1F] last:border-b-0 cursor-pointer hover:bg-[#1F1F1F]/30"
+                        onClick={() =>
+                          handleSubToolSelect(
+                            subTool.id,
+                            !selectedSubTools.has(subTool.id)
+                          )
+                        }
+                      >
+                        <Checkbox
+                          checked={selectedSubTools.has(subTool.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSubToolSelect(subTool.id, e.target.checked);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-[2px]"
+                        />
+                        <div className="flex-1">
+                          <Text_14_400_EEEEEE className="mb-[0.25rem]">
+                            {subTool.name}
+                          </Text_14_400_EEEEEE>
+                          <Text_12_400_B3B3B3 className="leading-[150%]">
+                            {subTool.description}
+                          </Text_12_400_B3B3B3>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="p-[1rem] text-center">
+                  <Text_12_400_B3B3B3>
+                    No sub-tools available for this tool.
+                  </Text_12_400_B3B3B3>
+                </div>
+              )}
             </div>
           </div>
         </BudDrawerLayout>

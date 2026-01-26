@@ -130,6 +130,7 @@ class ToolService(SessionMixin):
         tags: Optional[List[str]] = None,
         team_id: Optional[str] = None,
         visibility: Optional[str] = None,
+        search: Optional[str] = None,
         offset: int = 0,
         limit: int = 10,
     ) -> Tuple[List[ToolRead], int, Optional[str]]:
@@ -141,6 +142,7 @@ class ToolService(SessionMixin):
             tags: Filter by tags
             team_id: Filter by team ID
             visibility: Filter by visibility
+            search: Search by name or description (case-insensitive)
             offset: Number of items to skip (used if cursor not provided)
             limit: Maximum number of items to return
 
@@ -149,6 +151,11 @@ class ToolService(SessionMixin):
 
         Raises:
             ClientException: If the request fails
+
+        Note:
+            Pagination and search filtering are performed in-memory after fetching
+            from MCP Foundry, as their API doesn't support offset/limit pagination
+            or text search natively. This may impact performance with large datasets.
         """
         try:
             logger.info(
@@ -158,6 +165,7 @@ class ToolService(SessionMixin):
                 tags=tags,
                 team_id=team_id,
                 visibility=visibility,
+                search=search,
             )
 
             response = await mcp_foundry_service.list_all_tools(
@@ -176,19 +184,31 @@ class ToolService(SessionMixin):
                 tools_data = response if isinstance(response, list) else []
                 next_cursor = None
 
-            # Apply offset/limit if no cursor-based pagination
+            # Apply search filter (in-memory, as MCP Foundry doesn't support text search)
+            if search and tools_data:
+                search_lower = search.lower()
+                tools_data = [
+                    tool
+                    for tool in tools_data
+                    if search_lower in (tool.get("name", "") or "").lower()
+                    or search_lower in (tool.get("displayName", "") or "").lower()
+                    or search_lower in (tool.get("description", "") or "").lower()
+                ]
+
+            # Get total count before pagination
+            total_count = len(tools_data)
+
+            # Apply offset/limit pagination (in-memory)
             if cursor is None and tools_data:
                 tools_data = tools_data[offset : offset + limit]
 
             # Transform to ToolRead schemas
             tools = [self._transform_tool_response(tool) for tool in tools_data]
 
-            # Total count (MCP Foundry may not provide this)
-            total_count = len(tools_data) if cursor is None else 0
-
             logger.debug(
                 "Successfully fetched tools from MCP Foundry",
                 count=len(tools),
+                total_count=total_count,
             )
 
             return tools, total_count, next_cursor

@@ -27,13 +27,15 @@ type TabType = "tools" | "virtual-servers";
 const Tools = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<TabType>("tools");
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadMoreVsRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { openDrawer } = useDrawer();
-  const { tools, getTools, setSelectedTool, isLoading, isLoadingMore, hasMore, loadMore } = useTools();
+  const { tools, getTools, setSelectedTool, isLoading, isLoadingMore, hasMore, loadMore, resetPagination } = useTools();
   const {
     virtualServers,
     getVirtualServers,
@@ -57,9 +59,35 @@ const Tools = () => {
     return Array.from(tagMap.values());
   }, [tools]);
 
+  // Debounced search - updates debouncedSearch after 300ms of no typing
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Fetch tools when search changes (server-side search)
+  useEffect(() => {
+    if (!isMounted) return;
+
+    resetPagination();
+    getTools({
+      search: debouncedSearch || undefined,
+      tags: activeFilters.size > 0 ? Array.from(activeFilters).join(",") : undefined,
+    });
+  }, [debouncedSearch, activeFilters, isMounted]);
+
   useEffect(() => {
     setIsMounted(true);
-    getTools();
     getVirtualServers();
   }, []);
 
@@ -70,8 +98,8 @@ const Tools = () => {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        // Only load more if intersecting, has more items, not already loading, and no active search/filters
-        if (entry.isIntersecting && hasMore && !isLoadingMore && !isLoading && !searchTerm && activeFilters.size === 0) {
+        // Load more if intersecting, has more items, and not already loading
+        if (entry.isIntersecting && hasMore && !isLoadingMore && !isLoading) {
           loadMore();
         }
       },
@@ -87,7 +115,7 @@ const Tools = () => {
     return () => {
       observer.disconnect();
     };
-  }, [hasMore, isLoadingMore, isLoading, searchTerm, activeFilters, loadMore, activeTab]);
+  }, [hasMore, isLoadingMore, isLoading, loadMore, activeTab]);
 
   // Infinite scroll with Intersection Observer for Virtual Servers
   useEffect(() => {
@@ -114,19 +142,8 @@ const Tools = () => {
     };
   }, [hasMoreVs, isLoadingMoreVs, isLoadingVs, searchTerm, loadMoreVs, activeTab]);
 
-  // Filter tools based on search and active filters
-  const filteredTools = tools.filter((tool) => {
-    const matchesSearch =
-      !searchTerm ||
-      tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tool.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesFilter =
-      activeFilters.size === 0 ||
-      tool.tags.some((tag) => activeFilters.has(tag.name));
-
-    return matchesSearch && matchesFilter;
-  });
+  // Tools are now filtered server-side via search and tags params
+  // No need for client-side filtering
 
   // Filter virtual servers based on search
   const filteredVirtualServers = virtualServers.filter((server) => {
@@ -281,14 +298,14 @@ const Tools = () => {
               )}
 
               {/* Empty State */}
-              {!isLoading && !filteredTools.length && !searchTerm && activeFilters.size === 0 && (
+              {!isLoading && !tools.length && !debouncedSearch && activeFilters.size === 0 && (
                 <Text_12_400_6A6E76 className="mt-5">
                   No tools have been added yet. Click the "Add Tool" button to get
                   started.
                 </Text_12_400_6A6E76>
               )}
 
-              {(searchTerm || activeFilters.size > 0) && !filteredTools.length && (
+              {!isLoading && (debouncedSearch || activeFilters.size > 0) && !tools.length && (
                 <NoDataFount
                   classNames="h-[60vh]"
                   textMessage={`No tools found matching your criteria`}
@@ -297,9 +314,9 @@ const Tools = () => {
 
               {/* Tools Grid */}
               <div className="grid gap-[1.1rem] grid-cols-3 mt-[1rem] pb-[1.1rem]">
-                {filteredTools.length > 0 ? (
+                {tools.length > 0 ? (
                   <>
-                    {filteredTools.map((tool, index) => (
+                    {tools.map((tool, index) => (
                       <div
                         className="flex flex-col justify-start toolCards min-h-[280px] 1680px:min-h-[320px] border border-[#1F1F1F] rounded-lg text-[1rem] 1680px:text-[1.1rem] bg-[#101010] overflow-hidden"
                         key={index}
@@ -347,7 +364,7 @@ const Tools = () => {
                     ))}
                   </>
                 ) : (
-                  !searchTerm &&
+                  !isLoading && !debouncedSearch &&
                   activeFilters.size === 0 && (
                     <div
                       className="flex justify-center items-center w-[100%] min-h-[182px] border border-[#2F3035] rounded-lg bg-[#18191B] cursor-pointer"
@@ -360,19 +377,17 @@ const Tools = () => {
               </div>
 
               {/* Load More Sentinel & Indicator */}
-              {!searchTerm && activeFilters.size === 0 && (
-                <div ref={loadMoreRef} className="flex justify-center items-center py-6">
-                  {isLoadingMore && (
-                    <div className="flex items-center gap-2">
-                      <Spin size="small" />
-                      <Text_12_400_6A6E76>Loading more tools...</Text_12_400_6A6E76>
-                    </div>
-                  )}
-                  {!hasMore && tools.length > 0 && (
-                    <Text_12_400_6A6E76>No more tools to load</Text_12_400_6A6E76>
-                  )}
-                </div>
-              )}
+              <div ref={loadMoreRef} className="flex justify-center items-center py-6">
+                {isLoadingMore && (
+                  <div className="flex items-center gap-2">
+                    <Spin size="small" />
+                    <Text_12_400_6A6E76>Loading more tools...</Text_12_400_6A6E76>
+                  </div>
+                )}
+                {!hasMore && tools.length > 0 && (
+                  <Text_12_400_6A6E76>No more tools to load</Text_12_400_6A6E76>
+                )}
+              </div>
             </>
           )}
 

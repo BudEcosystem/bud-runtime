@@ -95,6 +95,7 @@ async def list_tools(
     tags: Optional[List[str]] = Query(None, description="Filter by tags"),
     team_id: Optional[str] = Query(None, description="Filter by team ID"),
     visibility: Optional[str] = Query(None, description="Filter by visibility (public, private)"),
+    search: Optional[str] = Query(None, description="Search by name or description"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=100, description="Items per page"),
 ) -> JSONResponse:
@@ -108,6 +109,7 @@ async def list_tools(
             tags=tags,
             team_id=team_id,
             visibility=visibility,
+            search=search,
             offset=offset,
             limit=limit,
         )
