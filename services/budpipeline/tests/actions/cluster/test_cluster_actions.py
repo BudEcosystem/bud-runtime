@@ -73,7 +73,7 @@ class TestClusterHealthAction:
             "invoke_service",
             new_callable=AsyncMock,
             return_value={
-                "health": {
+                "data": {
                     "nodes": {"healthy": True, "message": "All nodes ready"},
                     "api": {"healthy": True, "message": "API server responding"},
                 }
@@ -97,7 +97,7 @@ class TestClusterHealthAction:
             "invoke_service",
             new_callable=AsyncMock,
             return_value={
-                "health": {
+                "data": {
                     "nodes": {"healthy": False, "message": "2 nodes not ready"},
                     "api": {"healthy": True, "message": "API server responding"},
                 }
