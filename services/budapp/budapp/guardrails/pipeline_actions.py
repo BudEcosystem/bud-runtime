@@ -22,6 +22,7 @@ from uuid import UUID
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import select
 
+from budapp.commons.constants import ScannerTypeEnum
 from budapp.commons.db_utils import SessionMixin
 from budapp.guardrails.crud import GuardrailsDeploymentDataManager
 from budapp.guardrails.models import GuardrailProbe, GuardrailRule
@@ -179,13 +180,14 @@ class GuardrailPipelineActions(SessionMixin):
 
         Args:
             profile_id: The guardrail profile ID
-            rule_deployments: List of dicts with rule_id, endpoint_url, endpoint_id
+            rule_deployments: List of dicts with rule_id, endpoint_url, endpoint_id, endpoint_name
 
         Returns:
-            dict with 'custom_rules' list and 'metadata_json' with scanner URLs
+            dict with 'custom_rules', 'metadata_json', and 'rule_overrides_json'
         """
         metadata: dict[str, Any] = {}
-        custom_rules = []
+        custom_rules: list[dict[str, Any]] = []
+        rule_overrides: dict[str, dict[str, str]] = {}
 
         for rd in rule_deployments:
             rule_id = UUID(rd["rule_id"]) if isinstance(rd["rule_id"], str) else rd["rule_id"]
@@ -195,8 +197,10 @@ class GuardrailPipelineActions(SessionMixin):
                 continue
 
             endpoint_url = rd.get("endpoint_url", "")
+            endpoint_name = rd.get("endpoint_name", "")
+            model_config = rule.model_config_json or {}
 
-            if rule.scanner_type == "llm":
+            if rule.scanner_type == ScannerTypeEnum.LLM.value:
                 # LLM scanner uses /v1 endpoint for chat completions
                 metadata["llm"] = {
                     "url": f"{endpoint_url}/v1",
@@ -206,37 +210,67 @@ class GuardrailPipelineActions(SessionMixin):
                 custom_rules.append(
                     {
                         "id": rule.uri,
+                        "name": rule.name,
+                        "description": rule.description,
+                        "kind": "llm",
                         "scanner": "llm",
                         "scanner_config_json": {
                             "model_id": rule.model_uri,
-                            "handler": rule.model_config_json.get("handler", "gpt_safeguard")
-                            if rule.model_config_json
-                            else "gpt_safeguard",
-                            "handler_config": rule.model_config_json,
+                            "handler": "gpt_safeguard",
+                            "handler_config": {
+                                "output_format": "structured_json",
+                                "policy": model_config.get("policy", {}),
+                            },
+                            "target_labels": model_config.get("target_labels", []),
                         },
                     }
                 )
-            elif rule.scanner_type == "classifier":
+                # Add rule override for deployed endpoint name
+                if endpoint_name:
+                    rule_overrides[rule.uri] = {"model_id": endpoint_name}
+
+            elif rule.scanner_type == ScannerTypeEnum.CLASSIFIER.value:
                 # Classifier scanner uses direct endpoint
                 metadata["latentbud"] = {
                     "url": endpoint_url,
                     "api_key_header": "Authorization",
                     "timeout_ms": 30000,
                 }
-                custom_rules.append(
-                    {
-                        "id": rule.uri,
-                        "scanner": "latentbud",
-                        "scanner_config_json": {
-                            "model_id": rule.model_uri,
-                            **(rule.model_config_json if rule.model_config_json else {}),
-                        },
-                    }
-                )
+                # Build head_mappings with default head_name
+                head_mappings = model_config.get("head_mappings", [])
+                if head_mappings:
+                    # Ensure head_name is set to "default"
+                    head_mappings = [
+                        {"head_name": "default", "target_labels": hm.get("target_labels", [])} for hm in head_mappings
+                    ]
+                else:
+                    head_mappings = [{"head_name": "default", "target_labels": []}]
+
+                custom_rule: dict[str, Any] = {
+                    "id": rule.uri,
+                    "name": rule.name,
+                    "description": rule.description,
+                    "kind": "classifier",
+                    "scanner": "latentbud",
+                    "scanner_config_json": {
+                        "model_id": rule.model_uri,
+                        "head_mappings": head_mappings,
+                    },
+                }
+                # Add post_processing_json if present
+                if model_config.get("post_processing"):
+                    custom_rule["post_processing_json"] = model_config["post_processing"]
+
+                custom_rules.append(custom_rule)
+
+                # Add rule override for deployed endpoint name
+                if endpoint_name:
+                    rule_overrides[rule.uri] = {"model_id": endpoint_name}
 
         return {
             "custom_rules": custom_rules,
             "metadata_json": metadata,
+            "rule_overrides_json": rule_overrides,
         }
 
     async def get_deployment_progress(

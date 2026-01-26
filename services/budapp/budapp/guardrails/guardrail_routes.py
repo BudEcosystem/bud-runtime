@@ -32,6 +32,7 @@ from budapp.commons.schemas import ErrorResponse, PaginatedSuccessResponse, Succ
 from budapp.guardrails.crud import GuardrailsDeploymentDataManager
 from budapp.guardrails.schemas import (
     GuardrailCustomProbeCreate,
+    GuardrailCustomProbeDetailResponse,
     GuardrailCustomProbeResponse,
     GuardrailCustomProbeUpdate,
     GuardrailDeploymentDetailResponse,
@@ -368,11 +369,11 @@ async def create_custom_probe(
             project_id=project_id,
             user_id=current_user.id,
         )
-        return SuccessResponse(
+        return GuardrailCustomProbeDetailResponse(
             code=status.HTTP_201_CREATED,
             object="guardrail.custom_probe.create",
             message="Custom probe created successfully",
-            data=GuardrailCustomProbeResponse.model_validate(probe),
+            probe=GuardrailCustomProbeResponse.model_validate(probe),
         ).to_http_response()
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -467,11 +468,11 @@ async def update_custom_probe(
             request=request,
             user_id=current_user.id,
         )
-        return SuccessResponse(
+        return GuardrailCustomProbeDetailResponse(
             code=status.HTTP_200_OK,
             object="guardrail.custom_probe.update",
             message="Custom probe updated successfully",
-            data=GuardrailCustomProbeResponse.model_validate(probe),
+            probe=GuardrailCustomProbeResponse.model_validate(probe),
         ).to_http_response()
     except ClientException as e:
         return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
@@ -575,7 +576,6 @@ async def create_rule(
             user_id=current_user.id,
             status=request.status,
             description=request.description,
-            scanner_types=request.scanner_types,
             modality_types=request.modality_types,
             guard_types=request.guard_types,
             examples=request.examples,
@@ -610,7 +610,6 @@ async def edit_rule(
             name=request.name,
             description=request.description,
             status=request.status,
-            scanner_types=request.scanner_types,
             modality_types=request.modality_types,
             guard_types=request.guard_types,
             examples=request.examples,

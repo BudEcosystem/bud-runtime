@@ -3386,6 +3386,8 @@ class ScannerTypeEnum(str, Enum):
 
     CLASSIFIER = "classifier"  # Classification model (e.g., Arch-Guard)
     LLM = "llm"  # LLM-based policy scanner
+    PATTERN = "pattern"  # Pattern-based detection (regex, keywords)
+    STATIC_CLASSIFIER = "static_classifier"  # Static/rule-based classifier
 
 
 class ProviderCapabilityEnum(Enum):

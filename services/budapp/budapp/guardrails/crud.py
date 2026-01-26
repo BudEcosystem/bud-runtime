@@ -33,7 +33,7 @@ from budapp.commons.constants import (
     ProbeTypeEnum,
 )
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.commons.exceptions import DatabaseException
+from budapp.commons.exceptions import ClientException, DatabaseException
 from budapp.guardrails.models import (
     GuardrailDeployment,
     GuardrailProbe,
@@ -1055,26 +1055,41 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         provider_id: UUID,
     ) -> GuardrailProbe:
         """Create a custom probe with a single model-based rule atomically."""
-        async with self.session.begin_nested():
+        # Generate URI for uniqueness check
+        probe_uri = f"custom.{user_id}.{name.lower().replace(' ', '_')}"
+
+        # Check for existing probe with same URI (same user + same name)
+        existing = self.session.query(GuardrailProbe).filter_by(uri=probe_uri).first()
+        if existing:
+            raise ClientException(
+                message=f"A custom probe with name '{name}' already exists for this user",
+                status_code=409,
+            )
+
+        savepoint = None
+        try:
+            # Start a new transaction savepoint
+            savepoint = self.session.begin_nested()
+
             # Create probe
             probe = GuardrailProbe(
                 name=name,
-                uri=f"custom.{user_id}.{name.lower().replace(' ', '_')}",
+                uri=probe_uri,
                 description=description,
                 probe_type=ProbeTypeEnum.CUSTOM,
-                provider_type=GuardrailProviderTypeEnum.BUD_SENTINEL,
+                provider_type=GuardrailProviderTypeEnum.BUD,
                 provider_id=provider_id,
                 created_by=user_id,
                 status=GuardrailStatusEnum.ACTIVE,
             )
             self.session.add(probe)
-            await self.session.flush()
+            self.session.flush()
 
             # Create single rule for the probe
             rule = GuardrailRule(
                 probe_id=probe.id,
                 name=name,
-                uri=f"custom.{user_id}.{name.lower().replace(' ', '_')}.rule",
+                uri=f"{probe_uri}.rule",
                 description=description,
                 scanner_type=scanner_type,
                 model_uri=model_uri,
@@ -1086,9 +1101,25 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
                 status=GuardrailStatusEnum.ACTIVE,
             )
             self.session.add(rule)
-            await self.session.flush()
+            self.session.flush()
 
-        return probe
+            # Commit the savepoint and the session
+            if savepoint:
+                savepoint.commit()
+            self.session.commit()
+
+            # Refresh probe to load the rules relationship
+            self.session.refresh(probe)
+
+            return probe
+
+        except Exception as e:
+            # Rollback the savepoint on any error
+            if savepoint and savepoint.is_active:
+                savepoint.rollback()
+            self.session.rollback()
+            logger.exception(f"Failed to create custom probe with rule: {e}")
+            raise
 
     async def get_custom_probes(
         self,
@@ -1100,6 +1131,7 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         """Get custom probes created by user."""
         query = (
             select(GuardrailProbe)
+            .options(selectinload(GuardrailProbe.rules))
             .where(GuardrailProbe.probe_type == ProbeTypeEnum.CUSTOM)
             .where(GuardrailProbe.created_by == user_id)
             .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
@@ -1112,8 +1144,8 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
             .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
         )
 
-        total = await self.session.scalar(count_query)
-        result = await self.session.execute(query.offset(offset).limit(limit))
+        total = self.session.scalar(count_query)
+        result = self.session.execute(query.offset(offset).limit(limit))
         probes = result.scalars().all()
 
         return list(probes), total or 0

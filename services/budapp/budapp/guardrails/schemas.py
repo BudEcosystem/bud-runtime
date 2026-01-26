@@ -17,7 +17,7 @@
 """Guardrail Pydantic schemas for API validation and serialization."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -25,6 +25,7 @@ from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
     GuardrailStatusEnum,
+    ModelProviderTypeEnum,
     ProbeTypeEnum,
     ProxyProviderEnum,
     ScannerTypeEnum,
@@ -63,29 +64,75 @@ class ClassifierConfig(BaseModel):
     post_processing: list[dict] | None = None
 
 
-class CategoryDef(BaseModel):
-    """Category definition for LLM policy."""
+class DefinitionItem(BaseModel):
+    """Term definition for policy."""
 
-    id: str
-    description: str
-    violation: bool
-    escalate: bool | None = None
+    term: str
+    definition: str
 
 
-class ExampleDef(BaseModel):
-    """Example for LLM policy."""
+class EvaluationConfig(BaseModel):
+    """Evaluation configuration for policy."""
+
+    depiction: str = "Does the content CONTAIN policy violations?"
+    request: str = "Is the user ASKING to generate violating content?"
+    guidance: str = "Return the HIGHEST severity that applies. Include both aspects in your rationale."
+
+
+class PolicyExample(BaseModel):
+    """Example for policy evaluation."""
 
     input: str
-    output: dict
+    rationale: str
+    confidence: str = "high"
+
+
+class ContentItem(BaseModel):
+    """Content item for safe_content or violation items."""
+
+    name: str
+    description: str
+    example: str
+
+
+class SafeContentConfig(BaseModel):
+    """Safe content configuration for policy."""
+
+    category: str = "safe"
+    description: str
+    items: list[ContentItem]
+    examples: list[PolicyExample]
+
+
+class ViolationCategory(BaseModel):
+    """Violation category for policy."""
+
+    category: str
+    severity: str  # "Moderate", "High", "Critical", "Maximum"
+    description: str
+    escalate: bool = False
+    items: list[ContentItem]
+    examples: list[PolicyExample]
+
+
+class AmbiguityRule(BaseModel):
+    """Ambiguity handling rule for policy."""
+
+    condition: str
+    action: str
 
 
 class PolicyConfig(BaseModel):
     """Policy configuration for LLM-based rules."""
 
     task: str
-    instructions: str
-    categories: list[CategoryDef]
-    examples: list[ExampleDef] | None = None
+    definitions: list[DefinitionItem]
+    safe_content: SafeContentConfig
+    violations: list[ViolationCategory]
+    # Optional fields with defaults
+    interpretation: list[str] | None = None
+    evaluation: EvaluationConfig | None = None
+    ambiguity: list[AmbiguityRule] | None = None
 
 
 class LLMConfig(BaseModel):
@@ -104,10 +151,16 @@ class GuardrailRuleCreate(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
-    scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
+    # Model-based rule fields
+    scanner_type: Optional[ScannerTypeEnum] = None
+    model_uri: Optional[str] = None
+    model_provider_type: Optional[ModelProviderTypeEnum] = None
+    is_gated: Optional[bool] = False
+    model_config_json: Optional[dict] = None
+    model_id: Optional[UUID4] = None
 
 
 class GuardrailRuleUpdate(BaseModel):
@@ -115,7 +168,6 @@ class GuardrailRuleUpdate(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
-    scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -132,7 +184,6 @@ class GuardrailRuleResponse(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
-    scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -251,6 +302,40 @@ class GuardrailCustomProbeResponse(BaseModel):
     status: str
     created_at: datetime
     modified_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_rule_data(cls, data: Any) -> Any:
+        """Extract rule data from the probe's rules relationship for custom probes."""
+        # If data is a dict, it's already been processed
+        if isinstance(data, dict):
+            return data
+
+        # If data has a rules attribute with at least one rule, extract rule data
+        if hasattr(data, "rules") and data.rules:
+            rule = data.rules[0]  # Custom probes have exactly one rule
+            return {
+                "id": data.id,
+                "name": data.name,
+                "description": data.description,
+                "probe_type": data.probe_type,
+                "scanner_type": getattr(rule, "scanner_type", None),
+                "model_id": getattr(rule, "model_id", None),
+                "model_uri": getattr(rule, "model_uri", None),
+                "model_config_json": getattr(rule, "model_config_json", None),
+                "status": data.status,
+                "created_at": data.created_at,
+                "modified_at": data.modified_at,
+            }
+
+        return data
+
+
+class GuardrailCustomProbeDetailResponse(SuccessResponse):
+    """Detail response schema for a single custom probe."""
+
+    probe: GuardrailCustomProbeResponse
+    object: str = "guardrail.custom_probe"
 
 
 class GuardrailRulePaginatedResponse(PaginatedSuccessResponse):

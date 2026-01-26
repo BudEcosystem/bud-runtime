@@ -1213,7 +1213,6 @@ class GuardrailProbeRuleService(SessionMixin):
         user_id: UUID,
         status: GuardrailStatusEnum,
         description: Optional[str] = None,
-        scanner_types: Optional[list[str]] = None,
         modality_types: Optional[list[str]] = None,
         guard_types: Optional[list[str]] = None,
         examples: Optional[list[str]] = None,
@@ -1232,7 +1231,6 @@ class GuardrailProbeRuleService(SessionMixin):
                 created_by=user_id,
                 status=status,
                 description=description,
-                scanner_types=scanner_types,
                 modality_types=modality_types,
                 guard_types=guard_types,
                 examples=examples,
@@ -1253,7 +1251,6 @@ class GuardrailProbeRuleService(SessionMixin):
         name: Optional[str] = None,
         description: Optional[str] = None,
         status: Optional[GuardrailStatusEnum] = None,
-        scanner_types: Optional[list[str]] = None,
         modality_types: Optional[list[str]] = None,
         guard_types: Optional[list[str]] = None,
         examples: Optional[list[str]] = None,
@@ -1286,8 +1283,6 @@ class GuardrailProbeRuleService(SessionMixin):
             update_data["description"] = description
         if status is not None:
             update_data["status"] = status
-        if scanner_types is not None:
-            update_data["scanner_types"] = scanner_types
         if modality_types is not None:
             update_data["modality_types"] = modality_types
         if guard_types is not None:
@@ -2086,9 +2081,7 @@ class GuardrailCustomProbeService(SessionMixin):
             )
 
         # Get the BudSentinel provider for custom probes
-        provider = await ProviderDataManager(self.session).retrieve_by_fields(
-            Provider, {"provider_type": GuardrailProviderTypeEnum.BUD_SENTINEL}
-        )
+        provider = await ProviderDataManager(self.session).retrieve_by_fields(Provider, {"type": "bud_sentinel"})
         if not provider:
             raise ClientException(
                 message="BudSentinel provider not found",
@@ -2106,8 +2099,8 @@ class GuardrailCustomProbeService(SessionMixin):
             model_id=request.model_id,
             model_config=model_config,
             model_uri=db_model.uri or f"model://{db_model.id}",
-            model_provider_type=db_model.provider_type or "custom",
-            is_gated=db_model.is_gated or False,
+            model_provider_type=db_model.provider_type,
+            is_gated=False,
             project_id=project_id,
             user_id=user_id,
             provider_id=provider.id,
