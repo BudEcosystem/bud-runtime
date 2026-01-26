@@ -20,6 +20,7 @@ pub enum EndpointCapability {
     ImageVariation,
     Document,
     Completions,
+    Classify,
     // Future capabilities can be added here:
     // FineTuning,
 }
@@ -43,6 +44,7 @@ impl EndpointCapability {
             Self::ImageVariation => "image_variation",
             Self::Document => "document",
             Self::Completions => "completions",
+            Self::Classify => "classify",
         }
     }
 }

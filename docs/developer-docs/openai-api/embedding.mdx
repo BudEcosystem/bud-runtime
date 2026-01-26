@@ -34,6 +34,12 @@ Authorization: Bearer <YOUR_API_KEY>
   "model": "string",
   "input": "string" | ["array", "of", "strings"],
   "encoding_format": "float",
+  "modality": "text",
+  "dimensions": 0,
+  "priority": "normal",
+  "user": "string",
+  "include_input": false,
+  "chunking": { ... },
   "tensorzero::cache_options": {
     "enabled": "on" | "off",
     "max_age_s": 3600
@@ -41,16 +47,105 @@ Authorization: Bearer <YOUR_API_KEY>
 }
 ```
 
-#### Parameters
+### Base Fields
+
+| Parameter | Type | Default | Supported Values |
+|-----------|------|---------|------------------|
+| `model` | string | "default/not-specified" | Any deployed model name |
+| `input` | string \| string[] | required | Text strings, URLs, or `data:<mime>;base64,...` |
+| `encoding_format` | string | "float" | "float", "base64" |
+| `modality` | string | "text" | "text", "image", "audio" |
+| `dimensions` | integer | 0 | 0 (full), or model-supported dimensions |
+| `priority` | string \| null | null | "high", "normal", "low", null |
+| `user` | string \| null | null | Any string |
+
+### Text-only Fields
+
+| Parameter | Type | Default | Supported Values |
+|-----------|------|---------|------------------|
+| `include_input` | boolean | false | true, false |
+| `chunking` | object \| null | null | ChunkingConfig object |
+
+### Caching Options
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `model` | string | Yes | The model identifier to use for embeddings. Can be a simple model name (e.g., `text-embedding-3-small`) or prefixed with `tensorzero::` (e.g., `tensorzero::my-embedding-model::`) |
-| `input` | string \| string[] | Yes | The text(s) to generate embeddings for. Can be a single string or an array of strings for batch processing |
-| `encoding_format` | string | No | The format of the embeddings. Currently only `"float"` is supported (default) |
 | `tensorzero::cache_options` | object | No | Caching configuration for the request |
-| `tensorzero::cache_options.enabled` | string | No | Enable (`"on"`) or disable (`"off"`) caching for this request |
+| `tensorzero::cache_options.enabled` | string | No | Enable (`"on"`) or disable (`"off"`) caching |
 | `tensorzero::cache_options.max_age_s` | integer | No | Maximum age in seconds for cached embeddings |
+
+## ChunkingConfig Schema
+
+When `chunking` is provided, the input text(s) will be automatically chunked before embedding.
+
+### Core Parameters
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `enabled` | boolean | false | true, false |
+| `strategy` | string | "token" | "token", "sentence", "recursive", "semantic", "code", "table" |
+| `chunk_size` | integer | 512 | 1 - 8192 |
+| `chunk_overlap` | integer | 0 | 0 - chunk_size-1 |
+| `tokenizer` | string | "cl100k_base" | "cl100k_base", "p50k_base", "r50k_base", "gpt2", etc. |
+
+### Sentence Strategy
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `min_sentences` | integer | 1 | >= 1 |
+| `delimiters` | string[] \| null | null | e.g. `[". ", "! ", "? ", "\n"]` |
+
+### Recursive Strategy
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `recipe` | string \| null | null | "markdown", null |
+
+### Semantic Strategy
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `semantic_threshold` | float | 0.8 | 0.0 - 1.0 |
+| `semantic_model` | string | "minishlab/potion-base-32M" | Any sentence-transformers model |
+| `semantic_window` | integer | 3 | >= 1 |
+
+### Code Strategy
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `language` | string \| null | null (auto) | "python", "javascript", "typescript", "java", "c", "cpp", "go", "rust", "ruby", etc. |
+
+### Preprocessing (Chef)
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `chef` | string \| null | null | "text", "markdown", "table", null |
+
+- **"text"** - Normalize whitespace, remove excessive newlines
+- **"markdown"** - Strip markdown formatting (headers, bold, links, code blocks)
+- **"table"** - Preserve table structure, normalize cell content
+
+### Pipeline Mode
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `pipeline` | string[] \| null | null | e.g. `["sentence", "token"]`, `["recursive", "semantic"]` |
+
+When `pipeline` is set, it overrides `strategy`. Chunkers run sequentially - output from one becomes input to the next.
+
+### Overlap Refinery
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `add_overlap_context` | boolean | false | true, false |
+| `overlap_size` | integer \| float | 0.25 | Integer (tokens) or float (fraction 0-1) |
+| `overlap_method` | string | "suffix" | "prefix", "suffix" |
+
+### Response Options
+
+| Field | Type | Default | Supported Values |
+|-------|------|---------|------------------|
+| `return_chunk_text` | boolean | true | true, false |
 
 ## Response Format
 
@@ -63,14 +158,20 @@ Authorization: Bearer <YOUR_API_KEY>
     {
       "object": "embedding",
       "embedding": [0.0023064255, -0.009327292, ...],
-      "index": 0
+      "index": 0,
+      "text": "original text (if include_input=true)",
+      "chunk_text": "chunk text (if chunking enabled)",
+      "chunk_info": { ... }
     }
   ],
   "model": "text-embedding-3-small",
   "usage": {
     "prompt_tokens": 8,
     "total_tokens": 8
-  }
+  },
+  "id": "emb-abc123",
+  "created": 1699000000,
+  "chunking_info": { ... }
 }
 ```
 
@@ -83,10 +184,16 @@ Authorization: Bearer <YOUR_API_KEY>
 | `data[].object` | string | Always `"embedding"` |
 | `data[].embedding` | float[] | The embedding vector as an array of floats |
 | `data[].index` | integer | The index of this embedding in the batch (0-based) |
+| `data[].text` | string \| null | Original input text (when `include_input=true`) |
+| `data[].chunk_text` | string \| null | Chunk text (when chunking enabled) |
+| `data[].chunk_info` | object \| null | Chunk metadata (when chunking enabled) |
 | `model` | string | The model used to generate the embeddings |
 | `usage` | object | Token usage information |
 | `usage.prompt_tokens` | integer | Number of tokens in the input |
-| `usage.total_tokens` | integer | Total tokens used (same as prompt_tokens for embeddings) |
+| `usage.total_tokens` | integer | Total tokens used |
+| `id` | string \| null | Response ID |
+| `created` | integer \| null | Unix timestamp |
+| `chunking_info` | object \| null | Overall chunking metadata |
 
 ## Error Responses
 
@@ -148,22 +255,36 @@ All model providers exhausted (no available providers could handle the request).
 
 ## Usage Examples
 
-### Single Text Embedding
+### Basic Text Embedding
 
 ```bash
-curl -X POST https://api.tensorzero.com/v1/embeddings \
+curl -X POST https://api.example.com/v1/embeddings \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "text-embedding-3-small",
-    "input": "The quick brown fox jumps over the lazy dog"
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": "Hello world"
+  }'
+```
+
+### With Priority and Dimensions
+
+```bash
+curl -X POST https://api.example.com/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": ["Important query"],
+    "priority": "high",
+    "dimensions": 384
   }'
 ```
 
 ### Batch Embeddings
 
 ```bash
-curl -X POST https://api.tensorzero.com/v1/embeddings \
+curl -X POST https://api.example.com/v1/embeddings \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -176,10 +297,100 @@ curl -X POST https://api.tensorzero.com/v1/embeddings \
   }'
 ```
 
+### Sentence Chunking with Markdown Preprocessing
+
+```bash
+curl -X POST https://api.example.com/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": ["# Title\n\nLong markdown document..."],
+    "chunking": {
+      "enabled": true,
+      "strategy": "sentence",
+      "chunk_size": 256,
+      "min_sentences": 2,
+      "chef": "markdown"
+    }
+  }'
+```
+
+### Pipeline: Sentence -> Token with Overlap
+
+```bash
+curl -X POST https://api.example.com/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": ["Very long document..."],
+    "chunking": {
+      "enabled": true,
+      "pipeline": ["sentence", "token"],
+      "chunk_size": 512,
+      "add_overlap_context": true,
+      "overlap_size": 64,
+      "overlap_method": "suffix"
+    }
+  }'
+```
+
+### Code Chunking
+
+```bash
+curl -X POST https://api.example.com/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": ["def foo():\n    pass\n\nclass Bar:\n    ..."],
+    "chunking": {
+      "enabled": true,
+      "strategy": "code",
+      "language": "python",
+      "chunk_size": 1024
+    }
+  }'
+```
+
+### Semantic Chunking
+
+```bash
+curl -X POST https://api.example.com/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": ["Document with multiple topics..."],
+    "chunking": {
+      "enabled": true,
+      "strategy": "semantic",
+      "semantic_threshold": 0.7,
+      "semantic_model": "minishlab/potion-base-32M",
+      "chunk_size": 512
+    }
+  }'
+```
+
+### Image Embedding
+
+```bash
+curl -X POST https://api.example.com/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/clip-vit-base-patch32",
+    "input": ["http://example.com/image.jpg"],
+    "modality": "image",
+    "encoding_format": "base64"
+  }'
+```
+
 ### With Caching Options
 
 ```bash
-curl -X POST https://api.tensorzero.com/v1/embeddings \
+curl -X POST https://api.example.com/v1/embeddings \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -196,56 +407,57 @@ curl -X POST https://api.tensorzero.com/v1/embeddings \
 
 ```python
 import requests
-import json
 
-url = "https://api.tensorzero.com/v1/embeddings"
+url = "https://api.example.com/v1/embeddings"
 headers = {
     "Authorization": "Bearer YOUR_API_KEY",
     "Content-Type": "application/json"
 }
 
-# Single embedding
+# Basic embedding
 data = {
-    "model": "text-embedding-3-small",
+    "model": "BAAI/bge-small-en-v1.5",
     "input": "The quick brown fox jumps over the lazy dog"
 }
 
 response = requests.post(url, headers=headers, json=data)
 result = response.json()
-
-# Extract the embedding vector
 embedding = result["data"][0]["embedding"]
 print(f"Embedding dimension: {len(embedding)}")
 
-# Batch embeddings
-batch_data = {
-    "model": "text-embedding-3-small",
-    "input": [
-        "First text",
-        "Second text",
-        "Third text"
-    ]
+# With chunking
+chunked_data = {
+    "model": "BAAI/bge-small-en-v1.5",
+    "input": ["Long document that needs chunking..."],
+    "priority": "high",
+    "chunking": {
+        "enabled": True,
+        "pipeline": ["sentence", "token"],
+        "chunk_size": 512,
+        "add_overlap_context": True,
+        "overlap_size": 64
+    }
 }
 
-batch_response = requests.post(url, headers=headers, json=batch_data)
-batch_result = batch_response.json()
+response = requests.post(url, headers=headers, json=chunked_data)
+result = response.json()
 
-for item in batch_result["data"]:
-    print(f"Index {item['index']}: {len(item['embedding'])} dimensions")
+for item in result["data"]:
+    print(f"Chunk {item['index']}: {len(item['embedding'])} dims")
 ```
 
 ### JavaScript/TypeScript Example
 
 ```javascript
-const url = 'https://api.tensorzero.com/v1/embeddings';
+const url = 'https://api.example.com/v1/embeddings';
 const headers = {
   'Authorization': 'Bearer YOUR_API_KEY',
   'Content-Type': 'application/json'
 };
 
-// Single embedding
+// Basic embedding
 const data = {
-  model: 'text-embedding-3-small',
+  model: 'BAAI/bge-small-en-v1.5',
   input: 'The quick brown fox jumps over the lazy dog'
 };
 
@@ -260,27 +472,30 @@ fetch(url, {
     console.log(`Embedding dimension: ${embedding.length}`);
   });
 
-// Batch embeddings with async/await
-async function getBatchEmbeddings() {
-  const batchData = {
-    model: 'text-embedding-3-small',
-    input: [
-      'First text',
-      'Second text',
-      'Third text'
-    ]
+// With chunking
+async function getChunkedEmbeddings() {
+  const chunkedData = {
+    model: 'BAAI/bge-small-en-v1.5',
+    input: ['Long document that needs chunking...'],
+    priority: 'high',
+    chunking: {
+      enabled: true,
+      pipeline: ['sentence', 'token'],
+      chunk_size: 512,
+      add_overlap_context: true,
+      overlap_size: 64
+    }
   };
 
   const response = await fetch(url, {
     method: 'POST',
     headers: headers,
-    body: JSON.stringify(batchData)
+    body: JSON.stringify(chunkedData)
   });
 
   const result = await response.json();
-
   result.data.forEach(item => {
-    console.log(`Index ${item.index}: ${item.embedding.length} dimensions`);
+    console.log(`Chunk ${item.index}: ${item.embedding.length} dims`);
   });
 }
 ```
@@ -289,12 +504,14 @@ async function getBatchEmbeddings() {
 
 - The endpoint supports batch processing for efficiency when embedding multiple texts
 - Embeddings are returned as arrays of floating-point numbers
-- The model must be configured in TensorZero with embedding capabilities
+- The model must be configured with embedding capabilities
 - Caching can significantly improve performance for repeated queries
 - Token usage is calculated based on the input text(s)
-- The endpoint is compatible with OpenAI's embedding API format, making it easy to switch between providers
+- The endpoint is compatible with OpenAI's embedding API format
+- Chunking is processed server-side before embedding generation
+- Pipeline mode allows chaining multiple chunking strategies
 
-## Supported providers
+## Supported Providers
 
 <CardGroup cols={2}>
   <Card title="OpenAI">
@@ -311,5 +528,8 @@ async function getBatchEmbeddings() {
   </Card>
   <Card title="Mistral AI">
     Offers Mistral-embed model for high-quality text embeddings with multilingual support.
+  </Card>
+  <Card title="vLLM">
+    Self-hosted embedding models with support for chunking, priority, and multimodal inputs.
   </Card>
 </CardGroup>

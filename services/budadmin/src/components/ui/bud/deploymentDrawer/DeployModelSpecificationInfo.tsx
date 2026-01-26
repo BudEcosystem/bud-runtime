@@ -167,6 +167,13 @@ function DeployModelSpecificationInfo({
   const isCloudModelFlow =
     currentWorkflow?.workflow_steps?.model?.provider_type === "cloud_model";
 
+  // Check if model is embedding/classify-only (no TTFT/throughput metrics apply)
+  const hasChatEndpoint = selectedModel?.supported_endpoints?.chat?.enabled;
+  const hasCompletionEndpoint = selectedModel?.supported_endpoints?.completion?.enabled;
+  const hasEmbeddingEndpoint = selectedModel?.supported_endpoints?.embedding?.enabled;
+  const hasClassifyEndpoint = selectedModel?.supported_endpoints?.classify?.enabled;
+  const isEmbeddingOrClassifyOnly = (hasEmbeddingEndpoint || hasClassifyEndpoint) && !hasChatEndpoint && !hasCompletionEndpoint;
+
   const deploymentSpecs: SpecificationTableItemProps[] = [
     {
       name: "Template",
@@ -181,7 +188,7 @@ function DeployModelSpecificationInfo({
       icon: "/images/drawer/tag.png",
       // full: true,
     },
-    !isCloudModelFlow && {
+    !isCloudModelFlow && !isEmbeddingOrClassifyOnly && {
       name: "Time To First Token",
       value:
         deploymentSpecifcation.ttft?.length > 0 &&
@@ -193,7 +200,7 @@ function DeployModelSpecificationInfo({
       value: showDeployInfo && deploymentSpecifcation.concurrent_requests,
       icon: "/images/drawer/current.png",
     },
-    !isCloudModelFlow && {
+    !isCloudModelFlow && !isEmbeddingOrClassifyOnly && {
       name: "Per-session Token/sec",
       value:
         deploymentSpecifcation.per_session_tokens_per_sec?.length > 0 &&
@@ -217,14 +224,14 @@ function DeployModelSpecificationInfo({
         deploymentSpecifcation.e2e_latency?.join("-") + " s",
       icon: "/images/drawer/tag.png",
     },
-    {
+    !isEmbeddingOrClassifyOnly && {
       name: "Throughput per User",
       value:
         currentWorkflow?.workflow_steps?.endpoint_details?.result
           ?.target_throughput_per_user,
       icon: "/images/drawer/tag.png",
     },
-    {
+    !isEmbeddingOrClassifyOnly && {
       name: "Target TTFT",
       value:
         currentWorkflow?.workflow_steps?.endpoint_details?.result?.target_ttft,

@@ -70,8 +70,8 @@ const selectStyle: React.CSSProperties = {
 const inputClassName = "!bg-transparent !shadow-none border border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] [&_input]:!text-[#EEEEEE] [&_input]:!leading-[2.25rem] [&_.ant-input-number-input]:!h-[2.25rem] [&_.ant-input-number-input]:!py-0";
 const selectClassName = "drawerInp !bg-[transparent] text-[#EEEEEE] font-[300] text-[.75rem] shadow-none w-full border-0 outline-0 [&_.ant-select-selector]:!h-[2.25rem] [&_.ant-select-selector]:!flex [&_.ant-select-selector]:!items-center [&_.ant-select-selection-item]:!leading-normal";
 
-// LLM metrics (vLLM, SGLang)
-const metricItems = [
+// LLM/Audio metrics (vLLM, SGLang)
+const llmMetricItems = [
   { label: "Request in Queue", value: "bud:num_requests_waiting", type: "pod" as const, defaultValue: "5" },
   { label: "Running Requests", value: "bud:num_requests_running", type: "pod" as const, defaultValue: "10" },
   { label: "KV Cache Usage (%)", value: "bud:gpu_cache_usage_perc_average", type: "pod" as const, defaultValue: "0.8" },
@@ -79,6 +79,33 @@ const metricItems = [
   { label: "TPOT (s)", value: "bud:time_per_output_token_seconds_average", type: "pod" as const, defaultValue: "0.1" },
   { label: "E2E Latency (s)", value: "bud:e2e_request_latency_seconds_average", type: "pod" as const, defaultValue: "10" },
 ];
+
+// Embedding metrics (Infinity) - aggregated by runtime-sidecar
+const embeddingMetricItems = [
+  { label: "Queue Depth", value: "bud:infinity_queue_depth", type: "pod" as const, defaultValue: "10" },
+  { label: "Embedding Latency (s)", value: "bud:infinity_embedding_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+];
+
+// Classify metrics - similar to embedding (non-LLM models)
+const classifyMetricItems = [
+  { label: "Queue Depth", value: "bud:infinity_queue_depth", type: "pod" as const, defaultValue: "10" },
+  { label: "Classify Latency (s)", value: "bud:infinity_classify_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+];
+
+// Combined embedding + classify metrics (for models supporting both endpoints)
+const embeddingClassifyMetricItems = [
+  { label: "Queue Depth", value: "bud:infinity_queue_depth", type: "pod" as const, defaultValue: "10" },
+  { label: "Embedding Latency (s)", value: "bud:infinity_embedding_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+  { label: "Classify Latency (s)", value: "bud:infinity_classify_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+];
+
+// Get metrics based on model type
+const getMetricItems = (modelType: "llm" | "embedding" | "classify" | "embedding_classify" | "audio") => {
+  if (modelType === "embedding_classify") return embeddingClassifyMetricItems;
+  if (modelType === "embedding") return embeddingMetricItems;
+  if (modelType === "classify") return classifyMetricItems;
+  return llmMetricItems; // LLM and Audio use same metrics
+};
 
 // Select policy options
 const selectPolicyOptions = [
@@ -201,9 +228,9 @@ const defaultConfig: BudAIScalerConfig = {
   },
 };
 
-// Get default metric source
-const getDefaultMetricSource = (): BudAIScalerMetricSource => {
-  const defaultMetric = metricItems[0];
+// Get default metric source based on model type metrics
+const getDefaultMetricSource = (metrics: typeof llmMetricItems): BudAIScalerMetricSource => {
+  const defaultMetric = metrics[0];
   return {
     type: defaultMetric.type,
     targetMetric: defaultMetric.value,
@@ -226,8 +253,32 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
   const [originalConfig, setOriginalConfig] = useState<BudAIScalerConfig>(defaultConfig);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const { getAutoscaleConfig, updateAutoscaleConfig } = useEndPoints();
+  const { getAutoscaleConfig, updateAutoscaleConfig, clusterDetails } = useEndPoints();
   const { contextHolder, openConfirm } = useConfirmAction();
+
+  // Detect model type from clusterDetails
+  const model = clusterDetails?.model;
+  const isAudioModel =
+    model?.supported_endpoints?.audio_transcription?.enabled === true ||
+    model?.supported_endpoints?.audio_speech?.enabled === true;
+  const isEmbeddingModel = model?.supported_endpoints?.embedding?.enabled === true;
+  const isClassifyModel = model?.supported_endpoints?.classify?.enabled === true;
+  const hasChatOrCompletion = model?.supported_endpoints?.chat?.enabled === true || model?.supported_endpoints?.completion?.enabled === true;
+
+  // Determine model type: audio > embedding+classify > embedding > classify > llm
+  // For embedding/classify-only models (no chat/completion), use their specific metrics
+  const modelType: "llm" | "embedding" | "classify" | "embedding_classify" | "audio" = isAudioModel
+    ? "audio"
+    : (isEmbeddingModel && isClassifyModel && !hasChatOrCompletion)
+      ? "embedding_classify"
+      : (isEmbeddingModel && !hasChatOrCompletion)
+        ? "embedding"
+        : (isClassifyModel && !hasChatOrCompletion)
+          ? "classify"
+          : "llm";
+
+  // Get metrics based on detected model type
+  const metricItems = getMetricItems(modelType);
 
   // Load autoscale configuration
   useEffect(() => {
@@ -260,10 +311,10 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
     if (config.enabled && (!config.metricsSources || config.metricsSources.length === 0)) {
       setConfig((prev) => ({
         ...prev,
-        metricsSources: [getDefaultMetricSource()],
+        metricsSources: [getDefaultMetricSource(metricItems)],
       }));
     }
-  }, [config.enabled]);
+  }, [config.enabled, metricItems]);
 
   // Check for changes
   useEffect(() => {
@@ -278,7 +329,7 @@ export const AutoscaleSettings: React.FC<AutoscaleSettingsProps> = ({
   // Add a new metric source
   const addMetricSource = () => {
     updateConfig({
-      metricsSources: [...(config.metricsSources || []), getDefaultMetricSource()],
+      metricsSources: [...(config.metricsSources || []), getDefaultMetricSource(metricItems)],
     });
   };
 

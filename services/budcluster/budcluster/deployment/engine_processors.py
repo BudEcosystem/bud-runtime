@@ -304,6 +304,7 @@ class LatentBudConfigProcessor(EngineConfigProcessor):
         return [
             "bud:infinity_queue_depth",
             "bud:infinity_embedding_latency_seconds_average",
+            "bud:infinity_classify_latency_seconds_average",
         ]
 
     def supports_lora(self) -> bool:
@@ -380,9 +381,13 @@ class SGLangConfigProcessor(EngineConfigProcessor):
 
 
 # Engine processor registry
+# Note: "local" and "infinity" are aliases for "latentbud" (all use Infinity engine)
+_latentbud_processor = LatentBudConfigProcessor()
 ENGINE_PROCESSORS: Dict[str, EngineConfigProcessor] = {
     "vllm": VLLMConfigProcessor(),
-    "latentbud": LatentBudConfigProcessor(),
+    "latentbud": _latentbud_processor,
+    "infinity": _latentbud_processor,  # Alias for latentbud
+    "local": _latentbud_processor,  # Alias for latentbud (used by some deployments)
     "sglang": SGLangConfigProcessor(),
 }
 

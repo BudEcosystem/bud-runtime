@@ -1082,48 +1082,76 @@ class CreateDeploymentWorkflow:
         )
         # yield ctx.call_activity(notify_activity, input=notification_activity_request.model_dump_json())
 
-        # notify activity ETA
-        DeploymentService.publish_eta(
-            notification_req, deployment_request_json, instance_id, "run_performance_benchmark"
-        )
-
+        # Determine model type and whether to skip benchmark
+        supported_endpoints = verify_deployment_health_result["param"]["supported_endpoints"]
         model_type = "llm"
-        if "/v1/embeddings" in verify_deployment_health_result["param"]["supported_endpoints"]:
+        skip_benchmark = False
+
+        if "/v1/embeddings" in supported_endpoints:
             model_type = "embedding"
+        elif "/v1/classify" in supported_endpoints and "/v1/chat/completions" not in supported_endpoints:
+            # Classify-only models (e.g., FinBERT) don't support LLM benchmarks
+            model_type = "classify"
+            skip_benchmark = True
+            logger.info(f"Skipping benchmark for classify-only model: {deployment_request_json.model}")
 
-        run_performance_benchmark_request = RunPerformanceBenchmarkRequest(
-            model=app_settings.model_registry_path + deployment_request_json.model,
-            deployment_url=deploy_engine_result["param"]["deployment_url"],
-            target_ttft=deployment_request_json.target_ttft,
-            target_e2e_latency=deployment_request_json.target_e2e_latency,
-            target_throughput_per_user=deployment_request_json.target_throughput_per_user,
-            concurrency=deployment_request_json.concurrency,
-            input_tokens=deployment_request_json.input_tokens,
-            output_tokens=deployment_request_json.output_tokens,
-            datasets=deployment_request_json.datasets,
-            model_type=model_type,
-            num_prompts=deployment_request_json.num_prompts,
-        )
-        workflow_run_performance_benchmark_request = WorkflowRunPerformanceBenchmarkRequest(
-            cluster_config=deployment_request_json.cluster_config,
-            namespace=deploy_engine_result["param"]["namespace"],
-            benchmark_request=run_performance_benchmark_request,
-            platform=deployment_request_json.platform,
-            cleanup_namespace=deployment_request_json.is_performance_benchmark,
-        )
+        if skip_benchmark:
+            # Skip benchmark for classify models - provide default result
+            # Include deployment_url which is required by budapp for endpoint creation
+            run_performance_benchmark_result = {
+                "code": HTTPStatus.OK.value,
+                "message": "Benchmark skipped for classify model",
+                "param": {
+                    "result": {
+                        "benchmark_skipped": True,
+                        "reason": "classify-only model",
+                        "deployment_url": deploy_engine_result["param"]["deployment_url"],
+                    },
+                    "performance_status": True,
+                    "benchmark_status": True,
+                    "bud_cluster_benchmark_id": None,
+                },
+            }
+            logger.info(f"Skipped benchmark result: {run_performance_benchmark_result}")
+        else:
+            # notify activity ETA
+            DeploymentService.publish_eta(
+                notification_req, deployment_request_json, instance_id, "run_performance_benchmark"
+            )
 
-        if deployment_request_json.is_performance_benchmark:
-            workflow_run_performance_benchmark_request.benchmark_id = deployment_request_json.benchmark_id
-            workflow_run_performance_benchmark_request.cluster_id = deployment_request_json.cluster_id
-            workflow_run_performance_benchmark_request.user_id = deployment_request_json.user_id
-            workflow_run_performance_benchmark_request.model_id = deployment_request_json.model_id
-            workflow_run_performance_benchmark_request.nodes = deployment_request_json.nodes
+            run_performance_benchmark_request = RunPerformanceBenchmarkRequest(
+                model=app_settings.model_registry_path + deployment_request_json.model,
+                deployment_url=deploy_engine_result["param"]["deployment_url"],
+                target_ttft=deployment_request_json.target_ttft,
+                target_e2e_latency=deployment_request_json.target_e2e_latency,
+                target_throughput_per_user=deployment_request_json.target_throughput_per_user,
+                concurrency=deployment_request_json.concurrency,
+                input_tokens=deployment_request_json.input_tokens,
+                output_tokens=deployment_request_json.output_tokens,
+                datasets=deployment_request_json.datasets,
+                model_type=model_type,
+                num_prompts=deployment_request_json.num_prompts,
+            )
+            workflow_run_performance_benchmark_request = WorkflowRunPerformanceBenchmarkRequest(
+                cluster_config=deployment_request_json.cluster_config,
+                namespace=deploy_engine_result["param"]["namespace"],
+                benchmark_request=run_performance_benchmark_request,
+                platform=deployment_request_json.platform,
+                cleanup_namespace=deployment_request_json.is_performance_benchmark,
+            )
 
-        run_performance_benchmark_result = yield ctx.call_activity(
-            CreateDeploymentWorkflow.run_performance_benchmark,
-            input=workflow_run_performance_benchmark_request.model_dump_json(),
-        )
-        logger.info(f"Run performance benchmark result: {run_performance_benchmark_result}")
+            if deployment_request_json.is_performance_benchmark:
+                workflow_run_performance_benchmark_request.benchmark_id = deployment_request_json.benchmark_id
+                workflow_run_performance_benchmark_request.cluster_id = deployment_request_json.cluster_id
+                workflow_run_performance_benchmark_request.user_id = deployment_request_json.user_id
+                workflow_run_performance_benchmark_request.model_id = deployment_request_json.model_id
+                workflow_run_performance_benchmark_request.nodes = deployment_request_json.nodes
+
+            run_performance_benchmark_result = yield ctx.call_activity(
+                CreateDeploymentWorkflow.run_performance_benchmark,
+                input=workflow_run_performance_benchmark_request.model_dump_json(),
+            )
+            logger.info(f"Run performance benchmark result: {run_performance_benchmark_result}")
 
         if run_performance_benchmark_result.get("code", HTTPStatus.OK.value) != HTTPStatus.OK.value:
             # notify activity that performance benchmark failed

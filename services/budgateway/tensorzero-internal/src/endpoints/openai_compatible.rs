@@ -3336,7 +3336,9 @@ struct ParsedEmbeddingResponseMetadata {
     data: Vec<ParsedEmbeddingData>,
 }
 
-fn parse_embedding_response_metadata(raw_response: &str) -> Option<ParsedEmbeddingResponseMetadata> {
+fn parse_embedding_response_metadata(
+    raw_response: &str,
+) -> Option<ParsedEmbeddingResponseMetadata> {
     let value: Value = serde_json::from_str(raw_response).ok()?;
     let object = value.as_object()?;
 
@@ -3373,6 +3375,46 @@ fn parse_embedding_response_metadata(raw_response: &str) -> Option<ParsedEmbeddi
         extra,
         data,
     })
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OpenAICompatibleClassifyParams {
+    pub input: Vec<String>,
+    #[serde(default = "default_classify_model")]
+    pub model: String,
+    #[serde(default)]
+    pub raw_scores: bool,
+    /// Priority level (high/normal/low) - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    #[serde(flatten)]
+    pub unknown_fields: HashMap<String, Value>,
+}
+
+fn default_classify_model() -> String {
+    "default/not-specified".to_string()
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenAICompatibleClassifyUsage {
+    prompt_tokens: u32,
+    total_tokens: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenAICompatibleClassifyObject {
+    score: f32,
+    label: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenAICompatibleClassifyResponse {
+    object: String,
+    data: Vec<Vec<OpenAICompatibleClassifyObject>>,
+    model: String,
+    usage: OpenAICompatibleClassifyUsage,
+    id: String,
+    created: u64,
 }
 
 fn parse_embedding_data(value: &Value) -> ParsedEmbeddingData {
@@ -3488,6 +3530,56 @@ pub async fn list_models(
 
 /// A handler for the OpenAI-compatible embedding endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "embedding_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "embedding_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // EmbeddingInference request fields
+        embedding_inference.model = tracing::field::Empty,
+        embedding_inference.input_count = tracing::field::Empty,
+        embedding_inference.dimensions = tracing::field::Empty,
+        embedding_inference.encoding_format = tracing::field::Empty,
+        embedding_inference.processing_time_ms = tracing::field::Empty,
+        // EmbeddingInference response fields
+        embedding_inference.id = tracing::field::Empty,
+        embedding_inference.embedding_count = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.id = tracing::field::Empty,
+        model_inference.raw_request = tracing::field::Empty,
+        model_inference.raw_response = tracing::field::Empty,
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.request_ip = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.request_arrival_time = tracing::field::Empty,
+        model_inference_details.request_forward_time = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn embedding_handler(
     State(AppStateData {
         config,
@@ -3502,6 +3594,9 @@ pub async fn embedding_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleEmbeddingParams>,
 ) -> Result<Response<Body>, Error> {
+    // Capture start time for processing time calculation
+    let start_time = std::time::Instant::now();
+
     // Log any extra/unknown fields that will be forwarded to provider
     if !openai_compatible_params.extra.is_empty() {
         tracing::debug!(
@@ -3524,6 +3619,18 @@ pub async fn embedding_handler(
     })?;
 
     let original_model_name = model_resolution.original_model_name.to_string();
+
+    // Record embedding request for observability
+    let input_count = match &openai_compatible_params.input {
+        OpenAICompatibleEmbeddingInput::Single(_) => 1,
+        OpenAICompatibleEmbeddingInput::Batch(texts) => texts.len(),
+    };
+    super::observability::record_embedding_request(
+        &original_model_name,
+        input_count,
+        openai_compatible_params.dimensions,
+        openai_compatible_params.encoding_format.as_deref(),
+    );
 
     // Convert OpenAI request to internal format
     let internal_input = match &openai_compatible_params.input {
@@ -3596,6 +3703,27 @@ pub async fn embedding_handler(
     let response = model
         .embed(&embedding_request, &original_model_name, &clients)
         .await?;
+
+    // Calculate response time for observability
+    let response_time_ms = match &response.latency {
+        crate::inference::types::Latency::NonStreaming { response_time } => {
+            response_time.as_millis() as u64
+        }
+        _ => 0,
+    };
+
+    // Record embedding response for observability
+    super::observability::record_embedding_response(
+        &response.id.to_string(),
+        response.embeddings.len(),
+        &original_model_name,
+        response.usage.input_tokens,
+        response_time_ms,
+    );
+
+    // Record processing time
+    let processing_time_ms = start_time.elapsed().as_millis() as u64;
+    super::observability::record_embedding_processing_time(processing_time_ms);
 
     // Convert to OpenAI-compatible format, including provider pass-through metadata when present
     let parsed_metadata = parse_embedding_response_metadata(&response.raw_response);
@@ -3809,6 +3937,196 @@ pub async fn embedding_handler(
             })?;
         }
     }
+
+    Ok(Json(openai_response).into_response())
+}
+
+/// A handler for the /v1/classify endpoint
+#[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "classify_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "classify_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ClassifyInference request fields
+        classify_inference.model = tracing::field::Empty,
+        classify_inference.input_count = tracing::field::Empty,
+        classify_inference.raw_scores = tracing::field::Empty,
+        classify_inference.processing_time_ms = tracing::field::Empty,
+        // ClassifyInference response fields
+        classify_inference.id = tracing::field::Empty,
+        classify_inference.label_count = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.id = tracing::field::Empty,
+        model_inference.raw_request = tracing::field::Empty,
+        model_inference.raw_response = tracing::field::Empty,
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.output_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.request_ip = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.request_arrival_time = tracing::field::Empty,
+        model_inference_details.request_forward_time = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
+pub async fn classify_handler(
+    State(AppStateData {
+        config,
+        http_client,
+        clickhouse_connection_info,
+        authentication_info: _,
+        model_credential_store,
+        inference_batcher: _,
+        ..
+    }): AppState,
+    headers: HeaderMap,
+    StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleClassifyParams>,
+) -> Result<Response<Body>, Error> {
+    // Capture start time for processing time calculation
+    let start_time = std::time::Instant::now();
+
+    if !openai_compatible_params.unknown_fields.is_empty() {
+        tracing::debug!(
+            "Ignoring unknown fields in classify request: {:?}",
+            openai_compatible_params
+                .unknown_fields
+                .keys()
+                .collect::<Vec<_>>()
+        );
+    }
+
+    if openai_compatible_params.input.is_empty() {
+        return Err(Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Classification input cannot be empty.".to_string(),
+        }));
+    }
+
+    let model_resolution = model_resolution::resolve_model_name(
+        Some(&openai_compatible_params.model),
+        &headers,
+        true,
+    )?;
+
+    let model_id = model_resolution.model_name.ok_or_else(|| {
+        Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Classification requests must specify a model, not a function.".to_string(),
+        })
+    })?;
+
+    let original_model_name = model_resolution.original_model_name.to_string();
+
+    // Record classify request for observability
+    super::observability::record_classify_request(
+        &original_model_name,
+        openai_compatible_params.input.len(),
+        openai_compatible_params.raw_scores,
+    );
+
+    let classify_request = crate::classification::ClassificationRequest {
+        input: openai_compatible_params.input.clone(),
+        raw_scores: openai_compatible_params.raw_scores,
+        priority: openai_compatible_params.priority.clone(),
+    };
+
+    use crate::model::ModelTableExt;
+    let models = config.models.read().await;
+    let model = models
+        .get_with_capability(
+            &model_id,
+            crate::endpoints::capability::EndpointCapability::Classify,
+        )
+        .await?
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!(
+                    "Model '{original_model_name}' not found or does not support classification"
+                ),
+            })
+        })?;
+
+    let credentials = merge_credentials_from_store(&model_credential_store);
+    let cache_options: crate::cache::CacheOptions =
+        (crate::cache::CacheParamsOptions::default(), false).into();
+    let clients = super::inference::InferenceClients {
+        http_client: &http_client,
+        credentials: &credentials,
+        clickhouse_connection_info: &clickhouse_connection_info,
+        cache_options: &cache_options,
+    };
+
+    let response = model
+        .classify(&classify_request, &original_model_name, &clients)
+        .await?;
+
+    // Calculate processing time for observability
+    let processing_time_ms = start_time.elapsed().as_millis() as u64;
+
+    // Generate response ID
+    let response_id = format!("infinity-{}", uuid::Uuid::new_v4());
+
+    // Count total labels in response
+    let label_count: usize = response.data.iter().map(|labels| labels.len()).sum();
+
+    // Record classify response for observability
+    super::observability::record_classify_response(
+        &response_id,
+        label_count,
+        &original_model_name,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        processing_time_ms,
+    );
+
+    // Record processing time
+    super::observability::record_classify_processing_time(processing_time_ms);
+
+    let openai_response = OpenAICompatibleClassifyResponse {
+        object: "classify".to_string(),
+        data: response
+            .data
+            .into_iter()
+            .map(|labels| {
+                labels
+                    .into_iter()
+                    .map(|item| OpenAICompatibleClassifyObject {
+                        score: item.score,
+                        label: item.label,
+                    })
+                    .collect()
+            })
+            .collect(),
+        model: original_model_name.clone(),
+        usage: OpenAICompatibleClassifyUsage {
+            prompt_tokens: response.usage.input_tokens,
+            total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+        },
+        id: response_id,
+        created: crate::inference::types::current_timestamp(),
+    };
 
     Ok(Json(openai_response).into_response())
 }
@@ -6766,32 +7084,44 @@ pub async fn response_create_handler(
     let add_analytics_headers = |response: &mut Response<Body>| {
         if let Some(ref id) = prompt_id {
             if let Ok(value) = axum::http::HeaderValue::from_str(id) {
-                response.headers_mut().insert("x-tensorzero-prompt-id", value);
+                response
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-id", value);
             }
         }
         if let Some(ref version) = prompt_version {
             if let Ok(value) = axum::http::HeaderValue::from_str(version) {
-                response.headers_mut().insert("x-tensorzero-prompt-version", value);
+                response
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-version", value);
             }
         }
         if let Some(ref pid) = project_id {
             if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
-                response.headers_mut().insert("x-tensorzero-project-id", value);
+                response
+                    .headers_mut()
+                    .insert("x-tensorzero-project-id", value);
             }
         }
         // Add usage token headers if available (for /v1/responses success responses)
         if let Ok(guard) = captured_usage.lock() {
             if let Some((input_tokens, output_tokens, total_tokens)) = *guard {
                 if let Ok(value) = axum::http::HeaderValue::from_str(&input_tokens.to_string()) {
-                    response.headers_mut().insert("x-tensorzero-input-tokens", value);
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-input-tokens", value);
                 }
                 if let Some(output) = output_tokens {
                     if let Ok(value) = axum::http::HeaderValue::from_str(&output.to_string()) {
-                        response.headers_mut().insert("x-tensorzero-output-tokens", value);
+                        response
+                            .headers_mut()
+                            .insert("x-tensorzero-output-tokens", value);
                     }
                 }
                 if let Ok(value) = axum::http::HeaderValue::from_str(&total_tokens.to_string()) {
-                    response.headers_mut().insert("x-tensorzero-total-tokens", value);
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-total-tokens", value);
                 }
             }
         }

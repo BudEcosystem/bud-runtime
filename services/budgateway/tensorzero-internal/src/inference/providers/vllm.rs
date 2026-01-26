@@ -18,6 +18,10 @@ use super::openai::{
 };
 use super::provider_trait::{InferenceProvider, TensorZeroEventError};
 use crate::cache::ModelProviderRequest;
+use crate::classification::{
+    ClassificationObject, ClassificationProvider, ClassificationProviderResponse,
+    ClassificationRequest,
+};
 use crate::completions::{
     CompletionChoice, CompletionChunk, CompletionLogProbs, CompletionPrompt, CompletionProvider,
     CompletionProviderResponse, CompletionRequest, CompletionStop, CompletionStream,
@@ -576,6 +580,18 @@ fn get_embedding_url(base_url: &Url) -> Result<Url, Error> {
     })
 }
 
+fn get_classify_url(base_url: &Url) -> Result<Url, Error> {
+    let mut url = base_url.clone();
+    if !url.path().ends_with('/') {
+        url.set_path(&format!("{}/", url.path()));
+    }
+    url.join("classify").map_err(|e| {
+        Error::new(ErrorDetails::InvalidBaseUrl {
+            message: e.to_string(),
+        })
+    })
+}
+
 #[derive(Debug, Serialize)]
 struct VLLMEmbeddingRequest<'a> {
     model: &'a str,
@@ -739,6 +755,152 @@ impl EmbeddingProvider for VLLMProvider {
             })?;
             Err(handle_openai_error(
                 &serde_json::to_string(&request_body).unwrap_or_default(),
+                status,
+                &raw_response,
+                PROVIDER_TYPE,
+            ))
+        }
+    }
+}
+
+// vLLM Classification Support
+
+#[derive(Debug, Serialize)]
+struct VLLMClassifyRequest<'a> {
+    model: &'a str,
+    input: Vec<&'a str>,
+    raw_scores: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<&'a str>,
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMClassifyResponse {
+    data: Vec<Vec<VLLMClassifyObject>>,
+    usage: VLLMClassifyUsage,
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMClassifyObject {
+    score: f32,
+    label: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct VLLMClassifyUsage {
+    prompt_tokens: u32,
+    #[expect(dead_code)]
+    total_tokens: u32,
+}
+
+impl ClassificationProvider for VLLMProvider {
+    async fn classify(
+        &self,
+        request: &ClassificationRequest,
+        client: &reqwest::Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<ClassificationProviderResponse, Error> {
+        if request.input.is_empty() {
+            return Err(Error::new(ErrorDetails::InferenceServer {
+                message: "vLLM classify request input cannot be empty".to_string(),
+                raw_request: None,
+                raw_response: None,
+                provider_type: PROVIDER_TYPE.to_string(),
+            }));
+        }
+        let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
+        let request_body = VLLMClassifyRequest {
+            model: &self.model_name,
+            input: request.input.iter().map(|s| s.as_str()).collect(),
+            raw_scores: request.raw_scores,
+            priority: request.priority.as_deref(),
+        };
+        let raw_request = serde_json::to_string(&request_body).map_err(|e| {
+            Error::new(ErrorDetails::Serialization {
+                message: format!(
+                    "Error serializing request body: {}",
+                    DisplayOrDebugGateway::new(e)
+                ),
+            })
+        })?;
+        let request_url = get_classify_url(&self.api_base)?;
+        let start_time = Instant::now();
+        let mut request_builder = client
+            .post(request_url)
+            .header("Content-Type", "application/json");
+        if let Some(api_key) = api_key {
+            request_builder = request_builder.bearer_auth(api_key.expose_secret());
+        }
+        let res = request_builder
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| {
+                handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone()))
+            })?;
+        let latency = Latency::NonStreaming {
+            response_time: start_time.elapsed(),
+        };
+        if res.status().is_success() {
+            let raw_response = res.text().await.map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!("Error parsing response: {}", DisplayOrDebugGateway::new(e)),
+                    raw_request: Some(raw_request.clone()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+            let response_body: VLLMClassifyResponse =
+                serde_json::from_str(&raw_response).map_err(|e| {
+                    Error::new(ErrorDetails::InferenceServer {
+                        message: format!(
+                            "Error parsing response: {}",
+                            DisplayOrDebugGateway::new(e)
+                        ),
+                        raw_request: Some(raw_request.clone()),
+                        raw_response: Some(raw_response.clone()),
+                        provider_type: PROVIDER_TYPE.to_string(),
+                    })
+                })?;
+            let data = response_body
+                .data
+                .into_iter()
+                .map(|labels| {
+                    labels
+                        .into_iter()
+                        .map(|item| ClassificationObject {
+                            score: item.score,
+                            label: item.label,
+                        })
+                        .collect()
+                })
+                .collect();
+            let usage = Usage {
+                input_tokens: response_body.usage.prompt_tokens,
+                output_tokens: 0,
+            };
+            Ok(ClassificationProviderResponse {
+                data,
+                usage,
+                raw_request,
+                raw_response,
+                latency,
+            })
+        } else {
+            let status = res.status();
+            let raw_response = res.text().await.map_err(|e| {
+                Error::new(ErrorDetails::InferenceServer {
+                    message: format!(
+                        "Error parsing error response: {}",
+                        DisplayOrDebugGateway::new(e)
+                    ),
+                    raw_request: Some(raw_request.clone()),
+                    raw_response: None,
+                    provider_type: PROVIDER_TYPE.to_string(),
+                })
+            })?;
+            Err(handle_openai_error(
+                &raw_request,
                 status,
                 &raw_response,
                 PROVIDER_TYPE,

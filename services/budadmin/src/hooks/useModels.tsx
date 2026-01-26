@@ -118,6 +118,7 @@ export type Model = {
     audio_transcription: EndpointInfo;
     audio_speech: EndpointInfo;
     embedding: EndpointInfo;
+    classify: EndpointInfo;
     batch: EndpointInfo;
     response: EndpointInfo;
     rerank: EndpointInfo;

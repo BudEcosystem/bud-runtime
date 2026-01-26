@@ -219,19 +219,62 @@ impl EmbeddingInput {
     }
 }
 
-/// Configuration for text chunking - passed through to provider
+/// Configuration for text chunking - passed through to provider.
+/// See docs/dev/embedding-model-support.md for full API documentation.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct ChunkingConfig {
+    /// Enable chunking (default: false)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// Strategy: "token" | "sentence" | "recursive" | "semantic" | "code" | "table" (default: "token")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strategy: Option<String>,
+    /// Max tokens per chunk, 1-8192 (default: 512)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chunk_size: Option<u32>,
+    /// Token overlap between chunks (default: 0)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chunk_overlap: Option<u32>,
+    /// Tokenizer: "cl100k_base" | "p50k_base" | "r50k_base" | "gpt2" (default: "cl100k_base")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tokenizer: Option<String>,
+    /// [sentence] Min sentences per chunk (default: 1)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_sentences: Option<u32>,
+    /// [sentence] Custom delimiters, e.g. [". ", "! ", "? "]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delimiters: Option<Vec<String>>,
+    /// [recursive] Recipe: "markdown" | null
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<String>,
+    /// [semantic] Similarity threshold 0.0-1.0 (default: 0.8)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_threshold: Option<f32>,
+    /// [semantic] Embedding model (default: "minishlab/potion-base-32M")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_model: Option<String>,
+    /// [semantic] Similarity window (default: 3)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_window: Option<u32>,
+    /// [code] Language: "python" | "javascript" | "rust" | etc. (default: auto)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    /// Preprocessing: "text" | "markdown" | "table" | null
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chef: Option<String>,
+    /// Chain strategies: ["sentence", "token"], overrides strategy
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pipeline: Option<Vec<String>>,
+    /// Enable overlap refinery (default: false)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub add_overlap_context: Option<bool>,
+    /// Overlap size: int (tokens) or float (fraction 0-1) (default: 0.25)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overlap_size: Option<serde_json::Value>,
+    /// Overlap method: "prefix" | "suffix" (default: "suffix")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overlap_method: Option<String>,
+    /// Include chunk text in response (default: true)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub return_chunk_text: Option<bool>,
 }
