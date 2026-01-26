@@ -7,6 +7,7 @@ import {
   Text_10_400_B3B3B3,
   Text_12_400_757575,
   Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
   Text_14_400_EEEEEE,
   Text_16_400_EEEEEE,
 } from "@/components/ui/text";
@@ -28,76 +29,171 @@ interface SpanData {
   rawData?: Record<string, any>;
 }
 
-// JSON Tree View Component for expandable JSON display
+// JSON Tree View Component for expandable JSON display (Logfire-style)
 const JsonTreeView = ({
   data,
   depth = 0,
   keyName,
+  isLast = true,
 }: {
   data: any;
   depth?: number;
   keyName?: string;
+  isLast?: boolean;
 }) => {
   const [isExpanded, setIsExpanded] = useState(depth < 2);
 
-  const indent = depth * 16;
+  const INDENT_SIZE = 20; // pixels per indent level
+  const LINE_HEIGHT = 24; // line height in pixels
 
+  // Render the vertical guide lines for indentation
+  const renderIndentLines = (currentDepth: number) => {
+    const lines = [];
+    for (let i = 0; i < currentDepth; i++) {
+      lines.push(
+        <div
+          key={i}
+          className="absolute top-0 bottom-0 w-px bg-[#3a3a3a]"
+          style={{ left: `${i * INDENT_SIZE + 8}px` }}
+        />
+      );
+    }
+    return lines;
+  };
+
+  // Common row wrapper with indent lines
+  const RowWrapper = ({
+    children,
+    clickable = false,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    clickable?: boolean;
+    onClick?: () => void;
+  }) => (
+    <div
+      className={`relative flex items-start ${clickable ? "cursor-pointer hover:bg-[rgba(255,255,255,0.03)]" : ""}`}
+      style={{ minHeight: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px` }}
+      onClick={onClick}
+    >
+      {renderIndentLines(depth)}
+      <div
+        className="flex items-start flex-1"
+        style={{ paddingLeft: `${depth * INDENT_SIZE}px` }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+
+  // Render key with quotes
+  const renderKey = (key: string) => (
+    <span className="text-[#abb2bf]">"{key}"</span>
+  );
+
+  // Render colon separator
+  const renderColon = () => <span className="text-[#EEEEEE]">: </span>;
+
+  // Render comma (if not last item)
+  const renderComma = () =>
+    !isLast ? <span className="text-[#EEEEEE]">,</span> : null;
+
+  // Null value
   if (data === null) {
     return (
-      <div style={{ marginLeft: indent }} className="flex items-center py-0.5">
-        {keyName && <span className="text-[#B3B3B3]">"{keyName}": </span>}
-        <span className="text-[#6B9BD2]">null</span>
-        <span className="text-[#B3B3B3]">,</span>
-      </div>
+      <RowWrapper>
+        {keyName && (
+          <>
+            {renderKey(keyName)}
+            {renderColon()}
+          </>
+        )}
+        <span className="text-[#98c379]">null</span>
+        {/* <span className="text-[#6B9BD2]">null</span> */}
+        {renderComma()}
+      </RowWrapper>
     );
   }
 
+  // Boolean value
   if (typeof data === "boolean") {
     return (
-      <div style={{ marginLeft: indent }} className="flex items-center py-0.5">
-        {keyName && <span className="text-[#B3B3B3]">"{keyName}": </span>}
-        <span className="text-[#6B9BD2]">{data.toString()}</span>
-        <span className="text-[#B3B3B3]">,</span>
-      </div>
+      <RowWrapper>
+        {keyName && (
+          <>
+            {renderKey(keyName)}
+            {renderColon()}
+          </>
+        )}
+        <span className="text-[#98c379]">{data.toString()}</span>
+        {renderComma()}
+      </RowWrapper>
     );
   }
 
+  // Number value
   if (typeof data === "number") {
     return (
-      <div style={{ marginLeft: indent }} className="flex items-center py-0.5">
-        {keyName && <span className="text-[#B3B3B3]">"{keyName}": </span>}
-        <span className="text-[#D4A853]">{data}</span>
-        <span className="text-[#B3B3B3]">,</span>
-      </div>
+      <RowWrapper>
+        {keyName && (
+          <>
+            {renderKey(keyName)}
+            {renderColon()}
+          </>
+        )}
+        <span className="text-[#EEEEEE]">{data}</span>
+        {renderComma()}
+      </RowWrapper>
     );
   }
 
+  // String value
   if (typeof data === "string") {
     return (
-      <div style={{ marginLeft: indent }} className="flex items-center py-0.5">
-        {keyName && <span className="text-[#B3B3B3]">"{keyName}": </span>}
-        <span className="text-[#98C379]">"{data}"</span>
-        <span className="text-[#B3B3B3]">,</span>
-      </div>
+      <RowWrapper>
+        {keyName && (
+          <>
+            {renderKey(keyName)}
+            {renderColon()}
+          </>
+        )}
+        <span className="text-[#98c379]">"{data}"</span>
+        {renderComma()}
+      </RowWrapper>
     );
   }
 
+  // Array
   if (Array.isArray(data)) {
     const itemCount = data.length;
+    const itemLabel = itemCount === 1 ? "item" : "items";
+
     return (
-      <div style={{ marginLeft: indent }}>
-        <div
-          className="flex items-center py-0.5 cursor-pointer hover:bg-[rgba(255,255,255,0.05)]"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <span className="text-[#B3B3B3] mr-1">{isExpanded ? "▼" : "▶"}</span>
-          {keyName && <span className="text-[#B3B3B3]">"{keyName}": </span>}
-          <span className="text-[#B3B3B3]">[</span>
-          {!isExpanded && (
-            <span className="text-[#757575] ml-1">{itemCount} items</span>
+      <div>
+        {/* Header row with chevron and opening bracket */}
+        <RowWrapper clickable onClick={() => setIsExpanded(!isExpanded)}>
+          <span className="text-[#757575] w-4 flex-shrink-0 select-none">
+            {isExpanded ? "▾" : "▸"}
+          </span>
+          {keyName && (
+            <>
+              {renderKey(keyName)}
+              {renderColon()}
+            </>
           )}
-          {!isExpanded && <span className="text-[#B3B3B3]">]</span>}
-        </div>
+          <span className="text-[#EEEEEE]">[</span>
+          <span className="text-[#757575] ml-1 italic">
+            {itemCount} {itemLabel}
+          </span>
+          {!isExpanded && (
+            <>
+              <span className="text-[#EEEEEE]">]</span>
+              {renderComma()}
+            </>
+          )}
+        </RowWrapper>
+
+        {/* Expanded content */}
         {isExpanded && (
           <>
             {data.map((item, index) => (
@@ -106,47 +202,70 @@ const JsonTreeView = ({
                 data={item}
                 depth={depth + 1}
                 keyName={String(index)}
-              />
+                isLast={index === data.length - 1}
+                              />
             ))}
-            <div style={{ marginLeft: indent }} className="text-[#B3B3B3]">
-              ],
-            </div>
+            {/* Closing bracket */}
+            <RowWrapper>
+              <span className="w-4 flex-shrink-0" />
+              <span className="text-[#EEEEEE]">]</span>
+              {renderComma()}
+            </RowWrapper>
           </>
         )}
       </div>
     );
   }
 
+  // Object
   if (typeof data === "object") {
     const keys = Object.keys(data);
     const itemCount = keys.length;
+    const itemLabel = itemCount === 1 ? "item" : "items";
+
     return (
-      <div style={{ marginLeft: indent }}>
-        <div
-          className="flex items-center py-0.5 cursor-pointer hover:bg-[rgba(255,255,255,0.05)]"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <span className="text-[#B3B3B3] mr-1">{isExpanded ? "▼" : "▶"}</span>
-          {keyName && <span className="text-[#B3B3B3]">"{keyName}": </span>}
-          <span className="text-[#B3B3B3]">{"{"}</span>
-          {!isExpanded && (
-            <span className="text-[#757575] ml-1">{itemCount} items</span>
+      <div>
+        {/* Header row with chevron and opening brace */}
+        <RowWrapper clickable onClick={() => setIsExpanded(!isExpanded)}>
+          <span className="text-[#757575] w-4 flex-shrink-0 select-none">
+            {isExpanded ? "▾" : "▸"}
+          </span>
+          {keyName && (
+            <>
+              {renderKey(keyName)}
+              {renderColon()}
+            </>
           )}
-          {!isExpanded && <span className="text-[#B3B3B3]">{"}"}</span>}
-        </div>
+          <span className="text-[#EEEEEE]">{"{"}</span>
+          <span className="text-[#757575] ml-1 italic">
+            {itemCount} {itemLabel}
+          </span>
+          {!isExpanded && (
+            <>
+              <span className="text-[#EEEEEE]">{"}"}</span>
+              {renderComma()}
+            </>
+          )}
+        </RowWrapper>
+
+        {/* Expanded content */}
         {isExpanded && (
           <>
-            {keys.map((key) => (
+            {keys.map((key, index) => (
               <JsonTreeView
                 key={key}
                 data={data[key]}
                 depth={depth + 1}
                 keyName={key}
-              />
+                isLast={index === keys.length - 1}
+                              />
             ))}
-            <div style={{ marginLeft: indent }} className="text-[#B3B3B3]">
-              {"}"},
-            </div>
+            {/* Closing brace */}
+            <RowWrapper>
+              <span className="w-4 flex-shrink-0" />
+              <span className="text-[#EEEEEE]">{"}"}</span>
+              {renderComma()}
+            </RowWrapper>
           </>
         )}
       </div>
@@ -171,10 +290,10 @@ const DetailsTabContent = ({ spanData }: { spanData: SpanData }) => {
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4">
           <div className="flex items-center gap-2">
             <span className="text-xl">📄</span>
-            <Text_14_400_EEEEEE>
+            <Text_12_400_EEEEEE>
               {codeFilepath}
               {codeLineno && `:${codeLineno}`}
-            </Text_14_400_EEEEEE>
+            </Text_12_400_EEEEEE>
             {codeFunction && (
               <>
                 <span className="text-[#757575]">in</span>
