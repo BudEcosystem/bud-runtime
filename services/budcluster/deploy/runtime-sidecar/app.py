@@ -21,7 +21,7 @@ LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "9090"))  # Convert port to inte
 # Convert interval to float first to handle milliseconds, then convert to integer if needed
 SCRAPE_INTERVAL_SECONDS = float(os.environ.get("SCRAPE_INTERVAL_SECONDS", "10"))
 CALCULATION_WINDOW_SECONDS = float(os.environ.get("CALCULATION_WINDOW_SECONDS", "300"))
-# Engine type determines which metrics to parse (vllm, sglang, latentbud/infinity)
+# Engine type determines which metrics to parse (vllm, sglang, latentbud/infinity/local)
 ENGINE_TYPE = os.environ.get("ENGINE_TYPE", "vllm").lower()
 
 # --- Log configuration ---
@@ -81,6 +81,13 @@ INFINITY_QUEUE_DEPTH_GAUGE = Gauge(
     registry=registry,
 )
 
+# Infinity/LatentBud classify metrics
+AVG_INFINITY_CLASSIFY_LATENCY_GAUGE = Gauge(
+    "bud:infinity_classify_latency_seconds_average",
+    "Calculated average classify latency over the window",
+    registry=registry,
+)
+
 # Add a variable to store the previous metrics
 previous_metrics = None
 
@@ -136,13 +143,14 @@ def scrape_vllm_metrics(content: str) -> tuple:
 
 
 def scrape_infinity_metrics(content: str) -> tuple:
-    """Parse Infinity/LatentBud embedding metrics from Prometheus content.
+    """Parse Infinity/LatentBud embedding and classify metrics from Prometheus content.
 
     Returns:
         Tuple of (current_metrics dict, found_metrics set)
     """
     current_metrics = {
         "infinity_embedding_latency": {"sum": 0.0, "count": 0.0},
+        "infinity_classify_latency": {"sum": 0.0, "count": 0.0},
         "infinity_queue_depth": 0.0,
     }
     found_metrics = set()
@@ -157,6 +165,16 @@ def scrape_infinity_metrics(content: str) -> tuple:
                 elif sample.name.endswith("_count"):
                     current_metrics["infinity_embedding_latency"]["count"] = sample.value
                     found_metrics.add("infinity_embedding_latency_count")
+
+        elif family.name == "infinity_classify_latency_seconds":
+            # This is a histogram - extract sum and count
+            for sample in family.samples:
+                if sample.name.endswith("_sum"):
+                    current_metrics["infinity_classify_latency"]["sum"] = sample.value
+                    found_metrics.add("infinity_classify_latency_sum")
+                elif sample.name.endswith("_count"):
+                    current_metrics["infinity_classify_latency"]["count"] = sample.value
+                    found_metrics.add("infinity_classify_latency_count")
 
         elif family.name == "infinity_queue_depth":
             # This is a gauge - take the value directly
@@ -199,6 +217,12 @@ def calculate_infinity_deltas(current_metrics: dict, prev_metrics: dict) -> dict
             - prev_metrics["infinity_embedding_latency"]["sum"],
             "count": current_metrics["infinity_embedding_latency"]["count"]
             - prev_metrics["infinity_embedding_latency"]["count"],
+        },
+        "infinity_classify_latency": {
+            "sum": current_metrics["infinity_classify_latency"]["sum"]
+            - prev_metrics["infinity_classify_latency"]["sum"],
+            "count": current_metrics["infinity_classify_latency"]["count"]
+            - prev_metrics["infinity_classify_latency"]["count"],
         },
         "infinity_queue_depth": current_metrics["infinity_queue_depth"],
     }
@@ -251,9 +275,15 @@ def update_infinity_gauges(window_totals: dict, latest_metrics: dict = None):
             if totals["count"] > 0:
                 average = totals["sum"] / totals["count"]
             AVG_INFINITY_LATENCY_GAUGE.set(average)
+        elif metric_name == "infinity_classify_latency":
+            # Classify latency is a histogram, calculate average
+            if totals["count"] > 0:
+                average = totals["sum"] / totals["count"]
+            AVG_INFINITY_CLASSIFY_LATENCY_GAUGE.set(average)
 
     logging.info(
-        f"Window averages: INFINITY_LATENCY={AVG_INFINITY_LATENCY_GAUGE._value.get()}, "
+        f"Window averages: INFINITY_EMBEDDING_LATENCY={AVG_INFINITY_LATENCY_GAUGE._value.get()}, "
+        f"INFINITY_CLASSIFY_LATENCY={AVG_INFINITY_CLASSIFY_LATENCY_GAUGE._value.get()}, "
         f"INFINITY_QUEUE_DEPTH={INFINITY_QUEUE_DEPTH_GAUGE._value.get()}"
     )
 
@@ -274,6 +304,7 @@ def get_infinity_window_totals() -> dict:
     """Get initial window totals structure for Infinity metrics."""
     return {
         "infinity_embedding_latency": {"sum": 0.0, "count": 0.0},
+        "infinity_classify_latency": {"sum": 0.0, "count": 0.0},
         "infinity_queue_depth": {"sum": 0.0, "count": 0},
     }
 
@@ -289,7 +320,7 @@ def scrape_and_process():
         now = time.time()
 
         # Parse metrics based on engine type
-        if ENGINE_TYPE in ["latentbud", "infinity"]:
+        if ENGINE_TYPE in ["latentbud", "infinity", "local"]:
             current_metrics, found_metrics = scrape_infinity_metrics(content)
             get_window_totals = get_infinity_window_totals
             calculate_deltas = calculate_infinity_deltas
@@ -343,8 +374,9 @@ def scrape_and_process():
     except requests.exceptions.RequestException as e:
         logging.error(f"Error scraping {ENGINE_TYPE} metrics: {e}")
         # Set gauges to 0 on error based on engine type
-        if ENGINE_TYPE in ["latentbud", "infinity"]:
+        if ENGINE_TYPE in ["latentbud", "infinity", "local"]:
             AVG_INFINITY_LATENCY_GAUGE.set(0.0)
+            AVG_INFINITY_CLASSIFY_LATENCY_GAUGE.set(0.0)
             INFINITY_QUEUE_DEPTH_GAUGE.set(0.0)
         else:
             AVG_TTFT_GAUGE.set(0.0)

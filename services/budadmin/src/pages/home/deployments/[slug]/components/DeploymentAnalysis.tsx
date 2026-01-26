@@ -2263,6 +2263,15 @@ export default function DeploymentAnalysis({
     getInferenceQualityPrompts,
     clusterDetails,
   } = useEndPoints();
+
+  // Check if this is an embedding-only or classify-only model (no LLM capabilities)
+  // TTFT and Throughput metrics are only relevant for LLM models with chat/completion endpoints
+  const supportedEndpoints = clusterDetails?.model?.supported_endpoints;
+  const hasEmbeddingEndpoint = supportedEndpoints?.embedding?.enabled === true;
+  const hasClassifyEndpoint = supportedEndpoints?.classify?.enabled === true;
+  const hasChatEndpoint = supportedEndpoints?.chat?.enabled === true;
+  const hasCompletionEndpoint = supportedEndpoints?.completion?.enabled === true;
+  const isNonLLMModel = (hasEmbeddingEndpoint || hasClassifyEndpoint) && !hasChatEndpoint && !hasCompletionEndpoint;
   useEffect(() => {
     console.log("projectId", projectId);
     console.log("projectId", projectId);
@@ -2379,18 +2388,36 @@ export default function DeploymentAnalysis({
         </> */}
         {/* )} */}
       </div>
-      <div className="flex  gap-[.8rem]">
-        {deploymentId && <APICallsCard deploymentId={deploymentId} />}
-        {deploymentId && <TTFTCard deploymentId={deploymentId} />}
-      </div>
-      <div className="flex  gap-[.8rem]">
-        {deploymentId && <LatencyCard deploymentId={deploymentId} />}
-        {deploymentId && <ThroughputCard deploymentId={deploymentId} />}
-      </div>
-      <div className="flex  gap-[.8rem]">
-        {deploymentId && <TokenMetricsCard deploymentId={deploymentId} />}
-        <PlaceholderCard />
-      </div>
+      {/* For LLM models: show all metrics in original layout */}
+      {/* For embedding/classify-only models: show only relevant metrics (API Calls, Latency, Token Metrics) */}
+      {!isNonLLMModel ? (
+        <>
+          <div className="flex  gap-[.8rem]">
+            {deploymentId && <APICallsCard deploymentId={deploymentId} />}
+            {deploymentId && <TTFTCard deploymentId={deploymentId} />}
+          </div>
+          <div className="flex  gap-[.8rem]">
+            {deploymentId && <LatencyCard deploymentId={deploymentId} />}
+            {deploymentId && <ThroughputCard deploymentId={deploymentId} />}
+          </div>
+          <div className="flex  gap-[.8rem]">
+            {deploymentId && <TokenMetricsCard deploymentId={deploymentId} />}
+            <PlaceholderCard />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Embedding/Classify models: compact layout without TTFT and Throughput */}
+          <div className="flex  gap-[.8rem]">
+            {deploymentId && <APICallsCard deploymentId={deploymentId} />}
+            {deploymentId && <LatencyCard deploymentId={deploymentId} />}
+          </div>
+          <div className="flex  gap-[.8rem]">
+            {deploymentId && <TokenMetricsCard deploymentId={deploymentId} />}
+            <PlaceholderCard />
+          </div>
+        </>
+      )}
     </div>
   );
 }

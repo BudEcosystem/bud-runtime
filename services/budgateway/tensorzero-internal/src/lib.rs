@@ -13,6 +13,7 @@ pub mod baggage_processor; // SpanProcessor to copy baggage to span attributes
 pub mod blocking_middleware; // blocking rules enforcement middleware
 pub mod blocking_rules; // blocking rules management
 pub mod cache;
+pub mod classification; // classification inference
 pub mod clickhouse;
 pub mod completions; // text completion inference
 pub mod config_parser; // TensorZero config file

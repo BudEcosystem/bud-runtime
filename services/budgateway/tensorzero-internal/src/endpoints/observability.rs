@@ -593,3 +593,86 @@ pub fn record_response_result(response: &crate::responses::OpenAIResponse) {
         span.record("gen_ai.usage.total_tokens", usage.total_tokens as i64);
     }
 }
+
+/// Records embedding inference request as span attributes
+pub fn record_embedding_request(
+    model: &str,
+    input_count: usize,
+    dimensions: Option<u32>,
+    encoding_format: Option<&str>,
+) {
+    let span = Span::current();
+
+    span.record("embedding_inference.model", model);
+    span.record("embedding_inference.input_count", input_count as i64);
+
+    if let Some(dims) = dimensions {
+        span.record("embedding_inference.dimensions", dims as i64);
+    }
+    if let Some(format) = encoding_format {
+        span.record("embedding_inference.encoding_format", format);
+    }
+
+    span.record("model_inference.endpoint_type", "embedding");
+}
+
+/// Records embedding inference response as span attributes
+pub fn record_embedding_response(
+    id: &str,
+    embedding_count: usize,
+    model_name: &str,
+    input_tokens: u32,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("embedding_inference.id", id);
+    span.record("embedding_inference.embedding_count", embedding_count as i64);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.input_tokens", input_tokens as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+/// Records embedding processing time as span attribute
+pub fn record_embedding_processing_time(processing_time_ms: u64) {
+    let span = Span::current();
+    span.record("embedding_inference.processing_time_ms", processing_time_ms as i64);
+}
+
+/// Records classify inference request as span attributes
+pub fn record_classify_request(model: &str, input_count: usize, raw_scores: bool) {
+    let span = Span::current();
+
+    span.record("classify_inference.model", model);
+    span.record("classify_inference.input_count", input_count as i64);
+    span.record("classify_inference.raw_scores", raw_scores);
+
+    span.record("model_inference.endpoint_type", "classify");
+}
+
+/// Records classify inference response as span attributes
+pub fn record_classify_response(
+    id: &str,
+    label_count: usize,
+    model_name: &str,
+    input_tokens: u32,
+    output_tokens: u32,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("classify_inference.id", id);
+    span.record("classify_inference.label_count", label_count as i64);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.input_tokens", input_tokens as i64);
+    span.record("model_inference.output_tokens", output_tokens as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+/// Records classify processing time as span attribute
+pub fn record_classify_processing_time(processing_time_ms: u64) {
+    let span = Span::current();
+    span.record("classify_inference.processing_time_ms", processing_time_ms as i64);
+}
