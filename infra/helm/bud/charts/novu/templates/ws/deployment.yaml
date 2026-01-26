@@ -104,7 +104,7 @@ spec:
             - name: REDIS_PORT
               value : {{ include "novu.redis.port" . | quote }}
             - name: REDIS_DB_INDEX
-              value : "1"
+              value : {{ .Values.ws.env.REDIS_DB_INDEX | default "2" | quote }}
             - name: REDIS_PASSWORD
               valueFrom :
                 secretKeyRef:
