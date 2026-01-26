@@ -186,6 +186,67 @@ impl EmbeddingModelConfig {
     }
 }
 
+/// Represents a single embedding input item which can be text, URL, or base64 data URI.
+/// This enables multimodal embedding support for image and audio inputs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EmbeddingInputItem {
+    /// Plain text input
+    Text(String),
+}
+
+impl EmbeddingInputItem {
+    /// Parse a string into an EmbeddingInputItem, detecting URLs and data URIs
+    pub fn from_string(s: String, modality: Option<&str>) -> Self {
+        // For text modality or no modality specified, always treat as text
+        if modality.is_none() || modality == Some("text") {
+            return EmbeddingInputItem::Text(s);
+        }
+
+        // For image/audio modality, check if it's a URL or data URI
+        // Data URIs and URLs are passed through as text - the provider handles them
+        EmbeddingInputItem::Text(s)
+    }
+
+    /// Get the content as a string reference
+    pub fn as_str(&self) -> &str {
+        match self {
+            EmbeddingInputItem::Text(s) => s,
+        }
+    }
+
+    /// Check if this is a URL (starts with http:// or https://)
+    pub fn is_url(&self) -> bool {
+        match self {
+            EmbeddingInputItem::Text(s) => s.starts_with("http://") || s.starts_with("https://"),
+        }
+    }
+
+    /// Check if this is a data URI (starts with data:)
+    pub fn is_data_uri(&self) -> bool {
+        match self {
+            EmbeddingInputItem::Text(s) => s.starts_with("data:"),
+        }
+    }
+
+    /// Parse a data URI and return (mime_type, base64_data)
+    /// Returns None if not a valid data URI
+    pub fn parse_data_uri(&self) -> Option<(&str, &str)> {
+        match self {
+            EmbeddingInputItem::Text(s) => {
+                if !s.starts_with("data:") {
+                    return None;
+                }
+                // Format: data:<mime>;base64,<data>
+                let without_prefix = s.strip_prefix("data:")?;
+                let (mime_and_encoding, data) = without_prefix.split_once(',')?;
+                let mime_type = mime_and_encoding.strip_suffix(";base64")?;
+                Some((mime_type, data))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum EmbeddingInput {
@@ -215,6 +276,46 @@ impl EmbeddingInput {
         match self {
             EmbeddingInput::Single(text) => text.is_empty(),
             EmbeddingInput::Batch(texts) => texts.is_empty() || texts.iter().all(|t| t.is_empty()),
+        }
+    }
+
+    /// Check if any input is a URL
+    pub fn has_urls(&self) -> bool {
+        match self {
+            EmbeddingInput::Single(text) => {
+                text.starts_with("http://") || text.starts_with("https://")
+            }
+            EmbeddingInput::Batch(texts) => texts
+                .iter()
+                .any(|t| t.starts_with("http://") || t.starts_with("https://")),
+        }
+    }
+
+    /// Check if any input is a data URI
+    pub fn has_data_uris(&self) -> bool {
+        match self {
+            EmbeddingInput::Single(text) => text.starts_with("data:"),
+            EmbeddingInput::Batch(texts) => texts.iter().any(|t| t.starts_with("data:")),
+        }
+    }
+
+    /// Validate inputs for the given modality
+    /// Returns an error message if validation fails
+    pub fn validate_for_modality(&self, modality: Option<&str>) -> Result<(), String> {
+        let modality = modality.unwrap_or("text");
+
+        match modality {
+            "text" => {
+                // Text modality: URLs and data URIs should not be used
+                // (but we allow them and pass through for flexibility)
+                Ok(())
+            }
+            "image" | "audio" => {
+                // Image/audio modality: inputs should be URLs or data URIs
+                // Plain text is also allowed (some models may support text descriptions)
+                Ok(())
+            }
+            _ => Err(format!("Unsupported modality: {}", modality)),
         }
     }
 }
@@ -577,6 +678,191 @@ impl EmbeddingProviderResponse {
     }
 }
 
+/// Utility functions for processing multimodal embedding inputs
+pub mod multimodal {
+    use super::*;
+    use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
+
+    /// Supported media types for image inputs
+    pub const IMAGE_MEDIA_TYPES: &[&str] = &[
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/webp",
+        "image/bmp",
+    ];
+
+    /// Supported media types for audio inputs
+    pub const AUDIO_MEDIA_TYPES: &[&str] = &[
+        "audio/mpeg",
+        "audio/mp3",
+        "audio/wav",
+        "audio/ogg",
+        "audio/flac",
+        "audio/webm",
+    ];
+
+    /// Fetch content from a URL and return as base64-encoded data URI
+    pub async fn fetch_url_as_data_uri(
+        client: &Client,
+        url: &str,
+    ) -> Result<String, Error> {
+        let response = client.get(url).send().await.map_err(|e| {
+            Error::new(ErrorDetails::InvalidRequest {
+                message: format!("Failed to fetch URL {}: {}", url, e),
+            })
+        })?;
+
+        if !response.status().is_success() {
+            return Err(Error::new(ErrorDetails::InvalidRequest {
+                message: format!(
+                    "Failed to fetch URL {}: HTTP {}",
+                    url,
+                    response.status()
+                ),
+            }));
+        }
+
+        // Get content type from response headers (convert to owned String before consuming response)
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|ct| ct.to_str().ok())
+            .map(|ct| ct.split(';').next().unwrap_or(ct).trim())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+
+        let bytes = response.bytes().await.map_err(|e| {
+            Error::new(ErrorDetails::InvalidRequest {
+                message: format!("Failed to read response body from {}: {}", url, e),
+            })
+        })?;
+
+        // Encode as base64
+        let base64_data = BASE64_STANDARD.encode(&bytes);
+
+        // Return as data URI
+        Ok(format!("data:{};base64,{}", content_type, base64_data))
+    }
+
+    /// Validate a data URI format and return the mime type
+    pub fn validate_data_uri(data_uri: &str) -> Result<&str, Error> {
+        if !data_uri.starts_with("data:") {
+            return Err(Error::new(ErrorDetails::InvalidRequest {
+                message: "Invalid data URI: must start with 'data:'".to_string(),
+            }));
+        }
+
+        let without_prefix = data_uri.strip_prefix("data:").unwrap();
+        let (mime_and_encoding, _data) = without_prefix.split_once(',').ok_or_else(|| {
+            Error::new(ErrorDetails::InvalidRequest {
+                message: "Invalid data URI: missing comma separator".to_string(),
+            })
+        })?;
+
+        if !mime_and_encoding.ends_with(";base64") {
+            return Err(Error::new(ErrorDetails::InvalidRequest {
+                message: "Invalid data URI: must be base64 encoded".to_string(),
+            }));
+        }
+
+        let mime_type = mime_and_encoding.strip_suffix(";base64").unwrap();
+        Ok(mime_type)
+    }
+
+    /// Validate that the media type is appropriate for the modality
+    pub fn validate_media_type_for_modality(
+        media_type: &str,
+        modality: &str,
+    ) -> Result<(), Error> {
+        match modality {
+            "image" => {
+                if !IMAGE_MEDIA_TYPES.contains(&media_type) {
+                    return Err(Error::new(ErrorDetails::InvalidRequest {
+                        message: format!(
+                            "Unsupported image media type '{}'. Supported types: {:?}",
+                            media_type, IMAGE_MEDIA_TYPES
+                        ),
+                    }));
+                }
+            }
+            "audio" => {
+                if !AUDIO_MEDIA_TYPES.contains(&media_type) {
+                    return Err(Error::new(ErrorDetails::InvalidRequest {
+                        message: format!(
+                            "Unsupported audio media type '{}'. Supported types: {:?}",
+                            media_type, AUDIO_MEDIA_TYPES
+                        ),
+                    }));
+                }
+            }
+            "text" => {
+                // Text modality doesn't need media type validation
+            }
+            _ => {
+                return Err(Error::new(ErrorDetails::InvalidRequest {
+                    message: format!("Unsupported modality: {}", modality),
+                }));
+            }
+        }
+        Ok(())
+    }
+
+    /// Process embedding inputs, fetching URLs if necessary for non-text modalities
+    pub async fn process_inputs_for_modality(
+        client: &Client,
+        input: &EmbeddingInput,
+        modality: Option<&str>,
+    ) -> Result<EmbeddingInput, Error> {
+        let modality = modality.unwrap_or("text");
+
+        // For text modality, return as-is
+        if modality == "text" {
+            return Ok(input.clone());
+        }
+
+        // For image/audio modality, process URLs to data URIs
+        match input {
+            EmbeddingInput::Single(text) => {
+                let processed = process_single_input(client, text, modality).await?;
+                Ok(EmbeddingInput::Single(processed))
+            }
+            EmbeddingInput::Batch(texts) => {
+                let mut processed = Vec::with_capacity(texts.len());
+                for text in texts {
+                    processed.push(process_single_input(client, text, modality).await?);
+                }
+                Ok(EmbeddingInput::Batch(processed))
+            }
+        }
+    }
+
+    async fn process_single_input(
+        client: &Client,
+        input: &str,
+        modality: &str,
+    ) -> Result<String, Error> {
+        // Check if it's a URL
+        if input.starts_with("http://") || input.starts_with("https://") {
+            // Fetch and convert to data URI
+            let data_uri = fetch_url_as_data_uri(client, input).await?;
+            // Validate the fetched content type
+            let mime_type = validate_data_uri(&data_uri)?;
+            validate_media_type_for_modality(mime_type, modality)?;
+            Ok(data_uri)
+        } else if input.starts_with("data:") {
+            // Validate existing data URI
+            let mime_type = validate_data_uri(input)?;
+            validate_media_type_for_modality(mime_type, modality)?;
+            Ok(input.to_string())
+        } else {
+            // Plain text - pass through (some models may support text descriptions)
+            Ok(input.to_string())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -749,5 +1035,126 @@ mod tests {
         assert!(logs_contain(
             "Error sending request to Dummy provider for model 'error'"
         ))
+    }
+
+    #[test]
+    fn test_embedding_input_url_detection() {
+        // Test URL detection
+        let url_input = EmbeddingInput::Single("https://example.com/image.png".to_string());
+        assert!(url_input.has_urls());
+        assert!(!url_input.has_data_uris());
+
+        let http_url = EmbeddingInput::Single("http://example.com/image.png".to_string());
+        assert!(http_url.has_urls());
+
+        // Test data URI detection
+        let data_uri =
+            EmbeddingInput::Single("data:image/png;base64,iVBORw0KGgoAAAANS".to_string());
+        assert!(!data_uri.has_urls());
+        assert!(data_uri.has_data_uris());
+
+        // Test plain text
+        let text = EmbeddingInput::Single("Hello, world!".to_string());
+        assert!(!text.has_urls());
+        assert!(!text.has_data_uris());
+
+        // Test batch with mixed inputs
+        let batch = EmbeddingInput::Batch(vec![
+            "Hello".to_string(),
+            "https://example.com/image.png".to_string(),
+            "data:image/jpeg;base64,/9j/4AAQ".to_string(),
+        ]);
+        assert!(batch.has_urls());
+        assert!(batch.has_data_uris());
+    }
+
+    #[test]
+    fn test_embedding_input_item_data_uri_parsing() {
+        // Valid data URI
+        let item = EmbeddingInputItem::Text(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB".to_string(),
+        );
+        assert!(item.is_data_uri());
+        assert!(!item.is_url());
+
+        let parsed = item.parse_data_uri();
+        assert!(parsed.is_some());
+        let (mime, data) = parsed.unwrap();
+        assert_eq!(mime, "image/png");
+        assert_eq!(data, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB");
+
+        // Invalid data URI (no base64)
+        let invalid =
+            EmbeddingInputItem::Text("data:image/png,raw_data_without_base64".to_string());
+        assert!(invalid.parse_data_uri().is_none());
+
+        // Not a data URI
+        let text = EmbeddingInputItem::Text("Hello, world!".to_string());
+        assert!(text.parse_data_uri().is_none());
+    }
+
+    #[test]
+    fn test_multimodal_validate_data_uri() {
+        use super::multimodal::validate_data_uri;
+
+        // Valid data URI
+        let valid = "data:image/png;base64,iVBORw0KGgoAAAANS";
+        let result = validate_data_uri(valid);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "image/png");
+
+        // Missing data: prefix
+        let no_prefix = "image/png;base64,iVBORw0KGgoAAAANS";
+        assert!(validate_data_uri(no_prefix).is_err());
+
+        // Missing comma
+        let no_comma = "data:image/png;base64iVBORw0KGgoAAAANS";
+        assert!(validate_data_uri(no_comma).is_err());
+
+        // Missing base64 encoding
+        let no_base64 = "data:image/png,raw_data";
+        assert!(validate_data_uri(no_base64).is_err());
+    }
+
+    #[test]
+    fn test_multimodal_validate_media_type() {
+        use super::multimodal::validate_media_type_for_modality;
+
+        // Valid image types
+        assert!(validate_media_type_for_modality("image/png", "image").is_ok());
+        assert!(validate_media_type_for_modality("image/jpeg", "image").is_ok());
+        assert!(validate_media_type_for_modality("image/webp", "image").is_ok());
+
+        // Invalid image type
+        assert!(validate_media_type_for_modality("image/tiff", "image").is_err());
+
+        // Valid audio types
+        assert!(validate_media_type_for_modality("audio/mpeg", "audio").is_ok());
+        assert!(validate_media_type_for_modality("audio/wav", "audio").is_ok());
+
+        // Invalid audio type
+        assert!(validate_media_type_for_modality("audio/midi", "audio").is_err());
+
+        // Text modality accepts anything
+        assert!(validate_media_type_for_modality("anything", "text").is_ok());
+
+        // Invalid modality
+        assert!(validate_media_type_for_modality("image/png", "video").is_err());
+    }
+
+    #[test]
+    fn test_embedding_input_validate_for_modality() {
+        let text_input = EmbeddingInput::Single("Hello, world!".to_string());
+
+        // Text modality should accept anything
+        assert!(text_input.validate_for_modality(Some("text")).is_ok());
+        assert!(text_input.validate_for_modality(None).is_ok());
+
+        // Image and audio modalities should work
+        assert!(text_input.validate_for_modality(Some("image")).is_ok());
+        assert!(text_input.validate_for_modality(Some("audio")).is_ok());
+
+        // Invalid modality
+        assert!(text_input.validate_for_modality(Some("video")).is_err());
     }
 }

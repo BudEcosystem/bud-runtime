@@ -3633,7 +3633,7 @@ pub async fn embedding_handler(
     );
 
     // Convert OpenAI request to internal format
-    let internal_input = match &openai_compatible_params.input {
+    let raw_input = match &openai_compatible_params.input {
         OpenAICompatibleEmbeddingInput::Single(text) => {
             crate::embeddings::EmbeddingInput::Single(text.clone())
         }
@@ -3646,6 +3646,23 @@ pub async fn embedding_handler(
             crate::embeddings::EmbeddingInput::Batch(texts.clone())
         }
     };
+
+    // Validate input for the specified modality
+    raw_input
+        .validate_for_modality(openai_compatible_params.modality.as_deref())
+        .map_err(|e| {
+            Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+                message: e,
+            })
+        })?;
+
+    // Process multimodal inputs (fetch URLs for image/audio modality)
+    let internal_input = crate::embeddings::multimodal::process_inputs_for_modality(
+        &http_client,
+        &raw_input,
+        openai_compatible_params.modality.as_deref(),
+    )
+    .await?;
 
     // Capture the gateway request (without null values)
     let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
