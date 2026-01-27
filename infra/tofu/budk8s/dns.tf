@@ -23,6 +23,7 @@ locals {
     "app",
     "ask",
     "mcpgateway",
+    "notify",
     "api.novu",
     "ws.novu",
     "chat",

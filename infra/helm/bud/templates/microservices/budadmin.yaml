@@ -64,6 +64,8 @@ spec:
             value: '{{ include "bud.ingress.url.budask" $ }}/v1'
           - name: NEXT_PUBLIC_ASK_BUD_MODEL
             value: {{ .Values.microservices.askbud.model }}
+          - name: NEXT_PUBLIC_BUDNOTIFY_SERVICE_PUBLIC
+            value: {{ include "bud.ingress.url.budnotify" $ }}
         {{ $root := . }}
         {{- range $key, $value := .Values.microservices.budadmin.env }}
           - name: {{ $key }}

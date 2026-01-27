@@ -119,6 +119,16 @@ spec:
                 name: {{ .Release.Name }}-askbud
                 port:
                   number: 3000
+    - host: {{ include "bud.ingress.hosts.budnotify" $ }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-budnotify
+                port:
+                  number: 3000
   tls:
     - hosts:
         - {{ include "bud.ingress.hosts.budcustomer" $ }}
@@ -141,6 +151,9 @@ spec:
     - hosts:
         - {{ include "bud.ingress.hosts.budask" $ }}
       secretName: {{ .Release.Name }}-budask-acme-cert
+    - hosts:
+        - {{ include "bud.ingress.hosts.budnotify" $ }}
+      secretName: {{ .Release.Name }}-budnotify-acme-cert
 ---
 {{- if .Values.onyx.enabled }}
 apiVersion: traefik.io/v1alpha1
