@@ -60,6 +60,7 @@ export function SettingsSidebar({ isOpen, onClose, session }: SettingsSidebarPro
       const payload: Record<string, unknown> = {
         prompt_id: promptIdForUpdate,
         model_settings: modelSettings,
+        stream: session?.settings?.stream ?? false,
       };
 
       if (isEditVersionMode && editVersionData?.versionNumber) {
