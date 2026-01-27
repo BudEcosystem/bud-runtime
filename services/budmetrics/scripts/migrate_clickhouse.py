@@ -1555,7 +1555,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1572,7 +1572,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1589,7 +1589,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
