@@ -1,12 +1,8 @@
 'use client';
 
 import React, { useState } from "react";
-import { Dropdown, Tooltip, Switch } from "antd";
-import {
-  CloseOutlined,
-  CopyOutlined,
-  DeleteOutlined,
-} from "@ant-design/icons";
+import { Tooltip } from "antd";
+import { CloseOutlined } from "@ant-design/icons";
 import { useAgentStore, AgentSession, AgentVariable } from "@/stores/useAgentStore";
 import LoadModel from "./LoadModel";
 import { Editor } from "../flowgramEditorDemo/editor";
@@ -600,18 +596,6 @@ function AgentBoxInner({
   const handleStructuredOutputEnabledChange = (enabled: boolean) => {
     setStructuredOutputEnabled(enabled);
     if (session) updateSession(session.id, { structuredOutputEnabled: enabled });
-  };
-
-  const handleStreamToggle = (checked: boolean) => {
-    setStreamEnabled(checked);
-    if (session) {
-      updateSession(session.id, {
-        settings: {
-          ...session.settings,
-          stream: checked
-        }
-      });
-    }
   };
 
   // Handle Set as Default toggle change in edit version mode
@@ -1372,35 +1356,6 @@ function AgentBoxInner({
     }
   };
 
-  const menuItems = [
-    {
-      key: 'stream',
-      label: (
-        <div
-          className="flex items-center justify-between gap-3 py-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="text-[#B3B3B3]">Stream</span>
-          <Switch
-            size="small"
-            checked={streamEnabled}
-            onChange={handleStreamToggle}
-          />
-        </div>
-      ),
-      onClick: (e: any) => {
-        e.domEvent?.stopPropagation();
-      }
-    },
-    // {
-    //   key: 'delete',
-    //   icon: '',
-    //   // icon: <DeleteOutlined />,
-    //   label: 'Close',
-    //   danger: true,
-    //   onClick: () => session && handleCloseSession()
-    // }
-  ];
 
   return (
     <div
@@ -1555,28 +1510,6 @@ function AgentBoxInner({
               </button>
             </Tooltip>
           )}
-
-          {/* More Options Dropdown */}
-          <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
-            <Tooltip title="Options" placement="bottom">
-              <button className="w-7 h-7 rounded-md flex justify-center items-center cursor-pointer hover:bg-[#1A1A1A] transition-colors">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  fill="none"
-                >
-                  <path
-                    fill="currentColor"
-                    fillRule="evenodd"
-                    d="M10.453 3.226a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm0 5.45a1.226 1.226 0 1 1-2.453 0 1.226 1.226 0 0 1 2.453 0Zm-1.226 6.676a1.226 1.226 0 1 0 0-2.452 1.226 1.226 0 0 0 0 2.452Z"
-                    clipRule="evenodd"
-                    className="text-[#B3B3B3] hover:text-white"
-                  />
-                </svg>
-              </button>
-            </Tooltip>
-          </Dropdown>
 
           {/* Close Button */}
           {totalSessions > 1 && (

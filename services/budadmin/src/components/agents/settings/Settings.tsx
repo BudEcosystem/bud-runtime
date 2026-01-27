@@ -75,9 +75,30 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
     const [components, setComponents] = useState<SettingsListItemProps[]>([]);
     const [hasHydrated, setHasHydrated] = useState(false);
     const hasLoadedConfigRef = React.useRef<string | null>(null);
+    const [streamEnabled, setStreamEnabled] = useState(false);
 
     // Get current session to access its modelSettings
     const currentSession = sessions.find(s => s.id === sessionId);
+
+    // Initialize stream state from session
+    useEffect(() => {
+        if (currentSession?.settings?.stream !== undefined) {
+            setStreamEnabled(currentSession.settings.stream);
+        }
+    }, [currentSession?.settings?.stream]);
+
+    // Handle stream toggle change
+    const handleStreamToggle = useCallback((checked: boolean) => {
+        setStreamEnabled(checked);
+        if (sessionId) {
+            updateSession(sessionId, {
+                settings: {
+                    ...currentSession?.settings,
+                    stream: checked
+                }
+            });
+        }
+    }, [sessionId, currentSession?.settings, updateSession]);
 
     const buildDefaultSettings = React.useCallback((id: string): AgentSettings => ({
         id: `settings_${id}`,
@@ -386,6 +407,15 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
                 </button>
             </div>
             <div className='px-[1rem] pt-[.75rem]'>
+                {/* Stream Toggle - First Setting */}
+                <div className="flex flex-col w-full bg-[#ffffff08] px-[.4rem] py-[.5rem] border-[1px] border-[#1F1F1F] mb-[1rem] rounded-[.5rem]">
+                    <InlineSwitch
+                        title="Stream"
+                        value={streamEnabled}
+                        defaultValue={streamEnabled}
+                        onChange={handleStreamToggle}
+                    />
+                </div>
                 {components?.map((item, index) => (
                     <SettingsListItem key={index} {...item} />
                 ))}
