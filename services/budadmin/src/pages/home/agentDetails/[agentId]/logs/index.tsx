@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Tag, Spin } from "antd";
+import { Tag, Spin, Tooltip } from "antd";
 import * as echarts from "echarts";
 import {
   Text_10_400_B3B3B3,
@@ -8,8 +8,6 @@ import {
   Text_12_600_EEEEEE,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
-import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
-import ProjectTags from "src/flows/components/ProjectTags";
 import CustomSelect from "src/flows/components/CustomSelect";
 import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
@@ -92,7 +90,7 @@ const DurationBar = ({
   const widthPercent = referenceDuration > 0 ? (duration / referenceDuration) * 100 : 0;
 
   return (
-    <div className="relative h-5" style={{ width: "150px", flexShrink: 0 }}>
+    <div className="relative h-5" style={{ width: "120px", flexShrink: 0 }}>
       <div
         className="absolute h-[6px] top-[7px] rounded"
         style={{
@@ -131,17 +129,17 @@ const LogRow = ({
   onToggleExpand?: () => void;
   onViewDetails?: (log: LogEntry) => void;
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const hasChildren = row.children && row.children.length > 0;
   const canExpand = row.canExpand || hasChildren;
   const isChild = depth > 0;
   const indentPx = depth * 18; // 18px indent per level
 
-  // Base position for tree lines - center of expand button container
-  // 12px padding + 80px time + 90px status = 182px (start of expand button column)
-  // Expand button is 40px wide, so center is at +20px
-  const baseTreePosition = 182;
-  const expandButtonCenter = 20; // center offset within 40px expand button column
+  // Base position for tree lines - center of expand button/tag
+  // 12px padding + 50px time + 60px namespace = 122px (start of expand button column)
+  // Tag has min-w-[1.5rem] (24px), centered in 40px container, so center is at ~12px from tag left
+  // With tag centered: (40 - 24) / 2 + 12 = 8 + 12 = 20px, but visually adjust to 12px for tag center
+  const baseTreePosition = 122;
+  const expandButtonCenter = 15; // center offset to align with middle of min-w-[1.5rem] tag
 
   return (
     <div
@@ -149,8 +147,6 @@ const LogRow = ({
         ? "bg-[#1a1a1a] border-l-2 border-l-[#965CDE]"
         : "hover:bg-[rgba(255,255,255,0.03)] border-l-2 border-l-transparent"
         }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Continuation vertical lines for ancestor levels (skip level 0 - root items are separate) */}
       {/* level in array = depth of ancestor with siblings, line position = parent of that ancestor */}
@@ -186,7 +182,7 @@ const LogRow = ({
               className="absolute"
               style={{
                 left: `${baseTreePosition + expandButtonCenter + (depth - 1) * 18}px`,
-                top: "calc(50% - 5px)",
+                top: "calc(50% - 6px)",
                 width: "10px",
                 height: "7px",
                 borderLeft: "1px solid #D4A853",
@@ -232,7 +228,10 @@ const LogRow = ({
 
       <div
         className="flex items-center justify-between py-1 cursor-pointer relative"
-        onClick={onSelect}
+        onClick={() => {
+          onSelect();
+          onViewDetails?.(row);
+        }}
       >
         <div
           className="flex items-center flex-auto"
@@ -242,18 +241,17 @@ const LogRow = ({
           }}
         >
           {/* Time - fixed width, no indent */}
-          <div style={{ width: "80px", flexShrink: 0 }}>
+          <div style={{ width: "50px", flexShrink: 0 }}>
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
           {/* Namespace - fixed width, no indent */}
-          <div style={{ width: "90px", flexShrink: 0 }} className="flex justify-start items-center">
-            <ProjectTags
-              name={row.namespace || "-"}
-              color="#D4A853"
-              tagClass="w-fit"
-              textClass="px-[.15rem] pt-[.15rem] pb-[.2rem] text-[.5rem]"
-            />
+          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center">
+            <Tooltip title={row.namespace || "-"} placement="top">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[55px] truncate px-[.2rem] !leading-[200%]">
+                {row.namespace || "-"}
+              </Tag>
+            </Tooltip>
           </div>
 
           {/* Count / Expand indicator - indented based on depth */}
@@ -263,7 +261,7 @@ const LogRow = ({
           >
             {canExpand && (
               <div
-                className="cursor-pointer"
+                className="cursor-pointer flex items-center justify-center"
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
@@ -271,11 +269,11 @@ const LogRow = ({
                 }}
               >
                 {row.isLoadingChildren ? (
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%] min-w-[1.5rem]">
                     <Spin size="small" />
                   </Tag>
                 ) : (
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]  min-w-[1.5rem]">
                     {isExpanded ? "−" : "+"}{row.childCount || row.children?.length || ""}
                   </Tag>
                 )}
@@ -283,26 +281,32 @@ const LogRow = ({
             )}
           </div>
 
-          {/* Title + metadata */}
-          <div className="flex gap-3 items-center overflow-hidden flex-1 min-w-0">
-            <Text_10_600_EEEEEE className="whitespace-nowrap overflow-hidden text-ellipsis">
-              {row.title}
-            </Text_10_600_EEEEEE>
-            <div className="flex gap-2 items-center flex-shrink-0">
-              {row.metrics.sum !== undefined && (
-                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[11px]">
-                  ∅ ∑ ↗{row.metrics.sum} ↙{row.metrics.rate}
-                </Tag>
-              )}
-              {row.metrics.tag && (
-                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[11px]">
-                  {row.metrics.tag}
-                </Tag>
-              )}
-            </div>
+          {/* Title */}
+          <div className="flex items-center overflow-hidden flex-1 min-w-0">
+            <Tooltip title={row.title} placement="top">
+              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] block">
+                {row.title}
+              </Text_10_600_EEEEEE>
+            </Tooltip>
           </div>
         </div>
         <div className="flex justify-end items-center min-w-[30%] pr-[12px] pl-[12px] flex-shrink-0">
+          {/* Metrics tags */}
+          <div className="flex gap-2 items-center flex-shrink-0 mr-3">
+            {row.metrics.sum !== undefined && (
+              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                ∅ ∑ ↗{row.metrics.sum} ↙{row.metrics.rate}
+              </Tag>
+            )}
+            {row.metrics.tag && (
+              <Tooltip title={row.metrics.tag} placement="top">
+                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                  {row.metrics.tag}
+                </Tag>
+              </Tooltip>
+            )}
+          </div>
+
           {/* Timeline */}
           <DurationBar
             duration={row.duration}
@@ -310,22 +314,9 @@ const LogRow = ({
           />
 
           {/* Duration */}
-          <Text_10_400_B3B3B3 className="text-right mr-[2rem] ml-[1rem]">
+          <Text_10_400_B3B3B3 className="text-right ml-[1rem]">
             {formatDuration(row.duration)}
           </Text_10_400_B3B3B3>
-          {/* Hover/Selected View button */}
-          <div style={{ visibility: isHovered || isSelected ? "visible" : "hidden" }}>
-            <PrimaryButton
-              classNames=" h-[1.25rem]"
-              textClass="!text-[0.625rem]"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onViewDetails?.(row);
-              }}
-            >
-              View
-            </PrimaryButton>
-          </div>
         </div>
 
       </div>
@@ -347,8 +338,6 @@ const FlatLogRow = ({
   onSelect: () => void;
   onViewDetails?: (log: LogEntry) => void;
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
   return (
     <div
       className={`w-full flex-auto relative transition-colors border-b border-[rgba(255,255,255,0.08)] ${
@@ -356,63 +345,55 @@ const FlatLogRow = ({
           ? "bg-[#1a1a1a] border-l-2 border-l-[#965CDE]"
           : "hover:bg-[rgba(255,255,255,0.03)] border-l-2 border-l-transparent"
       }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div
         className="flex items-center justify-between py-1 cursor-pointer"
-        onClick={onSelect}
+        onClick={() => {
+          onSelect();
+          onViewDetails?.(row);
+        }}
       >
         <div className="flex items-center flex-auto px-3">
           {/* Time */}
-          <div style={{ width: "80px", flexShrink: 0 }}>
+          <div style={{ width: "50px", flexShrink: 0 }}>
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
           {/* Status */}
-          <div style={{ width: "90px", flexShrink: 0 }}>
-            <ProjectTags
-              name={row.namespace || "-"}
-              color="#D4A853"
-              tagClass="w-fit"
-              textClass="px-[.15rem] pt-[.15rem] pb-[.2rem] text-[.5rem]"
-            />
+          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center">
+            <Tooltip title={row.namespace || "-"} placement="top">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[55px] truncate px-[.2rem]">
+                {row.namespace || "-"}
+              </Tag>
+            </Tooltip>
           </div>
 
-          {/* Title + metadata */}
-          <div className="flex gap-3 items-center overflow-hidden flex-1 min-w-0">
-            <Text_10_600_EEEEEE className="whitespace-nowrap overflow-hidden text-ellipsis">
-              {row.title}
-            </Text_10_600_EEEEEE>
-            {row.metrics.tag && (
-              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[11px]">
-                {row.metrics.tag}
-              </Tag>
-            )}
+          {/* Title */}
+          <div className="flex items-center overflow-hidden flex-1 min-w-0">
+            <Tooltip title={row.title} placement="top">
+              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] block">
+                {row.title}
+              </Text_10_600_EEEEEE>
+            </Tooltip>
           </div>
         </div>
         <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 bg-[#101010]">
+          {/* Metrics tag */}
+          {row.metrics.tag && (
+            <Tooltip title={row.metrics.tag} placement="top">
+              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[11px] max-w-[80px] truncate mr-3">
+                {row.metrics.tag}
+              </Tag>
+            </Tooltip>
+          )}
+
           {/* Timeline */}
           <DurationBar duration={row.duration} referenceDuration={referenceDuration} />
 
           {/* Duration */}
-          <Text_10_400_B3B3B3 className="text-right mr-8 ml-4">
+          <Text_10_400_B3B3B3 className="text-right ml-4">
             {formatDuration(row.duration)}
           </Text_10_400_B3B3B3>
-
-          {/* Hover/Selected View button */}
-          <div style={{ visibility: isHovered || isSelected ? "visible" : "hidden" }}>
-            <PrimaryButton
-              classNames="h-5"
-              textClass="!text-[0.625rem]"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onViewDetails?.(row);
-              }}
-            >
-              View
-            </PrimaryButton>
-          </div>
         </div>
       </div>
     </div>
@@ -632,6 +613,7 @@ const buildChildrenFromTraceDetail = (
       time: formatTime(span.timestamp),
       namespace: span.resource_attributes?.["service.namespace"] || "",
       title: span.span_name,
+      childCount: span.child_span_count, // Use child_span_count from API
       metrics: {
         tag: span.service_name,
       },
@@ -641,6 +623,8 @@ const buildChildrenFromTraceDetail = (
       traceId: span.trace_id,
       spanId: span.span_id,
       parentSpanId: span.parent_span_id,
+      canExpand: (span.child_span_count ?? 0) > 0, // Set canExpand based on child_span_count
+      rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
     };
 
     spanMap.set(span.span_id, entry);
@@ -666,18 +650,17 @@ const buildChildrenFromTraceDetail = (
     }
   });
 
-  // Update child counts and sort children by timestamp
-  const updateChildCounts = (entry: LogEntry) => {
+  // Sort children by timestamp and clean up empty children arrays
+  const processChildren = (entry: LogEntry) => {
     if (entry.children && entry.children.length > 0) {
-      entry.childCount = entry.children.length;
       entry.children.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
-      entry.children.forEach(updateChildCounts);
+      entry.children.forEach(processChildren);
     } else {
       delete entry.children;
     }
   };
 
-  directChildren.forEach(updateChildCounts);
+  directChildren.forEach(processChildren);
 
   // Sort by timestamp
   directChildren.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
@@ -713,7 +696,12 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
 
   // Open drawer with selected log
   const openLogDetailsDrawer = (log: LogEntry) => {
-    openDrawer("log-details", { spanData: log });
+    openDrawer("log-details", {
+      spanData: log,
+      viewMode,
+      promptName,
+      projectId,
+    });
   };
 
   // Fetch traces from API
@@ -892,14 +880,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
             earliestTimestamp
           );
 
-          // Update the log entry with children
+          // Update the log entry with children (preserve original childCount from API)
           setLogsData((prev) =>
             prev.map((log) =>
               log.id === spanId
                 ? {
                   ...log,
                   children,
-                  childCount: children.length,
+                  // Keep original childCount from API, don't overwrite with children.length
                   isLoadingChildren: false,
                   canExpand: children.length > 0,
                 }
@@ -1008,7 +996,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
         return {
           ...log,
           children,
-          childCount: children.length,
+          // Keep original childCount from API, don't overwrite with children.length
           isLoadingChildren: false,
           canExpand: children.length > 0,
         };
