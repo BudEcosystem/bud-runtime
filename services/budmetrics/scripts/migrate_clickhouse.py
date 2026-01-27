@@ -1251,7 +1251,7 @@ class ClickHouseMigration:
         ENGINE = ReplacingMergeTree(timestamp)
         PARTITION BY toYYYYMMDD(timestamp)
         ORDER BY (trace_id)
-        TTL toDateTime(timestamp) + INTERVAL 30 DAY
+        TTL toDateTime(timestamp) + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
@@ -1483,9 +1483,9 @@ class ClickHouseMigration:
         """Create InferenceMetrics rollup tables for time-series aggregation.
 
         Creates three rollup tables with different granularities:
-        - InferenceMetrics5m: 5-minute granularity, 30 day TTL (real-time dashboards)
-        - InferenceMetrics1h: 1-hour granularity, 30 day TTL (daily/weekly analytics)
-        - InferenceMetrics1d: 1-day granularity, 60 day TTL (monthly trends, billing)
+        - InferenceMetrics5m: 5-minute granularity, 90 day TTL (real-time dashboards)
+        - InferenceMetrics1h: 1-hour granularity, 90 day TTL (daily/weekly analytics)
+        - InferenceMetrics1d: 1-day granularity, 90 day TTL (monthly trends, billing)
 
         UUID handling strategy:
         - Dimension UUIDs (keep): project_id, endpoint_id, model_id, api_key_project_id
@@ -1543,7 +1543,7 @@ class ClickHouseMigration:
             unique_blocked_ips AggregateFunction(uniq, IPv4)
         """
 
-        # InferenceMetrics5m - 5-minute granularity, 30 day TTL
+        # InferenceMetrics5m - 5-minute granularity, 90 day TTL
         query_5m = f"""
         CREATE TABLE IF NOT EXISTS InferenceMetrics5m
         (
@@ -1555,12 +1555,12 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
-        TTL time_bucket + INTERVAL 30 DAY
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
-        # InferenceMetrics1h - 1-hour granularity, 30 day TTL
+        # InferenceMetrics1h - 1-hour granularity, 90 day TTL
         query_1h = f"""
         CREATE TABLE IF NOT EXISTS InferenceMetrics1h
         (
@@ -1572,12 +1572,12 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
-        TTL time_bucket + INTERVAL 30 DAY
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
-        # InferenceMetrics1d - 1-day granularity, 60 day TTL
+        # InferenceMetrics1d - 1-day granularity, 90 day TTL
         query_1d = f"""
         CREATE TABLE IF NOT EXISTS InferenceMetrics1d
         (
@@ -1589,8 +1589,8 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
-        TTL time_bucket + INTERVAL 60 DAY
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
@@ -2717,6 +2717,52 @@ class ClickHouseMigration:
             logger.error(f"Error adding network columns to NodeMetrics: {e}")
             raise
 
+    async def migrate_inference_tables_ttl_90_days(self):
+        """Update TTL to 90 days for all inference-related tables.
+
+        This migration updates the TTL from their previous values to 90 days:
+        - InferenceFact: 30 days -> 90 days
+        - InferenceMetrics5m: 30 days -> 90 days
+        - InferenceMetrics1h: 30 days -> 90 days
+        - InferenceMetrics1d: 60 days -> 90 days
+        """
+        logger.info("Checking if inference tables TTL migration to 90 days is needed...")
+
+        ttl_updates = [
+            ("InferenceFact", "toDateTime(timestamp) + INTERVAL 90 DAY"),
+            ("InferenceMetrics5m", "time_bucket + INTERVAL 90 DAY"),
+            ("InferenceMetrics1h", "time_bucket + INTERVAL 90 DAY"),
+            ("InferenceMetrics1d", "time_bucket + INTERVAL 90 DAY"),
+        ]
+
+        for table_name, ttl_expression in ttl_updates:
+            try:
+                # Check if table exists
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    logger.info(f"{table_name} table does not exist yet. Skipping TTL migration.")
+                    continue
+
+                # Check current TTL - look for 90 DAY in the CREATE TABLE statement
+                create_stmt = await self.client.execute_query(f"SHOW CREATE TABLE {table_name}")
+                if create_stmt and create_stmt[0][0]:
+                    create_sql = create_stmt[0][0]
+                    # Check if already has 90 day TTL
+                    if "toIntervalDay(90)" in create_sql or "INTERVAL 90 DAY" in create_sql:
+                        logger.info(f"{table_name} already has 90-day TTL")
+                        continue
+
+                # Update TTL to 90 days
+                alter_query = f"ALTER TABLE {table_name} MODIFY TTL {ttl_expression}"
+                await self.client.execute_query(alter_query)
+                logger.info(f"Updated {table_name} TTL to 90 days")
+
+            except Exception as e:
+                logger.error(f"Error updating TTL for {table_name}: {e}")
+                raise
+
+        logger.info("Inference tables TTL migration to 90 days completed successfully")
+
     async def run_migration(self):
         """Run the complete migration process."""
         try:
@@ -2756,6 +2802,7 @@ class ClickHouseMigration:
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
             await self.add_blocking_metrics_to_rollup_tables()  # Add blocking metrics columns to rollup tables
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
+            await self.migrate_inference_tables_ttl_90_days()  # Update TTL to 90 days for inference tables
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 

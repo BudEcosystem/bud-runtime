@@ -10,8 +10,9 @@ use crate::endpoints::inference::InferenceDatabaseInsertMetadata;
 use crate::error::Error;
 use crate::inference::types::resolved_input::ResolvedInput;
 use crate::inference::types::{
-    FinishReason, InferenceResult, Latency, ModelInferenceResponseWithMetadata,
+    FinishReason, InferenceResult, Latency, ModelInferenceResponseWithMetadata, Usage,
 };
+use crate::model::ModelPricing;
 
 /// Records resolved input as span attribute
 pub fn record_resolved_input(input: &ResolvedInput) {
@@ -379,6 +380,27 @@ pub fn record_model_inference_details(
         span.record("model_inference_details.error_message", err.error_message);
         span.record("model_inference_details.error_type", err.error_type);
         span.record("model_inference_details.status_code", err.status_code as i64);
+    }
+}
+
+/// Calculate cost from usage and pricing information.
+/// Uses the same formula as inference.rs Kafka path to ensure consistency.
+pub fn calculate_cost(usage: &Usage, model_pricing: Option<&ModelPricing>) -> Option<f64> {
+    if usage.input_tokens > 0 || usage.output_tokens > 0 {
+        if let Some(pricing) = model_pricing {
+            // Convert tokens to the pricing unit (e.g., if per_tokens is 1000, divide by 1000)
+            let input_multiplier = usage.input_tokens as f64 / pricing.per_tokens as f64;
+            let output_multiplier = usage.output_tokens as f64 / pricing.per_tokens as f64;
+            let total_cost =
+                (input_multiplier * pricing.input_cost) + (output_multiplier * pricing.output_cost);
+            Some(total_cost)
+        } else {
+            // Fallback to default pricing if not configured
+            // Using reasonable defaults: $0.01 per 1K input tokens, $0.03 per 1K output tokens
+            Some((usage.input_tokens as f64 * 0.00001) + (usage.output_tokens as f64 * 0.00003))
+        }
+    } else {
+        None
     }
 }
 

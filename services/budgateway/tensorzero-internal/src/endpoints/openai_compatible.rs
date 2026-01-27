@@ -790,11 +790,23 @@ pub async fn inference_handler(
 
             // Record ModelInferenceDetails for success
             if let Some(ref obs_metadata) = observability_metadata {
-                let inference_id = match &result {
-                    InferenceResult::Chat(chat_result) => chat_result.inference_id,
-                    InferenceResult::Json(json_result) => json_result.inference_id,
-                    _ => uuid::Uuid::nil(),
+                let (inference_id, usage) = match &result {
+                    InferenceResult::Chat(chat_result) => {
+                        (chat_result.inference_id, &chat_result.usage)
+                    }
+                    InferenceResult::Json(json_result) => {
+                        (json_result.inference_id, &json_result.usage)
+                    }
+                    _ => (
+                        uuid::Uuid::nil(),
+                        &crate::inference::types::Usage::default(),
+                    ),
                 };
+
+                // Calculate cost from usage and model pricing
+                let model_pricing = write_info.as_ref().and_then(|wi| wi.model_pricing.as_ref());
+                let cost = super::observability::calculate_cost(usage, model_pricing);
+
                 let request_forward_time = chrono::Utc::now();
                 super::observability::record_model_inference_details(
                     &inference_id,
@@ -804,7 +816,7 @@ pub async fn inference_handler(
                     true, // is_success
                     request_arrival_time,
                     request_forward_time,
-                    None, // cost - could be calculated from usage if pricing available
+                    cost,
                     obs_metadata.api_key_id.as_deref(),
                     obs_metadata.user_id.as_deref(),
                     obs_metadata.api_key_project_id.as_deref(),
