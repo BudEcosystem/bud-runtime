@@ -110,6 +110,16 @@ const endpointTemplates: Record<string, EndpointTemplate> = {
       input: "Your text to embed",
     }),
   },
+  classify: {
+    id: "classify",
+    label: "Classify",
+    defaultPath: "/v1/classify",
+    buildPayload: (modelName = "MODEL_NAME") => ({
+      model: modelName,
+      input: ["Text to classify for sentiment or category"],
+      raw_scores: false,
+    }),
+  },
   audio_transcription: {
     id: "audio_transcription",
     label: "Audio Transcriptions",

@@ -1,0 +1,372 @@
+---
+title: "Classify API"
+description: "The `/v1/classify` endpoint performs text classification using deployed classifier models (e.g., FinBERT, BERT-based classifiers)."
+---
+
+## Endpoint
+
+```
+POST /v1/classify
+```
+
+## Authentication
+
+This endpoint requires API key authentication.
+
+**Required Header:**
+```
+Authorization: Bearer <YOUR_API_KEY>
+```
+
+## Request Format
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Authorization` | Yes | Bearer token for API authentication |
+| `Content-Type` | Yes | Must be `application/json` |
+
+### Request Body
+
+```json
+{
+  "model": "string",
+  "input": ["array", "of", "strings"],
+  "raw_scores": false,
+  "priority": "normal"
+}
+```
+
+### Parameters
+
+| Parameter | Type | Default | Supported Values |
+|-----------|------|---------|------------------|
+| `model` | string | "default/not-specified" | Any deployed classifier model |
+| `input` | string[] | required | Text strings to classify |
+| `raw_scores` | boolean | false | true, false |
+| `priority` | string \| null | null | "high", "normal", "low", null |
+
+#### Parameter Details
+
+- **model**: The classifier model to use. Must be a model deployed with classification capabilities (e.g., `ProsusAI/finbert`, `cardiffnlp/twitter-roberta-base-sentiment`).
+- **input**: Array of text strings to classify. Cannot be empty.
+- **raw_scores**: When `true`, returns raw logit scores instead of normalized probabilities.
+- **priority**: Request priority level for queue scheduling. Higher priority requests are processed first.
+
+## Response Format
+
+### Success Response (200 OK)
+
+```json
+{
+  "object": "classify",
+  "data": [
+    [
+      { "label": "positive", "score": 0.85 },
+      { "label": "neutral", "score": 0.10 },
+      { "label": "negative", "score": 0.05 }
+    ]
+  ],
+  "model": "ProsusAI/finbert",
+  "usage": {
+    "prompt_tokens": 15,
+    "total_tokens": 15
+  },
+  "id": "infinity-abc123",
+  "created": 1699000000
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `object` | string | Always `"classify"` |
+| `data` | array | Array of classification results (one per input) |
+| `data[][]` | array | Array of label-score pairs for each input |
+| `data[][].label` | string | Classification label |
+| `data[][].score` | float | Confidence score (0-1) or raw score if `raw_scores=true` |
+| `model` | string | The model used for classification |
+| `usage` | object | Token usage information |
+| `usage.prompt_tokens` | integer | Number of tokens in the input |
+| `usage.total_tokens` | integer | Total tokens used |
+| `id` | string | Response ID |
+| `created` | integer | Unix timestamp |
+
+## Error Responses
+
+### 400 Bad Request
+
+Invalid request format or empty input.
+
+```json
+{
+  "error": {
+    "message": "Classification input cannot be empty.",
+    "type": "invalid_request_error",
+    "code": "invalid_request"
+  }
+}
+```
+
+### 401 Unauthorized
+
+Missing or invalid API key.
+
+```json
+{
+  "error": {
+    "message": "Invalid API key",
+    "type": "authentication_error",
+    "code": "invalid_api_key"
+  }
+}
+```
+
+### 404 Not Found
+
+Model not found or doesn't support classification.
+
+```json
+{
+  "error": {
+    "message": "Model 'unknown-model' not found or does not support classification",
+    "type": "not_found_error",
+    "code": "model_not_found"
+  }
+}
+```
+
+### 503 Service Unavailable
+
+All model providers exhausted.
+
+```json
+{
+  "error": {
+    "message": "All model providers exhausted",
+    "type": "service_unavailable",
+    "code": "providers_exhausted"
+  }
+}
+```
+
+## Usage Examples
+
+### Basic Classification
+
+```bash
+curl -X POST https://api.example.com/v1/classify \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ProsusAI/finbert",
+    "input": ["The stock market is performing well today"]
+  }'
+```
+
+### Batch Classification
+
+```bash
+curl -X POST https://api.example.com/v1/classify \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ProsusAI/finbert",
+    "input": [
+      "The company reported strong quarterly earnings",
+      "The market crashed unexpectedly",
+      "Trading volume remained stable"
+    ]
+  }'
+```
+
+### With Priority and Raw Scores
+
+```bash
+curl -X POST https://api.example.com/v1/classify \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ProsusAI/finbert",
+    "input": ["Urgent analysis needed for this earnings report"],
+    "raw_scores": true,
+    "priority": "high"
+  }'
+```
+
+### Sentiment Analysis
+
+```bash
+curl -X POST https://api.example.com/v1/classify \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "cardiffnlp/twitter-roberta-base-sentiment",
+    "input": [
+      "I love this product! Best purchase ever!",
+      "This is okay, nothing special",
+      "Terrible experience, would not recommend"
+    ]
+  }'
+```
+
+### Python Example
+
+```python
+import requests
+
+url = "https://api.example.com/v1/classify"
+headers = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+}
+
+# Basic classification
+data = {
+    "model": "ProsusAI/finbert",
+    "input": ["The company announced record profits for Q4"]
+}
+
+response = requests.post(url, headers=headers, json=data)
+result = response.json()
+
+# Get top classification for first input
+classifications = result["data"][0]
+top_label = max(classifications, key=lambda x: x["score"])
+print(f"Sentiment: {top_label['label']} ({top_label['score']:.2%})")
+
+# Batch classification with priority
+batch_data = {
+    "model": "ProsusAI/finbert",
+    "input": [
+        "Revenue exceeded expectations",
+        "Layoffs announced for 500 employees",
+        "Stock price remained unchanged"
+    ],
+    "priority": "high"
+}
+
+response = requests.post(url, headers=headers, json=batch_data)
+result = response.json()
+
+for i, classifications in enumerate(result["data"]):
+    top = max(classifications, key=lambda x: x["score"])
+    print(f"Input {i+1}: {top['label']} ({top['score']:.2%})")
+```
+
+### JavaScript/TypeScript Example
+
+```javascript
+const url = 'https://api.example.com/v1/classify';
+const headers = {
+  'Authorization': 'Bearer YOUR_API_KEY',
+  'Content-Type': 'application/json'
+};
+
+// Basic classification
+const data = {
+  model: 'ProsusAI/finbert',
+  input: ['The company announced record profits for Q4']
+};
+
+fetch(url, {
+  method: 'POST',
+  headers: headers,
+  body: JSON.stringify(data)
+})
+  .then(response => response.json())
+  .then(result => {
+    const classifications = result.data[0];
+    const topLabel = classifications.reduce((a, b) => a.score > b.score ? a : b);
+    console.log(`Sentiment: ${topLabel.label} (${(topLabel.score * 100).toFixed(1)}%)`);
+  });
+
+// Batch classification with async/await
+async function classifyBatch() {
+  const batchData = {
+    model: 'ProsusAI/finbert',
+    input: [
+      'Revenue exceeded expectations',
+      'Layoffs announced for 500 employees',
+      'Stock price remained unchanged'
+    ],
+    priority: 'high'
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(batchData)
+  });
+
+  const result = await response.json();
+
+  result.data.forEach((classifications, i) => {
+    const top = classifications.reduce((a, b) => a.score > b.score ? a : b);
+    console.log(`Input ${i + 1}: ${top.label} (${(top.score * 100).toFixed(1)}%)`);
+  });
+}
+```
+
+## Common Use Cases
+
+### Financial Sentiment Analysis
+
+Use models like `ProsusAI/finbert` to analyze sentiment in financial news, earnings reports, and market commentary.
+
+```json
+{
+  "model": "ProsusAI/finbert",
+  "input": ["Apple reported quarterly revenue of $89.5 billion, up 8% year over year"]
+}
+```
+
+### Social Media Sentiment
+
+Use models like `cardiffnlp/twitter-roberta-base-sentiment` for social media sentiment analysis.
+
+```json
+{
+  "model": "cardiffnlp/twitter-roberta-base-sentiment",
+  "input": ["Just tried the new feature and it's amazing! #excited"]
+}
+```
+
+### Topic Classification
+
+Use topic classification models to categorize text into predefined categories.
+
+```json
+{
+  "model": "your-topic-classifier",
+  "input": ["The new vaccine shows 95% efficacy in clinical trials"]
+}
+```
+
+## Notes
+
+- Classification models return labels specific to their training (e.g., positive/negative/neutral for sentiment)
+- The order of labels in the response corresponds to the model's label ordering
+- Scores are probabilities summing to 1.0 (unless `raw_scores=true`)
+- Batch processing is supported for efficiency
+- The endpoint automatically detects models with classification capabilities
+- Priority affects queue ordering but not model inference speed
+
+## Supported Models
+
+Classification is supported for models that expose the `/v1/classify` endpoint, including:
+
+- **FinBERT** (`ProsusAI/finbert`) - Financial sentiment analysis
+- **Twitter-RoBERTa** (`cardiffnlp/twitter-roberta-base-sentiment`) - Social media sentiment
+- **BERT-based classifiers** - Various domain-specific classifiers
+- Other sequence classification models deployed via vLLM with classification support
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="vLLM">
+    Self-hosted classifier models with support for priority scheduling and batch processing.
+  </Card>
+</CardGroup>

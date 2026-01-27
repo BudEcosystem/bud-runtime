@@ -224,6 +224,10 @@ async fn main() {
             "/v1/embeddings",
             post(endpoints::openai_compatible::embedding_handler),
         )
+        .route(
+            "/v1/classify",
+            post(endpoints::openai_compatible::classify_handler),
+        )
         .route("/v1/models", get(endpoints::openai_compatible::list_models))
         .route(
             "/v1/moderations",
@@ -484,15 +488,10 @@ async fn main() {
 
         // Initialize and attach analytics batcher for efficient batched ClickHouse writes
         // This reduces individual writes from N to N/500, improving throughput under high load
-        if let ClickHouseConnectionInfo::Production { .. } =
-            &app_state.clickhouse_connection_info
-        {
-            let batcher = AnalyticsBatcher::new(Arc::new(
-                app_state.clickhouse_connection_info.clone(),
-            ));
-            tracing::info!(
-                "Analytics batcher initialized (batch_size=500, flush_interval=1000ms)"
-            );
+        if let ClickHouseConnectionInfo::Production { .. } = &app_state.clickhouse_connection_info {
+            let batcher =
+                AnalyticsBatcher::new(Arc::new(app_state.clickhouse_connection_info.clone()));
+            tracing::info!("Analytics batcher initialized (batch_size=500, flush_interval=1000ms)");
             router = router.layer(axum::middleware::from_fn_with_state(
                 batcher,
                 attach_analytics_batcher_middleware,

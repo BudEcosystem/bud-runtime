@@ -49,25 +49,42 @@ async def check_and_process_timeouts() -> dict:
 
             for step in timed_out_steps:
                 try:
+                    # Refresh step from database to get latest state
+                    fresh_step = await step_crud.get_by_id(step.id)
+                    if fresh_step is None:
+                        logger.warning(f"Step {step.id} no longer exists")
+                        continue
+
+                    # Check if step is still awaiting (may have been processed already)
+                    if not fresh_step.awaiting_event:
+                        logger.debug(f"Step {step.id} is no longer awaiting event, skipping")
+                        continue
+
                     logger.info(
-                        f"Processing timeout for step {step.id} "
-                        f"(external_workflow_id={step.external_workflow_id}, "
-                        f"timeout_at={step.timeout_at})"
+                        f"Processing timeout for step {fresh_step.id} "
+                        f"(external_workflow_id={fresh_step.external_workflow_id}, "
+                        f"timeout_at={fresh_step.timeout_at})"
                     )
 
-                    # Process the timeout
-                    result = await process_timeout(session, step)
+                    # Process the timeout using the fresh step data
+                    result = await process_timeout(session, fresh_step)
 
                     if result.step_completed:
                         processed_count += 1
 
+                        # Commit after each step to ensure changes are visible
+                        await session.commit()
+
                         # Trigger pipeline continuation to update execution status
                         try:
-                            await trigger_pipeline_continuation(session, step.id)
+                            await trigger_pipeline_continuation(session, fresh_step.id)
+                            # Commit continuation changes
+                            await session.commit()
                         except Exception as cont_err:
                             logger.error(
                                 f"Failed to trigger continuation for step {step.id}: {cont_err}"
                             )
+                            await session.rollback()
                     else:
                         errors.append(f"Step {step.id}: {result.error or 'Unknown error'}")
 
@@ -75,8 +92,7 @@ async def check_and_process_timeouts() -> dict:
                     error_msg = f"Step {step.id}: {str(e)}"
                     logger.exception(f"Error processing timeout: {error_msg}")
                     errors.append(error_msg)
-
-            await session.commit()
+                    await session.rollback()
 
             logger.info(
                 f"Timeout check completed: processed {processed_count} of "

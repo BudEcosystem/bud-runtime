@@ -205,6 +205,44 @@ impl ModelConfig {
         Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
     }
 
+    /// Classification inference method (when model supports classify capability)
+    #[instrument(skip_all)]
+    pub async fn classify(
+        &self,
+        request: &crate::classification::ClassificationRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::classification::ClassificationProviderResponse, Error> {
+        if !self.supports_endpoint(EndpointCapability::Classify) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Classify.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            let response = provider
+                .classify(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok(response) => return Ok(response),
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
     /// Completions inference method (when model supports completions capability)
     #[instrument(skip_all)]
     pub async fn complete(
@@ -2604,6 +2642,27 @@ impl ModelProvider {
             // Other providers don't support embeddings yet
             _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
                 capability: EndpointCapability::Embedding.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
+    /// Classification inference method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_classify"))]
+    pub async fn classify(
+        &self,
+        request: &crate::classification::ClassificationRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::classification::ClassificationProviderResponse, Error> {
+        use crate::classification::ClassificationProvider;
+
+        match &self.config {
+            ProviderConfig::VLLM(provider) => {
+                provider.classify(request, client, dynamic_api_keys).await
+            }
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Classify.as_str().to_string(),
                 provider: self.name.to_string(),
             })),
         }

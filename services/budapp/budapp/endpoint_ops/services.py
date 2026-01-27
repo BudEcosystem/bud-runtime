@@ -653,6 +653,11 @@ class EndpointService(SessionMixin):
             required_data["deploy_config"], engine_configs=engine_cfg_input
         )
 
+        # Store full node configuration from budcluster (includes engine_type needed for autoscaling)
+        # node_list comes from budcluster's deploy_config which contains BudSim's node_groups
+        if node_list:
+            normalized_deploy_config["nodes"] = node_list
+
         endpoint_data = EndpointCreate(
             model_id=required_data["model_id"],
             project_id=required_data["project_id"],
@@ -3417,12 +3422,28 @@ class EndpointService(SessionMixin):
         # Convert BudAIScalerSpecification to dict for budcluster
         budaiscaler_dict = request.budaiscaler_specification.model_dump(exclude_none=True)
 
-        # Determine engine type from model source (same pattern as endpoint publication)
-        # This ensures correct metric validation for different engines (vllm, infinity, etc.)
-        engine_type = db_endpoint.model.source.lower() if db_endpoint.model.source else "vllm"
-
         # Make a copy to avoid SQLAlchemy not detecting in-place JSONB modifications
         deployment_config = dict(db_endpoint.deployment_config or {})
+
+        # Determine engine type from deployment config (set by BudSim during deployment)
+        # The engine_type is stored in the node configuration from BudSim's node_groups
+        # This data is populated during endpoint creation from budcluster's deploy_config response
+        engine_type = None
+        nodes = deployment_config.get("nodes", [])
+        if nodes and isinstance(nodes, list) and len(nodes) > 0:
+            engine_type = nodes[0].get("engine_type")
+
+        if not engine_type:
+            # Legacy format: check if engine_type is directly in deployment_config
+            engine_type = deployment_config.get("engine_type")
+
+        if not engine_type:
+            logger.warning(
+                f"No engine_type found in deployment_config for endpoint {endpoint_id}. "
+                "This may indicate a legacy deployment without engine_type stored. "
+                "Defaulting to 'vllm'."
+            )
+            engine_type = "vllm"
 
         # Call budcluster to update autoscale configuration
         # Use bud_cluster_id directly - this is the cluster ID known to budcluster

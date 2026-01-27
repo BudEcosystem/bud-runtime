@@ -14,11 +14,12 @@ global:
       budapp: ""
       budgateway: ""
       budask: ""
+      budnotify: ""
       novuapi: ""
       novuws: ""
       s3: ""
       mcpgateway: ""
-      onyx: ""  # Auto-derives to chat.{root} e.g., chat.dev.domain.com
+      onyx: "" # Auto-derives to chat.{root} e.g., chat.dev.domain.com
   # Optional node scheduling configuration applied to all microservices by default
   # Can be overridden per-service in microservices.<service>.nodeSelector and microservices.<service>.affinity
   nodeSelector: {}
@@ -909,8 +910,8 @@ prometheus-adapter:
       - seriesQuery: 'gateway_processing_seconds{quantile="0.95"}'
         resources:
           overrides:
-            pod: {resource: "pod"}
-            namespace: {resource: "namespace"}
+            pod: { resource: "pod" }
+            namespace: { resource: "namespace" }
         name:
           as: "gateway_processing_seconds_p95"
         metricsQuery: 'gateway_processing_seconds{quantile="0.95",<<.LabelMatchers>>}'
@@ -948,7 +949,7 @@ onyx:
         cpu: 8000m
         memory: 32000Mi
   nginx:
-    enabled: false  # Disabled - bud uses traefik for ingress
+    enabled: false # Disabled - bud uses traefik for ingress
   # Disable Onyx's own ingress (bud's traefik handles routing via ingress.yaml)
   # NOTE: Onyx uses global.ingress.hosts.root for domain configuration
   ingress:
@@ -1008,7 +1009,7 @@ onyx:
     S3_FILE_STORE_BUCKET_NAME: "onyx-file-store-bucket"
     BUD_FOUNDRY_API_BASE: '{{ printf "https://gateway.%s" .Values.global.ingress.hosts.root }}/v1'
     BUD_FOUNDRY_APP_BASE: '{{ printf "https://app.%s" .Values.global.ingress.hosts.root }}'
-    OPENID_CONFIG_URL: 'http://{{ .Release.Name }}-keycloak/realms/bud-keycloak/.well-known/openid-configuration'
+    OPENID_CONFIG_URL: "http://{{ .Release.Name }}-keycloak/realms/bud-keycloak/.well-known/openid-configuration"
   # Component configurations
   webserver:
     replicaCount: 1
