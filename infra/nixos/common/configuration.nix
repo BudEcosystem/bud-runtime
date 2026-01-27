@@ -20,5 +20,6 @@ in
     timeout = lib.mkForce 0;
   };
 
-  networking.useDHCP = lib.mkForce true;
+  networking.useNetworkd = true;
+  systemd.network.enable = true;
 }

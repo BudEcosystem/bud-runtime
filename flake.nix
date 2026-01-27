@@ -196,7 +196,6 @@
       nixosConfigurations = lib.genAttrs [
         "primary-dev"
         "primary-disk"
-        "primary-pnap"
         "ingress"
         "worker"
       ] (host: makeNixos host "x86_64-linux");
