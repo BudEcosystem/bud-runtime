@@ -1267,7 +1267,11 @@ pub async fn inference_handler(
                 }
             }
 
-            // Create the stream with usage tracking
+            // Capture the current span before returning from handler
+            // This ensures the span stays alive until streaming completes
+            let observability_span = tracing::Span::current();
+
+            // Create the stream with usage tracking and observability
             let openai_compatible_stream =
                 prepare_serialized_openai_compatible_events_with_usage_tracking(
                     processed_stream,
@@ -1275,6 +1279,10 @@ pub async fn inference_handler(
                     stream_options,
                     usage_limiter_for_tracking,
                     headers_for_tracking,
+                    observability_metadata.clone(),
+                    model_pricing.clone(),
+                    Some(request_arrival_time),
+                    Some(observability_span),
                 );
 
             let mut response = Sse::new(openai_compatible_stream)
@@ -2634,6 +2642,12 @@ struct OpenAICompatibleStreamProcessor {
     stream_options: Option<OpenAICompatibleStreamOptions>,
     usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
     headers: Option<HeaderMap>,
+    // Observability fields for recording inference details after stream completes
+    observability_metadata: Option<super::inference::ObservabilityMetadata>,
+    model_pricing: Option<crate::model::ModelPricing>,
+    request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
+    // Captured span from handler to ensure Span::current() works correctly in streaming
+    observability_span: Option<tracing::Span>,
 }
 
 impl OpenAICompatibleStreamProcessor {
@@ -2648,6 +2662,10 @@ impl OpenAICompatibleStreamProcessor {
             stream_options,
             usage_limiter: None,
             headers: None,
+            observability_metadata: None,
+            model_pricing: None,
+            request_arrival_time: None,
+            observability_span: None,
         }
     }
 
@@ -2657,6 +2675,10 @@ impl OpenAICompatibleStreamProcessor {
         stream_options: Option<OpenAICompatibleStreamOptions>,
         usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
         headers: HeaderMap,
+        observability_metadata: Option<super::inference::ObservabilityMetadata>,
+        model_pricing: Option<crate::model::ModelPricing>,
+        request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
+        observability_span: Option<tracing::Span>,
     ) -> Self {
         Self {
             stream,
@@ -2664,6 +2686,10 @@ impl OpenAICompatibleStreamProcessor {
             stream_options,
             usage_limiter,
             headers: Some(headers),
+            observability_metadata,
+            model_pricing,
+            request_arrival_time,
+            observability_span,
         }
     }
 }
@@ -2799,6 +2825,41 @@ impl OpenAICompatibleStreamProcessor {
                     }
                 }
             }
+
+            // Record model inference details for observability (streaming case)
+            if let Some(ref obs_metadata) = self.observability_metadata {
+                if let Some(inference_id) = inference_id {
+                    // Enter the captured span context so Span::current() works correctly
+                    // This is necessary because the handler has already returned and the original
+                    // span context is no longer active when this code runs asynchronously
+                    let _span_guard = self.observability_span.as_ref().map(|s| s.enter());
+
+                    // Calculate cost from accumulated usage
+                    let usage = crate::inference::types::Usage {
+                        input_tokens: total_usage.prompt_tokens as u32,
+                        output_tokens: total_usage.completion_tokens as u32,
+                    };
+                    let cost = super::observability::calculate_cost(&usage, self.model_pricing.as_ref());
+
+                    let request_forward_time = chrono::Utc::now();
+                    let request_arrival_time = self.request_arrival_time.unwrap_or_else(chrono::Utc::now);
+
+                    super::observability::record_model_inference_details(
+                        &inference_id,
+                        &obs_metadata.project_id,
+                        &obs_metadata.endpoint_id,
+                        &obs_metadata.model_id,
+                        !stream_terminated_early, // is_success
+                        request_arrival_time,
+                        request_forward_time,
+                        cost,
+                        obs_metadata.api_key_id.as_deref(),
+                        obs_metadata.user_id.as_deref(),
+                        obs_metadata.api_key_project_id.as_deref(),
+                        None, // no error for success
+                    );
+                }
+            }
         }
     }
 }
@@ -2820,6 +2881,10 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
     stream_options: Option<OpenAICompatibleStreamOptions>,
     usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
     headers: HeaderMap,
+    observability_metadata: Option<super::inference::ObservabilityMetadata>,
+    model_pricing: Option<crate::model::ModelPricing>,
+    request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
+    observability_span: Option<tracing::Span>,
 ) -> impl Stream<Item = Result<Event, Error>> {
     OpenAICompatibleStreamProcessor::with_usage_tracking(
         stream,
@@ -2827,6 +2892,10 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
         stream_options,
         usage_limiter,
         headers,
+        observability_metadata,
+        model_pricing,
+        request_arrival_time,
+        observability_span,
     )
     .process_stream()
 }
