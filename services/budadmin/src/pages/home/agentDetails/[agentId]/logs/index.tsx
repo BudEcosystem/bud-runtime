@@ -624,6 +624,7 @@ const buildChildrenFromTraceDetail = (
       spanId: span.span_id,
       parentSpanId: span.parent_span_id,
       canExpand: (span.child_span_count ?? 0) > 0, // Set canExpand based on child_span_count
+      rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
     };
 
     spanMap.set(span.span_id, entry);
@@ -695,7 +696,12 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
 
   // Open drawer with selected log
   const openLogDetailsDrawer = (log: LogEntry) => {
-    openDrawer("log-details", { spanData: log });
+    openDrawer("log-details", {
+      spanData: log,
+      viewMode,
+      promptName,
+      projectId,
+    });
   };
 
   // Fetch traces from API
