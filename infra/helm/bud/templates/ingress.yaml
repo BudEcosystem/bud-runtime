@@ -52,7 +52,7 @@ spec:
     - host: {{ include "bud.ingress.hosts.budadmin" $ }}
       http:
         paths:
-          - path: /
+          - path: /ws/socket.io
             pathType: Prefix
             backend:
               service:
