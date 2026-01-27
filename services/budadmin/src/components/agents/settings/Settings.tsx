@@ -90,15 +90,15 @@ export default function Settings({ onClose, sessionId }: SettingsProps) {
     // Handle stream toggle change
     const handleStreamToggle = useCallback((checked: boolean) => {
         setStreamEnabled(checked);
-        if (sessionId) {
+        if (sessionId && currentSession) {
             updateSession(sessionId, {
                 settings: {
-                    ...currentSession?.settings,
+                    ...currentSession.settings,
                     stream: checked
                 }
             });
         }
-    }, [sessionId, currentSession?.settings, updateSession]);
+    }, [sessionId, currentSession, updateSession]);
 
     const buildDefaultSettings = React.useCallback((id: string): AgentSettings => ({
         id: `settings_${id}`,
