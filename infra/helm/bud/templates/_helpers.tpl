@@ -40,6 +40,13 @@
 {{- printf "ask.%s" .Values.global.ingress.hosts.root }}
 {{- end }}
 {{- end }}
+{{- define "bud.ingress.hosts.budnotify" -}}
+{{- if .Values.global.ingress.hosts.budnotify }}
+{{- .Values.global.ingress.hosts.budnotify }}
+{{- else }}
+{{- printf "notify.%s" .Values.global.ingress.hosts.root }}
+{{- end }}
+{{- end }}
 {{- define "bud.ingress.hosts.novuapi" -}}
 {{- if .Values.global.ingress.hosts.novuapi }}
 {{- .Values.global.ingress.hosts.novuapi }}
@@ -123,6 +130,13 @@
 {{- printf "https://%s" (include "bud.ingress.hosts.budask" $) }}
 {{- else }}
 {{- printf "http://%s" (include "bud.ingress.hosts.budask" $) }}
+{{- end }}
+{{- end }}
+{{- define "bud.ingress.url.budnotify" -}}
+{{- if ne .Values.ingress.https "disabled" }}
+{{- printf "https://%s" (include "bud.ingress.hosts.budnotify" $) }}
+{{- else }}
+{{- printf "http://%s" (include "bud.ingress.hosts.budnotify" $) }}
 {{- end }}
 {{- end }}
 {{- define "bud.ingress.url.novuapi" -}}
