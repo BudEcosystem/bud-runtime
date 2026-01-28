@@ -509,7 +509,7 @@ function NodePaletteComponent({
       {/* Search */}
       {config.searchable !== false && (
         <div style={themeStyles.search}>
-          <div style={(themeStyles as typeof themes.dark).searchContainer || themeStyles.search}>
+          <div style={'searchContainer' in themeStyles ? themeStyles.searchContainer : themeStyles.search}>
             <SearchIcon />
             <input
               type="text"

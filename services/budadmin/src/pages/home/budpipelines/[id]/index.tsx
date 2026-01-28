@@ -254,7 +254,18 @@ const WorkflowDetail = () => {
   const handleExecute = async () => {
     if (selectedWorkflow) {
       setIsExecuting(true);
-      await executeWorkflow(selectedWorkflow.id, {});
+      // Get parameters from the current DAG (edited or original)
+      const dag = editedDag || selectedWorkflow.dag;
+      const params: Record<string, any> = {};
+      // Populate params with default values from DAG parameters
+      if (dag?.parameters) {
+        for (const param of dag.parameters) {
+          if (param.default !== undefined) {
+            params[param.name] = param.default;
+          }
+        }
+      }
+      await executeWorkflow(selectedWorkflow.id, params);
       await getExecutions(selectedWorkflow.id);
       setIsExecuting(false);
       successToast("Pipeline execution started");
