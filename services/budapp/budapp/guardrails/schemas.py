@@ -17,6 +17,7 @@
 """Guardrail Pydantic schemas for API validation and serialization."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, List, Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -33,6 +34,30 @@ from budapp.commons.constants import (
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.endpoint_ops.schemas import ProviderConfig, ProxyModelPricing
 from budapp.model_ops.schemas import Provider
+
+
+class ModelDeploymentStatus(str, Enum):
+    """Status for guardrail model deployments.
+
+    Attributes:
+        NOT_ONBOARDED: Model is not yet onboarded to the system.
+        ONBOARDED: Model has been onboarded but not deployed.
+        RUNNING: Model deployment is running and healthy.
+        UNHEALTHY: Model deployment is unhealthy.
+        DEPLOYING: Model is currently being deployed.
+        PENDING: Model deployment is pending.
+        FAILURE: Model deployment has failed.
+        DELETING: Model deployment is being deleted.
+    """
+
+    NOT_ONBOARDED = "not_onboarded"
+    ONBOARDED = "onboarded"
+    RUNNING = "running"
+    UNHEALTHY = "unhealthy"
+    DEPLOYING = "deploying"
+    PENDING = "pending"
+    FAILURE = "failure"
+    DELETING = "deleting"
 
 
 class TagsListResponse(PaginatedSuccessResponse):
@@ -546,6 +571,8 @@ class GuardrailRuleDeploymentResponse(BaseModel):
     endpoint_id: UUID4
     cluster_id: UUID4
     config_override_json: dict | None = None
+    status: str
+    error_message: str | None = None
     created_at: datetime
     modified_at: datetime
 
