@@ -482,13 +482,17 @@ class DirectSearchOptimizer:
                     data = self._prepare_predictor_data(config)
                     # Use full heuristic calculator to get all metrics (ttft, throughput, e2e_latency)
                     ttft, throughput_per_user, e2e_latency = self.heuristic_calculator(data)
+                    # Apply quantization scaling to performance metrics (same as dedicated mode)
+                    ttft, throughput_per_user, e2e_latency = self._apply_quantization_performance(
+                        ttft, throughput_per_user, e2e_latency
+                    )
                     cost_per_million_tokens = self.cost_calculator.get_cost_per_million_tokens(
                         throughput_per_user, concurrency, self.device_config, tp_size
                     )
                     logger.info(
                         f"Shared mode metrics calculated: TTFT={ttft:.2f}ms, E2E={e2e_latency:.2f}s, "
                         f"throughput={throughput_per_user:.2f} tok/s, cost=${cost_per_million_tokens:.6f}/M tokens "
-                        f"(TP={tp_size}, concurrency={concurrency})"
+                        f"(TP={tp_size}, concurrency={concurrency}, quantization={self.is_quantization})"
                     )
                 except Exception as e:
                     logger.warning(f"Could not calculate metrics for shared mode: {e}. Using defaults.")

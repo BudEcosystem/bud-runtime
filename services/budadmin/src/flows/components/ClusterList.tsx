@@ -20,6 +20,7 @@ import {
   Text_10_400_B3B3B3,
 } from "@/components/ui/text";
 import Tags from "./DrawerTags";
+import { formatCost } from "@/utils/formatters";
 
 function PerformanceTag({ label }: { label: string }) {
   let color = "";
@@ -369,14 +370,14 @@ export function ClusterCard({
                   ))}
                   {hidePerformance && (
                     <Tags
-                      name={`$${data.cost_per_token && data.cost_per_token < 0.01 ? data.cost_per_token.toFixed(4) : data.cost_per_token?.toFixed(2)} to run`}
+                      name={`$${formatCost(data.cost_per_token)} to run`}
                       color="#965CDE"
                       classNames="py-[.26rem] px-[.4rem]"
                     />
                   )}
                   {!hidePerformance && (
                     <Tags
-                      name={`${data.cost_per_token && data.cost_per_token < 0.01 ? data.cost_per_token.toFixed(4) : data.cost_per_token?.toFixed(2)} USD / 1M tokens`}
+                      name={`${formatCost(data.cost_per_token)} USD / 1M tokens`}
                       color="#965CDE"
                       classNames="py-[.26rem] px-[.4rem]"
                     />
