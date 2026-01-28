@@ -73,6 +73,8 @@ from budapp.guardrails.schemas import (
     GuardrailDeploymentResponse,
     GuardrailDeploymentWorkflowRequest,
     GuardrailDeploymentWorkflowSteps,
+    GuardrailModelStatus,
+    GuardrailModelStatusResponse,
     GuardrailProbeDetailResponse,
     GuardrailProbeResponse,
     GuardrailProbeRuleSelection,
@@ -83,6 +85,7 @@ from budapp.guardrails.schemas import (
     GuardrailProfileRuleResponse,
     GuardrailRuleDetailResponse,
     GuardrailRuleResponse,
+    ModelDeploymentStatus,
     ProxyGuardrailConfig,
 )
 from budapp.model_ops.crud import ProviderDataManager
@@ -1040,6 +1043,179 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             progress["steps"] = steps
 
         return progress
+
+    async def derive_model_statuses(
+        self,
+        probe_selections: list[GuardrailProfileProbeSelection],
+        project_id: UUID | None = None,
+    ) -> GuardrailModelStatusResponse:
+        """Derive deployment status for all models required by selected probes/rules.
+
+        This method examines each rule that requires a model (has model_uri) and determines:
+        - If model needs onboarding (model_id is NULL)
+        - If model is onboarded but not deployed
+        - If model is already deployed and running
+        - If model deployment has issues (unhealthy, failed, etc.)
+
+        Args:
+            probe_selections: List of selected probes with optional rule selections
+            project_id: Optional project ID to check for existing deployments
+
+        Returns:
+            GuardrailModelStatusResponse with model statuses and summary counts
+        """
+        model_statuses: list[GuardrailModelStatus] = []
+        seen_model_uris: set[str] = set()  # Track unique models
+
+        # Collect all probe IDs and build rule selections mapping
+        probe_ids = [probe.id for probe in probe_selections]
+        rule_selections: dict[UUID, list[UUID]] = {}
+        for probe in probe_selections:
+            if probe.rules:
+                rule_selections[probe.id] = [rule.id for rule in probe.rules]
+
+        # Fetch all probes with their rules in one query
+        probes = await GuardrailsProbeRulesDataManager(self.session).get_probes_with_rules(probe_ids)
+
+        for db_probe in probes:
+            # Determine which rules to check
+            selected_rule_ids = rule_selections.get(db_probe.id)
+
+            for db_rule in db_probe.rules:
+                # Skip if rule not selected (when specific rules are selected)
+                if selected_rule_ids and db_rule.id not in selected_rule_ids:
+                    continue
+
+                # Skip rules without model_uri (cloud/API-based rules)
+                if not db_rule.model_uri:
+                    continue
+
+                # Skip duplicate model URIs (same model used by multiple rules)
+                if db_rule.model_uri in seen_model_uris:
+                    continue
+                seen_model_uris.add(db_rule.model_uri)
+
+                # Derive status based on model_id and endpoint state
+                status, endpoint_info = await self._derive_single_model_status(db_rule, project_id)
+
+                model_statuses.append(
+                    GuardrailModelStatus(
+                        rule_id=db_rule.id,
+                        rule_name=db_rule.name,
+                        probe_id=db_probe.id,
+                        probe_name=db_probe.name,
+                        model_uri=db_rule.model_uri,
+                        model_id=db_rule.model_id,
+                        status=status,
+                        endpoint_id=endpoint_info.get("endpoint_id"),
+                        endpoint_name=endpoint_info.get("endpoint_name"),
+                        endpoint_url=endpoint_info.get("endpoint_url"),
+                        cluster_id=endpoint_info.get("cluster_id"),
+                        cluster_name=endpoint_info.get("cluster_name"),
+                        requires_onboarding=status == ModelDeploymentStatus.NOT_ONBOARDED,
+                        requires_deployment=status
+                        in (
+                            ModelDeploymentStatus.NOT_ONBOARDED,
+                            ModelDeploymentStatus.ONBOARDED,
+                        ),
+                        can_reuse=status == ModelDeploymentStatus.RUNNING,
+                        show_warning=status == ModelDeploymentStatus.UNHEALTHY,
+                    )
+                )
+
+        # Calculate summary counts
+        models_requiring_onboarding = sum(1 for m in model_statuses if m.requires_onboarding)
+        models_requiring_deployment = sum(1 for m in model_statuses if m.requires_deployment)
+        models_reusable = sum(1 for m in model_statuses if m.can_reuse)
+
+        # Determine skip logic
+        skip_to_step = None
+        if models_requiring_onboarding == 0 and models_requiring_deployment == 0:
+            # All models already deployed and running - can skip to profile config
+            skip_to_step = 12  # Step 12 is profile configuration
+        elif models_requiring_onboarding == 0:
+            # All models onboarded but some need deployment - skip to cluster selection
+            skip_to_step = 8  # Step 8 is cluster recommendation
+
+        # Check if credential is required (any model needs onboarding and is gated)
+        credential_required = any(m.requires_onboarding for m in model_statuses)
+
+        return GuardrailModelStatusResponse(
+            models=model_statuses,
+            total_models=len(model_statuses),
+            models_requiring_onboarding=models_requiring_onboarding,
+            models_requiring_deployment=models_requiring_deployment,
+            models_reusable=models_reusable,
+            skip_to_step=skip_to_step,
+            credential_required=credential_required,
+        )
+
+    async def _derive_single_model_status(
+        self,
+        rule: GuardrailRule,
+        project_id: UUID | None = None,
+    ) -> tuple[ModelDeploymentStatus, dict]:
+        """Derive status for a single model/rule.
+
+        Args:
+            rule: The guardrail rule with model info
+            project_id: Optional project ID to check for existing deployments
+
+        Returns:
+            Tuple of (ModelDeploymentStatus, endpoint_info_dict)
+        """
+        endpoint_info: dict = {}
+
+        # Check if model is onboarded
+        if not rule.model_id:
+            return ModelDeploymentStatus.NOT_ONBOARDED, endpoint_info
+
+        # Model is onboarded, check for existing endpoint deployment
+        # Query for endpoints using this model
+        stmt = select(Endpoint).where(
+            Endpoint.model_id == rule.model_id,
+            Endpoint.status != EndpointStatusEnum.DELETED,
+        )
+        if project_id:
+            stmt = stmt.where(Endpoint.project_id == project_id)
+
+        result = await self.session.execute(stmt)
+        endpoints = result.scalars().all()
+
+        if not endpoints:
+            # Model onboarded but no endpoint deployed
+            return ModelDeploymentStatus.ONBOARDED, endpoint_info
+
+        # Find best endpoint (prefer RUNNING, then others)
+        best_endpoint = None
+        for ep in endpoints:
+            if ep.status == EndpointStatusEnum.RUNNING:
+                best_endpoint = ep
+                break
+            if best_endpoint is None or ep.status == EndpointStatusEnum.DEPLOYING:
+                best_endpoint = ep
+
+        if best_endpoint:
+            endpoint_info = {
+                "endpoint_id": best_endpoint.id,
+                "endpoint_name": best_endpoint.name,
+                "endpoint_url": best_endpoint.endpoint,
+                "cluster_id": best_endpoint.cluster_id,
+                "cluster_name": best_endpoint.cluster.name if best_endpoint.cluster else None,
+            }
+
+            # Map endpoint status to ModelDeploymentStatus
+            status_mapping = {
+                EndpointStatusEnum.RUNNING: ModelDeploymentStatus.RUNNING,
+                EndpointStatusEnum.UNHEALTHY: ModelDeploymentStatus.UNHEALTHY,
+                EndpointStatusEnum.DEPLOYING: ModelDeploymentStatus.DEPLOYING,
+                EndpointStatusEnum.PENDING: ModelDeploymentStatus.PENDING,
+                EndpointStatusEnum.FAILURE: ModelDeploymentStatus.FAILURE,
+                EndpointStatusEnum.DELETING: ModelDeploymentStatus.DELETING,
+            }
+            return status_mapping.get(best_endpoint.status, ModelDeploymentStatus.ONBOARDED), endpoint_info
+
+        return ModelDeploymentStatus.ONBOARDED, endpoint_info
 
 
 class GuardrailProbeRuleService(SessionMixin):

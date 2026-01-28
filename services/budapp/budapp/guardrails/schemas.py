@@ -60,6 +60,51 @@ class ModelDeploymentStatus(str, Enum):
     DELETING = "deleting"
 
 
+class GuardrailModelStatus(BaseModel):
+    """Status of a model required by guardrail rules."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    # Rule identification
+    rule_id: UUID4
+    rule_name: str
+    probe_id: UUID4
+    probe_name: str
+
+    # Model info
+    model_uri: str
+    model_id: UUID4 | None = None
+
+    # Status
+    status: ModelDeploymentStatus
+
+    # Endpoint details (populated when deployed)
+    endpoint_id: UUID4 | None = None
+    endpoint_name: str | None = None
+    endpoint_url: str | None = None
+    cluster_id: UUID4 | None = None
+    cluster_name: str | None = None
+
+    # Derived flags for UI
+    requires_onboarding: bool
+    requires_deployment: bool
+    can_reuse: bool
+    show_warning: bool = False
+
+
+class GuardrailModelStatusResponse(SuccessResponse):
+    """Response for model status identification step."""
+
+    models: list[GuardrailModelStatus]
+    total_models: int
+    models_requiring_onboarding: int
+    models_requiring_deployment: int
+    models_reusable: int
+    skip_to_step: int | None = None
+    credential_required: bool = False
+    object: str = "guardrail.model_status"
+
+
 class TagsListResponse(PaginatedSuccessResponse):
     """Response schema for tags list."""
 
