@@ -14,10 +14,7 @@ import { useLoader } from "src/context/appContext";
 import {
   ArrowLeftOutlined,
   PlayCircleOutlined,
-  EditOutlined,
-  DeleteOutlined,
   HistoryOutlined,
-  CodeOutlined,
   ApartmentOutlined,
   ClockCircleOutlined,
 } from "@ant-design/icons";
@@ -30,79 +27,13 @@ import { useProprietaryCredentials } from "src/stores/useProprietaryCredentials"
 import { useEndPoints } from "src/hooks/useEndPoint";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useConfirmAction } from "src/hooks/useConfirmAction";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
-import { Button, Tabs, Tag, Modal, Form, Input, InputNumber, Switch, Select, Empty, Table, message } from "antd";
-import { DAGViewer, ExecutionTimeline, PipelineEditor, PipelineTriggersPanel } from "@/components/pipelineEditor";
+import { Button, Tag, Empty, Table } from "antd";
+import { successToast, errorToast } from "@/components/toast";
+import { PipelineEditor, PipelineTriggersPanel } from "@/components/pipelineEditor";
 import { formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
-
-const { TabPane } = Tabs;
-
-// Execute pipeline modal
-const ExecuteWorkflowModal: React.FC<{
-  open: boolean;
-  onClose: () => void;
-  onExecute: (params: Record<string, any>) => void;
-  parameters: Array<{
-    name: string;
-    type: string;
-    description?: string;
-    default?: any;
-    required?: boolean;
-  }>;
-}> = ({ open, onClose, onExecute, parameters }) => {
-  const [form] = Form.useForm();
-
-  const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      onExecute(values);
-      form.resetFields();
-      onClose();
-    });
-  };
-
-  return (
-    <Modal
-      title="Execute Pipeline"
-      open={open}
-      onCancel={onClose}
-      onOk={handleSubmit}
-      okText="Execute"
-      className="dark-modal"
-    >
-      <Form form={form} layout="vertical" className="mt-4">
-        {parameters.map((param) => (
-          <Form.Item
-            key={param.name}
-            name={param.name}
-            label={
-              <span className="text-gray-300">
-                {param.name}
-                {param.required && <span className="text-red-500 ml-1">*</span>}
-              </span>
-            }
-            rules={[{ required: param.required, message: `${param.name} is required` }]}
-            initialValue={param.default}
-            tooltip={param.description}
-          >
-            {param.type === "boolean" ? (
-              <Switch />
-            ) : param.type === "integer" ? (
-              <InputNumber className="w-full" />
-            ) : (
-              <Input placeholder={`Enter ${param.name}`} />
-            )}
-          </Form.Item>
-        ))}
-        {parameters.length === 0 && (
-          <div className="text-gray-500 text-center py-4">
-            This pipeline has no parameters
-          </div>
-        )}
-      </Form>
-    </Modal>
-  );
-};
 
 const WorkflowDetail = () => {
   const router = useRouter();
@@ -128,12 +59,15 @@ const WorkflowDetail = () => {
 
   const [activeTab, setActiveTab] = useState("dag");
   const [selectedStep, setSelectedStep] = useState<PipelineStep | null>(null);
-  const [executeModalOpen, setExecuteModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [editedDag, setEditedDag] = useState<DAGDefinition | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Always in edit mode
+  const isEditing = true;
   const [loadingDataSources, setLoadingDataSources] = useState<Set<string>>(new Set());
+  const [isExecuting, setIsExecuting] = useState(false);
   const { openDrawer } = useDrawer();
+  const { contextHolder, openConfirm } = useConfirmAction();
 
   const sortedExecutions = useMemo(
     () =>
@@ -304,11 +238,41 @@ const WorkflowDetail = () => {
     return () => clearSelection();
   }, [id]);
 
-  const handleExecute = async (params: Record<string, any>) => {
-    if (selectedWorkflow) {
-      await executeWorkflow(selectedWorkflow.id, params);
-      await getExecutions(selectedWorkflow.id);
+  // Initialize editedDag when workflow loads
+  useEffect(() => {
+    if (selectedWorkflow?.dag) {
+      setEditedDag({ ...selectedWorkflow.dag });
+    } else if (selectedWorkflow) {
+      setEditedDag({
+        name: selectedWorkflow.name || "Untitled Pipeline",
+        steps: [],
+        parameters: []
+      });
     }
+  }, [selectedWorkflow]);
+
+  const handleExecute = async () => {
+    if (selectedWorkflow) {
+      setIsExecuting(true);
+      await executeWorkflow(selectedWorkflow.id, {});
+      await getExecutions(selectedWorkflow.id);
+      setIsExecuting(false);
+      successToast("Pipeline execution started");
+    }
+  };
+
+  const confirmExecute = () => {
+    openConfirm({
+      message: `Execute "${selectedWorkflow?.name}"?`,
+      description: "This will start a new execution of the pipeline with all configured steps.",
+      cancelAction: () => {},
+      cancelText: "Cancel",
+      loading: isExecuting,
+      key: "execute-pipeline",
+      okAction: handleExecute,
+      okText: "Execute",
+      type: "warning",
+    });
   };
 
   const handleOpenExecutionDetails = (executionId: string) => {
@@ -328,38 +292,21 @@ const WorkflowDetail = () => {
     return selectedExecution.steps.find((s) => s.step_id === stepId);
   };
 
-  // Edit mode handlers
-  const handleStartEditing = () => {
-    setEditedDag(selectedWorkflow.dag ? { ...selectedWorkflow.dag } : {
-      name: selectedWorkflow.name || "Untitled Pipeline",
-      steps: [],
-      parameters: []
-    });
-    setIsEditing(true);
-    setActiveTab("dag");
-  };
-
-  const handleCancelEditing = () => {
-    setEditedDag(null);
-    setIsEditing(false);
-  };
-
+  // Save handler
   const handleSaveEditing = async () => {
     if (editedDag && id && typeof id === "string") {
       try {
         setIsSaving(true);
         const result = await updateWorkflow(id, editedDag);
         if (result) {
-          message.success("Pipeline updated successfully");
-          setIsEditing(false);
-          setEditedDag(null);
+          successToast("Pipeline saved");
           // Refresh the pipeline to get the updated data
           await getWorkflow(id);
         } else {
-          message.error("Failed to save pipeline changes");
+          errorToast("Failed to save pipeline");
         }
       } catch (error) {
-        message.error("Failed to save pipeline changes");
+        errorToast("Failed to save pipeline");
         console.error("Save pipeline error:", error);
       } finally {
         setIsSaving(false);
@@ -392,8 +339,6 @@ const WorkflowDetail = () => {
       ...editedDag,
       steps: [...editedDag.steps, newStep],
     });
-
-    message.info(`Added new ${action} step`);
   };
 
   const handleStepUpdate = (stepId: string, updates: Partial<PipelineStep>) => {
@@ -423,7 +368,7 @@ const WorkflowDetail = () => {
       steps: updatedSteps,
     });
 
-    message.success("Step deleted");
+    successToast("Step deleted");
   };
 
   const handleNodeClick = (nodeType: string, nodeId: string, nodeData: any) => {
@@ -452,269 +397,302 @@ const WorkflowDetail = () => {
 
   return (
     <DashBoardLayout>
+      {contextHolder}
       <Box className="boardPageView">
-        {/* Header */}
-        <Flex
-          justify="between"
-          align="center"
-          className="px-6 py-4 border-b border-[#1F1F1F] bg-[#0D0D0D]"
+        {/* Header with integrated tabs */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 16px',
+            borderBottom: '1px solid #1F1F1F',
+            backgroundColor: '#0D0D0D',
+            gap: '16px',
+          }}
         >
-          <Flex align="center" gap="4">
+          {/* Left: Back button + Pipeline info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 1, minWidth: 0 }}>
             <Button
               type="text"
               icon={<ArrowLeftOutlined />}
               onClick={() => router.push("/pipelines")}
               className="text-gray-400 hover:text-white"
+              style={{ flexShrink: 0, padding: '4px 8px' }}
             />
-            <Box>
-              <Flex align="center" gap="2">
-                <Text_17_600_FFFFFF>{selectedWorkflow.name}</Text_17_600_FFFFFF>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                }}>{selectedWorkflow.name}</span>
                 <Tag
-                  className={`border-0 ${
+                  className={`border-0 text-[10px] ${
                     selectedWorkflow.status === "active"
                       ? "bg-green-500/20 text-green-500"
                       : selectedWorkflow.status === "draft"
                       ? "bg-yellow-500/20 text-yellow-500"
                       : "bg-gray-500/20 text-gray-500"
                   }`}
+                  style={{ marginRight: 0, padding: '0 6px', lineHeight: '18px' }}
                 >
                   {selectedWorkflow.status}
                 </Tag>
-              </Flex>
-              <Text_12_400_6A6E76>
-                {selectedWorkflow.step_count} steps • {selectedWorkflow.execution_count || 0} executions
-              </Text_12_400_6A6E76>
-            </Box>
-          </Flex>
-          <Flex gap="2">
+              </div>
+              <span style={{ fontSize: '11px', color: '#6A6E76', whiteSpace: 'nowrap' }}>
+                {selectedWorkflow.step_count} steps • {selectedWorkflow.execution_count || 0} runs
+              </span>
+            </div>
+          </div>
+
+          {/* Center: Tab buttons */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2px',
+              borderRadius: '6px',
+              padding: '3px',
+              backgroundColor: '#1a1a1a',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              onClick={() => setActiveTab("dag")}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 14px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                backgroundColor: activeTab === "dag" ? '#2a2a2a' : 'transparent',
+                color: activeTab === "dag" ? '#fff' : '#6b7280',
+              }}
+            >
+              <ApartmentOutlined style={{ fontSize: 11 }} />
+              <span>Editor</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("executions")}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 14px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                backgroundColor: activeTab === "executions" ? '#2a2a2a' : 'transparent',
+                color: activeTab === "executions" ? '#fff' : '#6b7280',
+              }}
+            >
+              <HistoryOutlined style={{ fontSize: 11 }} />
+              <span>Runs</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("triggers")}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 14px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                backgroundColor: activeTab === "triggers" ? '#2a2a2a' : 'transparent',
+                color: activeTab === "triggers" ? '#fff' : '#6b7280',
+              }}
+            >
+              <ClockCircleOutlined style={{ fontSize: 11 }} />
+              <span>Triggers</span>
+            </button>
+          </div>
+
+          {/* Right: Action buttons */}
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
             <Button
               type="primary"
               icon={<PlayCircleOutlined />}
-              onClick={() => setExecuteModalOpen(true)}
+              onClick={confirmExecute}
             >
               Execute
             </Button>
-            {isEditing ? (
-              <>
-                <Button onClick={handleCancelEditing} disabled={isSaving}>Cancel</Button>
-                <Button type="primary" onClick={handleSaveEditing} loading={isSaving}>
-                  Save Changes
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button icon={<EditOutlined />} onClick={handleStartEditing}>
-                  Edit
-                </Button>
-                <Button icon={<DeleteOutlined />} danger>
-                  Delete
-                </Button>
-              </>
-            )}
-          </Flex>
-        </Flex>
+            <Button
+              onClick={handleSaveEditing}
+              loading={isSaving}
+              className="pipeline-save-btn"
+            >
+              Save
+            </Button>
+            <style jsx global>{`
+              .pipeline-save-btn {
+                background-color: #22c55e !important;
+                border-color: #22c55e !important;
+                color: #fff !important;
+              }
+              .pipeline-save-btn:hover {
+                background-color: #16a34a !important;
+                border-color: #16a34a !important;
+              }
+            `}</style>
+          </div>
+        </div>
 
-        {/* Content */}
-        <Box className="p-6">
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            className="workflow-tabs"
-            items={[
-              {
-                key: "dag",
-                label: (
-                  <Flex align="center" gap="2">
-                    <ApartmentOutlined />
-                    <span>{isEditing ? "Visual Editor" : "DAG View"}</span>
-                  </Flex>
-                ),
-                children: (
-                  <Box
-                    className="-mx-5 -my-4"
-                    style={{ height: "calc(100vh - 150px)", minHeight: "500px" }}
-                  >
-                    <PipelineEditor
-                      dag={isEditing && editedDag ? editedDag : (selectedWorkflow.dag || {
-                        name: selectedWorkflow.name || "Untitled Pipeline",
-                        steps: [],
-                        parameters: []
-                      })}
-                      onNodeClick={handleNodeClick}
-                      onAddStep={isEditing ? handleAddStep : undefined}
-                      onSave={isEditing ? handleDagChange : undefined}
-                      onStepUpdate={isEditing ? handleStepUpdate : undefined}
-                      onStepDelete={isEditing ? handleStepDelete : undefined}
-                      readonly={!isEditing}
-                      dataSources={dataSources}
-                      loadingDataSources={loadingDataSources}
-                    />
-                  </Box>
-                ),
-              },
-              {
-                key: "executions",
-                label: (
-                  <Flex align="center" gap="2">
-                    <HistoryOutlined />
-                    <span>Executions ({executions.length})</span>
-                  </Flex>
-                ),
-                children: (
-                  <Box className="mt-4">
-                    {executions.length > 0 ? (
-                      <>
-                        <Table
-                          rowKey="execution_id"
-                          pagination={false}
-                          dataSource={sortedExecutions}
-                          className="workflow-executions-table"
-                          columns={[
-                            {
-                              title: "Run #",
-                              key: "run_number",
-                              render: (_: unknown, __: any, index: number) => (
-                                <Text_11_400_808080>
-                                  #{sortedExecutions.length - index}
-                                </Text_11_400_808080>
-                              ),
-                            },
-                            {
-                              title: "Execution ID",
-                              dataIndex: "execution_id",
-                              key: "execution_id",
-                              render: (value: string) => (
-                                <Text_11_400_808080>{value}</Text_11_400_808080>
-                              ),
-                            },
-                            {
-                              title: "Status",
-                              dataIndex: "status",
-                              key: "status",
-                              render: (status: string) => {
-                                const normalizedStatus = status?.toUpperCase();
-                                return (
-                                  <Tag
-                                    className={`border-0 text-[10px] ${
-                                      normalizedStatus === "COMPLETED"
-                                        ? "bg-green-500/20 text-green-500"
-                                        : normalizedStatus === "FAILED"
-                                        ? "bg-red-500/20 text-red-500"
-                                        : normalizedStatus === "RUNNING"
-                                        ? "bg-blue-500/20 text-blue-500"
-                                        : normalizedStatus === "PENDING"
-                                        ? "bg-yellow-500/20 text-yellow-500"
-                                        : "bg-gray-500/20 text-gray-500"
-                                    }`}
-                                  >
-                                    {status?.toLowerCase()}
-                                  </Tag>
-                                );
-                              },
-                            },
-                            {
-                              title: "Started",
-                              dataIndex: "started_at",
-                              key: "started_at",
-                              render: (value: string) => (
-                                <Text_11_400_808080>
-                                  {value
-                                    ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                                    : "—"}
-                                </Text_11_400_808080>
-                              ),
-                            },
-                            {
-                              title: "Completed",
-                              dataIndex: "completed_at",
-                              key: "completed_at",
-                              render: (value: string) => (
-                                <Text_11_400_808080>
-                                  {value
-                                    ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                                    : "—"}
-                                </Text_11_400_808080>
-                              ),
-                            },
-                            {
-                              title: "",
-                              key: "actions",
-                              align: "right",
-                              render: (_: unknown, record: any) => (
-                                <PrimaryButton
-                                  classNames="min-w-[3.4rem]"
-                                  onClick={() => handleOpenExecutionDetails(record.execution_id)}
-                                  text="View"
-                                  style={{
-                                    height: "1.4rem",
-                                    paddingLeft: "0.45rem",
-                                    paddingRight: "0.45rem",
-                                  }}
-                                  textStyle={{
-                                    fontSize: "0.65rem",
-                                  }}
-                                />
-                              ),
-                            },
-                          ]}
-                        />
-                      </>
-                    ) : (
-                      <Flex
-                        align="center"
-                        justify="center"
-                        className="h-[400px] bg-[#0D0D0D] rounded-lg border border-[#1F1F1F]"
-                      >
-                        <Empty
-                          description="No executions yet"
-                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        {/* Content - Full height for DAG, padded for other tabs */}
+        {activeTab === "dag" && (
+          <Box style={{ height: "calc(100vh - 73px)", minHeight: "500px" }}>
+            <PipelineEditor
+              dag={isEditing && editedDag ? editedDag : (selectedWorkflow.dag || {
+                name: selectedWorkflow.name || "Untitled Pipeline",
+                steps: [],
+                parameters: []
+              })}
+              onNodeClick={handleNodeClick}
+              onAddStep={isEditing ? handleAddStep : undefined}
+              onSave={isEditing ? handleDagChange : undefined}
+              onStepUpdate={isEditing ? handleStepUpdate : undefined}
+              onStepDelete={isEditing ? handleStepDelete : undefined}
+              readonly={!isEditing}
+              dataSources={dataSources}
+              loadingDataSources={loadingDataSources}
+            />
+          </Box>
+        )}
+
+        {activeTab === "executions" && (
+          <Box className="p-6">
+            {executions.length > 0 ? (
+              <Table
+                rowKey="execution_id"
+                pagination={false}
+                dataSource={sortedExecutions}
+                className="workflow-executions-table"
+                columns={[
+                  {
+                    title: "Run #",
+                    key: "run_number",
+                    render: (_: unknown, __: any, index: number) => (
+                      <Text_11_400_808080>
+                        #{sortedExecutions.length - index}
+                      </Text_11_400_808080>
+                    ),
+                  },
+                  {
+                    title: "Execution ID",
+                    dataIndex: "execution_id",
+                    key: "execution_id",
+                    render: (value: string) => (
+                      <Text_11_400_808080>{value}</Text_11_400_808080>
+                    ),
+                  },
+                  {
+                    title: "Status",
+                    dataIndex: "status",
+                    key: "status",
+                    render: (status: string) => {
+                      const normalizedStatus = status?.toUpperCase();
+                      return (
+                        <Tag
+                          className={`border-0 text-[10px] ${
+                            normalizedStatus === "COMPLETED"
+                              ? "bg-green-500/20 text-green-500"
+                              : normalizedStatus === "FAILED"
+                              ? "bg-red-500/20 text-red-500"
+                              : normalizedStatus === "RUNNING"
+                              ? "bg-blue-500/20 text-blue-500"
+                              : normalizedStatus === "PENDING"
+                              ? "bg-yellow-500/20 text-yellow-500"
+                              : "bg-gray-500/20 text-gray-500"
+                          }`}
                         >
-                          <Button
-                            type="primary"
-                            icon={<PlayCircleOutlined />}
-                            onClick={() => setExecuteModalOpen(true)}
-                          >
-                            Run First Execution
-                          </Button>
-                        </Empty>
-                      </Flex>
-                    )}
-                  </Box>
-                ),
-              },
-              {
-                key: "json",
-                label: (
-                  <Flex align="center" gap="2">
-                    <CodeOutlined />
-                    <span>JSON Definition</span>
-                  </Flex>
-                ),
-                children: (
-                  <Box className="mt-4 bg-[#0D0D0D] rounded-lg border border-[#1F1F1F] p-4">
-                    <pre className="text-[11px] text-gray-400 overflow-auto max-h-[600px]">
-                      {JSON.stringify(selectedWorkflow.dag || { steps: [], parameters: [] }, null, 2)}
-                    </pre>
-                  </Box>
-                ),
-              },
-              {
-                key: "triggers",
-                label: (
-                  <Flex align="center" gap="2">
-                    <ClockCircleOutlined />
-                    <span>Triggers</span>
-                  </Flex>
-                ),
-                children: (
-                  <Box className="mt-4">
-                    <PipelineTriggersPanel workflowId={selectedWorkflow.id} />
-                  </Box>
-                ),
-              },
-            ]}
-          />
-        </Box>
+                          {status?.toLowerCase()}
+                        </Tag>
+                      );
+                    },
+                  },
+                  {
+                    title: "Started",
+                    dataIndex: "started_at",
+                    key: "started_at",
+                    render: (value: string) => (
+                      <Text_11_400_808080>
+                        {value
+                          ? formatDistanceToNow(new Date(value), { addSuffix: true })
+                          : "—"}
+                      </Text_11_400_808080>
+                    ),
+                  },
+                  {
+                    title: "Completed",
+                    dataIndex: "completed_at",
+                    key: "completed_at",
+                    render: (value: string) => (
+                      <Text_11_400_808080>
+                        {value
+                          ? formatDistanceToNow(new Date(value), { addSuffix: true })
+                          : "—"}
+                      </Text_11_400_808080>
+                    ),
+                  },
+                  {
+                    title: "",
+                    key: "actions",
+                    align: "right",
+                    render: (_: unknown, record: any) => (
+                      <PrimaryButton
+                        classNames="min-w-[3.4rem]"
+                        onClick={() => handleOpenExecutionDetails(record.execution_id)}
+                        text="View"
+                        style={{
+                          height: "1.4rem",
+                          paddingLeft: "0.45rem",
+                          paddingRight: "0.45rem",
+                        }}
+                        textStyle={{
+                          fontSize: "0.65rem",
+                        }}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              <Flex
+                align="center"
+                justify="center"
+                className="h-[400px] bg-[#0D0D0D] rounded-lg border border-[#1F1F1F]"
+              >
+                <Empty
+                  description="No executions yet"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                >
+                  <Button
+                    type="primary"
+                    icon={<PlayCircleOutlined />}
+                    onClick={confirmExecute}
+                  >
+                    Run First Execution
+                  </Button>
+                </Empty>
+              </Flex>
+            )}
+          </Box>
+        )}
+
+        {activeTab === "triggers" && (
+          <Box className="p-6">
+            <PipelineTriggersPanel workflowId={selectedWorkflow.id} />
+          </Box>
+        )}
       </Box>
 
       {/* Step detail drawer */}
@@ -722,14 +700,6 @@ const WorkflowDetail = () => {
         step={selectedStep}
         execution={selectedStep ? getStepExecution(selectedStep.id) : undefined}
         onClose={() => setSelectedStep(null)}
-      />
-
-      {/* Execute modal */}
-      <ExecuteWorkflowModal
-        open={executeModalOpen}
-        onClose={() => setExecuteModalOpen(false)}
-        onExecute={handleExecute}
-        parameters={selectedWorkflow.dag?.parameters || []}
       />
     </DashBoardLayout>
   );

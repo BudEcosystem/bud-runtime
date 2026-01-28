@@ -60,10 +60,11 @@ export function usePipelineConversion(): UsePipelineConversionReturn {
     const edges: Edge[] = [];
 
     // Create start node (on the left)
+    // Use grid-aligned position (snap grid is 20x20)
     const startNode: Node<StartNodeData> = {
       id: START_NODE_ID,
       type: SPECIAL_NODE_TYPES.START,
-      position: { x: 0, y: 150 },
+      position: { x: 0, y: 140 },
       data: {
         title: dag.name || 'Start',
       },
@@ -78,9 +79,16 @@ export function usePipelineConversion(): UsePipelineConversionReturn {
     let xOffset = DEFAULT_NODE_WIDTH + HORIZONTAL_SPACING;
 
     stepsByLevel.forEach((levelSteps) => {
-      // Calculate vertical centering for this level
-      const levelHeight = levelSteps.length * (DEFAULT_NODE_HEIGHT + VERTICAL_SPACING);
-      const startY = 150 - levelHeight / 2 + DEFAULT_NODE_HEIGHT / 2;
+      // Calculate vertical position for this level
+      // For single step: align with start node at y=140
+      // For multiple steps: center around y=140
+      let startY: number;
+      if (levelSteps.length === 1) {
+        startY = 140; // Align single step with start node
+      } else {
+        const levelHeight = levelSteps.length * (DEFAULT_NODE_HEIGHT + VERTICAL_SPACING);
+        startY = 140 - levelHeight / 2 + DEFAULT_NODE_HEIGHT / 2;
+      }
 
       levelSteps.forEach((step, index) => {
         const nodeId = `step_${step.id}`;
@@ -259,12 +267,13 @@ export function usePipelineConversion(): UsePipelineConversionReturn {
       }
 
       // Empty workflow with just start node (positioned for horizontal flow)
+      // Use grid-aligned position (snap grid is 20x20)
       return {
         nodes: [
           {
             id: START_NODE_ID,
             type: SPECIAL_NODE_TYPES.START,
-            position: { x: 0, y: 150 },
+            position: { x: 0, y: 140 },
             data: {
               title: dag?.name || 'New Workflow',
             },

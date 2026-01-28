@@ -19,7 +19,6 @@ import {
   Tag,
   Tooltip,
   Empty,
-  message,
   Popconfirm,
   Space,
   Typography,
@@ -45,6 +44,7 @@ import {
   SUPPORTED_EVENT_TYPES,
 } from '@/stores/useBudPipeline';
 import { useDrawer } from "src/hooks/useDrawer";
+import { successToast, errorToast, infoToast } from "@/components/toast";
 
 const { Text } = Typography;
 
@@ -75,28 +75,28 @@ const ScheduleTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
   const handlePauseResume = async (schedule: PipelineSchedule) => {
     if (schedule.enabled) {
       const success = await pauseSchedule(schedule.id);
-      if (success) message.success('Schedule paused');
+      if (success) successToast('Schedule paused');
     } else {
       const success = await resumeSchedule(schedule.id);
-      if (success) message.success('Schedule resumed');
+      if (success) successToast('Schedule resumed');
     }
   };
 
   const handleTriggerNow = async (id: string) => {
     const success = await triggerSchedule(id);
     if (success) {
-      message.success('Workflow triggered');
+      successToast('Workflow triggered');
     } else {
-      message.error('Failed to trigger workflow');
+      errorToast('Failed to trigger workflow');
     }
   };
 
   const handleDelete = async (id: string) => {
     const success = await deleteSchedule(id);
     if (success) {
-      message.success('Schedule deleted');
+      successToast('Schedule deleted');
     } else {
-      message.error('Failed to delete schedule');
+      errorToast('Failed to delete schedule');
     }
   };
 
@@ -113,16 +113,16 @@ const ScheduleTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
       title: 'Status',
       key: 'status',
       render: (_: any, record: PipelineSchedule) => {
-        const statusColor =
+        const statusClass =
           record.status === "active"
-            ? "green"
+            ? "bg-green-500/20 text-green-500"
             : record.status === "paused"
-            ? "orange"
+            ? "bg-yellow-500/20 text-yellow-500"
             : record.status === "expired"
-            ? "default"
-            : "default";
+            ? "bg-gray-500/20 text-gray-500"
+            : "bg-gray-500/20 text-gray-500";
         return (
-          <Tag color={statusColor} className="capitalize">
+          <Tag className={`border-0 text-[10px] capitalize ${statusClass}`}>
             {record.status}
           </Tag>
         );
@@ -200,7 +200,7 @@ const ScheduleTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
               type="text"
               size="small"
               danger
-              className="text-white"
+              className="text-white hover:!bg-red-500/20"
               icon={<DeleteOutlined />}
             />
           </Popconfirm>
@@ -209,12 +209,17 @@ const ScheduleTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
     },
   ];
 
+  const filteredSchedules = schedules.filter((s) => s.workflow_id === workflowId);
+
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <Text className="text-gray-400">
-          Schedules run workflows automatically at specified times.
-        </Text>
+    <div>
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <div className="text-[#EEEEEE] font-semibold text-base">Schedules</div>
+          <div className="text-[#808080] text-xs mt-1">
+            Run this pipeline automatically at specified times
+          </div>
+        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -224,24 +229,23 @@ const ScheduleTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
         </Button>
       </div>
 
-      {schedules.length > 0 ? (
+      {filteredSchedules.length > 0 ? (
         <Table
-          dataSource={schedules.filter((s) => s.workflow_id === workflowId)}
+          dataSource={filteredSchedules}
           columns={columns}
           rowKey="id"
           loading={triggersLoading}
           pagination={false}
-          className="dark-table"
+          className="workflow-executions-table"
+          bordered={false}
         />
       ) : (
-        <Empty
-          description="No schedules configured"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        >
-          <Button type="primary" onClick={() => openDrawer("pipeline-create-schedule", { workflowId })}>
-            Create First Schedule
-          </Button>
-        </Empty>
+        <div className="flex items-center justify-center h-[300px] bg-[#0D0D0D] rounded-lg border border-[#1F1F1F]">
+          <Empty
+            description="No schedules configured"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        </div>
       )}
     </div>
   );
@@ -278,21 +282,21 @@ const WebhookTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
     });
 
     if (result) {
-      message.success('Webhook created');
+      successToast('Webhook created');
       if (result.secret) {
         setNewSecret(result.secret);
       }
       setModalOpen(false);
       form.resetFields();
     } else {
-      message.error('Failed to create webhook');
+      errorToast('Failed to create webhook');
     }
   };
 
   const handleDelete = async (id: string) => {
     const success = await deleteWebhook(id);
     if (success) {
-      message.success('Webhook deleted');
+      successToast('Webhook deleted');
     }
   };
 
@@ -300,15 +304,15 @@ const WebhookTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
     const secret = await rotateWebhookSecret(id);
     if (secret) {
       setNewSecret(secret);
-      message.success('Secret rotated');
+      successToast('Secret rotated');
     } else {
-      message.error('Failed to rotate secret');
+      errorToast('Failed to rotate secret');
     }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    message.success('Copied to clipboard');
+    successToast('Copied to clipboard');
   };
 
   const columns = [
@@ -517,18 +521,18 @@ const EventTriggerTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
     });
 
     if (result) {
-      message.success('Event trigger created');
+      successToast('Event trigger created');
       setModalOpen(false);
       form.resetFields();
     } else {
-      message.error('Failed to create event trigger');
+      errorToast('Failed to create event trigger');
     }
   };
 
   const handleDelete = async (id: string) => {
     const success = await deleteEventTrigger(id);
     if (success) {
-      message.success('Event trigger deleted');
+      successToast('Event trigger deleted');
     }
   };
 
@@ -666,48 +670,8 @@ const EventTriggerTab: React.FC<{ workflowId: string }> = ({ workflowId }) => {
 export const PipelineTriggersPanel: React.FC<PipelineTriggersPanelProps> = ({
   workflowId,
 }) => {
-  const items = [
-    {
-      key: 'schedules',
-      label: (
-        <span>
-          <ClockCircleOutlined className="mr-2" />
-          Schedules
-        </span>
-      ),
-      children: <ScheduleTab workflowId={workflowId} />,
-    },
-    {
-      key: 'webhooks',
-      label: (
-        <span>
-          <ApiOutlined className="mr-2" />
-          Webhooks
-        </span>
-      ),
-      children: <WebhookTab workflowId={workflowId} />,
-    },
-    {
-      key: 'events',
-      label: (
-        <span>
-          <ThunderboltOutlined className="mr-2" />
-          Event Triggers
-        </span>
-      ),
-      children: <EventTriggerTab workflowId={workflowId} />,
-    },
-  ];
-
-  return (
-    <div className="bg-[#0d0d0d] rounded-lg border border-[#1f1f1f] min-h-[400px]">
-      <Tabs
-        items={items}
-        className="workflow-triggers-tabs"
-        tabBarStyle={{ padding: '0 16px', marginBottom: 0 }}
-      />
-    </div>
-  );
+  // Only show schedules for now (webhooks and event triggers hidden)
+  return <ScheduleTab workflowId={workflowId} />;
 };
 
 export default PipelineTriggersPanel;

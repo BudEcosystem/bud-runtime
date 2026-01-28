@@ -19,6 +19,7 @@ import { DEFAULT_DRAG_MIME_TYPE } from '../hooks/useDragAndDrop';
 const ICON_MAP: Record<string, string> = {
   // Model Operations
   'database-plus': 'ph:database-bold',
+  'cloud-upload': 'ph:cloud-arrow-up-bold',
   'chart-bar': 'ph:chart-bar-bold',
   'trash': 'ph:trash-bold',
 
@@ -31,6 +32,7 @@ const ICON_MAP: Record<string, string> = {
   'rocket': 'ph:rocket-launch-bold',
   'shield': 'ph:shield-bold',
   'trending-up': 'ph:trend-up-bold',
+  'arrows-alt': 'ph:arrows-out-bold',
 
   // Integration Operations
   'globe': 'ph:globe-bold',
@@ -40,6 +42,7 @@ const ICON_MAP: Record<string, string> = {
   // Control Flow
   'note': 'ph:note-bold',
   'timer': 'ph:timer-bold',
+  'clock': 'ph:clock-bold',
   'git-branch': 'ph:git-branch-bold',
   'swap': 'ph:swap-bold',
   'stack': 'ph:stack-bold',
@@ -87,6 +90,10 @@ export interface NodePaletteProps {
   renderItem?: (item: NodePaletteItem, dragHandleProps: DragHandleProps) => React.ReactNode;
   /** Theme variant */
   theme?: 'light' | 'dark';
+  /** Controlled search value (when provided, component uses this instead of internal state) */
+  searchValue?: string;
+  /** Callback when search changes (for controlled mode) */
+  onSearchChange?: (value: string) => void;
 }
 
 export interface DragHandleProps {
@@ -206,7 +213,7 @@ const themes = {
     palette: {
       display: 'flex' as const,
       flexDirection: 'column' as const,
-      backgroundColor: '#141414',
+      backgroundColor: '#0a0a0a',
       borderRadius: '0',
       border: 'none',
       boxShadow: 'none',
@@ -217,10 +224,10 @@ const themes = {
     search: {
       display: 'flex' as const,
       alignItems: 'center' as const,
-      gap: '8px',
-      padding: '12px 16px',
-      borderBottom: '1px solid #333',
-      color: '#808080',
+      gap: '10px',
+      padding: '16px',
+      borderBottom: '1px solid #2F3035',
+      color: '#666',
     },
     searchInput: {
       flex: 1,
@@ -230,52 +237,72 @@ const themes = {
       color: '#fff',
       backgroundColor: 'transparent',
     },
+    searchContainer: {
+      display: 'flex' as const,
+      alignItems: 'center' as const,
+      gap: '10px',
+      padding: '10px 14px',
+      backgroundColor: '#161616',
+      borderRadius: '10px',
+      border: '1px solid #252525',
+      width: '100%',
+    },
     categories: {
       flex: 1,
       overflowY: 'auto' as const,
+      padding: '0 12px 12px 12px',
     },
     categoryHeader: {
       display: 'flex' as const,
       alignItems: 'center' as const,
       gap: '8px',
-      padding: '10px 16px',
+      padding: '12px 4px 8px 4px',
       cursor: 'pointer',
       userSelect: 'none' as const,
-      backgroundColor: '#1a1a1a',
-      borderBottom: '1px solid #333',
+      backgroundColor: 'transparent',
+      borderBottom: 'none',
       color: '#808080',
     },
     categoryLabel: {
       flex: 1,
-      fontWeight: 600,
-      fontSize: '12px',
-      color: '#808080',
+      fontWeight: 500,
+      fontSize: '11px',
+      color: '#666',
       textTransform: 'uppercase' as const,
       letterSpacing: '0.05em',
     },
     categoryCount: {
-      fontSize: '11px',
-      color: '#666',
+      fontSize: '10px',
+      color: '#555',
+      backgroundColor: '#1a1a1a',
+      padding: '2px 6px',
+      borderRadius: '10px',
     },
     categoryItems: {
-      padding: '8px 12px',
+      display: 'flex' as const,
+      flexDirection: 'column' as const,
+      gap: '4px',
+      padding: '8px',
     },
     item: {
       display: 'flex' as const,
       alignItems: 'center' as const,
-      gap: '10px',
-      padding: '8px 10px',
-      borderRadius: '6px',
+      gap: '12px',
+      padding: '10px 12px',
+      borderRadius: '10px',
       cursor: 'grab',
-      transition: 'background-color 0.2s',
+      transition: 'all 0.15s ease',
+      backgroundColor: '#111111',
+      border: '1px solid transparent',
     },
     itemHover: {
-      backgroundColor: '#1f1f1f',
+      backgroundColor: '#161616',
+      border: '1px solid #252525',
     },
     itemIcon: {
-      width: '28px',
-      height: '28px',
-      borderRadius: '6px',
+      width: '32px',
+      height: '32px',
+      borderRadius: '8px',
       display: 'flex' as const,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
@@ -289,20 +316,21 @@ const themes = {
     itemLabel: {
       fontWeight: 500,
       fontSize: '13px',
-      color: '#e0e0e0',
+      color: '#e5e5e5',
       whiteSpace: 'nowrap' as const,
       overflow: 'hidden' as const,
       textOverflow: 'ellipsis' as const,
     },
     itemDescription: {
       fontSize: '11px',
-      color: '#808080',
+      color: '#666',
       marginTop: '2px',
       whiteSpace: 'nowrap' as const,
       overflow: 'hidden' as const,
       textOverflow: 'ellipsis' as const,
+      display: 'none' as const, // Hidden by default for compact view
     },
-    iconBgDefault: '#1f1f1f',
+    iconBgDefault: '#1a1a1a',
     iconColorDefault: '#808080',
   },
 };
@@ -318,11 +346,20 @@ function NodePaletteComponent({
   className = '',
   renderItem,
   theme = 'light',
+  searchValue,
+  onSearchChange,
 }: NodePaletteProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
     new Set(config.categories.filter((c) => c.collapsed).map((c) => c.id))
   );
+
+  // Use controlled or internal search
+  const isControlled = searchValue !== undefined;
+  const searchTerm = isControlled ? searchValue : internalSearchTerm;
+  const setSearchTerm = isControlled
+    ? (value: string) => onSearchChange?.(value)
+    : setInternalSearchTerm;
 
   // Get theme styles
   const themeStyles = themes[theme];
@@ -472,14 +509,16 @@ function NodePaletteComponent({
       {/* Search */}
       {config.searchable !== false && (
         <div style={themeStyles.search}>
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder="Search actions..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={themeStyles.searchInput}
-          />
+          <div style={(themeStyles as typeof themes.dark).searchContainer || themeStyles.search}>
+            <SearchIcon />
+            <input
+              type="text"
+              placeholder="Search actions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={themeStyles.searchInput}
+            />
+          </div>
         </div>
       )}
 
