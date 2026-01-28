@@ -128,6 +128,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         guard_types = request.guard_types
         severity_threshold = request.severity_threshold
         trigger_workflow = request.trigger_workflow
+        derive_statuses = request.derive_model_statuses
 
         current_step_number = step_number
 
@@ -277,6 +278,29 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             guard_types=guard_types,
             severity_threshold=severity_threshold,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
+
+        # Derive model statuses if requested and probe_selections provided
+        if derive_statuses and probe_selections:
+            logger.info(f"Deriving model statuses for workflow step {current_step_number}")
+            model_status_response = await self.derive_model_statuses(probe_selections, project_id)
+
+            # Add model status data to workflow step data
+            workflow_step_data["model_statuses"] = [
+                model.model_dump(mode="json") for model in model_status_response.models
+            ]
+            workflow_step_data["total_models"] = model_status_response.total_models
+            workflow_step_data["models_requiring_onboarding"] = model_status_response.models_requiring_onboarding
+            workflow_step_data["models_requiring_deployment"] = model_status_response.models_requiring_deployment
+            workflow_step_data["models_reusable"] = model_status_response.models_reusable
+            workflow_step_data["skip_to_step"] = model_status_response.skip_to_step
+            workflow_step_data["credential_required"] = model_status_response.credential_required
+
+            logger.info(
+                f"Model status derived: {model_status_response.total_models} models, "
+                f"{model_status_response.models_requiring_onboarding} need onboarding, "
+                f"{model_status_response.models_requiring_deployment} need deployment, "
+                f"skip_to_step={model_status_response.skip_to_step}"
+            )
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -1216,6 +1240,90 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             return status_mapping.get(best_endpoint.status, ModelDeploymentStatus.ONBOARDED), endpoint_info
 
         return ModelDeploymentStatus.ONBOARDED, endpoint_info
+
+    async def get_workflow_model_statuses(
+        self,
+        workflow_id: UUID,
+        refresh: bool = False,
+    ) -> GuardrailModelStatusResponse:
+        """Get model statuses for an existing workflow.
+
+        This method retrieves or re-computes model statuses for a workflow by:
+        1. If refresh=False and model_statuses exist in step data, return cached data
+        2. Otherwise, extract probe_selections from workflow steps and derive fresh statuses
+
+        Args:
+            workflow_id: The workflow ID
+            refresh: If True, re-derive statuses even if cached
+
+        Returns:
+            GuardrailModelStatusResponse with model statuses
+        """
+        from budapp.guardrails.schemas import GuardrailProfileProbeSelection, GuardrailProfileRuleSelection
+
+        # Get workflow steps
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+
+        if not db_workflow_steps:
+            return GuardrailModelStatusResponse(
+                models=[],
+                total_models=0,
+                models_requiring_onboarding=0,
+                models_requiring_deployment=0,
+                models_reusable=0,
+            )
+
+        # Collect data from all workflow steps
+        probe_selections_data = None
+        project_id = None
+        cached_model_statuses = None
+
+        for db_step in db_workflow_steps:
+            step_data = db_step.data or {}
+            if step_data.get("probe_selections"):
+                probe_selections_data = step_data["probe_selections"]
+            if step_data.get("project_id"):
+                project_id = step_data["project_id"]
+            # Check for cached model statuses
+            if step_data.get("model_statuses") and not refresh:
+                cached_model_statuses = step_data
+
+        # Return cached statuses if available and refresh not requested
+        if cached_model_statuses and not refresh:
+            return GuardrailModelStatusResponse(
+                models=[GuardrailModelStatus(**status) for status in cached_model_statuses.get("model_statuses", [])],
+                total_models=cached_model_statuses.get("total_models", 0),
+                models_requiring_onboarding=cached_model_statuses.get("models_requiring_onboarding", 0),
+                models_requiring_deployment=cached_model_statuses.get("models_requiring_deployment", 0),
+                models_reusable=cached_model_statuses.get("models_reusable", 0),
+                skip_to_step=cached_model_statuses.get("skip_to_step"),
+                credential_required=cached_model_statuses.get("credential_required", False),
+            )
+
+        # Re-derive model statuses
+        if not probe_selections_data:
+            return GuardrailModelStatusResponse(
+                models=[],
+                total_models=0,
+                models_requiring_onboarding=0,
+                models_requiring_deployment=0,
+                models_reusable=0,
+            )
+
+        # Convert probe_selections_data to GuardrailProfileProbeSelection objects
+        probe_selections = []
+        for probe_data in probe_selections_data:
+            rules = None
+            if probe_data.get("rules"):
+                rules = [GuardrailProfileRuleSelection(**rule) for rule in probe_data["rules"]]
+            probe_selections.append(GuardrailProfileProbeSelection(id=probe_data["id"], rules=rules))
+
+        # Convert project_id string to UUID if needed
+        project_uuid = UUID(project_id) if isinstance(project_id, str) else project_id
+
+        return await self.derive_model_statuses(probe_selections, project_uuid)
 
 
 class GuardrailProbeRuleService(SessionMixin):

@@ -646,6 +646,8 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     cluster_id: UUID4 | None = None
     deployment_config: dict | None = None
     callback_topics: list[str] | None = None
+    # Model status derivation flag - set to True to derive model statuses at this step
+    derive_model_statuses: bool = False
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":
@@ -697,6 +699,20 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
     severity_threshold: float | None = None
+    # Model status fields (populated when derive_model_statuses=True)
+    model_statuses: list[dict] | None = None
+    total_models: int | None = None
+    models_requiring_onboarding: int | None = None
+    models_requiring_deployment: int | None = None
+    models_reusable: int | None = None
+    skip_to_step: int | None = None
+    credential_required: bool | None = None
+    # Cluster selection fields
+    selected_cluster_id: UUID4 | None = None
+    cluster_recommendations: list[dict] | None = None
+    # Deployment tracking fields
+    pipeline_execution_id: UUID4 | None = None
+    pipeline_status: str | None = None
 
 
 class BudSentinelConfig(BaseModel):
