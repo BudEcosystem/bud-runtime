@@ -94,6 +94,7 @@ from budapp.project_ops.crud import ProjectDataManager
 from budapp.project_ops.models import Project
 from budapp.shared.notification_service import BudNotifyService, NotificationBuilder
 from budapp.shared.redis_service import RedisService
+from budapp.workflow_ops.budpipeline_service import BudPipelineService
 from budapp.workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from budapp.workflow_ops.models import Workflow as WorkflowModel
 from budapp.workflow_ops.models import WorkflowStep as WorkflowStepModel
@@ -1324,6 +1325,258 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         project_uuid = UUID(project_id) if isinstance(project_id, str) else project_id
 
         return await self.derive_model_statuses(probe_selections, project_uuid)
+
+    # =========================================================================
+    # Pipeline Integration for Cross-Service Calls
+    # =========================================================================
+
+    async def trigger_model_onboarding(
+        self,
+        models: list[dict],
+        credential_id: UUID | None = None,
+        user_id: UUID | None = None,
+        callback_topics: list[str] | None = None,
+    ) -> dict:
+        """Trigger BudPipeline to onboard multiple models using model_add action.
+
+        Creates a DAG with parallel model_add steps for each model that needs onboarding.
+
+        Args:
+            models: List of model info dicts with keys: rule_id, model_uri, model_provider_type
+            credential_id: Optional credential ID for gated models
+            user_id: User ID initiating the operation
+            callback_topics: Optional callback topics for real-time updates
+
+        Returns:
+            Dict with execution_id and step mapping for tracking
+        """
+        if not models:
+            return {"execution_id": None, "message": "No models to onboard"}
+
+        # Build DAG steps - one model_add step per model
+        steps = []
+        for i, model in enumerate(models):
+            step_id = f"onboard_{i}"
+            steps.append(
+                {
+                    "id": step_id,
+                    "action": "model_add",
+                    "params": {
+                        "uri": model["model_uri"],
+                        "name": model["model_uri"].split("/")[-1],
+                        "provider_type": model.get("model_provider_type", "hugging_face"),
+                        "credential_id": str(credential_id) if credential_id else None,
+                    },
+                    "depends_on": [],  # All steps run in parallel
+                }
+            )
+
+        # Build the DAG definition
+        dag = {
+            "name": "guardrail-model-onboarding",
+            "version": "1.0",
+            "description": f"Onboard {len(models)} models for guardrail deployment",
+            "steps": steps,
+        }
+
+        logger.info(f"Triggering model onboarding pipeline for {len(models)} models")
+
+        # Execute via BudPipeline
+        pipeline_service = BudPipelineService(self.session)
+        result = await pipeline_service.run_ephemeral_execution(
+            pipeline_definition=dag,
+            params={"user_id": str(user_id)} if user_id else {},
+            callback_topics=callback_topics,
+            user_id=str(user_id) if user_id else None,
+        )
+
+        execution_id = result.get("execution_id")
+        logger.info(f"Model onboarding pipeline started: execution_id={execution_id}")
+
+        return {
+            "execution_id": execution_id,
+            "step_mapping": {model["rule_id"]: f"onboard_{i}" for i, model in enumerate(models)},
+            "total_models": len(models),
+        }
+
+    async def trigger_deployment(
+        self,
+        models: list[dict],
+        cluster_id: UUID,
+        project_id: UUID,
+        user_id: UUID | None = None,
+        callback_topics: list[str] | None = None,
+    ) -> dict:
+        """Trigger BudPipeline to deploy multiple models using deployment_create action.
+
+        Creates a DAG with parallel deployment_create steps for each model.
+
+        Args:
+            models: List of model info dicts with keys: model_id, model_name, deployment_config
+            cluster_id: Target cluster for deployment
+            project_id: Project ID for the deployments
+            user_id: User ID initiating the operation
+            callback_topics: Optional callback topics for real-time updates
+
+        Returns:
+            Dict with execution_id and step mapping for tracking
+        """
+        if not models:
+            return {"execution_id": None, "message": "No models to deploy"}
+
+        # Build DAG steps - one deployment_create step per model
+        steps = []
+        for i, model in enumerate(models):
+            step_id = f"deploy_{i}"
+            deploy_config = model.get("deployment_config", {})
+
+            steps.append(
+                {
+                    "id": step_id,
+                    "action": "deployment_create",
+                    "params": {
+                        "model_id": str(model["model_id"]),
+                        "model_name": model.get("model_name", ""),
+                        "cluster_id": str(cluster_id),
+                        "project_id": str(project_id),
+                        "replica": deploy_config.get("replica", 1),
+                        "tp": deploy_config.get("tensor_parallelism", 1),
+                        "pp": deploy_config.get("pipeline_parallelism", 1),
+                        "max_model_len": deploy_config.get("max_model_len"),
+                        "gpu_memory_utilization": deploy_config.get("gpu_memory_utilization", 0.9),
+                    },
+                    "depends_on": [],  # All steps run in parallel
+                }
+            )
+
+        # Build the DAG definition
+        dag = {
+            "name": "guardrail-model-deployment",
+            "version": "1.0",
+            "description": f"Deploy {len(models)} models for guardrail",
+            "steps": steps,
+        }
+
+        logger.info(f"Triggering model deployment pipeline for {len(models)} models to cluster {cluster_id}")
+
+        # Execute via BudPipeline
+        pipeline_service = BudPipelineService(self.session)
+        result = await pipeline_service.run_ephemeral_execution(
+            pipeline_definition=dag,
+            params={
+                "user_id": str(user_id) if user_id else None,
+                "project_id": str(project_id),
+                "cluster_id": str(cluster_id),
+            },
+            callback_topics=callback_topics,
+            user_id=str(user_id) if user_id else None,
+        )
+
+        execution_id = result.get("execution_id")
+        logger.info(f"Model deployment pipeline started: execution_id={execution_id}")
+
+        return {
+            "execution_id": execution_id,
+            "step_mapping": {str(model["model_id"]): f"deploy_{i}" for i, model in enumerate(models)},
+            "total_models": len(models),
+            "cluster_id": str(cluster_id),
+        }
+
+    async def trigger_simulation(
+        self,
+        models: list[dict],
+        hardware_mode: str = "dedicated",
+        user_id: UUID | None = None,
+    ) -> dict:
+        """Trigger budsim simulations for multiple models.
+
+        Calls budsim service directly via Dapr to run simulations for cluster recommendations.
+
+        Args:
+            models: List of model info dicts with keys: model_id, model_uri, deployment_config
+            hardware_mode: "dedicated" or "shared" hardware mode
+            user_id: User ID initiating the operation
+
+        Returns:
+            Dict with simulation workflow IDs for tracking
+        """
+        from budapp.commons.config import app_settings
+        from budapp.shared.dapr_service import DaprService
+
+        if not models:
+            return {"workflow_ids": [], "message": "No models to simulate"}
+
+        workflow_ids = []
+        results = []
+
+        for model in models:
+            deploy_config = model.get("deployment_config", {})
+
+            try:
+                response = await DaprService.invoke_service(
+                    app_id=app_settings.budsim_app_id,
+                    method_path="simulator/run",
+                    method="POST",
+                    data={
+                        "pretrained_model_uri": model.get("model_uri", ""),
+                        "model_uri": model.get("model_uri", ""),
+                        "input_tokens": deploy_config.get("input_tokens", 1024),
+                        "output_tokens": deploy_config.get("output_tokens", 128),
+                        "concurrency": deploy_config.get("concurrency", 10),
+                        "target_ttft": deploy_config.get("target_ttft"),
+                        "target_e2e_latency": deploy_config.get("target_e2e_latency"),
+                        "hardware_mode": hardware_mode,
+                        "is_proprietary_model": False,
+                    },
+                )
+
+                workflow_id = response.get("workflow_id")
+                workflow_ids.append(str(workflow_id))
+                results.append(
+                    {
+                        "model_id": str(model.get("model_id", "")),
+                        "model_uri": model.get("model_uri", ""),
+                        "workflow_id": str(workflow_id),
+                        "status": "running",
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to trigger simulation for model {model.get('model_uri')}: {e}")
+                results.append(
+                    {
+                        "model_id": str(model.get("model_id", "")),
+                        "model_uri": model.get("model_uri", ""),
+                        "workflow_id": None,
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
+
+        logger.info(f"Triggered {len(workflow_ids)} simulations for cluster recommendation")
+
+        return {
+            "workflow_ids": workflow_ids,
+            "results": results,
+            "total_models": len(models),
+            "successful": len(workflow_ids),
+            "failed": len(models) - len(workflow_ids),
+        }
+
+    async def get_pipeline_execution_progress(
+        self,
+        execution_id: str,
+    ) -> dict:
+        """Get progress of a pipeline execution.
+
+        Args:
+            execution_id: The pipeline execution ID
+
+        Returns:
+            Dict with execution status, progress percentage, and step details
+        """
+        pipeline_service = BudPipelineService(self.session)
+        return await pipeline_service.get_execution_progress(execution_id)
 
 
 class GuardrailProbeRuleService(SessionMixin):
