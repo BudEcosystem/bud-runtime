@@ -147,6 +147,10 @@ async def list_pipelines(
             step_count=p["step_count"],
             user_id=p.get("user_id"),
             system_owned=p.get("system_owned", False),
+            description=p.get("description"),
+            dag=p.get("dag"),
+            execution_count=p.get("execution_count", 0),
+            last_execution_at=p.get("last_execution_at"),
         )
         for p in pipelines
     ]

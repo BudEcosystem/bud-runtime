@@ -29,6 +29,7 @@ const ICON_MAP: Record<string, string> = {
   'rocket': 'ph:rocket-launch-bold',
   'shield': 'ph:shield-bold',
   'trending-up': 'ph:trend-up-bold',
+  'arrows-alt': 'ph:arrows-out-bold',
 
   // Integration Operations
   'globe': 'ph:globe-bold',
@@ -38,6 +39,7 @@ const ICON_MAP: Record<string, string> = {
   // Control Flow
   'note': 'ph:note-bold',
   'timer': 'ph:timer-bold',
+  'clock': 'ph:clock-bold',
   'git-branch': 'ph:git-branch-bold',
   'swap': 'ph:swap-bold',
   'stack': 'ph:stack-bold',
@@ -77,12 +79,12 @@ export type StepNodeProps = NodeProps<Node<StepNodeData>>;
 
 const nodeStyles: React.CSSProperties = {
   background: '#0E0E0E',
-  borderRadius: '8px',
-  padding: '12px',
-  border: '1px solid rgba(6, 7, 9, 0.15)',
+  borderRadius: '12px',
+  padding: '20px',
+  border: '1px solid #333333',
   boxShadow: '0 2px 6px 0 rgba(0, 0, 0, 0.04), 0 4px 12px 0 rgba(0, 0, 0, 0.02)',
-  minWidth: '180px',
-  maxWidth: '220px',
+  minWidth: '280px',
+  maxWidth: '360px',
   position: 'relative',
 };
 
@@ -94,26 +96,19 @@ const headerStyles: React.CSSProperties = {
   background: 'transparent',
   display: 'flex',
   alignItems: 'center',
-  gap: '8px',
-  marginBottom: '8px',
+  gap: '12px',
 };
 
 const titleStyles: React.CSSProperties = {
-  fontSize: '12px',
+  fontSize: '14px',
   fontWeight: '600',
-  color: '#EEEEEE',
+  color: '#FFFFFF',
   margin: 0,
   background: 'transparent',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  maxWidth: '130px',
-};
-
-const stepIdStyles: React.CSSProperties = {
-  fontSize: '10px',
-  color: '#666',
-  fontFamily: 'monospace',
+  maxWidth: '260px',
 };
 
 const conditionBadgeStyles: React.CSSProperties = {
@@ -124,15 +119,6 @@ const conditionBadgeStyles: React.CSSProperties = {
   borderRadius: '4px',
   marginTop: '4px',
   display: 'inline-block',
-};
-
-const paramPreviewStyles: React.CSSProperties = {
-  fontSize: '10px',
-  color: '#666',
-  marginTop: '4px',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
 };
 
 const branchContainerStyles: React.CSSProperties = {
@@ -167,9 +153,9 @@ const branchTargetStyles: React.CSSProperties = {
 };
 
 const handleStyles: React.CSSProperties = {
-  width: '12px',
-  height: '12px',
-  background: '#93bfe2',
+  width: '10px',
+  height: '10px',
+  background: '#555555',
   border: '2px solid #0E0E0E',
 };
 
@@ -187,16 +173,16 @@ const renderActionIcon = (iconName: string, color: string): React.ReactNode => {
   // Check if we have a mapping for this icon name
   const iconifyName = ICON_MAP[iconName.toLowerCase()];
   if (iconifyName) {
-    return <Icon icon={iconifyName} style={{ color, width: 16, height: 16 }} />;
+    return <Icon icon={iconifyName} style={{ color, width: 20, height: 20 }} />;
   }
 
   // Fallback: try to use it as a Phosphor icon directly
   if (!iconName.includes(':')) {
-    return <Icon icon={`ph:${iconName}-bold`} style={{ color, width: 16, height: 16 }} />;
+    return <Icon icon={`ph:${iconName}-bold`} style={{ color, width: 20, height: 20 }} />;
   }
 
   // If it contains a colon, assume it's already a valid iconify identifier
-  return <Icon icon={iconName} style={{ color, width: 16, height: 16 }} />;
+  return <Icon icon={iconName} style={{ color, width: 20, height: 20 }} />;
 };
 
 function StepNodeComponent({ data, selected }: StepNodeProps) {
@@ -204,10 +190,8 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
   const action = nodeData?.action || 'unknown';
   const actionMeta = getActionMeta(action);
   const name = nodeData?.name || actionMeta.label;
-  const stepId = nodeData?.stepId || 'N/A';
   const condition = nodeData?.condition;
   const params = nodeData?.params || {};
-  const paramCount = Object.keys(params).length;
 
   // Get branches for conditional nodes
   const branches = action === 'conditional' && params.branches && Array.isArray(params.branches)
@@ -216,25 +200,24 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
 
   // Icon container with action color
   const iconContainerStyles: React.CSSProperties = {
-    fontSize: '14px',
-    width: '28px',
-    height: '28px',
+    fontSize: '18px',
+    width: '36px',
+    height: '36px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#FFFFFF08',
-    border: '1px solid #1F1F1F',
+    background: `${actionMeta.color}15`,
+    border: 'none',
     color: actionMeta.color,
-    borderRadius: '6px',
+    borderRadius: '8px',
     flexShrink: 0,
   };
 
   // Subtitle with action color
   const subtitleStyles: React.CSSProperties = {
-    color: actionMeta.color,
-    fontSize: '10px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.3px',
+    color: '#808080',
+    fontSize: '12px',
+    marginTop: '2px',
   };
 
   return (
@@ -243,13 +226,18 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
       style={{
         ...nodeStyles,
         ...(selected ? selectedNodeStyles : {}),
+        borderLeft: `3px solid ${actionMeta.color}`,
       }}
     >
       {/* Input Handle (Left side for horizontal flow) */}
       <Handle type="target" position={Position.Left} id="input" style={handleStyles} />
 
       {/* Card Header */}
-      <div style={headerStyles}>
+      <div style={{
+        ...headerStyles,
+        // Add bottom margin only when there's content below (condition or branches)
+        marginBottom: (condition || branches) ? '12px' : undefined,
+      }}>
         <span style={iconContainerStyles}>
           {renderActionIcon(actionMeta.icon, actionMeta.color)}
         </span>
@@ -258,9 +246,6 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
           <div style={subtitleStyles}>{actionMeta.label}</div>
         </div>
       </div>
-
-      {/* Compact Info */}
-      <div style={stepIdStyles}>{stepId}</div>
 
       {/* Condition badge (if any) */}
       {condition && (
@@ -286,13 +271,6 @@ function StepNodeComponent({ data, selected }: StepNodeProps) {
               +{branches.length - 3} more
             </div>
           )}
-        </div>
-      )}
-
-      {/* Parameters count (not for conditional with branches) */}
-      {paramCount > 0 && !branches && (
-        <div style={paramPreviewStyles}>
-          {paramCount} param{paramCount > 1 ? 's' : ''} configured
         </div>
       )}
 

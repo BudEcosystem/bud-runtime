@@ -8,6 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Icon } from '@iconify/react';
 import {
   getActionMeta,
   getActionParams,
@@ -17,6 +18,44 @@ import {
   type SelectOption,
   type ConditionalBranch,
 } from '../config/actionRegistry';
+
+// ============================================================================
+// Icon Mapping - Maps action icon names to iconify icon identifiers
+// ============================================================================
+
+const ICON_MAP: Record<string, string> = {
+  // Model Operations
+  'database-plus': 'ph:database-bold',
+  'cloud-upload': 'ph:cloud-arrow-up-bold',
+  'chart-bar': 'ph:chart-bar-bold',
+  'trash': 'ph:trash-bold',
+
+  // Cluster Operations
+  'heart-pulse': 'ph:heartbeat-bold',
+  'server-x': 'ph:x-circle-bold',
+  'server-plus': 'ph:plus-circle-bold',
+
+  // Deployment Operations
+  'rocket': 'ph:rocket-launch-bold',
+  'shield': 'ph:shield-bold',
+  'trending-up': 'ph:trend-up-bold',
+  'arrows-alt': 'ph:arrows-out-bold',
+
+  // Integration Operations
+  'globe': 'ph:globe-bold',
+  'bell': 'ph:bell-bold',
+  'link': 'ph:link-bold',
+
+  // Control Flow
+  'note': 'ph:note-bold',
+  'timer': 'ph:timer-bold',
+  'clock': 'ph:clock-bold',
+  'git-branch': 'ph:git-branch-bold',
+  'swap': 'ph:swap-bold',
+  'stack': 'ph:stack-bold',
+  'arrow-square-out': 'ph:arrow-square-out-bold',
+  'x-circle': 'ph:x-circle-bold',
+};
 
 // ============================================================================
 // Branch Editor Styles
@@ -256,22 +295,30 @@ export interface ActionConfigPanelProps {
 // ============================================================================
 
 const panelStyles: React.CSSProperties = {
+  position: 'absolute',
+  right: '16px',
+  top: '16px',
+  bottom: '16px',
   width: '320px',
-  height: '100%',
-  background: '#141414',
-  borderLeft: '1px solid #333',
+  maxHeight: 'calc(100vh - 140px)',
+  background: '#0a0a0a',
+  border: '1px solid #262626',
+  borderRadius: '12px',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
+  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
+  zIndex: 10,
 };
 
 const headerStyles: React.CSSProperties = {
   padding: '12px 16px',
-  borderBottom: '1px solid #333',
+  borderBottom: '1px solid #1a1a1a',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  background: '#1a1a1a',
+  background: '#0a0a0a',
+  borderRadius: '12px 12px 0 0',
 };
 
 const headerTitleStyles: React.CSSProperties = {
@@ -282,6 +329,13 @@ const headerTitleStyles: React.CSSProperties = {
 
 const headerIconStyles: React.CSSProperties = {
   fontSize: '18px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '28px',
+  height: '28px',
+  borderRadius: '6px',
+  background: '#1a1a1a',
 };
 
 const headerTextStyles: React.CSSProperties = {
@@ -304,6 +358,7 @@ const contentStyles: React.CSSProperties = {
   flex: 1,
   overflow: 'auto',
   padding: '16px',
+  background: '#0a0a0a',
 };
 
 const sectionStyles: React.CSSProperties = {
@@ -389,9 +444,11 @@ const errorTextStyles: React.CSSProperties = {
 
 const footerStyles: React.CSSProperties = {
   padding: '12px 16px',
-  borderTop: '1px solid #333',
+  borderTop: '1px solid #1a1a1a',
   display: 'flex',
   gap: '8px',
+  background: '#080808',
+  borderRadius: '0 0 12px 12px',
 };
 
 const buttonStyles: React.CSSProperties = {
@@ -406,15 +463,18 @@ const buttonStyles: React.CSSProperties = {
 
 const primaryButtonStyles: React.CSSProperties = {
   ...buttonStyles,
-  background: '#1890ff',
+  background: '#965CDE',
   color: '#fff',
+  border: '1px solid #965CDE',
+  transition: 'all 0.2s',
 };
 
 const dangerButtonStyles: React.CSSProperties = {
   ...buttonStyles,
-  background: '#ff4d4f20',
+  background: 'transparent',
   color: '#ff4d4f',
   border: '1px solid #ff4d4f40',
+  transition: 'all 0.2s',
 };
 
 // ============================================================================
@@ -475,6 +535,44 @@ export function ActionConfigPanel({
   // Get action metadata
   const actionMeta = getActionMeta(action);
   const paramDefs = getActionParams(action);
+
+  // Check if a string is an emoji
+  const isEmoji = (str: string): boolean => {
+    if (!str || str.length === 0) return false;
+    const codePoint = str.codePointAt(0);
+    if (!codePoint) return false;
+    return codePoint >= 0x1F300 || (codePoint >= 0x2600 && codePoint <= 0x27BF);
+  };
+
+  // Render icon helper
+  const renderActionIcon = () => {
+    const iconStr = actionMeta.icon || '';
+    const iconColor = actionMeta.color || '#965cde';
+
+    // Check if it's an emoji
+    if (isEmoji(iconStr)) {
+      return <span style={{ fontSize: '16px' }}>{iconStr}</span>;
+    }
+
+    // Check if we have a mapping
+    const iconifyName = ICON_MAP[iconStr.toLowerCase()];
+    if (iconifyName) {
+      return <Icon icon={iconifyName} style={{ color: iconColor, width: 18, height: 18 }} />;
+    }
+
+    // Try as Phosphor icon
+    if (iconStr && !iconStr.includes(':')) {
+      return <Icon icon={`ph:${iconStr}-bold`} style={{ color: iconColor, width: 18, height: 18 }} />;
+    }
+
+    // If it contains a colon, use as-is
+    if (iconStr && iconStr.includes(':')) {
+      return <Icon icon={iconStr} style={{ color: iconColor, width: 18, height: 18 }} />;
+    }
+
+    // Fallback to gear icon
+    return <Icon icon="ph:gear-bold" style={{ color: iconColor, width: 18, height: 18 }} />;
+  };
 
   // Group parameters by group name
   const groupedParams = useMemo(() => {
@@ -802,8 +900,8 @@ export function ActionConfigPanel({
       {/* Header */}
       <div style={headerStyles}>
         <div style={headerTitleStyles}>
-          <span style={headerIconStyles}>{actionMeta.icon}</span>
-          <span style={headerTextStyles}>{actionMeta.label}</span>
+          <span style={headerIconStyles}>{renderActionIcon()}</span>
+          <span style={headerTextStyles}>{actionMeta.label || action}</span>
         </div>
         <button style={closeButtonStyles} onClick={onClose} title="Close">
           ✕
@@ -875,11 +973,33 @@ export function ActionConfigPanel({
       {/* Footer */}
       <div style={footerStyles}>
         {onDelete && (
-          <button style={dangerButtonStyles} onClick={onDelete}>
+          <button
+            style={dangerButtonStyles}
+            onClick={onDelete}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 77, 79, 0.2)';
+              e.currentTarget.style.borderColor = '#ff4d4f';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(255, 77, 79, 0.25)';
+            }}
+          >
             Delete
           </button>
         )}
-        <button style={primaryButtonStyles} onClick={handleSave}>
+        <button
+          style={primaryButtonStyles}
+          onClick={handleSave}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = '#7A4BC7';
+            e.currentTarget.style.borderColor = '#7A4BC7';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = '#965CDE';
+            e.currentTarget.style.borderColor = '#965CDE';
+          }}
+        >
           Save
         </button>
       </div>

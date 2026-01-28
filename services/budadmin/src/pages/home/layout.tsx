@@ -191,18 +191,18 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       hide: !enableDevMode,
     },
     {
-      label: "Pipelines",
-      route: "/pipelines",
-      icon: '/icons/simulations.png',
-      iconWhite: '/icons/simulationsWhite.svg',
-      cmd: "w",
-    },
-    {
       label: "Tools",
       route: "/tools",
       iconSvg: true,
       customSvg: "tools",
-      cmd: "11",
+      cmd: "H",
+    },
+    {
+      label: "Pipelines",
+      route: "/pipelines",
+      icon: '/icons/simulations.png',
+      iconWhite: '/icons/simulationsWhite.svg',
+      cmd: "J",
     },
   ]
 
