@@ -244,6 +244,10 @@ export const DrawerLogTree = ({
   onToggleExpand: (id: string) => void;
   onSelect: (node: DrawerLogEntry) => void;
 }) => {
+  const ancestors = ancestorHasMoreSiblings ?? [];
+  if (!nodes || !Array.isArray(nodes)) {
+    return null;
+  }
   return (
     <>
       {nodes.map((node, index) => {
@@ -252,7 +256,7 @@ export const DrawerLogTree = ({
         const isLastChild = index === nodes.length - 1;
         const isNotLastChild = !isLastChild;
 
-        const childAncestorSiblings = [...ancestorHasMoreSiblings, isNotLastChild];
+        const childAncestorSiblings = [...ancestors, isNotLastChild];
 
         return (
           <React.Fragment key={node.id}>
@@ -263,7 +267,7 @@ export const DrawerLogTree = ({
               isSelected={selectedId === node.id}
               isExpanded={isExpanded}
               hasExpandedParent={hasChildren && isExpanded}
-              ancestorHasMoreSiblings={ancestorHasMoreSiblings}
+              ancestorHasMoreSiblings={ancestors}
               onToggleExpand={() => onToggleExpand(node.id)}
               onSelect={() => onSelect(node)}
             />
