@@ -472,20 +472,41 @@ class DirectSearchOptimizer:
                         f"message={self._last_validation_result.get('message', 'N/A')}"
                     )
 
+                # Calculate performance metrics and cost for shared mode (for reporting, not for ranking)
+                # Performance targets are NOT checked - only memory validation determines meets_targets
+                ttft = 0.0
+                throughput_per_user = 0.0
+                e2e_latency = 0.0
+                cost_per_million_tokens = 0.0
+                try:
+                    data = self._prepare_predictor_data(config)
+                    # Use full heuristic calculator to get all metrics (ttft, throughput, e2e_latency)
+                    ttft, throughput_per_user, e2e_latency = self.heuristic_calculator(data)
+                    cost_per_million_tokens = self.cost_calculator.get_cost_per_million_tokens(
+                        throughput_per_user, concurrency, self.device_config, tp_size
+                    )
+                    logger.info(
+                        f"Shared mode metrics calculated: TTFT={ttft:.2f}ms, E2E={e2e_latency:.2f}s, "
+                        f"throughput={throughput_per_user:.2f} tok/s, cost=${cost_per_million_tokens:.6f}/M tokens "
+                        f"(TP={tp_size}, concurrency={concurrency})"
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not calculate metrics for shared mode: {e}. Using defaults.")
+
                 # Retrieve cached optimal max_loras for this configuration
                 optimal_max_loras = self._max_loras_cache.get(cache_key)
 
-                # Return minimal result - memory validation result from _validate_config
+                # Return result with calculated metrics - meets_targets based on memory validation only
                 result = SearchResult(
                     config=config,
                     total_memory=total_memory,
-                    ttft=0,  # Not predicted in shared mode
-                    e2e_latency=0,  # Not predicted in shared mode
-                    throughput_per_user=0,  # Not predicted in shared mode
+                    ttft=ttft,  # Calculated for reporting, not used for performance check
+                    e2e_latency=e2e_latency,  # Calculated for reporting, not used for performance check
+                    throughput_per_user=throughput_per_user,
                     concurrency=concurrency,
-                    cost_per_million_tokens=0,  # Cost model differs for shared mode
+                    cost_per_million_tokens=cost_per_million_tokens,
                     performance_penalty=0,  # No performance requirements in shared mode
-                    meets_targets=validation_passed,  # Use actual memory validation result
+                    meets_targets=validation_passed,  # Based on memory validation only, not performance
                     search_step=len(self.evaluated_configs),
                     error_rate=0,
                     weight_memory=weight_memory,

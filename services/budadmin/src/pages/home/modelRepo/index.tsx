@@ -154,9 +154,10 @@ function ModelCard(item: Model, index) {
                   }}
                 >
                   $
-                  {Number(
-                    item?.model_cluster_recommended?.cost_per_million_tokens,
-                  ).toFixed(2)}{" "}
+                  {(() => {
+                    const cost = Number(item?.model_cluster_recommended?.cost_per_million_tokens);
+                    return cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2);
+                  })()}{" "}
                   / 1M Tokens
                 </div>
               </Tag>

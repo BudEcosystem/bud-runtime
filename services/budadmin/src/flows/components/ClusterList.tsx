@@ -369,14 +369,14 @@ export function ClusterCard({
                   ))}
                   {hidePerformance && (
                     <Tags
-                      name={`$${data.cost_per_token?.toFixed(2)} to run`}
+                      name={`$${data.cost_per_token && data.cost_per_token < 0.01 ? data.cost_per_token.toFixed(4) : data.cost_per_token?.toFixed(2)} to run`}
                       color="#965CDE"
                       classNames="py-[.26rem] px-[.4rem]"
                     />
                   )}
                   {!hidePerformance && (
                     <Tags
-                      name={`${data.cost_per_token?.toFixed(2)} USD / 1M tokens`}
+                      name={`${data.cost_per_token && data.cost_per_token < 0.01 ? data.cost_per_token.toFixed(4) : data.cost_per_token?.toFixed(2)} USD / 1M tokens`}
                       color="#965CDE"
                       classNames="py-[.26rem] px-[.4rem]"
                     />
