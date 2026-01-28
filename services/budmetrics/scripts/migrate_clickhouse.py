@@ -1250,7 +1250,7 @@ class ClickHouseMigration:
         )
         ENGINE = ReplacingMergeTree(timestamp)
         PARTITION BY toYYYYMMDD(timestamp)
-        ORDER BY (trace_id)
+        ORDER BY (trace_id, span_id)
         TTL toDateTime(timestamp) + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1467,6 +1467,7 @@ class ClickHouseMigration:
         LEFT JOIN metrics.otel_traces g
             ON i.TraceId = g.TraceId
             AND g.SpanName = 'gateway_analytics'
+            AND g.SpanAttributes['gateway_analytics.inference_id'] = i.SpanAttributes['model_inference_details.inference_id']
         WHERE i.SpanName = 'inference_handler_observability'
           AND i.SpanAttributes['model_inference_details.inference_id'] != ''
           AND i.SpanAttributes['model_inference_details.project_id'] != ''
