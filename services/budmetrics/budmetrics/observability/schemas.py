@@ -375,12 +375,20 @@ class InferenceListRequest(BaseModel):
     endpoint_type: Optional[
         Literal[
             "chat",
+            "completion",
             "embedding",
+            "anthropic",
             "audio_transcription",
             "audio_translation",
             "text_to_speech",
             "image_generation",
+            "image_edit",
+            "image_variation",
             "moderation",
+            "classify",
+            "document",
+            "response",
+            "realtime",
         ]
     ] = None
 

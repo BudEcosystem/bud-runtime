@@ -249,7 +249,7 @@ class LatentBudConfigProcessor(EngineConfigProcessor):
         container_port = context.get("container_port", "8000")
         args["port"] = str(container_port)
 
-        args["engine"] = "torch"
+        # args["engine"] = "torch"
         args["vector-disk-cache"] = "true"
 
         # Note: LatentBud doesn't use these vLLM-specific args:

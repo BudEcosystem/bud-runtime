@@ -3692,6 +3692,8 @@ class ModelService(SessionMixin):
             "/v1/audio/transcriptions": "AUDIO",
             "/v1/audio/translations": "AUDIO",
             "/v1/audio/speech": "AUDIO",
+            "/v1/classify": "CLASSIFY",
+            "/v1/rerank": "RERANK",
         }
         model_endpoints = None
         if supported_endpoints:

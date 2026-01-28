@@ -1,4 +1,36 @@
 //! Gateway observability utilities for tracing and span management.
+//!
+//! This module provides standardized span attribute names and helper functions
+//! for recording observability data across all API handlers. The attributes
+//! follow a consistent naming convention that integrates with the unified
+//! OTEL analytics pipeline in ClickHouse.
+//!
+//! ## Span Naming Convention
+//! Handler spans follow the pattern: `{endpoint_type}_handler_observability`
+//! - `chat_handler_observability` (alias: `inference_handler_observability`)
+//! - `embedding_handler_observability`
+//! - `completion_handler_observability`
+//! - `audio_transcription_handler_observability`
+//! - `audio_translation_handler_observability`
+//! - `text_to_speech_handler_observability`
+//! - `image_generation_handler_observability`
+//! - `image_edit_handler_observability`
+//! - `image_variation_handler_observability`
+//! - `moderation_handler_observability`
+//! - `classify_handler_observability`
+//! - `document_handler_observability`
+//! - `response_handler_observability`
+//! - `realtime_handler_observability`
+//! - `anthropic_handler_observability`
+//!
+//! ## Attribute Prefixes
+//! - `model_inference.*` - Common model inference fields (tokens, cost, latency)
+//! - `model_inference_details.*` - Detailed inference context (project, endpoint, API key)
+//! - `embedding_inference.*` - Embedding-specific fields
+//! - `classify_inference.*` - Classification-specific fields
+//! - `audio_inference.*` - Audio endpoint-specific fields (duration, language)
+//! - `image_inference.*` - Image generation-specific fields (size, quality)
+//! - `gen_ai.*` - GenAI semantic conventions (for Responses API)
 
 use chrono::{DateTime, Utc};
 use opentelemetry::trace::Status as OtelStatus;
@@ -697,4 +729,360 @@ pub fn record_classify_response(
 pub fn record_classify_processing_time(processing_time_ms: u64) {
     let span = Span::current();
     span.record("classify_inference.processing_time_ms", processing_time_ms as i64);
+}
+
+// =============================================================================
+// Audio Endpoint Observability Helpers
+// =============================================================================
+
+/// Records audio transcription request as span attributes
+pub fn record_audio_transcription_request(
+    model: &str,
+    language: Option<&str>,
+    response_format: Option<&str>,
+) {
+    let span = Span::current();
+
+    span.record("audio_inference.model", model);
+    span.record("model_inference.endpoint_type", "audio_transcription");
+
+    if let Some(lang) = language {
+        span.record("audio_inference.language", lang);
+    }
+    if let Some(fmt) = response_format {
+        span.record("audio_inference.response_format", fmt);
+    }
+}
+
+/// Records audio transcription response as span attributes
+pub fn record_audio_transcription_response(
+    id: &str,
+    model_name: &str,
+    language: Option<&str>,
+    duration_seconds: Option<f64>,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("audio_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+
+    if let Some(lang) = language {
+        span.record("audio_inference.detected_language", lang);
+    }
+    if let Some(dur) = duration_seconds {
+        span.record("audio_inference.duration_seconds", dur);
+    }
+}
+
+/// Records audio translation request as span attributes
+pub fn record_audio_translation_request(model: &str, response_format: Option<&str>) {
+    let span = Span::current();
+
+    span.record("audio_inference.model", model);
+    span.record("model_inference.endpoint_type", "audio_translation");
+
+    if let Some(fmt) = response_format {
+        span.record("audio_inference.response_format", fmt);
+    }
+}
+
+/// Records audio translation response as span attributes
+pub fn record_audio_translation_response(
+    id: &str,
+    model_name: &str,
+    duration_seconds: Option<f64>,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("audio_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+
+    if let Some(dur) = duration_seconds {
+        span.record("audio_inference.duration_seconds", dur);
+    }
+}
+
+/// Records text-to-speech request as span attributes
+pub fn record_tts_request(model: &str, voice: Option<&str>, response_format: Option<&str>) {
+    let span = Span::current();
+
+    span.record("audio_inference.model", model);
+    span.record("model_inference.endpoint_type", "text_to_speech");
+
+    if let Some(v) = voice {
+        span.record("audio_inference.voice", v);
+    }
+    if let Some(fmt) = response_format {
+        span.record("audio_inference.response_format", fmt);
+    }
+}
+
+/// Records text-to-speech response as span attributes
+pub fn record_tts_response(
+    id: &str,
+    model_name: &str,
+    character_count: usize,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("audio_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("audio_inference.character_count", character_count as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+// =============================================================================
+// Image Endpoint Observability Helpers
+// =============================================================================
+
+/// Records image generation request as span attributes
+pub fn record_image_generation_request(
+    model: &str,
+    n: Option<u8>,
+    size: Option<&str>,
+    quality: Option<&str>,
+    style: Option<&str>,
+) {
+    let span = Span::current();
+
+    span.record("image_inference.model", model);
+    span.record("model_inference.endpoint_type", "image_generation");
+
+    if let Some(count) = n {
+        span.record("image_inference.n", count as i64);
+    }
+    if let Some(s) = size {
+        span.record("image_inference.size", s);
+    }
+    if let Some(q) = quality {
+        span.record("image_inference.quality", q);
+    }
+    if let Some(st) = style {
+        span.record("image_inference.style", st);
+    }
+}
+
+/// Records image generation response as span attributes
+pub fn record_image_generation_response(
+    id: &str,
+    model_name: &str,
+    images_count: usize,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("image_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("image_inference.images_generated", images_count as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+/// Records image edit request as span attributes
+pub fn record_image_edit_request(model: &str, n: Option<u8>, size: Option<&str>) {
+    let span = Span::current();
+
+    span.record("image_inference.model", model);
+    span.record("model_inference.endpoint_type", "image_edit");
+
+    if let Some(count) = n {
+        span.record("image_inference.n", count as i64);
+    }
+    if let Some(s) = size {
+        span.record("image_inference.size", s);
+    }
+}
+
+/// Records image edit response as span attributes
+pub fn record_image_edit_response(
+    id: &str,
+    model_name: &str,
+    images_count: usize,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("image_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("image_inference.images_generated", images_count as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+/// Records image variation request as span attributes
+pub fn record_image_variation_request(model: &str, n: Option<u8>, size: Option<&str>) {
+    let span = Span::current();
+
+    span.record("image_inference.model", model);
+    span.record("model_inference.endpoint_type", "image_variation");
+
+    if let Some(count) = n {
+        span.record("image_inference.n", count as i64);
+    }
+    if let Some(s) = size {
+        span.record("image_inference.size", s);
+    }
+}
+
+/// Records image variation response as span attributes
+pub fn record_image_variation_response(
+    id: &str,
+    model_name: &str,
+    images_count: usize,
+    response_time_ms: u64,
+) {
+    let span = Span::current();
+
+    span.record("image_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("image_inference.images_generated", images_count as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+// =============================================================================
+// Moderation Endpoint Observability Helpers
+// =============================================================================
+
+/// Records moderation request as span attributes
+pub fn record_moderation_request(model: &str, input_count: usize) {
+    let span = Span::current();
+
+    span.record("moderation_inference.model", model);
+    span.record("moderation_inference.input_count", input_count as i64);
+    span.record("model_inference.endpoint_type", "moderation");
+}
+
+/// Records moderation response as span attributes
+pub fn record_moderation_response(id: &str, model_name: &str, response_time_ms: u64) {
+    let span = Span::current();
+
+    span.record("moderation_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+// =============================================================================
+// Completion Endpoint Observability Helpers
+// =============================================================================
+
+/// Records completion request as span attributes
+pub fn record_completion_request(
+    model: &str,
+    max_tokens: Option<u32>,
+    temperature: Option<f32>,
+    stream: bool,
+) {
+    let span = Span::current();
+
+    span.record("completion_inference.model", model);
+    span.record("model_inference.endpoint_type", "completion");
+    span.record("completion_inference.stream", stream);
+
+    if let Some(max) = max_tokens {
+        span.record("completion_inference.max_tokens", max as i64);
+    }
+    if let Some(temp) = temperature {
+        span.record("completion_inference.temperature", temp as f64);
+    }
+}
+
+/// Records completion response as span attributes
+pub fn record_completion_response(
+    id: &str,
+    model_name: &str,
+    input_tokens: u32,
+    output_tokens: u32,
+    response_time_ms: u64,
+    ttft_ms: Option<u64>,
+    finish_reason: Option<&str>,
+) {
+    let span = Span::current();
+
+    span.record("completion_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.input_tokens", input_tokens as i64);
+    span.record("model_inference.output_tokens", output_tokens as i64);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+
+    if let Some(ttft) = ttft_ms {
+        span.record("model_inference.ttft_ms", ttft as i64);
+    }
+    if let Some(fr) = finish_reason {
+        span.record("model_inference.finish_reason", fr);
+    }
+}
+
+// =============================================================================
+// Document Processing Endpoint Observability Helpers
+// =============================================================================
+
+/// Records document processing request as span attributes
+pub fn record_document_request(model: &str, page_count: Option<usize>) {
+    let span = Span::current();
+
+    span.record("document_inference.model", model);
+    span.record("model_inference.endpoint_type", "document");
+
+    if let Some(pages) = page_count {
+        span.record("document_inference.page_count", pages as i64);
+    }
+}
+
+/// Records document processing response as span attributes
+pub fn record_document_response(id: &str, model_name: &str, response_time_ms: u64) {
+    let span = Span::current();
+
+    span.record("document_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.response_time_ms", response_time_ms as i64);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+// =============================================================================
+// Realtime Session Endpoint Observability Helpers
+// =============================================================================
+
+/// Records realtime session request as span attributes
+pub fn record_realtime_session_request(model: &str) {
+    let span = Span::current();
+
+    span.record("realtime_inference.model", model);
+    span.record("model_inference.endpoint_type", "realtime");
+}
+
+/// Records realtime session response as span attributes
+pub fn record_realtime_session_response(id: &str, model_name: &str) {
+    let span = Span::current();
+
+    span.record("realtime_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
+}
+
+/// Records realtime transcription session request as span attributes
+pub fn record_realtime_transcription_request(model: &str) {
+    let span = Span::current();
+
+    span.record("realtime_inference.model", model);
+    span.record("model_inference.endpoint_type", "realtime_transcription");
+}
+
+/// Records realtime transcription session response as span attributes
+pub fn record_realtime_transcription_response(id: &str, model_name: &str) {
+    let span = Span::current();
+
+    span.record("realtime_inference.id", id);
+    span.record("model_inference.model_name", model_name);
+    span.record("model_inference.timestamp", chrono::Utc::now().timestamp());
 }
