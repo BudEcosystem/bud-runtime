@@ -1166,6 +1166,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         credential_required = any(m.requires_onboarding for m in model_statuses)
 
         return GuardrailModelStatusResponse(
+            message="OK",
             models=model_statuses,
             total_models=len(model_statuses),
             models_requiring_onboarding=models_requiring_onboarding,
@@ -1260,7 +1261,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         Returns:
             GuardrailModelStatusResponse with model statuses
         """
-        from budapp.guardrails.schemas import GuardrailProfileProbeSelection, GuardrailProfileRuleSelection
+        from budapp.guardrails.schemas import GuardrailProbeRuleSelection, GuardrailProfileProbeSelection
 
         # Get workflow steps
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -1269,6 +1270,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         if not db_workflow_steps:
             return GuardrailModelStatusResponse(
+                message="No workflow steps found",
                 models=[],
                 total_models=0,
                 models_requiring_onboarding=0,
@@ -1294,6 +1296,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         # Return cached statuses if available and refresh not requested
         if cached_model_statuses and not refresh:
             return GuardrailModelStatusResponse(
+                message="OK",
                 models=[GuardrailModelStatus(**status) for status in cached_model_statuses.get("model_statuses", [])],
                 total_models=cached_model_statuses.get("total_models", 0),
                 models_requiring_onboarding=cached_model_statuses.get("models_requiring_onboarding", 0),
@@ -1306,6 +1309,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         # Re-derive model statuses
         if not probe_selections_data:
             return GuardrailModelStatusResponse(
+                message="No probe selections found",
                 models=[],
                 total_models=0,
                 models_requiring_onboarding=0,
@@ -1318,7 +1322,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         for probe_data in probe_selections_data:
             rules = None
             if probe_data.get("rules"):
-                rules = [GuardrailProfileRuleSelection(**rule) for rule in probe_data["rules"]]
+                rules = [GuardrailProbeRuleSelection(**rule) for rule in probe_data["rules"]]
             probe_selections.append(GuardrailProfileProbeSelection(id=probe_data["id"], rules=rules))
 
         # Convert project_id string to UUID if needed
@@ -1711,10 +1715,10 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     rollback_result["errors"].append(f"Failed to delete endpoints: {e}")
                     logger.error(f"Rollback: Failed to delete endpoints: {e}")
 
-            # 4. Mark workflow as CANCELLED
+            # 4. Mark workflow as FAILED (no CANCELLED status exists - cancelled workflows use FAILED)
             await WorkflowDataManager(self.session).update_by_fields(
                 db_workflow,
-                {"status": WorkflowStatusEnum.CANCELLED, "reason": reason},
+                {"status": WorkflowStatusEnum.FAILED, "reason": reason or "Cancelled by user"},
             )
 
             # Note: Onboarded models are intentionally NOT deleted (J2 option)

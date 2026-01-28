@@ -233,6 +233,7 @@ class TestGuardrailModelStatusResponse:
     def test_create_response_with_models(self, sample_model_statuses):
         """Test creating response with model statuses."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=sample_model_statuses,
             total_models=2,
             models_requiring_onboarding=1,
@@ -251,6 +252,7 @@ class TestGuardrailModelStatusResponse:
     def test_create_response_with_skip_logic(self, sample_model_statuses):
         """Test response with skip_to_step set."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=sample_model_statuses,
             total_models=2,
             models_requiring_onboarding=0,
@@ -265,6 +267,7 @@ class TestGuardrailModelStatusResponse:
     def test_create_response_with_credential_required(self, sample_model_statuses):
         """Test response with credential_required flag."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=sample_model_statuses,
             total_models=2,
             models_requiring_onboarding=1,
@@ -278,6 +281,7 @@ class TestGuardrailModelStatusResponse:
     def test_create_empty_response(self):
         """Test creating response with no models."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=[],
             total_models=0,
             models_requiring_onboarding=0,
@@ -292,6 +296,7 @@ class TestGuardrailModelStatusResponse:
     def test_response_object_field(self, sample_model_statuses):
         """Test that object field has correct default value."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=sample_model_statuses,
             total_models=2,
             models_requiring_onboarding=1,
@@ -304,6 +309,7 @@ class TestGuardrailModelStatusResponse:
     def test_response_serialization(self, sample_model_statuses):
         """Test response serializes correctly."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=sample_model_statuses,
             total_models=2,
             models_requiring_onboarding=1,
@@ -325,6 +331,7 @@ class TestGuardrailModelStatusResponse:
     def test_response_inherits_success_response(self, sample_model_statuses):
         """Test that response inherits from SuccessResponse."""
         response = GuardrailModelStatusResponse(
+            message="OK",
             models=sample_model_statuses,
             total_models=2,
             models_requiring_onboarding=1,
@@ -332,8 +339,11 @@ class TestGuardrailModelStatusResponse:
             models_reusable=1,
         )
 
-        # SuccessResponse should have success=True by default
-        assert hasattr(response, "success")
+        # SuccessResponse provides message and code fields
+        assert hasattr(response, "message")
+        assert hasattr(response, "code")
+        assert response.message == "OK"
+        assert response.code == 200
 
 
 class TestModelStatusSkipLogic:

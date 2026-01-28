@@ -34,7 +34,6 @@ from budapp.commons.constants import (
 )
 from budapp.guardrails.schemas import (
     GuardrailProfileProbeSelection,
-    GuardrailProfileRuleSelection,
     ModelDeploymentStatus,
 )
 
@@ -136,7 +135,9 @@ class TestWorkflowModelStatusDerivation:
             mock_endpoint.endpoint = "http://localhost:8000"
             mock_endpoint.status = EndpointStatusEnum.RUNNING
             mock_endpoint.cluster_id = uuid4()
-            mock_endpoint.cluster = Mock(name="test-cluster")
+            mock_cluster = Mock()
+            mock_cluster.name = "test-cluster"
+            mock_endpoint.cluster = mock_cluster
 
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = [mock_endpoint]
@@ -279,9 +280,9 @@ class TestWorkflowCancellationRollback:
                                 reason="Test cancellation",
                             )
 
-                            # Verify workflow was marked as cancelled
+                            # Verify workflow was marked as FAILED (no CANCELLED status exists)
                             update_call = mock_wf_dm.update_by_fields.call_args
-                            assert WorkflowStatusEnum.CANCELLED in str(update_call) or "CANCELLED" in str(update_call)
+                            assert WorkflowStatusEnum.FAILED in str(update_call) or "FAILED" in str(update_call)
 
                             assert result["status"] in ("success", "partial")
                             assert result["reason"] == "Test cancellation"
@@ -497,7 +498,9 @@ class TestEndToEndWorkflowScenarios:
         mock_endpoint.endpoint = "http://localhost:8000"
         mock_endpoint.status = EndpointStatusEnum.RUNNING
         mock_endpoint.cluster_id = uuid4()
-        mock_endpoint.cluster = Mock(name="test-cluster")
+        mock_cluster = Mock()
+        mock_cluster.name = "test-cluster"
+        mock_endpoint.cluster = mock_cluster
 
         probe_selections = [GuardrailProfileProbeSelection(id=probe_id, rules=None)]
 
@@ -549,7 +552,9 @@ class TestEndToEndWorkflowScenarios:
         mock_endpoint.endpoint = "http://localhost:8000"
         mock_endpoint.status = EndpointStatusEnum.RUNNING
         mock_endpoint.cluster_id = uuid4()
-        mock_endpoint.cluster = Mock(name="test-cluster")
+        mock_cluster = Mock()
+        mock_cluster.name = "test-cluster"
+        mock_endpoint.cluster = mock_cluster
 
         probe_selections = [GuardrailProfileProbeSelection(id=probe_id, rules=None)]
 

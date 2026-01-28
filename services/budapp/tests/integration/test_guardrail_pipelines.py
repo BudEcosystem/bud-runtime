@@ -296,7 +296,13 @@ class TestGuardrailSimulationPipeline:
         """Test that trigger_simulation calls budsim for each model."""
         workflow_ids = [str(uuid4()), str(uuid4())]
 
-        with patch("budapp.guardrails.services.DaprService") as MockDaprService:
+        mock_settings = MagicMock()
+        mock_settings.budsim_app_id = "budsim"
+
+        with (
+            patch("budapp.commons.config.app_settings", mock_settings),
+            patch("budapp.shared.dapr_service.DaprService") as MockDaprService,
+        ):
             # Mock successful simulation responses
             MockDaprService.invoke_service = AsyncMock(
                 side_effect=[
@@ -333,7 +339,13 @@ class TestGuardrailSimulationPipeline:
         """Test handling of partial simulation failures."""
         workflow_id = str(uuid4())
 
-        with patch("budapp.guardrails.services.DaprService") as MockDaprService:
+        mock_settings = MagicMock()
+        mock_settings.budsim_app_id = "budsim"
+
+        with (
+            patch("budapp.commons.config.app_settings", mock_settings),
+            patch("budapp.shared.dapr_service.DaprService") as MockDaprService,
+        ):
             # First succeeds, second fails
             MockDaprService.invoke_service = AsyncMock(
                 side_effect=[
@@ -361,7 +373,13 @@ class TestGuardrailSimulationPipeline:
         """Test that deployment config is passed to budsim."""
         workflow_id = str(uuid4())
 
-        with patch("budapp.guardrails.services.DaprService") as MockDaprService:
+        mock_settings = MagicMock()
+        mock_settings.budsim_app_id = "budsim"
+
+        with (
+            patch("budapp.commons.config.app_settings", mock_settings),
+            patch("budapp.shared.dapr_service.DaprService") as MockDaprService,
+        ):
             MockDaprService.invoke_service = AsyncMock(return_value={"workflow_id": workflow_id})
 
             await service.trigger_simulation(
