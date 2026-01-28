@@ -604,8 +604,19 @@ No additional guardrail-specific notifications needed. Individual service notifi
 
 ---
 
-## Open Questions
+## Additional Decisions
 
-1. Should there be a timeout for the entire workflow (not just individual pipelines)?
-2. How to handle partial success in batch operations (e.g., 2/3 models onboarded)?
-3. Should we add a "retry failed" option for individual model operations?
+### Partial Success Handling
+
+Partial success in batch operations is treated as **failure**:
+- If 2/3 models onboard successfully but 1 fails → entire step fails
+- Rollback is triggered for the current pipeline
+- Users are notified of the failure via existing service notifications
+- User must restart the workflow after resolving the issue
+
+### No Retry Mechanism
+
+Individual operation retry is not implemented:
+- Existing service notifications inform users of failures
+- Users can restart the workflow to retry
+- Keeps the workflow logic simple and predictable
