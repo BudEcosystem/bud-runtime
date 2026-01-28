@@ -122,8 +122,15 @@ spec:
     - host: {{ include "bud.ingress.hosts.budnotify" $ }}
       http:
         paths:
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: {{ .Release.Name }}-budnotify
+                port:
+                  number: 3000
           - path: /ws/socket.io
-            pathType: Prefix
+            pathType: Exact
             backend:
               service:
                 name: {{ .Release.Name }}-budnotify
