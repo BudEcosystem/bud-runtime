@@ -128,6 +128,33 @@ class RetrieveWorkflowStepData(BaseModel):
     supports_lora: bool | None = None
     supports_pipeline_parallelism: bool | None = None
 
+    # Guardrail model status fields (Step 4)
+    model_statuses: list[dict] | None = None
+    models_requiring_onboarding: int | None = None
+    models_requiring_deployment: int | None = None
+    models_reusable: int | None = None
+
+    # Skip logic
+    skip_to_step: int | None = None
+    credential_required: bool | None = None
+
+    # Pipeline execution tracking
+    pipeline_execution_id: UUID4 | None = None
+    pipeline_status: str | None = None
+    pipeline_results: dict | None = None
+
+    # Cluster recommendation results
+    recommended_clusters: list[dict] | None = None
+    per_model_configs: list[dict] | None = None
+
+    # Models categorization for deployment
+    models_to_deploy: list[dict] | None = None
+    models_to_reuse: list[dict] | None = None
+
+    # Deployment results
+    deployment_id: UUID4 | None = None
+    deployed_endpoint_ids: list[UUID4] | None = None
+
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
     """Retrieve Workflow Data Response."""
