@@ -1578,6 +1578,175 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         pipeline_service = BudPipelineService(self.session)
         return await pipeline_service.get_execution_progress(execution_id)
 
+    # =========================================================================
+    # Workflow Cancellation with Rollback
+    # =========================================================================
+
+    async def cancel_workflow_with_rollback(
+        self,
+        workflow_id: UUID,
+        reason: str = "User cancelled",
+    ) -> dict:
+        """Cancel a guardrail deployment workflow and rollback any partial deployments.
+
+        This method performs cleanup in the following order:
+        1. Mark workflow as CANCELLED
+        2. Delete GuardrailDeployment records created by the workflow
+        3. Remove guardrail config from Redis (guardrail_table, model_table)
+        4. Delete endpoints created by the workflow (if any)
+        5. Keep onboarded models (models are NOT deleted)
+
+        Args:
+            workflow_id: The workflow ID to cancel
+            reason: Reason for cancellation
+
+        Returns:
+            Dict with rollback status and cleanup details
+        """
+        rollback_result = {
+            "workflow_id": str(workflow_id),
+            "status": "success",
+            "reason": reason,
+            "cleaned_up": {
+                "deployments": 0,
+                "redis_keys": 0,
+                "endpoints": 0,
+            },
+            "preserved": {
+                "onboarded_models": 0,
+            },
+            "errors": [],
+        }
+
+        try:
+            # Get workflow and verify it exists
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": workflow_id}
+            )
+
+            if not db_workflow:
+                return {"status": "error", "message": "Workflow not found"}
+
+            # Get workflow steps to find what was deployed
+            db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": workflow_id}
+            )
+
+            # Collect deployed resources from step data
+            profile_id = None
+            endpoint_ids = []
+            deployment_ids = []
+            deployed_endpoint_ids = []
+
+            for db_step in db_workflow_steps:
+                step_data = db_step.data or {}
+                if step_data.get("profile_id"):
+                    profile_id = step_data["profile_id"]
+                if step_data.get("endpoint_ids"):
+                    endpoint_ids.extend(step_data["endpoint_ids"])
+                if step_data.get("deployment"):
+                    for dep in step_data["deployment"]:
+                        if dep.get("id"):
+                            deployment_ids.append(dep["id"])
+                if step_data.get("deployed_endpoint_ids"):
+                    deployed_endpoint_ids.extend(step_data["deployed_endpoint_ids"])
+
+            # 1. Delete GuardrailDeployment records
+            if profile_id:
+                try:
+                    deployments = await GuardrailsDeploymentDataManager(self.session).get_all_by_fields(
+                        GuardrailDeployment, {"profile_id": profile_id}
+                    )
+                    for deployment in deployments:
+                        await GuardrailsDeploymentDataManager(self.session).update_by_fields(
+                            deployment, {"status": GuardrailDeploymentStatusEnum.DELETED}
+                        )
+                        rollback_result["cleaned_up"]["deployments"] += 1
+                except Exception as e:
+                    rollback_result["errors"].append(f"Failed to delete deployments: {e}")
+                    logger.error(f"Rollback: Failed to delete deployments for profile {profile_id}: {e}")
+
+            # 2. Remove guardrail config from Redis
+            if profile_id:
+                try:
+                    redis_service = RedisService()
+
+                    # Delete guardrail_table entry
+                    guardrail_key = f"guardrail_table:{profile_id}"
+                    await redis_service.delete(guardrail_key)
+                    rollback_result["cleaned_up"]["redis_keys"] += 1
+
+                    # Remove guardrail_profile reference from model_table entries
+                    for endpoint_id in endpoint_ids:
+                        model_key = f"model_table:{endpoint_id}"
+                        existing_config = await redis_service.get(model_key)
+                        if existing_config:
+                            import json
+
+                            model_config = json.loads(existing_config)
+                            if str(endpoint_id) in model_config:
+                                model_config[str(endpoint_id)].pop("guardrail_profile", None)
+                                await redis_service.set(model_key, json.dumps(model_config))
+                                rollback_result["cleaned_up"]["redis_keys"] += 1
+
+                except Exception as e:
+                    rollback_result["errors"].append(f"Failed to clean Redis: {e}")
+                    logger.error(f"Rollback: Failed to clean Redis for profile {profile_id}: {e}")
+
+            # 3. Delete endpoints that were created by this workflow
+            # Only delete endpoints that are specifically from guardrail deployment
+            if deployed_endpoint_ids:
+                try:
+                    for endpoint_id in deployed_endpoint_ids:
+                        endpoint_uuid = UUID(endpoint_id) if isinstance(endpoint_id, str) else endpoint_id
+                        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                            Endpoint, {"id": endpoint_uuid}, missing_ok=True
+                        )
+                        if endpoint:
+                            await EndpointDataManager(self.session).update_by_fields(
+                                endpoint, {"status": EndpointStatusEnum.DELETED}
+                            )
+                            rollback_result["cleaned_up"]["endpoints"] += 1
+                except Exception as e:
+                    rollback_result["errors"].append(f"Failed to delete endpoints: {e}")
+                    logger.error(f"Rollback: Failed to delete endpoints: {e}")
+
+            # 4. Mark workflow as CANCELLED
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow,
+                {"status": WorkflowStatusEnum.CANCELLED, "reason": reason},
+            )
+
+            # Note: Onboarded models are intentionally NOT deleted (J2 option)
+            # Count models that were onboarded and will be preserved
+            for db_step in db_workflow_steps:
+                step_data = db_step.data or {}
+                if step_data.get("model_statuses"):
+                    for model_status in step_data["model_statuses"]:
+                        if model_status.get("model_id"):
+                            rollback_result["preserved"]["onboarded_models"] += 1
+
+            logger.info(
+                f"Workflow {workflow_id} cancelled with rollback: "
+                f"deleted {rollback_result['cleaned_up']['deployments']} deployments, "
+                f"cleaned {rollback_result['cleaned_up']['redis_keys']} redis keys, "
+                f"preserved {rollback_result['preserved']['onboarded_models']} onboarded models"
+            )
+
+            if rollback_result["errors"]:
+                rollback_result["status"] = "partial"
+
+            return rollback_result
+
+        except Exception as e:
+            logger.exception(f"Rollback failed for workflow {workflow_id}: {e}")
+            return {
+                "workflow_id": str(workflow_id),
+                "status": "error",
+                "message": str(e),
+                "errors": [str(e)],
+            }
+
 
 class GuardrailProbeRuleService(SessionMixin):
     async def list_probe_tags(self, name: str, offset: int = 0, limit: int = 10) -> tuple[list[Tag], int]:
