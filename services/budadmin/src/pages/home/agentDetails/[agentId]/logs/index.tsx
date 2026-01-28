@@ -11,6 +11,7 @@ import {
 import CustomSelect from "src/flows/components/CustomSelect";
 import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useObservabilitySocket } from "@/hooks/useObservabilitySocket";
 
 // API Response Types
 interface TraceSpan {
@@ -682,6 +683,10 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [isLive, setIsLive] = useState(false);
 
+  // Live streaming state
+  const liveSpanIdsRef = useRef<Set<string>>(new Set());
+  const MAX_LIVE_ITEMS = 200;
+
   // View mode and pagination state
   const [viewMode, setViewMode] = useState<'traces' | 'flatten'>('traces');
   const [page, setPage] = useState(1);
@@ -691,6 +696,48 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
 
   // Drawer hook
   const { openDrawer } = useDrawer();
+
+  // Handle incoming live trace data
+  const handleLiveTrace = useCallback((trace: TraceSpan) => {
+    // In traces view, only show root spans (empty parent_span_id)
+    if (viewMode === 'traces' && trace.parent_span_id && trace.parent_span_id !== '') {
+      return;
+    }
+
+    // Deduplicate by span_id
+    if (liveSpanIdsRef.current.has(trace.span_id)) {
+      return;
+    }
+    liveSpanIdsRef.current.add(trace.span_id);
+
+    // Transform to LogEntry and prepend to list
+    const newEntry: LogEntry = {
+      id: trace.span_id,
+      time: formatTime(trace.timestamp),
+      namespace: trace.resource_attributes?.["service.namespace"] || "",
+      title: trace.span_name,
+      childCount: trace.child_span_count,
+      metrics: { tag: trace.service_name },
+      duration: (trace.duration ?? 0) / 1_000_000_000,
+      startOffsetSec: 0,
+      traceId: trace.trace_id,
+      spanId: trace.span_id,
+      parentSpanId: trace.parent_span_id,
+      canExpand: (trace.child_span_count ?? 0) > 0,
+      rawData: trace as unknown as Record<string, any>,
+    };
+
+    setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
+  }, [viewMode]);
+
+  // Socket hook for live streaming
+  const { isSubscribed, connectionStatus, error: socketError } = useObservabilitySocket({
+    projectId: projectId || '',
+    promptId: promptName || '',
+    enabled: isLive && !!projectId && !!promptName,
+    onTraceReceived: handleLiveTrace,
+    onError: (err) => console.error('[LiveTrace] Socket error:', err),
+  });
 
   const ITEMS_PER_PAGE = 15;
 
@@ -1062,7 +1109,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
 
   // Toggle live mode
   const handleToggleLive = () => {
-    setIsLive((prev) => !prev);
+    setIsLive((prev) => {
+      // Clear deduplication set when enabling live mode
+      if (!prev) {
+        liveSpanIdsRef.current.clear();
+      }
+      return !prev;
+    });
   };
 
   // Initialize and update echarts
@@ -1267,13 +1320,24 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
             <button
               className={`flex items-center gap-1.5 transition-colors text-xs ${isLive ? "text-white" : "text-[#B3B3B3] hover:text-white"}`}
               onClick={handleToggleLive}
-              title={isLive ? "Disable live mode" : "Enable live mode"}
+              title={isLive ? `Live: ${connectionStatus}${socketError ? ` - ${socketError.message}` : ''}` : "Enable live mode"}
             >
+              {/* Pulsing green dot when subscribed */}
+              {isLive && isSubscribed && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+              )}
+              {/* Loading spinner when connecting */}
+              {isLive && !isSubscribed && connectionStatus !== 'error' && connectionStatus !== 'disconnected' && (
+                <Spin size="small" className="scale-50" />
+              )}
+              {/* Red dot on error */}
+              {isLive && connectionStatus === 'error' && (
+                <span className="h-2 w-2 rounded-full bg-red-500"></span>
+              )}
               <span>Live</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
             </button>
           </div>
         </div>
