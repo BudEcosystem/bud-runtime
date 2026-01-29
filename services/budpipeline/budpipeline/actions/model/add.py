@@ -56,6 +56,7 @@ class ModelAddExecutor(BaseActionExecutor):
         model_name = context.params.get("model_name", model_uri.split("/")[-1] if model_uri else "")
         description = context.params.get("description", "")
         author = context.params.get("author", "")
+        credential_id = context.params.get("credential_id")
         max_wait_seconds = context.params.get("max_wait_seconds", 86400)
 
         logger.info(
@@ -84,6 +85,7 @@ class ModelAddExecutor(BaseActionExecutor):
                     "uri": model_uri,
                     "description": description,
                     "author": author,
+                    "proprietary_credential_id": credential_id,
                     "callback_topic": CALLBACK_TOPIC,
                 },
                 timeout_seconds=60,
@@ -362,7 +364,7 @@ class ModelAddExecutor(BaseActionExecutor):
 
 META = ActionMeta(
     type="model_add",
-    version="1.1.0",
+    version="1.2.0",
     name="Add Model",
     description="Add a new model to the model repository from HuggingFace, URL, or local disk",
     category="Model Operations",
@@ -392,6 +394,13 @@ META = ActionMeta(
             description="Model location: HuggingFace ID (org/model), URL, or disk path",
             required=True,
             placeholder="meta-llama/Llama-2-7b or https://... or /path/to/model",
+        ),
+        ParamDefinition(
+            name="credential_id",
+            label="HuggingFace Credential",
+            type=ParamType.CREDENTIAL_REF,
+            description="Credential for accessing gated HuggingFace models (optional for public models)",
+            required=False,
         ),
         ParamDefinition(
             name="model_name",
