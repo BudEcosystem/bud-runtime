@@ -2447,7 +2447,7 @@ class ClickHouseMigration:
             -- ===== PERFORMANCE METRICS =====
             toUInt32OrNull(r.SpanAttributes['gen_ai.usage.input_tokens']) AS input_tokens,
             toUInt32OrNull(r.SpanAttributes['gen_ai.usage.output_tokens']) AS output_tokens,
-            toUInt32(r.Duration / 1000000) AS response_time_ms,  -- Duration is UInt64 nanoseconds, convert to ms
+            toUInt32OrNull(r.SpanAttributes['gen_ai.response_time_ms']) AS response_time_ms,  -- Uses provider latency from span attribute
             CAST(NULL AS Nullable(UInt32)) AS ttft_ms,  -- TTFT not tracked for responses
             false AS cached,
             CAST(NULL AS Nullable(String)) AS finish_reason,

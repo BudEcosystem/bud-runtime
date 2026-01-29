@@ -6854,6 +6854,9 @@ fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Optio
         gen_ai.usage.total_tokens = tracing::field::Empty,
         gen_ai.openai.response.service_tier = tracing::field::Empty,
         gen_ai.response.top_p = tracing::field::Empty,
+
+        // Model inference timing (for ClickHouse response_time_ms)
+        gen_ai.response_time_ms = tracing::field::Empty,
     )
 )]
 #[debug_handler(state = AppStateData)]
@@ -7074,6 +7077,11 @@ pub async fn response_create_handler(
                 // Record response fields for observability
                 super::observability::record_response_result(&response);
 
+                // Record provider latency as span attribute for ClickHouse materialized view
+                // This is the gateway-calculated latency: time from request to provider until response received
+                let span = tracing::Span::current();
+                span.record("gen_ai.response_time_ms", provider_latency_ms as i64);
+
                 // Capture usage for analytics headers
                 if let Some(ref usage) = response.usage {
                     if let Ok(mut guard) = captured_usage_clone.lock() {
@@ -7176,6 +7184,11 @@ pub async fn response_create_handler(
 
             // Record response fields for observability
             super::observability::record_response_result(&response);
+
+            // Record provider latency as span attribute for ClickHouse materialized view
+            // This is the gateway-calculated latency: time from request to provider until response received
+            let span = tracing::Span::current();
+            span.record("gen_ai.response_time_ms", provider_latency_ms as i64);
 
             // Capture usage for analytics headers
             if let Some(ref usage) = response.usage {
