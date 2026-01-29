@@ -33,6 +33,16 @@ microservices:
         image: dittops/ask-bud:nightly
     budpipeline:
         image: dittops/budpipeline:nightly
+    budmetrics:
+        image: dittops/budmetrics:nightly
+    budprompt:
+        enabled:false
+    budplayground:
+        enabled: false
+    budcustomer:
+        enabled: false
+    budeval:
+        enabled: false
     global:
         env:
             LOG_LEVEL: DEBUG

@@ -27,21 +27,7 @@ const statusColors: Record<string, string> = {
   draft: "#faad14",
 };
 
-// Action type icons
-const actionIcons: Record<string, string> = {
-  http_request: "🌐",
-  transform: "🔄",
-  log: "📝",
-  delay: "⏱️",
-  aggregate: "📊",
-  set_output: "📤",
-  conditional: "🔀",
-  fail: "❌",
-};
-
 const WorkflowCard = ({ workflow, onClick }: { workflow: BudPipelineItem; onClick: () => void }) => {
-  const steps = workflow.dag?.steps || [];
-  const uniqueActions = Array.from(new Set(steps.map((s) => s.action)));
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -86,8 +72,8 @@ const WorkflowCard = ({ workflow, onClick }: { workflow: BudPipelineItem; onClic
           {workflow.dag?.description || "No description provided"}
         </Text_13_400_B3B3B3>
 
-        {/* Action types tags */}
-        <Flex gap="1" wrap="wrap" className="mt-4">
+        {/* Step count and status */}
+        <Flex gap="2" wrap="wrap" className="mt-4" align="center">
           {workflow.step_count > 0 && (
             <Tag
               className="text-[#B3B3B3] border-[0] rounded-[6px] flex justify-center items-center py-[.3rem] px-[.4rem]"
@@ -98,44 +84,18 @@ const WorkflowCard = ({ workflow, onClick }: { workflow: BudPipelineItem; onClic
               </div>
             </Tag>
           )}
-          {uniqueActions.slice(0, 3).map((action) => (
-            <Tooltip key={action} title={action}>
-              <Tag
-                className="text-[#B3B3B3] border-[0] rounded-[6px] flex justify-center items-center py-[.3rem] px-[.4rem]"
-                style={{ backgroundColor: "#1F1F1F" }}
-              >
-                <div className="text-[0.625rem] font-[400] leading-[100%]">
-                  {actionIcons[action] || "⚙️"} {action}
-                </div>
-              </Tag>
-            </Tooltip>
-          ))}
-          {uniqueActions.length > 3 && (
-            <Tag
-              className="text-[#808080] border-[0] rounded-[6px] flex justify-center items-center py-[.3rem] px-[.4rem]"
-              style={{ backgroundColor: "#1F1F1F" }}
-            >
-              <div className="text-[0.625rem] font-[400] leading-[100%]">
-                +{uniqueActions.length - 3} more
-              </div>
-            </Tag>
-          )}
-        </Flex>
-
-        {/* Status badge */}
-        <Box
-          className={`inline-block rounded-[6px] px-[.3em] mt-[.5rem] py-[.15em] capitalize`}
-          style={{
-            backgroundColor: workflow.status === "active" ? "#52c41a20" : workflow.status === "draft" ? "#faad1420" : "#8c8c8c20",
-          }}
-        >
-          <div
-            className="text-[0.625rem] font-[400] leading-[0.965625rem]"
-            style={{ color: statusColors[workflow.status] }}
+          <Tag
+            className="border-[0] rounded-[6px] flex justify-center items-center py-[.3rem] px-[.4rem] capitalize"
+            style={{
+              backgroundColor: workflow.status === "active" ? "#52c41a20" : workflow.status === "draft" ? "#faad1420" : "#8c8c8c20",
+              color: statusColors[workflow.status],
+            }}
           >
-            {workflow.status}
-          </div>
-        </Box>
+            <div className="text-[0.625rem] font-[400] leading-[100%]">
+              {workflow.status}
+            </div>
+          </Tag>
+        </Flex>
       </div>
 
       {/* Footer */}

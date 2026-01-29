@@ -28,8 +28,8 @@ import {
   Tabs,
   Tag,
   Tooltip,
-  message,
 } from "antd";
+import { successToast, errorToast } from "@/components/toast";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -133,7 +133,7 @@ const NewPipeline = () => {
       ) as PipelineStep[];
 
       if (validSteps.length === 0) {
-        message.error("At least one step is required");
+        errorToast("At least one step is required");
         return;
       }
 
@@ -151,7 +151,7 @@ const NewPipeline = () => {
       hideLoader();
 
       if (result) {
-        message.success("Pipeline created successfully");
+        successToast("Pipeline created successfully");
         router.push(`/pipelines/${result.id}`);
       }
     } catch (error) {
@@ -181,7 +181,7 @@ const NewPipeline = () => {
       setParameters(parsed.parameters || []);
       setSteps(parsed.steps || []);
 
-      message.success("DAG imported successfully");
+      successToast("DAG imported successfully");
       setActiveTab("visual");
     } catch (e) {
       setJsonError("Invalid JSON format");

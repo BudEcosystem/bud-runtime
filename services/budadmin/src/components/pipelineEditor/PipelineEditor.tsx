@@ -8,11 +8,12 @@
  * connection validation, and undo/redo support.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   type Node,
   type Edge,
@@ -93,6 +94,7 @@ const canvasContainerStyles: React.CSSProperties = {
   position: 'relative',
   height: '100%',
   minHeight: 0, // Important for flex children to properly shrink
+  overflow: 'hidden', // Prevent sidebar from overflowing
 };
 
 const defaultEdgeStyle: React.CSSProperties = {
@@ -102,21 +104,75 @@ const defaultEdgeStyle: React.CSSProperties = {
 };
 
 const sidebarStyles: React.CSSProperties = {
+  position: 'absolute',
+  right: '16px',
+  top: '16px',
+  bottom: '16px',
   width: '280px',
-  height: '100%',
-  background: '#141414',
-  borderLeft: '1px solid #333',
+  maxHeight: 'calc(100vh - 140px)', // Ensure it doesn't overflow viewport
+  background: '#0a0a0a',
+  border: '1px solid #262626',
+  borderRadius: '12px',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
+  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
+  zIndex: 10,
 };
 
 const sidebarHeaderStyles: React.CSSProperties = {
-  padding: '16px',
-  borderBottom: '1px solid #333',
-  fontSize: '14px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '12px',
+  paddingLeft: '16px',
+  gap: '12px',
+  minHeight: '56px',
+  boxSizing: 'border-box',
+};
+
+const sidebarTitleStyles: React.CSSProperties = {
+  fontSize: '13px',
   fontWeight: 600,
+  color: '#888',
+  letterSpacing: '0.02em',
+  flexShrink: 0,
+};
+
+const sidebarSearchIconStyles: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '32px',
+  height: '32px',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  color: '#666',
+  transition: 'all 0.15s ease',
+  flexShrink: 0,
+};
+
+const sidebarSearchExpandedStyles: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '0 10px',
+  height: '32px',
+  backgroundColor: '#161616',
+  borderRadius: '8px',
+  border: '1px solid #252525',
+  flex: 1,
+  boxSizing: 'border-box',
+};
+
+const sidebarSearchInputStyles: React.CSSProperties = {
+  flex: 1,
+  border: 'none',
+  outline: 'none',
+  fontSize: '12px',
   color: '#fff',
+  backgroundColor: 'transparent',
+  width: '100%',
 };
 
 const paletteContainerStyles: React.CSSProperties = {
@@ -127,11 +183,12 @@ const paletteContainerStyles: React.CSSProperties = {
 
 const helpTextStyles: React.CSSProperties = {
   padding: '12px 16px',
-  borderTop: '1px solid #333',
-  background: '#0a0a0a',
-  color: '#666',
+  borderTop: '1px solid #1a1a1a',
+  background: '#080808',
+  color: '#555',
   fontSize: '11px',
   textAlign: 'center',
+  borderRadius: '0 0 12px 12px',
 };
 
 // ============================================================================
@@ -160,6 +217,9 @@ function PipelineEditorInner({
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
+  const [actionSearch, setActionSearch] = useState('');
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Get selected node data
   const selectedNode = useMemo(() => {
@@ -360,14 +420,24 @@ function PipelineEditorInner({
     (action: string) => {
       if (readonly) return;
 
-      // Create new node at a default position
-      const newNode = createStepNode(action, { x: 250, y: nodes.length * 150 + 100 });
+      // Count existing step nodes (excluding start node)
+      const stepNodes = nodes.filter((n) => n.type !== SPECIAL_NODE_TYPES.START);
+      const stepCount = stepNodes.length;
+
+      // Position new nodes to the right of start node with vertical stacking
+      // Use grid-aligned values (snap grid is 20x20)
+      // x=440 places node to the right of start node (which is at x=0, width ~280-360)
+      // First node at y=140 (same as start node), subsequent nodes 140px below
+      const newNode = createStepNode(action, {
+        x: 440,
+        y: 140 + stepCount * 140,
+      });
       setNodes((nds) => [...nds, newNode]);
 
       // Notify parent
       onAddStep?.(action);
     },
-    [readonly, createStepNode, nodes.length, onAddStep]
+    [readonly, createStepNode, nodes, onAddStep]
   );
 
   // Handle dropping a node from the palette
@@ -435,6 +505,10 @@ function PipelineEditorInner({
           onPaneClick={handlePaneClick}
           nodeTypes={pipelineNodeTypes}
           fitView
+          fitViewOptions={{
+            maxZoom: 0.75,
+            padding: 0.3,
+          }}
           snapToGrid
           snapGrid={[20, 20]}
           defaultEdgeOptions={{
@@ -444,7 +518,12 @@ function PipelineEditorInner({
           }}
           style={{ background: '#060606' }}
         >
-          <Background color="#2a2a2a" gap={8} />
+          <Background
+            variant={BackgroundVariant.Dots}
+            color="rgba(255, 255, 255, 0.25)"
+            gap={24}
+            size={1.5}
+          />
           <PipelineToolbar
             position="bottom-left"
             showFitView={true}
@@ -452,41 +531,90 @@ function PipelineEditorInner({
             customActions={[]}
           />
         </ReactFlow>
-      </div>
 
-      {/* Config Panel (shown when step node is selected in edit mode) */}
-      {!readonly && configPanelOpen && selectedStepData && (
-        <ActionConfigPanel
-          key={`config-${selectedStepData.stepId}`}
-          stepId={selectedStepData.stepId || ''}
-          stepName={selectedStepData.name || ''}
-          action={selectedStepData.action || ''}
-          params={selectedStepData.params || {}}
-          condition={selectedStepData.condition}
-          onUpdate={handleStepUpdate}
-          onClose={() => setConfigPanelOpen(false)}
-          onDelete={!readonly ? handleStepDelete : undefined}
-          dataSources={dataSources}
-          loadingDataSources={loadingDataSources}
-          availableSteps={availableSteps}
-        />
-      )}
+        {/* Config Panel (shown when step node is selected in edit mode) */}
+        {!readonly && configPanelOpen && selectedStepData && (
+          <ActionConfigPanel
+            key={`config-${selectedStepData.stepId}`}
+            stepId={selectedStepData.stepId || ''}
+            stepName={selectedStepData.name || ''}
+            action={selectedStepData.action || ''}
+            params={selectedStepData.params || {}}
+            condition={selectedStepData.condition}
+            onUpdate={handleStepUpdate}
+            onClose={() => setConfigPanelOpen(false)}
+            onDelete={!readonly ? handleStepDelete : undefined}
+            dataSources={dataSources}
+            loadingDataSources={loadingDataSources}
+            availableSteps={availableSteps}
+          />
+        )}
 
-      {/* Action Sidebar */}
-      {!readonly && !configPanelOpen && (
-        <div style={sidebarStyles}>
-          <div style={sidebarHeaderStyles}>Actions</div>
-          <div style={paletteContainerStyles}>
-            <NodePalette
-              config={paletteConfig}
-              onItemClick={(item) => handleAddAction(item.type)}
-              mimeType="application/reactflow-node"
-              theme="dark"
-            />
+        {/* Action Sidebar (floating) */}
+        {!readonly && !configPanelOpen && (
+          <div style={sidebarStyles}>
+            <div style={sidebarHeaderStyles}>
+              <span style={sidebarTitleStyles}>Actions</span>
+              {searchExpanded ? (
+                <div style={sidebarSearchExpandedStyles}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search..."
+                    value={actionSearch}
+                    onChange={(e) => setActionSearch(e.target.value)}
+                    onBlur={() => {
+                      if (!actionSearch) {
+                        setSearchExpanded(false);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setActionSearch('');
+                        setSearchExpanded(false);
+                      }
+                    }}
+                    style={sidebarSearchInputStyles}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    ...sidebarSearchIconStyles,
+                    backgroundColor: actionSearch ? '#161616' : 'transparent',
+                  }}
+                  onClick={() => {
+                    setSearchExpanded(true);
+                    setTimeout(() => searchInputRef.current?.focus(), 0);
+                  }}
+                  title="Search actions"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            <div style={paletteContainerStyles}>
+              <NodePalette
+                config={{ ...paletteConfig, searchable: false }}
+                onItemClick={(item) => handleAddAction(item.type)}
+                mimeType="application/reactflow-node"
+                theme="dark"
+                searchValue={actionSearch}
+                onSearchChange={setActionSearch}
+              />
+            </div>
+            <div style={helpTextStyles}>Click or drag to add action</div>
           </div>
-          <div style={helpTextStyles}>Click or drag to add action</div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

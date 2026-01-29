@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # New action architecture (002-pipeline-event-persistence)
@@ -25,7 +26,7 @@ from budpipeline.engine.dependency_resolver import DependencyResolver
 from budpipeline.engine.param_resolver import ParamResolver
 from budpipeline.engine.schemas import OnFailureAction
 from budpipeline.pipeline.crud import PipelineDefinitionCRUD
-from budpipeline.pipeline.models import PipelineStatus
+from budpipeline.pipeline.models import PipelineExecution, PipelineStatus
 
 logger = logging.getLogger(__name__)
 
@@ -363,6 +364,30 @@ class PipelineService:
             include_system=include_system,
         )
 
+        # Get execution stats for all pipelines
+        pipeline_ids = [d.id for d in definitions]
+        execution_stats: dict[UUID, dict[str, Any]] = {}
+
+        if pipeline_ids:
+            # Query execution counts and last execution times
+            stats_query = (
+                select(
+                    PipelineExecution.pipeline_id,
+                    func.count(PipelineExecution.id).label("execution_count"),
+                    func.max(PipelineExecution.created_at).label("last_execution_at"),
+                )
+                .where(PipelineExecution.pipeline_id.in_(pipeline_ids))
+                .group_by(PipelineExecution.pipeline_id)
+            )
+            result = await session.execute(stats_query)
+            for row in result:
+                execution_stats[row.pipeline_id] = {
+                    "execution_count": row.execution_count,
+                    "last_execution_at": row.last_execution_at.isoformat()
+                    if row.last_execution_at
+                    else None,
+                }
+
         return [
             {
                 "id": str(d.id),
@@ -377,6 +402,8 @@ class PipelineService:
                 "description": d.description,
                 "user_id": str(d.user_id) if d.user_id else None,
                 "system_owned": d.system_owned,
+                "execution_count": execution_stats.get(d.id, {}).get("execution_count", 0),
+                "last_execution_at": execution_stats.get(d.id, {}).get("last_execution_at"),
             }
             for d in definitions
         ]

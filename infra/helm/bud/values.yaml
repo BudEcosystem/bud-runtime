@@ -350,7 +350,7 @@ microservices:
       INFERENCE_URL: http://172.184.137.177:8502/classify
       CLICKHOUSE_HOST: "{{ .Release.Name }}-clickhouse"
       CLICKHOUSE_PORT: "9000"
-      CLICKHOUSE_DB_NAME: budproxy
+      CLICKHOUSE_DB_NAME: metrics
       SECRETS_CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
       # ClickHouse TTL configuration for cluster metrics (in days)
