@@ -700,6 +700,12 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
     const timestamps = traceSpans.map(s => new Date(s.timestamp).getTime());
     const earliestTimestamp = Math.min(...timestamps);
 
+    // Helper to count total descendants recursively
+    const countDescendants = (node: LogEntry): number => {
+      if (!node.children || node.children.length === 0) return 0;
+      return node.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
+    };
+
     // Recursive function to build children
     const buildNode = (span: TraceSpan): LogEntry => {
       const children = traceSpans.filter(s => s.parent_span_id === span.span_id);
@@ -710,12 +716,18 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
 
       const timestamp = new Date(span.timestamp).getTime();
 
+      // Calculate total descendant count (all children + grandchildren + etc.)
+      const totalDescendants = childNodes.reduce(
+        (sum, child) => sum + 1 + countDescendants(child),
+        0
+      );
+
       return {
         id: span.span_id,
         time: formatTime(span.timestamp),
         namespace: span.resource_attributes?.["service.name"] || "",
         title: span.span_name || 'Unknown Span',
-        childCount: childNodes.length,
+        childCount: totalDescendants,
         metrics: { tag: span.service_name || '' },
         duration: (span.duration ?? 0) / 1_000_000_000,
         startOffsetSec: (timestamp - earliestTimestamp) / 1000,
