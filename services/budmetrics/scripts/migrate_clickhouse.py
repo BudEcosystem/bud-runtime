@@ -2478,6 +2478,86 @@ class ClickHouseMigration:
 
         logger.info("Blocking event columns migration to InferenceFact completed successfully")
 
+    async def add_endpoint_specific_columns_to_inference_fact(self):
+        """Add endpoint-specific columns to existing InferenceFact table.
+
+        This migration adds columns for different inference endpoint types:
+        - Audio: duration, language, detected_language, voice, response_format
+        - TTS: character_count
+        - Image: images_generated, size, quality, style
+        - Embedding: input_count, dimensions, encoding_format
+        - Document: page_count
+
+        These columns were added to the CREATE TABLE statement but need ALTER TABLE
+        for existing deployments where the table already exists.
+        """
+        logger.info("Adding endpoint-specific columns to InferenceFact table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceFact")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceFact table does not exist. Skipping endpoint-specific columns migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if InferenceFact table exists: {e}")
+            return
+
+        # Define the columns to add with their types and codecs
+        # Matching exactly the CREATE TABLE definitions
+        columns_to_add = [
+            # Audio endpoint data
+            ("audio_duration_seconds", "Nullable(Float32) CODEC(Gorilla, ZSTD(1))"),
+            ("audio_language", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("audio_detected_language", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("audio_voice", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("audio_response_format", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            # TTS endpoint data
+            ("tts_character_count", "Nullable(UInt32) CODEC(Delta, ZSTD(1))"),
+            # Image endpoint data
+            ("images_generated", "Nullable(UInt8) CODEC(ZSTD(1))"),
+            ("image_size", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("image_quality", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("image_style", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            # Embedding endpoint data
+            ("embedding_input_count", "Nullable(UInt32) CODEC(Delta, ZSTD(1))"),
+            ("embedding_dimensions", "Nullable(UInt32) CODEC(ZSTD(1))"),
+            ("embedding_encoding_format", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            # Document endpoint data
+            ("document_page_count", "Nullable(UInt16) CODEC(ZSTD(1))"),
+        ]
+
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = 'InferenceFact'
+                  AND database = currentDatabase()
+                  AND name = '{column_name}'
+                """
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    alter_query = f"""
+                    ALTER TABLE InferenceFact
+                    ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column {column_name} to InferenceFact table")
+                else:
+                    logger.debug(f"Column {column_name} already exists in InferenceFact table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.debug(f"Column {column_name} already exists")
+                else:
+                    logger.error(f"Error adding column {column_name}: {e}")
+
+        logger.info("Endpoint-specific columns migration to InferenceFact completed successfully")
+
     async def create_mv_otel_blocking_to_inference_fact(self):
         """Create Materialized View for blocked-only requests to InferenceFact.
 
@@ -3175,6 +3255,9 @@ class ClickHouseMigration:
                 self.add_gateway_columns_to_inference_fact()
             )  # Add gateway analytics columns to existing InferenceFact
             await self.add_blocking_columns_to_inference_fact()  # Add blocking event columns to existing InferenceFact
+            await (
+                self.add_endpoint_specific_columns_to_inference_fact()
+            )  # Add audio/image/embedding/TTS/document columns
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
             # NOTE: mv_handler_to_inference_fact was removed to avoid duplicates - the main MV handles both cases
             await (
