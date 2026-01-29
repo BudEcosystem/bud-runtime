@@ -281,8 +281,36 @@ class ModelAddExecutor(BaseActionExecutor):
             # The final step is "save_model" or "results"
             is_completion_event = event_name in ("save_model", "results")
 
-            if payload_type == "perform_model_extraction" and is_completion_event:
-                if status_str == "COMPLETED":
+            if payload_type == "perform_model_extraction":
+                # Handle FAILED status for ANY step (validation, download, etc.)
+                # Failures can occur at any point in the extraction workflow
+                if status_str == "FAILED":
+                    error_msg = content.get("message", "") or content.get(
+                        "error", f"Model extraction failed at step: {event_name}"
+                    )
+                    logger.error(
+                        "model_add_failed_via_notification",
+                        step_execution_id=context.step_execution_id,
+                        error=error_msg,
+                        event_name=event_name,
+                    )
+
+                    return EventResult(
+                        action=EventAction.COMPLETE,
+                        status=StepStatus.FAILED,
+                        outputs={
+                            "success": False,
+                            "model_id": None,
+                            "model_name": context.step_outputs.get("model_name", ""),
+                            "workflow_id": context.external_workflow_id,
+                            "status": "failed",
+                            "message": error_msg,
+                        },
+                        error=error_msg,
+                    )
+
+                # Handle COMPLETED status only for final completion events
+                if is_completion_event and status_str == "COMPLETED":
                     result = content.get("result", {})
                     model_id = result.get("model_id")
                     model_name = result.get("model_name", "") or context.step_outputs.get(
@@ -307,30 +335,6 @@ class ModelAddExecutor(BaseActionExecutor):
                             "status": "completed",
                             "message": f"Model '{model_name}' added successfully",
                         },
-                    )
-                elif status_str == "FAILED":
-                    error_msg = content.get("message", "") or content.get(
-                        "error", "Model extraction failed"
-                    )
-                    logger.error(
-                        "model_add_failed_via_notification",
-                        step_execution_id=context.step_execution_id,
-                        error=error_msg,
-                        event_name=event_name,
-                    )
-
-                    return EventResult(
-                        action=EventAction.COMPLETE,
-                        status=StepStatus.FAILED,
-                        outputs={
-                            "success": False,
-                            "model_id": None,
-                            "model_name": context.step_outputs.get("model_name", ""),
-                            "workflow_id": context.external_workflow_id,
-                            "status": "failed",
-                            "message": error_msg,
-                        },
-                        error=error_msg,
                     )
 
         # Event not relevant to completion
