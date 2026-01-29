@@ -12,8 +12,17 @@ use tracing::{debug, error, info, warn};
 
 /// Check if a Redis error indicates a broken connection that requires reconnection
 fn is_connection_error(err: &redis::RedisError) -> bool {
+    // Check for error kinds that are definitively connection-related first.
+    // This avoids expensive string allocation for common I/O errors.
+    if matches!(
+        err.kind(),
+        redis::ErrorKind::IoError | redis::ErrorKind::BusyLoadingError
+    ) {
+        return true;
+    }
+
+    // For other error kinds, fall back to string matching.
     let err_str = err.to_string().to_lowercase();
-    // Check for common connection-related error patterns
     err_str.contains("broken pipe")
         || err_str.contains("connection reset")
         || err_str.contains("connection refused")
@@ -22,10 +31,6 @@ fn is_connection_error(err: &redis::RedisError) -> bool {
         || err_str.contains("eof")
         || err_str.contains("socket")
         || err_str.contains("timed out")
-        || matches!(
-            err.kind(),
-            redis::ErrorKind::IoError | redis::ErrorKind::BusyLoadingError
-        )
 }
 
 /// Usage limit information from Redis
