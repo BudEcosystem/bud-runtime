@@ -201,6 +201,50 @@ class GuardrailsProbeRulesDataManager(DataManagerUtils):
 
         return result, count
 
+    async def get_probes_with_rules(self, probe_ids: list[UUID]) -> list[GuardrailProbe]:
+        """Get probes by IDs with their rules eagerly loaded.
+
+        Args:
+            probe_ids: List of probe IDs to fetch
+
+        Returns:
+            List of GuardrailProbe objects with rules relationship loaded
+        """
+        # Query probes
+        probe_stmt = (
+            select(GuardrailProbe)
+            .where(GuardrailProbe.id.in_(probe_ids))
+            .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+        )
+        probe_result = self.session.execute(probe_stmt)
+        probes = list(probe_result.scalars().all())
+
+        if not probes:
+            return []
+
+        # Query rules for these probes
+        probe_id_list = [p.id for p in probes]
+        rule_stmt = (
+            select(GuardrailRule)
+            .where(GuardrailRule.probe_id.in_(probe_id_list))
+            .where(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+        )
+        rule_result = self.session.execute(rule_stmt)
+        rules = list(rule_result.scalars().all())
+
+        # Group rules by probe_id
+        rules_by_probe: dict[UUID, list[GuardrailRule]] = {}
+        for rule in rules:
+            if rule.probe_id not in rules_by_probe:
+                rules_by_probe[rule.probe_id] = []
+            rules_by_probe[rule.probe_id].append(rule)
+
+        # Attach rules to probes
+        for probe in probes:
+            probe.rules = rules_by_probe.get(probe.id, [])
+
+        return probes
+
     async def get_all_probe_rules(
         self,
         probe_id: UUID,

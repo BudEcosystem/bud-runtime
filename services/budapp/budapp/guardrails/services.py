@@ -130,6 +130,8 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         severity_threshold = request.severity_threshold
         trigger_workflow = request.trigger_workflow
         derive_statuses = request.derive_model_statuses
+        trigger_onboarding = request.trigger_onboarding
+        callback_topics = request.callback_topics
 
         current_step_number = step_number
 
@@ -342,6 +344,113 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
         workflow_current_step = max(current_step_number, db_max_workflow_step_number)
         logger.info(f"The current step of workflow {db_workflow.id} is {workflow_current_step}")
+
+        # Trigger model onboarding if requested
+        if trigger_onboarding:
+            logger.info(f"Triggering model onboarding for workflow {db_workflow.id}")
+
+            # Check if there's an existing pipeline execution that's still running
+            existing_execution_id = workflow_step_data.get("pipeline_execution_id")
+            if existing_execution_id:
+                try:
+                    pipeline_service = BudPipelineService(self.session)
+                    existing_execution = await pipeline_service.get_execution(existing_execution_id)
+                    existing_status = existing_execution.get("status", "").lower()
+
+                    if existing_status in ("running", "pending"):
+                        logger.info(
+                            f"Existing onboarding execution {existing_execution_id} is still {existing_status}, "
+                            "returning existing execution instead of starting new one"
+                        )
+                        workflow_step_data["pipeline_status"] = existing_status
+                        # Update the workflow step with current status
+                        await WorkflowStepDataManager(self.session).update_by_fields(
+                            db_workflow_step,
+                            {"data": workflow_step_data},
+                        )
+                        # Skip triggering new onboarding - will return existing execution info
+                        trigger_onboarding = False
+                    else:
+                        logger.info(
+                            f"Existing execution {existing_execution_id} has status {existing_status}, "
+                            "allowing new onboarding trigger"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to check existing execution status: {e}, will trigger new onboarding")
+
+        if trigger_onboarding:
+            # Get model_statuses from workflow step data (current or previous steps)
+            model_statuses_data = workflow_step_data.get("model_statuses")
+            if not model_statuses_data:
+                # Try to get from previous workflow steps
+                for db_step in db_workflow_steps:
+                    step_data = db_step.data or {}
+                    if step_data.get("model_statuses"):
+                        model_statuses_data = step_data["model_statuses"]
+                        break
+
+            if not model_statuses_data:
+                raise ClientException("No model statuses found. Run derive_model_statuses first.")
+
+            # Get credential_id from request or workflow data
+            onboarding_credential_id = credential_id
+            if not onboarding_credential_id:
+                for db_step in db_workflow_steps:
+                    step_data = db_step.data or {}
+                    if step_data.get("credential_id"):
+                        onboarding_credential_id = UUID(step_data["credential_id"])
+                        break
+
+            # Filter to models requiring onboarding and build the models list
+            models_to_onboard = [
+                {
+                    "rule_id": str(m["rule_id"]),
+                    "model_uri": m["model_uri"],
+                    "model_provider_type": m.get("model_provider_type", "hugging_face"),
+                    "tags": m.get("tags"),
+                }
+                for m in model_statuses_data
+                if m.get("requires_onboarding")
+            ]
+
+            if not models_to_onboard:
+                logger.info("No models require onboarding, skipping trigger")
+                workflow_step_data["pipeline_status"] = "skipped"
+                workflow_step_data["pipeline_results"] = {"message": "No models require onboarding"}
+            else:
+                logger.info(f"Triggering onboarding for {len(models_to_onboard)} models: {models_to_onboard}")
+
+                # Trigger the onboarding pipeline
+                try:
+                    onboarding_result = await self.trigger_model_onboarding(
+                        models=models_to_onboard,
+                        credential_id=onboarding_credential_id,
+                        user_id=current_user_id,
+                        callback_topics=callback_topics,
+                    )
+
+                    execution_id = onboarding_result.get("execution_id")
+                    if execution_id:
+                        workflow_step_data["pipeline_execution_id"] = execution_id
+                        workflow_step_data["pipeline_status"] = "running"
+                    else:
+                        workflow_step_data["pipeline_status"] = "failed"
+                        workflow_step_data["pipeline_results"] = onboarding_result
+
+                    logger.info(
+                        f"Model onboarding triggered: execution_id={execution_id}, "
+                        f"models={len(models_to_onboard)}, result={onboarding_result}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to trigger model onboarding: {e}", exc_info=True)
+                    workflow_step_data["pipeline_status"] = "failed"
+                    workflow_step_data["pipeline_results"] = {"error": str(e)}
+
+            # Update the workflow step with pipeline info
+            await WorkflowStepDataManager(self.session).update_by_fields(
+                db_workflow_step,
+                {"data": workflow_step_data},
+            )
 
         # Create next step if workflow is triggered
         if trigger_workflow:
@@ -727,7 +836,11 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     await redis_service.set(model_table_key, json.dumps(model_config))
 
     async def add_guardrail_profile_to_cache(
-        self, profile_id: UUID, credential_data: Optional[dict] = None, provider_type: str = None
+        self,
+        profile_id: UUID,
+        credential_data: Optional[dict] = None,
+        provider_type: str = None,
+        model_config: Optional[dict] = None,
     ) -> None:
         """Add guardrail profile data to cache with the correct schema format.
 
@@ -740,6 +853,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             profile_id: The guardrail profile ID to cache
             credential_data: Optional raw encrypted credential data from ProprietaryCredential.other_provider_creds
             provider_type: The actual provider type (e.g., "openai", "azure-content-safety")
+            model_config: Optional dict with custom_rules, metadata_json, rule_overrides_json for model-based rules
         """
         redis_service = RedisService()
         # 1. Get the profile
@@ -801,12 +915,21 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             providers["aws-comprehend"] = provider_config
 
         elif provider_type == "bud_sentinel":
-            providers["bud_sentinel"] = {
+            bud_sentinel_config = {
                 "type": "bud_sentinel",
                 "probe_config": {},
                 "endpoint": app_settings.bud_sentinel_base_url,
                 "api_key_location": "none",  # Bud sentinel doesn't require credentials
             }
+            # Add model-based rule config if provided (custom_rules, metadata_json, rule_overrides_json)
+            if model_config:
+                if model_config.get("custom_rules"):
+                    bud_sentinel_config["custom_rules"] = model_config["custom_rules"]
+                if model_config.get("metadata_json"):
+                    bud_sentinel_config["metadata_json"] = model_config["metadata_json"]
+                if model_config.get("rule_overrides_json"):
+                    bud_sentinel_config["rule_overrides_json"] = model_config["rule_overrides_json"]
+            providers["bud_sentinel"] = bud_sentinel_config
 
         else:
             # Default case for any other providers
@@ -1131,6 +1254,8 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                         probe_name=db_probe.name,
                         model_uri=db_rule.model_uri,
                         model_id=db_rule.model_id,
+                        model_provider_type=db_rule.model_provider_type,
+                        tags=db_rule.tags if hasattr(db_rule, "tags") and db_rule.tags else None,
                         status=status,
                         endpoint_id=endpoint_info.get("endpoint_id"),
                         endpoint_name=endpoint_info.get("endpoint_name"),
@@ -1344,9 +1469,14 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         """Trigger BudPipeline to onboard multiple models using model_add action.
 
         Creates a DAG with parallel model_add steps for each model that needs onboarding.
+        Auto-derives name and author from model_uri, and includes default guardrail tag plus rule tags.
 
         Args:
-            models: List of model info dicts with keys: rule_id, model_uri, model_provider_type
+            models: List of model info dicts with keys:
+                - rule_id: UUID of the guardrail rule
+                - model_uri: HuggingFace model URI (e.g., "meta-llama/Llama-3.1-8B")
+                - model_provider_type: Provider type (default: "hugging_face")
+                - tags: Optional list of rule tags to include
             credential_id: Optional credential ID for gated models
             user_id: User ID initiating the operation
             callback_topics: Optional callback topics for real-time updates
@@ -1361,15 +1491,30 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         steps = []
         for i, model in enumerate(models):
             step_id = f"onboard_{i}"
+            model_uri = model["model_uri"]
+            uri_parts = model_uri.split("/")
+
+            # Auto-derive name and author from model_uri
+            # Format: "author/model-name" -> author="author", name="model-name"
+            model_name = uri_parts[-1] if uri_parts else model_uri
+            model_author = uri_parts[0] if len(uri_parts) > 1 else None
+
+            # Default guardrail tag + any tags from the rule
+            tags = [{"name": "guardrail", "color": "#6366f1"}]
+            if model.get("tags"):
+                tags.extend(model["tags"])
+
             steps.append(
                 {
                     "id": step_id,
+                    "name": f"Onboard {model_name}",
                     "action": "model_add",
                     "params": {
-                        "uri": model["model_uri"],
-                        "name": model["model_uri"].split("/")[-1],
-                        "provider_type": model.get("model_provider_type", "hugging_face"),
-                        "credential_id": str(credential_id) if credential_id else None,
+                        "model_uri": model_uri,
+                        "model_name": model_name,
+                        "model_source": model.get("model_provider_type", "hugging_face"),
+                        "author": model_author,
+                        "description": f"Guardrail model for rule {model.get('rule_id', 'unknown')}",
                     },
                     "depends_on": [],  # All steps run in parallel
                 }
@@ -1434,13 +1579,15 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             step_id = f"deploy_{i}"
             deploy_config = model.get("deployment_config", {})
 
+            model_name = model.get("model_name", f"model_{i}")
             steps.append(
                 {
                     "id": step_id,
+                    "name": f"Deploy {model_name}",
                     "action": "deployment_create",
                     "params": {
                         "model_id": str(model["model_id"]),
-                        "model_name": model.get("model_name", ""),
+                        "model_name": model_name,
                         "cluster_id": str(cluster_id),
                         "project_id": str(project_id),
                         "replica": deploy_config.get("replica", 1),

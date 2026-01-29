@@ -344,3 +344,43 @@ class GuardrailPipelineActions(SessionMixin):
             "total_endpoints": total,
             "endpoints": endpoint_statuses,
         }
+
+    async def save_deployment(
+        self,
+        profile_id: UUID,
+        guardrail_deployment_id: UUID,
+        model_config: dict[str, Any] | None = None,
+        credential_data: dict | None = None,
+    ) -> dict[str, Any]:
+        """Save deployment and update Redis cache with model-based rule config.
+
+        This action is called after models are deployed to update the guardrail_table
+        with custom_rules, metadata_json, and rule_overrides_json.
+
+        Args:
+            profile_id: The guardrail profile ID
+            guardrail_deployment_id: The guardrail deployment ID
+            model_config: Dict with custom_rules, metadata_json, rule_overrides_json from build_guardrail_config()
+            credential_data: Optional credential data for the profile
+
+        Returns:
+            dict with success status and updated cache keys
+        """
+        from budapp.guardrails.services import GuardrailDeploymentWorkflowService
+
+        service = GuardrailDeploymentWorkflowService(self.session)
+
+        # Update Redis cache with model config (custom_rules, metadata_json inside bud_sentinel)
+        await service.add_guardrail_profile_to_cache(
+            profile_id=profile_id,
+            credential_data=credential_data,
+            provider_type="bud_sentinel",
+            model_config=model_config,
+        )
+
+        return {
+            "success": True,
+            "profile_id": str(profile_id),
+            "guardrail_deployment_id": str(guardrail_deployment_id),
+            "cache_key": f"guardrail_table:{profile_id}",
+        }

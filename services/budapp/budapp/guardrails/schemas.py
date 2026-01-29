@@ -74,6 +74,8 @@ class GuardrailModelStatus(BaseModel):
     # Model info
     model_uri: str
     model_id: UUID4 | None = None
+    model_provider_type: str | None = None
+    tags: list[dict] | None = None  # Rule tags to use for onboarding
 
     # Status
     status: ModelDeploymentStatus
@@ -605,7 +607,10 @@ class GuardrailDeploymentDetailResponse(SuccessResponse):
 
 
 class GuardrailRuleDeploymentResponse(BaseModel):
-    """Response schema for rule deployment."""
+    """Response schema for rule deployment.
+
+    Status is derived from the linked endpoint's status.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -616,10 +621,23 @@ class GuardrailRuleDeploymentResponse(BaseModel):
     endpoint_id: UUID4
     cluster_id: UUID4
     config_override_json: dict | None = None
-    status: str
-    error_message: str | None = None
+    status: str | None = None  # Derived from endpoint.status
     created_at: datetime
     modified_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_status_from_endpoint(cls, data: Any) -> Any:
+        """Derive status from the endpoint relationship."""
+        if hasattr(data, "endpoint") and data.endpoint is not None:
+            # SQLAlchemy model - get status from endpoint relationship
+            if not hasattr(data, "status") or data.status is None:
+                object.__setattr__(data, "status", data.endpoint.status)
+        elif isinstance(data, dict) and "endpoint" in data and data["endpoint"]:
+            # Dict input - get status from endpoint dict
+            if "status" not in data or data["status"] is None:
+                data["status"] = data["endpoint"].get("status")
+        return data
 
 
 class GuardrailDeploymentWorkflowRequest(BaseModel):
@@ -648,6 +666,8 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     callback_topics: list[str] | None = None
     # Model status derivation flag - set to True to derive model statuses at this step
     derive_model_statuses: bool = False
+    # Trigger model onboarding - set to True to start onboarding models that require it
+    trigger_onboarding: bool = False
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":

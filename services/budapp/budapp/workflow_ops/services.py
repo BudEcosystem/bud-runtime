@@ -177,6 +177,27 @@ class WorkflowService(SessionMixin):
             probe_selections = required_data.get("probe_selections")
             guard_types = required_data.get("guard_types")
             severity_threshold = required_data.get("severity_threshold")
+            # Model status fields
+            model_statuses = required_data.get("model_statuses")
+            _total_models = required_data.get("total_models")  # noqa: F841
+            models_requiring_onboarding = required_data.get("models_requiring_onboarding")
+            models_requiring_deployment = required_data.get("models_requiring_deployment")
+            models_reusable = required_data.get("models_reusable")
+            skip_to_step = required_data.get("skip_to_step")
+            credential_required = required_data.get("credential_required")
+            # Cluster selection fields
+            _selected_cluster_id = required_data.get("selected_cluster_id")  # noqa: F841
+            _cluster_recommendations = required_data.get("cluster_recommendations")  # noqa: F841
+            recommended_clusters = required_data.get("recommended_clusters")
+            per_model_configs = required_data.get("per_model_configs")
+            models_to_deploy = required_data.get("models_to_deploy")
+            models_to_reuse = required_data.get("models_to_reuse")
+            # Deployment tracking fields
+            pipeline_execution_id = required_data.get("pipeline_execution_id")
+            pipeline_status = required_data.get("pipeline_status")
+            pipeline_results = required_data.get("pipeline_results")
+            deployment_id = required_data.get("deployment_id")
+            deployed_endpoint_ids = required_data.get("deployed_endpoint_ids")
 
             quantization_config = (
                 QuantizeModelWorkflowStepData(
@@ -425,6 +446,24 @@ class WorkflowService(SessionMixin):
                 probe_selections=probe_selections if probe_selections else None,
                 guard_types=guard_types if guard_types else None,
                 severity_threshold=severity_threshold if severity_threshold else None,
+                # Model status fields
+                model_statuses=model_statuses if model_statuses else None,
+                models_requiring_onboarding=models_requiring_onboarding,
+                models_requiring_deployment=models_requiring_deployment,
+                models_reusable=models_reusable,
+                skip_to_step=skip_to_step,
+                credential_required=credential_required,
+                # Cluster selection fields
+                recommended_clusters=recommended_clusters if recommended_clusters else None,
+                per_model_configs=per_model_configs if per_model_configs else None,
+                models_to_deploy=models_to_deploy if models_to_deploy else None,
+                models_to_reuse=models_to_reuse if models_to_reuse else None,
+                # Deployment tracking fields
+                pipeline_execution_id=pipeline_execution_id if pipeline_execution_id else None,
+                pipeline_status=pipeline_status if pipeline_status else None,
+                pipeline_results=pipeline_results if pipeline_results else None,
+                deployment_id=deployment_id if deployment_id else None,
+                deployed_endpoint_ids=deployed_endpoint_ids if deployed_endpoint_ids else None,
                 prompt_type=prompt_type if prompt_type else None,
                 prompt_schema=prompt_schema if prompt_schema else None,
                 auto_scale=auto_scale if auto_scale else None,
@@ -599,6 +638,27 @@ class WorkflowService(SessionMixin):
                 "probe_selections",
                 "guard_types",
                 "severity_threshold",
+                # Model status fields (populated when derive_model_statuses=True)
+                "model_statuses",
+                "total_models",
+                "models_requiring_onboarding",
+                "models_requiring_deployment",
+                "models_reusable",
+                "skip_to_step",
+                "credential_required",
+                # Cluster selection fields
+                "selected_cluster_id",
+                "cluster_recommendations",
+                "recommended_clusters",
+                "per_model_configs",
+                "models_to_deploy",
+                "models_to_reuse",
+                # Deployment tracking fields
+                "pipeline_execution_id",
+                "pipeline_status",
+                "pipeline_results",
+                "deployment_id",
+                "deployed_endpoint_ids",
             ],
             "prompt_creation": [
                 "model_id",
