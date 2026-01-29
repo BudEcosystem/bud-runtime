@@ -6857,6 +6857,9 @@ fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Optio
 
         // Model inference timing (for ClickHouse response_time_ms)
         gen_ai.response_time_ms = tracing::field::Empty,
+
+        // Inference ID (for ClickHouse InferenceFact table)
+        gen_ai.inference_id = tracing::field::Empty,
     )
 )]
 #[debug_handler(state = AppStateData)]
@@ -6875,6 +6878,11 @@ pub async fn response_create_handler(
 ) -> Result<Response<Body>, Error> {
     // Record request fields for observability
     super::observability::record_response_request(&params);
+
+    // Generate inference_id for this request (same pattern as /v1/chat/completions)
+    let inference_id = uuid::Uuid::now_v7();
+    let span = tracing::Span::current();
+    span.record("gen_ai.inference_id", inference_id.to_string().as_str());
 
     // Capture prompt info for analytics headers (before params is moved into async block)
     let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());

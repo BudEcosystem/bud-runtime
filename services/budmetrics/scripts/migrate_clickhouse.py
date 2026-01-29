@@ -2404,7 +2404,7 @@ class ClickHouseMigration:
             r.SpanId AS span_id,
 
             -- ===== CORE IDENTIFIERS (from baggage) =====
-            CAST(NULL AS Nullable(UUID)) AS inference_id,  -- Not applicable for /v1/responses
+            toUUIDOrNull(nullIf(r.SpanAttributes['gen_ai.inference_id'], '')) AS inference_id,
             toUUIDOrNull(nullIf(r.SpanAttributes['bud.project_id'], '')) AS project_id,
             toUUIDOrNull(nullIf(r.SpanAttributes['bud.endpoint_id'], '')) AS endpoint_id,
             CAST(NULL AS Nullable(UUID)) AS model_id,  -- Model resolved dynamically
@@ -2441,7 +2441,7 @@ class ClickHouseMigration:
                 nullIf(r.SpanAttributes['gen_ai.request.model'], ''),
                 ''
             ) AS model_name,
-            '' AS model_provider,  -- Not directly available in response span
+            'budprompt' AS model_provider,  -- Always budprompt for /v1/responses
             'response' AS endpoint_type,  -- Differentiate from 'chat'
 
             -- ===== PERFORMANCE METRICS =====
