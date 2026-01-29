@@ -2418,9 +2418,9 @@ class ClickHouseMigration:
             CAST(NULL AS Nullable(DateTime64(3))) AS request_forward_time,
 
             -- ===== STATUS & COST =====
-            -- Success based on otel.status_code and gen_ai.response.status
+            -- is_success: false if error fields are present OR response status is failed
             if(
-                r.SpanAttributes['otel.status_code'] = 'ERROR' OR r.SpanAttributes['gen_ai.response.status'] = 'failed',
+                r.SpanAttributes['error.type'] != '' OR r.SpanAttributes['error.message'] != '' OR r.SpanAttributes['gen_ai.response.status'] = 'failed',
                 false,
                 true
             ) AS is_success,
