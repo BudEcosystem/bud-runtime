@@ -145,9 +145,8 @@ const GeoMapChart: React.FC<GeoMapChartProps> = ({
     const maxAttempts = 3;
 
     try {
-      const response = await fetch(
-        "https://cdn.jsdelivr.net/npm/echarts/map/json/world.json",
-      );
+      // Use India-compliant world map with correct Kashmir boundaries
+      const response = await fetch("/maps/world-india-compliant.json");
       if (!response.ok) throw new Error("Failed to fetch map data");
 
       const worldJson = await response.json();

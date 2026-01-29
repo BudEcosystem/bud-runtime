@@ -271,6 +271,66 @@ class ModelAddExecutor(BaseActionExecutor):
                     error=error_msg,
                 )
 
+        # Check for notification events from budmodel/budmicroframe
+        # These have type="notification" and completion info in payload.content
+        if event_type == "notification":
+            payload_type = payload.get("type", "")
+            # Handle model extraction completion notifications
+            # The final step is "save_model" or "results"
+            is_completion_event = event_name in ("save_model", "results")
+
+            if payload_type == "perform_model_extraction" and is_completion_event:
+                if status_str == "COMPLETED":
+                    result = content.get("result", {})
+                    model_id = result.get("model_id")
+                    model_name = result.get("model_name", "") or context.step_outputs.get(
+                        "model_name", ""
+                    )
+
+                    logger.info(
+                        "model_add_completed_via_notification",
+                        step_execution_id=context.step_execution_id,
+                        model_id=model_id,
+                        event_name=event_name,
+                    )
+
+                    return EventResult(
+                        action=EventAction.COMPLETE,
+                        status=StepStatus.COMPLETED,
+                        outputs={
+                            "success": True,
+                            "model_id": model_id,
+                            "model_name": model_name,
+                            "workflow_id": context.external_workflow_id,
+                            "status": "completed",
+                            "message": f"Model '{model_name}' added successfully",
+                        },
+                    )
+                elif status_str == "FAILED":
+                    error_msg = content.get("message", "") or content.get(
+                        "error", "Model extraction failed"
+                    )
+                    logger.error(
+                        "model_add_failed_via_notification",
+                        step_execution_id=context.step_execution_id,
+                        error=error_msg,
+                        event_name=event_name,
+                    )
+
+                    return EventResult(
+                        action=EventAction.COMPLETE,
+                        status=StepStatus.FAILED,
+                        outputs={
+                            "success": False,
+                            "model_id": None,
+                            "model_name": context.step_outputs.get("model_name", ""),
+                            "workflow_id": context.external_workflow_id,
+                            "status": "failed",
+                            "message": error_msg,
+                        },
+                        error=error_msg,
+                    )
+
         # Event not relevant to completion
         logger.debug(
             "model_add_event_ignored",

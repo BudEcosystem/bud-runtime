@@ -348,11 +348,12 @@ export const useInferences = create<InferenceStore>((set, get) => ({
         throw new Error(response.data?.message || "Failed to fetch inferences");
       }
     } catch (error: any) {
+      // Don't show toast here - let axios interceptor handle it
+      // This prevents double toasts and toasts during token refresh
       const errorMsg =
         error?.response?.data?.message ||
         error?.message ||
         "Failed to fetch inferences";
-      errorToast(errorMsg);
       set({ error: errorMsg, isLoading: false });
     }
   },

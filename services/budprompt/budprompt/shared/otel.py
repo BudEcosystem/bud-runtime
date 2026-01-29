@@ -33,6 +33,7 @@ from pydantic_ai import Agent
 from pydantic_ai.agent import InstrumentationSettings
 
 from budprompt.commons.config import app_settings
+from budprompt.shared.baggage_processor import BaggageSpanProcessor
 
 
 logger = logging.get_logger(__name__)
@@ -136,6 +137,13 @@ class OTelManager:
 
         # Create tracer provider
         self._tracer_provider = TracerProvider(resource=resource)
+
+        # Add BaggageSpanProcessor FIRST to copy W3C Baggage entries to span attributes.
+        # This processor copies bud.project_id, bud.prompt_id, etc. from baggage to
+        # span attributes for real-time observability filtering.
+        baggage_processor = BaggageSpanProcessor()
+        self._tracer_provider.add_span_processor(baggage_processor)
+        logger.debug("BaggageSpanProcessor registered for business context propagation")
 
         # Configure OTLP exporter
         exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")

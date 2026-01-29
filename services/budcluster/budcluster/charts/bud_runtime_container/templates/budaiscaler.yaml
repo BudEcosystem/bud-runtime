@@ -19,6 +19,16 @@ spec:
   maxReplicas: {{ .Values.budaiscaler.maxReplicas }}
   scalingStrategy: {{ .Values.budaiscaler.scalingStrategy | default "BudScaler" }}
 
+  {{- if .Values.budaiscaler.scaleToZeroConfig }}
+  {{- if .Values.budaiscaler.scaleToZeroConfig.enabled }}
+  # Scale-to-zero configuration
+  scaleToZeroConfig:
+    enabled: true
+    activationScale: {{ .Values.budaiscaler.scaleToZeroConfig.activationScale | default 1 }}
+    gracePeriod: {{ .Values.budaiscaler.scaleToZeroConfig.gracePeriod | default "5m" }}
+  {{- end }}
+  {{- end }}
+
   # Metrics sources configuration
   {{- if .Values.budaiscaler.metricsSources }}
   metricsSources:

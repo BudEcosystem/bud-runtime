@@ -755,7 +755,7 @@ class KubernetesHandler(BaseClusterHandler):
     def verify_ingress_health(self, namespace: str) -> bool:
         """Verify the ingress health by checking if the model is available in the models list."""
         ingress_url = self.get_ingress_url(namespace)
-        models_url = f"{ingress_url}/v1/models"
+        models_url = f"{ingress_url}/v1/models/"
 
         try:
             response = requests.get(models_url, timeout=30)
@@ -795,9 +795,11 @@ class KubernetesHandler(BaseClusterHandler):
         headers = {}
 
         # Define endpoints to check
+        # Note: These endpoints do NOT use trailing slashes (unlike /v1/models/ which requires it)
         endpoints_to_check = [
             "/v1/embeddings",
             "/v1/chat/completions",
+            "/v1/classify",
             # "/v1/models",
             # "/v1/completions",
             # "/health",
@@ -811,7 +813,7 @@ class KubernetesHandler(BaseClusterHandler):
                 url = f"{ingress_url}{endpoint}"
 
                 # For endpoints that require POST, prepare minimal valid payload
-                if endpoint in ["/v1/embeddings", "/v1/chat/completions", "/v1/completions"]:
+                if endpoint in ["/v1/embeddings", "/v1/chat/completions", "/v1/completions", "/v1/classify"]:
                     if endpoint == "/v1/embeddings":
                         payload = {"model": namespace, "input": "test"}
                     elif endpoint == "/v1/chat/completions":
@@ -820,6 +822,8 @@ class KubernetesHandler(BaseClusterHandler):
                             "messages": [{"role": "user", "content": "who are you?"}],
                             "max_tokens": 1,
                         }
+                    elif endpoint == "/v1/classify":
+                        payload = {"model": namespace, "input": ["test"], "raw_scores": False}
                     else:  # /v1/completions
                         payload = {"model": namespace, "prompt": "test", "max_tokens": 1}
 

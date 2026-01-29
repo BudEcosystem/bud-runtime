@@ -44,6 +44,12 @@ spec:
         command: ["sh", "-c", "uvicorn notify.main:app --host 0.0.0.0 --port 3000"]
         ports:
         - containerPort: 3000
+        env:
+        {{- $root := . }}
+        {{- range $key, $value := .Values.microservices.budnotify.env }}
+          - name: {{ $key }}
+            value: {{ tpl $value $root | quote }}
+        {{- end }}
         envFrom:
           - configMapRef:
               name: {{ .Release.Name}}-bud-global

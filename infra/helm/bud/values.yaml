@@ -14,11 +14,12 @@ global:
       budapp: ""
       budgateway: ""
       budask: ""
+      budnotify: ""
       novuapi: ""
       novuws: ""
       s3: ""
       mcpgateway: ""
-      onyx: ""  # Auto-derives to chat.{root} e.g., chat.dev.domain.com
+      onyx: "" # Auto-derives to chat.{root} e.g., chat.dev.domain.com
   # Optional node scheduling configuration applied to all microservices by default
   # Can be overridden per-service in microservices.<service>.nodeSelector and microservices.<service>.affinity
   nodeSelector: {}
@@ -349,7 +350,7 @@ microservices:
       INFERENCE_URL: http://172.184.137.177:8502/classify
       CLICKHOUSE_HOST: "{{ .Release.Name }}-clickhouse"
       CLICKHOUSE_PORT: "9000"
-      CLICKHOUSE_DB_NAME: budproxy
+      CLICKHOUSE_DB_NAME: metrics
       SECRETS_CLICKHOUSE_USER: "{{ .Values.clickhouse.auth.username }}"
       SECRETS_CLICKHOUSE_PASSWORD: "{{ .Values.clickhouse.auth.password }}"
       # ClickHouse TTL configuration for cluster metrics (in days)
@@ -444,6 +445,9 @@ microservices:
     image: budstudio/budnotify:0.5.0
     daprid: budnotify
     pubsubTopic: notificationMessages
+    env:
+      KEYCLOAK_URL: http://{{ .Release.Name }}-keycloak
+      KEYCLOAK_REALM: bud-keycloak
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration (fast scale-up for notifications)
@@ -823,7 +827,7 @@ otelCollector:
   enabled: true
   image:
     repository: otel/opentelemetry-collector-contrib
-    tag: 0.91.0
+    tag: 0.96.0
   replicas: 1
   logLevel: info
   debug: false
@@ -845,6 +849,10 @@ otelCollector:
     username: default
     password: ""
     ttl: 720h # 30 days - retention for raw OTel metrics (otel_metrics_*)
+  # Realtime streaming configuration (hot path to BudNotify)
+  realtime:
+    batchTimeout: 2s
+    batchSize: 10000
   # Optional node scheduling for OTel Collector
   nodeSelector: {}
   affinity: {}
@@ -902,8 +910,8 @@ prometheus-adapter:
       - seriesQuery: 'gateway_processing_seconds{quantile="0.95"}'
         resources:
           overrides:
-            pod: {resource: "pod"}
-            namespace: {resource: "namespace"}
+            pod: { resource: "pod" }
+            namespace: { resource: "namespace" }
         name:
           as: "gateway_processing_seconds_p95"
         metricsQuery: 'gateway_processing_seconds{quantile="0.95",<<.LabelMatchers>>}'
@@ -941,7 +949,7 @@ onyx:
         cpu: 8000m
         memory: 32000Mi
   nginx:
-    enabled: false  # Disabled - bud uses traefik for ingress
+    enabled: false # Disabled - bud uses traefik for ingress
   # Disable Onyx's own ingress (bud's traefik handles routing via ingress.yaml)
   # NOTE: Onyx uses global.ingress.hosts.root for domain configuration
   ingress:
@@ -979,8 +987,10 @@ onyx:
         KEYCLOAK_ADMIN_PASSWORD: keycloak_admin_password
         # Cookie secret for session encryption
         OAUTH_COOKIE_SECRET: oauth_cookie_secret
-        # NOTE: OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are NOT set here.
-        # Onyx auto-provisions 'onyx-client' at startup with directAccessGrantsEnabled.
+        # Explicitly disable these - Onyx auto-provisions 'onyx-client' at startup
+        # Setting to empty string prevents Helm deep-merge from including defaults
+        OAUTH_CLIENT_ID: ""
+        OAUTH_CLIENT_SECRET: ""
     smtp:
       enabled: false
   # ConfigMap overrides (template expressions are evaluated via tpl function)
@@ -999,7 +1009,7 @@ onyx:
     S3_FILE_STORE_BUCKET_NAME: "onyx-file-store-bucket"
     BUD_FOUNDRY_API_BASE: '{{ printf "https://gateway.%s" .Values.global.ingress.hosts.root }}/v1'
     BUD_FOUNDRY_APP_BASE: '{{ printf "https://app.%s" .Values.global.ingress.hosts.root }}'
-    OPENID_CONFIG_URL: 'http://{{ .Release.Name }}-keycloak/realms/bud-keycloak/.well-known/openid-configuration'
+    OPENID_CONFIG_URL: "http://{{ .Release.Name }}-keycloak/realms/bud-keycloak/.well-known/openid-configuration"
   # Component configurations
   webserver:
     replicaCount: 1

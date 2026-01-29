@@ -3241,6 +3241,8 @@ class ModelService(SessionMixin):
         chat_template: Optional[str] = None,
         supports_lora: Optional[bool] = None,
         supports_pipeline_parallelism: Optional[bool] = None,
+        callback_topic: Optional[str] = None,
+        simulator_id: Optional[UUID] = None,
     ) -> EndpointModel:
         """Create workflow steps and execute deployment workflow.
 
@@ -3339,6 +3341,8 @@ class ModelService(SessionMixin):
             chat_template=chat_template,
             supports_lora=supports_lora,
             supports_pipeline_parallelism=supports_pipeline_parallelism,
+            callback_topic=callback_topic,
+            simulator_id=simulator_id,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
         logger.info(f"[DEBUG] workflow_step_data budaiscaler: {workflow_step_data.get('budaiscaler_specification')}")
 
@@ -3440,41 +3444,52 @@ class ModelService(SessionMixin):
                 Model, {"id": model_id, "status": ModelStatusEnum.ACTIVE}
             )
 
-            # Skip cluster simulation for cloud models
+            # Skip cluster simulation for cloud models OR if simulator_id is already provided
+            # (e.g., from budpipeline which runs its own simulation with debug=True)
             if db_model.provider_type != ModelProviderTypeEnum.CLOUD_MODEL:
-                # Create next step from backend
-                # Increment workflow_current_step with 1
-                current_step_number = current_step_number + 1
-                workflow_current_step = current_step_number
+                if simulator_id:
+                    # Simulator ID already provided (e.g., from budpipeline's pre-run simulation)
+                    # Skip running a redundant simulation and use the existing simulator_id
+                    logger.info(f"Skipping cluster simulation - using provided simulator_id: {simulator_id}")
+                    recommended_cluster_events = {
+                        "simulator_id": str(simulator_id),
+                        "bud_simulator_events": {},  # No new events since we're reusing existing simulation
+                    }
+                else:
+                    # No simulator_id provided - run the simulation
+                    # Create next step from backend
+                    # Increment workflow_current_step with 1
+                    current_step_number = current_step_number + 1
+                    workflow_current_step = current_step_number
 
-                bud_simulator_events = await self._perform_cluster_simulation(
-                    db_workflow.id,
-                    deploy_config,
-                    current_user_id,
-                    db_model.uri,
-                    db_model.provider_type,
-                    db_model.local_path,
-                    workflow_hardware_mode,
-                    db_model.supported_endpoints,
-                )
-                simulator_id = bud_simulator_events.pop("workflow_id")
-                recommended_cluster_events = {
-                    "simulator_id": simulator_id,
-                    "bud_simulator_events": bud_simulator_events,
-                }
+                    bud_simulator_events = await self._perform_cluster_simulation(
+                        db_workflow.id,
+                        deploy_config,
+                        current_user_id,
+                        db_model.uri,
+                        db_model.provider_type,
+                        db_model.local_path,
+                        workflow_hardware_mode,
+                        db_model.supported_endpoints,
+                    )
+                    simulator_id = bud_simulator_events.pop("workflow_id")
+                    recommended_cluster_events = {
+                        "simulator_id": simulator_id,
+                        "bud_simulator_events": bud_simulator_events,
+                    }
 
-                # Update or create next workflow step
-                db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
-                    db_workflow.id, current_step_number, recommended_cluster_events
-                )
-                logger.debug(f"Workflow step updated {db_workflow_step.id}")
+                    # Update or create next workflow step
+                    db_workflow_step = await WorkflowStepService(self.session).create_or_update_next_workflow_step(
+                        db_workflow.id, current_step_number, recommended_cluster_events
+                    )
+                    logger.debug(f"Workflow step updated {db_workflow_step.id}")
 
-                # Update workflow progress
-                bud_simulator_events["progress_type"] = "bud_simulator_events"
-                db_workflow = await WorkflowDataManager(self.session).update_by_fields(
-                    db_workflow,
-                    {"progress": bud_simulator_events, "current_step": workflow_current_step},
-                )
+                    # Update workflow progress
+                    bud_simulator_events["progress_type"] = "bud_simulator_events"
+                    db_workflow = await WorkflowDataManager(self.session).update_by_fields(
+                        db_workflow,
+                        {"progress": bud_simulator_events, "current_step": workflow_current_step},
+                    )
             else:
                 logger.info(f"Skipping cluster simulation for cloud model: {db_model.id}")
 
@@ -3677,6 +3692,8 @@ class ModelService(SessionMixin):
             "/v1/audio/transcriptions": "AUDIO",
             "/v1/audio/translations": "AUDIO",
             "/v1/audio/speech": "AUDIO",
+            "/v1/classify": "CLASSIFY",
+            "/v1/rerank": "RERANK",
         }
         model_endpoints = None
         if supported_endpoints:

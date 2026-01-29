@@ -42,6 +42,10 @@ class PipelineResponse(BaseModel):
     step_count: int
     user_id: str | None = None
     system_owned: bool = False
+    description: str | None = None
+    dag: dict[str, Any] | None = None
+    execution_count: int = 0
+    last_execution_at: datetime | None = None
 
 
 # Backwards compatibility alias

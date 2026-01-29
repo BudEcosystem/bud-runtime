@@ -89,6 +89,7 @@ class HttpRequestExecutor(BaseActionExecutor):
         headers = context.params.get("headers", {})
         body = context.params.get("body")
         timeout = context.params.get("timeout_seconds", 30)
+        include_metadata = context.params.get("include_metadata", False)
 
         # SSRF protection: validate URL before making request
         is_safe, ssrf_error = is_safe_url(url)
@@ -116,12 +117,22 @@ class HttpRequestExecutor(BaseActionExecutor):
             url=url,
         )
 
+        # Optionally add workflow metadata to body
+        enriched_body = dict(body) if body else {}
+        if include_metadata:
+            enriched_body["_workflow_metadata"] = {
+                "execution_id": context.execution_id,
+                "step_id": context.step_id,
+            }
+
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.request(
                     method=method,
                     url=url,
-                    json=body if method in ["POST", "PUT", "PATCH"] and body else None,
+                    json=enriched_body
+                    if method in ["POST", "PUT", "PATCH"] and enriched_body
+                    else None,
                     headers=headers if headers else None,
                 )
 
@@ -208,7 +219,7 @@ META = ActionMeta(
     type="http_request",
     version="1.0.0",
     name="HTTP Request",
-    description="Makes HTTP requests to external APIs",
+    description="Makes HTTP requests to external APIs with optional workflow metadata",
     category="Integration",
     icon="globe",
     color="#8B5CF6",  # Purple
@@ -260,6 +271,13 @@ META = ActionMeta(
             description="Request timeout in seconds",
             default=30,
             validation=ValidationRules(min=1, max=300),
+        ),
+        ParamDefinition(
+            name="include_metadata",
+            label="Include Metadata",
+            type=ParamType.BOOLEAN,
+            description="Include workflow execution metadata in request body",
+            default=False,
         ),
     ],
     outputs=[

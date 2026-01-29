@@ -32,9 +32,13 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
   const hasAudioTranscription = selectedModel?.supported_endpoints?.audio_transcription?.enabled;
   const hasAudioSpeech = selectedModel?.supported_endpoints?.audio_speech?.enabled;
   const hasEmbeddingEndpoint = selectedModel?.supported_endpoints?.embedding?.enabled;
+  const hasClassifyEndpoint = selectedModel?.supported_endpoints?.classify?.enabled;
 
   // Hide for pure audio models (transcription/TTS) or embedding models that don't have chat/completion
   const hideContextSequence = (hasAudioTranscription || hasAudioSpeech || hasEmbeddingEndpoint) && !hasChatEndpoint && !hasCompletionEndpoint;
+
+  // Hide TTFT and throughput for embedding/classify-only models (these metrics don't apply)
+  const hideTTFTThroughput = (hasEmbeddingEndpoint || hasClassifyEndpoint) && !hasChatEndpoint && !hasCompletionEndpoint;
 
   // Compute max context length based on model architecture
   const getMaxContextLength = () => {
@@ -412,7 +416,7 @@ const DeploymentSpecificationConfig: React.FC = (props: {}) => {
           </div>
         </div>
         )}
-        {!isCloudModelFlow && hardwareMode === "dedicated" && !hideContextSequence && (
+        {!isCloudModelFlow && hardwareMode === "dedicated" && !hideContextSequence && !hideTTFTThroughput && (
           <>
             <div className="flex gap-[1rem] w-full flex-row">
               <div className="w-full">

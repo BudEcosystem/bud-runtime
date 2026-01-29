@@ -191,11 +191,18 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       hide: !enableDevMode,
     },
     {
+      label: "Tools",
+      route: "/tools",
+      iconSvg: true,
+      customSvg: "tools",
+      cmd: "H",
+    },
+    {
       label: "Pipelines",
       route: "/pipelines",
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
-      cmd: "w",
+      cmd: "J",
     },
   ]
 
@@ -464,7 +471,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
 
                   return (
                     <Link
-                      className="linkLink mb-[.5rem]"
+                      className="linkLink mb-[.3rem]"
                       key={tab.route}
                       href={tab.route}
                       passHref
@@ -502,6 +509,25 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
                                     d="M2 1.5C1.17157 1.5 0.5 2.17157 0.5 3V9C0.5 9.82843 1.17157 10.5 2 10.5H3.5V12.5C3.5 12.7761 3.72386 13 4 13C4.13807 13 4.26858 12.9414 4.35858 12.8414L6.70711 10.5H12C12.8284 10.5 13.5 9.82843 13.5 9V3C13.5 2.17157 12.8284 1.5 12 1.5H2ZM1.5 3C1.5 2.72386 1.72386 2.5 2 2.5H12C12.2761 2.5 12.5 2.72386 12.5 3V9C12.5 9.27614 12.2761 9.5 12 9.5H6.5C6.36193 9.5 6.23142 9.55858 6.14142 9.65858L4.5 11.2929V10C4.5 9.72386 4.27614 9.5 4 9.5H2C1.72386 9.5 1.5 9.27614 1.5 9V3ZM4 4.5C3.72386 4.5 3.5 4.72386 3.5 5C3.5 5.27614 3.72386 5.5 4 5.5H10C10.2761 5.5 10.5 5.27614 10.5 5C10.5 4.72386 10.2761 4.5 10 4.5H4ZM3.5 7C3.5 6.72386 3.72386 6.5 4 6.5H8C8.27614 6.5 8.5 6.72386 8.5 7C8.5 7.27614 8.27614 7.5 8 7.5H4C3.72386 7.5 3.5 7.27614 3.5 7Z"
                                     fill="currentColor"
                                   />
+                                </svg>
+                              ) : tab.customSvg === "tools" ? (
+                                // Wrench/Tool SVG for Tools
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className={classNames(
+                                    "w-[0.875em] h-[0.875em] 1920px:w-[1em] 1920px:h-[1em]",
+                                    (isHovered === tab.route || isActive) ? "stroke-[#EEEEEE]" : "stroke-[#B3B3B3]"
+                                  )}
+                                >
+                                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                                 </svg>
                               ) : (
                                 // Folder SVG for Observability

@@ -210,6 +210,10 @@ class AppConfig(BaseConfig):
     # Profiling
     profiler_enabled: bool = Field(False, alias="ENABLE_PROFILER")
 
+    # Keycloak settings for realtime auth
+    keycloak_url: Optional[str] = Field(None, alias="KEYCLOAK_URL")
+    keycloak_realm: str = Field("bud", alias="KEYCLOAK_REALM")
+
     pubsub_name: Optional[str] = None
     pubsub_topic: Optional[str] = None
     dead_letter_topic: Optional[str] = None

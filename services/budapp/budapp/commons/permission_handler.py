@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import WRAPPER_ASSIGNMENTS, update_wrapper, wraps
 from typing import Callable, List, Optional, Union
 
 from fastapi import Depends, HTTPException, status
@@ -236,7 +236,6 @@ def require_permissions_or_internal(
         roles = [roles]
 
     def decorator(func: Callable) -> Callable:
-        @wraps(func)
         async def wrapper(
             current_user: User = Depends(get_current_active_user_or_internal),
             session: Session = Depends(get_session),
@@ -326,6 +325,9 @@ def require_permissions_or_internal(
 
             return await func(current_user=current_user, session=session, *args, **kwargs)
 
+        # Copy function metadata without __wrapped__ to prevent FastAPI from using original signature
+        wrapper_assignments = tuple(a for a in WRAPPER_ASSIGNMENTS if a != "__wrapped__")
+        update_wrapper(wrapper, func, assigned=wrapper_assignments)
         return wrapper
 
     return decorator

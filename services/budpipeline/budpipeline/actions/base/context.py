@@ -71,16 +71,14 @@ class ActionContext:
             "Content-Type": "application/json",
         }
 
-        # Add tokens for authentication:
-        # 1. dapr-api-token: Used for Dapr sidecar authentication
-        # 2. x-app-api-token: Forwarded to target app for app-level internal auth
-        # (Dapr may consume dapr-api-token and not forward it, so we use x-app-api-token)
-        dapr_token = os.environ.get("DAPR_API_TOKEN")
-        app_token = os.environ.get("APP_API_TOKEN")
+        # Add dapr-api-token for Dapr sidecar authentication
+        # (required when target app has dapr.io/app-token-secret configured)
+        dapr_token = os.environ.get("DAPR_API_TOKEN") or os.environ.get("APP_API_TOKEN")
         if dapr_token:
             headers["dapr-api-token"] = dapr_token
-        if app_token:
-            headers["x-app-api-token"] = app_token
+            # Also add x-app-api-token which Dapr forwards to the target app
+            # (Dapr consumes dapr-api-token for auth but doesn't forward it)
+            headers["x-app-api-token"] = dapr_token
 
         # Use provided client or create a temporary one
         client = self._http_client

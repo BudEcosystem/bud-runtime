@@ -48,9 +48,21 @@ axiosInstance.defaults.paramsSerializer = {
 };
 
 let Token = null;
-let isRefreshing = false;
-let refreshSubscribers = [];
-let isRedirecting = false;
+export let isRefreshing = false;
+export let refreshSubscribers: ((token: string) => void)[] = [];
+export let isRedirecting = false;
+
+export const setIsRefreshing = (value: boolean) => {
+  isRefreshing = value;
+};
+
+export const setIsRedirecting = (value: boolean) => {
+  isRedirecting = value;
+};
+
+export const clearRefreshSubscribers = () => {
+  refreshSubscribers = [];
+};
 
 if (typeof window !== "undefined") {
   Token = localStorage.getItem("access_token");
@@ -263,15 +275,15 @@ const handleErrorResponse = (err) => {
   }
 };
 
-const onRrefreshed = (token) => {
+export const onRrefreshed = (token) => {
   refreshSubscribers.map((callback) => callback(token));
 };
 
-const subscribeTokenRefresh = (callback) => {
+export const subscribeTokenRefresh = (callback) => {
   refreshSubscribers.push(callback);
 };
 
-const refreshToken = async () => {
+export const refreshToken = async () => {
   try {
     const response = await axiosInstance.post("auth/refresh-token", {
       refresh_token: localStorage.getItem("refresh_token"),

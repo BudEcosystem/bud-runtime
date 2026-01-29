@@ -2038,24 +2038,25 @@ class ClusterService(SessionMixin):
                 over_all_throughput_data = None
                 e2e_latency_data = None
             else:
-                # calculate ttft
-                ttft_data = {
-                    "label": await get_range_label(
-                        recommended_cluster_data["metrics"]["ttft"],
-                        deploy_config.ttft,
-                        higher_is_better=False,
-                    ),
-                    "value": recommended_cluster_data["metrics"]["ttft"],
-                }
+                # calculate ttft - only calculate label if target is set
+                ttft_value = recommended_cluster_data["metrics"]["ttft"]
+                if deploy_config.ttft is not None:
+                    ttft_data = {
+                        "label": await get_range_label(ttft_value, deploy_config.ttft, higher_is_better=False),
+                        "value": ttft_value,
+                    }
+                else:
+                    ttft_data = {"label": None, "value": ttft_value}
 
-                # calculate per_session_tokens_per_sec
-                per_session_tokens_per_sec_data = {
-                    "label": await get_range_label(
-                        recommended_cluster_data["metrics"]["throughput_per_user"],
-                        deploy_config.per_session_tokens_per_sec,
-                    ),
-                    "value": recommended_cluster_data["metrics"]["throughput_per_user"],
-                }
+                # calculate per_session_tokens_per_sec - only calculate label if target is set
+                throughput_value = recommended_cluster_data["metrics"]["throughput_per_user"]
+                if deploy_config.per_session_tokens_per_sec is not None:
+                    per_session_tokens_per_sec_data = {
+                        "label": await get_range_label(throughput_value, deploy_config.per_session_tokens_per_sec),
+                        "value": throughput_value,
+                    }
+                else:
+                    per_session_tokens_per_sec_data = {"label": None, "value": throughput_value}
 
                 # calculate overall throughput
                 over_all_throughput = (
@@ -2069,15 +2070,17 @@ class ClusterService(SessionMixin):
                     "value": over_all_throughput,
                 }
 
-                # calculate e2e_latency
-                e2e_latency_data = {
-                    "label": await get_range_label(
-                        recommended_cluster_data["metrics"]["e2e_latency"],
-                        deploy_config.e2e_latency,
-                        higher_is_better=False,
-                    ),
-                    "value": recommended_cluster_data["metrics"]["e2e_latency"],
-                }
+                # calculate e2e_latency - only calculate label if target is set
+                e2e_latency_value = recommended_cluster_data["metrics"]["e2e_latency"]
+                if deploy_config.e2e_latency is not None:
+                    e2e_latency_data = {
+                        "label": await get_range_label(
+                            e2e_latency_value, deploy_config.e2e_latency, higher_is_better=False
+                        ),
+                        "value": e2e_latency_value,
+                    }
+                else:
+                    e2e_latency_data = {"label": None, "value": e2e_latency_value}
 
             # cost per million tokens
             cost_per_million_tokens = recommended_cluster_data["metrics"]["cost_per_million_tokens"]

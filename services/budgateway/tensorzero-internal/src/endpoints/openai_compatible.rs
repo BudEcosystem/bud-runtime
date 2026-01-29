@@ -933,11 +933,23 @@ pub async fn inference_handler(
 
             // Record ModelInferenceDetails for success
             if let Some(ref obs_metadata) = observability_metadata {
-                let inference_id = match &result {
-                    InferenceResult::Chat(chat_result) => chat_result.inference_id,
-                    InferenceResult::Json(json_result) => json_result.inference_id,
-                    _ => uuid::Uuid::nil(),
+                let (inference_id, usage) = match &result {
+                    InferenceResult::Chat(chat_result) => {
+                        (chat_result.inference_id, &chat_result.usage)
+                    }
+                    InferenceResult::Json(json_result) => {
+                        (json_result.inference_id, &json_result.usage)
+                    }
+                    _ => (
+                        uuid::Uuid::nil(),
+                        &crate::inference::types::Usage::default(),
+                    ),
                 };
+
+                // Calculate cost from usage and model pricing
+                let model_pricing = write_info.as_ref().and_then(|wi| wi.model_pricing.as_ref());
+                let cost = super::observability::calculate_cost(usage, model_pricing);
+
                 let request_forward_time = chrono::Utc::now();
                 super::observability::record_model_inference_details(
                     &inference_id,
@@ -947,7 +959,7 @@ pub async fn inference_handler(
                     true, // is_success
                     request_arrival_time,
                     request_forward_time,
-                    None, // cost - could be calculated from usage if pricing available
+                    cost,
                     obs_metadata.api_key_id.as_deref(),
                     obs_metadata.user_id.as_deref(),
                     obs_metadata.api_key_project_id.as_deref(),
@@ -1424,7 +1436,11 @@ pub async fn inference_handler(
                 }
             }
 
-            // Create the stream with usage tracking
+            // Capture the current span before returning from handler
+            // This ensures the span stays alive until streaming completes
+            let observability_span = tracing::Span::current();
+
+            // Create the stream with usage tracking and observability
             let openai_compatible_stream =
                 prepare_serialized_openai_compatible_events_with_usage_tracking(
                     processed_stream,
@@ -1432,6 +1448,10 @@ pub async fn inference_handler(
                     stream_options,
                     usage_limiter_for_tracking,
                     headers_for_tracking,
+                    observability_metadata.clone(),
+                    model_pricing.clone(),
+                    Some(request_arrival_time),
+                    Some(observability_span),
                 );
 
             let mut response = Sse::new(openai_compatible_stream)
@@ -2801,6 +2821,12 @@ struct OpenAICompatibleStreamProcessor {
     stream_options: Option<OpenAICompatibleStreamOptions>,
     usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
     headers: Option<HeaderMap>,
+    // Observability fields for recording inference details after stream completes
+    observability_metadata: Option<super::inference::ObservabilityMetadata>,
+    model_pricing: Option<crate::model::ModelPricing>,
+    request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
+    // Captured span from handler to ensure Span::current() works correctly in streaming
+    observability_span: Option<tracing::Span>,
 }
 
 impl OpenAICompatibleStreamProcessor {
@@ -2815,6 +2841,10 @@ impl OpenAICompatibleStreamProcessor {
             stream_options,
             usage_limiter: None,
             headers: None,
+            observability_metadata: None,
+            model_pricing: None,
+            request_arrival_time: None,
+            observability_span: None,
         }
     }
 
@@ -2824,6 +2854,10 @@ impl OpenAICompatibleStreamProcessor {
         stream_options: Option<OpenAICompatibleStreamOptions>,
         usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
         headers: HeaderMap,
+        observability_metadata: Option<super::inference::ObservabilityMetadata>,
+        model_pricing: Option<crate::model::ModelPricing>,
+        request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
+        observability_span: Option<tracing::Span>,
     ) -> Self {
         Self {
             stream,
@@ -2831,6 +2865,10 @@ impl OpenAICompatibleStreamProcessor {
             stream_options,
             usage_limiter,
             headers: Some(headers),
+            observability_metadata,
+            model_pricing,
+            request_arrival_time,
+            observability_span,
         }
     }
 }
@@ -2966,6 +3004,41 @@ impl OpenAICompatibleStreamProcessor {
                     }
                 }
             }
+
+            // Record model inference details for observability (streaming case)
+            if let Some(ref obs_metadata) = self.observability_metadata {
+                if let Some(inference_id) = inference_id {
+                    // Enter the captured span context so Span::current() works correctly
+                    // This is necessary because the handler has already returned and the original
+                    // span context is no longer active when this code runs asynchronously
+                    let _span_guard = self.observability_span.as_ref().map(|s| s.enter());
+
+                    // Calculate cost from accumulated usage
+                    let usage = crate::inference::types::Usage {
+                        input_tokens: total_usage.prompt_tokens as u32,
+                        output_tokens: total_usage.completion_tokens as u32,
+                    };
+                    let cost = super::observability::calculate_cost(&usage, self.model_pricing.as_ref());
+
+                    let request_forward_time = chrono::Utc::now();
+                    let request_arrival_time = self.request_arrival_time.unwrap_or_else(chrono::Utc::now);
+
+                    super::observability::record_model_inference_details(
+                        &inference_id,
+                        &obs_metadata.project_id,
+                        &obs_metadata.endpoint_id,
+                        &obs_metadata.model_id,
+                        !stream_terminated_early, // is_success
+                        request_arrival_time,
+                        request_forward_time,
+                        cost,
+                        obs_metadata.api_key_id.as_deref(),
+                        obs_metadata.user_id.as_deref(),
+                        obs_metadata.api_key_project_id.as_deref(),
+                        None, // no error for success
+                    );
+                }
+            }
         }
     }
 }
@@ -2987,6 +3060,10 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
     stream_options: Option<OpenAICompatibleStreamOptions>,
     usage_limiter: Option<Arc<crate::usage_limit::UsageLimiter>>,
     headers: HeaderMap,
+    observability_metadata: Option<super::inference::ObservabilityMetadata>,
+    model_pricing: Option<crate::model::ModelPricing>,
+    request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
+    observability_span: Option<tracing::Span>,
 ) -> impl Stream<Item = Result<Event, Error>> {
     OpenAICompatibleStreamProcessor::with_usage_tracking(
         stream,
@@ -2994,6 +3071,10 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
         stream_options,
         usage_limiter,
         headers,
+        observability_metadata,
+        model_pricing,
+        request_arrival_time,
+        observability_span,
     )
     .process_stream()
 }
@@ -3236,6 +3317,53 @@ struct OpenAICompatibleCompletionLogProbs {
     text_offset: Vec<u32>,
 }
 
+/// A handler for the OpenAI-compatible completion endpoint
+#[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "completion_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "completion_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // CompletionInference request fields
+        completion_inference.model = tracing::field::Empty,
+        completion_inference.max_tokens = tracing::field::Empty,
+        completion_inference.temperature = tracing::field::Empty,
+        completion_inference.stream = tracing::field::Empty,
+        // CompletionInference response fields
+        completion_inference.id = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.output_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.ttft_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.finish_reason = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn completion_handler(
     State(AppStateData {
         config,
@@ -3516,7 +3644,9 @@ struct ParsedEmbeddingResponseMetadata {
     data: Vec<ParsedEmbeddingData>,
 }
 
-fn parse_embedding_response_metadata(raw_response: &str) -> Option<ParsedEmbeddingResponseMetadata> {
+fn parse_embedding_response_metadata(
+    raw_response: &str,
+) -> Option<ParsedEmbeddingResponseMetadata> {
     let value: Value = serde_json::from_str(raw_response).ok()?;
     let object = value.as_object()?;
 
@@ -3553,6 +3683,46 @@ fn parse_embedding_response_metadata(raw_response: &str) -> Option<ParsedEmbeddi
         extra,
         data,
     })
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OpenAICompatibleClassifyParams {
+    pub input: Vec<String>,
+    #[serde(default = "default_classify_model")]
+    pub model: String,
+    #[serde(default)]
+    pub raw_scores: bool,
+    /// Priority level (high/normal/low) - forwarded to provider
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    #[serde(flatten)]
+    pub unknown_fields: HashMap<String, Value>,
+}
+
+fn default_classify_model() -> String {
+    "default/not-specified".to_string()
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenAICompatibleClassifyUsage {
+    prompt_tokens: u32,
+    total_tokens: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenAICompatibleClassifyObject {
+    score: f32,
+    label: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct OpenAICompatibleClassifyResponse {
+    object: String,
+    data: Vec<Vec<OpenAICompatibleClassifyObject>>,
+    model: String,
+    usage: OpenAICompatibleClassifyUsage,
+    id: String,
+    created: u64,
 }
 
 fn parse_embedding_data(value: &Value) -> ParsedEmbeddingData {
@@ -3668,6 +3838,58 @@ pub async fn list_models(
 
 /// A handler for the OpenAI-compatible embedding endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "embedding_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "embedding_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // EmbeddingInference request fields
+        embedding_inference.model = tracing::field::Empty,
+        embedding_inference.input_count = tracing::field::Empty,
+        embedding_inference.dimensions = tracing::field::Empty,
+        embedding_inference.encoding_format = tracing::field::Empty,
+        embedding_inference.processing_time_ms = tracing::field::Empty,
+        // EmbeddingInference response fields
+        embedding_inference.id = tracing::field::Empty,
+        embedding_inference.embedding_count = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.id = tracing::field::Empty,
+        model_inference.raw_request = tracing::field::Empty,
+        model_inference.raw_response = tracing::field::Empty,
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        model_inference.gateway_request = tracing::field::Empty,
+        model_inference.gateway_response = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.request_ip = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.request_arrival_time = tracing::field::Empty,
+        model_inference_details.request_forward_time = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn embedding_handler(
     State(AppStateData {
         config,
@@ -3682,6 +3904,13 @@ pub async fn embedding_handler(
     headers: HeaderMap,
     StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleEmbeddingParams>,
 ) -> Result<Response<Body>, Error> {
+    // Capture start time for processing time calculation
+    let start_time = std::time::Instant::now();
+    let request_arrival_time = chrono::Utc::now();
+
+    // Extract observability metadata from headers (for inference_id tracking in OTel)
+    let obs_metadata = extract_observability_metadata_from_headers(&headers);
+
     // Log any extra/unknown fields that will be forwarded to provider
     if !openai_compatible_params.extra.is_empty() {
         tracing::debug!(
@@ -3705,8 +3934,20 @@ pub async fn embedding_handler(
 
     let original_model_name = model_resolution.original_model_name.to_string();
 
+    // Record embedding request for observability
+    let input_count = match &openai_compatible_params.input {
+        OpenAICompatibleEmbeddingInput::Single(_) => 1,
+        OpenAICompatibleEmbeddingInput::Batch(texts) => texts.len(),
+    };
+    super::observability::record_embedding_request(
+        &original_model_name,
+        input_count,
+        openai_compatible_params.dimensions,
+        openai_compatible_params.encoding_format.as_deref(),
+    );
+
     // Convert OpenAI request to internal format
-    let internal_input = match &openai_compatible_params.input {
+    let raw_input = match &openai_compatible_params.input {
         OpenAICompatibleEmbeddingInput::Single(text) => {
             crate::embeddings::EmbeddingInput::Single(text.clone())
         }
@@ -3720,8 +3961,25 @@ pub async fn embedding_handler(
         }
     };
 
+    // Validate input for the specified modality
+    raw_input
+        .validate_for_modality(openai_compatible_params.modality.as_deref())
+        .map_err(|e| {
+            Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+                message: e,
+            })
+        })?;
+
+    // Process multimodal inputs (fetch URLs for image/audio modality)
+    let internal_input = crate::embeddings::multimodal::process_inputs_for_modality(
+        &http_client,
+        &raw_input,
+        openai_compatible_params.modality.as_deref(),
+    )
+    .await?;
+
     // Capture the gateway request (without null values)
-    let _gateway_request = serialize_without_nulls(&openai_compatible_params).ok();
+    let gateway_request_json = serialize_without_nulls(&openai_compatible_params).ok();
 
     // Create embedding request with all extended parameters
     let mut extra = openai_compatible_params.extra.clone();
@@ -3776,6 +4034,61 @@ pub async fn embedding_handler(
     let response = model
         .embed(&embedding_request, &original_model_name, &clients)
         .await?;
+
+    // Calculate response time for observability
+    let response_time_ms = match &response.latency {
+        crate::inference::types::Latency::NonStreaming { response_time } => {
+            response_time.as_millis() as u64
+        }
+        _ => 0,
+    };
+
+    // Create inference_id early so it can be used in both OTel tracing and ClickHouse
+    let inference_id = Uuid::now_v7();
+
+    // Record embedding response for observability
+    super::observability::record_embedding_response(
+        &response.id.to_string(),
+        response.embeddings.len(),
+        &original_model_name,
+        response.usage.input_tokens,
+        response_time_ms,
+    );
+
+    // Record raw request/response to OTel span for the materialized view
+    {
+        let span = tracing::Span::current();
+        span.record("model_inference.raw_request", response.raw_request.as_str());
+        span.record("model_inference.raw_response", response.raw_response.as_str());
+        // Record gateway_request (the user-facing request)
+        if let Some(ref gw_req) = gateway_request_json {
+            span.record("model_inference.gateway_request", gw_req.as_str());
+        }
+    }
+
+    // Record model inference details for OTel if observability metadata is present
+    // This populates model_inference_details.inference_id for the materialized view
+    if let Some(ref obs_metadata) = obs_metadata {
+        let request_forward_time = chrono::Utc::now();
+        super::observability::record_model_inference_details(
+            &inference_id,
+            &obs_metadata.project_id,
+            &obs_metadata.endpoint_id,
+            &obs_metadata.model_id,
+            true, // is_success
+            request_arrival_time,
+            request_forward_time,
+            None, // cost - embeddings don't have cost calculation yet
+            obs_metadata.api_key_id.as_deref(),
+            obs_metadata.user_id.as_deref(),
+            obs_metadata.api_key_project_id.as_deref(),
+            None, // no error for success
+        );
+    }
+
+    // Record processing time
+    let processing_time_ms = start_time.elapsed().as_millis() as u64;
+    super::observability::record_embedding_processing_time(processing_time_ms);
 
     // Convert to OpenAI-compatible format, including provider pass-through metadata when present
     let parsed_metadata = parse_embedding_response_metadata(&response.raw_response);
@@ -3832,13 +4145,16 @@ pub async fn embedding_handler(
     };
 
     // Capture the gateway response (without null values)
-    let gateway_response = serialize_without_nulls(&openai_response).ok();
+    let gateway_response_json = serialize_without_nulls(&openai_response).ok();
+
+    // Record gateway_response to OTel span for the materialized view
+    if let Some(ref gw_resp) = gateway_response_json {
+        let span = tracing::Span::current();
+        span.record("model_inference.gateway_response", gw_resp.as_str());
+    }
 
     // Write to observability database if enabled
     if config.gateway.observability.enabled.unwrap_or(true) {
-        // Create the InferenceResult for observability
-        let inference_id = Uuid::now_v7();
-
         // Create a ModelInferenceResponseWithMetadata for the embedding
         let model_inference = crate::inference::types::ModelInferenceResponseWithMetadata {
             id: Uuid::now_v7(),
@@ -3957,8 +4273,8 @@ pub async fn embedding_handler(
         let config_clone = config.clone();
         let clickhouse_info = clickhouse_connection_info.clone();
         let kafka_info = kafka_connection_info.clone();
-        let gateway_request_json = _gateway_request;
-        let gateway_response_json = gateway_response.clone();
+        let gateway_request_for_write = gateway_request_json.clone();
+        let gateway_response_for_write = gateway_response_json.clone();
         let async_writes = config.gateway.observability.async_writes;
         let model_pricing = model.pricing.clone();
         let inference_batcher_clone = inference_batcher.clone();
@@ -3972,8 +4288,8 @@ pub async fn embedding_handler(
                 result,
                 metadata,
                 observability_metadata,
-                gateway_request_json,
-                gateway_response_json,
+                gateway_request_for_write,
+                gateway_response_for_write,
                 model_pricing,
                 None, // No guardrail records for embeddings
                 inference_batcher_clone.as_ref(),
@@ -3988,6 +4304,243 @@ pub async fn embedding_handler(
                 })
             })?;
         }
+    }
+
+    Ok(Json(openai_response).into_response())
+}
+
+/// A handler for the /v1/classify endpoint
+#[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "classify_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "classify_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ClassifyInference request fields
+        classify_inference.model = tracing::field::Empty,
+        classify_inference.input_count = tracing::field::Empty,
+        classify_inference.raw_scores = tracing::field::Empty,
+        classify_inference.processing_time_ms = tracing::field::Empty,
+        // ClassifyInference response fields
+        classify_inference.id = tracing::field::Empty,
+        classify_inference.label_count = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.id = tracing::field::Empty,
+        model_inference.raw_request = tracing::field::Empty,
+        model_inference.raw_response = tracing::field::Empty,
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.model_provider_name = tracing::field::Empty,
+        model_inference.input_tokens = tracing::field::Empty,
+        model_inference.output_tokens = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.cached = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        model_inference.gateway_request = tracing::field::Empty,
+        model_inference.gateway_response = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.request_ip = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.request_arrival_time = tracing::field::Empty,
+        model_inference_details.request_forward_time = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
+pub async fn classify_handler(
+    State(AppStateData {
+        config,
+        http_client,
+        clickhouse_connection_info,
+        authentication_info: _,
+        model_credential_store,
+        inference_batcher: _,
+        ..
+    }): AppState,
+    headers: HeaderMap,
+    StructuredJson(openai_compatible_params): StructuredJson<OpenAICompatibleClassifyParams>,
+) -> Result<Response<Body>, Error> {
+    // Capture start time for processing time calculation
+    let start_time = std::time::Instant::now();
+    let request_arrival_time = chrono::Utc::now();
+
+    // Extract observability metadata from headers (for inference_id tracking in OTel)
+    let obs_metadata = extract_observability_metadata_from_headers(&headers);
+
+    if !openai_compatible_params.unknown_fields.is_empty() {
+        tracing::debug!(
+            "Ignoring unknown fields in classify request: {:?}",
+            openai_compatible_params
+                .unknown_fields
+                .keys()
+                .collect::<Vec<_>>()
+        );
+    }
+
+    if openai_compatible_params.input.is_empty() {
+        return Err(Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Classification input cannot be empty.".to_string(),
+        }));
+    }
+
+    let model_resolution = model_resolution::resolve_model_name(
+        Some(&openai_compatible_params.model),
+        &headers,
+        true,
+    )?;
+
+    let model_id = model_resolution.model_name.ok_or_else(|| {
+        Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
+            message: "Classification requests must specify a model, not a function.".to_string(),
+        })
+    })?;
+
+    let original_model_name = model_resolution.original_model_name.to_string();
+
+    // Capture the gateway request (without null values)
+    let gateway_request_json = serialize_without_nulls(&openai_compatible_params).ok();
+
+    // Record classify request for observability
+    super::observability::record_classify_request(
+        &original_model_name,
+        openai_compatible_params.input.len(),
+        openai_compatible_params.raw_scores,
+    );
+
+    let classify_request = crate::classification::ClassificationRequest {
+        input: openai_compatible_params.input.clone(),
+        raw_scores: openai_compatible_params.raw_scores,
+        priority: openai_compatible_params.priority.clone(),
+    };
+
+    use crate::model::ModelTableExt;
+    let models = config.models.read().await;
+    let model = models
+        .get_with_capability(
+            &model_id,
+            crate::endpoints::capability::EndpointCapability::Classify,
+        )
+        .await?
+        .ok_or_else(|| {
+            Error::new(ErrorDetails::Config {
+                message: format!(
+                    "Model '{original_model_name}' not found or does not support classification"
+                ),
+            })
+        })?;
+
+    let credentials = merge_credentials_from_store(&model_credential_store);
+    let cache_options: crate::cache::CacheOptions =
+        (crate::cache::CacheParamsOptions::default(), false).into();
+    let clients = super::inference::InferenceClients {
+        http_client: &http_client,
+        credentials: &credentials,
+        clickhouse_connection_info: &clickhouse_connection_info,
+        cache_options: &cache_options,
+    };
+
+    let response = model
+        .classify(&classify_request, &original_model_name, &clients)
+        .await?;
+
+    // Calculate processing time for observability
+    let processing_time_ms = start_time.elapsed().as_millis() as u64;
+
+    // Create inference_id for classify (used for both response ID and observability)
+    let inference_id = Uuid::now_v7();
+    let response_id = format!("infinity-{}", inference_id);
+
+    // Count total labels in response
+    let label_count: usize = response.data.iter().map(|labels| labels.len()).sum();
+
+    // Record classify response for observability
+    super::observability::record_classify_response(
+        &response_id,
+        label_count,
+        &original_model_name,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        processing_time_ms,
+    );
+
+    // Record processing time
+    super::observability::record_classify_processing_time(processing_time_ms);
+
+    // Record raw request/response to OTel span for the materialized view
+    {
+        let span = tracing::Span::current();
+        span.record("model_inference.raw_request", response.raw_request.as_str());
+        span.record("model_inference.raw_response", response.raw_response.as_str());
+        // Record gateway_request (the user-facing request)
+        if let Some(ref gw_req) = gateway_request_json {
+            span.record("model_inference.gateway_request", gw_req.as_str());
+        }
+    }
+
+    // Record model inference details for OTel if observability metadata is present
+    // This populates model_inference_details fields including model_id for the materialized view
+    if let Some(ref obs_metadata) = obs_metadata {
+        let request_forward_time = chrono::Utc::now();
+        super::observability::record_model_inference_details(
+            &inference_id,
+            &obs_metadata.project_id,
+            &obs_metadata.endpoint_id,
+            &obs_metadata.model_id,
+            true, // is_success
+            request_arrival_time,
+            request_forward_time,
+            None, // cost - classify doesn't have cost calculation yet
+            obs_metadata.api_key_id.as_deref(),
+            obs_metadata.user_id.as_deref(),
+            obs_metadata.api_key_project_id.as_deref(),
+            None, // no error for success
+        );
+    }
+
+    let openai_response = OpenAICompatibleClassifyResponse {
+        object: "classify".to_string(),
+        data: response
+            .data
+            .into_iter()
+            .map(|labels| {
+                labels
+                    .into_iter()
+                    .map(|item| OpenAICompatibleClassifyObject {
+                        score: item.score,
+                        label: item.label,
+                    })
+                    .collect()
+            })
+            .collect(),
+        model: original_model_name.clone(),
+        usage: OpenAICompatibleClassifyUsage {
+            prompt_tokens: response.usage.input_tokens,
+            total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+        },
+        id: response_id,
+        created: crate::inference::types::current_timestamp(),
+    };
+
+    // Capture and record the gateway response (without null values)
+    if let Some(gateway_response_json) = serialize_without_nulls(&openai_response).ok() {
+        let span = tracing::Span::current();
+        span.record("model_inference.gateway_response", gateway_response_json.as_str());
     }
 
     Ok(Json(openai_response).into_response())
@@ -4020,6 +4573,41 @@ pub struct OpenAICompatibleModerationResponse {
 
 /// A handler for the OpenAI-compatible moderation endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "moderation_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "moderation_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ModerationInference fields
+        moderation_inference.model = tracing::field::Empty,
+        moderation_inference.input_count = tracing::field::Empty,
+        moderation_inference.id = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn moderation_handler(
     State(AppStateData {
         config,
@@ -4717,6 +5305,45 @@ pub struct OpenAICompatibleSegmentTimestamp {
 
 /// A handler for the OpenAI-compatible audio transcription endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "audio_transcription_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "audio_transcription_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // AudioInference fields
+        audio_inference.model = tracing::field::Empty,
+        audio_inference.id = tracing::field::Empty,
+        audio_inference.language = tracing::field::Empty,
+        audio_inference.detected_language = tracing::field::Empty,
+        audio_inference.response_format = tracing::field::Empty,
+        audio_inference.duration_seconds = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn audio_transcription_handler(
     State(AppStateData {
         config,
@@ -4947,6 +5574,43 @@ pub async fn audio_transcription_handler(
 
 /// A handler for the OpenAI-compatible audio translation endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "audio_translation_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "audio_translation_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // AudioInference fields
+        audio_inference.model = tracing::field::Empty,
+        audio_inference.id = tracing::field::Empty,
+        audio_inference.response_format = tracing::field::Empty,
+        audio_inference.duration_seconds = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn audio_translation_handler(
     State(AppStateData {
         config,
@@ -5115,6 +5779,44 @@ pub async fn audio_translation_handler(
 
 /// A handler for the OpenAI-compatible text-to-speech endpoint
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "text_to_speech_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "text_to_speech_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // AudioInference fields
+        audio_inference.model = tracing::field::Empty,
+        audio_inference.id = tracing::field::Empty,
+        audio_inference.voice = tracing::field::Empty,
+        audio_inference.response_format = tracing::field::Empty,
+        audio_inference.character_count = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn text_to_speech_handler(
     State(AppStateData {
         config,
@@ -5280,6 +5982,39 @@ pub async fn text_to_speech_handler(
 
 /// Handler for creating realtime sessions
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "realtime_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "realtime_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // RealtimeInference fields
+        realtime_inference.model = tracing::field::Empty,
+        realtime_inference.id = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn realtime_session_handler(
     State(AppStateData {
         config,
@@ -5365,6 +6100,39 @@ pub async fn realtime_session_handler(
 
 /// Handler for creating realtime transcription sessions
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "realtime_transcription_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "realtime_transcription_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // RealtimeInference fields
+        realtime_inference.model = tracing::field::Empty,
+        realtime_inference.id = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn realtime_transcription_session_handler(
     State(AppStateData {
         config,
@@ -5606,6 +6374,46 @@ use crate::images::*;
 
 /// Handler for image generation (POST /v1/images/generations)
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "image_generation_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "image_generation_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ImageInference fields
+        image_inference.model = tracing::field::Empty,
+        image_inference.id = tracing::field::Empty,
+        image_inference.n = tracing::field::Empty,
+        image_inference.size = tracing::field::Empty,
+        image_inference.quality = tracing::field::Empty,
+        image_inference.style = tracing::field::Empty,
+        image_inference.images_generated = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn image_generation_handler(
     State(AppStateData {
         config,
@@ -5934,6 +6742,44 @@ pub async fn image_generation_handler(
 
 /// Handler for image editing (POST /v1/images/edits)
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "image_edit_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "image_edit_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ImageInference fields
+        image_inference.model = tracing::field::Empty,
+        image_inference.id = tracing::field::Empty,
+        image_inference.n = tracing::field::Empty,
+        image_inference.size = tracing::field::Empty,
+        image_inference.images_generated = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn image_edit_handler(
     State(AppStateData {
         config,
@@ -6104,6 +6950,44 @@ pub async fn image_edit_handler(
 
 /// Handler for image variations (POST /v1/images/variations)
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "image_variation_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "image_variation_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ImageInference fields
+        image_inference.model = tracing::field::Empty,
+        image_inference.id = tracing::field::Empty,
+        image_inference.n = tracing::field::Empty,
+        image_inference.size = tracing::field::Empty,
+        image_inference.images_generated = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn image_variation_handler(
     State(AppStateData {
         config,
@@ -6669,6 +7553,10 @@ pub async fn response_create_handler(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
+    // Extract baggage data from headers for downstream propagation
+    // The auth middleware has already set x-tensorzero-* headers with business context
+    let baggage_data = crate::baggage::BaggageData::from_headers(&headers);
+
     // Capture usage tokens for analytics (will be populated inside async block)
     // Format: (input_tokens, output_tokens, total_tokens)
     let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
@@ -6774,6 +7662,7 @@ pub async fn response_create_handler(
                 &params,
                 &model_resolution.original_model_name,
                 &clients,
+                Some(&baggage_data),
             )
             .await?;
 
@@ -6866,7 +7755,7 @@ pub async fn response_create_handler(
 
             // Handle streaming response
             let stream = model
-                .stream_response(&params, &model_resolution.original_model_name, &clients)
+                .stream_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
 
             // Wrap stream to capture events and record observability after completion
@@ -6931,7 +7820,7 @@ pub async fn response_create_handler(
         } else {
             // Handle non-streaming response
             let response = model
-                .create_response(&params, &model_resolution.original_model_name, &clients)
+                .create_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
 
             // Log the response size for debugging
@@ -6964,32 +7853,44 @@ pub async fn response_create_handler(
     let add_analytics_headers = |response: &mut Response<Body>| {
         if let Some(ref id) = prompt_id {
             if let Ok(value) = axum::http::HeaderValue::from_str(id) {
-                response.headers_mut().insert("x-tensorzero-prompt-id", value);
+                response
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-id", value);
             }
         }
         if let Some(ref version) = prompt_version {
             if let Ok(value) = axum::http::HeaderValue::from_str(version) {
-                response.headers_mut().insert("x-tensorzero-prompt-version", value);
+                response
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-version", value);
             }
         }
         if let Some(ref pid) = project_id {
             if let Ok(value) = axum::http::HeaderValue::from_str(pid) {
-                response.headers_mut().insert("x-tensorzero-project-id", value);
+                response
+                    .headers_mut()
+                    .insert("x-tensorzero-project-id", value);
             }
         }
         // Add usage token headers if available (for /v1/responses success responses)
         if let Ok(guard) = captured_usage.lock() {
             if let Some((input_tokens, output_tokens, total_tokens)) = *guard {
                 if let Ok(value) = axum::http::HeaderValue::from_str(&input_tokens.to_string()) {
-                    response.headers_mut().insert("x-tensorzero-input-tokens", value);
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-input-tokens", value);
                 }
                 if let Some(output) = output_tokens {
                     if let Ok(value) = axum::http::HeaderValue::from_str(&output.to_string()) {
-                        response.headers_mut().insert("x-tensorzero-output-tokens", value);
+                        response
+                            .headers_mut()
+                            .insert("x-tensorzero-output-tokens", value);
                     }
                 }
                 if let Ok(value) = axum::http::HeaderValue::from_str(&total_tokens.to_string()) {
-                    response.headers_mut().insert("x-tensorzero-total-tokens", value);
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-total-tokens", value);
                 }
             }
         }
@@ -9396,7 +10297,24 @@ struct AnthropicMetadata {
 }
 
 /// Handler for Anthropic Messages API compatibility
+/// Note: This handler delegates to inference_handler, which already has observability instrumentation
+/// The anthropic_handler_observability span wraps the outer conversion layer
 #[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "anthropic_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "anthropic_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // ModelInference fields (delegated to inference_handler)
+        model_inference.endpoint_type = tracing::field::Empty,
+    )
+)]
 pub async fn anthropic_messages_handler(
     State(app_state): AppState,
     analytics: Option<Extension<Arc<tokio::sync::Mutex<RequestAnalytics>>>>,
@@ -9832,6 +10750,43 @@ fn convert_openai_chunk_to_anthropic(openai_chunk: Value) -> Value {
 
 // Document processing handler
 /// Handler for document processing (POST /v1/documents)
+#[debug_handler(state = AppStateData)]
+#[tracing::instrument(
+    name = "document_handler_observability",
+    skip_all,
+    fields(
+        otel.name = "document_handler_observability",
+        // OpenTelemetry error status fields
+        otel.status_code = tracing::field::Empty,
+        otel.status_description = tracing::field::Empty,
+        // Error details fields
+        error.type = tracing::field::Empty,
+        error.message = tracing::field::Empty,
+        // DocumentInference fields
+        document_inference.model = tracing::field::Empty,
+        document_inference.id = tracing::field::Empty,
+        document_inference.page_count = tracing::field::Empty,
+        // ModelInference fields
+        model_inference.model_name = tracing::field::Empty,
+        model_inference.response_time_ms = tracing::field::Empty,
+        model_inference.timestamp = tracing::field::Empty,
+        model_inference.endpoint_type = tracing::field::Empty,
+        // ModelInferenceDetails fields
+        model_inference_details.inference_id = tracing::field::Empty,
+        model_inference_details.project_id = tracing::field::Empty,
+        model_inference_details.endpoint_id = tracing::field::Empty,
+        model_inference_details.model_id = tracing::field::Empty,
+        model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.is_success = tracing::field::Empty,
+        model_inference_details.api_key_id = tracing::field::Empty,
+        model_inference_details.user_id = tracing::field::Empty,
+        model_inference_details.api_key_project_id = tracing::field::Empty,
+        model_inference_details.error_code = tracing::field::Empty,
+        model_inference_details.error_message = tracing::field::Empty,
+        model_inference_details.error_type = tracing::field::Empty,
+        model_inference_details.status_code = tracing::field::Empty,
+    )
+)]
 pub async fn document_processing_handler(
     State(AppStateData {
         config,

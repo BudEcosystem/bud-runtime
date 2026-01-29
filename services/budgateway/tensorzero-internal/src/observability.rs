@@ -14,6 +14,7 @@ use tracing_subscriber::layer::Filter;
 use tracing_subscriber::{filter, EnvFilter, Registry};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
+use crate::baggage_processor::BaggageSpanProcessor;
 use crate::error::{Error, ErrorDetails};
 
 #[derive(Clone, Debug, Default, ValueEnum)]
@@ -27,14 +28,19 @@ pub enum LogFormat {
 fn internal_build_otel_layer<T: SpanExporter + 'static>(
     override_exporter: Option<T>,
 ) -> Result<impl Layer<Registry>, Error> {
-    let mut provider = SdkTracerProvider::builder().with_resource(
-        Resource::builder_empty()
-            .with_attribute(KeyValue::new(
-                opentelemetry_semantic_conventions::resource::SERVICE_NAME,
-                "budgateway",
-            ))
-            .build(),
-    );
+    let mut provider = SdkTracerProvider::builder()
+        .with_resource(
+            Resource::builder_empty()
+                .with_attribute(KeyValue::new(
+                    opentelemetry_semantic_conventions::resource::SERVICE_NAME,
+                    "budgateway",
+                ))
+                .build(),
+        )
+        // Register BaggageSpanProcessor to copy baggage values to span attributes.
+        // This allows observability tools (Grafana/Tempo) to filter spans by
+        // business context (project_id, prompt_id, endpoint_id, etc.)
+        .with_span_processor(BaggageSpanProcessor::new());
 
     if let Some(exporter) = override_exporter {
         provider = provider.with_simple_exporter(exporter)

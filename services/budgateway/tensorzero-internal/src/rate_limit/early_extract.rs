@@ -36,6 +36,7 @@ pub async fn early_model_extraction(mut request: Request, next: Next) -> Respons
         // Check if this is an endpoint that needs model extraction
         if path == "/v1/chat/completions"
             || path == "/v1/embeddings"
+            || path == "/v1/classify"
             || path == "/v1/moderations"
             || path == "/v1/messages"
         {

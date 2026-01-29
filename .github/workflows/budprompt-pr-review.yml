@@ -221,7 +221,9 @@ jobs:
       - name: Run dependency vulnerability scan
         run: |
           echo "::group::Checking for vulnerable dependencies"
-          pip-audit -r requirements.txt -r requirements-test.txt -r requirements-lint.txt
+          # GHSA-7gcm-g887-7qv7: protobuf CVE-2026-0994 - pinned to 6.31.1, advisory DB not updated yet
+          pip-audit -r requirements.txt -r requirements-test.txt -r requirements-lint.txt \
+            --ignore-vuln GHSA-7gcm-g887-7qv7
           echo "::endgroup::"
 
   pr-status:

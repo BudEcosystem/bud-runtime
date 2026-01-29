@@ -156,9 +156,7 @@ export default function CommonStatus({
     }, [steps, workflowId]);
 
     useEffect(() => {
-        console.log(`socket`, socket)
         if (socket) {
-            console.log(handleNotification)
             socket.on("notification_received", handleNotification);
         }
 

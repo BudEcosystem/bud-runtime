@@ -1,0 +1,124 @@
+name: "BudAdmin: PR Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'services/budadmin/**'
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  lint:
+    name: Lint Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budadmin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm install
+        env:
+          HUSKY: 0
+
+      - name: Run ESLint
+        run: |
+          echo "::group::Running ESLint"
+          npm run lint
+          echo "::endgroup::"
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budadmin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm install
+        env:
+          HUSKY: 0
+
+      - name: Run TypeScript type checking
+        run: |
+          echo "::group::Running TypeScript type check"
+          npm run typecheck
+          echo "::endgroup::"
+
+  build:
+    name: Build Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/budadmin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm install
+        env:
+          HUSKY: 0
+
+      - name: Build Next.js application
+        run: |
+          echo "::group::Building Next.js application"
+          npm run build
+          echo "::endgroup::"
+        env:
+          # Disable telemetry during build
+          NEXT_TELEMETRY_DISABLED: 1
+
+  pr-status:
+    name: PR Review Status
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, build]
+    if: always()
+
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.lint.result }}" == "failure" ]]; then
+            echo "::error::Lint check failed"
+            exit 1
+          fi
+          if [[ "${{ needs.typecheck.result }}" == "failure" ]]; then
+            echo "::error::TypeScript check failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "::error::Build failed"
+            exit 1
+          fi
+          echo "All checks passed!"

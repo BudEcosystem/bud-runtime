@@ -1244,6 +1244,30 @@ class ClickHouseMigration:
             action_taken LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
             blocked_at Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
 
+            -- ===== AUDIO ENDPOINT DATA (from audio_inference.* attributes) =====
+            audio_duration_seconds Nullable(Float32) CODEC(Gorilla, ZSTD(1)),
+            audio_language LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            audio_detected_language LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            audio_voice LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            audio_response_format LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+
+            -- ===== TTS ENDPOINT DATA (from audio_inference.* attributes) =====
+            tts_character_count Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+
+            -- ===== IMAGE ENDPOINT DATA (from image_inference.* attributes) =====
+            images_generated Nullable(UInt8) CODEC(ZSTD(1)),
+            image_size LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            image_quality LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+            image_style LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+
+            -- ===== EMBEDDING ENDPOINT DATA (from embedding_inference.* attributes) =====
+            embedding_input_count Nullable(UInt32) CODEC(Delta, ZSTD(1)),
+            embedding_dimensions Nullable(UInt32) CODEC(ZSTD(1)),
+            embedding_encoding_format LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+
+            -- ===== DOCUMENT ENDPOINT DATA (from document_inference.* attributes) =====
+            document_page_count Nullable(UInt16) CODEC(ZSTD(1)),
+
             -- ===== MATERIALIZED COLUMNS =====
             date Date MATERIALIZED toDate(timestamp),
             hour DateTime MATERIALIZED toStartOfHour(timestamp)
@@ -1251,7 +1275,7 @@ class ClickHouseMigration:
         ENGINE = ReplacingMergeTree(timestamp)
         PARTITION BY toYYYYMMDD(timestamp)
         ORDER BY (trace_id)
-        TTL toDateTime(timestamp) + INTERVAL 30 DAY
+        TTL toDateTime(timestamp) + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
@@ -1308,15 +1332,21 @@ class ClickHouseMigration:
             raise
 
     async def create_mv_otel_to_inference_fact(self):
-        """Create Materialized View to transform otel_traces to InferenceFact.
+        """Create Unified Materialized View to transform otel_traces to InferenceFact.
 
-        This MV extracts span attributes from two span types using LEFT JOIN on TraceId:
-        - inference_handler_observability span: model_inference_details.*, model_inference.*, chat_inference.*
-        - gateway_analytics span: gateway_analytics.*
+        This unified MV uses gateway_analytics as the primary source and LEFT JOINs
+        with all handler observability spans. This captures ALL API requests including:
+        - chat completions (inference_handler_observability)
+        - embeddings (embedding_handler_observability)
+        - completions (completion_handler_observability)
+        - audio transcription/translation/TTS
+        - image generation/edit/variation
+        - moderation, classify, document, realtime, responses, anthropic
 
-        The LEFT JOIN ensures inference data is captured even if gateway span is missing.
+        The endpoint_type is derived from the gateway path when the handler span
+        doesn't provide it, ensuring all endpoints are captured.
         """
-        logger.info("Creating mv_otel_to_inference_fact materialized view...")
+        logger.info("Creating mv_otel_to_inference_fact unified materialized view...")
 
         # First drop existing view if it exists to ensure clean state
         try:
@@ -1330,81 +1360,151 @@ class ClickHouseMigration:
         SELECT
             -- ===== OTel TRACE IDENTIFIERS =====
             generateUUIDv4() AS id,
-            i.TraceId AS trace_id,
-            i.SpanId AS span_id,
+            g.TraceId AS trace_id,
+            COALESCE(h.SpanId, g.SpanId) AS span_id,
 
-            -- ===== CORE IDENTIFIERS (from model_inference_details.*) =====
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.inference_id'], '')) AS inference_id,
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.project_id'], '')) AS project_id,
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.endpoint_id'], '')) AS endpoint_id,
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.model_id'], '')) AS model_id,
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.api_key_id'], '')) AS api_key_id,
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference_details.api_key_project_id'], '')) AS api_key_project_id,
-            nullIf(i.SpanAttributes['model_inference_details.user_id'], '') AS user_id,
+            -- ===== CORE IDENTIFIERS (prefer handler, fallback to gateway) =====
+            -- inference_id: check model_inference_details, classify_inference (strip infinity- prefix), then gateway
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.inference_id'], '')),
+                toUUIDOrNull(replaceOne(h.SpanAttributes['classify_inference.id'], 'infinity-', '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.inference_id'], ''))
+            ) AS inference_id,
+            -- project_id: prefer handler, fallback to baggage (set by auth middleware)
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.project_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.project_id'], ''))
+            ) AS project_id,
+            -- endpoint_id: prefer handler, fallback to baggage (set by auth middleware)
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.endpoint_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.endpoint_id'], ''))
+            ) AS endpoint_id,
+            toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.model_id'], '')) AS model_id,
+            -- api_key_id: prefer handler, fallback to baggage (set by auth middleware)
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.api_key_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.api_key_id'], ''))
+            ) AS api_key_id,
+            -- api_key_project_id: prefer handler, fallback to bud.project_id (same value for most cases)
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.api_key_project_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.project_id'], ''))
+            ) AS api_key_project_id,
+            -- user_id: prefer handler, fallback to baggage (set by auth middleware)
+            COALESCE(
+                nullIf(h.SpanAttributes['model_inference_details.user_id'], ''),
+                nullIf(g.SpanAttributes['bud.user_id'], '')
+            ) AS user_id,
 
             -- ===== TIMESTAMPS =====
-            toDateTime64(i.Timestamp, 3) AS timestamp,
-            parseDateTime64BestEffortOrNull(i.SpanAttributes['model_inference_details.request_arrival_time']) AS request_arrival_time,
-            parseDateTime64BestEffortOrNull(i.SpanAttributes['model_inference_details.request_forward_time']) AS request_forward_time,
+            toDateTime64(g.Timestamp, 3) AS timestamp,
+            parseDateTime64BestEffortOrNull(h.SpanAttributes['model_inference_details.request_arrival_time']) AS request_arrival_time,
+            parseDateTime64BestEffortOrNull(h.SpanAttributes['model_inference_details.request_forward_time']) AS request_forward_time,
 
-            -- ===== STATUS & COST (from model_inference_details.*) =====
-            i.SpanAttributes['model_inference_details.is_success'] = 'true' AS is_success,
-            toFloat64OrNull(i.SpanAttributes['model_inference_details.cost']) AS cost,
-            toUInt16OrNull(i.SpanAttributes['model_inference_details.status_code']) AS status_code,
-            toIPv4OrNull(i.SpanAttributes['model_inference_details.request_ip']) AS request_ip,
-            nullIf(i.SpanAttributes['model_inference_details.response_analysis'], '') AS response_analysis,
-
-            -- ===== ERROR TRACKING (from model_inference_details.*) =====
-            nullIf(i.SpanAttributes['model_inference_details.error_code'], '') AS error_code,
-            nullIf(i.SpanAttributes['model_inference_details.error_message'], '') AS error_message,
-            nullIf(i.SpanAttributes['model_inference_details.error_type'], '') AS error_type,
-
-            -- ===== MODEL INFO (from model_inference.*) =====
-            toUUIDOrNull(nullIf(i.SpanAttributes['model_inference.id'], '')) AS model_inference_id,
-            i.SpanAttributes['model_inference.model_name'] AS model_name,
-            i.SpanAttributes['model_inference.model_provider_name'] AS model_provider,
-            if(i.SpanAttributes['model_inference.endpoint_type'] != '', i.SpanAttributes['model_inference.endpoint_type'], 'chat') AS endpoint_type,
-
-            -- ===== PERFORMANCE METRICS (from model_inference.*) =====
-            toUInt32OrNull(i.SpanAttributes['model_inference.input_tokens']) AS input_tokens,
-            toUInt32OrNull(i.SpanAttributes['model_inference.output_tokens']) AS output_tokens,
-            toUInt32OrNull(i.SpanAttributes['model_inference.response_time_ms']) AS response_time_ms,
-            toUInt32OrNull(i.SpanAttributes['model_inference.ttft_ms']) AS ttft_ms,
-            i.SpanAttributes['model_inference.cached'] = 'true' AS cached,
+            -- ===== STATUS & COST =====
+            -- is_success: use explicit value if set, otherwise derive from status_code
             multiIf(
-                i.SpanAttributes['model_inference.finish_reason'] = 'stop', toNullable(CAST(1, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
-                i.SpanAttributes['model_inference.finish_reason'] = 'length', toNullable(CAST(2, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
-                i.SpanAttributes['model_inference.finish_reason'] = 'tool_call', toNullable(CAST(3, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
-                i.SpanAttributes['model_inference.finish_reason'] = 'content_filter', toNullable(CAST(4, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
-                i.SpanAttributes['model_inference.finish_reason'] != '', toNullable(CAST(5, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference_details.is_success'] = 'true', true,
+                h.SpanAttributes['model_inference_details.is_success'] = 'false', false,
+                COALESCE(toUInt16OrNull(h.SpanAttributes['model_inference_details.status_code']),
+                         toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code']), 500) < 400
+            ) AS is_success,
+            toFloat64OrNull(h.SpanAttributes['model_inference_details.cost']) AS cost,
+            COALESCE(
+                toUInt16OrNull(h.SpanAttributes['model_inference_details.status_code']),
+                toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code'])
+            ) AS status_code,
+            toIPv4OrNull(h.SpanAttributes['model_inference_details.request_ip']) AS request_ip,
+            nullIf(h.SpanAttributes['model_inference_details.response_analysis'], '') AS response_analysis,
+
+            -- ===== ERROR TRACKING =====
+            nullIf(h.SpanAttributes['model_inference_details.error_code'], '') AS error_code,
+            COALESCE(
+                nullIf(h.SpanAttributes['model_inference_details.error_message'], ''),
+                nullIf(h.SpanAttributes['error.message'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.error_message'], '')
+            ) AS error_message,
+            COALESCE(
+                nullIf(h.SpanAttributes['model_inference_details.error_type'], ''),
+                nullIf(h.SpanAttributes['error.type'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.error_type'], '')
+            ) AS error_type,
+
+            -- ===== MODEL INFO (prefer handler, fallback to gateway, then empty string) =====
+            -- NOTE: model_name and model_provider are LowCardinality(String) (non-nullable) in InferenceFact,
+            -- so we MUST use ifNull() to guarantee empty string instead of NULL.
+            -- COALESCE alone is insufficient in MVs when all inputs can be NULL.
+            toUUIDOrNull(nullIf(h.SpanAttributes['model_inference.id'], '')) AS model_inference_id,
+            ifNull(COALESCE(
+                nullIf(h.SpanAttributes['model_inference.model_name'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.model_name'], '')
+            ), '') AS model_name,
+            ifNull(COALESCE(
+                nullIf(h.SpanAttributes['model_inference.model_provider_name'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.model_provider'], '')
+            ), '') AS model_provider,
+            -- Derive endpoint_type: prefer handler, then gateway path, then default
+            multiIf(
+                h.SpanAttributes['model_inference.endpoint_type'] != '', h.SpanAttributes['model_inference.endpoint_type'],
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/chat/completions%%', 'chat',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/completions%%', 'completion',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/embeddings%%', 'embedding',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/messages%%', 'anthropic',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/audio/transcriptions%%', 'audio_transcription',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/audio/translations%%', 'audio_translation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/audio/speech%%', 'text_to_speech',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/images/generations%%', 'image_generation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/images/edits%%', 'image_edit',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/images/variations%%', 'image_variation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/moderations%%', 'moderation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/classify%%', 'classify',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/documents%%', 'document',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/responses%%', 'response',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/realtime%%', 'realtime',
+                'unknown'
+            ) AS endpoint_type,
+
+            -- ===== PERFORMANCE METRICS =====
+            toUInt32OrNull(h.SpanAttributes['model_inference.input_tokens']) AS input_tokens,
+            toUInt32OrNull(h.SpanAttributes['model_inference.output_tokens']) AS output_tokens,
+            toUInt32OrNull(h.SpanAttributes['model_inference.response_time_ms']) AS response_time_ms,
+            toUInt32OrNull(h.SpanAttributes['model_inference.ttft_ms']) AS ttft_ms,
+            h.SpanAttributes['model_inference.cached'] = 'true' AS cached,
+            multiIf(
+                h.SpanAttributes['model_inference.finish_reason'] = 'stop', toNullable(CAST(1, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] = 'length', toNullable(CAST(2, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] = 'tool_call', toNullable(CAST(3, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] = 'content_filter', toNullable(CAST(4, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] != '', toNullable(CAST(5, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
                 NULL
             ) AS finish_reason,
 
             -- ===== CONTENT (from model_inference.*) =====
-            nullIf(i.SpanAttributes['model_inference.system'], '') AS system_prompt,
-            nullIf(i.SpanAttributes['model_inference.input_messages'], '') AS input_messages,
-            nullIf(i.SpanAttributes['model_inference.output'], '') AS output,
-            nullIf(i.SpanAttributes['model_inference.raw_request'], '') AS raw_request,
-            nullIf(i.SpanAttributes['model_inference.raw_response'], '') AS raw_response,
-            nullIf(i.SpanAttributes['model_inference.gateway_request'], '') AS gateway_request,
-            nullIf(i.SpanAttributes['model_inference.gateway_response'], '') AS gateway_response,
-            nullIf(i.SpanAttributes['model_inference.guardrail_scan_summary'], '') AS guardrail_scan_summary,
-            toUInt64OrNull(i.SpanAttributes['model_inference.timestamp']) AS model_inference_timestamp,
+            nullIf(h.SpanAttributes['model_inference.system'], '') AS system_prompt,
+            nullIf(h.SpanAttributes['model_inference.input_messages'], '') AS input_messages,
+            nullIf(h.SpanAttributes['model_inference.output'], '') AS output,
+            nullIf(h.SpanAttributes['model_inference.raw_request'], '') AS raw_request,
+            nullIf(h.SpanAttributes['model_inference.raw_response'], '') AS raw_response,
+            nullIf(h.SpanAttributes['model_inference.gateway_request'], '') AS gateway_request,
+            nullIf(h.SpanAttributes['model_inference.gateway_response'], '') AS gateway_response,
+            nullIf(h.SpanAttributes['model_inference.guardrail_scan_summary'], '') AS guardrail_scan_summary,
+            toUInt64OrNull(h.SpanAttributes['model_inference.timestamp']) AS model_inference_timestamp,
 
             -- ===== CHAT INFERENCE (from chat_inference.*) =====
-            toUUIDOrNull(nullIf(i.SpanAttributes['chat_inference.id'], '')) AS chat_inference_id,
-            toUUIDOrNull(nullIf(i.SpanAttributes['chat_inference.episode_id'], '')) AS episode_id,
-            nullIf(i.SpanAttributes['chat_inference.function_name'], '') AS function_name,
-            nullIf(i.SpanAttributes['chat_inference.variant_name'], '') AS variant_name,
-            toUInt32OrNull(i.SpanAttributes['chat_inference.processing_time_ms']) AS processing_time_ms,
-            nullIf(i.SpanAttributes['chat_inference.input'], '') AS chat_input,
-            nullIf(i.SpanAttributes['chat_inference.output'], '') AS chat_output,
-            nullIf(i.SpanAttributes['chat_inference.tags'], '') AS tags,
-            nullIf(i.SpanAttributes['chat_inference.inference_params'], '') AS inference_params,
-            nullIf(i.SpanAttributes['chat_inference.extra_body'], '') AS extra_body,
-            nullIf(i.SpanAttributes['chat_inference.tool_params'], '') AS tool_params,
+            toUUIDOrNull(nullIf(h.SpanAttributes['chat_inference.id'], '')) AS chat_inference_id,
+            toUUIDOrNull(nullIf(h.SpanAttributes['chat_inference.episode_id'], '')) AS episode_id,
+            nullIf(h.SpanAttributes['chat_inference.function_name'], '') AS function_name,
+            nullIf(h.SpanAttributes['chat_inference.variant_name'], '') AS variant_name,
+            toUInt32OrNull(h.SpanAttributes['chat_inference.processing_time_ms']) AS processing_time_ms,
+            nullIf(h.SpanAttributes['chat_inference.input'], '') AS chat_input,
+            nullIf(h.SpanAttributes['chat_inference.output'], '') AS chat_output,
+            nullIf(h.SpanAttributes['chat_inference.tags'], '') AS tags,
+            nullIf(h.SpanAttributes['chat_inference.inference_params'], '') AS inference_params,
+            nullIf(h.SpanAttributes['chat_inference.extra_body'], '') AS extra_body,
+            nullIf(h.SpanAttributes['chat_inference.tool_params'], '') AS tool_params,
 
-            -- ===== GATEWAY ANALYTICS (from gateway_analytics.* span via LEFT JOIN) =====
+            -- ===== GATEWAY ANALYTICS (from gateway_analytics.*) =====
             -- Geographic
             nullIf(g.SpanAttributes['gateway_analytics.country_code'], '') AS country_code,
             nullIf(g.SpanAttributes['gateway_analytics.country_name'], '') AS country_name,
@@ -1461,31 +1561,298 @@ class ClickHouseMigration:
             toInt32OrNull(g.SpanAttributes['gateway_blocking_events.rule_priority']) AS rule_priority,
             nullIf(g.SpanAttributes['gateway_blocking_events.block_reason'], '') AS block_reason_detail,
             nullIf(g.SpanAttributes['gateway_blocking_events.action_taken'], '') AS action_taken,
-            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at']) AS blocked_at
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at']) AS blocked_at,
 
-        FROM metrics.otel_traces i
-        LEFT JOIN metrics.otel_traces g
-            ON i.TraceId = g.TraceId
-            AND g.SpanName = 'gateway_analytics'
-        WHERE i.SpanName = 'inference_handler_observability'
-          AND i.SpanAttributes['model_inference_details.inference_id'] != ''
-          AND i.SpanAttributes['model_inference_details.project_id'] != ''
+            -- ===== AUDIO ENDPOINT DATA (from audio_inference.* in handler span) =====
+            toFloat32OrNull(h.SpanAttributes['audio_inference.duration_seconds']) AS audio_duration_seconds,
+            nullIf(h.SpanAttributes['audio_inference.language'], '') AS audio_language,
+            nullIf(h.SpanAttributes['audio_inference.detected_language'], '') AS audio_detected_language,
+            nullIf(h.SpanAttributes['audio_inference.voice'], '') AS audio_voice,
+            nullIf(h.SpanAttributes['audio_inference.response_format'], '') AS audio_response_format,
+
+            -- ===== TTS ENDPOINT DATA =====
+            toUInt32OrNull(h.SpanAttributes['audio_inference.character_count']) AS tts_character_count,
+
+            -- ===== IMAGE ENDPOINT DATA (from image_inference.* in handler span) =====
+            toUInt8OrNull(h.SpanAttributes['image_inference.images_generated']) AS images_generated,
+            nullIf(h.SpanAttributes['image_inference.size'], '') AS image_size,
+            nullIf(h.SpanAttributes['image_inference.quality'], '') AS image_quality,
+            nullIf(h.SpanAttributes['image_inference.style'], '') AS image_style,
+
+            -- ===== EMBEDDING ENDPOINT DATA (from embedding_inference.* in handler span) =====
+            toUInt32OrNull(h.SpanAttributes['embedding_inference.input_count']) AS embedding_input_count,
+            toUInt32OrNull(h.SpanAttributes['embedding_inference.dimensions']) AS embedding_dimensions,
+            nullIf(h.SpanAttributes['embedding_inference.encoding_format'], '') AS embedding_encoding_format,
+
+            -- ===== DOCUMENT ENDPOINT DATA (from document_inference.* in handler span) =====
+            toUInt16OrNull(h.SpanAttributes['document_inference.page_count']) AS document_page_count
+
+        FROM metrics.otel_traces g
+        LEFT JOIN metrics.otel_traces h
+            ON g.TraceId = h.TraceId
+            AND h.SpanName LIKE '%%_handler_observability'
+        WHERE g.SpanName = 'gateway_analytics'
+          AND g.SpanAttributes['gateway_analytics.path'] LIKE '/v1/%%'
+          -- Exclude administrative endpoints (no inference)
+          AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/files%%'
+          AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/batches%%'
+          AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/models%%'
         """
 
         try:
             await self.client.execute_query(query)
-            logger.info("mv_otel_to_inference_fact materialized view created successfully")
+            logger.info("mv_otel_to_inference_fact unified materialized view created successfully")
         except Exception as e:
             logger.error(f"Error creating mv_otel_to_inference_fact: {e}")
+            raise
+
+    async def create_mv_handler_to_inference_fact(self):
+        """Create reverse MV for handler observability spans (DEPRECATED).
+
+        Note: This MV is no longer used to avoid duplicate insertions.
+        The main MV (mv_otel_to_inference_fact) with proper ifNull() handling is
+        sufficient. This method is kept for reference only.
+
+        Original purpose:
+        Create Reverse Materialized View that triggers on handler observability spans.
+        This MV was intended to address the race condition where gateway_analytics span
+        is inserted before handler_observability span.
+
+        Why deprecated:
+        - Both MVs inserting to the same table created duplicates
+        - ReplacingMergeTree deduplication only happens on merge, not immediately
+        - The main MV with LEFT JOIN captures data adequately
+        """
+        logger.info("Creating mv_handler_to_inference_fact reverse materialized view...")
+
+        # First drop existing view if it exists to ensure clean state
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_handler_to_inference_fact")
+            logger.info("Dropped existing mv_handler_to_inference_fact (if any)")
+        except Exception as e:
+            logger.warning(f"Could not drop existing view: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_handler_to_inference_fact TO InferenceFact AS
+        SELECT
+            -- ===== OTel TRACE IDENTIFIERS =====
+            generateUUIDv4() AS id,
+            h.TraceId AS trace_id,
+            h.SpanId AS span_id,
+
+            -- ===== CORE IDENTIFIERS (prefer handler, fallback to gateway) =====
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.inference_id'], '')),
+                toUUIDOrNull(replaceOne(h.SpanAttributes['classify_inference.id'], 'infinity-', '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.inference_id'], ''))
+            ) AS inference_id,
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.project_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.project_id'], ''))
+            ) AS project_id,
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.endpoint_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.endpoint_id'], ''))
+            ) AS endpoint_id,
+            toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.model_id'], '')) AS model_id,
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.api_key_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.api_key_id'], ''))
+            ) AS api_key_id,
+            COALESCE(
+                toUUIDOrNull(nullIf(h.SpanAttributes['model_inference_details.api_key_project_id'], '')),
+                toUUIDOrNull(nullIf(g.SpanAttributes['bud.project_id'], ''))
+            ) AS api_key_project_id,
+            COALESCE(
+                nullIf(h.SpanAttributes['model_inference_details.user_id'], ''),
+                nullIf(g.SpanAttributes['bud.user_id'], '')
+            ) AS user_id,
+
+            -- ===== TIMESTAMPS (use handler timestamp for accuracy) =====
+            toDateTime64(h.Timestamp, 3) AS timestamp,
+            parseDateTime64BestEffortOrNull(h.SpanAttributes['model_inference_details.request_arrival_time']) AS request_arrival_time,
+            parseDateTime64BestEffortOrNull(h.SpanAttributes['model_inference_details.request_forward_time']) AS request_forward_time,
+
+            -- ===== STATUS & COST =====
+            h.SpanAttributes['model_inference_details.is_success'] = 'true' AS is_success,
+            toFloat64OrNull(h.SpanAttributes['model_inference_details.cost']) AS cost,
+            COALESCE(
+                toUInt16OrNull(h.SpanAttributes['model_inference_details.status_code']),
+                toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code'])
+            ) AS status_code,
+            toIPv4OrNull(h.SpanAttributes['model_inference_details.request_ip']) AS request_ip,
+            nullIf(h.SpanAttributes['model_inference_details.response_analysis'], '') AS response_analysis,
+
+            -- ===== ERROR TRACKING =====
+            nullIf(h.SpanAttributes['model_inference_details.error_code'], '') AS error_code,
+            COALESCE(
+                nullIf(h.SpanAttributes['model_inference_details.error_message'], ''),
+                nullIf(h.SpanAttributes['error.message'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.error_message'], '')
+            ) AS error_message,
+            COALESCE(
+                nullIf(h.SpanAttributes['model_inference_details.error_type'], ''),
+                nullIf(h.SpanAttributes['error.type'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.error_type'], '')
+            ) AS error_type,
+
+            -- ===== MODEL INFO =====
+            -- model_name and model_provider are LowCardinality(String) (non-nullable)
+            -- so we MUST use ifNull() to guarantee empty string instead of NULL
+            toUUIDOrNull(nullIf(h.SpanAttributes['model_inference.id'], '')) AS model_inference_id,
+            ifNull(COALESCE(
+                nullIf(h.SpanAttributes['model_inference.model_name'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.model_name'], '')
+            ), '') AS model_name,
+            ifNull(COALESCE(
+                nullIf(h.SpanAttributes['model_inference.model_provider_name'], ''),
+                nullIf(g.SpanAttributes['gateway_analytics.model_provider'], '')
+            ), '') AS model_provider,
+            -- Derive endpoint_type: prefer handler, then gateway path
+            multiIf(
+                h.SpanAttributes['model_inference.endpoint_type'] != '', h.SpanAttributes['model_inference.endpoint_type'],
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/chat/completions%%', 'chat',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/completions%%', 'completion',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/embeddings%%', 'embedding',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/messages%%', 'anthropic',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/audio/transcriptions%%', 'audio_transcription',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/audio/translations%%', 'audio_translation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/audio/speech%%', 'text_to_speech',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/images/generations%%', 'image_generation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/images/edits%%', 'image_edit',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/images/variations%%', 'image_variation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/moderations%%', 'moderation',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/classify%%', 'classify',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/documents%%', 'document',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/responses%%', 'response',
+                g.SpanAttributes['gateway_analytics.path'] LIKE '%%/realtime%%', 'realtime',
+                'unknown'
+            ) AS endpoint_type,
+
+            -- ===== PERFORMANCE METRICS =====
+            toUInt32OrNull(h.SpanAttributes['model_inference.input_tokens']) AS input_tokens,
+            toUInt32OrNull(h.SpanAttributes['model_inference.output_tokens']) AS output_tokens,
+            toUInt32OrNull(h.SpanAttributes['model_inference.response_time_ms']) AS response_time_ms,
+            toUInt32OrNull(h.SpanAttributes['model_inference.ttft_ms']) AS ttft_ms,
+            h.SpanAttributes['model_inference.cached'] = 'true' AS cached,
+            multiIf(
+                h.SpanAttributes['model_inference.finish_reason'] = 'stop', toNullable(CAST(1, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] = 'length', toNullable(CAST(2, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] = 'tool_call', toNullable(CAST(3, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] = 'content_filter', toNullable(CAST(4, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                h.SpanAttributes['model_inference.finish_reason'] != '', toNullable(CAST(5, 'Enum8(\\'stop\\' = 1, \\'length\\' = 2, \\'tool_call\\' = 3, \\'content_filter\\' = 4, \\'unknown\\' = 5)')),
+                NULL
+            ) AS finish_reason,
+
+            -- ===== CONTENT (from model_inference.*) =====
+            nullIf(h.SpanAttributes['model_inference.system'], '') AS system_prompt,
+            nullIf(h.SpanAttributes['model_inference.input_messages'], '') AS input_messages,
+            nullIf(h.SpanAttributes['model_inference.output'], '') AS output,
+            nullIf(h.SpanAttributes['model_inference.raw_request'], '') AS raw_request,
+            nullIf(h.SpanAttributes['model_inference.raw_response'], '') AS raw_response,
+            nullIf(h.SpanAttributes['model_inference.gateway_request'], '') AS gateway_request,
+            nullIf(h.SpanAttributes['model_inference.gateway_response'], '') AS gateway_response,
+            nullIf(h.SpanAttributes['model_inference.guardrail_scan_summary'], '') AS guardrail_scan_summary,
+            toUInt64OrNull(h.SpanAttributes['model_inference.timestamp']) AS model_inference_timestamp,
+
+            -- ===== CHAT INFERENCE =====
+            toUUIDOrNull(nullIf(h.SpanAttributes['chat_inference.id'], '')) AS chat_inference_id,
+            toUUIDOrNull(nullIf(h.SpanAttributes['chat_inference.episode_id'], '')) AS episode_id,
+            nullIf(h.SpanAttributes['chat_inference.function_name'], '') AS function_name,
+            nullIf(h.SpanAttributes['chat_inference.variant_name'], '') AS variant_name,
+            toUInt32OrNull(h.SpanAttributes['chat_inference.processing_time_ms']) AS processing_time_ms,
+            nullIf(h.SpanAttributes['chat_inference.input'], '') AS chat_input,
+            nullIf(h.SpanAttributes['chat_inference.output'], '') AS chat_output,
+            nullIf(h.SpanAttributes['chat_inference.tags'], '') AS tags,
+            nullIf(h.SpanAttributes['chat_inference.inference_params'], '') AS inference_params,
+            nullIf(h.SpanAttributes['chat_inference.extra_body'], '') AS extra_body,
+            nullIf(h.SpanAttributes['chat_inference.tool_params'], '') AS tool_params,
+
+            -- ===== GATEWAY ANALYTICS (from gateway span) =====
+            nullIf(g.SpanAttributes['gateway_analytics.country_code'], '') AS country_code,
+            nullIf(g.SpanAttributes['gateway_analytics.country_name'], '') AS country_name,
+            nullIf(g.SpanAttributes['gateway_analytics.region'], '') AS region,
+            nullIf(g.SpanAttributes['gateway_analytics.city'], '') AS city,
+            toFloat32OrNull(g.SpanAttributes['gateway_analytics.latitude']) AS latitude,
+            toFloat32OrNull(g.SpanAttributes['gateway_analytics.longitude']) AS longitude,
+            nullIf(g.SpanAttributes['gateway_analytics.timezone'], '') AS timezone,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.asn']) AS asn,
+            nullIf(g.SpanAttributes['gateway_analytics.isp'], '') AS isp,
+            toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip']) AS client_ip,
+            nullIf(g.SpanAttributes['gateway_analytics.user_agent'], '') AS user_agent,
+            nullIf(g.SpanAttributes['gateway_analytics.device_type'], '') AS device_type,
+            nullIf(g.SpanAttributes['gateway_analytics.browser_name'], '') AS browser_name,
+            nullIf(g.SpanAttributes['gateway_analytics.browser_version'], '') AS browser_version,
+            nullIf(g.SpanAttributes['gateway_analytics.os_name'], '') AS os_name,
+            nullIf(g.SpanAttributes['gateway_analytics.os_version'], '') AS os_version,
+            g.SpanAttributes['gateway_analytics.is_bot'] = 'true' AS is_bot,
+            nullIf(g.SpanAttributes['gateway_analytics.method'], '') AS method,
+            nullIf(g.SpanAttributes['gateway_analytics.path'], '') AS path,
+            nullIf(g.SpanAttributes['gateway_analytics.query_params'], '') AS query_params,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.body_size']) AS body_size,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.response_size']) AS response_size,
+            nullIf(g.SpanAttributes['gateway_analytics.protocol_version'], '') AS protocol_version,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.gateway_processing_ms']) AS gateway_processing_ms,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.total_duration_ms']) AS total_duration_ms,
+            nullIf(g.SpanAttributes['gateway_analytics.model_version'], '') AS model_version,
+            nullIf(g.SpanAttributes['gateway_analytics.routing_decision'], '') AS routing_decision,
+            g.SpanAttributes['gateway_analytics.is_blocked'] = 'true' AS is_blocked,
+            nullIf(g.SpanAttributes['gateway_analytics.block_reason'], '') AS block_reason,
+            nullIf(g.SpanAttributes['gateway_analytics.block_rule_id'], '') AS block_rule_id,
+            nullIf(g.SpanAttributes['gateway_analytics.proxy_chain'], '') AS proxy_chain,
+            nullIf(g.SpanAttributes['gateway_analytics.request_headers'], '') AS request_headers,
+            nullIf(g.SpanAttributes['gateway_analytics.response_headers'], '') AS response_headers,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp']) AS request_timestamp,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.response_timestamp']) AS response_timestamp,
+            nullIf(g.SpanAttributes['gateway_analytics.tags'], '') AS gateway_tags,
+
+            -- ===== BLOCKING EVENT DATA =====
+            toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.id'], '')) AS blocking_event_id,
+            toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.rule_id'], '')) AS rule_id,
+            nullIf(g.SpanAttributes['gateway_blocking_events.rule_type'], '') AS rule_type,
+            nullIf(g.SpanAttributes['gateway_blocking_events.rule_name'], '') AS rule_name,
+            toInt32OrNull(g.SpanAttributes['gateway_blocking_events.rule_priority']) AS rule_priority,
+            nullIf(g.SpanAttributes['gateway_blocking_events.block_reason'], '') AS block_reason_detail,
+            nullIf(g.SpanAttributes['gateway_blocking_events.action_taken'], '') AS action_taken,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at']) AS blocked_at,
+
+            -- ===== ENDPOINT-SPECIFIC DATA =====
+            toFloat32OrNull(h.SpanAttributes['audio_inference.duration_seconds']) AS audio_duration_seconds,
+            nullIf(h.SpanAttributes['audio_inference.language'], '') AS audio_language,
+            nullIf(h.SpanAttributes['audio_inference.detected_language'], '') AS audio_detected_language,
+            nullIf(h.SpanAttributes['audio_inference.voice'], '') AS audio_voice,
+            nullIf(h.SpanAttributes['audio_inference.response_format'], '') AS audio_response_format,
+            toUInt32OrNull(h.SpanAttributes['audio_inference.character_count']) AS tts_character_count,
+            toUInt8OrNull(h.SpanAttributes['image_inference.images_generated']) AS images_generated,
+            nullIf(h.SpanAttributes['image_inference.size'], '') AS image_size,
+            nullIf(h.SpanAttributes['image_inference.quality'], '') AS image_quality,
+            nullIf(h.SpanAttributes['image_inference.style'], '') AS image_style,
+            toUInt32OrNull(h.SpanAttributes['embedding_inference.input_count']) AS embedding_input_count,
+            toUInt32OrNull(h.SpanAttributes['embedding_inference.dimensions']) AS embedding_dimensions,
+            nullIf(h.SpanAttributes['embedding_inference.encoding_format'], '') AS embedding_encoding_format,
+            toUInt16OrNull(h.SpanAttributes['document_inference.page_count']) AS document_page_count
+
+        FROM metrics.otel_traces h
+        LEFT JOIN metrics.otel_traces g
+            ON h.TraceId = g.TraceId
+            AND g.SpanName = 'gateway_analytics'
+        WHERE h.SpanName LIKE '%%_handler_observability'
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("mv_handler_to_inference_fact reverse materialized view created successfully")
+        except Exception as e:
+            logger.error(f"Error creating mv_handler_to_inference_fact: {e}")
             raise
 
     async def create_inference_metrics_rollup_tables(self):
         """Create InferenceMetrics rollup tables for time-series aggregation.
 
         Creates three rollup tables with different granularities:
-        - InferenceMetrics5m: 5-minute granularity, 30 day TTL (real-time dashboards)
-        - InferenceMetrics1h: 1-hour granularity, 30 day TTL (daily/weekly analytics)
-        - InferenceMetrics1d: 1-day granularity, 60 day TTL (monthly trends, billing)
+        - InferenceMetrics5m: 5-minute granularity, 90 day TTL (real-time dashboards)
+        - InferenceMetrics1h: 1-hour granularity, 90 day TTL (daily/weekly analytics)
+        - InferenceMetrics1d: 1-day granularity, 90 day TTL (monthly trends, billing)
 
         UUID handling strategy:
         - Dimension UUIDs (keep): project_id, endpoint_id, model_id, api_key_project_id
@@ -1543,7 +1910,7 @@ class ClickHouseMigration:
             unique_blocked_ips AggregateFunction(uniq, IPv4)
         """
 
-        # InferenceMetrics5m - 5-minute granularity, 30 day TTL
+        # InferenceMetrics5m - 5-minute granularity, 90 day TTL
         query_5m = f"""
         CREATE TABLE IF NOT EXISTS InferenceMetrics5m
         (
@@ -1555,12 +1922,12 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
-        TTL time_bucket + INTERVAL 30 DAY
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
-        # InferenceMetrics1h - 1-hour granularity, 30 day TTL
+        # InferenceMetrics1h - 1-hour granularity, 90 day TTL
         query_1h = f"""
         CREATE TABLE IF NOT EXISTS InferenceMetrics1h
         (
@@ -1572,12 +1939,12 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
-        TTL time_bucket + INTERVAL 30 DAY
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
-        # InferenceMetrics1d - 1-day granularity, 60 day TTL
+        # InferenceMetrics1d - 1-day granularity, 90 day TTL
         query_1d = f"""
         CREATE TABLE IF NOT EXISTS InferenceMetrics1d
         (
@@ -1589,8 +1956,8 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, time_bucket, is_success, country_code)
-        TTL time_bucket + INTERVAL 60 DAY
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
 
@@ -2111,6 +2478,86 @@ class ClickHouseMigration:
 
         logger.info("Blocking event columns migration to InferenceFact completed successfully")
 
+    async def add_endpoint_specific_columns_to_inference_fact(self):
+        """Add endpoint-specific columns to existing InferenceFact table.
+
+        This migration adds columns for different inference endpoint types:
+        - Audio: duration, language, detected_language, voice, response_format
+        - TTS: character_count
+        - Image: images_generated, size, quality, style
+        - Embedding: input_count, dimensions, encoding_format
+        - Document: page_count
+
+        These columns were added to the CREATE TABLE statement but need ALTER TABLE
+        for existing deployments where the table already exists.
+        """
+        logger.info("Adding endpoint-specific columns to InferenceFact table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceFact")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceFact table does not exist. Skipping endpoint-specific columns migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if InferenceFact table exists: {e}")
+            return
+
+        # Define the columns to add with their types and codecs
+        # Matching exactly the CREATE TABLE definitions
+        columns_to_add = [
+            # Audio endpoint data
+            ("audio_duration_seconds", "Nullable(Float32) CODEC(Gorilla, ZSTD(1))"),
+            ("audio_language", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("audio_detected_language", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("audio_voice", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("audio_response_format", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            # TTS endpoint data
+            ("tts_character_count", "Nullable(UInt32) CODEC(Delta, ZSTD(1))"),
+            # Image endpoint data
+            ("images_generated", "Nullable(UInt8) CODEC(ZSTD(1))"),
+            ("image_size", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("image_quality", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            ("image_style", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            # Embedding endpoint data
+            ("embedding_input_count", "Nullable(UInt32) CODEC(Delta, ZSTD(1))"),
+            ("embedding_dimensions", "Nullable(UInt32) CODEC(ZSTD(1))"),
+            ("embedding_encoding_format", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+            # Document endpoint data
+            ("document_page_count", "Nullable(UInt16) CODEC(ZSTD(1))"),
+        ]
+
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = 'InferenceFact'
+                  AND database = currentDatabase()
+                  AND name = '{column_name}'
+                """
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    alter_query = f"""
+                    ALTER TABLE InferenceFact
+                    ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column {column_name} to InferenceFact table")
+                else:
+                    logger.debug(f"Column {column_name} already exists in InferenceFact table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.debug(f"Column {column_name} already exists")
+                else:
+                    logger.error(f"Error adding column {column_name}: {e}")
+
+        logger.info("Endpoint-specific columns migration to InferenceFact completed successfully")
+
     async def create_mv_otel_blocking_to_inference_fact(self):
         """Create Materialized View for blocked-only requests to InferenceFact.
 
@@ -2143,15 +2590,15 @@ class ClickHouseMigration:
             TraceId AS trace_id,
             any(g.SpanId) AS span_id,
 
-            -- ===== CORE IDENTIFIERS (from gateway_analytics span) =====
+            -- ===== CORE IDENTIFIERS (from baggage set by auth middleware) =====
             -- No inference_id for blocked requests
             any(CAST(NULL AS Nullable(UUID))) AS inference_id,
-            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.project_id'], ''))) AS project_id,
-            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.endpoint_id'], ''))) AS endpoint_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['bud.project_id'], ''))) AS project_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['bud.endpoint_id'], ''))) AS endpoint_id,
             any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.model_id'], ''))) AS model_id,
-            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.api_key_id'], ''))) AS api_key_id,
-            any(toUUIDOrNull(nullIf(g.SpanAttributes['gateway_analytics.api_key_project_id'], ''))) AS api_key_project_id,
-            any(nullIf(g.SpanAttributes['gateway_analytics.user_id'], '')) AS user_id,
+            any(toUUIDOrNull(nullIf(g.SpanAttributes['bud.api_key_id'], ''))) AS api_key_id,
+            any(CAST(NULL AS Nullable(UUID))) AS api_key_project_id,  -- not in baggage
+            any(nullIf(g.SpanAttributes['bud.user_id'], '')) AS user_id,
 
             -- ===== TIMESTAMPS =====
             any(toDateTime64(g.Timestamp, 3)) AS timestamp,
@@ -2172,10 +2619,10 @@ class ClickHouseMigration:
 
             -- ===== MODEL INFO (from gateway_analytics if available) =====
             -- model_name and model_provider are LowCardinality(String) (non-nullable)
-            -- so we must provide empty string instead of NULL
+            -- so we MUST use ifNull() to guarantee empty string instead of NULL
             any(CAST(NULL AS Nullable(UUID))) AS model_inference_id,
-            any(g.SpanAttributes['gateway_analytics.model_name']) AS model_name,
-            any(g.SpanAttributes['gateway_analytics.model_provider']) AS model_provider,
+            ifNull(any(g.SpanAttributes['gateway_analytics.model_name']), '') AS model_name,
+            ifNull(any(g.SpanAttributes['gateway_analytics.model_provider']), '') AS model_provider,
             any('blocked') AS endpoint_type,
 
             -- ===== PERFORMANCE METRICS (zeros for blocked requests) =====
@@ -2256,7 +2703,23 @@ class ClickHouseMigration:
             any(toInt32OrNull(g.SpanAttributes['gateway_blocking_events.rule_priority'])) AS rule_priority,
             any(nullIf(g.SpanAttributes['gateway_blocking_events.block_reason'], '')) AS block_reason_detail,
             any(nullIf(g.SpanAttributes['gateway_blocking_events.action_taken'], '')) AS action_taken,
-            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at'])) AS blocked_at
+            any(parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at'])) AS blocked_at,
+
+            -- ===== ENDPOINT-SPECIFIC COLUMNS (empty for blocked requests) =====
+            any(CAST(NULL AS Nullable(Float32))) AS audio_duration_seconds,
+            any(CAST(NULL AS Nullable(String))) AS audio_language,
+            any(CAST(NULL AS Nullable(String))) AS audio_detected_language,
+            any(CAST(NULL AS Nullable(String))) AS audio_voice,
+            any(CAST(NULL AS Nullable(String))) AS audio_response_format,
+            any(CAST(NULL AS Nullable(UInt32))) AS tts_character_count,
+            any(CAST(NULL AS Nullable(UInt8))) AS images_generated,
+            any(CAST(NULL AS Nullable(String))) AS image_size,
+            any(CAST(NULL AS Nullable(String))) AS image_quality,
+            any(CAST(NULL AS Nullable(String))) AS image_style,
+            any(CAST(NULL AS Nullable(UInt32))) AS embedding_input_count,
+            any(CAST(NULL AS Nullable(UInt32))) AS embedding_dimensions,
+            any(CAST(NULL AS Nullable(String))) AS embedding_encoding_format,
+            any(CAST(NULL AS Nullable(UInt16))) AS document_page_count
 
         FROM metrics.otel_traces g
         WHERE g.SpanName = 'gateway_analytics'
@@ -2717,6 +3180,52 @@ class ClickHouseMigration:
             logger.error(f"Error adding network columns to NodeMetrics: {e}")
             raise
 
+    async def migrate_inference_tables_ttl_90_days(self):
+        """Update TTL to 90 days for all inference-related tables.
+
+        This migration updates the TTL from their previous values to 90 days:
+        - InferenceFact: 30 days -> 90 days
+        - InferenceMetrics5m: 30 days -> 90 days
+        - InferenceMetrics1h: 30 days -> 90 days
+        - InferenceMetrics1d: 60 days -> 90 days
+        """
+        logger.info("Checking if inference tables TTL migration to 90 days is needed...")
+
+        ttl_updates = [
+            ("InferenceFact", "toDateTime(timestamp) + INTERVAL 90 DAY"),
+            ("InferenceMetrics5m", "time_bucket + INTERVAL 90 DAY"),
+            ("InferenceMetrics1h", "time_bucket + INTERVAL 90 DAY"),
+            ("InferenceMetrics1d", "time_bucket + INTERVAL 90 DAY"),
+        ]
+
+        for table_name, ttl_expression in ttl_updates:
+            try:
+                # Check if table exists
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    logger.info(f"{table_name} table does not exist yet. Skipping TTL migration.")
+                    continue
+
+                # Check current TTL - look for 90 DAY in the CREATE TABLE statement
+                create_stmt = await self.client.execute_query(f"SHOW CREATE TABLE {table_name}")
+                if create_stmt and create_stmt[0][0]:
+                    create_sql = create_stmt[0][0]
+                    # Check if already has 90 day TTL
+                    if "toIntervalDay(90)" in create_sql or "INTERVAL 90 DAY" in create_sql:
+                        logger.info(f"{table_name} already has 90-day TTL")
+                        continue
+
+                # Update TTL to 90 days
+                alter_query = f"ALTER TABLE {table_name} MODIFY TTL {ttl_expression}"
+                await self.client.execute_query(alter_query)
+                logger.info(f"Updated {table_name} TTL to 90 days")
+
+            except Exception as e:
+                logger.error(f"Error updating TTL for {table_name}: {e}")
+                raise
+
+        logger.info("Inference tables TTL migration to 90 days completed successfully")
+
     async def run_migration(self):
         """Run the complete migration process."""
         try:
@@ -2746,7 +3255,11 @@ class ClickHouseMigration:
                 self.add_gateway_columns_to_inference_fact()
             )  # Add gateway analytics columns to existing InferenceFact
             await self.add_blocking_columns_to_inference_fact()  # Add blocking event columns to existing InferenceFact
+            await (
+                self.add_endpoint_specific_columns_to_inference_fact()
+            )  # Add audio/image/embedding/TTS/document columns
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
+            # NOTE: mv_handler_to_inference_fact was removed to avoid duplicates - the main MV handles both cases
             await (
                 self.create_mv_otel_blocking_to_inference_fact()
             )  # Create MV for blocked-only requests to InferenceFact
@@ -2756,6 +3269,7 @@ class ClickHouseMigration:
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
             await self.add_blocking_metrics_to_rollup_tables()  # Add blocking metrics columns to rollup tables
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
+            await self.migrate_inference_tables_ttl_90_days()  # Update TTL to 90 days for inference tables
             await self.verify_tables()
             logger.info("Migration completed successfully!")
 

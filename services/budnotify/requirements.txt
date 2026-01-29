@@ -14,8 +14,14 @@ ujson >= 5.10.0
 structlog >= 24.4.0
 cachetools >= 5.4.0
 
+# JWT Authentication
+PyJWT[crypto] >= 2.8.0
+
 # Novu
 novu==1.14.0
 
 # Profiling
 memory-profiler>=0.61.0
+
+# Socket.IO for realtime WebSocket support
+python-socketio[asyncio]>=5.10.0

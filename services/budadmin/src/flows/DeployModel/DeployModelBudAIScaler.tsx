@@ -96,9 +96,24 @@ const embeddingMetricItems = [
   { label: "Embedding Latency (s)", value: "bud:infinity_embedding_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
 ];
 
+// Classify metrics - similar to embedding (non-LLM models)
+const classifyMetricItems = [
+  { label: "Queue Depth", value: "bud:infinity_queue_depth", type: "pod" as const, defaultValue: "10" },
+  { label: "Classify Latency (s)", value: "bud:infinity_classify_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+];
+
+// Combined embedding + classify metrics (for models supporting both endpoints)
+const embeddingClassifyMetricItems = [
+  { label: "Queue Depth", value: "bud:infinity_queue_depth", type: "pod" as const, defaultValue: "10" },
+  { label: "Embedding Latency (s)", value: "bud:infinity_embedding_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+  { label: "Classify Latency (s)", value: "bud:infinity_classify_latency_seconds_average", type: "pod" as const, defaultValue: "2" },
+];
+
 // Get metrics based on model type
-const getMetricItems = (modelType: "llm" | "embedding" | "audio") => {
+const getMetricItems = (modelType: "llm" | "embedding" | "classify" | "embedding_classify" | "audio") => {
+  if (modelType === "embedding_classify") return embeddingClassifyMetricItems;
   if (modelType === "embedding") return embeddingMetricItems;
+  if (modelType === "classify") return classifyMetricItems;
   return llmMetricItems; // LLM and Audio use same metrics
 };
 
@@ -352,7 +367,20 @@ export default function DeployModelBudAIScaler() {
     model?.supported_endpoints?.audio_transcription?.enabled === true ||
     model?.supported_endpoints?.audio_speech?.enabled === true;
   const isEmbeddingModel = model?.supported_endpoints?.embedding?.enabled === true;
-  const modelType: "llm" | "embedding" | "audio" = isAudioModel ? "audio" : isEmbeddingModel ? "embedding" : "llm";
+  const isClassifyModel = model?.supported_endpoints?.classify?.enabled === true;
+  const hasChatOrCompletion = model?.supported_endpoints?.chat?.enabled === true || model?.supported_endpoints?.completion?.enabled === true;
+
+  // Determine model type: audio > embedding+classify > embedding > classify > llm
+  // For embedding/classify-only models (no chat/completion), use their specific metrics
+  const modelType: "llm" | "embedding" | "classify" | "embedding_classify" | "audio" = isAudioModel
+    ? "audio"
+    : (isEmbeddingModel && isClassifyModel && !hasChatOrCompletion)
+      ? "embedding_classify"
+      : (isEmbeddingModel && !hasChatOrCompletion)
+        ? "embedding"
+        : (isClassifyModel && !hasChatOrCompletion)
+          ? "classify"
+          : "llm";
 
   // Get metrics based on detected model type
   const metricItems = getMetricItems(modelType);

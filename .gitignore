@@ -15,3 +15,4 @@ services/budapp/vr/app.yaml
 services/budapp/vr/*
 .worktrees/
 *.backup
+.playwright-mcp/

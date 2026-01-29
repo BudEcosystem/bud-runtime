@@ -205,6 +205,44 @@ impl ModelConfig {
         Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
     }
 
+    /// Classification inference method (when model supports classify capability)
+    #[instrument(skip_all)]
+    pub async fn classify(
+        &self,
+        request: &crate::classification::ClassificationRequest,
+        model_name: &str,
+        clients: &crate::endpoints::inference::InferenceClients<'_>,
+    ) -> Result<crate::classification::ClassificationProviderResponse, Error> {
+        if !self.supports_endpoint(EndpointCapability::Classify) {
+            return Err(Error::new(ErrorDetails::ModelNotConfiguredForCapability {
+                model_name: model_name.to_string(),
+                capability: EndpointCapability::Classify.as_str().to_string(),
+            }));
+        }
+
+        let mut provider_errors: HashMap<String, Error> = HashMap::new();
+        for provider_name in &self.routing {
+            let provider = self.providers.get(provider_name).ok_or_else(|| {
+                Error::new(ErrorDetails::ProviderNotFound {
+                    provider_name: provider_name.to_string(),
+                })
+            })?;
+
+            let response = provider
+                .classify(request, clients.http_client, clients.credentials)
+                .await;
+
+            match response {
+                Ok(response) => return Ok(response),
+                Err(error) => {
+                    provider_errors.insert(provider_name.to_string(), error);
+                }
+            }
+        }
+
+        Err(ErrorDetails::ModelProvidersExhausted { provider_errors }.into())
+    }
+
     /// Completions inference method (when model supports completions capability)
     #[instrument(skip_all)]
     pub async fn complete(
@@ -1340,6 +1378,7 @@ impl ModelConfig {
         request: &crate::responses::OpenAIResponseCreateParams,
         model_name: &str,
         clients: &InferenceClients<'_>,
+        baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<crate::responses::OpenAIResponse, Error> {
         let mut provider_errors: HashMap<String, Error> = HashMap::new();
         for provider_name in &self.routing {
@@ -1349,7 +1388,7 @@ impl ModelConfig {
                 })
             })?;
             let response = provider
-                .create_response(request, clients.http_client, clients.credentials)
+                .create_response(request, clients.http_client, clients.credentials, baggage)
                 .await;
             match response {
                 Ok(response) => {
@@ -1372,6 +1411,7 @@ impl ModelConfig {
         request: &crate::responses::OpenAIResponseCreateParams,
         model_name: &str,
         clients: &InferenceClients<'_>,
+        baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<
         Box<
             dyn futures::Stream<Item = Result<crate::responses::ResponseStreamEvent, Error>>
@@ -1388,7 +1428,7 @@ impl ModelConfig {
                 })
             })?;
             let response = provider
-                .stream_response(request, clients.http_client, clients.credentials)
+                .stream_response(request, clients.http_client, clients.credentials, baggage)
                 .await;
             match response {
                 Ok(response) => {
@@ -1539,6 +1579,7 @@ impl ModelConfig {
         request: &crate::responses::OpenAIResponseCreateParams,
         model_name: &str,
         clients: &InferenceClients<'_>,
+        baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<crate::responses::ResponseResult, Error> {
         let mut provider_errors = HashMap::new();
         for provider_name in &self.routing {
@@ -1554,6 +1595,7 @@ impl ModelConfig {
                     model_name,
                     clients.http_client,
                     clients.credentials,
+                    baggage,
                 )
                 .await;
             match response {
@@ -2605,6 +2647,27 @@ impl ModelProvider {
         }
     }
 
+    /// Classification inference method
+    #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_classify"))]
+    pub async fn classify(
+        &self,
+        request: &crate::classification::ClassificationRequest,
+        client: &Client,
+        dynamic_api_keys: &InferenceCredentials,
+    ) -> Result<crate::classification::ClassificationProviderResponse, Error> {
+        use crate::classification::ClassificationProvider;
+
+        match &self.config {
+            ProviderConfig::VLLM(provider) => {
+                provider.classify(request, client, dynamic_api_keys).await
+            }
+            _ => Err(Error::new(ErrorDetails::CapabilityNotSupported {
+                capability: EndpointCapability::Classify.as_str().to_string(),
+                provider: self.name.to_string(),
+            })),
+        }
+    }
+
     /// Completions inference method
     #[tracing::instrument(skip_all, fields(provider_name = &*self.name, otel.name = "model_provider_completion"))]
     pub async fn complete(
@@ -2878,24 +2941,25 @@ impl ModelProvider {
         request: &crate::responses::OpenAIResponseCreateParams,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
+        baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<crate::responses::OpenAIResponse, Error> {
         use crate::responses::ResponseProvider;
 
         match &self.config {
             ProviderConfig::OpenAI(provider) => {
                 provider
-                    .create_response(request, client, dynamic_api_keys)
+                    .create_response(request, client, dynamic_api_keys, baggage)
                     .await
             }
             ProviderConfig::BudPrompt(provider) => {
                 provider
-                    .create_response(request, client, dynamic_api_keys)
+                    .create_response(request, client, dynamic_api_keys, baggage)
                     .await
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
-                    .create_response(request, client, dynamic_api_keys)
+                    .create_response(request, client, dynamic_api_keys, baggage)
                     .await
             }
             // Other providers don't support responses yet
@@ -2913,6 +2977,7 @@ impl ModelProvider {
         request: &crate::responses::OpenAIResponseCreateParams,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
+        baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<
         Box<
             dyn futures::Stream<Item = Result<crate::responses::ResponseStreamEvent, Error>>
@@ -2926,18 +2991,18 @@ impl ModelProvider {
         match &self.config {
             ProviderConfig::OpenAI(provider) => {
                 provider
-                    .stream_response(request, client, dynamic_api_keys)
+                    .stream_response(request, client, dynamic_api_keys, baggage)
                     .await
             }
             ProviderConfig::BudPrompt(provider) => {
                 provider
-                    .stream_response(request, client, dynamic_api_keys)
+                    .stream_response(request, client, dynamic_api_keys, baggage)
                     .await
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
-                    .stream_response(request, client, dynamic_api_keys)
+                    .stream_response(request, client, dynamic_api_keys, baggage)
                     .await
             }
             // Other providers don't support responses yet
@@ -3088,23 +3153,42 @@ impl ModelProvider {
         model_name: &str,
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
+        baggage: Option<&crate::baggage::BaggageData>,
     ) -> Result<crate::responses::ResponseResult, Error> {
         use crate::responses::ResponseProvider;
         match &self.config {
             ProviderConfig::BudPrompt(provider) => {
                 provider
-                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .execute_response_with_detection(
+                        request,
+                        model_name,
+                        client,
+                        dynamic_api_keys,
+                        baggage,
+                    )
                     .await
             }
             ProviderConfig::OpenAI(provider) => {
                 provider
-                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .execute_response_with_detection(
+                        request,
+                        model_name,
+                        client,
+                        dynamic_api_keys,
+                        baggage,
+                    )
                     .await
             }
             #[cfg(any(test, feature = "e2e_tests"))]
             ProviderConfig::Dummy(provider) => {
                 provider
-                    .execute_response_with_detection(request, model_name, client, dynamic_api_keys)
+                    .execute_response_with_detection(
+                        request,
+                        model_name,
+                        client,
+                        dynamic_api_keys,
+                        baggage,
+                    )
                     .await
             }
             // Other providers don't support responses yet

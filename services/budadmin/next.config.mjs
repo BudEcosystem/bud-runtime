@@ -183,6 +183,10 @@ export default {
         source: '/pipelines/:id',
         destination: '/home/budpipelines/:id',
       },
+      {
+        source: '/tools',
+        destination: '/home/tools',
+      },
     ];
   },
   env: {

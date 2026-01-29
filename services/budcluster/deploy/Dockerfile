@@ -21,8 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install ansible-core instead of full ansible (saves ~200MB)
+# Install community.kubernetes from GitHub to avoid Ansible Galaxy API issues
 RUN pip install --no-cache-dir ansible-core==2.15.* ansible-runner \
-    && ansible-galaxy collection install community.kubernetes \
+    && ansible-galaxy collection install git+https://github.com/ansible-collections/kubernetes.core.git,main --force \
     && rm -rf /root/.cache/pip/*
 
 # Install CPU-only PyTorch to save ~8GB (CUDA version is ~10GB, CPU-only is ~2GB)
