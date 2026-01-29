@@ -6892,6 +6892,12 @@ pub async fn response_create_handler(
         std::sync::Arc::new(std::sync::Mutex::new(None));
     let captured_usage_clone = captured_usage.clone();
 
+    // Capture model latency for analytics (will be populated inside async block)
+    // This is used to calculate gateway_processing_ms = total_duration_ms - model_latency_ms
+    let captured_latency: std::sync::Arc<std::sync::Mutex<Option<u32>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_latency_clone = captured_latency.clone();
+
     let result = async {
         if !params.unknown_fields.is_empty() {
             tracing::warn!(
@@ -6986,6 +6992,8 @@ pub async fn response_create_handler(
         // Use automatic format detection for BudPrompt with prompt parameter
         use crate::responses::ResponseResult;
 
+        // Measure provider latency for analytics
+        let provider_start = std::time::Instant::now();
         let result = model
             .execute_response_with_detection(
                 &params,
@@ -6994,6 +7002,7 @@ pub async fn response_create_handler(
                 Some(&baggage_data),
             )
             .await?;
+        let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
 
         match result {
             ResponseResult::Streaming(stream) => {
@@ -7072,6 +7081,11 @@ pub async fn response_create_handler(
                     }
                 }
 
+                // Capture latency for analytics (gateway_processing_ms calculation)
+                if let Ok(mut guard) = captured_latency_clone.lock() {
+                    *guard = Some(provider_latency_ms);
+                }
+
                 Ok(Json(response).into_response())
             }
         }
@@ -7148,9 +7162,12 @@ pub async fn response_create_handler(
             Ok(Sse::new(sse_stream).into_response())
         } else {
             // Handle non-streaming response
+            // Measure provider latency for analytics
+            let provider_start = std::time::Instant::now();
             let response = model
                 .create_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
+            let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
 
             // Log the response size for debugging
             if let Ok(response_json) = serde_json::to_string(&response) {
@@ -7165,6 +7182,11 @@ pub async fn response_create_handler(
                 if let Ok(mut guard) = captured_usage_clone.lock() {
                     *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
                 }
+            }
+
+            // Capture latency for analytics (gateway_processing_ms calculation)
+            if let Ok(mut guard) = captured_latency_clone.lock() {
+                *guard = Some(provider_latency_ms);
             }
 
             Ok(Json(response).into_response())
@@ -7220,6 +7242,17 @@ pub async fn response_create_handler(
                     response
                         .headers_mut()
                         .insert("x-tensorzero-total-tokens", value);
+                }
+            }
+        }
+        // Add model latency header for gateway_processing_ms calculation
+        // This is used by analytics middleware: gateway_processing_ms = total_duration_ms - model_latency_ms
+        if let Ok(guard) = captured_latency.lock() {
+            if let Some(latency_ms) = *guard {
+                if let Ok(value) = axum::http::HeaderValue::from_str(&latency_ms.to_string()) {
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-model-latency-ms", value);
                 }
             }
         }
