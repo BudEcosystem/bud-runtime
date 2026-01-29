@@ -672,6 +672,75 @@ const buildChildrenFromTraceDetail = (
   return directChildren;
 };
 
+// Helper function to build tree structure from live socket spans
+// This is used for live data where child_span_count is not available
+const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
+  if (!spans || spans.length === 0) return [];
+
+  // Step 1: Group spans by trace_id
+  const spansByTraceId = new Map<string, TraceSpan[]>();
+  spans.forEach(span => {
+    const traceId = span.trace_id;
+    if (!traceId) return;
+    if (!spansByTraceId.has(traceId)) {
+      spansByTraceId.set(traceId, []);
+    }
+    spansByTraceId.get(traceId)!.push(span);
+  });
+
+  const result: LogEntry[] = [];
+
+  // Step 2: For each trace, build tree structure
+  spansByTraceId.forEach((traceSpans) => {
+    // Find root span (no parent_span_id or empty)
+    const rootSpan = traceSpans.find(s => !s.parent_span_id || s.parent_span_id === '');
+    if (!rootSpan) return; // Skip if no root found
+
+    // Find earliest timestamp for offset calculation
+    const timestamps = traceSpans.map(s => new Date(s.timestamp).getTime());
+    const earliestTimestamp = Math.min(...timestamps);
+
+    // Recursive function to build children
+    const buildNode = (span: TraceSpan): LogEntry => {
+      const children = traceSpans.filter(s => s.parent_span_id === span.span_id);
+      const childNodes = children.map(c => buildNode(c));
+
+      // Sort children by timestamp
+      childNodes.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
+
+      const timestamp = new Date(span.timestamp).getTime();
+
+      return {
+        id: span.span_id,
+        time: formatTime(span.timestamp),
+        namespace: span.resource_attributes?.["service.name"] || "",
+        title: span.span_name || 'Unknown Span',
+        childCount: childNodes.length,
+        metrics: { tag: span.service_name || '' },
+        duration: (span.duration ?? 0) / 1_000_000_000,
+        startOffsetSec: (timestamp - earliestTimestamp) / 1000,
+        traceId: span.trace_id,
+        spanId: span.span_id,
+        parentSpanId: span.parent_span_id || '',
+        canExpand: childNodes.length > 0,
+        children: childNodes.length > 0 ? childNodes : undefined,
+        rawData: span as unknown as Record<string, any>,
+      };
+    };
+
+    result.push(buildNode(rootSpan));
+  });
+
+  // Sort result by timestamp (most recent first for live data)
+  result.sort((a, b) => {
+    const timeA = new Date(a.rawData?.timestamp || 0).getTime();
+    const timeB = new Date(b.rawData?.timestamp || 0).getTime();
+    return timeB - timeA; // Descending order (newest first)
+  });
+
+  return result;
+};
+
 const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [timeRange, setTimeRange] = useState("5m");
@@ -745,6 +814,61 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
   }, [viewMode]);
 
+  // Handle batch of live traces (for tree building in traces view)
+  const handleLiveTraceBatch = useCallback((traces: TraceSpan[]) => {
+    console.log('[LiveTrace] Received batch:', traces.length, 'spans');
+
+    if (!traces || traces.length === 0) return;
+
+    if (viewMode === 'traces') {
+      // In traces view, build proper tree structure from batch
+      const newTrees = buildTreeFromLiveSpans(traces);
+      console.log('[LiveTrace] Built', newTrees.length, 'trees from batch');
+
+      if (newTrees.length === 0) return;
+
+      // Track trace IDs for deduplication
+      newTrees.forEach(tree => {
+        if (tree.traceId) {
+          liveSpanIdsRef.current.add(tree.traceId);
+        }
+      });
+
+      // Merge with existing data (prepend new trees, replace existing with same trace_id)
+      setLogsData(prev => {
+        const newTraceIds = new Set(newTrees.map(t => t.traceId));
+        // Filter out existing trees with same trace_id (update scenario)
+        const filteredPrev = prev.filter(p => !newTraceIds.has(p.traceId));
+        return [...newTrees, ...filteredPrev].slice(0, MAX_LIVE_ITEMS);
+      });
+    } else {
+      // In flatten view, process each span individually (existing behavior)
+      traces.forEach(trace => {
+        if (!trace || !trace.span_id) return;
+        if (liveSpanIdsRef.current.has(trace.span_id)) return;
+        liveSpanIdsRef.current.add(trace.span_id);
+
+        const newEntry: LogEntry = {
+          id: trace.span_id,
+          time: trace.timestamp ? formatTime(trace.timestamp) : 'N/A',
+          namespace: trace.resource_attributes?.["service.name"] || "",
+          title: trace.span_name || 'Unknown Span',
+          childCount: 0,
+          metrics: { tag: trace.service_name || '' },
+          duration: (trace.duration ?? 0) / 1_000_000_000,
+          startOffsetSec: 0,
+          traceId: trace.trace_id,
+          spanId: trace.span_id,
+          parentSpanId: trace.parent_span_id || '',
+          canExpand: false,
+          rawData: trace as unknown as Record<string, any>,
+        };
+
+        setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
+      });
+    }
+  }, [viewMode]);
+
   // Socket hook for live streaming
   // Note: promptId (UUID) is used for socket subscription, promptName is used for API calls
   console.log('[LogsTab] Socket params:', { projectId, promptId, promptName, isLive });
@@ -752,6 +876,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     projectId: projectId || '',
     promptId: promptId || '',
     enabled: isLive && !!projectId && !!promptId,
+    onTraceBatchReceived: handleLiveTraceBatch,
     onTraceReceived: handleLiveTrace,
     onError: (err) => console.error('[LiveTrace] Socket error:', err),
   });

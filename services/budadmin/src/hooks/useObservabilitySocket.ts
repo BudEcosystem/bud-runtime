@@ -13,7 +13,8 @@ interface UseObservabilitySocketProps {
   projectId: string;
   promptId: string;
   enabled: boolean;
-  onTraceReceived: (trace: any) => void;
+  onTraceReceived?: (trace: any) => void;
+  onTraceBatchReceived?: (traces: any[]) => void;
   onError?: (error: Error) => void;
 }
 
@@ -33,6 +34,7 @@ export function useObservabilitySocket({
   promptId,
   enabled,
   onTraceReceived,
+  onTraceBatchReceived,
   onError,
 }: UseObservabilitySocketProps): UseObservabilitySocketReturn {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
@@ -41,11 +43,13 @@ export function useObservabilitySocket({
   // Use refs to avoid re-creating socket on every render
   const socketRef = useRef<Socket | null>(null);
   const onTraceReceivedRef = useRef(onTraceReceived);
+  const onTraceBatchReceivedRef = useRef(onTraceBatchReceived);
   const onErrorRef = useRef(onError);
   const isConnectingRef = useRef(false);
 
   // Update callback refs
   onTraceReceivedRef.current = onTraceReceived;
+  onTraceBatchReceivedRef.current = onTraceBatchReceived;
   onErrorRef.current = onError;
 
   useEffect(() => {
@@ -152,11 +156,16 @@ export function useObservabilitySocket({
       const traces = payload?.data || payload;
 
       if (Array.isArray(traces)) {
-        // Multiple traces received - call handler for each
         console.log(`[ObservabilitySocket] Processing ${traces.length} traces`);
-        traces.forEach((trace: any) => {
-          onTraceReceivedRef.current?.(trace);
-        });
+        // Prefer batch handler for array data (enables tree building)
+        if (onTraceBatchReceivedRef.current) {
+          onTraceBatchReceivedRef.current(traces);
+        } else {
+          // Fallback to individual processing
+          traces.forEach((trace: any) => {
+            onTraceReceivedRef.current?.(trace);
+          });
+        }
       } else if (traces && typeof traces === 'object') {
         // Single trace object
         onTraceReceivedRef.current?.(traces);
