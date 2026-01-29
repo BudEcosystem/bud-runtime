@@ -18,6 +18,7 @@ import BackButton from "@/components/ui/bud/drawer/BackButton";
 
 const AgentDetailsPage = () => {
   const router = useRouter();
+  // Note: 'id' comes from the rewrite rule in next.config.mjs (:id -> [agentId] folder)
   const { id, projectId, name } = router.query;
   const [activeTab, setActiveTab] = useState("1");
 
@@ -70,7 +71,7 @@ const AgentDetailsPage = () => {
         </div>
       ),
       key: "2",
-      children: <LogsTab promptName={name as string} projectId={projectId as string} />,
+      children: <LogsTab promptName={name as string} promptId={id as string} projectId={projectId as string} />,
     },
     // {
     //   label: (

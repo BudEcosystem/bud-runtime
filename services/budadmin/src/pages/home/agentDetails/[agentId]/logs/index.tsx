@@ -76,6 +76,7 @@ interface LogEntry {
 
 interface LogsTabProps {
   promptName?: string;
+  promptId?: string;
   projectId?: string;
 }
 
@@ -519,7 +520,9 @@ const getTimeRangeDates = (range: string): { from_date: string; to_date: string 
 
 // Helper function to format timestamp to time string
 const formatTime = (timestamp: string): string => {
+  if (!timestamp) return 'N/A';
   const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Invalid';
   return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -548,7 +551,7 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
       const entry: LogEntry = {
         id: span.span_id,
         time: formatTime(span.timestamp),
-        namespace: span.resource_attributes?.["service.namespace"] || "",
+        namespace: span.resource_attributes?.["service.name"] || "",
         title: span.span_name,
         childCount: span.child_span_count,
         metrics: {
@@ -580,7 +583,7 @@ const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
     return {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.namespace"] || "",
+      namespace: span.resource_attributes?.["service.name"] || "",
       title: span.span_name,
       metrics: {
         tag: span.service_name,
@@ -612,7 +615,7 @@ const buildChildrenFromTraceDetail = (
     const entry: LogEntry = {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.namespace"] || "",
+      namespace: span.resource_attributes?.["service.name"] || "",
       title: span.span_name,
       childCount: span.child_span_count, // Use child_span_count from API
       metrics: {
@@ -669,7 +672,7 @@ const buildChildrenFromTraceDetail = (
   return directChildren;
 };
 
-const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
+const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [timeRange, setTimeRange] = useState("5m");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -699,42 +702,56 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
 
   // Handle incoming live trace data
   const handleLiveTrace = useCallback((trace: TraceSpan) => {
-    // In traces view, only show root spans (empty parent_span_id)
+    console.log('[LiveTrace] Received trace:', trace);
+
+    // Validate required fields
+    if (!trace || !trace.span_id) {
+      console.warn('[LiveTrace] Invalid trace data - missing span_id:', trace);
+      return;
+    }
+
+    // In traces view, only show root spans (those with empty parent_span_id)
     if (viewMode === 'traces' && trace.parent_span_id && trace.parent_span_id !== '') {
+      console.log('[LiveTrace] Skipping non-root span:', trace.span_id);
       return;
     }
 
     // Deduplicate by span_id
     if (liveSpanIdsRef.current.has(trace.span_id)) {
+      console.log('[LiveTrace] Duplicate span, skipping:', trace.span_id);
       return;
     }
     liveSpanIdsRef.current.add(trace.span_id);
 
     // Transform to LogEntry and prepend to list
+    // Handle both snake_case (from socket) and potential variations
     const newEntry: LogEntry = {
       id: trace.span_id,
-      time: formatTime(trace.timestamp),
-      namespace: trace.resource_attributes?.["service.namespace"] || "",
-      title: trace.span_name,
-      childCount: trace.child_span_count,
-      metrics: { tag: trace.service_name },
-      duration: (trace.duration ?? 0) / 1_000_000_000,
+      time: trace.timestamp ? formatTime(trace.timestamp) : 'N/A',
+      namespace: trace.resource_attributes?.["service.name"] || "",
+      title: trace.span_name || 'Unknown Span',
+      childCount: trace.child_span_count ?? 0,
+      metrics: { tag: trace.service_name || '' },
+      duration: (trace.duration ?? 0) / 1_000_000_000, // nanoseconds to seconds
       startOffsetSec: 0,
       traceId: trace.trace_id,
       spanId: trace.span_id,
-      parentSpanId: trace.parent_span_id,
+      parentSpanId: trace.parent_span_id || '',
       canExpand: (trace.child_span_count ?? 0) > 0,
       rawData: trace as unknown as Record<string, any>,
     };
 
+    console.log('[LiveTrace] Created LogEntry:', newEntry);
     setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
   }, [viewMode]);
 
   // Socket hook for live streaming
+  // Note: promptId (UUID) is used for socket subscription, promptName is used for API calls
+  console.log('[LogsTab] Socket params:', { projectId, promptId, promptName, isLive });
   const { isSubscribed, connectionStatus, error: socketError } = useObservabilitySocket({
     projectId: projectId || '',
-    promptId: promptName || '',
-    enabled: isLive && !!projectId && !!promptName,
+    promptId: promptId || '',
+    enabled: isLive && !!projectId && !!promptId,
     onTraceReceived: handleLiveTrace,
     onError: (err) => console.error('[LiveTrace] Socket error:', err),
   });
@@ -1102,20 +1119,48 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
     }
   };
 
-  // Close selection handler
+  // Close/Clear handler
   const handleClose = () => {
     setSelectedId(null);
+
+    if (isLive) {
+      // If showing socket data, clear current data and allow new data to appear
+      setLogsData([]);
+      liveSpanIdsRef.current.clear();
+    } else {
+      // If showing regular traces, reset time filter to default and refetch
+      const defaultTimeRange = "5m";
+      if (timeRange === defaultTimeRange) {
+        // If already at default, manually trigger refetch since setState won't cause a change
+        fetchTraces();
+      } else {
+        // Setting timeRange will trigger useEffect which calls fetchTraces
+        setTimeRange(defaultTimeRange);
+      }
+    }
   };
 
   // Toggle live mode
   const handleToggleLive = () => {
     setIsLive((prev) => {
-      // Clear deduplication set when enabling live mode
       if (!prev) {
+        // Enabling live mode: clear existing traces data and deduplication set
+        setLogsData([]);
         liveSpanIdsRef.current.clear();
       }
       return !prev;
     });
+  };
+
+  // Handle time range change - disables live mode if active
+  const handleTimeRangeChange = (newRange: string) => {
+    if (isLive) {
+      // Disable live mode and clear live data when changing time filter
+      setIsLive(false);
+      setLogsData([]);
+      liveSpanIdsRef.current.clear();
+    }
+    setTimeRange(newRange);
   };
 
   // Initialize and update echarts
@@ -1225,7 +1270,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
           <CustomSelect
             name="timeRange"
             value={timeRange}
-            onChange={setTimeRange}
+            onChange={handleTimeRangeChange}
             selectOptions={timeRangeOptions}
             ClassNames="w-[160px] !py-[.1rem]"
             InputClasses="!text-[.625rem] !py-[.1rem] !min-h-[1.6rem] !h-[1.6rem]"
@@ -1309,7 +1354,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
               onClick={handleClose}
               title="Close selection"
             >
-              <span>Close</span>
+              <span>Clear</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />

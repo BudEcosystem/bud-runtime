@@ -301,7 +301,7 @@ const buildTraceTree = (spans: TraceSpan[]): DrawerLogEntry[] => {
     const node: DrawerLogEntry = {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.namespace"] || "",
+      namespace: span.resource_attributes?.["service.name"] || "",
       title: span.span_name,
       serviceName: span.service_name,
       duration: (span.duration ?? 0) / 1_000_000_000,

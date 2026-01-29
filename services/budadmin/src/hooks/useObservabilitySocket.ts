@@ -49,18 +49,22 @@ export function useObservabilitySocket({
   onErrorRef.current = onError;
 
   useEffect(() => {
-    // Skip if not enabled or missing required params
-    if (!enabled || !projectId || !promptId) {
-      // Cleanup existing socket
+    // Helper function to cleanup socket
+    const cleanupSocket = () => {
       if (socketRef.current) {
-        console.log('[ObservabilitySocket] Disabling - disconnecting socket');
+        console.log('[ObservabilitySocket] Cleanup - disconnecting socket');
         socketRef.current.disconnect();
         socketRef.current = null;
-        isConnectingRef.current = false;
-        setConnectionStatus('disconnected');
-        setError(null);
       }
-      return;
+      isConnectingRef.current = false;
+    };
+
+    // Skip if not enabled or missing required params
+    if (!enabled || !projectId || !promptId) {
+      cleanupSocket();
+      setConnectionStatus('disconnected');
+      setError(null);
+      return cleanupSocket; // Always return cleanup
     }
 
     // Check socket URL
@@ -68,13 +72,7 @@ export function useObservabilitySocket({
       console.error('[ObservabilitySocket] Missing NEXT_PUBLIC_OBSERVABILITY_SOCKET_URL');
       setError(new Error('Socket URL not configured'));
       setConnectionStatus('error');
-      return;
-    }
-
-    // Prevent multiple simultaneous connections (only if actively connecting)
-    if (isConnectingRef.current) {
-      console.log('[ObservabilitySocket] Already connecting, skipping');
-      return;
+      return cleanupSocket; // Always return cleanup
     }
 
     // Get JWT token
@@ -83,15 +81,11 @@ export function useObservabilitySocket({
       console.error('[ObservabilitySocket] No authentication token');
       setError(new Error('No authentication token'));
       setConnectionStatus('error');
-      return;
+      return cleanupSocket; // Always return cleanup
     }
 
-    // Disconnect any existing socket first (handles React StrictMode)
-    if (socketRef.current) {
-      console.log('[ObservabilitySocket] Cleaning up existing socket before creating new one');
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
+    // Disconnect any existing socket first (handles React StrictMode and re-renders)
+    cleanupSocket();
 
     // Mark as connecting
     isConnectingRef.current = true;
@@ -102,20 +96,22 @@ export function useObservabilitySocket({
     console.log('[ObservabilitySocket] Filters:', { project_id: projectId, prompt_id: promptId });
 
     // Create socket
-    // Note: extraHeaders doesn't work with WebSockets in browsers
-    // Use 'auth' option instead for JWT authentication
+    // Browser WebSocket connections cannot send custom HTTP headers.
+    // We use Socket.IO 4.x 'auth' option which sends auth data during the handshake.
+    // This works with websocket transport in browsers.
     const socket = io(observabilitySocketUrl, {
       path: '/ws/socket.io',
-      transports: ['websocket', 'polling'], // Allow polling fallback
+      // Use websocket directly - auth is handled via Socket.IO handshake, not HTTP headers
+      transports: ['websocket'],
+      // Socket.IO 4.x auth - sent during handshake (works with websocket in browsers)
+      // Server reads from socket.handshake.auth
       auth: {
-        token: token, // Server should read this from socket.handshake.auth.token
-      },
-      query: {
-        token: token, // Fallback: some servers read from query params
+        token: token,
       },
       reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 2000,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       timeout: 10000,
     });
 
@@ -127,14 +123,15 @@ export function useObservabilitySocket({
       isConnectingRef.current = false;
 
       // Subscribe immediately after connect
-      console.log('[ObservabilitySocket] Emitting subscribe...');
-      socket.emit('subscribe', {
+      const subscribePayload = {
         channel: 'observability',
         filters: {
           project_id: projectId,
           prompt_id: promptId,
         },
-      });
+      };
+      console.log('[ObservabilitySocket] Emitting subscribe with payload:', JSON.stringify(subscribePayload, null, 2));
+      socket.emit('subscribe', subscribePayload);
     });
 
     socket.on('authenticated', (msg) => {
@@ -142,13 +139,28 @@ export function useObservabilitySocket({
     });
 
     socket.on('subscribed', (msg) => {
-      console.log('[ObservabilitySocket] Subscribed!', msg);
+      console.log('[ObservabilitySocket] Subscribed successfully!', msg);
+      console.log('[ObservabilitySocket] Now listening for data on channel: observability');
       setConnectionStatus('subscribed');
     });
 
-    socket.on('data', (data: any) => {
-      console.log('[ObservabilitySocket] Received trace data:', data);
-      onTraceReceivedRef.current?.(data);
+    socket.on('data', (payload: any) => {
+      console.log('[ObservabilitySocket] ====== RECEIVED TRACE DATA ======');
+      console.log('[ObservabilitySocket] Payload:', payload);
+
+      // Handle the data structure: { channel: "observability", data: TraceSpan[] }
+      const traces = payload?.data || payload;
+
+      if (Array.isArray(traces)) {
+        // Multiple traces received - call handler for each
+        console.log(`[ObservabilitySocket] Processing ${traces.length} traces`);
+        traces.forEach((trace: any) => {
+          onTraceReceivedRef.current?.(trace);
+        });
+      } else if (traces && typeof traces === 'object') {
+        // Single trace object
+        onTraceReceivedRef.current?.(traces);
+      }
     });
 
     socket.on('error', (err: any) => {
@@ -160,8 +172,15 @@ export function useObservabilitySocket({
       onErrorRef.current?.(socketError);
     });
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', (err: any) => {
+      // Log detailed error information for debugging
       console.error('[ObservabilitySocket] Connection error:', err.message);
+      console.error('[ObservabilitySocket] Error details:', {
+        type: err.type,
+        description: err.description,
+        context: err.context,
+        transport: socket.io?.engine?.transport?.name,
+      });
       setError(err);
       setConnectionStatus('error');
       isConnectingRef.current = false;
@@ -170,13 +189,23 @@ export function useObservabilitySocket({
 
     socket.on('disconnect', (reason) => {
       console.log('[ObservabilitySocket] Disconnected:', reason);
-      setConnectionStatus('disconnected');
-      isConnectingRef.current = false;
+      // Only set disconnected if we haven't already cleaned up (prevents state updates after unmount)
+      if (socketRef.current === socket) {
+        setConnectionStatus('disconnected');
+        isConnectingRef.current = false;
+      }
     });
 
-    // Cleanup function
+    // Cleanup function - always return this
     return () => {
-      console.log('[ObservabilitySocket] Cleanup - disconnecting socket');
+      console.log('[ObservabilitySocket] Effect cleanup - disconnecting socket');
+      socket.off('connect');
+      socket.off('authenticated');
+      socket.off('subscribed');
+      socket.off('data');
+      socket.off('error');
+      socket.off('connect_error');
+      socket.off('disconnect');
       socket.disconnect();
       socketRef.current = null;
       isConnectingRef.current = false;
