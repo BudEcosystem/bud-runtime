@@ -2448,7 +2448,7 @@ class ClickHouseMigration:
             toUInt32OrNull(r.SpanAttributes['gen_ai.usage.input_tokens']) AS input_tokens,
             toUInt32OrNull(r.SpanAttributes['gen_ai.usage.output_tokens']) AS output_tokens,
             toUInt32OrNull(r.SpanAttributes['gen_ai.response_time_ms']) AS response_time_ms,  -- Uses provider latency from span attribute
-            CAST(NULL AS Nullable(UInt32)) AS ttft_ms,  -- TTFT not tracked for responses
+            toUInt32OrNull(r.SpanAttributes['gen_ai.ttft_ms']) AS ttft_ms,  -- TTFT for streaming responses
             false AS cached,
             CAST(NULL AS Nullable(String)) AS finish_reason,
 
@@ -2468,7 +2468,7 @@ class ClickHouseMigration:
             CAST(NULL AS Nullable(UUID)) AS episode_id,
             CAST(NULL AS Nullable(String)) AS function_name,
             CAST(NULL AS Nullable(String)) AS variant_name,
-            CAST(NULL AS Nullable(UInt32)) AS processing_time_ms,
+            toUInt32OrNull(r.SpanAttributes['gen_ai.processing_time_ms']) AS processing_time_ms,
             CAST(NULL AS Nullable(String)) AS chat_input,
             CAST(NULL AS Nullable(String)) AS chat_output,
             CAST(NULL AS Nullable(String)) AS tags,

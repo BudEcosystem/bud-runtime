@@ -6858,6 +6858,12 @@ fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Optio
         // Model inference timing (for ClickHouse response_time_ms)
         gen_ai.response_time_ms = tracing::field::Empty,
 
+        // Total handler processing time (for ClickHouse processing_time_ms)
+        gen_ai.processing_time_ms = tracing::field::Empty,
+
+        // Time to first token for streaming (for ClickHouse ttft_ms)
+        gen_ai.ttft_ms = tracing::field::Empty,
+
         // Inference ID (for ClickHouse InferenceFact table)
         gen_ai.inference_id = tracing::field::Empty,
 
@@ -6888,6 +6894,9 @@ pub async fn response_create_handler(
 ) -> Result<Response<Body>, Error> {
     // Capture request arrival time for observability
     let request_arrival_time = chrono::Utc::now();
+
+    // Capture start time for processing_time_ms calculation (total handler time)
+    let processing_start_time = std::time::Instant::now();
 
     // Record request fields for observability
     super::observability::record_response_request(&params);
@@ -7040,18 +7049,36 @@ pub async fn response_create_handler(
                 let gateway_request_clone = gateway_request.clone();
                 let raw_request = gateway_request.clone().unwrap_or_default();
 
+                // Clone processing_start_time for use in async stream closure (for processing_time_ms calculation)
+                let processing_start_time_clone = processing_start_time;
+
+                // Capture latency for analytics (gateway_processing_ms calculation)
+                // For streaming, this is the time to initiate the stream (before streaming starts)
+                if let Ok(mut guard) = captured_latency_clone.lock() {
+                    *guard = Some(provider_latency_ms);
+                }
+
                 // Wrap stream to capture events and record observability after completion
                 let sse_stream = async_stream::stream! {
                     use futures::StreamExt;
 
                     let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
                     let mut had_streaming_error = false;
+                    // Use provider_start (captured before execute_response_with_detection) for accurate TTFT
+                    let mut ttft_recorded = false;
                     futures::pin_mut!(stream);
 
                     while let Some(result) = stream.next().await {
                         // Buffer successful events for post-stream observability
                         if let Ok(event) = &result {
                             buffer.push(event.clone());
+
+                            // Record TTFT on first successful event (includes full provider latency)
+                            if !ttft_recorded {
+                                let ttft_ms = provider_start.elapsed().as_millis() as i64;
+                                observability_span.record("gen_ai.ttft_ms", ttft_ms);
+                                ttft_recorded = true;
+                            }
                         }
 
                         // Convert to SSE Event and yield
@@ -7111,6 +7138,11 @@ pub async fn response_create_handler(
                             if let Some(ref gw_req) = gateway_request_clone {
                                 span.record("gen_ai.gateway_request", gw_req.as_str());
                             }
+
+                            // Record total processing time (handler start to stream complete)
+                            span.record("gen_ai.processing_time_ms", processing_start_time_clone.elapsed().as_millis() as i64);
+                            // Record response_time_ms (provider start to stream complete) for streaming analytics
+                            span.record("gen_ai.response_time_ms", provider_start.elapsed().as_millis() as i64);
                         } else {
                             tracing::warn!(
                                 "Could not reconstruct response from {} buffered stream events",
@@ -7154,6 +7186,9 @@ pub async fn response_create_handler(
                     span.record("gen_ai.gateway_response", gateway_response.as_str());
                 }
 
+                // Record total processing time (handler start to response ready)
+                span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
+
                 // Capture usage for analytics headers
                 if let Some(ref usage) = result.response.usage {
                     if let Ok(mut guard) = captured_usage_clone.lock() {
@@ -7181,10 +7216,23 @@ pub async fn response_create_handler(
             let gateway_request_clone = gateway_request.clone();
             let raw_request = gateway_request.clone().unwrap_or_default();
 
+            // Clone processing_start_time for use in async stream closure (for processing_time_ms calculation)
+            let processing_start_time_clone = processing_start_time;
+
+            // Measure provider latency for analytics (time to initiate stream)
+            let provider_start = std::time::Instant::now();
+
             // Handle streaming response
             let stream = model
                 .stream_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
+            let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
+
+            // Capture latency for analytics (gateway_processing_ms calculation)
+            // For streaming, this is the time to initiate the stream (before streaming starts)
+            if let Ok(mut guard) = captured_latency_clone.lock() {
+                *guard = Some(provider_latency_ms);
+            }
 
             // Wrap stream to capture events and record observability after completion
             let sse_stream = async_stream::stream! {
@@ -7192,12 +7240,21 @@ pub async fn response_create_handler(
 
                 let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
                 let mut had_streaming_error = false;
+                // Use provider_start (captured before stream_response) for accurate TTFT
+                let mut ttft_recorded = false;
                 futures::pin_mut!(stream);
 
                 while let Some(result) = stream.next().await {
                     // Buffer successful events for post-stream observability
                     if let Ok(event) = &result {
                         buffer.push(event.clone());
+
+                        // Record TTFT on first successful event (includes full provider latency)
+                        if !ttft_recorded {
+                            let ttft_ms = provider_start.elapsed().as_millis() as i64;
+                            observability_span.record("gen_ai.ttft_ms", ttft_ms);
+                            ttft_recorded = true;
+                        }
                     }
 
                     // Convert to SSE Event and yield
@@ -7258,6 +7315,11 @@ pub async fn response_create_handler(
                         if let Some(ref gw_req) = gateway_request_clone {
                             span.record("gen_ai.gateway_request", gw_req.as_str());
                         }
+
+                        // Record total processing time (handler start to stream complete)
+                        span.record("gen_ai.processing_time_ms", processing_start_time_clone.elapsed().as_millis() as i64);
+                        // Record response_time_ms (provider start to stream complete) for streaming analytics
+                        span.record("gen_ai.response_time_ms", provider_start.elapsed().as_millis() as i64);
                     } else {
                         tracing::warn!(
                             "Could not reconstruct response from {} buffered stream events",
@@ -7308,6 +7370,9 @@ pub async fn response_create_handler(
                 span.record("gen_ai.gateway_response", gateway_response.as_str());
             }
 
+            // Record total processing time (handler start to response ready)
+            span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
+
             // Capture usage for analytics headers
             if let Some(ref usage) = result.response.usage {
                 if let Ok(mut guard) = captured_usage_clone.lock() {
@@ -7353,6 +7418,9 @@ pub async fn response_create_handler(
         if let Ok(gateway_response_json) = serde_json::to_string(&error_body) {
             span.record("gen_ai.gateway_response", gateway_response_json.as_str());
         }
+
+        // Record total processing time even for errors (handler start to error)
+        span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
     }
 
     // Helper to add analytics headers to a response
