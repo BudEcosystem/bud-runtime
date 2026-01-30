@@ -1,5 +1,18 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Tag, Tooltip, Spin } from "antd";
+
+// Hook to detect screen width for responsive tree positioning
+const useScreenWidth = () => {
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1366);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return width;
+};
 
 // Types for Drawer Log Tree
 export interface DrawerLogEntry {
@@ -52,15 +65,23 @@ const DrawerLogRow = ({
   onToggleExpand: () => void;
   onSelect: () => void;
 }) => {
+  const screenWidth = useScreenWidth();
   const hasChildren = node.children && node.children.length > 0;
   const canExpand = node.canExpand || hasChildren;
   const isChild = depth > 0;
   const indentPx = depth * 14; // 14px indent per level (scaled down from 18px)
 
   // Base position for tree lines (scaled down for drawer)
-  // 8px padding + 40px time + 45px namespace = 93px
-  const baseTreePosition = 93;
+  // Responsive calculation based on column widths (adjusted for spacing from expand indicator):
+  // < 1680px: 8px padding + 40px time + 45px namespace - 4px adjustment = 89px
+  // >= 1680px: 8px padding + 52px time + 72px namespace - 5px adjustment = 127px
+  // >= 1920px: 8px padding + 64px time + 92px namespace - 6px adjustment = 158px
+  const baseTreePosition = screenWidth >= 1920 ? 158 : screenWidth >= 1680 ? 127 : 89;
   const expandButtonCenter = 12; // center offset for tag
+
+  // Responsive column widths
+  const timeWidth = screenWidth >= 1920 ? 64 : screenWidth >= 1680 ? 52 : 40;
+  const namespaceWidth = screenWidth >= 1920 ? 92 : screenWidth >= 1680 ? 72 : 45;
 
   return (
     <div
@@ -156,14 +177,14 @@ const DrawerLogRow = ({
           style={{ paddingLeft: "8px", paddingRight: "8px" }}
         >
           {/* Time */}
-          <div style={{ width: "40px", flexShrink: 0 }}>
+          <div style={{ width: `${timeWidth}px`, flexShrink: 0 }}>
             <span className="text-[#B3B3B3] text-[0.5rem]">{node.time}</span>
           </div>
 
           {/* Namespace */}
-          <div style={{ width: "45px", flexShrink: 0 }} className="flex justify-start items-center">
+          <div style={{ width: `${namespaceWidth}px`, flexShrink: 0 }} className="flex justify-start items-center max-w-[80px]">
             <Tooltip title={node.namespace || node.serviceName || "-"} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[0.4375rem] max-w-[42px] truncate px-[.15rem] !leading-[180%]">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[0.4375rem] max-w-[70px] truncate px-[.15rem] !leading-[180%]">
                 {node.namespace || node.serviceName || "-"}
               </Tag>
             </Tooltip>

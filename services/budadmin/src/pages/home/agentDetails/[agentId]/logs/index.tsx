@@ -11,6 +11,7 @@ import {
 import CustomSelect from "src/flows/components/CustomSelect";
 import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useObservabilitySocket } from "@/hooks/useObservabilitySocket";
 
 // API Response Types
 interface TraceSpan {
@@ -75,6 +76,7 @@ interface LogEntry {
 
 interface LogsTabProps {
   promptName?: string;
+  promptId?: string;
   projectId?: string;
 }
 
@@ -104,6 +106,19 @@ const DurationBar = ({
 };
 
 // Single log row component
+// Hook to detect screen width for responsive tree positioning
+const useScreenWidth = () => {
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1366);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return width;
+};
+
 const LogRow = ({
   row,
   referenceDuration,
@@ -129,16 +144,18 @@ const LogRow = ({
   onToggleExpand?: () => void;
   onViewDetails?: (log: LogEntry) => void;
 }) => {
+  const screenWidth = useScreenWidth();
   const hasChildren = row.children && row.children.length > 0;
   const canExpand = row.canExpand || hasChildren;
   const isChild = depth > 0;
   const indentPx = depth * 18; // 18px indent per level
 
   // Base position for tree lines - center of expand button/tag
-  // 12px padding + 50px time + 60px namespace = 122px (start of expand button column)
-  // Tag has min-w-[1.5rem] (24px), centered in 40px container, so center is at ~12px from tag left
-  // With tag centered: (40 - 24) / 2 + 12 = 8 + 12 = 20px, but visually adjust to 12px for tag center
-  const baseTreePosition = 122;
+  // Responsive calculation based on column widths:
+  // < 1680px: 12px padding + 50px time + 60px namespace = 122px
+  // >= 1680px: 12px padding + 65px time + 90px namespace = 167px
+  // >= 1920px: 12px padding + 80px time + 115px namespace = 207px
+  const baseTreePosition = screenWidth >= 1920 ? 207 : screenWidth >= 1680 ? 167 : 122;
   const expandButtonCenter = 15; // center offset to align with middle of min-w-[1.5rem] tag
 
   return (
@@ -241,14 +258,14 @@ const LogRow = ({
           }}
         >
           {/* Time - fixed width, no indent */}
-          <div style={{ width: "50px", flexShrink: 0 }}>
+          <div style={{ flexShrink: 0 }} className="w-[50px] 1680px:w-[65px] 1920px:w-[80px]">
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
           {/* Namespace - fixed width, no indent */}
-          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center">
+          <div style={{ flexShrink: 0 }} className="flex justify-start items-center w-[60px] 1680px:w-[90px] 1920px:w-[115px]">
             <Tooltip title={row.namespace || "-"} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[55px] truncate px-[.2rem] !leading-[200%]">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[80px] truncate px-[.2rem] !leading-[200%]">
                 {row.namespace || "-"}
               </Tag>
             </Tooltip>
@@ -269,11 +286,11 @@ const LogRow = ({
                 }}
               >
                 {row.isLoadingChildren ? (
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%] min-w-[1.5rem]">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%] min-w-[1.5rem] 1920px:min-w-[1.3rem]">
                     <Spin size="small" />
                   </Tag>
                 ) : (
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]  min-w-[1.5rem]">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]  min-w-[1.5rem] 1920px:min-w-[1.3rem]">
                     {isExpanded ? "−" : "+"}{row.childCount || row.children?.length || ""}
                   </Tag>
                 )}
@@ -284,7 +301,7 @@ const LogRow = ({
           {/* Title */}
           <div className="flex items-center overflow-hidden flex-1 min-w-0">
             <Tooltip title={row.title} placement="top">
-              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] block">
+              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] 1680px:max-w-[150px] block">
                 {row.title}
               </Text_10_600_EEEEEE>
             </Tooltip>
@@ -355,14 +372,14 @@ const FlatLogRow = ({
       >
         <div className="flex items-center flex-auto px-3">
           {/* Time */}
-          <div style={{ width: "50px", flexShrink: 0 }}>
+          <div style={{ width: "50px", flexShrink: 0 }} className="1680px:w-[65px] 1920px:w-[80px]">
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
           {/* Status */}
-          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center">
+          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center  1680px:w-[90px] 1920px:w-[115px]">
             <Tooltip title={row.namespace || "-"} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[55px] truncate px-[.2rem]">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[80px] truncate px-[.2rem]">
                 {row.namespace || "-"}
               </Tag>
             </Tooltip>
@@ -371,13 +388,13 @@ const FlatLogRow = ({
           {/* Title */}
           <div className="flex items-center overflow-hidden flex-1 min-w-0">
             <Tooltip title={row.title} placement="top">
-              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] block">
+              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] 1680px:max-w-[150px]  block">
                 {row.title}
               </Text_10_600_EEEEEE>
             </Tooltip>
           </div>
         </div>
-        <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 bg-[#101010]">
+        <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 ">
           {/* Metrics tag */}
           {row.metrics.tag && (
             <Tooltip title={row.metrics.tag} placement="top">
@@ -518,7 +535,9 @@ const getTimeRangeDates = (range: string): { from_date: string; to_date: string 
 
 // Helper function to format timestamp to time string
 const formatTime = (timestamp: string): string => {
+  if (!timestamp) return 'N/A';
   const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Invalid';
   return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -547,7 +566,7 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
       const entry: LogEntry = {
         id: span.span_id,
         time: formatTime(span.timestamp),
-        namespace: span.resource_attributes?.["service.namespace"] || "",
+        namespace: span.resource_attributes?.["service.name"] || "",
         title: span.span_name,
         childCount: span.child_span_count,
         metrics: {
@@ -579,7 +598,7 @@ const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
     return {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.namespace"] || "",
+      namespace: span.resource_attributes?.["service.name"] || "",
       title: span.span_name,
       metrics: {
         tag: span.service_name,
@@ -611,7 +630,7 @@ const buildChildrenFromTraceDetail = (
     const entry: LogEntry = {
       id: span.span_id,
       time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.namespace"] || "",
+      namespace: span.resource_attributes?.["service.name"] || "",
       title: span.span_name,
       childCount: span.child_span_count, // Use child_span_count from API
       metrics: {
@@ -668,7 +687,88 @@ const buildChildrenFromTraceDetail = (
   return directChildren;
 };
 
-const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
+// Helper function to build tree structure from live socket spans
+// This is used for live data where child_span_count is not available
+const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
+  if (!spans || spans.length === 0) return [];
+
+  // Step 1: Group spans by trace_id
+  const spansByTraceId = new Map<string, TraceSpan[]>();
+  spans.forEach(span => {
+    const traceId = span.trace_id;
+    if (!traceId) return;
+    if (!spansByTraceId.has(traceId)) {
+      spansByTraceId.set(traceId, []);
+    }
+    spansByTraceId.get(traceId)!.push(span);
+  });
+
+  const result: LogEntry[] = [];
+
+  // Step 2: For each trace, build tree structure
+  spansByTraceId.forEach((traceSpans) => {
+    // Find root span (no parent_span_id or empty)
+    const rootSpan = traceSpans.find(s => !s.parent_span_id || s.parent_span_id === '');
+    if (!rootSpan) return; // Skip if no root found
+
+    // Find earliest timestamp for offset calculation
+    const timestamps = traceSpans.map(s => new Date(s.timestamp).getTime());
+    const earliestTimestamp = Math.min(...timestamps);
+
+    // Helper to count total descendants recursively
+    const countDescendants = (node: LogEntry): number => {
+      if (!node.children || node.children.length === 0) return 0;
+      return node.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
+    };
+
+    // Recursive function to build children
+    const buildNode = (span: TraceSpan): LogEntry => {
+      const children = traceSpans.filter(s => s.parent_span_id === span.span_id);
+      const childNodes = children.map(c => buildNode(c));
+
+      // Sort children by timestamp
+      childNodes.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
+
+      const timestamp = new Date(span.timestamp).getTime();
+
+      // Calculate total descendant count (all children + grandchildren + etc.)
+      const totalDescendants = childNodes.reduce(
+        (sum, child) => sum + 1 + countDescendants(child),
+        0
+      );
+
+      return {
+        id: span.span_id,
+        time: formatTime(span.timestamp),
+        namespace: span.resource_attributes?.["service.name"] || "",
+        title: span.span_name || 'Unknown Span',
+        childCount: totalDescendants,
+        metrics: { tag: span.service_name || '' },
+        duration: (span.duration ?? 0) / 1_000_000_000,
+        startOffsetSec: (timestamp - earliestTimestamp) / 1000,
+        traceId: span.trace_id,
+        spanId: span.span_id,
+        parentSpanId: span.parent_span_id || '',
+        canExpand: childNodes.length > 0,
+        children: childNodes.length > 0 ? childNodes : undefined,
+        rawData: span as unknown as Record<string, any>,
+      };
+    };
+
+    result.push(buildNode(rootSpan));
+  });
+
+  // Sort result by timestamp (most recent first for live data)
+  result.sort((a, b) => {
+    const timeA = new Date(a.rawData?.timestamp || 0).getTime();
+    const timeB = new Date(b.rawData?.timestamp || 0).getTime();
+    return timeB - timeA; // Descending order (newest first)
+  });
+
+  return result;
+};
+
+const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [timeRange, setTimeRange] = useState("5m");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -682,6 +782,10 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [isLive, setIsLive] = useState(false);
 
+  // Live streaming state
+  const liveSpanIdsRef = useRef<Set<string>>(new Set());
+  const MAX_LIVE_ITEMS = 200;
+
   // View mode and pagination state
   const [viewMode, setViewMode] = useState<'traces' | 'flatten'>('traces');
   const [page, setPage] = useState(1);
@@ -691,6 +795,118 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
 
   // Drawer hook
   const { openDrawer } = useDrawer();
+
+  // Handle incoming live trace data
+  const handleLiveTrace = useCallback((trace: TraceSpan) => {
+    console.log('[LiveTrace] Received trace:', trace);
+
+    // Validate required fields
+    if (!trace || !trace.span_id) {
+      console.warn('[LiveTrace] Invalid trace data - missing span_id:', trace);
+      return;
+    }
+
+    // In traces view, only show root spans (those with empty parent_span_id)
+    if (viewMode === 'traces' && trace.parent_span_id && trace.parent_span_id !== '') {
+      console.log('[LiveTrace] Skipping non-root span:', trace.span_id);
+      return;
+    }
+
+    // Deduplicate by span_id
+    if (liveSpanIdsRef.current.has(trace.span_id)) {
+      console.log('[LiveTrace] Duplicate span, skipping:', trace.span_id);
+      return;
+    }
+    liveSpanIdsRef.current.add(trace.span_id);
+
+    // Transform to LogEntry and prepend to list
+    // Handle both snake_case (from socket) and potential variations
+    const newEntry: LogEntry = {
+      id: trace.span_id,
+      time: trace.timestamp ? formatTime(trace.timestamp) : 'N/A',
+      namespace: trace.resource_attributes?.["service.name"] || "",
+      title: trace.span_name || 'Unknown Span',
+      childCount: trace.child_span_count ?? 0,
+      metrics: { tag: trace.service_name || '' },
+      duration: (trace.duration ?? 0) / 1_000_000_000, // nanoseconds to seconds
+      startOffsetSec: 0,
+      traceId: trace.trace_id,
+      spanId: trace.span_id,
+      parentSpanId: trace.parent_span_id || '',
+      canExpand: (trace.child_span_count ?? 0) > 0,
+      rawData: trace as unknown as Record<string, any>,
+    };
+
+    console.log('[LiveTrace] Created LogEntry:', newEntry);
+    setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
+  }, [viewMode]);
+
+  // Handle batch of live traces (for tree building in traces view)
+  const handleLiveTraceBatch = useCallback((traces: TraceSpan[]) => {
+    console.log('[LiveTrace] Received batch:', traces.length, 'spans');
+
+    if (!traces || traces.length === 0) return;
+
+    if (viewMode === 'traces') {
+      // In traces view, build proper tree structure from batch
+      const newTrees = buildTreeFromLiveSpans(traces);
+      console.log('[LiveTrace] Built', newTrees.length, 'trees from batch');
+
+      if (newTrees.length === 0) return;
+
+      // Track trace IDs for deduplication
+      newTrees.forEach(tree => {
+        if (tree.traceId) {
+          liveSpanIdsRef.current.add(tree.traceId);
+        }
+      });
+
+      // Merge with existing data (prepend new trees, replace existing with same trace_id)
+      setLogsData(prev => {
+        const newTraceIds = new Set(newTrees.map(t => t.traceId));
+        // Filter out existing trees with same trace_id (update scenario)
+        const filteredPrev = prev.filter(p => !newTraceIds.has(p.traceId));
+        return [...newTrees, ...filteredPrev].slice(0, MAX_LIVE_ITEMS);
+      });
+    } else {
+      // In flatten view, process each span individually (existing behavior)
+      traces.forEach(trace => {
+        if (!trace || !trace.span_id) return;
+        if (liveSpanIdsRef.current.has(trace.span_id)) return;
+        liveSpanIdsRef.current.add(trace.span_id);
+
+        const newEntry: LogEntry = {
+          id: trace.span_id,
+          time: trace.timestamp ? formatTime(trace.timestamp) : 'N/A',
+          namespace: trace.resource_attributes?.["service.name"] || "",
+          title: trace.span_name || 'Unknown Span',
+          childCount: 0,
+          metrics: { tag: trace.service_name || '' },
+          duration: (trace.duration ?? 0) / 1_000_000_000,
+          startOffsetSec: 0,
+          traceId: trace.trace_id,
+          spanId: trace.span_id,
+          parentSpanId: trace.parent_span_id || '',
+          canExpand: false,
+          rawData: trace as unknown as Record<string, any>,
+        };
+
+        setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
+      });
+    }
+  }, [viewMode]);
+
+  // Socket hook for live streaming
+  // Note: promptId (UUID) is used for socket subscription, promptName is used for API calls
+  console.log('[LogsTab] Socket params:', { projectId, promptId, promptName, isLive });
+  const { isSubscribed, connectionStatus, error: socketError } = useObservabilitySocket({
+    projectId: projectId || '',
+    promptId: promptId || '',
+    enabled: isLive && !!projectId && !!promptId,
+    onTraceBatchReceived: handleLiveTraceBatch,
+    onTraceReceived: handleLiveTrace,
+    onError: (err) => console.error('[LiveTrace] Socket error:', err),
+  });
 
   const ITEMS_PER_PAGE = 15;
 
@@ -823,6 +1039,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
     setSelectedId(null);
     setPage(1);
     setHasMore(true);
+    setIsAllExpanded(false);
   }, [viewMode]);
 
   // Infinite scroll observer for flatten view
@@ -1055,14 +1272,58 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
     }
   };
 
-  // Close selection handler
+  // Close/Clear handler
   const handleClose = () => {
     setSelectedId(null);
+
+    if (isLive) {
+      // If showing socket data, clear current data and allow new data to appear
+      setLogsData([]);
+      liveSpanIdsRef.current.clear();
+    } else {
+      // If showing regular traces, reset time filter to default and refetch
+      const defaultTimeRange = "5m";
+      if (timeRange === defaultTimeRange) {
+        // If already at default, manually trigger refetch since setState won't cause a change
+        fetchTraces();
+      } else {
+        // Setting timeRange will trigger useEffect which calls fetchTraces
+        setTimeRange(defaultTimeRange);
+      }
+    }
   };
 
   // Toggle live mode
   const handleToggleLive = () => {
-    setIsLive((prev) => !prev);
+    setIsLive((prev) => {
+      if (!prev) {
+        // Enabling live mode: clear existing traces data and deduplication set
+        setLogsData([]);
+        liveSpanIdsRef.current.clear();
+        setExpandedIds(new Set());
+        setIsAllExpanded(false);
+      } else {
+        // Disabling live mode: clear live data and fetch regular traces
+        setLogsData([]);
+        liveSpanIdsRef.current.clear();
+        setExpandedIds(new Set());
+        setIsAllExpanded(false);
+        // Fetch regular traces after state update
+        setTimeout(() => fetchTraces(), 0);
+      }
+      return !prev;
+    });
+  };
+
+  // Handle time range change - disables live mode if active
+  const handleTimeRangeChange = (newRange: string) => {
+    if (isLive) {
+      // Disable live mode and clear live data when changing time filter
+      setIsLive(false);
+      setLogsData([]);
+      liveSpanIdsRef.current.clear();
+    }
+    setTimeRange(newRange);
   };
 
   // Initialize and update echarts
@@ -1172,7 +1433,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
           <CustomSelect
             name="timeRange"
             value={timeRange}
-            onChange={setTimeRange}
+            onChange={handleTimeRangeChange}
             selectOptions={timeRangeOptions}
             ClassNames="w-[160px] !py-[.1rem]"
             InputClasses="!text-[.625rem] !py-[.1rem] !min-h-[1.6rem] !h-[1.6rem]"
@@ -1229,26 +1490,28 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
               : `Showing ${logsData.length} records from the last ${getTimeRangeLabel()}`}
           </Text_12_400_B3B3B3>
           <div className="flex items-center gap-4">
-            {/* Expand/Collapse button */}
-            <button
-              className="flex items-center gap-1.5 text-[#B3B3B3] hover:text-white transition-colors text-xs"
-              onClick={handleExpandCollapseAll}
-              title={isAllExpanded ? "Collapse all" : "Expand all"}
-            >
-              <span>{isAllExpanded ? "Collapse" : "Expand"}</span>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className={isAllExpanded ? "" : "rotate-180"}
+            {/* Expand/Collapse button - only show in traces view */}
+            {viewMode === 'traces' && (
+              <button
+                className="flex items-center gap-1.5 text-[#B3B3B3] hover:text-white transition-colors text-xs"
+                onClick={handleExpandCollapseAll}
+                title={isAllExpanded ? "Collapse all" : "Expand all"}
               >
-                <path d="M4 14l8-8 8 8" />
-                <path d="M4 10l8 8 8-8" />
-              </svg>
-            </button>
+                <span>{isAllExpanded ? "Collapse" : "Expand"}</span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={isAllExpanded ? "" : "rotate-180"}
+                >
+                  <path d="M4 14l8-8 8 8" />
+                  <path d="M4 10l8 8 8-8" />
+                </svg>
+              </button>
+            )}
 
             {/* Close button */}
             <button
@@ -1256,7 +1519,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
               onClick={handleClose}
               title="Close selection"
             >
-              <span>Close</span>
+              <span>Clear</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -1267,13 +1530,24 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, projectId }) => {
             <button
               className={`flex items-center gap-1.5 transition-colors text-xs ${isLive ? "text-white" : "text-[#B3B3B3] hover:text-white"}`}
               onClick={handleToggleLive}
-              title={isLive ? "Disable live mode" : "Enable live mode"}
+              title={isLive ? `Live: ${connectionStatus}${socketError ? ` - ${socketError.message}` : ''}` : "Enable live mode"}
             >
+              {/* Pulsing green dot when subscribed */}
+              {isLive && isSubscribed && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+              )}
+              {/* Loading spinner when connecting */}
+              {isLive && !isSubscribed && connectionStatus !== 'error' && connectionStatus !== 'disconnected' && (
+                <Spin size="small" className="scale-50" />
+              )}
+              {/* Red dot on error */}
+              {isLive && connectionStatus === 'error' && (
+                <span className="h-2 w-2 rounded-full bg-red-500"></span>
+              )}
               <span>Live</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
             </button>
           </div>
         </div>
