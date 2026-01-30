@@ -275,7 +275,8 @@ class DeploymentHandler:
         # Auto-configure scale-to-zero when minReplicas is 0
         # This enables the BudAIScaler to scale down to zero replicas
         if config["minReplicas"] == 0:
-            scale_to_zero_config = budaiscaler.get("scaleToZeroConfig", {})
+            # Use 'or {}' to handle case where scaleToZeroConfig is explicitly None
+            scale_to_zero_config = budaiscaler.get("scaleToZeroConfig") or {}
             config["scaleToZeroConfig"] = {
                 "enabled": scale_to_zero_config.get("enabled", True),
                 "activationScale": scale_to_zero_config.get("activationScale", 1),
