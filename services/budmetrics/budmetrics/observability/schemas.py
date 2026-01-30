@@ -56,8 +56,8 @@ class CredentialUsageItem(BaseModel):
     credential_id: UUID
     """The credential ID (api_key_id from ModelInferenceDetails)."""
 
-    last_used_at: datetime
-    """The most recent timestamp when this credential was used."""
+    last_used_at: Optional[datetime] = None
+    """The most recent timestamp when this credential was used. None if never used."""
 
     request_count: int
     """Total number of requests made with this credential in the time window."""

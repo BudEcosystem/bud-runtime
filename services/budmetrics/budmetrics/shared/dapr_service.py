@@ -62,11 +62,7 @@ class DaprServiceClient:
                 app_id="budapp",
                 method_name="billing/users-with-billing",
                 http_verb="GET",
-                headers={
-                    "Content-Type": "application/json",
-                    # Note: In production, we should add proper service-to-service authentication
-                    # For now, budapp endpoint checks for admin user type
-                },
+                content_type="application/json",
             )
 
             if response.status_code != 200:
