@@ -4,7 +4,7 @@ use crate::error::{DisplayOrDebugGateway, Error, ErrorDetails};
 use crate::model::{Credential, CredentialLocation};
 use crate::responses::{
     OpenAIResponse, OpenAIResponseCreateParams, ResponseInputItemsList, ResponseProvider,
-    ResponseResult, ResponseStreamEvent,
+    ResponseResult, ResponseStreamEvent, ResponseWithRawData,
 };
 use futures::{Stream, StreamExt};
 use reqwest::Client;
@@ -133,10 +133,13 @@ impl ResponseProvider for BudPromptProvider {
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
         baggage: Option<&BaggageData>,
-    ) -> Result<OpenAIResponse, Error> {
+    ) -> Result<ResponseWithRawData, Error> {
         let api_key = self.credentials.get_api_key(dynamic_api_keys)?;
         let request_url = get_responses_url(&self.api_base)?;
         let _start_time = Instant::now();
+
+        // Serialize the request for raw_request capture (before sending)
+        let raw_request = serde_json::to_string(&request).unwrap_or_default();
 
         let mut request_builder = client
             .post(request_url)
@@ -181,7 +184,7 @@ impl ResponseProvider for BudPromptProvider {
             handle_reqwest_error(
                 e,
                 PROVIDER_TYPE,
-                Some(serde_json::to_string(&request).unwrap_or_default()),
+                Some(raw_request.clone()),
             )
         })?;
 
@@ -192,7 +195,7 @@ impl ResponseProvider for BudPromptProvider {
                         "Error parsing text response: {}",
                         DisplayOrDebugGateway::new(e)
                     ),
-                    raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                    raw_request: Some(raw_request.clone()),
                     raw_response: None,
                     provider_type: PROVIDER_TYPE.to_string(),
                 })
@@ -204,16 +207,20 @@ impl ResponseProvider for BudPromptProvider {
                         "Error parsing JSON response: {}",
                         DisplayOrDebugGateway::new(e)
                     ),
-                    raw_request: Some(serde_json::to_string(&request).unwrap_or_default()),
+                    raw_request: Some(raw_request.clone()),
                     raw_response: Some(raw_response.clone()),
                     provider_type: PROVIDER_TYPE.to_string(),
                 })
             })?;
 
-            Ok(response)
+            Ok(ResponseWithRawData {
+                response,
+                raw_request,
+                raw_response,
+            })
         } else {
             Err(handle_budprompt_error(
-                &serde_json::to_string(&request).unwrap_or_default(),
+                &raw_request,
                 res.status(),
                 &res.text().await.unwrap_or_default(),
             ))
@@ -830,7 +837,14 @@ impl ResponseProvider for BudPromptProvider {
                 })
             })?;
 
-            Ok(ResponseResult::NonStreaming(response))
+            // Create raw_request for observability
+            let raw_request = serde_json::to_string(&request).unwrap_or_default();
+
+            Ok(ResponseResult::NonStreaming(ResponseWithRawData {
+                response,
+                raw_request,
+                raw_response,
+            }))
         } else {
             Err(Error::new(ErrorDetails::InferenceServer {
                 message: format!(

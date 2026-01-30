@@ -6860,6 +6860,16 @@ fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Optio
 
         // Inference ID (for ClickHouse InferenceFact table)
         gen_ai.inference_id = tracing::field::Empty,
+
+        // Timing fields (for ClickHouse InferenceFact table)
+        gen_ai.request_arrival_time = tracing::field::Empty,
+        gen_ai.request_forward_time = tracing::field::Empty,
+
+        // Request/Response content fields (for ClickHouse InferenceFact table)
+        gen_ai.raw_request = tracing::field::Empty,
+        gen_ai.raw_response = tracing::field::Empty,
+        gen_ai.gateway_request = tracing::field::Empty,
+        gen_ai.gateway_response = tracing::field::Empty,
     )
 )]
 #[debug_handler(state = AppStateData)]
@@ -6876,6 +6886,9 @@ pub async fn response_create_handler(
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
 ) -> Result<Response<Body>, Error> {
+    // Capture request arrival time for observability
+    let request_arrival_time = chrono::Utc::now();
+
     // Record request fields for observability
     super::observability::record_response_request(&params);
 
@@ -6883,6 +6896,7 @@ pub async fn response_create_handler(
     let inference_id = uuid::Uuid::now_v7();
     let span = tracing::Span::current();
     span.record("gen_ai.inference_id", inference_id.to_string().as_str());
+    span.record("gen_ai.request_arrival_time", request_arrival_time.to_rfc3339().as_str());
 
     // Capture prompt info for analytics headers (before params is moved into async block)
     let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());
@@ -6908,6 +6922,10 @@ pub async fn response_create_handler(
     let captured_latency: std::sync::Arc<std::sync::Mutex<Option<u32>>> =
         std::sync::Arc::new(std::sync::Mutex::new(None));
     let captured_latency_clone = captured_latency.clone();
+
+    // Capture gateway_request before async block so it's available for error handling
+    // This must be captured here since params is moved into the async block
+    let gateway_request_for_error = serialize_without_nulls(&params).ok();
 
     let result = async {
         if !params.unknown_fields.is_empty() {
@@ -7017,6 +7035,11 @@ pub async fn response_create_handler(
 
         match result {
             ResponseResult::Streaming(stream) => {
+                // Clone gateway_request for use in async stream closure
+                // For responses API, raw_request is the same as gateway_request since we pass through to provider
+                let gateway_request_clone = gateway_request.clone();
+                let raw_request = gateway_request.clone().unwrap_or_default();
+
                 // Wrap stream to capture events and record observability after completion
                 let sse_stream = async_stream::stream! {
                     use futures::StreamExt;
@@ -7065,6 +7088,29 @@ pub async fn response_create_handler(
                                 response.id
                             );
                             super::observability::record_response_result(&response);
+
+                            // Record timing and request/response fields for streaming
+                            // (Follows same pattern as chat completions in inference.rs)
+                            let request_forward_time = chrono::Utc::now();
+                            let span = tracing::Span::current();
+
+                            // Record timing
+                            span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+                            // Record raw_request (for responses API, this is the serialized params)
+                            span.record("gen_ai.raw_request", raw_request.as_str());
+
+                            // For streaming, raw_response and gateway_response are the reconstructed response JSON
+                            // (Similar to how chat completions joins gateway_response_chunks)
+                            if let Ok(response_json) = serde_json::to_string(&response) {
+                                span.record("gen_ai.raw_response", response_json.as_str());
+                                span.record("gen_ai.gateway_response", response_json.as_str());
+                            }
+
+                            // Record gateway_request
+                            if let Some(ref gw_req) = gateway_request_clone {
+                                span.record("gen_ai.gateway_request", gw_req.as_str());
+                            }
                         } else {
                             tracing::warn!(
                                 "Could not reconstruct response from {} buffered stream events",
@@ -7076,22 +7122,40 @@ pub async fn response_create_handler(
 
                 Ok(Sse::new(sse_stream).into_response())
             }
-            ResponseResult::NonStreaming(response) => {
+            ResponseResult::NonStreaming(result) => {
+                // Capture request_forward_time (when gateway completed processing)
+                let request_forward_time = chrono::Utc::now();
+
                 // Log the response size for debugging
-                if let Ok(response_json) = serde_json::to_string(&response) {
+                if let Ok(response_json) = serde_json::to_string(&result.response) {
                     tracing::debug!("Response size: {} bytes", response_json.len());
                 }
 
                 // Record response fields for observability
-                super::observability::record_response_result(&response);
+                super::observability::record_response_result(&result.response);
 
                 // Record provider latency as span attribute for ClickHouse materialized view
                 // This is the gateway-calculated latency: time from request to provider until response received
                 let span = tracing::Span::current();
                 span.record("gen_ai.response_time_ms", provider_latency_ms as i64);
 
+                // Record timing fields
+                span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+                // Record raw request/response from provider
+                span.record("gen_ai.raw_request", result.raw_request.as_str());
+                span.record("gen_ai.raw_response", result.raw_response.as_str());
+
+                // Record gateway request/response
+                if let Some(ref gw_req) = gateway_request {
+                    span.record("gen_ai.gateway_request", gw_req.as_str());
+                }
+                if let Ok(gateway_response) = serde_json::to_string(&result.response) {
+                    span.record("gen_ai.gateway_response", gateway_response.as_str());
+                }
+
                 // Capture usage for analytics headers
-                if let Some(ref usage) = response.usage {
+                if let Some(ref usage) = result.response.usage {
                     if let Ok(mut guard) = captured_usage_clone.lock() {
                         *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
                     }
@@ -7102,7 +7166,7 @@ pub async fn response_create_handler(
                     *guard = Some(provider_latency_ms);
                 }
 
-                Ok(Json(response).into_response())
+                Ok(Json(result.response).into_response())
             }
         }
     } else {
@@ -7111,6 +7175,11 @@ pub async fn response_create_handler(
             // Capture the current span BEFORE calling model methods
             // This ensures the span stays alive until streaming completes
             let observability_span = tracing::Span::current();
+
+            // Clone gateway_request for use in async stream closure
+            // For responses API, raw_request is the same as gateway_request since we pass through to provider
+            let gateway_request_clone = gateway_request.clone();
+            let raw_request = gateway_request.clone().unwrap_or_default();
 
             // Handle streaming response
             let stream = model
@@ -7166,6 +7235,29 @@ pub async fn response_create_handler(
                             response.id
                         );
                         super::observability::record_response_result(&response);
+
+                        // Record timing and request/response fields for streaming
+                        // (Follows same pattern as chat completions in inference.rs)
+                        let request_forward_time = chrono::Utc::now();
+                        let span = tracing::Span::current();
+
+                        // Record timing
+                        span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+                        // Record raw_request (for responses API, this is the serialized params)
+                        span.record("gen_ai.raw_request", raw_request.as_str());
+
+                        // For streaming, raw_response and gateway_response are the reconstructed response JSON
+                        // (Similar to how chat completions joins gateway_response_chunks)
+                        if let Ok(response_json) = serde_json::to_string(&response) {
+                            span.record("gen_ai.raw_response", response_json.as_str());
+                            span.record("gen_ai.gateway_response", response_json.as_str());
+                        }
+
+                        // Record gateway_request
+                        if let Some(ref gw_req) = gateway_request_clone {
+                            span.record("gen_ai.gateway_request", gw_req.as_str());
+                        }
                     } else {
                         tracing::warn!(
                             "Could not reconstruct response from {} buffered stream events",
@@ -7180,26 +7272,44 @@ pub async fn response_create_handler(
             // Handle non-streaming response
             // Measure provider latency for analytics
             let provider_start = std::time::Instant::now();
-            let response = model
+            let result = model
                 .create_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
             let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
 
+            // Capture request_forward_time (when gateway completed processing)
+            let request_forward_time = chrono::Utc::now();
+
             // Log the response size for debugging
-            if let Ok(response_json) = serde_json::to_string(&response) {
+            if let Ok(response_json) = serde_json::to_string(&result.response) {
                 tracing::debug!("Response size: {} bytes", response_json.len());
             }
 
             // Record response fields for observability
-            super::observability::record_response_result(&response);
+            super::observability::record_response_result(&result.response);
 
             // Record provider latency as span attribute for ClickHouse materialized view
             // This is the gateway-calculated latency: time from request to provider until response received
             let span = tracing::Span::current();
             span.record("gen_ai.response_time_ms", provider_latency_ms as i64);
 
+            // Record timing fields
+            span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+            // Record raw request/response from provider
+            span.record("gen_ai.raw_request", result.raw_request.as_str());
+            span.record("gen_ai.raw_response", result.raw_response.as_str());
+
+            // Record gateway request/response
+            if let Some(ref gw_req) = gateway_request {
+                span.record("gen_ai.gateway_request", gw_req.as_str());
+            }
+            if let Ok(gateway_response) = serde_json::to_string(&result.response) {
+                span.record("gen_ai.gateway_response", gateway_response.as_str());
+            }
+
             // Capture usage for analytics headers
-            if let Some(ref usage) = response.usage {
+            if let Some(ref usage) = result.response.usage {
                 if let Ok(mut guard) = captured_usage_clone.lock() {
                     *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
                 }
@@ -7210,7 +7320,7 @@ pub async fn response_create_handler(
                 *guard = Some(provider_latency_ms);
             }
 
-            Ok(Json(response).into_response())
+            Ok(Json(result.response).into_response())
         }
     }
     }
@@ -7219,6 +7329,30 @@ pub async fn response_create_handler(
     // Record error on span if request failed
     if let Err(ref error) = result {
         super::observability::record_error(error);
+
+        // Record request/response fields for parity with /v1/chat/completions in error scenarios
+        // This ensures ClickHouse InferenceFact has the same fields populated for both endpoints
+        let span = tracing::Span::current();
+
+        // Record gateway_request (client's request to the gateway)
+        if let Some(ref gw_req) = gateway_request_for_error {
+            span.record("gen_ai.gateway_request", gw_req.as_str());
+        }
+
+        // For responses API, raw_request is the same as gateway_request (the request is passed through to provider)
+        if let Some(ref gw_req) = gateway_request_for_error {
+            span.record("gen_ai.raw_request", gw_req.as_str());
+        }
+
+        // raw_response contains the error message (matches chat completions pattern from extract_failure_model_inference)
+        span.record("gen_ai.raw_response", error.to_string().as_str());
+
+        // gateway_response contains the JSON error response sent to the client
+        // This is what error.into_response() would serialize
+        let (_status_code, error_body) = error.to_response_json();
+        if let Ok(gateway_response_json) = serde_json::to_string(&error_body) {
+            span.record("gen_ai.gateway_response", gateway_response_json.as_str());
+        }
     }
 
     // Helper to add analytics headers to a response

@@ -2414,8 +2414,8 @@ class ClickHouseMigration:
 
             -- ===== TIMESTAMPS =====
             toDateTime64(r.Timestamp, 3) AS timestamp,
-            CAST(NULL AS Nullable(DateTime64(3))) AS request_arrival_time,
-            CAST(NULL AS Nullable(DateTime64(3))) AS request_forward_time,
+            parseDateTime64BestEffortOrNull(r.SpanAttributes['gen_ai.request_arrival_time']) AS request_arrival_time,
+            parseDateTime64BestEffortOrNull(r.SpanAttributes['gen_ai.request_forward_time']) AS request_forward_time,
 
             -- ===== STATUS & COST =====
             -- is_success: false if error fields are present OR response status is failed
@@ -2456,10 +2456,10 @@ class ClickHouseMigration:
             nullIf(r.SpanAttributes['gen_ai.system.instructions'], '') AS system_prompt,
             nullIf(r.SpanAttributes['gen_ai.input.messages'], '') AS input_messages,
             nullIf(r.SpanAttributes['gen_ai.output.messages'], '') AS output,
-            CAST(NULL AS Nullable(String)) AS raw_request,
-            CAST(NULL AS Nullable(String)) AS raw_response,
-            CAST(NULL AS Nullable(String)) AS gateway_request,
-            CAST(NULL AS Nullable(String)) AS gateway_response,
+            nullIf(r.SpanAttributes['gen_ai.raw_request'], '') AS raw_request,
+            nullIf(r.SpanAttributes['gen_ai.raw_response'], '') AS raw_response,
+            nullIf(r.SpanAttributes['gen_ai.gateway_request'], '') AS gateway_request,
+            nullIf(r.SpanAttributes['gen_ai.gateway_response'], '') AS gateway_response,
             CAST(NULL AS Nullable(String)) AS guardrail_scan_summary,
             CAST(NULL AS Nullable(UInt64)) AS model_inference_timestamp,
 
