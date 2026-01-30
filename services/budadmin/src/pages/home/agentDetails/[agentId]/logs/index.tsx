@@ -106,6 +106,19 @@ const DurationBar = ({
 };
 
 // Single log row component
+// Hook to detect screen width for responsive tree positioning
+const useScreenWidth = () => {
+  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1366);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return width;
+};
+
 const LogRow = ({
   row,
   referenceDuration,
@@ -131,16 +144,18 @@ const LogRow = ({
   onToggleExpand?: () => void;
   onViewDetails?: (log: LogEntry) => void;
 }) => {
+  const screenWidth = useScreenWidth();
   const hasChildren = row.children && row.children.length > 0;
   const canExpand = row.canExpand || hasChildren;
   const isChild = depth > 0;
   const indentPx = depth * 18; // 18px indent per level
 
   // Base position for tree lines - center of expand button/tag
-  // 12px padding + 50px time + 60px namespace = 122px (start of expand button column)
-  // Tag has min-w-[1.5rem] (24px), centered in 40px container, so center is at ~12px from tag left
-  // With tag centered: (40 - 24) / 2 + 12 = 8 + 12 = 20px, but visually adjust to 12px for tag center
-  const baseTreePosition = 122;
+  // Responsive calculation based on column widths:
+  // < 1680px: 12px padding + 50px time + 60px namespace = 122px
+  // >= 1680px: 12px padding + 65px time + 90px namespace = 167px
+  // >= 1920px: 12px padding + 80px time + 115px namespace = 207px
+  const baseTreePosition = screenWidth >= 1920 ? 207 : screenWidth >= 1680 ? 167 : 122;
   const expandButtonCenter = 15; // center offset to align with middle of min-w-[1.5rem] tag
 
   return (
@@ -243,14 +258,14 @@ const LogRow = ({
           }}
         >
           {/* Time - fixed width, no indent */}
-          <div style={{ width: "50px", flexShrink: 0 }}>
+          <div style={{ flexShrink: 0 }} className="w-[50px] 1680px:w-[65px] 1920px:w-[80px]">
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
           {/* Namespace - fixed width, no indent */}
-          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center">
+          <div style={{ flexShrink: 0 }} className="flex justify-start items-center w-[60px] 1680px:w-[90px] 1920px:w-[115px]">
             <Tooltip title={row.namespace || "-"} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[55px] truncate px-[.2rem] !leading-[200%]">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[80px] truncate px-[.2rem] !leading-[200%]">
                 {row.namespace || "-"}
               </Tag>
             </Tooltip>
@@ -271,11 +286,11 @@ const LogRow = ({
                 }}
               >
                 {row.isLoadingChildren ? (
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%] min-w-[1.5rem]">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%] min-w-[1.5rem] 1920px:min-w-[1.3rem]">
                     <Spin size="small" />
                   </Tag>
                 ) : (
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]  min-w-[1.5rem]">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[.5rem] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]  min-w-[1.5rem] 1920px:min-w-[1.3rem]">
                     {isExpanded ? "−" : "+"}{row.childCount || row.children?.length || ""}
                   </Tag>
                 )}
@@ -286,7 +301,7 @@ const LogRow = ({
           {/* Title */}
           <div className="flex items-center overflow-hidden flex-1 min-w-0">
             <Tooltip title={row.title} placement="top">
-              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] block">
+              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] 1680px:max-w-[150px] block">
                 {row.title}
               </Text_10_600_EEEEEE>
             </Tooltip>
@@ -357,14 +372,14 @@ const FlatLogRow = ({
       >
         <div className="flex items-center flex-auto px-3">
           {/* Time */}
-          <div style={{ width: "50px", flexShrink: 0 }}>
+          <div style={{ width: "50px", flexShrink: 0 }} className="1680px:w-[65px] 1920px:w-[80px]">
             <Text_10_400_B3B3B3>{row.time}</Text_10_400_B3B3B3>
           </div>
 
           {/* Status */}
-          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center">
+          <div style={{ width: "60px", flexShrink: 0 }} className="flex justify-start items-center  1680px:w-[90px] 1920px:w-[115px]">
             <Tooltip title={row.namespace || "-"} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[55px] truncate px-[.2rem]">
+              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[80px] truncate px-[.2rem]">
                 {row.namespace || "-"}
               </Tag>
             </Tooltip>
@@ -373,13 +388,13 @@ const FlatLogRow = ({
           {/* Title */}
           <div className="flex items-center overflow-hidden flex-1 min-w-0">
             <Tooltip title={row.title} placement="top">
-              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] block">
+              <Text_10_600_EEEEEE className="ibm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] 1680px:max-w-[150px]  block">
                 {row.title}
               </Text_10_600_EEEEEE>
             </Tooltip>
           </div>
         </div>
-        <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 bg-[#101010]">
+        <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 ">
           {/* Metrics tag */}
           {row.metrics.tag && (
             <Tooltip title={row.metrics.tag} placement="top">
@@ -1024,6 +1039,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     setSelectedId(null);
     setPage(1);
     setHasMore(true);
+    setIsAllExpanded(false);
   }, [viewMode]);
 
   // Infinite scroll observer for flatten view
@@ -1284,6 +1300,16 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         // Enabling live mode: clear existing traces data and deduplication set
         setLogsData([]);
         liveSpanIdsRef.current.clear();
+        setExpandedIds(new Set());
+        setIsAllExpanded(false);
+      } else {
+        // Disabling live mode: clear live data and fetch regular traces
+        setLogsData([]);
+        liveSpanIdsRef.current.clear();
+        setExpandedIds(new Set());
+        setIsAllExpanded(false);
+        // Fetch regular traces after state update
+        setTimeout(() => fetchTraces(), 0);
       }
       return !prev;
     });
@@ -1464,26 +1490,28 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
               : `Showing ${logsData.length} records from the last ${getTimeRangeLabel()}`}
           </Text_12_400_B3B3B3>
           <div className="flex items-center gap-4">
-            {/* Expand/Collapse button */}
-            <button
-              className="flex items-center gap-1.5 text-[#B3B3B3] hover:text-white transition-colors text-xs"
-              onClick={handleExpandCollapseAll}
-              title={isAllExpanded ? "Collapse all" : "Expand all"}
-            >
-              <span>{isAllExpanded ? "Collapse" : "Expand"}</span>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className={isAllExpanded ? "" : "rotate-180"}
+            {/* Expand/Collapse button - only show in traces view */}
+            {viewMode === 'traces' && (
+              <button
+                className="flex items-center gap-1.5 text-[#B3B3B3] hover:text-white transition-colors text-xs"
+                onClick={handleExpandCollapseAll}
+                title={isAllExpanded ? "Collapse all" : "Expand all"}
               >
-                <path d="M4 14l8-8 8 8" />
-                <path d="M4 10l8 8 8-8" />
-              </svg>
-            </button>
+                <span>{isAllExpanded ? "Collapse" : "Expand"}</span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={isAllExpanded ? "" : "rotate-180"}
+                >
+                  <path d="M4 14l8-8 8 8" />
+                  <path d="M4 10l8 8 8-8" />
+                </svg>
+              </button>
+            )}
 
             {/* Close button */}
             <button
