@@ -1603,12 +1603,16 @@ class ClickHouseMigration:
         LEFT JOIN metrics.otel_traces h
             ON g.TraceId = h.TraceId
             AND h.SpanName LIKE '%%_handler_observability'
+            AND h.SpanName != 'response_create_handler_observability'
+            AND g.SpanAttributes['gateway_analytics.inference_id'] = h.SpanAttributes['model_inference_details.inference_id']
         WHERE g.SpanName = 'gateway_analytics'
           AND g.SpanAttributes['gateway_analytics.path'] LIKE '/v1/%%'
           -- Exclude administrative endpoints (no inference)
           AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/files%%'
           AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/batches%%'
           AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/models%%'
+          -- Exclude /v1/responses (handled by mv_otel_response_to_inference_fact)
+          AND g.SpanAttributes['gateway_analytics.path'] != '/v1/responses'
         """
 
         try:
