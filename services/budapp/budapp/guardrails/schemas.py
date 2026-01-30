@@ -18,7 +18,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -76,6 +76,8 @@ class GuardrailModelStatus(BaseModel):
     model_id: UUID4 | None = None
     model_provider_type: str | None = None
     tags: list[dict] | None = None  # Rule tags to use for onboarding
+    local_path: str | None = None  # Local cached path after onboarding
+    supported_endpoints: list[str] | None = None  # Model endpoint types for budsim
 
     # Status
     status: ModelDeploymentStatus
@@ -662,12 +664,10 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     severity_threshold: float | None = None
     # Model deployment fields
     cluster_id: UUID4 | None = None
-    deployment_config: dict | None = None
+    hardware_mode: Literal["dedicated", "shared"] | None = None
+    deploy_config: dict | None = None  # Default config applied to all models
+    per_model_deployment_configs: list[dict] | None = None  # Per-model configs: [{model_id/model_uri, deploy_config}]
     callback_topics: list[str] | None = None
-    # Model status derivation flag - set to True to derive model statuses at this step
-    derive_model_statuses: bool = False
-    # Trigger model onboarding - set to True to start onboarding models that require it
-    trigger_onboarding: bool = False
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":
@@ -719,6 +719,11 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
     severity_threshold: float | None = None
+    # Model deployment fields
+    hardware_mode: Literal["dedicated", "shared"] | None = None
+    deploy_config: dict | None = None  # Default config for all models
+    per_model_deployment_configs: list[dict] | None = None  # Per-model configs
+    cluster_id: UUID4 | None = None  # Global cluster_id for deployment
     # Model status fields (populated when derive_model_statuses=True)
     model_statuses: list[dict] | None = None
     total_models: int | None = None
@@ -730,9 +735,14 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     # Cluster selection fields
     selected_cluster_id: UUID4 | None = None
     cluster_recommendations: list[dict] | None = None
-    # Deployment tracking fields
-    pipeline_execution_id: UUID4 | None = None
-    pipeline_status: str | None = None
+    # Onboarding events: {execution_id, status, results}
+    onboarding_events: dict | None = None
+    # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
+    simulation_events: dict | None = None
+    # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
+    deployment_events: dict | None = None
+    # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
+    pending_profile_data: dict | None = None
 
 
 class BudSentinelConfig(BaseModel):

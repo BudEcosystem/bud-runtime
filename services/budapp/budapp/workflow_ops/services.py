@@ -189,13 +189,21 @@ class WorkflowService(SessionMixin):
             _selected_cluster_id = required_data.get("selected_cluster_id")  # noqa: F841
             _cluster_recommendations = required_data.get("cluster_recommendations")  # noqa: F841
             recommended_clusters = required_data.get("recommended_clusters")
-            per_model_configs = required_data.get("per_model_configs")
+            per_model_deployment_configs = required_data.get("per_model_deployment_configs")
             models_to_deploy = required_data.get("models_to_deploy")
             models_to_reuse = required_data.get("models_to_reuse")
-            # Deployment tracking fields
-            pipeline_execution_id = required_data.get("pipeline_execution_id")
-            pipeline_status = required_data.get("pipeline_status")
-            pipeline_results = required_data.get("pipeline_results")
+            # Deployment config fields
+            hardware_mode = required_data.get("hardware_mode")
+            deploy_config = required_data.get("deploy_config")
+            # Onboarding events: {execution_id, status, results}
+            onboarding_events = required_data.get("onboarding_events")
+            # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
+            simulation_events = required_data.get("simulation_events")
+            # Deployment events: {execution_id, results: [{model_id, cluster_id, status, endpoint_id}], total, successful, failed, running}
+            deployment_events = required_data.get("deployment_events")
+            # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
+            pending_profile_data = required_data.get("pending_profile_data")
+            # Deployment results
             deployment_id = required_data.get("deployment_id")
             deployed_endpoint_ids = required_data.get("deployed_endpoint_ids")
 
@@ -455,13 +463,18 @@ class WorkflowService(SessionMixin):
                 credential_required=credential_required,
                 # Cluster selection fields
                 recommended_clusters=recommended_clusters if recommended_clusters else None,
-                per_model_configs=per_model_configs if per_model_configs else None,
+                per_model_deployment_configs=per_model_deployment_configs if per_model_deployment_configs else None,
                 models_to_deploy=models_to_deploy if models_to_deploy else None,
                 models_to_reuse=models_to_reuse if models_to_reuse else None,
-                # Deployment tracking fields
-                pipeline_execution_id=pipeline_execution_id if pipeline_execution_id else None,
-                pipeline_status=pipeline_status if pipeline_status else None,
-                pipeline_results=pipeline_results if pipeline_results else None,
+                # Onboarding events: {execution_id, status, results}
+                onboarding_events=onboarding_events if onboarding_events else None,
+                # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
+                simulation_events=simulation_events if simulation_events else None,
+                # Deployment events: {execution_id, results: [{model_id, cluster_id, status, endpoint_id}], total, successful, failed, running}
+                deployment_events=deployment_events if deployment_events else None,
+                # Pending profile data: stored when deployment is in progress
+                pending_profile_data=pending_profile_data if pending_profile_data else None,
+                # Deployment results
                 deployment_id=deployment_id if deployment_id else None,
                 deployed_endpoint_ids=deployed_endpoint_ids if deployed_endpoint_ids else None,
                 prompt_type=prompt_type if prompt_type else None,
@@ -638,7 +651,11 @@ class WorkflowService(SessionMixin):
                 "probe_selections",
                 "guard_types",
                 "severity_threshold",
-                # Model status fields (populated when derive_model_statuses=True)
+                # Deployment config fields
+                "hardware_mode",
+                "deploy_config",
+                "per_model_deployment_configs",
+                # Model status fields
                 "model_statuses",
                 "total_models",
                 "models_requiring_onboarding",
@@ -650,15 +667,16 @@ class WorkflowService(SessionMixin):
                 "selected_cluster_id",
                 "cluster_recommendations",
                 "recommended_clusters",
-                "per_model_configs",
                 "models_to_deploy",
                 "models_to_reuse",
-                # Deployment tracking fields
-                "pipeline_execution_id",
-                "pipeline_status",
-                "pipeline_results",
-                "deployment_id",
-                "deployed_endpoint_ids",
+                # Onboarding events: {execution_id, status, results}
+                "onboarding_events",
+                # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
+                "simulation_events",
+                # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
+                "deployment_events",
+                # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
+                "pending_profile_data",
             ],
             "prompt_creation": [
                 "model_id",
