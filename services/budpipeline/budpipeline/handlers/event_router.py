@@ -752,6 +752,10 @@ async def _continue_pipeline_execution(
                 outputs={},
                 error_message=str(e),
             )
+            # Commit the failure and finalize execution
+            await session.commit()
+            updated_steps = await step_crud.get_by_execution_id(execution_id)
+            await _check_and_finalize_execution(session, execution_id, updated_steps)
             continue
 
         if result.success:
@@ -806,3 +810,8 @@ async def _continue_pipeline_execution(
                 error_message=result.error,
             )
             logger.warning(f"Step {step_id} failed: {result.error}")
+
+            # Commit the failure and finalize execution
+            await session.commit()
+            updated_steps = await step_crud.get_by_execution_id(execution_id)
+            await _check_and_finalize_execution(session, execution_id, updated_steps)

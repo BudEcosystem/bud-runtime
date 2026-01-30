@@ -196,6 +196,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       iconSvg: true,
       customSvg: "tools",
       cmd: "H",
+      hide: !enableDevMode,
     },
     {
       label: "Pipelines",
@@ -203,6 +204,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
       cmd: "J",
+      hide: !enableDevMode,
     },
   ]
 
