@@ -1890,6 +1890,9 @@ class ClickHouseMigration:
             model_id Nullable(UUID) CODEC(ZSTD(1)),
             api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
 
+            -- Prompt dimension (for filtering by prompt)
+            prompt_id Nullable(String) CODEC(ZSTD(1)),
+
             -- String dimensions (for grouping)
             model_name LowCardinality(String) CODEC(ZSTD(1)),
             model_provider LowCardinality(String) CODEC(ZSTD(1)),
@@ -1922,6 +1925,9 @@ class ClickHouseMigration:
             unique_episodes AggregateFunction(uniq, Nullable(UUID)),
             unique_api_keys AggregateFunction(uniq, Nullable(UUID)),
 
+            -- Prompt analytics aggregate
+            unique_prompts AggregateFunction(uniq, Nullable(String)),
+
             -- Blocking metrics
             block_count UInt64 DEFAULT 0 CODEC(Delta, ZSTD(1)),
             unique_blocked_ips AggregateFunction(uniq, IPv4)
@@ -1939,7 +1945,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1956,7 +1962,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1973,7 +1979,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -2035,6 +2041,9 @@ class ClickHouseMigration:
             model_id,
             api_key_project_id,
 
+            -- Prompt dimension
+            prompt_id,
+
             -- String dimensions
             model_name,
             model_provider,
@@ -2067,6 +2076,9 @@ class ClickHouseMigration:
             uniqState(episode_id) AS unique_episodes,
             uniqState(api_key_id) AS unique_api_keys,
 
+            -- Prompt analytics aggregate
+            uniqState(prompt_id) AS unique_prompts,
+
             -- Blocking metrics
             countIf(is_blocked = true) AS block_count,
             uniqStateIf(client_ip, is_blocked = true) AS unique_blocked_ips
@@ -2074,7 +2086,7 @@ class ClickHouseMigration:
         FROM InferenceFact
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id,
+            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2090,6 +2102,9 @@ class ClickHouseMigration:
             model_id,
             api_key_project_id,
 
+            -- Prompt dimension
+            prompt_id,
+
             -- String dimensions
             model_name,
             model_provider,
@@ -2122,6 +2137,9 @@ class ClickHouseMigration:
             uniqMergeState(unique_episodes) AS unique_episodes,
             uniqMergeState(unique_api_keys) AS unique_api_keys,
 
+            -- Prompt analytics aggregate
+            uniqMergeState(unique_prompts) AS unique_prompts,
+
             -- Blocking metrics
             sum(block_count) AS block_count,
             uniqMergeState(unique_blocked_ips) AS unique_blocked_ips
@@ -2129,7 +2147,7 @@ class ClickHouseMigration:
         FROM InferenceMetrics5m
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id,
+            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2145,6 +2163,9 @@ class ClickHouseMigration:
             model_id,
             api_key_project_id,
 
+            -- Prompt dimension
+            prompt_id,
+
             -- String dimensions
             model_name,
             model_provider,
@@ -2177,6 +2198,9 @@ class ClickHouseMigration:
             uniqMergeState(unique_episodes) AS unique_episodes,
             uniqMergeState(unique_api_keys) AS unique_api_keys,
 
+            -- Prompt analytics aggregate
+            uniqMergeState(unique_prompts) AS unique_prompts,
+
             -- Blocking metrics
             sum(block_count) AS block_count,
             uniqMergeState(unique_blocked_ips) AS unique_blocked_ips
@@ -2184,7 +2208,7 @@ class ClickHouseMigration:
         FROM InferenceMetrics1h
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id,
+            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -3099,6 +3123,82 @@ class ClickHouseMigration:
 
         logger.info("Blocking metrics columns migration to rollup tables completed successfully")
 
+    async def add_prompt_analytics_to_rollup_tables(self):
+        """Add prompt analytics columns to InferenceMetrics rollup tables.
+
+        This migration adds prompt_id dimension and unique_prompts aggregate to:
+        - InferenceMetrics5m
+        - InferenceMetrics1h
+        - InferenceMetrics1d
+
+        These columns enable efficient querying of prompt-specific analytics for /v1/responses.
+        """
+        logger.info("Adding prompt analytics columns to rollup tables...")
+
+        tables = ["InferenceMetrics5m", "InferenceMetrics1h", "InferenceMetrics1d"]
+
+        for table_name in tables:
+            try:
+                # Check if table exists
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    logger.info(f"{table_name} table does not exist. Skipping prompt analytics migration.")
+                    continue
+
+                # Define columns to add
+                columns_to_add = [
+                    ("prompt_id", "Nullable(String) CODEC(ZSTD(1))"),
+                    ("unique_prompts", "AggregateFunction(uniq, Nullable(String))"),
+                ]
+
+                for column_name, column_type in columns_to_add:
+                    try:
+                        # Check if column already exists
+                        check_column_query = f"""
+                        SELECT COUNT(*)
+                        FROM system.columns
+                        WHERE table = '{table_name}'
+                          AND database = currentDatabase()
+                          AND name = '{column_name}'
+                        """
+                        result = await self.client.execute_query(check_column_query)
+                        column_exists = result[0][0] > 0 if result else False
+
+                        if not column_exists:
+                            alter_query = f"""
+                            ALTER TABLE {table_name}
+                            ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                            """
+                            await self.client.execute_query(alter_query)
+                            logger.info(f"Added column {column_name} to {table_name} table")
+                        else:
+                            logger.debug(f"Column {column_name} already exists in {table_name} table")
+
+                    except Exception as e:
+                        if "already exists" in str(e).lower():
+                            logger.debug(f"Column {column_name} already exists in {table_name}")
+                        else:
+                            logger.error(f"Error adding column {column_name} to {table_name}: {e}")
+
+                # Add bloom filter index for prompt_id
+                try:
+                    index_query = f"""
+                    ALTER TABLE {table_name}
+                    ADD INDEX IF NOT EXISTS idx_prompt_id (prompt_id) TYPE bloom_filter(0.01) GRANULARITY 4
+                    """
+                    await self.client.execute_query(index_query)
+                    logger.info(f"Added idx_prompt_id index to {table_name} table")
+                except Exception as e:
+                    if "already exists" in str(e).lower():
+                        logger.debug(f"Index idx_prompt_id already exists in {table_name}")
+                    else:
+                        logger.warning(f"Could not add idx_prompt_id index to {table_name}: {e}")
+
+            except Exception as e:
+                logger.error(f"Error adding prompt analytics to {table_name}: {e}")
+
+        logger.info("Prompt analytics columns migration to rollup tables completed successfully")
+
     async def make_metrics_dimension_columns_nullable(self):
         """Make dimension columns nullable in InferenceMetrics rollup tables.
 
@@ -3563,6 +3663,7 @@ class ClickHouseMigration:
             )  # Drop old tables if dimension columns aren't nullable (must be before table creation)
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
             await self.add_blocking_metrics_to_rollup_tables()  # Add blocking metrics columns to rollup tables
+            await self.add_prompt_analytics_to_rollup_tables()  # Add prompt analytics columns to rollup tables
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
             await self.migrate_inference_tables_ttl_90_days()  # Update TTL to 90 days for inference tables
             await self.verify_tables()
