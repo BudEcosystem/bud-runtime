@@ -85,7 +85,6 @@ deployment_create = "budpipeline.actions.deployment.create:DeploymentCreateActio
 deployment_delete = "budpipeline.actions.deployment.delete:DeploymentDeleteAction"
 deployment_scale = "budpipeline.actions.deployment.scale:DeploymentScaleAction"
 deployment_ratelimit = "budpipeline.actions.deployment.ratelimit:DeploymentRateLimitAction"
-direct_deployment_scale = "budpipeline.actions.deployment.direct_scale:DirectDeploymentScaleAction"
 
 # Integration Actions
 http_request = "budpipeline.actions.integration.http_request:HttpRequestAction"

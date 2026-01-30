@@ -25,6 +25,7 @@ import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
 import { formatDate } from "src/utils/formatDate";
 import { cloudProviders, Model, useModels } from "src/hooks/useModels";
 import Tags from "src/flows/components/DrawerTags";
+import { formatCost } from "@/utils/formatters";
 import {
   PrimaryButton,
   SecondaryButton,
@@ -153,10 +154,7 @@ function ModelCard(item: Model, index) {
                     color: "#EEEEEE",
                   }}
                 >
-                  $
-                  {Number(
-                    item?.model_cluster_recommended?.cost_per_million_tokens,
-                  ).toFixed(2)}{" "}
+                  ${formatCost(item?.model_cluster_recommended?.cost_per_million_tokens)}{" "}
                   / 1M Tokens
                 </div>
               </Tag>

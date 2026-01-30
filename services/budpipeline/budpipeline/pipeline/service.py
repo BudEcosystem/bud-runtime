@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # New action architecture (002-pipeline-event-persistence)
@@ -25,7 +26,7 @@ from budpipeline.engine.dependency_resolver import DependencyResolver
 from budpipeline.engine.param_resolver import ParamResolver
 from budpipeline.engine.schemas import OnFailureAction
 from budpipeline.pipeline.crud import PipelineDefinitionCRUD
-from budpipeline.pipeline.models import PipelineStatus
+from budpipeline.pipeline.models import PipelineExecution, PipelineStatus
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,15 @@ class PipelineService:
                 if not action_registry.has(step.action):
                     warnings.append(f"Action '{step.action}' is not registered")
 
+            # Validate action params against action metadata (required params, validation rules)
+            for step in dag.steps:
+                action_meta = action_registry.get_meta(step.action)
+                if action_meta:
+                    param_errors = self._validate_action_params(
+                        step.id, step.params, action_meta.params
+                    )
+                    errors.extend(param_errors)
+
         except DAGParseError as e:
             errors.append(str(e))
         except CyclicDependencyError as e:
@@ -154,6 +164,77 @@ class PipelineService:
             errors.extend(e.errors if e.errors else [str(e)])
 
         return (len(errors) == 0, errors, warnings)
+
+    def _validate_action_params(
+        self,
+        step_id: str,
+        step_params: dict[str, Any],
+        param_definitions: list,
+    ) -> list[str]:
+        """Validate step params against action's parameter definitions.
+
+        Args:
+            step_id: Step identifier for error messages
+            step_params: Parameters provided in the step
+            param_definitions: List of ParamDefinition from action metadata
+
+        Returns:
+            List of validation error messages
+        """
+        errors: list[str] = []
+
+        for param_def in param_definitions:
+            param_name = param_def.name
+            param_value = step_params.get(param_name)
+
+            # Check required params
+            if param_def.required:
+                # Value is missing, None, or empty string
+                if param_value is None or param_value == "":
+                    errors.append(
+                        f"Step '{step_id}': Required parameter '{param_name}' is missing or empty"
+                    )
+                    continue
+
+            # Skip further validation if value is not provided (optional param)
+            if param_value is None:
+                continue
+
+            # Validate against ValidationRules if present
+            if param_def.validation:
+                rules = param_def.validation
+
+                # Min/max for numbers
+                if rules.min is not None and isinstance(param_value, int | float):
+                    if param_value < rules.min:
+                        errors.append(
+                            f"Step '{step_id}': Parameter '{param_name}' value {param_value} "
+                            f"is less than minimum {rules.min}"
+                        )
+
+                if rules.max is not None and isinstance(param_value, int | float):
+                    if param_value > rules.max:
+                        errors.append(
+                            f"Step '{step_id}': Parameter '{param_name}' value {param_value} "
+                            f"exceeds maximum {rules.max}"
+                        )
+
+                # Min/max length for strings
+                if rules.min_length is not None and isinstance(param_value, str):
+                    if len(param_value) < rules.min_length:
+                        errors.append(
+                            f"Step '{step_id}': Parameter '{param_name}' length {len(param_value)} "
+                            f"is less than minimum {rules.min_length}"
+                        )
+
+                if rules.max_length is not None and isinstance(param_value, str):
+                    if len(param_value) > rules.max_length:
+                        errors.append(
+                            f"Step '{step_id}': Parameter '{param_name}' length {len(param_value)} "
+                            f"exceeds maximum {rules.max_length}"
+                        )
+
+        return errors
 
     # =========================================================================
     # Async Database Methods (002-pipeline-event-persistence)
@@ -363,6 +444,30 @@ class PipelineService:
             include_system=include_system,
         )
 
+        # Get execution stats for all pipelines
+        pipeline_ids = [d.id for d in definitions]
+        execution_stats: dict[UUID, dict[str, Any]] = {}
+
+        if pipeline_ids:
+            # Query execution counts and last execution times
+            stats_query = (
+                select(
+                    PipelineExecution.pipeline_id,
+                    func.count(PipelineExecution.id).label("execution_count"),
+                    func.max(PipelineExecution.created_at).label("last_execution_at"),
+                )
+                .where(PipelineExecution.pipeline_id.in_(pipeline_ids))
+                .group_by(PipelineExecution.pipeline_id)
+            )
+            result = await session.execute(stats_query)
+            for row in result:
+                execution_stats[row.pipeline_id] = {
+                    "execution_count": row.execution_count,
+                    "last_execution_at": row.last_execution_at.isoformat()
+                    if row.last_execution_at
+                    else None,
+                }
+
         return [
             {
                 "id": str(d.id),
@@ -377,6 +482,8 @@ class PipelineService:
                 "description": d.description,
                 "user_id": str(d.user_id) if d.user_id else None,
                 "system_owned": d.system_owned,
+                "execution_count": execution_stats.get(d.id, {}).get("execution_count", 0),
+                "last_execution_at": execution_stats.get(d.id, {}).get("last_execution_at"),
             }
             for d in definitions
         ]

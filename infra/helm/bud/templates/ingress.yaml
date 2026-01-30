@@ -52,7 +52,7 @@ spec:
     - host: {{ include "bud.ingress.hosts.budadmin" $ }}
       http:
         paths:
-          - path: /ws/socket.io
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -123,7 +123,14 @@ spec:
       http:
         paths:
           - path: /
-            pathType: Prefix
+            pathType: Exact
+            backend:
+              service:
+                name: {{ .Release.Name }}-budnotify
+                port:
+                  number: 3000
+          - path: /ws/socket.io
+            pathType: Exact
             backend:
               service:
                 name: {{ .Release.Name }}-budnotify

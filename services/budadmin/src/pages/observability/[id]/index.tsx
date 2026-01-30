@@ -666,8 +666,7 @@ const ObservabilityDetailPage: React.FC = () => {
               </Text_14_600_EEEEEE>
 
               <div className="flex justify-between items-center">
-                {inferenceData.endpoint_type !== "embedding" &&
-                  inferenceData.endpoint_type !== "audio_transcription" &&
+                {inferenceData.endpoint_type !== "audio_transcription" &&
                   inferenceData.endpoint_type !== "audio_translation" &&
                   inferenceData.endpoint_type !== "text_to_speech" &&
                   inferenceData.endpoint_type !== "image_generation" &&
