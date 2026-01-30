@@ -1,0 +1,49 @@
+---
+title: "Delete File"
+description: "Delete a file by ID."
+api: "DELETE /v1/files/{file_id}"
+---
+
+<RequestExample>
+
+```bash cURL
+curl -X DELETE https://gateway.bud.studio/v1/files/file-abc123 \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "file-abc123",
+  "object": "file",
+  "deleted": true
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| file_id | string | Yes | The ID of the file to delete |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    File management for Batch API and Assistants
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise file storage with compliance
+  </Card>
+</CardGroup>

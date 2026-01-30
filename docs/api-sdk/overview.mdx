@@ -1,0 +1,113 @@
+---
+title: "API & SDK Overview"
+description: "Access Bud AI Foundry programmatically via REST APIs, Python SDK, and CLI tools"
+---
+
+## Introduction
+
+Bud AI Foundry provides multiple ways to interact with the platform programmatically:
+
+- **Python SDK**: High-level interface for Python applications
+- **Gateway API**: OpenAI-compatible REST API for model inference
+- **CLI Tool**: Command-line interface for automation and DevOps
+
+## Quick Comparison
+
+| Interface | Best For | Installation |
+|-----------|----------|--------------|
+| **Python SDK** | Python applications, data science workflows | `pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK` |
+| **Gateway API** | Any language, direct HTTP access | REST API calls |
+| **CLI** | DevOps, CI/CD, shell scripts | `pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK` |
+| **OpenAI SDK** | Drop-in OpenAI replacement | Change base URL |
+
+
+## Key Capabilities
+
+### Model Inference
+```python
+from budai import BudClient
+
+client = BudClient(api_key="your-key")
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+### Pipeline Automation
+```python
+# Create and execute deployment pipelines
+pipeline = client.pipelines.create(
+    name="Deploy Model",
+    definition={
+        "steps": [...]
+    }
+)
+```
+
+### Infrastructure Management
+```python
+# Manage clusters and deployments
+cluster = client.clusters.get("cluster_prod")
+deployment = client.deployments.create(
+    model_id="model_xyz",
+    cluster_id=cluster.id
+)
+```
+
+## Authentication
+
+All API access requires authentication:
+
+1. **API Keys**: Generate in the dashboard under API Keys & Security
+2. **Environment Variable**: Set `BUD_API_KEY` for SDK/CLI
+3. **Header**: Use `Authorization: Bearer <key>` for direct API calls
+
+See [Authentication](/api-sdk/authentication) for detailed setup.
+
+## OpenAI Compatibility
+
+The Gateway API is fully compatible with OpenAI's interface:
+
+```python
+from openai import OpenAI
+
+# Just change the base URL
+client = OpenAI(
+    base_url="https://gateway.bud.studio/v1",
+    api_key="your-bud-key"
+)
+
+# Use OpenAI SDK as normal
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+## Support
+
+- **Documentation**: Browse the sections in this tab
+- **GitHub**: [BudAIFoundry-SDK](https://github.com/BudEcosystem/BudAIFoundry-SDK)
+- **Issues**: Report bugs and request features on GitHub
+- **Email**: contact@bud.studio for enterprise support
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="play" href="/api-sdk/quickstart">
+    Make your first API call in 5 minutes
+  </Card>
+
+  <Card title="Python SDK" icon="python" href="/api-sdk/python-sdk/installation">
+    Install and use the Python SDK
+  </Card>
+
+  <Card title="Gateway API" icon="plug" href="/api-sdk/chat/create-chat-completion">
+    OpenAI-compatible inference API
+  </Card>
+
+  <Card title="CLI Reference" icon="terminal" href="/api-sdk/python-sdk/cli-reference">
+    Command-line tools for DevOps
+  </Card>
+</CardGroup>

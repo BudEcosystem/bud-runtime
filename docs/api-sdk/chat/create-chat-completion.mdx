@@ -1,0 +1,126 @@
+---
+title: "Chat Completions"
+description: "Generate chat-based completions using the specified model."
+api: "POST /v1/chat/completions"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama-3.2-1b",
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is AI?"
+      }
+    ]
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1699000000,
+  "model": "llama-3.2-1b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hello! How can I help you today?"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 20,
+    "total_tokens": 30
+  }
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | header | Bearer authentication header of the form `Bearer <token>` where `<token>` is your API key |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Model identifier (deployment name, adapter name, or routing) |
+| messages | array | Yes | Array of message objects forming the conversation |
+| temperature | float | No | Sampling temperature (0.0 to 2.0). Default: model default |
+| max_tokens | integer | No | Maximum tokens to generate. Default: model default |
+| max_completion_tokens | integer | No | Maximum tokens to generate (alternative to max_tokens) |
+| top_p | float | No | Nucleus sampling parameter (0.0 to 1.0). Default: 1.0 |
+| frequency_penalty | float | No | Penalize tokens based on frequency (-2.0 to 2.0). Default: 0.0 |
+| presence_penalty | float | No | Penalize tokens based on presence (-2.0 to 2.0). Default: 0.0 |
+| repetition_penalty | float | No | Penalize token repetition (> 0.0). Default: 1.0 |
+| stream | boolean | No | Enable streaming response. Default: `false` |
+| stream_options | object | No | Streaming options (e.g., `{"include_usage": true}`) |
+| n | integer | No | Number of chat completion choices to generate. Default: 1 |
+| stop | string or array | No | Up to 4 sequences where the API will stop generating |
+| response_format | object | No | Response format specification (e.g., `{"type": "json_object"}`) |
+| seed | integer | No | Random seed for deterministic sampling |
+| logprobs | boolean | No | Include log probabilities in response. Default: `false` |
+| top_logprobs | integer | No | Number of most likely tokens to return (0-20) |
+| logit_bias | object | No | Modify likelihood of specified tokens appearing |
+| tools | array | No | Available tool/function definitions |
+| tool_choice | string or object | No | Tool selection strategy. Options: `auto`, `none`, `required`, or specific tool |
+| parallel_tool_calls | boolean | No | Allow parallel tool calls. Default: `true` |
+| user | string | No | Unique identifier representing your end-user |
+
+### Message Object
+
+```json
+{
+  "role": "system" | "user" | "assistant" | "tool",
+  "content": "string or array of content blocks",
+  "name": "optional participant name",
+  "tool_calls": "array of tool calls (for assistant messages)",
+  "tool_call_id": "ID of the tool call (for tool messages)"
+}
+```
+
+## Supported Providers
+
+<CardGroup cols={4}>
+  <Card title="OpenAI" icon="openai">
+    GPT-4, GPT-3.5 Turbo, and o1 models
+  </Card>
+  <Card title="Anthropic" icon="ant">
+    Claude 3.5 Sonnet, Claude 3 Opus, and Haiku
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise GPT-4 and GPT-3.5 deployments
+  </Card>
+  <Card title="Google" icon="google">
+    Gemini Pro and Ultra models
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    Claude, Llama, and Mistral on AWS
+  </Card>
+  <Card title="Together AI" icon="arrow-progress">
+    Llama 3, Mixtral, and open-source models
+  </Card>
+  <Card title="Fireworks" icon="fire">
+    Fast inference for Llama and Mistral models
+  </Card>
+  <Card title="xAI" icon="x">
+    Grok models with extended context
+  </Card>
+</CardGroup>

@@ -1,0 +1,60 @@
+---
+title: "Get Response"
+description: "Retrieve a response by ID."
+api: "GET /v1/responses/{response_id}"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/responses/resp_abc123 \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "x-model-name: gpt-4"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "created_at": 1699000000,
+  "model": "gpt-4",
+  "status": "completed",
+  "output": "The capital of France is Paris.",
+  "usage": {
+    "input_tokens": 15,
+    "output_tokens": 8,
+    "total_tokens": 23
+  },
+  "metadata": null
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+| x-model-name | string | No | Model name for routing. Default: gpt-4-responses |
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| response_id | string | Yes | The ID of the response to retrieve |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    Full Responses API lifecycle management
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise-grade response management
+  </Card>
+</CardGroup>

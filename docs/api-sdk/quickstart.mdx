@@ -1,0 +1,202 @@
+---
+title: "Quickstart"
+description: "Make your first API call to Bud AI Foundry in 5 minutes"
+---
+
+## Get Your API Key
+
+1. Log in to Bud AI Foundry
+2. Navigate to **API Keys & Security**
+3. Click **+ Create API Key**
+4. Name it "Quickstart" and click **Create**
+5. Copy the key (starts with `bud_`)
+
+<Warning>
+Save your API key securely. It won't be shown again after creation.
+</Warning>
+
+## Python SDK
+
+### Install
+
+```bash
+pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+```
+
+### Your First Request
+
+```python
+from budai import BudClient
+
+# Initialize client
+client = BudClient(api_key="bud_your_key_here")
+
+# Make inference request
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[
+        {"role": "user", "content": "Explain quantum computing in one sentence"}
+    ]
+)
+
+print(response.choices[0].message.content)
+```
+
+**Output:**
+```
+Quantum computing uses quantum mechanical phenomena like superposition and
+entanglement to perform calculations exponentially faster than classical computers
+for certain problems.
+```
+
+### Run a Pipeline
+
+```python
+# Create a deployment pipeline
+pipeline = client.pipelines.create(
+    name="Deploy Llama",
+    definition={
+        "steps": [
+            {
+                "id": "add_model",
+                "action": "model_add",
+                "params": {
+                    "model_uri": "meta-llama/Llama-3.2-1B-Instruct",
+                    "model_source": "hugging_face"
+                }
+            },
+            {
+                "id": "deploy",
+                "action": "deployment_create",
+                "params": {
+                    "model_id": "{{steps.add_model.output.model_id}}",
+                    "cluster_id": "cluster_prod"
+                },
+                "depends_on": ["add_model"]
+            }
+        ]
+    }
+)
+
+# Execute the pipeline
+execution = client.executions.create(pipeline_id=pipeline.id)
+print(f"Deployment created: {execution.outputs['deployment_id']}")
+```
+
+## Gateway API (cURL)
+
+### Direct API Call
+
+```bash
+curl https://gateway.bud.studio/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer bud_your_key_here" \
+  -d '{
+    "model": "llama-3.2-1b",
+    "messages": [
+      {"role": "user", "content": "What is machine learning?"}
+    ]
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1706554800,
+  "model": "llama-3.2-1b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Machine learning is a subset of artificial intelligence..."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 45,
+    "total_tokens": 57
+  }
+}
+```
+
+## Environment Setup
+
+### Environment Variables
+
+```bash
+# Set your API key
+export BUD_API_KEY="bud_your_key_here"
+
+# Set custom endpoint (optional)
+export BUD_BASE_URL="https://gateway.bud.studio/v1"
+```
+
+### Configuration File
+
+Create `~/.budai/config.yaml`:
+
+```yaml
+api_key: bud_your_key_here
+base_url: https://gateway.bud.studio/v1
+timeout: 30
+```
+
+The SDK automatically loads this configuration.
+
+## Check Available Models
+
+```python
+# List all available models
+models = client.models.list()
+
+for model in models:
+    print(f"{model.id}: {model.description}")
+```
+
+**Output:**
+```
+llama-3.2-1b: Llama 3.2 1B Instruct
+llama-3.2-3b: Llama 3.2 3B Instruct
+gpt-4o: OpenAI GPT-4 Omni (cloud)
+claude-3-5-sonnet: Anthropic Claude 3.5 Sonnet (cloud)
+```
+
+## Error Handling
+
+```python
+from budai.exceptions import BudAPIError
+
+try:
+    response = client.chat.completions.create(
+        model="nonexistent-model",
+        messages=[{"role": "user", "content": "Hello"}]
+    )
+except BudAPIError as e:
+    print(f"Error: {e.status_code} - {e.message}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Python SDK Guide" icon="python" href="/api-sdk/python-sdk/installation">
+    Deep dive into Python SDK features
+  </Card>
+
+  <Card title="Gateway API" icon="plug" href="/api-sdk/gateway/overview">
+    REST API reference and examples
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/api-sdk/authentication">
+    Secure your API access
+  </Card>
+
+  <Card title="CLI Tools" icon="terminal" href="/api-sdk/cli/installation">
+    Command-line interface guide
+  </Card>
+</CardGroup>

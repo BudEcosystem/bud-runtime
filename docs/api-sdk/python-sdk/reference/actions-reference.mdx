@@ -1,0 +1,432 @@
+---
+title: "Actions Reference"
+description: "Complete list of available pipeline action types and their configuration"
+icon: "list"
+---
+
+## Overview
+
+Actions are the building blocks of pipelines in BudAI Foundry. This reference provides details on all available action types and their configuration options.
+
+## Action Structure
+
+Every action in a pipeline has the following structure:
+
+```python
+{
+    "id": "unique-step-id",
+    "action": "action_type",
+    "params": {
+        # Action-specific parameters
+    },
+    "depends_on": ["previous-step-id"],  # Optional
+    "condition": "expression",            # Optional
+    "retry": {                           # Optional
+        "max_attempts": 3,
+        "backoff_multiplier": 2
+    }
+}
+```
+
+## Available Action Types
+
+### Log Action
+
+Log messages during pipeline execution.
+
+**Type:** `log`
+
+**Parameters:**
+- `message` (string, required) - The message to log
+- `level` (string, optional) - Log level: `info`, `warning`, `error`, `debug`. Default: `info`
+
+**Example:**
+```python
+{
+    "id": "logger",
+    "action": "log",
+    "params": {
+        "message": "Processing started",
+        "level": "info"
+    }
+}
+```
+
+### Transform Action
+
+Transform data between pipeline steps.
+
+**Type:** `transform`
+
+**Parameters:**
+- `operation` (string, required) - Transform operation: `map`, `filter`, `reduce`, `normalize`, `uppercase`, `lowercase`
+- `field` (string, optional) - Field to transform
+- `function` (string, optional) - Custom transformation function
+
+**Example:**
+```python
+{
+    "id": "transformer",
+    "action": "transform",
+    "params": {
+        "operation": "normalize",
+        "field": "text"
+    }
+}
+```
+
+### API Call Action
+
+Make HTTP requests to external APIs.
+
+**Type:** `api_call`
+
+**Parameters:**
+- `url` (string, required) - API endpoint URL
+- `method` (string, required) - HTTP method: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`
+- `headers` (object, optional) - HTTP headers
+- `body` (object, optional) - Request body for POST/PUT/PATCH
+- `timeout` (integer, optional) - Request timeout in seconds. Default: `30`
+
+**Example:**
+```python
+{
+    "id": "fetch_data",
+    "action": "api_call",
+    "params": {
+        "url": "https://api.example.com/data",
+        "method": "POST",
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer {{secrets.api_token}}"
+        },
+        "body": {
+            "query": "value"
+        }
+    }
+}
+```
+
+### Condition Action
+
+Conditional branching based on expressions.
+
+**Type:** `condition`
+
+**Parameters:**
+- `condition` (string, required) - Boolean expression to evaluate
+- `on_true` (string, optional) - Step ID to execute if true
+- `on_false` (string, optional) - Step ID to execute if false
+
+**Example:**
+```python
+{
+    "id": "check_status",
+    "action": "condition",
+    "params": {
+        "condition": "steps.health_check.output.status == 'healthy'",
+        "on_true": "deploy",
+        "on_false": "notify_error"
+    }
+}
+```
+
+### Loop Action
+
+Iterate over collections of data.
+
+**Type:** `loop`
+
+**Parameters:**
+- `items` (string, required) - Collection to iterate over (can reference previous step output)
+- `action` (string, required) - Action to execute for each item
+- `max_iterations` (integer, optional) - Maximum number of iterations. Default: `100`
+- `parallel` (boolean, optional) - Execute iterations in parallel. Default: `false`
+
+**Example:**
+```python
+{
+    "id": "process_items",
+    "action": "loop",
+    "params": {
+        "items": "steps.fetch_data.output.items",
+        "action": "process_single_item",
+        "parallel": true
+    }
+}
+```
+
+### Model Add Action
+
+Add a model to the model registry.
+
+**Type:** `model_add`
+
+**Parameters:**
+- `model_uri` (string, required) - Model URI (e.g., `meta-llama/Llama-3.2-1B-Instruct`)
+- `model_source` (string, required) - Model source: `hugging_face`, `custom`, `s3`, `gcs`
+- `model_name` (string, optional) - Custom model name
+- `metadata` (object, optional) - Additional model metadata
+
+**Example:**
+```python
+{
+    "id": "add_model",
+    "action": "model_add",
+    "params": {
+        "model_uri": "meta-llama/Llama-3.2-1B-Instruct",
+        "model_source": "hugging_face",
+        "model_name": "llama-3.2-1b"
+    }
+}
+```
+
+### Deployment Create Action
+
+Create a new model deployment.
+
+**Type:** `deployment_create`
+
+**Parameters:**
+- `model_id` (string, required) - Model ID to deploy
+- `cluster_id` (string, required) - Target cluster ID
+- `deployment_name` (string, required) - Name for the deployment
+- `replicas` (integer, optional) - Number of replicas. Default: `1`
+- `gpu_count` (integer, optional) - GPUs per replica. Default: `0`
+- `memory_gb` (integer, optional) - Memory in GB
+- `cpu_cores` (integer, optional) - CPU cores
+
+**Example:**
+```python
+{
+    "id": "deploy_model",
+    "action": "deployment_create",
+    "params": {
+        "model_id": "{{steps.add_model.output.model_id}}",
+        "cluster_id": "cluster_prod",
+        "deployment_name": "llama-deployment",
+        "replicas": 3,
+        "gpu_count": 1
+    }
+}
+```
+
+### Cluster Health Action
+
+Check cluster health status.
+
+**Type:** `cluster_health`
+
+**Parameters:**
+- `cluster_id` (string, required) - Cluster ID to check
+- `timeout` (integer, optional) - Health check timeout in seconds. Default: `30`
+
+**Example:**
+```python
+{
+    "id": "health_check",
+    "action": "cluster_health",
+    "params": {
+        "cluster_id": "cluster_prod",
+        "timeout": 60
+    }
+}
+```
+
+### Email Action
+
+Send email notifications.
+
+**Type:** `email`
+
+**Parameters:**
+- `to` (string or array, required) - Recipient email address(es)
+- `subject` (string, required) - Email subject
+- `body` (string, required) - Email body (supports templates)
+- `cc` (string or array, optional) - CC recipients
+- `attachments` (array, optional) - File attachments
+
+**Example:**
+```python
+{
+    "id": "notify_success",
+    "action": "email",
+    "params": {
+        "to": "team@example.com",
+        "subject": "Deployment Successful",
+        "body": "Deployment {{steps.deploy.output.deployment_id}} completed successfully"
+    }
+}
+```
+
+### Notification Action
+
+Send notifications to various channels.
+
+**Type:** `notification`
+
+**Parameters:**
+- `message` (string, required) - Notification message
+- `channel` (string, required) - Notification channel: `slack`, `teams`, `webhook`
+- `webhook_url` (string, optional) - Webhook URL for webhook channel
+- `severity` (string, optional) - Severity level: `info`, `warning`, `error`. Default: `info`
+
+**Example:**
+```python
+{
+    "id": "notify_slack",
+    "action": "notification",
+    "params": {
+        "message": "Deployment failed: {{steps.deploy.error}}",
+        "channel": "slack",
+        "severity": "error"
+    }
+}
+```
+
+### Database Action
+
+Interact with databases.
+
+**Type:** `database`
+
+**Parameters:**
+- `connection` (string, required) - Database connection string
+- `operation` (string, required) - Operation: `insert`, `update`, `delete`, `query`
+- `table` (string, required) - Target table name
+- `data` (object, optional) - Data for insert/update operations
+- `query` (string, optional) - SQL query for query operation
+
+**Example:**
+```python
+{
+    "id": "save_results",
+    "action": "database",
+    "params": {
+        "connection": "postgres://user:pass@host:5432/db",
+        "operation": "insert",
+        "table": "deployment_logs",
+        "data": {
+            "deployment_id": "{{steps.deploy.output.deployment_id}}",
+            "status": "success",
+            "timestamp": "{{now}}"
+        }
+    }
+}
+```
+
+### Wait Action
+
+Pause execution for a specified duration.
+
+**Type:** `wait`
+
+**Parameters:**
+- `duration` (integer, required) - Wait duration in seconds
+- `reason` (string, optional) - Reason for waiting (for logging)
+
+**Example:**
+```python
+{
+    "id": "wait_for_warmup",
+    "action": "wait",
+    "params": {
+        "duration": 60,
+        "reason": "Waiting for model warmup"
+    }
+}
+```
+
+## Listing Available Actions
+
+### Using SDK
+
+```python
+from budai import BudClient
+
+client = BudClient(api_key="your-key")
+
+actions = client.actions.list()
+
+for action in actions:
+    print(f"{action.type}: {action.description}")
+    print(f"  Parameters: {action.parameters}")
+```
+
+### Using CLI
+
+```bash
+bud action list
+```
+
+Get details for a specific action:
+
+```bash
+bud action get <action-type>
+```
+
+## Template Variables
+
+Actions support template variables for dynamic values:
+
+### Step Outputs
+```python
+"{{steps.step_id.output.field_name}}"
+```
+
+### Pipeline Parameters
+```python
+"{{params.parameter_name}}"
+```
+
+### Secrets
+```python
+"{{secrets.secret_name}}"
+```
+
+### Built-in Variables
+- `{{now}}` - Current timestamp
+- `{{pipeline_id}}` - Current pipeline ID
+- `{{execution_id}}` - Current execution ID
+
+## Retry Configuration
+
+All actions support retry configuration:
+
+```python
+{
+    "id": "action_with_retry",
+    "action": "api_call",
+    "params": {...},
+    "retry": {
+        "max_attempts": 3,
+        "backoff_multiplier": 2,
+        "retry_on": ["timeout", "connection_error"]
+    }
+}
+```
+
+## Conditional Execution
+
+Execute actions conditionally:
+
+```python
+{
+    "id": "conditional_action",
+    "action": "notification",
+    "params": {...},
+    "condition": "steps.deploy.status == 'failed'"
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pipelines & Executions" icon="diagram-project" href="/api-sdk/python-sdk/pipelines">
+    Learn how to use actions in pipelines
+  </Card>
+
+  <Card title="Pipeline DSL" icon="code-branch" href="/api-sdk/python-sdk/pipeline-dsl">
+    Build pipelines with Python DSL
+  </Card>
+</CardGroup>

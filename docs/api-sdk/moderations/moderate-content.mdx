@@ -1,0 +1,85 @@
+---
+title: "Moderate Content"
+description: "Check if content complies with usage policies."
+api: "POST /v1/moderations"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/moderations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "omni-moderation-latest",
+    "input": "I want to hurt someone."
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "modr-abc123",
+  "model": "omni-moderation-latest",
+  "results": [
+    {
+      "flagged": true,
+      "categories": {
+        "sexual": false,
+        "hate": false,
+        "harassment": false,
+        "self-harm": false,
+        "sexual/minors": false,
+        "hate/threatening": false,
+        "violence/graphic": false,
+        "self-harm/intent": false,
+        "self-harm/instructions": false,
+        "harassment/threatening": true,
+        "violence": true
+      },
+      "category_scores": {
+        "sexual": 0.001,
+        "hate": 0.003,
+        "harassment": 0.156,
+        "self-harm": 0.002,
+        "sexual/minors": 0.0,
+        "hate/threatening": 0.001,
+        "violence/graphic": 0.004,
+        "self-harm/intent": 0.001,
+        "self-harm/instructions": 0.0,
+        "harassment/threatening": 0.789,
+        "violence": 0.891
+      }
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Moderation model identifier (e.g., omni-moderation-latest) |
+| input | string or array | Yes | Text content to moderate |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    omni-moderation-latest, text-moderation-stable
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise content moderation models
+  </Card>
+</CardGroup>

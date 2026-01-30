@@ -1,0 +1,98 @@
+---
+title: "Generate Embeddings"
+description: "Generate vector embeddings for input text(s)."
+api: "POST /v1/embeddings"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/embeddings \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": "Machine learning is transforming industries",
+    "dimensions": 1536,
+    "priority": "normal"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023064255, -0.009327292, ...],
+      "index": 0
+    }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": {
+    "prompt_tokens": 8,
+    "total_tokens": 8
+  }
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | header | Bearer authentication header of the form `Bearer <token>` where `<token>` is your API key |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Embedding model identifier |
+| input | string or array | Yes | Text(s) to embed. Can be a single string or array of strings |
+| encoding_format | string | No | Format of the embedding. Options: `float`, `base64`. Default: `float` |
+| dimensions | integer | No | Matryoshka dimensions for output embeddings. Default: model's full dimensions |
+| modality | string | No | Modality type: `text`, `image`, `audio`. Default: `text` |
+| priority | string | No | Priority level: `high`, `normal`, `low`. Default: `normal` |
+| include_input | boolean | No | Include original input text in response. Default: `false` |
+| chunking | object | No | Chunking configuration for long texts (see Chunking Configuration below) |
+
+### Chunking Configuration
+
+The `chunking` parameter accepts an object with the following fields:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| enabled | boolean | Enable text chunking. Default: `false` |
+| strategy | string | Chunking strategy: `token`, `sentence`, `recursive`, `semantic`, `code`, `table`. Default: `token` |
+| chunk_size | integer | Max tokens per chunk (1-8192). Default: `512` |
+| chunk_overlap | integer | Token overlap between chunks. Default: `0` |
+| tokenizer | string | Tokenizer: `cl100k_base`, `p50k_base`, `r50k_base`, `gpt2`. Default: `cl100k_base` |
+| min_sentences | integer | [sentence strategy] Minimum sentences per chunk. Default: `1` |
+
+## Supported Providers
+
+<CardGroup cols={4}>
+  <Card title="OpenAI" icon="openai">
+    text-embedding-3-small, text-embedding-3-large, ada-002
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise text embeddings with global availability
+  </Card>
+  <Card title="Cohere" icon="sparkles">
+    embed-english-v3.0, embed-multilingual-v3.0
+  </Card>
+  <Card title="Voyage AI" icon="ship">
+    voyage-2, voyage-code-2 specialized embeddings
+  </Card>
+  <Card title="Together AI" icon="arrow-progress">
+    Nomic Embed and open-source embedding models
+  </Card>
+  <Card title="Google" icon="google">
+    text-embedding-004 and multimodal embeddings
+  </Card>
+</CardGroup>

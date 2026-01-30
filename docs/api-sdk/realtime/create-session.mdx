@@ -1,0 +1,62 @@
+---
+title: "Create Realtime Session"
+description: "Create a WebSocket-based realtime session."
+api: "POST /v1/realtime/sessions"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/realtime/sessions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4-realtime",
+    "modalities": ["text", "audio"]
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "session_abc123",
+  "object": "realtime.session",
+  "created_at": 1699000000,
+  "model": "gpt-4-realtime",
+  "modalities": ["text", "audio"],
+  "ws_url": "wss://gateway.bud.studio/v1/realtime/sessions/session_abc123",
+  "expires_at": 1699003600
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Realtime model identifier |
+| modalities | array | No | Supported modalities: text, audio. Default: ["text"] |
+| voice | string | No | Voice for audio output (alloy, echo, fable, onyx, nova, shimmer) |
+| instructions | string | No | System instructions for the session |
+| temperature | float | No | Sampling temperature (0.0 to 2.0). Default: 1.0 |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    Real-time audio streaming with GPT-4o
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise real-time API with low latency
+  </Card>
+</CardGroup>

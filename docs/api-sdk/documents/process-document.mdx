@@ -1,0 +1,84 @@
+---
+title: "Process Document"
+description: "Process and analyze documents using AI models."
+api: "POST /v1/documents"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/documents \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "document-processor",
+    "document": "base64_encoded_document_content",
+    "task": "extract"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "doc-abc123",
+  "object": "document.processing",
+  "created": 1699000000,
+  "model": "document-processor",
+  "result": {
+    "extracted_text": "Document content here...",
+    "metadata": {
+      "pages": 5,
+      "format": "pdf"
+    }
+  }
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Document processing model identifier |
+| document | string | Yes | Document content (base64 encoded or URL) |
+| task | string | No | Processing task: extract, analyze, summarize. Default: extract |
+| options | object | No | Task-specific processing options |
+
+## Supported Providers
+
+<CardGroup cols={4}>
+  <Card title="OpenAI" icon="openai">
+    GPT-4, GPT-3.5 for document understanding
+  </Card>
+  <Card title="Anthropic" icon="ant">
+    Claude 3.5 Sonnet, Opus, Haiku for document analysis
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise GPT-4 and GPT-3.5 deployments
+  </Card>
+  <Card title="Google" icon="google">
+    Gemini Pro and Ultra for document processing
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    Claude, Llama, and Mistral on AWS
+  </Card>
+  <Card title="Together AI" icon="arrow-progress">
+    Llama 3, Mixtral, and open-source models
+  </Card>
+  <Card title="Fireworks" icon="fire">
+    Fast inference for document understanding
+  </Card>
+  <Card title="xAI" icon="x">
+    Grok models with extended context
+  </Card>
+</CardGroup>

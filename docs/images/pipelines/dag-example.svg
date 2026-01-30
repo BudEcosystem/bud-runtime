@@ -1,0 +1,26 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="400" fill="#f5f5f5"/>
+  <rect x="20" y="20" width="560" height="360" fill="white" stroke="#e0e0e0" stroke-width="2"/>
+  
+  <!-- Simple DAG visualization -->
+  <circle cx="300" cy="100" r="40" fill="#4A90E2" stroke="#2E5C8A" stroke-width="2"/>
+  <text x="300" y="105" font-family="Arial, sans-serif" font-size="14" fill="white" text-anchor="middle">Start</text>
+  
+  <line x1="300" y1="140" x2="300" y2="180" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <circle cx="300" cy="220" r="40" fill="#4A90E2" stroke="#2E5C8A" stroke-width="2"/>
+  <text x="300" y="225" font-family="Arial, sans-serif" font-size="14" fill="white" text-anchor="middle">Process</text>
+  
+  <line x1="300" y1="260" x2="300" y2="300" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <circle cx="300" cy="340" r="40" fill="#4A90E2" stroke="#2E5C8A" stroke-width="2"/>
+  <text x="300" y="345" font-family="Arial, sans-serif" font-size="14" fill="white" text-anchor="middle">End</text>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666"/>
+    </marker>
+  </defs>
+  
+  <text x="300" y="30" font-family="Arial, sans-serif" font-size="14" fill="#999" text-anchor="middle">DAG Example - Replace with actual screenshot</text>
+</svg>

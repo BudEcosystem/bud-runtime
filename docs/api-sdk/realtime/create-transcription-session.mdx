@@ -1,0 +1,61 @@
+---
+title: "Create Realtime Transcription Session"
+description: "Create a WebSocket session for real-time audio transcription."
+api: "POST /v1/realtime/transcription_sessions"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/realtime/transcription_sessions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "whisper-1",
+    "language": "en"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "session_xyz789",
+  "object": "realtime.transcription_session",
+  "created_at": 1699000000,
+  "model": "whisper-1",
+  "language": "en",
+  "ws_url": "wss://gateway.bud.studio/v1/realtime/transcription_sessions/session_xyz789",
+  "expires_at": 1699003600
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Transcription model identifier |
+| language | string | No | ISO-639-1 language code for transcription |
+| response_format | string | No | Format: json, text. Default: json |
+| temperature | float | No | Sampling temperature (0.0 to 1.0) |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    Real-time audio streaming with GPT-4o
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise real-time API with low latency
+  </Card>
+</CardGroup>

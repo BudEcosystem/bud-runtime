@@ -1,0 +1,453 @@
+---
+title: "Type Reference"
+description: "Complete type definitions for the Python SDK"
+icon: "brackets-curly"
+---
+
+## Overview
+
+The Python SDK is fully typed with Pydantic models for IDE autocomplete and validation.
+
+## Core Types
+
+### BudClient
+
+```python
+from budai import BudClient
+
+client: BudClient = BudClient(
+    api_key: str,
+    base_url: str = "https://gateway.bud.studio/v1",
+    timeout: int = 30,
+    max_retries: int = 3,
+    verify_ssl: bool = True,
+    proxy: Optional[str] = None
+)
+```
+
+### ChatCompletion
+
+```python
+from budai.types import ChatCompletion, Choice, Message, Usage
+
+response: ChatCompletion = client.chat.completions.create(...)
+
+response.id: str
+response.object: Literal["chat.completion"]
+response.created: int
+response.model: str
+response.choices: List[Choice]
+response.usage: Usage
+```
+
+### Choice
+
+```python
+from budai.types import Choice, Message
+
+choice: Choice = response.choices[0]
+
+choice.index: int
+choice.message: Message
+choice.finish_reason: Literal["stop", "length", "tool_calls", "content_filter"]
+```
+
+### Message
+
+```python
+from budai.types import Message, ToolCall
+
+message: Message = choice.message
+
+message.role: Literal["system", "user", "assistant", "tool"]
+message.content: Optional[str]
+message.tool_calls: Optional[List[ToolCall]]
+```
+
+## Pipeline Types
+
+### Pipeline
+
+```python
+from budai.types import Pipeline, PipelineDefinition
+
+pipeline: Pipeline = client.pipelines.get(...)
+
+pipeline.id: str
+pipeline.name: str
+pipeline.description: Optional[str]
+pipeline.definition: PipelineDefinition
+pipeline.created_at: datetime
+pipeline.updated_at: datetime
+pipeline.status: Literal["active", "paused", "archived"]
+```
+
+### PipelineDefinition
+
+```python
+from budai.types import PipelineDefinition, Step
+
+definition: PipelineDefinition = {
+    "steps": List[Step]
+}
+```
+
+### Step
+
+```python
+from typing import TypedDict, Optional, List, Any
+
+class Step(TypedDict):
+    id: str
+    action: str
+    params: dict[str, Any]
+    depends_on: Optional[List[str]]
+    condition: Optional[str]
+    retry: Optional[RetryConfig]
+```
+
+### RetryConfig
+
+```python
+from typing import TypedDict
+
+class RetryConfig(TypedDict):
+    max_attempts: int
+    backoff_multiplier: float
+```
+
+## Execution Types
+
+### Execution
+
+```python
+from budai.types import Execution, ExecutionStep
+
+execution: Execution = client.executions.get(...)
+
+execution.id: str
+execution.pipeline_id: str
+execution.status: Literal["pending", "running", "completed", "failed", "cancelled"]
+execution.started_at: Optional[datetime]
+execution.completed_at: Optional[datetime]
+execution.duration_seconds: Optional[float]
+execution.outputs: dict[str, Any]
+execution.steps: dict[str, ExecutionStep]
+execution.error: Optional[str]
+```
+
+### ExecutionStep
+
+```python
+from budai.types import ExecutionStep
+
+step: ExecutionStep
+
+step.id: str
+step.action: str
+step.status: Literal["pending", "running", "completed", "failed", "skipped"]
+step.output: Optional[dict[str, Any]]
+step.error: Optional[str]
+step.started_at: Optional[datetime]
+step.completed_at: Optional[datetime]
+step.duration_seconds: Optional[float]
+```
+
+## Model Types
+
+### Model
+
+```python
+from budai.types import Model, ModelSource
+
+model: Model = client.models.get(...)
+
+model.id: str
+model.name: str
+model.source: ModelSource
+model.uri: str
+model.size_bytes: int
+model.status: Literal["downloading", "available", "error", "deleting"]
+model.metadata: dict[str, Any]
+model.created_at: datetime
+```
+
+### ModelSource
+
+```python
+from budai.types import ModelSource
+
+source: ModelSource = Literal["hugging_face", "url", "local", "cloud"]
+```
+
+## Deployment Types
+
+### Deployment
+
+```python
+from budai.types import Deployment, AutoScaling, Resources
+
+deployment: Deployment = client.deployments.get(...)
+
+deployment.id: str
+deployment.name: str
+deployment.model_id: str
+deployment.cluster_id: str
+deployment.status: Literal["pending", "deploying", "active", "scaling", "failed", "stopped"]
+deployment.replicas: int
+deployment.endpoint_url: str
+deployment.auto_scaling: Optional[AutoScaling]
+deployment.resources: Resources
+deployment.created_at: datetime
+```
+
+### AutoScaling
+
+```python
+from budai.types import AutoScaling
+
+auto_scaling: AutoScaling = {
+    "enabled": bool,
+    "min_replicas": int,
+    "max_replicas": int,
+    "target_cpu": int,
+    "target_memory": int
+}
+```
+
+### Resources
+
+```python
+from budai.types import Resources
+
+resources: Resources = {
+    "cpu": str,
+    "memory": str,
+    "gpu": Optional[int],
+    "gpu_type": Optional[str]
+}
+```
+
+## Cluster Types
+
+### Cluster
+
+```python
+from budai.types import Cluster, ClusterHealth
+
+cluster: Cluster = client.clusters.get(...)
+
+cluster.id: str
+cluster.name: str
+cluster.provider: Literal["aws", "azure", "onpremise"]
+cluster.region: str
+cluster.status: Literal["provisioning", "active", "degraded", "maintenance", "failed"]
+cluster.node_count: int
+cluster.kubernetes_version: str
+cluster.created_at: datetime
+```
+
+### ClusterHealth
+
+```python
+from budai.types import ClusterHealth, AvailableResources
+
+health: ClusterHealth = client.clusters.health(...)
+
+health.status: Literal["healthy", "degraded", "unhealthy"]
+health.node_count: int
+health.available_resources: AvailableResources
+```
+
+### AvailableResources
+
+```python
+from budai.types import AvailableResources
+
+resources: AvailableResources = {
+    "cpu": str,
+    "memory_gb": float,
+    "gpu_count": int,
+    "gpu_types": List[str]
+}
+```
+
+## Exception Types
+
+```python
+from budai.exceptions import (
+    BudAPIError,          # Base exception
+    AuthenticationError,  # 401
+    PermissionError,      # 403
+    NotFoundError,        # 404
+    ValidationError,      # 422
+    RateLimitError,       # 429
+    ConflictError,        # 409
+    ServerError,          # 5xx
+    TimeoutError          # Request timeout
+)
+
+# All exceptions have these attributes
+error: BudAPIError
+
+error.status_code: int
+error.message: str
+error.type: str
+error.request_id: str
+error.param: Optional[str]  # For validation errors
+
+# RateLimitError has additional attribute
+rate_error: RateLimitError
+rate_error.retry_after: int  # Seconds to wait
+```
+
+## Generic Types
+
+### Response Wrapper
+
+```python
+from budai.types import Response
+from typing import TypeVar, Generic
+
+T = TypeVar('T')
+
+class Response(Generic[T]):
+    data: T
+    headers: dict[str, str]
+    status_code: int
+    request_id: str
+    rate_limit_remaining: Optional[int]
+    rate_limit_reset: Optional[int]
+```
+
+## Type Checking
+
+### With mypy
+
+```python
+from budai import BudClient
+from budai.types import ChatCompletion, Deployment
+
+client: BudClient = BudClient(api_key="your-key")
+
+# Type-checked
+response: ChatCompletion = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+
+deployment: Deployment = client.deployments.create(
+    model_id="model_abc",
+    cluster_id="cluster_prod"
+)
+```
+
+Run type checking:
+
+```bash
+mypy your_script.py
+```
+
+### With IDE Autocomplete
+
+```python
+from budai import BudClient
+
+client = BudClient(api_key="your-key")
+
+# IDE shows available methods
+response = client.chat.completions.create(
+    # IDE autocompletes parameters
+    model="",
+    messages=[],
+    temperature=0.7,
+    # ... all available params
+)
+
+# IDE knows response structure
+content = response.choices[0].message.content
+# Type: Optional[str]
+```
+
+## Custom Type Annotations
+
+```python
+from typing import List, Dict, Any
+from budai import BudClient
+from budai.types import ChatCompletion, Pipeline, Execution
+
+def process_batch(
+    client: BudClient,
+    prompts: List[str]
+) -> List[ChatCompletion]:
+    return [
+        client.chat.completions.create(
+            model="llama-3.2-1b",
+            messages=[{"role": "user", "content": p}]
+        )
+        for p in prompts
+    ]
+
+def create_deployment_pipeline(
+    client: BudClient,
+    model_id: str,
+    cluster_id: str
+) -> Pipeline:
+    return client.pipelines.create(
+        name="Deploy",
+        definition={
+            "steps": [...]
+        }
+    )
+
+def run_and_wait(
+    client: BudClient,
+    pipeline_id: str,
+    params: Dict[str, Any]
+) -> Execution:
+    return client.executions.create(
+        pipeline_id=pipeline_id,
+        params=params,
+        wait=True
+    )
+```
+
+## Pydantic Models
+
+Access underlying Pydantic models:
+
+```python
+from budai.models import (
+    PipelineModel,
+    ExecutionModel,
+    DeploymentModel,
+    ModelModel,
+    ClusterModel
+)
+
+# These are Pydantic models with full validation
+pipeline = PipelineModel(
+    name="Test",
+    definition={
+        "steps": [...]
+    }
+)
+
+# Serialize to JSON
+json_str = pipeline.model_dump_json()
+
+# Parse from JSON
+parsed = PipelineModel.model_validate_json(json_str)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced" icon="gear" href="/api-sdk/python-sdk/advanced">
+    Production patterns
+  </Card>
+
+  <Card title="Pipeline DSL" icon="code" href="/api-sdk/python-sdk/pipeline-dsl">
+    Pythonic pipeline builder
+  </Card>
+</CardGroup>

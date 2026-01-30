@@ -1,0 +1,66 @@
+---
+title: "Edit Image"
+description: "Edit an image using a text prompt and mask."
+api: "POST /v1/images/edits"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/images/edits \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "image=@original.png" \
+  -F "mask=@mask.png" \
+  -F "prompt=Add a red hat to the person" \
+  -F "model=dall-e-2" \
+  -F "n=1" \
+  -F "size=1024x1024"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "created": 1699000000,
+  "data": [
+    {
+      "url": "https://storage.example.com/edited_image_abc123.png",
+      "b64_json": null
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| image | file | Yes | Image to edit (PNG only, must have transparency) |
+| mask | file | No | Mask image indicating areas to edit (PNG with transparency) |
+| prompt | string | Yes | Text description of the desired edit |
+| model | string | Yes | Model identifier (e.g., dall-e-2) |
+| n | integer | No | Number of images to generate (1-10). Default: 1 |
+| size | string | No | Image size: 256x256, 512x512, 1024x1024. Default: 1024x1024 |
+| response_format | string | No | Response format: url or b64_json. Default: url |
+| user | string | No | Unique identifier for end-user |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    DALL-E 2 for image editing with masks
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise DALL-E 2 image editing
+  </Card>
+</CardGroup>

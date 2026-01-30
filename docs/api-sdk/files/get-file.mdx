@@ -1,0 +1,54 @@
+---
+title: "Get File"
+description: "Retrieve file metadata by ID."
+api: "GET /v1/files/{file_id}"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/files/file-abc123 \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "file-abc123",
+  "object": "file",
+  "bytes": 2048,
+  "created_at": 1699000000,
+  "filename": "batch_requests.jsonl",
+  "purpose": "batch",
+  "status": "processed",
+  "status_details": null
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| file_id | string | Yes | The ID of the file to retrieve |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    File management for Batch API and Assistants
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise file storage with compliance
+  </Card>
+</CardGroup>

@@ -1,0 +1,187 @@
+---
+title: "Authentication"
+description: "Configure authentication for the BudAI Foundry SDK"
+icon: "key"
+---
+
+## Overview
+
+The BudClient supports multiple authentication methods for different deployment scenarios.
+
+## Authentication Methods
+
+### 1. API Key (Recommended)
+
+Most common method for production applications:
+
+```python
+from bud import BudClient
+
+# Direct API key
+client = BudClient(api_key="your-api-key-here")
+
+# From environment variable
+import os
+os.environ["BUD_API_KEY"] = "your-api-key-here"
+client = BudClient()
+```
+
+### 2. JWT Token
+
+For server-to-server authentication:
+
+```python
+client = BudClient(jwt_token="your-jwt-token")
+```
+
+### 3. Dapr Token
+
+For services running in Dapr-enabled environments:
+
+```python
+client = BudClient(dapr_token="your-dapr-token")
+```
+
+### 4. CLI Stored Credentials
+
+After logging in with the CLI, credentials are stored locally:
+
+```bash
+bud auth login
+```
+
+Then use the client without explicit credentials:
+
+```python
+# Automatically uses stored CLI credentials
+client = BudClient()
+```
+
+### 5. Custom Base URL
+
+For self-hosted or custom deployments:
+
+```python
+client = BudClient(
+    api_key="your-api-key",
+    base_url="https://your-custom-domain.com"
+)
+```
+
+## Environment Variables
+
+The SDK recognizes these environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `BUD_API_KEY` | Your API key | `bud_abc123...` |
+| `BUD_BASE_URL` | Custom API endpoint | `https://api.example.com` |
+| `BUD_JWT_TOKEN` | JWT authentication token | `eyJhbGc...` |
+| `BUD_DAPR_TOKEN` | Dapr authentication token | `dapr_xyz...` |
+
+## CLI Authentication
+
+### Login
+
+Authenticate via CLI:
+
+```bash
+bud auth login
+```
+
+This will prompt for your credentials and store them securely.
+
+### Check Status
+
+Verify your authentication status:
+
+```bash
+bud auth status
+```
+
+### Logout
+
+Remove stored credentials:
+
+```bash
+bud auth logout
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Environment Variables">
+    Store API keys in environment variables instead of hardcoding them:
+    ```python
+    import os
+    client = BudClient(api_key=os.environ["BUD_API_KEY"])
+    ```
+  </Accordion>
+
+  <Accordion title="Use .env Files for Development">
+    Use python-dotenv for local development:
+    ```python
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    client = BudClient()  # Reads BUD_API_KEY from .env
+    ```
+  </Accordion>
+
+  <Accordion title="Rotate Keys Regularly">
+    Regularly rotate your API keys from the Bud platform dashboard.
+  </Accordion>
+
+  <Accordion title="Use Different Keys per Environment">
+    Maintain separate API keys for development, staging, and production.
+  </Accordion>
+</AccordionGroup>
+
+## Example: Multi-Environment Setup
+
+```python
+import os
+from bud import BudClient
+
+def get_client():
+    """Get BudClient configured for current environment"""
+    env = os.environ.get("ENVIRONMENT", "development")
+
+    if env == "production":
+        return BudClient(
+            api_key=os.environ["BUD_PROD_API_KEY"],
+            base_url="https://gateway.bud.studio"
+        )
+    elif env == "staging":
+        return BudClient(
+            api_key=os.environ["BUD_STAGING_API_KEY"],
+            base_url="https://staging.bud.studio"
+        )
+    else:
+        return BudClient(
+            api_key=os.environ["BUD_DEV_API_KEY"]
+        )
+
+# Usage
+client = get_client()
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication Failed">
+    If you receive authentication errors:
+    - Verify your API key is correct
+    - Check that the key hasn't expired
+    - Ensure you're using the correct base URL
+    - Try logging in again with `bud auth login`
+  </Accordion>
+
+  <Accordion title="Module Not Found">
+    If Python can't find the `bud` module:
+    ```bash
+    pip show budai-foundry-sdk
+    pip install --upgrade git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+    ```
+  </Accordion>
+</AccordionGroup>
