@@ -73,7 +73,7 @@ export function useObservabilitySocket({
 
     // Check socket URL
     if (!observabilitySocketUrl) {
-      console.error('[ObservabilitySocket] Missing NEXT_PUBLIC_OBSERVABILITY_SOCKET_URL');
+      console.error('[ObservabilitySocket] Missing NEXT_PUBLIC_BUDNOTIFY_SERVICE_PUBLIC');
       setError(new Error('Socket URL not configured'));
       setConnectionStatus('error');
       return cleanupSocket; // Always return cleanup
