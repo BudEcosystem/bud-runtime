@@ -541,6 +541,27 @@ async def _check_and_finalize_execution(
     total_steps = len(fresh_steps)
     all_done = pending_count == 0 and running_count == 0
 
+    # Fail-fast: If any step failed and no steps are running, skip pending steps and finalize
+    should_fail_fast = failed_count > 0 and running_count == 0 and pending_count > 0
+
+    if should_fail_fast:
+        logger.info(
+            f"Execution {execution_id} fail-fast: {failed_count} failed, "
+            f"skipping {pending_count} pending steps"
+        )
+        # Mark all pending steps as SKIPPED since they can't run after a failure
+        for s in fresh_steps:
+            if s.status == StepStatus.PENDING:
+                await step_crud.update_with_version(
+                    step_id=s.id,
+                    expected_version=s.version,
+                    status=StepStatus.SKIPPED,
+                    error_message="Skipped due to prior step failure",
+                )
+        await session.commit()
+        # Now all_done is effectively true
+        all_done = True
+
     if not all_done:
         logger.debug(
             f"Execution {execution_id} not yet complete: "
@@ -593,6 +614,26 @@ async def _check_and_finalize_execution(
             end_time=datetime.now(timezone.utc),
             final_outputs=final_outputs,
         )
+
+
+async def _commit_and_finalize_on_failure(
+    session: AsyncSession,
+    step_crud: "StepExecutionCRUD",
+    execution_id: UUID,
+) -> None:
+    """Commit session changes and finalize execution status after a step failure.
+
+    This helper commits the failed step to the database and then checks if
+    the execution should be finalized (marked as FAILED).
+
+    Args:
+        session: Database session.
+        step_crud: Step execution CRUD instance.
+        execution_id: The execution to potentially finalize.
+    """
+    await session.commit()
+    updated_steps = await step_crud.get_by_execution_id(execution_id)
+    await _check_and_finalize_execution(session, execution_id, updated_steps)
 
 
 async def _continue_pipeline_execution(
@@ -752,10 +793,7 @@ async def _continue_pipeline_execution(
                 outputs={},
                 error_message=str(e),
             )
-            # Commit the failure and finalize execution
-            await session.commit()
-            updated_steps = await step_crud.get_by_execution_id(execution_id)
-            await _check_and_finalize_execution(session, execution_id, updated_steps)
+            await _commit_and_finalize_on_failure(session, step_crud, execution_id)
             continue
 
         if result.success:
@@ -810,8 +848,4 @@ async def _continue_pipeline_execution(
                 error_message=result.error,
             )
             logger.warning(f"Step {step_id} failed: {result.error}")
-
-            # Commit the failure and finalize execution
-            await session.commit()
-            updated_steps = await step_crud.get_by_execution_id(execution_id)
-            await _check_and_finalize_execution(session, execution_id, updated_steps)
+            await _commit_and_finalize_on_failure(session, step_crud, execution_id)
