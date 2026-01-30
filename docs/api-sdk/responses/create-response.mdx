@@ -1,0 +1,74 @@
+---
+title: "Create Response"
+description: "Create a new response using OpenAI's Responses API."
+api: "POST /v1/responses"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/responses \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "input": "What is the capital of France?",
+    "instructions": "You are a helpful geography tutor.",
+    "stream": false
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "created_at": 1699000000,
+  "model": "gpt-4",
+  "status": "completed",
+  "output": "The capital of France is Paris.",
+  "usage": {
+    "input_tokens": 15,
+    "output_tokens": 8,
+    "total_tokens": 23
+  },
+  "metadata": null
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Model identifier to use |
+| input | string or array | Yes | Input text or multimodal content |
+| instructions | string | No | System instructions for the model |
+| previous_response_id | string | No | ID of previous response for conversation continuity |
+| tools | array | No | Available tools for the model to use |
+| tool_choice | string or object | No | Tool selection strategy |
+| temperature | float | No | Sampling temperature (0.0 to 2.0). Default: 1.0 |
+| max_tokens | integer | No | Maximum tokens to generate |
+| stream | boolean | No | Enable streaming response. Default: false |
+| metadata | object | No | Custom metadata (max 16 key-value pairs) |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    GPT-4 and o1 models with Responses API support
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise Responses API with SLA guarantees
+  </Card>
+</CardGroup>

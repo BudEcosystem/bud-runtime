@@ -1,0 +1,118 @@
+---
+title: "List Batches"
+description: "Retrieve a list of all batch jobs."
+api: "GET /v1/batches"
+---
+
+<RequestExample>
+
+```bash cURL
+curl "https://gateway.bud.studio/v1/batches?limit=20" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "batch_abc123",
+      "object": "batch",
+      "endpoint": "/v1/chat/completions",
+      "status": "completed",
+      "input_file_id": "file-abc123",
+      "output_file_id": "file-xyz789",
+      "created_at": 1699123456,
+      "completed_at": 1699130000,
+      "request_counts": {
+        "total": 100,
+        "completed": 98,
+        "failed": 2
+      }
+    },
+    {
+      "id": "batch_def456",
+      "object": "batch",
+      "endpoint": "/v1/embeddings",
+      "status": "in_progress",
+      "input_file_id": "file-def456",
+      "output_file_id": null,
+      "created_at": 1699140000,
+      "request_counts": {
+        "total": 500,
+        "completed": 250,
+        "failed": 0
+      }
+    }
+  ],
+  "first_id": "batch_abc123",
+  "last_id": "batch_def456",
+  "has_more": true
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| after | string | No | Cursor for pagination (batch ID to start after) |
+| limit | integer | No | Number of results per page (default: 20, max: 100) |
+
+## Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| object | string | Always `"list"` |
+| data | array | Array of batch objects |
+| first_id | string | ID of the first batch in the list |
+| last_id | string | ID of the last batch in the list |
+| has_more | boolean | Whether more results are available |
+
+## Pagination Example
+
+```python
+import requests
+
+API_KEY = "YOUR_API_KEY"
+BASE_URL = "https://gateway.bud.studio"
+
+all_batches = []
+after = None
+
+while True:
+    params = {"limit": 100}
+    if after:
+        params["after"] = after
+
+    response = requests.get(
+        f"{BASE_URL}/v1/batches",
+        headers={"Authorization": f"Bearer {API_KEY}"},
+        params=params
+    )
+    result = response.json()
+
+    all_batches.extend(result["data"])
+
+    if not result["has_more"]:
+        break
+
+    after = result["last_id"]
+
+print(f"Total batches: {len(all_batches)}")
+```
+
+<Note>
+For complete Batch API documentation including file upload, JSONL format, and usage examples, see [Create Batch](/api-sdk/batch/create-batch).
+</Note>

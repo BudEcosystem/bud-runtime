@@ -1,0 +1,59 @@
+---
+title: "Text-to-Speech"
+description: "Generate audio from text input."
+api: "POST /v1/audio/speech"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/audio/speech \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tts-1",
+    "input": "Hello, this is a test of text-to-speech.",
+    "voice": "alloy"
+  }' \
+  --output speech.mp3
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+Binary audio file returned with appropriate Content-Type header (e.g., audio/mpeg for MP3)
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Model identifier (e.g., tts-1, tts-1-hd) |
+| input | string | Yes | Text to convert to speech (max 4096 characters) |
+| voice | string | Yes | Voice to use: `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`, `ash`, `ballad`, `coral`, `sage`, `verse` |
+| response_format | string | No | Audio format: mp3, opus, aac, flac, wav, pcm. Default: mp3 |
+| speed | float | No | Speed of generated audio (0.25 to 4.0). Default: 1.0 |
+
+## Supported Providers
+
+<CardGroup cols={3}>
+  <Card title="OpenAI" icon="openai">
+    TTS-1 and TTS-1-HD with multiple voices
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise text-to-speech with global deployment
+  </Card>
+  <Card title="Together AI" icon="arrow-progress">
+    Cartesia Sonic with 100+ voice options
+  </Card>
+</CardGroup>

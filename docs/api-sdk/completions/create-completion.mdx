@@ -1,0 +1,94 @@
+---
+title: "Create Completion"
+description: "Generate text completions using the specified model."
+api: "POST /v1/completions"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-3.5-turbo-instruct",
+    "prompt": "Write a tagline for an ice cream shop.",
+    "max_tokens": 50,
+    "temperature": 0.7
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "cmpl-abc123",
+  "object": "text_completion",
+  "created": 1699000000,
+  "model": "gpt-3.5-turbo-instruct",
+  "choices": [
+    {
+      "text": "\n\nSweet moments, one scoop at a time.",
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 10,
+    "completion_tokens": 12,
+    "total_tokens": 22
+  }
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Model identifier to use for completion |
+| prompt | string or array | Yes | Text prompt(s) to complete. Can be a single string or array of strings |
+| suffix | string | No | Text to append after completion for insert mode |
+| max_tokens | integer | No | Maximum tokens to generate. Default: 16 |
+| temperature | float | No | Sampling temperature (0.0 to 2.0). Default: 1.0 |
+| top_p | float | No | Nucleus sampling parameter. Default: 1.0 |
+| n | integer | No | Number of completions to generate. Default: 1 |
+| stream | boolean | No | Enable streaming response. Default: false |
+| logprobs | integer | No | Include log probabilities on the most likely tokens |
+| echo | boolean | No | Echo back the prompt in addition to completion. Default: false |
+| stop | string or array | No | Sequences where the API will stop generating |
+| presence_penalty | float | No | Penalize new tokens based on presence (-2.0 to 2.0). Default: 0 |
+| frequency_penalty | float | No | Penalize new tokens based on frequency (-2.0 to 2.0). Default: 0 |
+| repetition_penalty | float | No | Penalize token repetition. Default: 1.0 |
+| best_of | integer | No | Generate n completions server-side and return the best |
+| logit_bias | object | No | Modify likelihood of specified tokens |
+| user | string | No | Unique identifier representing your end-user |
+| seed | integer | No | Random seed for deterministic sampling |
+| ignore_eos | boolean | No | Continue generating until max_tokens is reached. Default: false |
+
+## Supported Providers
+
+<CardGroup cols={4}>
+  <Card title="OpenAI" icon="openai">
+    GPT-3.5 Turbo Instruct for legacy completions
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise completions deployments
+  </Card>
+  <Card title="Together AI" icon="arrow-progress">
+    Llama, Mixtral, and open-source models
+  </Card>
+  <Card title="Fireworks" icon="fire">
+    Fast completions for various LLMs
+  </Card>
+</CardGroup>

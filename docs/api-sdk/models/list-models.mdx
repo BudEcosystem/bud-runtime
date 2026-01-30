@@ -1,0 +1,51 @@
+---
+title: "List Models"
+description: "Retrieve a list of available models."
+api: "GET /v1/models"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "llama-3.2-1b",
+      "object": "model",
+      "created": 1699000000,
+      "owned_by": "meta"
+    },
+    {
+      "id": "mistral-7b",
+      "object": "model",
+      "created": 1699000000,
+      "owned_by": "mistralai"
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header of the form `Bearer <token>` where `<token>` is your API key |
+
+## Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| limit | integer | No | Maximum number of models to return. Default: `100` |
+| offset | integer | No | Number of models to skip for pagination. Default: `0` |

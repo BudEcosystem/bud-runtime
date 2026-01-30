@@ -1,0 +1,338 @@
+---
+title: "Inference"
+description: "Make chat completion requests and stream responses"
+icon: "wand-magic-sparkles"
+---
+
+## Chat Completions
+
+### Basic Request
+
+```python
+from budai import BudClient
+
+client = BudClient(api_key="your-key")
+
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is machine learning?"}
+    ]
+)
+
+print(response.choices[0].message.content)
+```
+
+### With Parameters
+
+```python
+response = client.chat.completions.create(
+    model="llama-3.2-3b",
+    messages=[
+        {"role": "user", "content": "Write a haiku about AI"}
+    ],
+    temperature=0.7,
+    max_tokens=100,
+    top_p=0.9,
+    frequency_penalty=0.5,
+    presence_penalty=0.3
+)
+```
+
+## Streaming Responses
+
+Stream tokens as they're generated:
+
+```python
+stream = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Explain quantum physics"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)
+```
+
+### Streaming with Event Handling
+
+```python
+def handle_stream(stream):
+    full_response = ""
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+
+        if delta.content:
+            print(delta.content, end="", flush=True)
+            full_response += delta.content
+
+        if chunk.choices[0].finish_reason:
+            print(f"\n\nFinish reason: {chunk.choices[0].finish_reason}")
+
+    return full_response
+
+stream = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Count to 10"}],
+    stream=True
+)
+
+response_text = handle_stream(stream)
+```
+
+## Function Calling
+
+Use function calling for structured outputs:
+
+```python
+response = client.chat.completions.create(
+    model="llama-3.2-3b",
+    messages=[
+        {"role": "user", "content": "What's the weather in San Francisco?"}
+    ],
+    tools=[
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather for a location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "City name"
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": ["celsius", "fahrenheit"]
+                        }
+                    },
+                    "required": ["location"]
+                }
+            }
+        }
+    ]
+)
+
+# Check if model wants to call function
+if response.choices[0].message.tool_calls:
+    tool_call = response.choices[0].message.tool_calls[0]
+    print(f"Function: {tool_call.function.name}")
+    print(f"Arguments: {tool_call.function.arguments}")
+```
+
+## Multi-turn Conversations
+
+Maintain conversation history:
+
+```python
+messages = [
+    {"role": "system", "content": "You are a helpful coding assistant."}
+]
+
+# First turn
+messages.append({"role": "user", "content": "Write a Python function to reverse a string"})
+response = client.chat.completions.create(model="llama-3.2-1b", messages=messages)
+messages.append({"role": "assistant", "content": response.choices[0].message.content})
+
+# Second turn
+messages.append({"role": "user", "content": "Now add type hints"})
+response = client.chat.completions.create(model="llama-3.2-1b", messages=messages)
+messages.append({"role": "assistant", "content": response.choices[0].message.content})
+
+print(response.choices[0].message.content)
+```
+
+## Response Object
+
+### Structure
+
+```python
+response = client.chat.completions.create(...)
+
+# Access response fields
+response.id                    # "chatcmpl-abc123"
+response.model                 # "llama-3.2-1b"
+response.created               # 1706554800
+response.choices[0].message.content  # "Machine learning is..."
+response.choices[0].finish_reason    # "stop"
+response.usage.prompt_tokens         # 15
+response.usage.completion_tokens     # 45
+response.usage.total_tokens          # 60
+```
+
+### Finish Reasons
+
+| Reason | Description |
+|--------|-------------|
+| `stop` | Natural completion |
+| `length` | Hit max_tokens limit |
+| `tool_calls` | Model requested function call |
+| `content_filter` | Content filtered by guardrails |
+
+## Advanced Parameters
+
+### Temperature and Sampling
+
+```python
+# More deterministic (lower temperature)
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "What is 2+2?"}],
+    temperature=0.1  # More focused, less creative
+)
+
+# More creative (higher temperature)
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Write a creative story"}],
+    temperature=1.2  # More random, more creative
+)
+```
+
+### Top-p Sampling
+
+```python
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Suggest product names"}],
+    top_p=0.9,  # Nucleus sampling
+    temperature=0.8
+)
+```
+
+### Presence and Frequency Penalties
+
+```python
+# Reduce repetition
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "List 10 unique ideas"}],
+    presence_penalty=0.6,   # Encourage new topics
+    frequency_penalty=0.8   # Penalize repeated phrases
+)
+```
+
+## Vision Models
+
+Send images for analysis:
+
+```python
+response = client.chat.completions.create(
+    model="llava-1.6",
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": "https://example.com/image.jpg"}
+                }
+            ]
+        }
+    ]
+)
+```
+
+## Batch Inference
+
+Process multiple prompts efficiently:
+
+```python
+prompts = [
+    "What is AI?",
+    "What is ML?",
+    "What is deep learning?"
+]
+
+responses = []
+for prompt in prompts:
+    response = client.chat.completions.create(
+        model="llama-3.2-1b",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    responses.append(response.choices[0].message.content)
+```
+
+## Stop Sequences
+
+Define custom stop sequences:
+
+```python
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Count to 10"}],
+    stop=["5", "\n\n"]  # Stop at "5" or double newline
+)
+```
+
+## Logit Bias
+
+Bias token selection:
+
+```python
+# Discourage certain tokens
+response = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "Write about technology"}],
+    logit_bias={
+        "2435": -10,  # Token ID for "AI" - heavily discouraged
+        "1234": 5     # Token ID for "innovation" - encouraged
+    }
+)
+```
+
+## Response Caching
+
+Reduce costs with response caching:
+
+```python
+# First request - cached
+response1 = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "What is AI?"}],
+    cache=True
+)
+
+# Second request - served from cache
+response2 = client.chat.completions.create(
+    model="llama-3.2-1b",
+    messages=[{"role": "user", "content": "What is AI?"}],
+    cache=True
+)
+
+print(response2.cached)  # True
+```
+
+## Error Handling
+
+```python
+from budai import BudAPIError, RateLimitError
+
+try:
+    response = client.chat.completions.create(
+        model="llama-3.2-1b",
+        messages=[{"role": "user", "content": "Hello"}]
+    )
+except RateLimitError as e:
+    print(f"Rate limited. Retry after {e.retry_after}s")
+except BudAPIError as e:
+    print(f"Error: {e.status_code} - {e.message}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Code Examples" icon="code" href="/api-sdk/python-sdk/examples">
+    Complete code examples and patterns
+  </Card>
+
+  <Card title="Pipelines" icon="diagram-project" href="/api-sdk/python-sdk/pipelines">
+    Orchestrate complex workflows
+  </Card>
+</CardGroup>

@@ -1,0 +1,362 @@
+---
+title: "Actions Reference"
+description: "Complete reference for all pipeline actions"
+---
+
+## Overview
+
+Actions are the building blocks of pipelines. Each action performs a specific operation and can be configured with parameters, outputs, and conditions.
+
+## Control Flow Actions
+
+### Log
+
+Write messages to execution logs for debugging and monitoring.
+
+**Parameters:**
+- `message` (string, required): The message to log
+- `level` (string): Log level - `info`, `warning`, `error`, `debug`
+
+**Example:**
+```python
+{
+    "action": "log",
+    "params": {
+        "message": "Starting deployment process",
+        "level": "info"
+    }
+}
+```
+
+### Conditional Branch
+
+Execute different paths based on conditions.
+
+**Parameters:**
+- `condition` (string, required): Boolean expression to evaluate
+- `branches` (object): Named branches with their conditions
+
+**Example:**
+```python
+{
+    "action": "conditional",
+    "params": {
+        "condition": "steps.health_check.output.status == 'healthy'"
+    }
+}
+```
+
+### Transform
+
+Modify or transform data between steps.
+
+**Parameters:**
+- `operation` (string, required): Transformation type
+- `input` (any): Input data to transform
+- `template` (string): Jinja2 template for transformation
+
+### Aggregate
+
+Combine outputs from multiple parallel actions.
+
+**Parameters:**
+- `sources` (array, required): List of step IDs to aggregate
+- `strategy` (string): Aggregation strategy - `merge`, `concat`, `first`
+
+### Set Output
+
+Define pipeline-level outputs.
+
+**Parameters:**
+- `key` (string, required): Output variable name
+- `value` (any, required): Output value
+
+**Example:**
+```python
+{
+    "action": "set_output",
+    "params": {
+        "key": "endpoint_url",
+        "value": "{{steps.deploy.output.endpoint_url}}"
+    }
+}
+```
+
+### Wait Until
+
+Pause execution until a condition is met.
+
+**Parameters:**
+- `condition` (string, required): Condition to wait for
+- `timeout_seconds` (integer): Maximum wait time
+- `poll_interval_seconds` (integer): Check interval
+
+### Fail
+
+Explicitly fail the pipeline with a message.
+
+**Parameters:**
+- `message` (string, required): Failure message
+- `error_code` (string): Error code for categorization
+
+---
+
+## Deployment Actions
+
+### Deploy Model
+
+Create a model deployment endpoint.
+
+**Parameters:**
+- `model_id` (string, required): Model to deploy
+- `cluster_id` (string, required): Target cluster
+- `deployment_name` (string, required): Deployment identifier
+- `replicas` (integer): Initial replica count
+- `auto_scaling` (object): Autoscaling configuration
+
+**Outputs:**
+- `deployment_id`: Created deployment ID
+- `endpoint_url`: Inference endpoint URL
+- `status`: Deployment status
+
+**Example:**
+```python
+{
+    "action": "deployment_create",
+    "params": {
+        "model_id": "{{steps.add_model.output.model_id}}",
+        "cluster_id": "cluster_prod",
+        "deployment_name": "llama-inference",
+        "replicas": 2
+    }
+}
+```
+
+### Scale Deployment
+
+Adjust the number of replicas for a deployment.
+
+**Parameters:**
+- `deployment_id` (string, required): Deployment to scale
+- `replicas` (integer, required): Target replica count
+
+**Outputs:**
+- `previous_replicas`: Replica count before scaling
+- `current_replicas`: New replica count
+
+### Configure Rate Limiting
+
+Set rate limits for a deployment endpoint.
+
+**Parameters:**
+- `deployment_id` (string, required): Target deployment
+- `rate_limit` (integer, required): Requests per time window
+- `time_window` (string): Time window - `second`, `minute`, `hour`
+- `algorithm` (string): Algorithm - `token_bucket`, `fixed_window`
+
+### Delete Deployment
+
+Remove a deployment and release resources.
+
+**Parameters:**
+- `deployment_id` (string, required): Deployment to delete
+
+---
+
+## Model Operations Actions
+
+### Add Model
+
+Add a model from HuggingFace or URL to the registry.
+
+**Parameters:**
+- `model_uri` (string, required): Model identifier or URL
+- `model_name` (string, required): Display name
+- `model_source` (string, required): Source - `hugging_face`, `url`, `local`
+- `max_wait_seconds` (integer): Maximum download wait time
+
+**Outputs:**
+- `model_id`: Created model ID
+- `model_name`: Model name
+- `size_bytes`: Model size
+
+**Example:**
+```python
+{
+    "action": "model_add",
+    "params": {
+        "model_uri": "meta-llama/Llama-3.2-1B-Instruct",
+        "model_name": "Llama-3.2-1B-Instruct",
+        "model_source": "hugging_face"
+    }
+}
+```
+
+### Add Cloud Model
+
+Add a cloud-hosted model (OpenAI, Anthropic, etc.).
+
+**Parameters:**
+- `provider` (string, required): Cloud provider
+- `model_id` (string, required): Provider's model ID
+- `api_key` (string): API key (use secrets)
+
+### Model Benchmark
+
+Run performance benchmarks on a model.
+
+**Parameters:**
+- `model_id` (string, required): Model to benchmark
+- `test_prompts` (array): List of test prompts
+- `metrics` (array): Metrics to measure
+
+**Outputs:**
+- `latency_p50`: 50th percentile latency
+- `latency_p99`: 99th percentile latency
+- `throughput`: Requests per second
+
+### Delete Model
+
+Remove a model from the registry.
+
+**Parameters:**
+- `model_id` (string, required): Model to delete
+
+---
+
+## Cluster Actions
+
+### Cluster Health Check
+
+Verify cluster status and readiness.
+
+**Parameters:**
+- `cluster_id` (string, required): Cluster to check
+- `timeout_seconds` (integer): Health check timeout
+
+**Outputs:**
+- `status`: Cluster status - `healthy`, `degraded`, `unhealthy`
+- `node_count`: Number of active nodes
+- `available_resources`: Available CPU/GPU/memory
+
+**Example:**
+```python
+{
+    "action": "cluster_health",
+    "params": {
+        "cluster_id": "cluster_prod",
+        "timeout_seconds": 30
+    }
+}
+```
+
+---
+
+## Integration Actions
+
+### HTTP Request
+
+Make external API calls.
+
+**Parameters:**
+- `url` (string, required): Request URL
+- `method` (string): HTTP method - `GET`, `POST`, `PUT`, `DELETE`
+- `headers` (object): Request headers
+- `body` (object): Request body
+- `timeout_seconds` (integer): Request timeout
+
+**Outputs:**
+- `status_code`: HTTP status code
+- `response_body`: Response data
+- `headers`: Response headers
+
+**Example:**
+```python
+{
+    "action": "http_request",
+    "params": {
+        "url": "https://api.example.com/webhook",
+        "method": "POST",
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "body": {
+            "event": "deployment_complete",
+            "deployment_id": "{{steps.deploy.output.deployment_id}}"
+        }
+    }
+}
+```
+
+### Send Notification
+
+Send alerts via email, Slack, or Teams.
+
+**Parameters:**
+- `message` (string, required): Notification message
+- `channel` (string, required): Channel type - `email`, `slack`, `teams`
+- `recipients` (array): List of recipients
+- `priority` (string): Priority level
+
+**Example:**
+```python
+{
+    "action": "notification",
+    "params": {
+        "message": "Deployment {{steps.deploy.output.deployment_name}} completed successfully",
+        "channel": "slack",
+        "priority": "normal"
+    }
+}
+```
+
+---
+
+## Common Patterns
+
+### Referencing Step Outputs
+
+Access outputs from previous steps:
+
+```
+{{steps.step_id.output.field_name}}
+```
+
+### Conditional Execution
+
+All actions support conditional execution:
+
+```python
+{
+    "action": "notification",
+    "condition": "steps.deploy.output.status == 'active'",
+    "params": {...}
+}
+```
+
+### Error Handling
+
+Configure retry behavior:
+
+```python
+{
+    "action": "deployment_create",
+    "retry": {
+        "max_attempts": 3,
+        "backoff_multiplier": 2
+    },
+    "params": {...}
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pipeline Concepts" icon="book" href="/pipelines/pipeline-concepts">
+    Learn about DAGs and workflows
+  </Card>
+
+  <Card title="Quick Start" icon="play" href="/pipelines/quickstart">
+    Build your first pipeline
+  </Card>
+</CardGroup>

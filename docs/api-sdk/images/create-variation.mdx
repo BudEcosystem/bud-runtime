@@ -1,0 +1,65 @@
+---
+title: "Create Image Variation"
+description: "Create variations of an existing image."
+api: "POST /v1/images/variations"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/images/variations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "image=@original.png" \
+  -F "model=dall-e-2" \
+  -F "n=2" \
+  -F "size=1024x1024"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "created": 1699000000,
+  "data": [
+    {
+      "url": "https://storage.example.com/variation_abc123.png"
+    },
+    {
+      "url": "https://storage.example.com/variation_def456.png"
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+| Content-Type | string | Yes | Must be `multipart/form-data` |
+
+## Form Data
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| image | file | Yes | Source image file (PNG only, must be square, max 4MB) |
+| model | string | Yes | Model identifier (e.g., `dall-e-2`) |
+| n | integer | No | Number of variations to generate (1-10). Default: 1 |
+| size | string | No | Image size: `256x256`, `512x512`, `1024x1024`. Default: `1024x1024` |
+| response_format | string | No | Response format: `url` or `b64_json`. Default: `url` |
+| user | string | No | Unique identifier for end-user |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    DALL-E 2 for creating image variations
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise DALL-E 2 with secure deployments
+  </Card>
+</CardGroup>

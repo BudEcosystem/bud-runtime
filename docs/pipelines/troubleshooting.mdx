@@ -1,0 +1,469 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for Bud AI Foundry Pipelines"
+---
+
+<Note>
+This guide covers common problems you may encounter when working with pipelines and provides solutions to resolve them quickly.
+</Note>
+
+## Installation & Authentication Issues
+
+### SDK Installation Fails
+
+**Problem**: `pip install` fails with dependency errors
+
+**Solutions**:
+```bash
+# Use Python 3.11+ environment
+python --version  # Check version
+
+# Create fresh virtual environment
+python -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+
+# Install from GitHub
+pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+```
+
+### Authentication Fails
+
+**Problem**: `bud auth login` doesn't work or shows errors
+
+**Solutions**:
+<AccordionGroup>
+  <Accordion title="Browser doesn't open">
+    Manually copy the URL from the terminal and open it in your browser.
+  </Accordion>
+
+  <Accordion title="Token expired">
+    ```bash
+    # Logout and login again
+    bud auth logout
+    bud auth login
+    ```
+  </Accordion>
+
+  <Accordion title="Use API key instead">
+    ```bash
+    export BUD_API_KEY="your-api-key"
+    ```
+    Get your API key from the [dashboard](https://budai.dev/settings/api-keys).
+  </Accordion>
+</AccordionGroup>
+
+## Pipeline Creation Issues
+
+### Pipeline Registration Fails
+
+**Problem**: `bud pipeline create` returns validation errors
+
+**Common Causes & Solutions**:
+
+<AccordionGroup>
+  <Accordion title="Missing dag export">
+    **Error**: "Pipeline file must export 'dag' variable"
+
+    **Solution**: Ensure your file ends with:
+    ```python
+    dag = p.to_dag()
+    ```
+  </Accordion>
+
+  <Accordion title="Invalid action type">
+    **Error**: "Unknown action type: xyz"
+
+    **Solution**: Use valid action types: `log`, `transform`, `http_request`, `ml_training`, `ml_inference`, `set_output`, `conditional`, `parallel`
+  </Accordion>
+
+  <Accordion title="Circular dependency">
+    **Error**: "Circular dependency detected"
+
+    **Solution**: Remove circular references in `.after()` chains:
+    ```python
+    # Bad - circular dependency
+    a = Action("a", type="log").after(b)
+    b = Action("b", type="log").after(a)  # Error!
+
+    # Good - linear dependency
+    a = Action("a", type="log")
+    b = Action("b", type="log").after(a)
+    ```
+  </Accordion>
+
+  <Accordion title="Syntax errors in pipeline file">
+    **Error**: "SyntaxError in pipeline definition"
+
+    **Solution**: Validate Python syntax:
+    ```bash
+    python -m py_compile my_pipeline.py
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Pipeline Execution Issues
+
+### Execution Fails Immediately
+
+**Problem**: Pipeline fails right after starting
+
+**Debugging Steps**:
+1. Check execution logs:
+   ```bash
+   bud execution logs exec_xyz789
+   ```
+
+2. Look for parameter errors:
+   ```bash
+   bud execution get exec_xyz789 | jq '.params'
+   ```
+
+3. Verify pipeline definition:
+   ```bash
+   bud pipeline get pipe_abc123
+   ```
+
+### Template Resolution Errors
+
+**Problem**: Action fails with "Cannot resolve template variable"
+
+**Error Examples**:
+- `Cannot resolve ${params.missing_param}`
+- `Cannot resolve ${steps.nonexistent.output}`
+
+**Solutions**:
+<AccordionGroup>
+  <Accordion title="Missing parameter">
+    **Cause**: Parameter wasn't provided during execution
+
+    **Solution**: Include all required parameters:
+    ```bash
+    bud run pipe_abc123 --params '{"required_param": "value"}'
+    ```
+  </Accordion>
+
+  <Accordion title="Wrong step reference">
+    **Cause**: Referenced step doesn't exist or hasn't executed yet
+
+    **Solution**: Check action IDs match:
+    ```python
+    # Use correct action ID
+    process = Action("process_data", type="transform")
+    # Reference it correctly
+    next = Action("next", type="log").with_config(
+        message="${steps.process_data.output}"  # Matches ID
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Accessing nested output">
+    **Cause**: Incorrect path to nested output field
+
+    **Solution**: Use correct JSON path:
+    ```python
+    # If output is {"data": {"value": 123}}
+    .with_config(value="${steps.previous.output.data.value}")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Action Timeout Errors
+
+**Problem**: Action status shows "timeout"
+
+**Solutions**:
+<AccordionGroup>
+  <Accordion title="Increase timeout">
+    For legitimately long-running tasks:
+    ```python
+    Action("train", type="ml_training") \
+        .with_timeout(7200)  # 2 hours
+    ```
+  </Accordion>
+
+  <Accordion title="Optimize the action">
+    - Reduce data size
+    - Use more efficient algorithms
+    - Enable caching
+    - Consider splitting into smaller actions
+  </Accordion>
+
+  <Accordion title="Check for hanging processes">
+    Look for infinite loops or blocking operations in custom action code.
+  </Accordion>
+</AccordionGroup>
+
+### Retry Exhaustion
+
+**Problem**: Action fails after all retry attempts
+
+**Debugging**:
+```python
+execution = client.executions.get("exec_xyz789")
+failed_action = next(a for a in execution.actions if a.status == "failed")
+
+print(f"Attempts: {failed_action.attempt_count}")
+print(f"Last error: {failed_action.error}")
+print(f"All attempt errors:")
+for i, attempt in enumerate(failed_action.attempts, 1):
+    print(f"  Attempt {i}: {attempt.error}")
+```
+
+**Solutions**:
+- If transient: Increase retry attempts
+  ```python
+  .with_retry(max_attempts=5, delay=10)
+  ```
+- If permanent: Fix the underlying issue (wrong URL, invalid data, etc.)
+
+### Conditional Actions Never Execute
+
+**Problem**: Action with `.when()` is always skipped
+
+**Solutions**:
+<AccordionGroup>
+  <Accordion title="Check condition syntax">
+    ```python
+    # Valid conditions
+    .when("${params.enabled} == true")
+    .when("${steps.eval.output.score} > 0.8")
+    .when("${params.env} == 'production'")
+    ```
+  </Accordion>
+
+  <Accordion title="Verify condition values">
+    Check what values are being compared:
+    ```bash
+    bud execution get exec_xyz789 | jq '.params'
+    bud execution get exec_xyz789 | jq '.actions[] | select(.name=="eval") | .output'
+    ```
+  </Accordion>
+
+  <Accordion title="Type mismatches">
+    Ensure types match:
+    ```python
+    # Bad - comparing string to number
+    .when("${params.count} > 5")  # If count is "5" (string)
+
+    # Good - convert types
+    .when("int(${params.count}) > 5")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+### Slow Pipeline Execution
+
+**Problem**: Pipeline takes much longer than expected
+
+**Optimization Strategies**:
+
+1. **Enable parallel execution**:
+   ```python
+   # These run concurrently
+   task_a = Action("a", type="transform").after(start)
+   task_b = Action("b", type="transform").after(start)
+   task_c = Action("c", type="transform").after(start)
+   ```
+
+2. **Reduce action timeouts**:
+   ```python
+   # Don't wait unnecessarily long
+   api_call = Action("api", type="http_request").with_timeout(30)
+   ```
+
+3. **Cache results**:
+   ```python
+   Action("fetch", type="http_request").with_config(
+       cache_ttl=3600  # Cache for 1 hour
+   )
+   ```
+
+4. **Optimize data transfers**:
+   - Reduce data size passed between actions
+   - Use references instead of copying large data
+   - Compress data when possible
+
+### High Resource Usage
+
+**Problem**: Pipeline consumes excessive memory or CPU
+
+**Solutions**:
+- Process data in batches
+- Stream large datasets instead of loading all at once
+- Use efficient data formats (Parquet instead of CSV)
+- Configure resource limits per action
+
+## API & Network Issues
+
+### HTTP Request Actions Fail
+
+**Problem**: `http_request` actions fail with network errors
+
+**Common Causes**:
+<AccordionGroup>
+  <Accordion title="Connection timeout">
+    ```python
+    Action("api", type="http_request").with_config(
+        url="https://api.example.com/data",
+        timeout=60,  # Increase timeout
+        connect_timeout=10
+    ).with_retry(max_attempts=3, delay=5)
+    ```
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    ```python
+    # Include proper headers
+    .with_config(
+        headers={
+            "Authorization": "Bearer ${params.api_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Rate limiting">
+    Add delays and retries:
+    ```python
+    .with_retry(
+        max_attempts=5,
+        delay=10,
+        backoff=2.0  # Exponential backoff
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Cannot Connect to Bud AI Foundry
+
+**Problem**: SDK cannot reach Bud AI Foundry API
+
+**Solutions**:
+1. Check network connectivity
+2. Verify API endpoint:
+   ```python
+   client = BudClient(base_url="https://api.budai.dev")
+   ```
+3. Check firewall settings
+4. Verify SSL certificates
+
+## Data Issues
+
+### Data Validation Fails
+
+**Problem**: `validate_schema` action fails
+
+**Solutions**:
+<AccordionGroup>
+  <Accordion title="Check actual data format">
+    Log the data first to see what you're receiving:
+    ```python
+    log_data = Action("log_data", type="log").with_config(
+        message="Data: ${steps.fetch.output}",
+        level="debug"
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Adjust schema requirements">
+    Be flexible with validation rules:
+    ```python
+    .with_config(
+        schema={
+            "required_columns": ["id", "value"],
+            "min_rows": 10,  # Lower threshold
+            "max_missing_ratio": 0.2  # Allow more missing data
+        }
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Data Transformation Errors
+
+**Problem**: Transform actions produce unexpected results
+
+**Debugging**:
+```python
+# Add logging between transformations
+step1 = Action("step1", type="transform").with_config(...)
+
+log1 = Action("log1", type="log").with_config(
+    message="After step1: ${steps.step1.output}",
+    level="debug"
+).after(step1)
+
+step2 = Action("step2", type="transform").with_config(...).after(log1)
+```
+
+## Getting Help
+
+If you can't resolve an issue:
+
+1. **Check logs**:
+   ```bash
+   bud execution logs exec_xyz789 --level error
+   ```
+
+2. **Review execution details**:
+   ```bash
+   bud execution get exec_xyz789
+   ```
+
+3. **Search documentation**:
+   - [Pipeline Concepts](/pipelines/pipeline-concepts)
+   - [Creating Pipelines](/pipelines/creating-first-pipeline)
+   - [API Reference](/pipelines/reference/api-reference)
+
+4. **Community support**:
+   - [GitHub Issues](https://github.com/BudEcosystem/BudAIFoundry-SDK/issues)
+   - [Community Forum](https://community.budai.dev)
+   - [Discord](https://discord.gg/budecosystem)
+
+5. **Contact support**:
+   - Email: [support@bud.studio](mailto:support@bud.studio)
+   - Include: Pipeline ID, execution ID, error logs
+
+## Reporting Bugs
+
+When reporting a bug, include:
+
+```text
+**Pipeline ID**: pipe_abc123
+**Execution ID**: exec_xyz789
+**Error Message**: [Full error text]
+**Steps to Reproduce**:
+1. Create pipeline with...
+2. Execute with parameters...
+3. Observe error at step...
+
+**Expected Behavior**: [What should happen]
+**Actual Behavior**: [What actually happens]
+
+**Environment**:
+- SDK Version: [version]
+- Python Version: [version]
+- OS: [OS and version]
+```
+
+<CardGroup cols={2}>
+  <Card title="Pipeline Concepts" icon="book" href="/pipelines/pipeline-concepts">
+    Learn fundamental concepts
+  </Card>
+
+  <Card title="Quick Start" icon="bolt" href="/pipelines/quickstart">
+    Get started with pipelines
+  </Card>
+
+  <Card title="API Reference" icon="code" href="/pipelines/reference/api-reference">
+    Complete API documentation
+  </Card>
+
+  <Card title="GitHub" icon="github" href="https://github.com/BudEcosystem/BudAIFoundry-SDK">
+    View source code and examples
+  </Card>
+</CardGroup>

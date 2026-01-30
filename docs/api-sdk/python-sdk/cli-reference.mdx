@@ -1,0 +1,300 @@
+---
+title: "CLI Reference"
+description: "Command-line interface for BudAI Foundry operations"
+icon: "terminal"
+---
+
+## Overview
+
+The `bud` CLI provides command-line access to BudAI Foundry platform features. It's automatically installed with the Python SDK.
+
+## Installation
+
+The CLI is included with the SDK:
+
+```bash
+pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+```
+
+Verify installation:
+
+```bash
+bud --version
+```
+
+## Authentication Commands
+
+### Login
+
+Authenticate with the BudAI Foundry platform:
+
+```bash
+bud auth login
+```
+
+This will prompt for your credentials and store them securely.
+
+### Check Status
+
+View your current authentication status:
+
+```bash
+bud auth status
+```
+
+### Logout
+
+Remove stored credentials:
+
+```bash
+bud auth logout
+```
+
+## Action Commands
+
+### List Actions
+
+View all available pipeline actions:
+
+```bash
+bud action list
+```
+
+### Get Action Details
+
+View details for a specific action:
+
+```bash
+bud action get <action-name>
+```
+
+## Pipeline Commands
+
+### Create Pipeline
+
+Register a new pipeline from a YAML or Python file:
+
+```bash
+# From YAML file
+bud pipeline create pipeline.yaml --name my-pipeline
+
+# From Python file
+bud pipeline create pipeline.py --name my-pipeline
+```
+
+### List Pipelines
+
+View all registered pipelines:
+
+```bash
+bud pipeline list
+```
+
+### Get Pipeline
+
+View details of a specific pipeline:
+
+```bash
+bud pipeline get <pipeline-id>
+```
+
+### Delete Pipeline
+
+Remove a pipeline:
+
+```bash
+bud pipeline delete <pipeline-id>
+```
+
+## Execution Commands
+
+### Run Pipeline
+
+Execute a pipeline with parameters:
+
+```bash
+# Run and wait for completion
+bud run <pipeline-name> --param key=value --wait
+
+# Run in background
+bud run <pipeline-name> --param key=value
+
+# Run with multiple parameters
+bud run my-pipeline \
+  --param input_file=data.csv \
+  --param output_format=json \
+  --wait
+```
+
+### List Executions
+
+View execution history:
+
+```bash
+# All executions
+bud execution list
+
+# Filter by status
+bud execution list --status completed
+bud execution list --status running
+bud execution list --status failed
+
+# Limit results
+bud execution list --limit 10
+```
+
+### Get Execution
+
+View details of a specific execution:
+
+```bash
+bud execution get <execution-id>
+```
+
+### Cancel Execution
+
+Cancel a running execution:
+
+```bash
+bud execution cancel <execution-id>
+```
+
+## Common Options
+
+Most commands support these global options:
+
+| Option | Description |
+|--------|-------------|
+| `--help` | Show help for command |
+| `--json` | Output in JSON format |
+| `--verbose` | Enable verbose logging |
+| `--quiet` | Suppress non-essential output |
+
+## Examples
+
+### Complete Workflow
+
+```bash
+# 1. Login
+bud auth login
+
+# 2. List available actions
+bud action list
+
+# 3. Create a pipeline
+bud pipeline create my_pipeline.yaml --name data-processor
+
+# 4. Run the pipeline
+bud run data-processor \
+  --param input_file=data.csv \
+  --param output_dir=./results \
+  --wait
+
+# 5. Check execution status
+bud execution list --status completed
+```
+
+### Pipeline Development Workflow
+
+```bash
+# Create and test a pipeline
+bud pipeline create pipeline.yaml --name test-pipeline
+
+# Run with test data
+bud run test-pipeline --param test_mode=true --wait
+
+# View logs
+bud execution get <execution-id>
+
+# Update pipeline (delete and recreate)
+bud pipeline delete <pipeline-id>
+bud pipeline create updated_pipeline.yaml --name test-pipeline
+```
+
+## Output Formats
+
+### Default (Human-Readable)
+
+```bash
+$ bud pipeline list
+
+Pipelines:
+ID                                    Name              Created
+abc-123                              data-processor    2024-01-15
+def-456                              ml-trainer        2024-01-16
+```
+
+### JSON Format
+
+```bash
+$ bud pipeline list --json
+
+{
+  "pipelines": [
+    {
+      "id": "abc-123",
+      "name": "data-processor",
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+## Configuration
+
+### Config File Location
+
+CLI configuration is stored at:
+
+- **Linux/macOS:** `~/.bud/config.json`
+- **Windows:** `%USERPROFILE%\.bud\config.json`
+
+### Manual Configuration
+
+Edit the config file directly:
+
+```json
+{
+  "api_key": "your-api-key",
+  "base_url": "https://gateway.bud.studio",
+  "default_project": "my-project"
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command Not Found">
+    If `bud` command is not found:
+    ```bash
+    # Ensure SDK is installed
+    pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+
+    # Check your PATH includes Python scripts
+    python -m site --user-base
+    ```
+  </Accordion>
+
+  <Accordion title="Authentication Errors">
+    If authentication fails:
+    ```bash
+    # Re-login
+    bud auth logout
+    bud auth login
+
+    # Or set API key manually
+    export BUD_API_KEY=your-api-key
+    ```
+  </Accordion>
+
+  <Accordion title="Pipeline Not Found">
+    If pipeline isn't found:
+    ```bash
+    # List all pipelines
+    bud pipeline list
+
+    # Use pipeline ID instead of name
+    bud run <pipeline-id>
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,57 @@
+---
+title: "List Input Items"
+description: "List input items for a response."
+api: "GET /v1/responses/{response_id}/input_items"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/responses/resp_abc123/input_items \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "x-model-name: gpt-4"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "item_abc123",
+      "type": "text",
+      "content": "What is the capital of France?",
+      "index": 0
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+| x-model-name | string | No | Model name for routing. Default: gpt-4-responses |
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| response_id | string | Yes | The ID of the response |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    Full Responses API lifecycle management
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise-grade response management
+  </Card>
+</CardGroup>

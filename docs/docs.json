@@ -60,6 +60,30 @@
             ]
           },
           {
+            "group": "Pipelines",
+            "icon": "diagram-project",
+            "pages": [
+              "pipelines/introduction",
+              "pipelines/quickstart",
+              "pipelines/pipeline-concepts",
+              "pipelines/creating-first-pipeline",
+              {
+                "group": "Guides",
+                "pages": [
+                  "pipelines/guides/scheduled-pipelines",
+                  "pipelines/guides/event-driven-pipelines"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "pipelines/reference/actions-reference"
+                ]
+              },
+              "pipelines/troubleshooting"
+            ]
+          },
+          {
             "group": "Clusters",
             "icon": "server",
             "pages": [
@@ -156,6 +180,100 @@
         ]
       },
       {
+        "tab": "API & SDK Reference",
+        "groups": [
+          {
+            "group": "Introduction",
+            "icon": "book",
+            "pages": [
+              "api-sdk/overview",
+              "api-sdk/quickstart"
+            ]
+          },
+          {
+            "group": "Gateway APIs",
+            "icon": "plug",
+            "pages": [
+              "api-sdk/chat/create-chat-completion",
+              "api-sdk/completions/create-completion",
+              "api-sdk/messages/create-message",
+              "api-sdk/embeddings/generate-embeddings",
+              "api-sdk/classify/classify-text",
+              "api-sdk/moderations/moderate-content",
+              "api-sdk/audio/transcribe-audio",
+              "api-sdk/audio/translate-audio",
+              "api-sdk/audio/text-to-speech",
+              "api-sdk/images/generate-images",
+              "api-sdk/images/edit-image",
+              "api-sdk/images/create-variation",
+              "api-sdk/documents/process-document",
+              "api-sdk/models/list-models",
+              {
+                "group": "Files API",
+                "collapsed": false,
+                "pages": [
+                  "api-sdk/files/upload-file",
+                  "api-sdk/files/get-file",
+                  "api-sdk/files/get-file-content",
+                  "api-sdk/files/delete-file"
+                ]
+              },
+              {
+                "group": "Batch API",
+                "collapsed": false,
+                "pages": [
+                  "api-sdk/batch/create-batch",
+                  "api-sdk/batch/list-batches",
+                  "api-sdk/batch/get-batch",
+                  "api-sdk/batch/cancel-batch"
+                ]
+              },
+              {
+                "group": "Responses API",
+                "collapsed": false,
+                "pages": [
+                  "api-sdk/responses/create-response",
+                  "api-sdk/responses/get-response",
+                  "api-sdk/responses/delete-response",
+                  "api-sdk/responses/cancel-response",
+                  "api-sdk/responses/list-input-items",
+                  "api-sdk/responses/response-format"
+                ]
+              },
+              {
+                "group": "Realtime API",
+                "collapsed": false,
+                "pages": [
+                  "api-sdk/realtime/create-session",
+                  "api-sdk/realtime/create-transcription-session"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Python SDK & CLI",
+            "icon": "python",
+            "pages": [
+              "api-sdk/python-sdk/installation",
+              "api-sdk/python-sdk/quickstart",
+              "api-sdk/python-sdk/authentication",
+              "api-sdk/python-sdk/inference",
+              "api-sdk/python-sdk/pipelines",
+              "api-sdk/python-sdk/pipeline-dsl",
+              "api-sdk/python-sdk/cli-reference",
+              "api-sdk/python-sdk/examples",
+              {
+                "group": "Reference",
+                "pages": [
+                  "api-sdk/python-sdk/reference/actions-reference",
+                  "api-sdk/python-sdk/reference/types"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Use Cases",
         "groups": [
           {
@@ -239,20 +357,6 @@
               "developer-docs/development/guidelines",
               "developer-docs/development/architecture",
               "developer-docs/development/environment"
-            ]
-          },
-          {
-            "group": "OpenAI-Compatible API",
-            "icon": "puzzle-piece",
-            "pages": [
-              "developer-docs/openai-api/chat",
-              "developer-docs/openai-api/embedding",
-              "developer-docs/openai-api/audio",
-              "developer-docs/openai-api/images",
-              "developer-docs/openai-api/batch",
-              "developer-docs/openai-api/realtime",
-              "developer-docs/openai-api/responses",
-              "developer-docs/openai-api/documents"
             ]
           },
           {

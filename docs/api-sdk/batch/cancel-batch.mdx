@@ -1,0 +1,105 @@
+---
+title: "Cancel Batch"
+description: "Cancel a running batch job."
+api: "POST /v1/batches/{batch_id}/cancel"
+---
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://gateway.bud.studio/v1/batches/batch_abc123/cancel \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "batch_abc123",
+  "object": "batch",
+  "endpoint": "/v1/chat/completions",
+  "errors": null,
+  "input_file_id": "file-abc123",
+  "completion_window": "24h",
+  "status": "cancelling",
+  "output_file_id": null,
+  "error_file_id": null,
+  "created_at": 1699123456,
+  "in_progress_at": 1699123500,
+  "expires_at": 1699209856,
+  "finalizing_at": null,
+  "completed_at": null,
+  "failed_at": null,
+  "expired_at": null,
+  "cancelling_at": 1699125000,
+  "cancelled_at": null,
+  "request_counts": {
+    "total": 100,
+    "completed": 45,
+    "failed": 0
+  },
+  "metadata": {}
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| batch_id | string | Yes | The ID of the batch to cancel |
+
+## Behavior
+
+- The batch status transitions to `cancelling` immediately
+- Once cancellation completes, status becomes `cancelled`
+- Requests already completed will remain in the output
+- In-progress requests may or may not complete
+
+## Usage Example
+
+```python
+import requests
+import time
+
+API_KEY = "YOUR_API_KEY"
+BASE_URL = "https://gateway.bud.studio"
+batch_id = "batch_abc123"
+
+# Cancel the batch
+response = requests.post(
+    f"{BASE_URL}/v1/batches/{batch_id}/cancel",
+    headers={"Authorization": f"Bearer {API_KEY}"}
+)
+batch = response.json()
+print(f"Status: {batch['status']}")  # "cancelling"
+
+# Wait for cancellation to complete
+while batch["status"] == "cancelling":
+    time.sleep(5)
+    response = requests.get(
+        f"{BASE_URL}/v1/batches/{batch_id}",
+        headers={"Authorization": f"Bearer {API_KEY}"}
+    )
+    batch = response.json()
+
+print(f"Final status: {batch['status']}")  # "cancelled"
+print(f"Completed before cancel: {batch['request_counts']['completed']}")
+```
+
+<Warning>
+Cancellation cannot be undone. Any requests not yet processed will not be completed.
+</Warning>
+
+<Note>
+For complete Batch API documentation including file upload, JSONL format, and usage examples, see [Create Batch](/api-sdk/batch/create-batch).
+</Note>
