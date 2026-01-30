@@ -71,23 +71,28 @@ class ModelAddExecutor(BaseActionExecutor):
             # Call budapp endpoint to start the local-model-workflow
             initiator_user_id = _resolve_initiator_user_id(context)
 
+            # Build payload - only include proprietary_credential_id for HuggingFace sources
+            # budapp rejects requests with credential_id for url/disk sources (422 error)
+            payload = {
+                "workflow_total_steps": 1,
+                "step_number": 1,
+                "trigger_workflow": True,
+                "provider_type": model_source,
+                "name": model_name,
+                "uri": model_uri,
+                "description": description,
+                "author": author,
+                "callback_topic": CALLBACK_TOPIC,
+            }
+            if credential_id and model_source == "hugging_face":
+                payload["proprietary_credential_id"] = credential_id
+
             response = await context.invoke_service(
                 app_id=settings.budapp_app_id,
                 method_path="models/local-model-workflow",
                 http_method="POST",
                 params={"user_id": initiator_user_id} if initiator_user_id else None,
-                data={
-                    "workflow_total_steps": 1,
-                    "step_number": 1,
-                    "trigger_workflow": True,
-                    "provider_type": model_source,
-                    "name": model_name,
-                    "uri": model_uri,
-                    "description": description,
-                    "author": author,
-                    "proprietary_credential_id": credential_id,
-                    "callback_topic": CALLBACK_TOPIC,
-                },
+                data=payload,
                 timeout_seconds=60,
             )
 
