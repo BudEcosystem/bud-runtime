@@ -271,7 +271,7 @@ impl TryFrom<Credential> for BudSentinelCredentials {
         match credentials {
             Credential::Static(key) => Ok(BudSentinelCredentials::Static(key)),
             Credential::Dynamic(key_name) => Ok(BudSentinelCredentials::Dynamic(key_name)),
-            Credential::Missing => Ok(BudSentinelCredentials::None),
+            Credential::Missing | Credential::None => Ok(BudSentinelCredentials::None),
             _ => Err(Error::new(ErrorDetails::Config {
                 message: "Invalid api_key_location for Bud Sentinel provider".to_string(),
             })),
