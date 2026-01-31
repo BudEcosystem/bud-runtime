@@ -1,0 +1,61 @@
+---
+title: "Transcribe Audio"
+description: "Convert audio files to text in the original language."
+api: "POST /v1/audio/transcriptions"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/audio/transcriptions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@audio.mp3" \
+  -F "model=whisper-1" \
+  -F "language=en" \
+  -F "response_format=json"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "text": "Hello, this is a transcribed audio message."
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+| Content-Type | string | Yes | Must be `multipart/form-data` |
+
+## Form Data
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| file | file | Yes | Audio file to transcribe (max 25MB). Supported formats: `flac`, `mp3`, `mp4`, `mpeg`, `mpga`, `m4a`, `ogg`, `wav`, `webm` |
+| model | string | Yes | Model identifier (e.g., `whisper-1`) |
+| language | string | No | ISO-639-1 language code of the input audio |
+| prompt | string | No | Optional text to guide the model's style or continue previous audio segment |
+| response_format | string | No | Format of the transcript output: `json`, `text`, `srt`, `verbose_json`, `vtt`. Default: `json` |
+| temperature | float | No | Sampling temperature (0.0 to 1.0). Default: 0.0 |
+| timestamp_granularities | array | No | Timestamp detail level: `word`, `segment`. Default: `segment` |
+
+## Supported Providers
+
+<CardGroup cols={3}>
+  <Card title="OpenAI" icon="openai">
+    Industry-leading Whisper models for high-accuracy transcription
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise-grade Whisper model support with global availability
+  </Card>
+  <Card title="Fireworks" icon="fire">
+    Fast and efficient Whisper v3 and v3-turbo models
+  </Card>
+</CardGroup>

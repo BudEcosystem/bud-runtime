@@ -1,0 +1,87 @@
+---
+title: "Create Message"
+description: "Create a message using Anthropic-compatible API."
+api: "POST /v1/messages"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/messages \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-3-5-sonnet-20241022",
+    "max_tokens": 1024,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello, Claude!"
+      }
+    ]
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "msg_abc123",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "Hello! How can I help you today?"
+    }
+  ],
+  "model": "claude-3-5-sonnet-20241022",
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 10,
+    "output_tokens": 12
+  }
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+| anthropic-version | string | Yes | API version (e.g., 2023-06-01) |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Model identifier (e.g., claude-3-5-sonnet-20241022) |
+| messages | array | Yes | Array of message objects with role and content |
+| max_tokens | integer | Yes | Maximum tokens to generate |
+| temperature | float | No | Sampling temperature (0.0 to 1.0). Default: 1.0 |
+| top_p | float | No | Nucleus sampling parameter. Default: 1.0 |
+| top_k | integer | No | Top-k sampling parameter |
+| stop_sequences | array | No | Custom stop sequences |
+| stream | boolean | No | Enable streaming response. Default: false |
+| system | string | No | System prompt to guide the assistant |
+| metadata | object | No | Metadata about the request |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="Anthropic" icon="ant">
+    Native Claude Messages API with full feature support
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    Claude models on AWS infrastructure
+  </Card>
+  <Card title="Google Vertex AI" icon="google">
+    Claude models on Google Cloud
+  </Card>
+</CardGroup>

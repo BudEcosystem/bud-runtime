@@ -1,0 +1,270 @@
+---
+title: "Event-Driven Pipelines"
+description: "Trigger pipelines automatically based on platform events"
+---
+
+## Overview
+
+Event-driven pipelines execute automatically when specific platform events occur. React to model deployments, cluster changes, or custom events without manual intervention.
+
+## Available Event Types
+
+| Event Type | When Triggered | Use Case |
+|------------|----------------|----------|
+| `model.added` | New model registered | Auto-deploy new models |
+| `model.updated` | Model metadata changed | Update deployments |
+| `deployment.created` | New deployment started | Configure monitoring |
+| `deployment.failed` | Deployment failed | Send alerts, rollback |
+| `cluster.ready` | Cluster becomes available | Deploy waiting models |
+| `cluster.unhealthy` | Cluster health degraded | Trigger diagnostics |
+
+## Creating Event Triggers
+
+### In the UI
+
+1. Open your pipeline
+2. Go to **Triggers** tab
+3. Click **Add Event Trigger**
+4. Configure:
+   - **Event Type**: `model.added`
+   - **Filter** (optional): JSON condition
+   - **Enabled**: Toggle on
+5. Click **Save**
+
+### Using the SDK
+
+```python
+from bud import BudClient
+
+client = BudClient()
+
+# Create event trigger
+trigger = client.event_triggers.create(
+    pipeline_id="pipe_abc123",
+    event_type="model.added",
+    filter={
+        "model_source": "hugging_face"
+    },
+    enabled=True
+)
+
+print(f"Event trigger created: {trigger.id}")
+```
+
+## Event Filtering
+
+Filter events to only trigger for specific conditions:
+
+```python
+# Only trigger for production deployments
+trigger = client.event_triggers.create(
+    pipeline_id="pipe_monitoring",
+    event_type="deployment.created",
+    filter={
+        "environment": "production",
+        "cluster_id": "cluster_prod"
+    }
+)
+```
+
+## Event Data Access
+
+Access event data in your pipeline using the `event` context:
+
+```python
+# In your pipeline actions, reference event data
+{
+    "id": "notify",
+    "action": "notification",
+    "params": {
+        "message": "Model {{event.model_name}} was added",
+        "recipients": ["team@example.com"]
+    }
+}
+```
+
+## Example: Auto-Deploy on Model Add
+
+Automatically deploy models when they're added to the registry:
+
+```python
+from bud import BudClient
+
+client = BudClient()
+
+# Create auto-deployment pipeline
+pipeline = client.pipelines.create(
+    name="Auto-Deploy New Models",
+    definition={
+        "steps": [
+            {
+                "id": "health_check",
+                "action": "cluster_health",
+                "params": {
+                    "cluster_id": "cluster_prod"
+                }
+            },
+            {
+                "id": "deploy",
+                "action": "deployment_create",
+                "params": {
+                    "model_id": "{{event.model_id}}",
+                    "cluster_id": "cluster_prod",
+                    "deployment_name": "{{event.model_name}}-auto"
+                },
+                "depends_on": ["health_check"]
+            },
+            {
+                "id": "notify",
+                "action": "notification",
+                "params": {
+                    "message": "Deployed {{event.model_name}} successfully",
+                    "channel": "slack"
+                },
+                "depends_on": ["deploy"]
+            }
+        ]
+    }
+)
+
+# Create event trigger
+trigger = client.event_triggers.create(
+    pipeline_id=pipeline.id,
+    event_type="model.added",
+    filter={
+        "model_source": "hugging_face",
+        "auto_deploy": True
+    },
+    enabled=True
+)
+```
+
+## Example: Failure Alert Pipeline
+
+Send alerts when deployments fail:
+
+```python
+pipeline = client.pipelines.create(
+    name="Deployment Failure Alerts",
+    definition={
+        "steps": [
+            {
+                "id": "log_failure",
+                "action": "log",
+                "params": {
+                    "message": "Deployment failed: {{event.deployment_id}}",
+                    "level": "error"
+                }
+            },
+            {
+                "id": "send_alert",
+                "action": "notification",
+                "params": {
+                    "message": "🚨 Deployment {{event.deployment_name}} failed: {{event.error_message}}",
+                    "channel": "slack",
+                    "priority": "high"
+                }
+            }
+        ]
+    }
+)
+
+trigger = client.event_triggers.create(
+    pipeline_id=pipeline.id,
+    event_type="deployment.failed",
+    enabled=True
+)
+```
+
+## Managing Event Triggers
+
+### List All Triggers
+
+```python
+# Get all event triggers for a pipeline
+triggers = client.event_triggers.list(pipeline_id="pipe_abc123")
+
+for trigger in triggers:
+    print(f"{trigger.event_type}: {trigger.enabled}")
+```
+
+### Disable a Trigger
+
+```python
+# Temporarily disable
+client.event_triggers.disable(trigger_id="trig_xyz789")
+```
+
+### Update Filter
+
+```python
+# Update event filter conditions
+client.event_triggers.update(
+    trigger_id="trig_xyz789",
+    filter={
+        "environment": "production",
+        "priority": "high"
+    }
+)
+```
+
+## Best Practices
+
+<Check>**Use Filters**: Avoid triggering on every event - filter for relevance</Check>
+<Check>**Idempotent Actions**: Ensure pipeline actions are safe to retry</Check>
+<Check>**Add Logging**: Track which events triggered executions</Check>
+<Check>**Test Events**: Manually trigger test events before enabling</Check>
+<Check>**Monitor Executions**: Watch for unexpected trigger frequency</Check>
+
+## Event Data Structure
+
+Each event includes standard fields:
+
+```json
+{
+  "event_type": "model.added",
+  "event_id": "evt_abc123",
+  "timestamp": "2024-01-29T12:00:00Z",
+  "source": "budmodel",
+  "data": {
+    "model_id": "model_xyz789",
+    "model_name": "Llama-3.2-1B",
+    "model_source": "hugging_face",
+    "created_by": "user@example.com"
+  }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Pipeline not triggering">
+    **Cause**: Event filter too restrictive or trigger disabled
+
+    **Solution**: Check filter conditions, verify trigger is enabled
+  </Accordion>
+
+  <Accordion title="Too many executions">
+    **Cause**: Events firing more frequently than expected
+
+    **Solution**: Add more specific filters, check event source
+  </Accordion>
+
+  <Accordion title="Missing event data">
+    **Cause**: Event payload doesn't include expected fields
+
+    **Solution**: Check event schema, add fallback values in pipeline
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scheduled Pipelines" icon="clock" href="/pipelines/guides/scheduled-pipelines">
+    Run pipelines on a schedule
+  </Card>
+
+  <Card title="Troubleshooting" icon="wrench" href="/pipelines/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

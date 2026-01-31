@@ -1,0 +1,46 @@
+---
+title: "Get File Content"
+description: "Download the content of a file."
+api: "GET /v1/files/{file_id}/content"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/files/file-abc123/content \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -o downloaded_file.jsonl
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+Returns the raw file content with appropriate Content-Type header
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| file_id | string | Yes | The ID of the file to download |
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="openai">
+    File management for Batch API and Assistants
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    Enterprise file storage with compliance
+  </Card>
+</CardGroup>

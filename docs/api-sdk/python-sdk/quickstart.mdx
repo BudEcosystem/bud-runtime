@@ -1,0 +1,137 @@
+---
+title: "Quickstart"
+description: "Get started with the BudAI Foundry Python SDK in minutes"
+icon: "rocket"
+---
+
+## Installation
+
+Install the SDK from GitHub:
+
+```bash
+pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+```
+
+## Initialize the Client
+
+Create a client instance with your API key:
+
+```python
+from bud import BudClient
+
+# Using API key
+client = BudClient(api_key="your-api-key-here")
+
+# Or using environment variable BUD_API_KEY
+client = BudClient()
+```
+
+## Your First API Call
+
+### Chat Completion
+
+```python
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[
+        {"role": "user", "content": "What is artificial intelligence?"}
+    ],
+    temperature=0.7
+)
+
+print(response.choices[0].message.content)
+```
+
+### Generate Embeddings
+
+```python
+response = client.embeddings.create(
+    model="text-embedding-3-small",
+    input="Machine learning is transforming industries"
+)
+
+print(f"Embedding vector: {response.data[0].embedding}")
+```
+
+### Streaming Response
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")
+```
+
+## Create and Run a Pipeline
+
+```python
+from bud import Pipeline, Action
+
+# Define a pipeline
+with Pipeline("my-first-pipeline") as p:
+    start = Action("start", type="log").with_config(
+        message="Pipeline started"
+    )
+
+    process = Action("process", type="transform").after(start)
+
+    end = Action("end", type="log").after(process).with_config(
+        message="Pipeline completed"
+    )
+
+# Create the pipeline
+pipeline = client.pipelines.create(
+    dag=p.to_dag(),
+    name=p.name,
+    description="My first pipeline"
+)
+
+# Execute the pipeline
+execution = client.executions.create(
+    pipeline_id=pipeline.id,
+    params={"input_data": "Hello, World!"}
+)
+
+print(f"Execution ID: {execution.id}")
+print(f"Status: {execution.status}")
+```
+
+## Using the CLI
+
+The SDK includes a CLI tool accessible via the `bud` command:
+
+```bash
+# Login
+bud auth login
+
+# List available actions
+bud action list
+
+# Create a pipeline from YAML
+bud pipeline create pipeline.yaml --name my-pipeline
+
+# Execute a pipeline
+bud run my-pipeline --param key=value --wait
+
+# View execution history
+bud execution list --status completed
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Authentication" icon="key" href="./authentication">
+    Configure auth methods
+  </Card>
+  <Card title="Pipelines" icon="diagram-project" href="./pipelines">
+    Build DAG pipelines
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="./cli-reference">
+    Learn CLI commands
+  </Card>
+</CardGroup>

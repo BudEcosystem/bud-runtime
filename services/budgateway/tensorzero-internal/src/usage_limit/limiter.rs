@@ -10,6 +10,29 @@ use tokio::sync::RwLock;
 use tokio::time::{interval, timeout, Duration};
 use tracing::{debug, error, info, warn};
 
+/// Check if a Redis error indicates a broken connection that requires reconnection
+fn is_connection_error(err: &redis::RedisError) -> bool {
+    // Check for error kinds that are definitively connection-related first.
+    // This avoids expensive string allocation for common I/O errors.
+    if matches!(
+        err.kind(),
+        redis::ErrorKind::IoError | redis::ErrorKind::BusyLoadingError
+    ) {
+        return true;
+    }
+
+    // For other error kinds, fall back to string matching.
+    let err_str = err.to_string().to_lowercase();
+    err_str.contains("broken pipe")
+        || err_str.contains("connection reset")
+        || err_str.contains("connection refused")
+        || err_str.contains("connection closed")
+        || err_str.contains("not connected")
+        || err_str.contains("eof")
+        || err_str.contains("socket")
+        || err_str.contains("timed out")
+}
+
 /// Usage limit information from Redis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageLimitInfo {
@@ -393,7 +416,7 @@ impl UsageLimiter {
             let cost_delta = cost.unwrap_or(0.0);
 
             // Execute atomic Lua script
-            let result: Result<Vec<redis::Value>, _> = timeout(
+            let timeout_result = timeout(
                 Duration::from_millis(self.config.redis_timeout_ms),
                 redis::Script::new(lua_script)
                     .key(&key)
@@ -401,12 +424,20 @@ impl UsageLimiter {
                     .arg(cost_delta)
                     .invoke_async(&mut conn),
             )
-            .await
-            .map_err(|_| {
-                Error::new(ErrorDetails::Config {
-                    message: "Redis timeout on atomic increment".to_string(),
-                })
-            })?;
+            .await;
+
+            // Handle timeout - this might indicate connection issues
+            let result: Result<Vec<redis::Value>, _> = match timeout_result {
+                Ok(r) => r,
+                Err(_) => {
+                    warn!("Redis timeout on atomic increment, clearing connection for reconnection");
+                    drop(redis_client);
+                    self.clear_connection_for_reconnect().await;
+                    return Err(Error::new(ErrorDetails::Config {
+                        message: "Redis timeout on atomic increment".to_string(),
+                    }));
+                }
+            };
 
             match result {
                 Ok(values) => {
@@ -428,6 +459,16 @@ impl UsageLimiter {
                 }
                 Err(e) => {
                     warn!("Redis atomic increment failed for user {}: {}", user_id, e);
+                    // Check if this is a connection error and trigger reconnection
+                    if is_connection_error(&e) {
+                        warn!(
+                            "Connection error detected during increment, clearing connection for reconnection: {}",
+                            e
+                        );
+                        // Release read lock before acquiring write lock
+                        drop(redis_client);
+                        self.clear_connection_for_reconnect().await;
+                    }
                     Err(Error::new(ErrorDetails::Config {
                         message: format!("Redis atomic increment error: {}", e),
                     }))
@@ -487,12 +528,25 @@ impl UsageLimiter {
                         "Redis error fetching usage limit for user {}: {}",
                         user_id, e
                     );
+                    // Check if this is a connection error and trigger reconnection
+                    if is_connection_error(&e) {
+                        warn!(
+                            "Connection error detected, clearing connection for reconnection: {}",
+                            e
+                        );
+                        // Release read lock before acquiring write lock
+                        drop(redis_client);
+                        self.clear_connection_for_reconnect().await;
+                    }
                     Err(Error::new(ErrorDetails::Config {
                         message: format!("Redis error: {}", e),
                     }))
                 }
                 Err(_) => {
                     warn!("Redis timeout fetching usage limit for user {}", user_id);
+                    // Timeout might also indicate connection issues
+                    drop(redis_client);
+                    self.clear_connection_for_reconnect().await;
                     Err(Error::new(ErrorDetails::Config {
                         message: "Redis timeout".to_string(),
                     }))
@@ -585,7 +639,24 @@ impl UsageLimiter {
                                     break;
                                 }
                             }
-                            _ => break,
+                            Ok(Err(e)) => {
+                                // Redis error - check if connection error
+                                if is_connection_error(&e) {
+                                    warn!("Connection error in sync task (clear signals), triggering reconnect: {}", e);
+                                    let mut guard = redis_client.write().await;
+                                    *guard = None;
+                                }
+                                metrics.record_redis_error();
+                                break;
+                            }
+                            Err(_) => {
+                                // Timeout - might indicate connection issues
+                                warn!("Timeout in sync task (clear signals), triggering reconnect");
+                                let mut guard = redis_client.write().await;
+                                *guard = None;
+                                metrics.record_redis_error();
+                                break;
+                            }
                         }
                     }
 
@@ -663,7 +734,21 @@ impl UsageLimiter {
                                     break;
                                 }
                             }
-                            _ => {
+                            Ok(Err(e)) => {
+                                // Redis error - check if connection error
+                                if is_connection_error(&e) {
+                                    warn!("Connection error in sync task (usage limits), triggering reconnect: {}", e);
+                                    let mut guard = redis_client.write().await;
+                                    *guard = None;
+                                }
+                                metrics.record_redis_error();
+                                break;
+                            }
+                            Err(_) => {
+                                // Timeout - might indicate connection issues
+                                warn!("Timeout in sync task (usage limits), triggering reconnect");
+                                let mut guard = redis_client.write().await;
+                                *guard = None;
                                 metrics.record_redis_error();
                                 break;
                             }
@@ -706,6 +791,16 @@ impl UsageLimiter {
     /// Get cache entry count
     pub fn get_cache_size(&self) -> u64 {
         self.cache.entry_count()
+    }
+
+    /// Clear the Redis connection to trigger reconnection on next sync cycle
+    /// This should be called when a connection error (like broken pipe) is detected
+    async fn clear_connection_for_reconnect(&self) {
+        let mut redis_guard = self.redis_client.write().await;
+        if redis_guard.is_some() {
+            warn!("Clearing stale Redis connection to trigger reconnection");
+            *redis_guard = None;
+        }
     }
 }
 

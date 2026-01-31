@@ -1,0 +1,162 @@
+---
+title: "Scheduled Pipelines"
+description: "Run pipelines on a schedule with cron expressions"
+---
+
+## Overview
+
+Schedule pipelines to run automatically at specific times using cron expressions. Perfect for recurring tasks like daily model updates, nightly deployments, or weekly cleanups.
+
+## Creating a Schedule
+
+### In the UI
+
+1. Open your pipeline
+2. Click the **Triggers** tab
+3. Click **Add Schedule**
+4. Configure:
+   - **Name**: "Daily Model Sync"
+   - **Cron Expression**: `0 2 * * *`
+   - **Enabled**: Toggle on
+5. Click **Save**
+
+### Using the SDK
+
+```python
+from bud import BudClient
+
+client = BudClient()
+
+# Create a scheduled trigger
+schedule = client.schedules.create(
+    pipeline_id="pipe_abc123",
+    name="Daily Model Sync",
+    cron_expression="0 2 * * *",
+    enabled=True
+)
+
+print(f"Schedule created: {schedule.id}")
+```
+
+## Common Cron Patterns
+
+| Pattern | Description | Example Use Case |
+|---------|-------------|------------------|
+| `0 * * * *` | Every hour | Hourly health checks |
+| `0 0 * * *` | Daily at midnight | Daily backups |
+| `0 2 * * *` | Daily at 2 AM | Nightly model updates |
+| `0 0 * * 0` | Weekly on Sunday | Weekly cleanup |
+| `0 0 1 * *` | Monthly on 1st | Monthly reports |
+| `*/15 * * * *` | Every 15 minutes | Frequent monitoring |
+
+## Managing Schedules
+
+### Pause a Schedule
+
+```python
+# Pause temporarily
+client.schedules.pause(schedule_id="sched_xyz789")
+```
+
+In the UI: Click **Pause** button on the schedule.
+
+### Resume a Schedule
+
+```python
+# Resume execution
+client.schedules.resume(schedule_id="sched_xyz789")
+```
+
+### Trigger Manually
+
+Run a scheduled pipeline immediately without waiting:
+
+```python
+# Trigger right now
+client.schedules.trigger(schedule_id="sched_xyz789")
+```
+
+## Example: Nightly Model Deployment
+
+Create a pipeline that deploys updated models every night at 2 AM:
+
+```python
+from bud import BudClient
+
+client = BudClient()
+
+# Create pipeline
+pipeline = client.pipelines.create(
+    name="Nightly Model Deployment",
+    definition={
+        "steps": [
+            {
+                "id": "add_model",
+                "action": "model_add",
+                "params": {
+                    "model_uri": "org/model-name",
+                    "model_source": "hugging_face"
+                }
+            },
+            {
+                "id": "deploy",
+                "action": "deployment_create",
+                "params": {
+                    "model_id": "{{steps.add_model.output.model_id}}",
+                    "cluster_id": "cluster_prod"
+                },
+                "depends_on": ["add_model"]
+            }
+        ]
+    }
+)
+
+# Schedule it
+schedule = client.schedules.create(
+    pipeline_id=pipeline.id,
+    cron_expression="0 2 * * *",  # 2 AM daily
+    enabled=True
+)
+```
+
+## Best Practices
+
+<Check>**Use Off-Peak Hours**: Schedule resource-intensive tasks during low-traffic periods</Check>
+<Check>**Add Notifications**: Configure alerts for schedule failures</Check>
+<Check>**Test First**: Run manually before enabling the schedule</Check>
+<Check>**Monitor Execution**: Check run history regularly</Check>
+<Check>**Set Timeouts**: Prevent long-running schedules from overlapping</Check>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Schedule not running">
+    **Cause**: Schedule is paused or cron expression is incorrect
+
+    **Solution**: Verify schedule is enabled and test cron pattern at [crontab.guru](https://crontab.guru)
+  </Accordion>
+
+  <Accordion title="Executions overlapping">
+    **Cause**: Previous execution hasn't finished when next one starts
+
+    **Solution**: Increase schedule interval or optimize pipeline performance
+  </Accordion>
+
+  <Accordion title="Failed at specific time">
+    **Cause**: Resource contention or dependency unavailable
+
+    **Solution**: Check execution logs, adjust schedule timing
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pipeline Concepts" icon="book" href="/pipelines/pipeline-concepts">
+    Learn about DAGs and actions
+  </Card>
+
+  <Card title="Troubleshooting" icon="wrench" href="/pipelines/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

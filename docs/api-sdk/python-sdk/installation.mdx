@@ -1,0 +1,90 @@
+---
+title: "Installation"
+description: "Install the BudAI Foundry Python SDK and CLI"
+icon: "download"
+---
+
+## Overview
+
+The **BudAI Foundry SDK** is the official Python SDK for the BudAI Foundry Platform. It provides:
+
+- Full-featured client library for the BudAI Foundry API
+- OpenAI-compatible inference endpoints (chat, embeddings, classifications)
+- DAG-based pipeline definition and execution
+- Command-line interface (`bud` CLI) for pipeline operations
+- Both synchronous and asynchronous client support
+- Complete type hints with Pydantic models
+
+## Requirements
+
+- **Python:** 3.8 or higher
+- **pip:** Latest version recommended
+
+## Install from GitHub
+
+Install directly from the GitHub repository:
+
+```bash
+pip install git+https://github.com/BudEcosystem/BudAIFoundry-SDK
+```
+
+## Install from Source
+
+Clone and install from source:
+
+```bash
+git clone https://github.com/BudEcosystem/BudAIFoundry-SDK
+cd BudAIFoundry-SDK
+pip install -e .
+```
+
+## Verify Installation
+
+Verify the SDK is installed correctly:
+
+```python
+from bud import BudClient
+
+client = BudClient()
+print("BudAI Foundry SDK installed successfully!")
+```
+
+Verify the CLI is available:
+
+```bash
+bud --version
+```
+
+## What's Included
+
+After installation, you have access to:
+
+### Python SDK
+- `BudClient` - Main client for API interactions
+- `Pipeline`, `Action` - DAG-based pipeline builders
+- Type-safe models and schemas
+- Async client support
+
+### CLI Tool
+- `bud auth` - Authentication management
+- `bud pipeline` - Pipeline operations
+- `bud run` - Execute pipelines
+- `bud execution` - View execution history
+- `bud action` - List available actions
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="./quickstart">
+    Get started with your first API call
+  </Card>
+  <Card title="Authentication" icon="key" href="./authentication">
+    Configure authentication methods
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="./cli-reference">
+    Learn CLI commands
+  </Card>
+  <Card title="Examples" icon="code" href="./examples">
+    View code examples
+  </Card>
+</CardGroup>

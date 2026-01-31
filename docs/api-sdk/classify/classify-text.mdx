@@ -1,0 +1,77 @@
+---
+title: "Classify Text"
+description: "Classify text into predefined categories."
+api: "POST /v1/classify"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/classify \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "classifier-model",
+    "input": ["This product is amazing!", "Great service!"],
+    "raw_scores": false,
+    "priority": "normal"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": "classify-abc123",
+  "object": "classification",
+  "created": 1699000000,
+  "model": "classifier-model",
+  "results": [
+    {
+      "category": "positive",
+      "score": 0.95
+    },
+    {
+      "category": "neutral",
+      "score": 0.04
+    },
+    {
+      "category": "negative",
+      "score": 0.01
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | No | Classification model identifier. Default: `default/not-specified` |
+| input | array | Yes | Array of text strings to classify |
+| raw_scores | boolean | No | Return raw scores instead of normalized probabilities. Default: `false` |
+| priority | string | No | Priority level: `high`, `normal`, `low`. Default: `normal` |
+
+## Supported Providers
+
+<CardGroup cols={3}>
+  <Card title="Cohere" icon="sparkles">
+    Specialized classification models
+  </Card>
+  <Card title="OpenAI" icon="openai">
+    GPT-based classification endpoints
+  </Card>
+  <Card title="Custom" icon="server">
+    Self-hosted classification models
+  </Card>
+</CardGroup>

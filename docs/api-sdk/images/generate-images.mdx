@@ -1,0 +1,77 @@
+---
+title: "Generate Images"
+description: "Generate images from text prompts."
+api: "POST /v1/images/generations"
+---
+
+<RequestExample>
+
+```bash cURL
+curl https://gateway.bud.studio/v1/images/generations \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "dall-e-3",
+    "prompt": "A serene landscape with mountains and a lake at sunset",
+    "size": "1024x1024",
+    "quality": "standard",
+    "n": 1
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "created": 1699000000,
+  "data": [
+    {
+      "url": "https://storage.example.com/image_abc123.png",
+      "revised_prompt": "A detailed serene landscape featuring majestic mountains and a tranquil lake during a beautiful sunset"
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Headers
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| Authorization | string | Yes | Bearer authentication header |
+
+## Body
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | Yes | Model identifier: `dall-e-2`, `dall-e-3` |
+| prompt | string | Yes | Text description of image (max 4000 chars for dall-e-3, 1000 for dall-e-2) |
+| n | integer | No | Number of images to generate (1-10 for dall-e-2, only 1 for dall-e-3). Default: 1 |
+| size | string | No | Image dimensions: `256x256`, `512x512`, `1024x1024`, `1792x1024`, `1024x1792`. Default: `1024x1024` |
+| quality | string | No | Image quality: `standard`, `hd` (dall-e-3 only). Default: `standard` |
+| style | string | No | Image style: `vivid`, `natural` (dall-e-3 only). Default: `vivid` |
+| response_format | string | No | Response format: `url` or `b64_json`. Default: `url` |
+| user | string | No | Unique identifier for end-user |
+
+## Supported Providers
+
+<CardGroup cols={3}>
+  <Card title="OpenAI" icon="openai">
+    DALL-E 3 and DALL-E 2 for image generation
+  </Card>
+  <Card title="Azure OpenAI" icon="microsoft">
+    DALL-E models with enterprise features
+  </Card>
+  <Card title="Together AI" icon="arrow-progress">
+    FLUX.1 schnell, FLUX1.1 pro, and Stable Diffusion XL
+  </Card>
+  <Card title="xAI" icon="x">
+    Grok-2-image for high-quality generation
+  </Card>
+  <Card title="Fireworks" icon="fire">
+    Stable Diffusion XL and FLUX models (async)
+  </Card>
+</CardGroup>

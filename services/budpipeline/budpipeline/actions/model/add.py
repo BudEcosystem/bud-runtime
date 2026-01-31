@@ -56,6 +56,7 @@ class ModelAddExecutor(BaseActionExecutor):
         model_name = context.params.get("model_name", model_uri.split("/")[-1] if model_uri else "")
         description = context.params.get("description", "")
         author = context.params.get("author", "")
+        credential_id = context.params.get("credential_id")
         max_wait_seconds = context.params.get("max_wait_seconds", 86400)
 
         logger.info(
@@ -70,22 +71,28 @@ class ModelAddExecutor(BaseActionExecutor):
             # Call budapp endpoint to start the local-model-workflow
             initiator_user_id = _resolve_initiator_user_id(context)
 
+            # Build payload - only include proprietary_credential_id for HuggingFace sources
+            # budapp rejects requests with credential_id for url/disk sources (422 error)
+            payload = {
+                "workflow_total_steps": 1,
+                "step_number": 1,
+                "trigger_workflow": True,
+                "provider_type": model_source,
+                "name": model_name,
+                "uri": model_uri,
+                "description": description,
+                "author": author,
+                "callback_topic": CALLBACK_TOPIC,
+            }
+            if credential_id and model_source == "hugging_face":
+                payload["proprietary_credential_id"] = credential_id
+
             response = await context.invoke_service(
                 app_id=settings.budapp_app_id,
                 method_path="models/local-model-workflow",
                 http_method="POST",
                 params={"user_id": initiator_user_id} if initiator_user_id else None,
-                data={
-                    "workflow_total_steps": 1,
-                    "step_number": 1,
-                    "trigger_workflow": True,
-                    "provider_type": model_source,
-                    "name": model_name,
-                    "uri": model_uri,
-                    "description": description,
-                    "author": author,
-                    "callback_topic": CALLBACK_TOPIC,
-                },
+                data=payload,
                 timeout_seconds=60,
             )
 
@@ -279,8 +286,36 @@ class ModelAddExecutor(BaseActionExecutor):
             # The final step is "save_model" or "results"
             is_completion_event = event_name in ("save_model", "results")
 
-            if payload_type == "perform_model_extraction" and is_completion_event:
-                if status_str == "COMPLETED":
+            if payload_type == "perform_model_extraction":
+                # Handle FAILED status for ANY step (validation, download, etc.)
+                # Failures can occur at any point in the extraction workflow
+                if status_str == "FAILED":
+                    error_msg = content.get("message", "") or content.get(
+                        "error", f"Model extraction failed at step: {event_name}"
+                    )
+                    logger.error(
+                        "model_add_failed_via_notification",
+                        step_execution_id=context.step_execution_id,
+                        error=error_msg,
+                        event_name=event_name,
+                    )
+
+                    return EventResult(
+                        action=EventAction.COMPLETE,
+                        status=StepStatus.FAILED,
+                        outputs={
+                            "success": False,
+                            "model_id": None,
+                            "model_name": context.step_outputs.get("model_name", ""),
+                            "workflow_id": context.external_workflow_id,
+                            "status": "failed",
+                            "message": error_msg,
+                        },
+                        error=error_msg,
+                    )
+
+                # Handle COMPLETED status only for final completion events
+                if is_completion_event and status_str == "COMPLETED":
                     result = content.get("result", {})
                     model_id = result.get("model_id")
                     model_name = result.get("model_name", "") or context.step_outputs.get(
@@ -305,30 +340,6 @@ class ModelAddExecutor(BaseActionExecutor):
                             "status": "completed",
                             "message": f"Model '{model_name}' added successfully",
                         },
-                    )
-                elif status_str == "FAILED":
-                    error_msg = content.get("message", "") or content.get(
-                        "error", "Model extraction failed"
-                    )
-                    logger.error(
-                        "model_add_failed_via_notification",
-                        step_execution_id=context.step_execution_id,
-                        error=error_msg,
-                        event_name=event_name,
-                    )
-
-                    return EventResult(
-                        action=EventAction.COMPLETE,
-                        status=StepStatus.FAILED,
-                        outputs={
-                            "success": False,
-                            "model_id": None,
-                            "model_name": context.step_outputs.get("model_name", ""),
-                            "workflow_id": context.external_workflow_id,
-                            "status": "failed",
-                            "message": error_msg,
-                        },
-                        error=error_msg,
                     )
 
         # Event not relevant to completion
@@ -362,7 +373,7 @@ class ModelAddExecutor(BaseActionExecutor):
 
 META = ActionMeta(
     type="model_add",
-    version="1.1.0",
+    version="1.2.0",
     name="Add Model",
     description="Add a new model to the model repository from HuggingFace, URL, or local disk",
     category="Model Operations",
@@ -392,6 +403,13 @@ META = ActionMeta(
             description="Model location: HuggingFace ID (org/model), URL, or disk path",
             required=True,
             placeholder="meta-llama/Llama-2-7b or https://... or /path/to/model",
+        ),
+        ParamDefinition(
+            name="credential_id",
+            label="HuggingFace Credential",
+            type=ParamType.CREDENTIAL_REF,
+            description="Credential for accessing gated HuggingFace models (optional for public models)",
+            required=False,
         ),
         ParamDefinition(
             name="model_name",
