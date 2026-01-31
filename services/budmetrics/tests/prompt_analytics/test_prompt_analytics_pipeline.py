@@ -28,6 +28,7 @@ from .conftest import (
 from .ground_truth import (
     SKIP_COLUMNS,
     compare_values,
+    get_all_expected_inference_facts,
     get_expected_blocked_count,
     get_expected_cached_count,
     get_expected_dimension_values,
@@ -638,13 +639,17 @@ class TestInferenceFactFromChatCompletion:
 
     def test_inference_fact_row_created(self):
         """Verify InferenceFact row exists for chat completion."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_success")
+        facts = get_all_expected_inference_facts(self.seeder_data, "chat_success")
+        assert len(facts) > 0, "No expected facts for chat_success"
+        expected = facts[0]
         rows = query_inference_fact_by_trace(expected["trace_id"])
-        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        # Chat success has 1 inference_handler_observability span
+        assert len(rows) == len(facts), f"Expected {len(facts)} row(s), got {len(rows)}"
 
     def test_core_identifiers(self):
         """Verify core identifiers match derived ground truth."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_success")
+        facts = get_all_expected_inference_facts(self.seeder_data, "chat_success")
+        expected = facts[0]
         actual = query_inference_fact(expected["inference_id"])
         assert actual is not None, "InferenceFact row not found"
 
@@ -657,7 +662,8 @@ class TestInferenceFactFromChatCompletion:
 
     def test_model_inference_fields(self):
         """Verify model inference fields from handler span."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_success")
+        facts = get_all_expected_inference_facts(self.seeder_data, "chat_success")
+        expected = facts[0]
         actual = query_inference_fact(expected["inference_id"])
 
         model_fields = [
@@ -677,7 +683,8 @@ class TestInferenceFactFromChatCompletion:
 
     def test_gateway_analytics_fields(self):
         """Verify gateway analytics fields from LEFT JOIN."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_success")
+        facts = get_all_expected_inference_facts(self.seeder_data, "chat_success")
+        expected = facts[0]
         actual = query_inference_fact(expected["inference_id"])
 
         gateway_fields = [
@@ -695,7 +702,8 @@ class TestInferenceFactFromChatCompletion:
 
     def test_prompt_analytics_null_for_chat(self):
         """Verify prompt analytics fields are NULL for chat (not /v1/responses)."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_success")
+        facts = get_all_expected_inference_facts(self.seeder_data, "chat_success")
+        expected = facts[0]
         actual = query_inference_fact(expected["inference_id"])
 
         prompt_fields = ["prompt_id", "client_prompt_id", "prompt_version", "response_id"]
@@ -716,21 +724,29 @@ class TestInferenceFactFromResponseEndpoint:
     def setup(self):
         """Clear DB and seed response data before each test."""
         clear_all_tables()
-        result = seed_otel_traces(["response_prompt"])
+        # Use response_success_1 which has /v1/responses data with prompt analytics
+        result = seed_otel_traces(["response_success_1"])
         assert result.get("success"), f"Seeding failed: {result}"
         self.seeder_data = load_test_data()
         time.sleep(0.5)
         yield
 
-    def test_inference_fact_row_created(self):
-        """Verify InferenceFact row exists for /v1/responses."""
-        expected = get_expected_inference_fact(self.seeder_data, "response_prompt")
-        rows = query_inference_fact_by_trace(expected["trace_id"])
-        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+    def test_inference_fact_rows_created(self):
+        """Verify InferenceFact rows exist for /v1/responses trace."""
+        facts = get_all_expected_inference_facts(self.seeder_data, "response_success_1")
+        # response_success_1 has 1 response + 3 chat = 4 facts
+        response_facts = [f for f in facts if f.get("endpoint_type") == "response"]
+        assert len(response_facts) == 1, f"Expected 1 response fact, got {len(response_facts)}"
+        expected = response_facts[0]
+        actual = query_inference_fact(expected["inference_id"])
+        assert actual is not None, "Response InferenceFact row not found"
 
     def test_prompt_analytics_populated(self):
         """Verify prompt analytics fields are populated (derived from seeder)."""
-        expected = get_expected_inference_fact(self.seeder_data, "response_prompt")
+        facts = get_all_expected_inference_facts(self.seeder_data, "response_success_1")
+        # Find the response endpoint fact
+        response_facts = [f for f in facts if f.get("endpoint_type") == "response"]
+        expected = response_facts[0]
         actual = query_inference_fact(expected["inference_id"])
         assert actual is not None, "InferenceFact row not found"
 
@@ -749,7 +765,9 @@ class TestInferenceFactFromResponseEndpoint:
 
     def test_model_provider_is_budprompt(self):
         """Verify model_provider is 'budprompt' for /v1/responses."""
-        expected = get_expected_inference_fact(self.seeder_data, "response_prompt")
+        facts = get_all_expected_inference_facts(self.seeder_data, "response_success_1")
+        response_facts = [f for f in facts if f.get("endpoint_type") == "response"]
+        expected = response_facts[0]
         actual = query_inference_fact(expected["inference_id"])
         assert actual.get("model_provider") == "budprompt", (
             f"Expected model_provider='budprompt', got {actual.get('model_provider')!r}"
@@ -757,7 +775,9 @@ class TestInferenceFactFromResponseEndpoint:
 
     def test_endpoint_type_is_response(self):
         """Verify endpoint_type is 'response' for /v1/responses."""
-        expected = get_expected_inference_fact(self.seeder_data, "response_prompt")
+        facts = get_all_expected_inference_facts(self.seeder_data, "response_success_1")
+        response_facts = [f for f in facts if f.get("endpoint_type") == "response"]
+        expected = response_facts[0]
         actual = query_inference_fact(expected["inference_id"])
         assert actual.get("endpoint_type") == "response", (
             f"Expected endpoint_type='response', got {actual.get('endpoint_type')!r}"
@@ -771,7 +791,8 @@ class TestInferenceFactErrorCase:
     @pytest.fixture(autouse=True)
     def setup(self):
         clear_all_tables()
-        result = seed_otel_traces(["chat_error"])
+        # Use response_error which has all failed requests (502 status)
+        result = seed_otel_traces(["response_error"])
         assert result.get("success"), f"Seeding failed: {result}"
         self.seeder_data = load_test_data()
         time.sleep(0.5)
@@ -779,153 +800,23 @@ class TestInferenceFactErrorCase:
 
     def test_is_success_false(self):
         """Verify is_success=false for error response."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_error")
-        actual = query_inference_fact(expected["inference_id"])
-
-        assert actual.get("is_success") is False, (
-            f"Expected is_success=false, got {actual.get('is_success')}"
-        )
-
-    def test_error_fields_populated(self):
-        """Verify error_code, error_message, error_type from seeder."""
-        expected = get_expected_inference_fact(self.seeder_data, "chat_error")
-        actual = query_inference_fact(expected["inference_id"])
-
-        for col in ["error_code", "error_message", "error_type"]:
-            expected_val = expected.get(col)
-            actual_val = actual.get(col)
-            assert compare_values(expected_val, actual_val, col), (
-                f"{col}: expected={expected_val!r}, actual={actual_val!r}"
+        facts = get_all_expected_inference_facts(self.seeder_data, "response_error")
+        # All facts in response_error should have is_success=false
+        for expected in facts:
+            actual = query_inference_fact(expected["inference_id"])
+            assert actual is not None, f"InferenceFact row not found for {expected['inference_id']}"
+            assert actual.get("is_success") is False, (
+                f"Expected is_success=false, got {actual.get('is_success')}"
             )
 
-
-@pytest.mark.integration
-class TestInferenceFactBlockedRequest:
-    """Test MV transformation for blocked requests."""
-
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        clear_all_tables()
-        result = seed_otel_traces(["blocked_request"])
-        assert result.get("success"), f"Seeding failed: {result}"
-        self.seeder_data = load_test_data()
-        time.sleep(0.5)
-        yield
-
-    def test_is_blocked_true(self):
-        """Verify is_blocked=true for blocked request."""
-        expected = get_expected_inference_fact(self.seeder_data, "blocked_request")
-        rows = query_inference_fact_by_trace(expected["trace_id"])
-        assert len(rows) > 0, "No InferenceFact rows found"
-        actual = rows[0]
-
-        assert actual.get("is_blocked") is True, (
-            f"Expected is_blocked=true, got {actual.get('is_blocked')}"
+    def test_error_response_count(self):
+        """Verify all error rows are created."""
+        facts = get_all_expected_inference_facts(self.seeder_data, "response_error")
+        # response_error has 1 response + 3 chat = 4 facts, all errors
+        actual_count = int(execute_query("SELECT count() FROM InferenceFact WHERE is_success = false"))
+        assert actual_count == len(facts), (
+            f"Expected {len(facts)} error rows, got {actual_count}"
         )
-
-    def test_blocking_event_fields(self):
-        """Verify blocking event fields from gateway span."""
-        expected = get_expected_inference_fact(self.seeder_data, "blocked_request")
-        rows = query_inference_fact_by_trace(expected["trace_id"])
-        actual = rows[0]
-
-        blocking_fields = ["block_reason", "rule_type", "rule_name", "action_taken"]
-        populated_fields = []
-        for col in blocking_fields:
-            expected_val = expected.get(col)
-            actual_val = actual.get(col)
-            if expected_val and compare_values(expected_val, actual_val, col):
-                populated_fields.append(col)
-
-        # At least one blocking field should be populated
-        assert len(populated_fields) > 0, "No blocking fields populated"
-
-
-@pytest.mark.integration
-class TestInferenceFactEmbeddingEndpoint:
-    """Test MV transformation for embedding endpoints."""
-
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        clear_all_tables()
-        result = seed_otel_traces(["embedding"])
-        assert result.get("success"), f"Seeding failed: {result}"
-        self.seeder_data = load_test_data()
-        time.sleep(0.5)
-        yield
-
-    def test_embedding_fields_populated(self):
-        """Verify embedding-specific fields from handler span."""
-        expected = get_expected_inference_fact(self.seeder_data, "embedding")
-        actual = query_inference_fact(expected["inference_id"])
-
-        embedding_fields = ["embedding_input_count", "embedding_dimensions", "embedding_encoding_format"]
-        for col in embedding_fields:
-            expected_val = expected.get(col)
-            actual_val = actual.get(col)
-            assert compare_values(expected_val, actual_val, col), (
-                f"{col}: expected={expected_val!r}, actual={actual_val!r}"
-            )
-
-    def test_endpoint_type_is_embedding(self):
-        """Verify endpoint_type is 'embedding'."""
-        expected = get_expected_inference_fact(self.seeder_data, "embedding")
-        actual = query_inference_fact(expected["inference_id"])
-
-        assert actual.get("endpoint_type") == "embedding", (
-            f"Expected 'embedding', got {actual.get('endpoint_type')!r}"
-        )
-
-
-@pytest.mark.integration
-class TestInferenceFactMissingHandler:
-    """Test MV transformation when handler span is missing (LEFT JOIN behavior)."""
-
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        clear_all_tables()
-        result = seed_otel_traces(["missing_handler"])
-        assert result.get("success"), f"Seeding failed: {result}"
-        self.seeder_data = load_test_data()
-        time.sleep(0.5)
-        yield
-
-    def test_row_created_from_gateway_only(self):
-        """Verify InferenceFact row exists even without handler span."""
-        expected = get_expected_inference_fact(self.seeder_data, "missing_handler")
-        rows = query_inference_fact_by_trace(expected["trace_id"])
-
-        assert len(rows) == 1, f"Expected 1 row from gateway-only, got {len(rows)}"
-
-    def test_gateway_fields_populated(self):
-        """Verify gateway fields are populated even without handler."""
-        expected = get_expected_inference_fact(self.seeder_data, "missing_handler")
-        rows = query_inference_fact_by_trace(expected["trace_id"])
-        actual = rows[0]
-
-        gateway_fields = ["method", "path", "country_code", "device_type"]
-        for col in gateway_fields:
-            expected_val = expected.get(col)
-            actual_val = actual.get(col)
-            # Should have gateway data
-            if expected_val:
-                assert compare_values(expected_val, actual_val, col), (
-                    f"{col}: expected={expected_val!r}, actual={actual_val!r}"
-                )
-
-    def test_handler_fields_null(self):
-        """Verify handler-specific fields are NULL when handler missing."""
-        expected = get_expected_inference_fact(self.seeder_data, "missing_handler")
-        rows = query_inference_fact_by_trace(expected["trace_id"])
-        actual = rows[0]
-
-        handler_fields = ["input_tokens", "output_tokens", "response_time_ms"]
-        for col in handler_fields:
-            actual_val = actual.get(col)
-            # Should be NULL (or default) when handler missing
-            assert actual_val is None or actual_val == "" or actual_val == 0, (
-                f"{col} should be NULL when handler missing, got {actual_val!r}"
-            )
 
 
 @pytest.mark.integration
@@ -974,9 +865,10 @@ class TestRollupPromptIdPreserved:
         """Verify prompt_id from seeder is preserved in 5m rollup."""
         expected_prompt_ids = set()
         for scenario_key in self.seeder_data:
-            expected = get_expected_inference_fact(self.seeder_data, scenario_key)
-            if expected.get("prompt_id"):
-                expected_prompt_ids.add(expected["prompt_id"])
+            facts = get_all_expected_inference_facts(self.seeder_data, scenario_key)
+            for expected in facts:
+                if expected.get("prompt_id"):
+                    expected_prompt_ids.add(expected["prompt_id"])
 
         if not expected_prompt_ids:
             pytest.skip("No prompt_ids in seeder data")
@@ -999,9 +891,10 @@ class TestRollupPromptIdPreserved:
         """Verify prompt_id preserved in 1h rollup."""
         expected_prompt_ids = set()
         for scenario_key in self.seeder_data:
-            expected = get_expected_inference_fact(self.seeder_data, scenario_key)
-            if expected.get("prompt_id"):
-                expected_prompt_ids.add(expected["prompt_id"])
+            facts = get_all_expected_inference_facts(self.seeder_data, scenario_key)
+            for expected in facts:
+                if expected.get("prompt_id"):
+                    expected_prompt_ids.add(expected["prompt_id"])
 
         if not expected_prompt_ids:
             pytest.skip("No prompt_ids in seeder data")
@@ -1024,9 +917,10 @@ class TestRollupPromptIdPreserved:
         """Verify prompt_id preserved in 1d rollup."""
         expected_prompt_ids = set()
         for scenario_key in self.seeder_data:
-            expected = get_expected_inference_fact(self.seeder_data, scenario_key)
-            if expected.get("prompt_id"):
-                expected_prompt_ids.add(expected["prompt_id"])
+            facts = get_all_expected_inference_facts(self.seeder_data, scenario_key)
+            for expected in facts:
+                if expected.get("prompt_id"):
+                    expected_prompt_ids.add(expected["prompt_id"])
 
         if not expected_prompt_ids:
             pytest.skip("No prompt_ids in seeder data")

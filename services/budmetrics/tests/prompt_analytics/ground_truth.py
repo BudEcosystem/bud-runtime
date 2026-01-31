@@ -94,6 +94,8 @@ def _find_response_handler_span(spans: list[dict]) -> dict | None:
 def get_expected_inference_fact(seeder_data: dict, scenario_key: str) -> dict:
     """Derive expected InferenceFact row from seeder otel_traces data.
 
+    DEPRECATED: Use get_all_expected_inference_facts for multi-inference scenarios.
+
     This function mirrors the MV transformation logic exactly.
     For /v1/responses endpoint, uses mv_otel_response_to_inference_fact logic.
     For other endpoints, uses mv_otel_to_inference_fact logic.
@@ -103,31 +105,135 @@ def get_expected_inference_fact(seeder_data: dict, scenario_key: str) -> dict:
         scenario_key: Key for the scenario to derive expected values from
 
     Returns:
-        Dict of expected InferenceFact column values
+        Dict of expected InferenceFact column values (first inference only)
+    """
+    facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+    return facts[0] if facts else {}
+
+
+def get_all_expected_inference_facts(seeder_data: dict, scenario_key: str) -> list[dict]:
+    """Derive ALL expected InferenceFact rows from seeder otel_traces data.
+
+    The MV creates rows based on:
+    - response_create_handler_observability spans (for /v1/responses)
+    - gateway_analytics spans with inference_id (for /v1/chat/completions, etc.)
+
+    For gateway spans, handler data is only joined if inference_ids match.
+
+    Args:
+        seeder_data: Full seeder data dict
+        scenario_key: Key for the scenario to derive expected values from
+
+    Returns:
+        List of expected InferenceFact column values
     """
     spans = seeder_data[scenario_key]
+    facts = []
 
-    # Find gateway and handler spans
-    gateway = _find_span_by_name(spans, "gateway_analytics")
-    response_handler = _find_response_handler_span(spans)
-    handler = response_handler or _find_handler_span(spans)
+    # Find ALL response_create_handler_observability spans
+    response_handlers = [s for s in spans if s.get("SpanName") == "response_create_handler_observability"]
 
-    # Determine if this is a /v1/responses endpoint (uses different MV)
-    g_path = _get_span_attr(gateway, "gateway_analytics.path") or ""
-    is_response_endpoint = g_path == "/v1/responses" or response_handler is not None
+    # Find ALL inference_handler_observability spans (for matching, not for iteration)
+    inference_handlers = [s for s in spans if s.get("SpanName") == "inference_handler_observability"]
 
-    # Helper functions for cleaner attribute access
-    def g_attr(key: str) -> str | None:
-        return _get_span_attr(gateway, key)
+    # Find gateway spans for matching
+    gateway_spans = [s for s in spans if s.get("SpanName") == "gateway_analytics"]
 
-    def h_attr(key: str) -> str | None:
-        return _get_span_attr(handler, key)
+    # Process response handlers (for /v1/responses endpoint)
+    for response_handler in response_handlers:
+        # Find matching gateway span (same parent or by path)
+        gateway = _find_matching_gateway_for_response(response_handler, gateway_spans)
+        facts.append(_derive_response_endpoint_fact(response_handler, gateway))
 
-    # For /v1/responses, use response handler attributes (gen_ai.* prefix)
-    if is_response_endpoint and response_handler:
-        return _derive_response_endpoint_fact(response_handler, gateway)
-    else:
-        return _derive_standard_endpoint_fact(handler, gateway)
+    # Process gateway spans with inference_id (for /v1/chat/completions, etc.)
+    # The MV creates rows from gateway spans, joining handler data if inference_ids match
+    for gateway in gateway_spans:
+        gw_inf_id = _get_span_attr(gateway, "gateway_analytics.inference_id")
+        path = _get_span_attr(gateway, "gateway_analytics.path")
+
+        # Skip /v1/responses gateways (handled by response_handlers)
+        if path == "/v1/responses":
+            continue
+
+        # Skip gateways without inference_id
+        if not gw_inf_id:
+            continue
+
+        # Find matching handler by inference_id
+        handler = _find_handler_for_gateway(gateway, inference_handlers)
+        facts.append(_derive_standard_endpoint_fact(handler, gateway))
+
+    return facts
+
+
+def _find_handler_for_gateway(gateway: dict, inference_handlers: list[dict]) -> dict | None:
+    """Find inference_handler_observability span that matches the gateway by inference_id.
+
+    The MV joins handler data only when handler.inference_id == gateway.inference_id.
+    """
+    gw_inf_id = _get_span_attr(gateway, "gateway_analytics.inference_id")
+    trace_id = gateway.get("TraceId")
+
+    if not gw_inf_id:
+        return None
+
+    for handler in inference_handlers:
+        if handler.get("TraceId") != trace_id:
+            continue
+        handler_inf_id = _get_span_attr(handler, "model_inference_details.inference_id")
+        if handler_inf_id == gw_inf_id:
+            return handler
+
+    return None
+
+
+def _find_matching_gateway_for_response(response_handler: dict, gateway_spans: list[dict]) -> dict | None:
+    """Find gateway span that matches the response handler.
+
+    Looks for gateway with path=/v1/responses in the same trace.
+    """
+    trace_id = response_handler.get("TraceId")
+    for gw in gateway_spans:
+        if gw.get("TraceId") == trace_id:
+            path = _get_span_attr(gw, "gateway_analytics.path")
+            if path == "/v1/responses":
+                return gw
+    # Fallback to first gateway in trace
+    for gw in gateway_spans:
+        if gw.get("TraceId") == trace_id:
+            return gw
+    return None
+
+
+def _find_matching_gateway_for_inference(inference_handler: dict, gateway_spans: list[dict]) -> dict | None:
+    """Find gateway span that matches the inference handler.
+
+    Matches by inference_id or parent span relationship.
+    """
+    handler_inf_id = _get_span_attr(inference_handler, "model_inference_details.inference_id")
+    trace_id = inference_handler.get("TraceId")
+
+    # Try to match by inference_id
+    for gw in gateway_spans:
+        if gw.get("TraceId") == trace_id:
+            gw_inf_id = _get_span_attr(gw, "gateway_analytics.inference_id")
+            if gw_inf_id and gw_inf_id == handler_inf_id:
+                return gw
+
+    # Fallback: find gateway with /v1/chat/completions path in same trace
+    for gw in gateway_spans:
+        if gw.get("TraceId") == trace_id:
+            path = _get_span_attr(gw, "gateway_analytics.path")
+            if path and "/chat/completions" in path:
+                return gw
+
+    # Last resort: first non-response gateway in trace
+    for gw in gateway_spans:
+        if gw.get("TraceId") == trace_id:
+            path = _get_span_attr(gw, "gateway_analytics.path")
+            if path != "/v1/responses":
+                return gw
+    return None
 
 
 def _derive_response_endpoint_fact(response_handler: dict, gateway: dict | None) -> dict:
@@ -473,8 +579,9 @@ def _derive_endpoint_type(h_attr, g_attr) -> str:
 def get_expected_row_count(seeder_data: dict, scenario_keys: list[str] | None = None) -> int:
     """Get expected InferenceFact row count from seeder.
 
-    Each gateway_analytics or response_create_handler_observability span
-    becomes 1 InferenceFact row.
+    The MV creates rows from:
+    - response_create_handler_observability spans (for /v1/responses)
+    - gateway_analytics spans with inference_id (for /v1/chat/completions, etc.)
 
     Args:
         seeder_data: Full seeder data dict
@@ -487,13 +594,14 @@ def get_expected_row_count(seeder_data: dict, scenario_keys: list[str] | None = 
     count = 0
     for key in keys:
         spans = seeder_data.get(key, [])
-        # Count gateway_analytics spans for standard endpoints
+        # Count gateway_analytics spans with inference_id (for non-response endpoints)
         gateway_count = sum(
             1 for s in spans
-            if s.get("SpanName") == "gateway_analytics"
-            and s.get("SpanAttributes", {}).get("gateway_analytics.path") != "/v1/responses"
+            if (s.get("SpanName") == "gateway_analytics"
+                and _get_span_attr(s, "gateway_analytics.inference_id")
+                and _get_span_attr(s, "gateway_analytics.path") != "/v1/responses")
         )
-        # Count response_create_handler_observability spans for /v1/responses
+        # Count response_create_handler_observability spans (for /v1/responses)
         response_count = sum(
             1 for s in spans
             if s.get("SpanName") == "response_create_handler_observability"
@@ -522,18 +630,19 @@ def get_expected_rollup_totals(seeder_data: dict) -> dict:
     error_count = 0
 
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        total_requests += 1
-        total_input_tokens += expected.get("input_tokens") or 0
-        total_output_tokens += expected.get("output_tokens") or 0
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            total_requests += 1
+            total_input_tokens += expected.get("input_tokens") or 0
+            total_output_tokens += expected.get("output_tokens") or 0
 
-        if expected.get("prompt_id"):
-            prompt_ids.add(expected["prompt_id"])
+            if expected.get("prompt_id"):
+                prompt_ids.add(expected["prompt_id"])
 
-        if expected.get("is_success"):
-            success_count += 1
-        else:
-            error_count += 1
+            if expected.get("is_success"):
+                success_count += 1
+            else:
+                error_count += 1
 
     return {
         "request_count": total_requests,
@@ -549,9 +658,10 @@ def get_expected_blocked_count(seeder_data: dict) -> int:
     """Get expected count of blocked requests."""
     count = 0
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        if expected.get("is_blocked"):
-            count += 1
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            if expected.get("is_blocked"):
+                count += 1
     return count
 
 
@@ -559,9 +669,10 @@ def get_expected_rows_with_tokens(seeder_data: dict) -> int:
     """Get expected count of rows with non-NULL tokens."""
     count = 0
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        if expected.get("input_tokens") is not None:
-            count += 1
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            if expected.get("input_tokens") is not None:
+                count += 1
     return count
 
 
@@ -575,12 +686,13 @@ def get_expected_performance_totals(seeder_data: dict) -> dict:
         "total_duration_ms": 0,
     }
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        totals["total_response_time_ms"] += expected.get("response_time_ms") or 0
-        totals["total_ttft_ms"] += expected.get("ttft_ms") or 0
-        totals["total_processing_time_ms"] += expected.get("processing_time_ms") or 0
-        totals["total_gateway_processing_ms"] += expected.get("gateway_processing_ms") or 0
-        totals["total_duration_ms"] += expected.get("total_duration_ms") or 0
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            totals["total_response_time_ms"] += expected.get("response_time_ms") or 0
+            totals["total_ttft_ms"] += expected.get("ttft_ms") or 0
+            totals["total_processing_time_ms"] += expected.get("processing_time_ms") or 0
+            totals["total_gateway_processing_ms"] += expected.get("gateway_processing_ms") or 0
+            totals["total_duration_ms"] += expected.get("total_duration_ms") or 0
     return totals
 
 
@@ -588,10 +700,11 @@ def get_expected_dimension_values(seeder_data: dict, dimension: str) -> set:
     """Get all expected values for a dimension UUID."""
     values = set()
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        val = expected.get(dimension)
-        if val:
-            values.add(str(val))
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            val = expected.get(dimension)
+            if val:
+                values.add(str(val))
     return values
 
 
@@ -599,9 +712,10 @@ def get_expected_endpoint_type_counts(seeder_data: dict) -> dict:
     """Get expected count per endpoint_type."""
     counts = {}
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        ep_type = expected.get("endpoint_type") or "unknown"
-        counts[ep_type] = counts.get(ep_type, 0) + 1
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            ep_type = expected.get("endpoint_type") or "unknown"
+            counts[ep_type] = counts.get(ep_type, 0) + 1
     return counts
 
 
@@ -613,13 +727,14 @@ def get_expected_prompt_analytics_counts(seeder_data: dict) -> dict:
         "with_response_id": 0,
     }
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        if expected.get("prompt_id"):
-            counts["with_prompt_id"] += 1
-        if expected.get("client_prompt_id"):
-            counts["with_client_prompt_id"] += 1
-        if expected.get("response_id"):
-            counts["with_response_id"] += 1
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            if expected.get("prompt_id"):
+                counts["with_prompt_id"] += 1
+            if expected.get("client_prompt_id"):
+                counts["with_client_prompt_id"] += 1
+            if expected.get("response_id"):
+                counts["with_response_id"] += 1
     return counts
 
 
@@ -627,10 +742,11 @@ def get_expected_prompt_analytics_values(seeder_data: dict, field: str) -> set:
     """Get all expected values for a prompt analytics field."""
     values = set()
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        val = expected.get(field)
-        if val:
-            values.add(str(val))
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            val = expected.get(field)
+            if val:
+                values.add(str(val))
     return values
 
 
@@ -638,10 +754,11 @@ def get_expected_model_values(seeder_data: dict, field: str) -> set:
     """Get all expected values for model info fields."""
     values = set()
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        val = expected.get(field)
-        if val:
-            values.add(str(val))
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            val = expected.get(field)
+            if val:
+                values.add(str(val))
     return values
 
 
@@ -649,10 +766,11 @@ def get_expected_finish_reason_counts(seeder_data: dict) -> dict:
     """Get expected count per finish_reason."""
     counts = {}
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        reason = expected.get("finish_reason")
-        if reason:
-            counts[reason] = counts.get(reason, 0) + 1
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            reason = expected.get("finish_reason")
+            if reason:
+                counts[reason] = counts.get(reason, 0) + 1
     return counts
 
 
@@ -660,9 +778,10 @@ def get_expected_cached_count(seeder_data: dict) -> int:
     """Get expected count of cached=true rows."""
     count = 0
     for scenario_key in seeder_data:
-        expected = get_expected_inference_fact(seeder_data, scenario_key)
-        if expected.get("cached"):
-            count += 1
+        facts = get_all_expected_inference_facts(seeder_data, scenario_key)
+        for expected in facts:
+            if expected.get("cached"):
+                count += 1
     return count
 
 
