@@ -44,4 +44,3 @@ Use existing OpenAI-compatible error JSON. For guardrail failures, return `serve
 - Unit test: guardrail wrapper classifies retryable vs non-retryable errors.
 - Integration smoke: moderation handler returns 502 on guardrail error.
 - Chat completions: simulate guardrail provider error to ensure 502 is returned and no inference proceeds.
-
