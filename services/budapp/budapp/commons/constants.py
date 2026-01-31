@@ -3377,6 +3377,23 @@ class GuardrailStatusEnum(StrEnum):
     DELETED = auto()
 
 
+class ProbeTypeEnum(str, Enum):
+    """Type of guardrail probe."""
+
+    PROVIDER = "provider"  # Traditional probe from external provider
+    MODEL_SCANNER = "model_scanner"  # System model-based rule
+    CUSTOM = "custom"  # User-created model-based rule
+
+
+class ScannerTypeEnum(str, Enum):
+    """Type of model scanner for guardrail rules."""
+
+    CLASSIFIER = "classifier"  # Classification model (e.g., Arch-Guard)
+    LLM = "llm"  # LLM-based policy scanner
+    PATTERN = "pattern"  # Pattern-based detection (regex, keywords)
+    STATIC_CLASSIFIER = "static_classifier"  # Static/rule-based classifier
+
+
 class ProviderCapabilityEnum(Enum):
     """Enumeration for identifying provider capabilities.
 

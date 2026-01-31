@@ -33,6 +33,7 @@ dist/
 
 # Misc
 .ruff_cache/
+.worktrees/
 credentials/
 
 # Node

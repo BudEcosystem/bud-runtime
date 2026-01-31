@@ -1361,17 +1361,68 @@ class ClusterService(SessionMixin):
         )
 
         # Define the keys required for endpoint creation
+        # Support both single model_id (traditional) and model_statuses (guardrail deployment)
         keys_of_interest = [
             "model_id",
+            "model_statuses",
+            "name",  # Guardrail profile name
+            "simulation_events",  # For multi-model aggregation
         ]
 
         # from workflow steps extract necessary information
         required_data = {}
+        latest_step_with_sim_events = None
         for db_workflow_step in db_workflow_steps:
             for key in keys_of_interest:
                 if key in db_workflow_step.data:
                     required_data[key] = db_workflow_step.data[key]
+                    if key == "simulation_events":
+                        latest_step_with_sim_events = db_workflow_step
         logger.debug("Collected required data from workflow steps")
+
+        # Get budsim's simulation workflow_id from payload
+        budsim_workflow_id = payload.content.result.get("workflow_id")
+        recommendations = payload.content.result.get("recommendations", [])
+
+        # Check if this is a multi-model workflow (has simulation_events)
+        simulation_events = required_data.get("simulation_events")
+        if simulation_events and simulation_events.get("results"):
+            # Multi-model workflow - update the specific model's result and check if all complete
+            results = simulation_events.get("results", [])
+            all_complete = True
+            updated = False
+
+            for result in results:
+                if str(result.get("workflow_id")) == str(budsim_workflow_id):
+                    # Found the matching simulation - update it
+                    result["status"] = "success"
+                    result["recommendations"] = recommendations
+                    updated = True
+                    logger.debug(f"Updated simulation result for workflow_id {budsim_workflow_id}")
+
+                if result.get("status") == "running":
+                    all_complete = False
+
+            if updated and latest_step_with_sim_events:
+                # Update the workflow step with new simulation_events
+                simulation_events["successful"] = len([r for r in results if r.get("status") == "success"])
+                simulation_events["failed"] = len([r for r in results if r.get("status") == "failed"])
+                await WorkflowStepDataManager(self.session).update_by_fields(
+                    latest_step_with_sim_events,
+                    {"data": {**latest_step_with_sim_events.data, "simulation_events": simulation_events}},
+                )
+                logger.debug("Saved updated simulation_events to workflow step")
+
+            if not all_complete:
+                # Not all simulations done yet - wait for more notifications
+                logger.debug(
+                    f"Waiting for more simulations to complete. "
+                    f"Successful: {simulation_events.get('successful', 0)}, "
+                    f"Total: {simulation_events.get('total_models', 0)}"
+                )
+                return
+
+            logger.info(f"All {len(results)} simulations completed for workflow {workflow_id}")
 
         # NOTE: Frontend will fetch this step details from clusters/recommended/{workflow_id}
         # In order to navigate from widget this extra step need to be created.
@@ -1388,15 +1439,50 @@ class ClusterService(SessionMixin):
         await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"current_step": workflow_current_step})
         logger.debug(f"Updated current step number in workflow: {workflow_id}")
 
-        # Fetch model
-        db_model = await ModelDataManager(self.session).retrieve_by_fields(
-            Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
-        )
-        model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        # Determine notification title and icon based on workflow type
+        notification_title = "Cluster Recommendation"
+        model_icon = None
 
-        # Get bud cluster ids from recommendations
-        recommendations = payload.content.result.get("recommendations", [])
-        bud_cluster_ids = [UUID(recommendation["cluster_id"]) for recommendation in recommendations]
+        if required_data.get("model_id"):
+            # Traditional single-model workflow
+            db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                Model, {"id": required_data["model_id"], "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+            )
+            if db_model:
+                notification_title = db_model.name
+                model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+        elif required_data.get("model_statuses"):
+            # Guardrail deployment workflow with multiple models
+            model_statuses = required_data["model_statuses"]
+            model_count = len(model_statuses)
+            if required_data.get("name"):
+                # Use guardrail profile name
+                notification_title = required_data["name"]
+            else:
+                notification_title = f"{model_count} Guardrail Model(s)"
+            # Try to get icon from first model
+            if model_statuses and model_statuses[0].get("model_id"):
+                first_model_id = model_statuses[0]["model_id"]
+                db_model = await ModelDataManager(self.session).retrieve_by_fields(
+                    Model, {"id": first_model_id, "status": ModelStatusEnum.ACTIVE}, missing_ok=True
+                )
+                if db_model:
+                    model_icon = await ModelServiceUtil(self.session).get_model_icon(db_model)
+
+        # For multi-model workflows, aggregate all cluster recommendations
+        if simulation_events and simulation_events.get("results"):
+            # Collect all unique cluster_ids from all model simulations
+            all_cluster_ids = set()
+            for result in simulation_events.get("results", []):
+                for rec in result.get("recommendations", []):
+                    if rec.get("cluster_id"):
+                        all_cluster_ids.add(rec["cluster_id"])
+            bud_cluster_ids = [UUID(cid) for cid in all_cluster_ids]
+            logger.debug(f"Aggregated {len(bud_cluster_ids)} unique clusters from all simulations")
+        else:
+            # Single-model workflow - use recommendations directly from payload
+            bud_cluster_ids = [UUID(recommendation["cluster_id"]) for recommendation in recommendations]
+
         logger.debug(f"Found {len(bud_cluster_ids)} clusters from budsim")
         logger.debug(f"bud cluster_ids from budsim: {bud_cluster_ids}")
 
@@ -1419,7 +1505,7 @@ class ClusterService(SessionMixin):
         notification_request = (
             NotificationBuilder()
             .set_content(
-                title=db_model.name,
+                title=notification_title,
                 message=message,
                 icon=model_icon,
                 result=NotificationResult(target_id=db_workflow.id, target_type="workflow").model_dump(

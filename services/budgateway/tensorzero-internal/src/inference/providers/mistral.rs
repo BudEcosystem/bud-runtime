@@ -1177,6 +1177,7 @@ impl ModerationProvider for MistralProvider {
                         secrets: false,       // Mistral doesn't have this category
                         ip_violation: false,  // Mistral doesn't have this category
                         hallucination: false, // Mistral doesn't have this category
+                        other: false,
                     };
 
                     let category_scores = ModerationCategoryScores {
@@ -1207,6 +1208,7 @@ impl ModerationProvider for MistralProvider {
                         malicious: 0.0,        // Mistral doesn't have this category
                         pii: 0.0,
                         secrets: 0.0,
+                        other: 0.0,
                     };
 
                     // Determine if content is flagged (any category is true)
@@ -1240,6 +1242,7 @@ impl ModerationProvider for MistralProvider {
                         category_applied_input_types: None, // Mistral doesn't provide this information
                         hallucination_details: None,
                         ip_violation_details: None,
+                        other_categories: Default::default(),
                     }
                 })
                 .collect();

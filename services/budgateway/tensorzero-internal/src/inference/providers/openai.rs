@@ -3322,6 +3322,7 @@ impl<'a> TryFrom<OpenAIModerationResponseWithMetadata<'a>> for ModerationProvide
                 category_applied_input_types: r.category_applied_input_types,
                 hallucination_details: None,
                 ip_violation_details: None,
+                other_categories: Default::default(),
             })
             .collect();
 

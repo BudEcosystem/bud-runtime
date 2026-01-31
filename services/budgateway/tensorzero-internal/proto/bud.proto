@@ -22,6 +22,20 @@ message Profile {
   optional float severity_threshold = 7;
   string metadata_json = 8;
   string rule_overrides_json = 9;
+  repeated CustomRule custom_rules = 10;  // Profile-scoped inline rules
+}
+
+// Custom rule defined inline in a profile (profile-scoped)
+message CustomRule {
+  string id = 1;                           // Rule identifier
+  string scanner = 2;                      // Scanner engine (e.g., "llm", "latentbud")
+  string scanner_config_json = 3;          // Scanner config as JSON string
+  repeated string target_labels = 4;       // Labels that trigger findings
+  optional float severity_threshold = 5;   // Optional threshold override
+  optional string probe = 6;               // Optional probe assignment
+  optional string name = 7;                // Optional human-readable name
+  optional string description = 8;         // Optional description
+  optional string post_processing_json = 9; // Optional post-processing pipeline as JSON array
 }
 
 message ProfileRequest {
@@ -48,10 +62,18 @@ message DeleteProfileRequest {
 
 message DeleteProfileResponse {}
 
+// OpenAI-compatible conversation message
+message ConversationMessage {
+  string role = 1;     // "system", "user", "assistant", "tool"
+  string content = 2;
+  optional string name = 3;  // for tool messages
+}
+
 message ModerationRequest {
   string profile_id = 1;
   repeated string inputs = 2;
-  optional float severity_threshold = 3;
+  repeated ConversationMessage conversations = 3;  // OpenAI-compatible: [{role, content}, ...]
+  optional float severity_threshold = 4;
 }
 
 message ModerationResponse {
@@ -79,6 +101,8 @@ message ClassificationFinding {
   string label = 1;
   double confidence = 2;
   bool triggered = 3;
+  optional int32 turn_index = 4;   // NEW: 0-based index into conversation
+  optional string turn_role = 5;   // NEW: "user", "assistant", etc.
 }
 
 message PatternFinding {

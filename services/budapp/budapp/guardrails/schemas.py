@@ -17,7 +17,8 @@
 """Guardrail Pydantic schemas for API validation and serialization."""
 
 from datetime import datetime
-from typing import List, Optional
+from enum import Enum
+from typing import Any, List, Literal, Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -25,11 +26,87 @@ from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
     GuardrailStatusEnum,
+    ModelProviderTypeEnum,
+    ProbeTypeEnum,
     ProxyProviderEnum,
+    ScannerTypeEnum,
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.endpoint_ops.schemas import ProviderConfig, ProxyModelPricing
 from budapp.model_ops.schemas import Provider
+
+
+class ModelDeploymentStatus(str, Enum):
+    """Status for guardrail model deployments.
+
+    Attributes:
+        NOT_ONBOARDED: Model is not yet onboarded to the system.
+        ONBOARDED: Model has been onboarded but not deployed.
+        RUNNING: Model deployment is running and healthy.
+        UNHEALTHY: Model deployment is unhealthy.
+        DEPLOYING: Model is currently being deployed.
+        PENDING: Model deployment is pending.
+        FAILURE: Model deployment has failed.
+        DELETING: Model deployment is being deleted.
+    """
+
+    NOT_ONBOARDED = "not_onboarded"
+    ONBOARDED = "onboarded"
+    RUNNING = "running"
+    UNHEALTHY = "unhealthy"
+    DEPLOYING = "deploying"
+    PENDING = "pending"
+    FAILURE = "failure"
+    DELETING = "deleting"
+
+
+class GuardrailModelStatus(BaseModel):
+    """Status of a model required by guardrail rules."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    # Rule identification
+    rule_id: UUID4
+    rule_name: str
+    probe_id: UUID4
+    probe_name: str
+
+    # Model info
+    model_uri: str
+    model_id: UUID4 | None = None
+    model_provider_type: str | None = None
+    tags: list[dict] | None = None  # Rule tags to use for onboarding
+    local_path: str | None = None  # Local cached path after onboarding
+    supported_endpoints: list[str] | None = None  # Model endpoint types for budsim
+
+    # Status
+    status: ModelDeploymentStatus
+
+    # Endpoint details (populated when deployed)
+    endpoint_id: UUID4 | None = None
+    endpoint_name: str | None = None
+    endpoint_url: str | None = None
+    cluster_id: UUID4 | None = None
+    cluster_name: str | None = None
+
+    # Derived flags for UI
+    requires_onboarding: bool
+    requires_deployment: bool
+    can_reuse: bool
+    show_warning: bool = False
+
+
+class GuardrailModelStatusResponse(SuccessResponse):
+    """Response for model status identification step."""
+
+    models: list[GuardrailModelStatus]
+    total_models: int
+    models_requiring_onboarding: int
+    models_requiring_deployment: int
+    models_reusable: int
+    skip_to_step: int | None = None
+    credential_required: bool = False
+    object: str = "guardrail.model_status"
 
 
 class TagsListResponse(PaginatedSuccessResponse):
@@ -46,6 +123,99 @@ class GuardrailFilter(BaseModel):
     provider_id: UUID4 | None = None
 
 
+# Model config schemas for custom rules
+class HeadMapping(BaseModel):
+    """Head mapping for classifier models."""
+
+    head_name: str = "default"
+    target_labels: list[str]
+
+
+class ClassifierConfig(BaseModel):
+    """Configuration for classifier-based rules."""
+
+    head_mappings: list[HeadMapping]
+    post_processing: list[dict] | None = None
+
+
+class DefinitionItem(BaseModel):
+    """Term definition for policy."""
+
+    term: str
+    definition: str
+
+
+class EvaluationConfig(BaseModel):
+    """Evaluation configuration for policy."""
+
+    depiction: str = "Does the content CONTAIN policy violations?"
+    request: str = "Is the user ASKING to generate violating content?"
+    guidance: str = "Return the HIGHEST severity that applies. Include both aspects in your rationale."
+
+
+class PolicyExample(BaseModel):
+    """Example for policy evaluation."""
+
+    input: str
+    rationale: str
+    confidence: str = "high"
+
+
+class ContentItem(BaseModel):
+    """Content item for safe_content or violation items."""
+
+    name: str
+    description: str
+    example: str
+
+
+class SafeContentConfig(BaseModel):
+    """Safe content configuration for policy."""
+
+    category: str = "safe"
+    description: str
+    items: list[ContentItem]
+    examples: list[PolicyExample]
+
+
+class ViolationCategory(BaseModel):
+    """Violation category for policy."""
+
+    category: str
+    severity: str  # "Moderate", "High", "Critical", "Maximum"
+    description: str
+    escalate: bool = False
+    items: list[ContentItem]
+    examples: list[PolicyExample]
+
+
+class AmbiguityRule(BaseModel):
+    """Ambiguity handling rule for policy."""
+
+    condition: str
+    action: str
+
+
+class PolicyConfig(BaseModel):
+    """Policy configuration for LLM-based rules."""
+
+    task: str
+    definitions: list[DefinitionItem]
+    safe_content: SafeContentConfig
+    violations: list[ViolationCategory]
+    # Optional fields with defaults
+    interpretation: list[str] | None = None
+    evaluation: EvaluationConfig | None = None
+    ambiguity: list[AmbiguityRule] | None = None
+
+
+class LLMConfig(BaseModel):
+    """Configuration for LLM-based rules."""
+
+    handler: str = "gpt_safeguard"
+    policy: PolicyConfig
+
+
 # Rule schemas
 class GuardrailRuleCreate(BaseModel):
     """Schema for creating guardrail rule."""
@@ -55,10 +225,16 @@ class GuardrailRuleCreate(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
-    scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
+    # Model-based rule fields
+    scanner_type: Optional[ScannerTypeEnum] = None
+    model_uri: Optional[str] = None
+    model_provider_type: Optional[ModelProviderTypeEnum] = None
+    is_gated: Optional[bool] = False
+    model_config_json: Optional[dict] = None
+    model_id: Optional[UUID4] = None
 
 
 class GuardrailRuleUpdate(BaseModel):
@@ -66,7 +242,6 @@ class GuardrailRuleUpdate(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
-    scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -83,10 +258,16 @@ class GuardrailRuleResponse(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
-    scanner_types: Optional[list[str]] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
+    # Model-based rule fields
+    scanner_type: ScannerTypeEnum | None = None
+    model_uri: str | None = None
+    model_provider_type: str | None = None
+    is_gated: bool = False
+    model_config_json: dict | None = None
+    model_id: UUID4 | None = None
     created_by: Optional[UUID4] = None
     created_at: datetime
     modified_at: datetime
@@ -124,6 +305,7 @@ class GuardrailProbeResponse(BaseModel):
     uri: Optional[str] = None
     description: Optional[str] = None
     tags: Optional[list[Tag]] = None
+    probe_type: ProbeTypeEnum = ProbeTypeEnum.PROVIDER
     provider_type: GuardrailProviderTypeEnum
     provider: Provider
     status: GuardrailStatusEnum
@@ -147,6 +329,87 @@ class GuardrailProbeDetailResponse(SuccessResponse):
     probe: GuardrailProbeResponse
     rule_count: int
     object: str = "guardrail.probe.get"
+
+
+# Custom probe schemas
+class GuardrailCustomProbeCreate(BaseModel):
+    """Schema for creating a custom model probe."""
+
+    name: str
+    description: str | None = None
+    scanner_type: ScannerTypeEnum
+    model_id: UUID4  # User's onboarded model
+    model_config_data: ClassifierConfig | LLMConfig
+
+    @model_validator(mode="after")
+    def validate_config_type(self) -> "GuardrailCustomProbeCreate":
+        if self.scanner_type == ScannerTypeEnum.CLASSIFIER:
+            if not isinstance(self.model_config_data, ClassifierConfig):
+                raise ValueError("Classifier scanner requires ClassifierConfig")
+        elif self.scanner_type == ScannerTypeEnum.LLM:
+            if not isinstance(self.model_config_data, LLMConfig):
+                raise ValueError("LLM scanner requires LLMConfig")
+        return self
+
+
+class GuardrailCustomProbeUpdate(BaseModel):
+    """Schema for updating a custom model probe."""
+
+    name: str | None = None
+    description: str | None = None
+    model_config_data: ClassifierConfig | LLMConfig | None = None
+
+
+class GuardrailCustomProbeResponse(BaseModel):
+    """Response schema for custom probe."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    name: str
+    description: str | None = None
+    probe_type: ProbeTypeEnum
+    scanner_type: ScannerTypeEnum | None = None
+    model_id: UUID4 | None = None
+    model_uri: str | None = None
+    model_config_json: dict | None = None
+    status: str
+    created_at: datetime
+    modified_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_rule_data(cls, data: Any) -> Any:
+        """Extract rule data from the probe's rules relationship for custom probes."""
+        # If data is a dict, it's already been processed
+        if isinstance(data, dict):
+            return data
+
+        # If data has a rules attribute with at least one rule, extract rule data
+        if hasattr(data, "rules") and data.rules:
+            rule = data.rules[0]  # Custom probes have exactly one rule
+            return {
+                "id": data.id,
+                "name": data.name,
+                "description": data.description,
+                "probe_type": data.probe_type,
+                "scanner_type": getattr(rule, "scanner_type", None),
+                "model_id": getattr(rule, "model_id", None),
+                "model_uri": getattr(rule, "model_uri", None),
+                "model_config_json": getattr(rule, "model_config_json", None),
+                "status": data.status,
+                "created_at": data.created_at,
+                "modified_at": data.modified_at,
+            }
+
+        return data
+
+
+class GuardrailCustomProbeDetailResponse(SuccessResponse):
+    """Detail response schema for a single custom probe."""
+
+    probe: GuardrailCustomProbeResponse
+    object: str = "guardrail.custom_probe"
 
 
 class GuardrailRulePaginatedResponse(PaginatedSuccessResponse):
@@ -197,6 +460,7 @@ class GuardrailProfileProbeSelection(BaseModel):
     rules: Optional[list[GuardrailProbeRuleSelection]] = None
     severity_threshold: Optional[float] = None
     guard_types: Optional[list[str]] = None
+    cluster_config_override: dict | None = None
 
 
 class GuardrailProfileUpdateWithProbes(GuardrailProfileUpdate):
@@ -344,6 +608,40 @@ class GuardrailDeploymentDetailResponse(SuccessResponse):
     object: str = "guardrail.deployment"
 
 
+class GuardrailRuleDeploymentResponse(BaseModel):
+    """Response schema for rule deployment.
+
+    Status is derived from the linked endpoint's status.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID4
+    guardrail_deployment_id: UUID4
+    rule_id: UUID4
+    model_id: UUID4
+    endpoint_id: UUID4
+    cluster_id: UUID4
+    config_override_json: dict | None = None
+    status: str | None = None  # Derived from endpoint.status
+    created_at: datetime
+    modified_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_status_from_endpoint(cls, data: Any) -> Any:
+        """Derive status from the endpoint relationship."""
+        if hasattr(data, "endpoint") and data.endpoint is not None:
+            # SQLAlchemy model - get status from endpoint relationship
+            if not hasattr(data, "status") or data.status is None:
+                object.__setattr__(data, "status", data.endpoint.status)
+        elif isinstance(data, dict) and "endpoint" in data and data["endpoint"]:
+            # Dict input - get status from endpoint dict
+            if "status" not in data or data["status"] is None:
+                data["status"] = data["endpoint"].get("status")
+        return data
+
+
 class GuardrailDeploymentWorkflowRequest(BaseModel):
     """Guardrail deployment workflow request schema."""
 
@@ -364,6 +662,12 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
     severity_threshold: float | None = None
+    # Model deployment fields
+    cluster_id: UUID4 | None = None
+    hardware_mode: Literal["dedicated", "shared"] | None = None
+    deploy_config: dict | None = None  # Default config applied to all models
+    per_model_deployment_configs: list[dict] | None = None  # Per-model configs: [{model_id/model_uri, deploy_config}]
+    callback_topics: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":
@@ -415,6 +719,30 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     probe_selections: list[GuardrailProfileProbeSelection] | None = None
     guard_types: list[str] | None = None
     severity_threshold: float | None = None
+    # Model deployment fields
+    hardware_mode: Literal["dedicated", "shared"] | None = None
+    deploy_config: dict | None = None  # Default config for all models
+    per_model_deployment_configs: list[dict] | None = None  # Per-model configs
+    cluster_id: UUID4 | None = None  # Global cluster_id for deployment
+    # Model status fields (populated when derive_model_statuses=True)
+    model_statuses: list[dict] | None = None
+    total_models: int | None = None
+    models_requiring_onboarding: int | None = None
+    models_requiring_deployment: int | None = None
+    models_reusable: int | None = None
+    skip_to_step: int | None = None
+    credential_required: bool | None = None
+    # Cluster selection fields
+    selected_cluster_id: UUID4 | None = None
+    cluster_recommendations: list[dict] | None = None
+    # Onboarding events: {execution_id, status, results}
+    onboarding_events: dict | None = None
+    # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
+    simulation_events: dict | None = None
+    # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
+    deployment_events: dict | None = None
+    # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
+    pending_profile_data: dict | None = None
 
 
 class BudSentinelConfig(BaseModel):

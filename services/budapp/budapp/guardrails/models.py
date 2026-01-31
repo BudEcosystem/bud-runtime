@@ -19,8 +19,9 @@
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer, String, Uuid
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer, String, Uuid, func, select
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -29,6 +30,9 @@ from budapp.commons.constants import (
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
     GuardrailStatusEnum,
+    ModelProviderTypeEnum,
+    ProbeTypeEnum,
+    ScannerTypeEnum,
 )
 from budapp.commons.database import Base, TimestampMixin
 from budapp.endpoint_ops.models import Endpoint
@@ -70,6 +74,15 @@ class GuardrailProbe(Base, TimestampMixin):
         ),
         nullable=False,
     )
+    probe_type: Mapped[str] = mapped_column(
+        Enum(
+            ProbeTypeEnum,
+            name="probe_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        default=ProbeTypeEnum.PROVIDER,
+    )
 
     # Relationships
     provider: Mapped["Provider"] = relationship("Provider")
@@ -101,22 +114,20 @@ class GuardrailProbe(Base, TimestampMixin):
         )
         return subquery.as_scalar()
 
-    # You can apply the exact same pattern for scanner_types and modality_types
     @hybrid_property
     def scanner_types(self) -> List[str]:
+        """Aggregate unique scanner_type values from rules."""
         if not self.rules:
             return []
-        all_types = set()
-        for rule in self.rules:
-            if rule.scanner_types:
-                all_types.update(rule.scanner_types)
-        return sorted(all_types)
+        return sorted({r.scanner_type for r in self.rules if r.scanner_type})
 
     @scanner_types.expression
     def scanner_types(cls):
+        """SQL expression to aggregate unique scanner_type values."""
         subquery = (
-            select(func.array_agg(func.distinct(func.unnest(GuardrailRule.scanner_types))))
+            select(func.array_agg(func.distinct(GuardrailRule.scanner_type)))
             .where(GuardrailRule.probe_id == cls.id)
+            .where(GuardrailRule.scanner_type.isnot(None))
             .label("aggregated_scanner_types")
         )
         return subquery.as_scalar()
@@ -196,14 +207,37 @@ class GuardrailRule(Base, TimestampMixin):
         default=GuardrailStatusEnum.ACTIVE,
     )
     guard_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
-    scanner_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
     modality_types: Mapped[Optional[List[str]]] = mapped_column(PG_ARRAY(String), nullable=True)
+
+    # Model-based rule fields
+    scanner_type: Mapped[Optional[str]] = mapped_column(
+        Enum(
+            ScannerTypeEnum,
+            name="scanner_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=True,
+    )
+    model_uri: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    model_provider_type: Mapped[Optional[str]] = mapped_column(
+        PG_ENUM(
+            ModelProviderTypeEnum,
+            name="model_provider_type_enum",
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,
+        ),
+        nullable=True,
+    )
+    is_gated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    model_config_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    model_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("model.id", ondelete="SET NULL"), nullable=True)
 
     created_by: Mapped[Optional[UUID]] = mapped_column(ForeignKey("user.id"), nullable=True)
 
     # Relationships
     probe: Mapped["GuardrailProbe"] = relationship("GuardrailProbe", back_populates="rules")
     rule_profiles: Mapped[List["GuardrailProfileRule"]] = relationship("GuardrailProfileRule", back_populates="rule")
+    model: Mapped[Optional["Model"]] = relationship("Model")
 
 
 class GuardrailProfile(Base, TimestampMixin):
@@ -317,3 +351,35 @@ class GuardrailDeployment(Base, TimestampMixin):
     project: Mapped["Project"] = relationship("Project")
     credential: Mapped[Optional["ProprietaryCredential"]] = relationship("ProprietaryCredential")
     profile: Mapped["GuardrailProfile"] = relationship("GuardrailProfile", back_populates="deployments")
+    rule_deployments: Mapped[List["GuardrailRuleDeployment"]] = relationship(
+        "GuardrailRuleDeployment", back_populates="guardrail_deployment"
+    )
+
+
+class GuardrailRuleDeployment(Base, TimestampMixin):
+    """Tracks model deployments for guardrail rules."""
+
+    __tablename__ = "guardrail_rule_deployment"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    guardrail_deployment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("guardrail_deployment.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    rule_id: Mapped[UUID] = mapped_column(
+        ForeignKey("guardrail_rule.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    model_id: Mapped[UUID] = mapped_column(ForeignKey("model.id", ondelete="CASCADE"), nullable=False)
+    endpoint_id: Mapped[UUID] = mapped_column(
+        ForeignKey("endpoint.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    cluster_id: Mapped[UUID] = mapped_column(ForeignKey("cluster.id", ondelete="CASCADE"), nullable=False)
+    config_override_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Relationships
+    guardrail_deployment: Mapped["GuardrailDeployment"] = relationship(
+        "GuardrailDeployment", back_populates="rule_deployments"
+    )
+    rule: Mapped["GuardrailRule"] = relationship("GuardrailRule")
+    model: Mapped["Model"] = relationship("Model")
+    endpoint: Mapped["Endpoint"] = relationship("Endpoint")
+    cluster: Mapped["Cluster"] = relationship("Cluster")
