@@ -1373,7 +1373,7 @@ class ClickHouseMigration:
             -- ===== OTel TRACE IDENTIFIERS =====
             generateUUIDv4() AS id,
             g.TraceId AS trace_id,
-            COALESCE(h.SpanId, g.SpanId) AS span_id,
+            COALESCE(nullIf(h.SpanId, ''), g.SpanId) AS span_id,
 
             -- ===== CORE IDENTIFIERS (prefer handler, fallback to gateway) =====
             -- inference_id: check model_inference_details, classify_inference (strip infinity- prefix), then gateway
