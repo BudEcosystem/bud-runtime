@@ -917,6 +917,7 @@ class AggregatedMetricsRequest(BaseModel):
             "unique_users",
         ]
     ]
+    data_source: Literal["inference", "prompt"] = "inference"
 
     @field_validator("to_date")
     @classmethod
@@ -986,6 +987,7 @@ class TimeSeriesRequest(BaseModel):
     filters: Optional[Dict[str, Any]] = None
     group_by: Optional[list[Literal["model", "project", "endpoint", "user_project"]]] = None
     fill_gaps: bool = True
+    data_source: Literal["inference", "prompt"] = "inference"
 
     @field_validator("to_date")
     @classmethod
@@ -1036,6 +1038,7 @@ class GeographicDataRequest(BaseModel):
     filters: Optional[Dict[str, Any]] = None
     group_by: Literal["country", "region", "city"] = "country"
     limit: int = 50
+    data_source: Literal["inference", "prompt"] = "inference"
 
     @field_validator("to_date")
     @classmethod
@@ -1091,6 +1094,7 @@ class LatencyDistributionRequest(BaseModel):
     filters: Optional[Dict[str, Any]] = None
     group_by: Optional[list[Literal["model", "project", "endpoint", "user", "user_project"]]] = None
     buckets: Optional[List[Dict[str, Union[int, str]]]] = None
+    data_source: Literal["inference", "prompt"] = "inference"
 
     @field_validator("to_date")
     @classmethod

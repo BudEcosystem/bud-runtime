@@ -2323,6 +2323,13 @@ class ObservabilityMetricsService:
                     where_conditions.append("rm.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(rm.prompt_id IS NULL OR rm.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("rm.prompt_id IS NOT NULL AND rm.prompt_id != ''")
+
         # Build final query (use rm as table alias)
         order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
         query = f"""
@@ -2446,6 +2453,13 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         # Build final query (no JOINs - all data in InferenceFact)
         order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
@@ -2663,6 +2677,13 @@ class ObservabilityMetricsService:
                     where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(prompt_id IS NULL OR prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
+
         # Build WITH FILL expression for time gap filling
         fill_expr = ""
         if request.fill_gaps:
@@ -2780,6 +2801,13 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         # Build WITH FILL expression for time gap filling
         fill_expr = ""
@@ -3032,6 +3060,13 @@ class ObservabilityMetricsService:
                         where_conditions.append("country_code = %(country_code)s")
                         params["country_code"] = filter_value
 
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(prompt_id IS NULL OR prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
+
         where_clause = " AND ".join(where_conditions)
 
         # Query with pre-aggregated metrics
@@ -3175,6 +3210,13 @@ class ObservabilityMetricsService:
                     else:
                         where_conditions.append("ifact.country_code = %(country_code)s")
                         params["country_code"] = filter_value
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         where_clause = " AND ".join(where_conditions)
 
@@ -3322,6 +3364,13 @@ class ObservabilityMetricsService:
                     model_ids = [model_ids]
                 model_filter = "', '".join(str(mid) for mid in model_ids)
                 filter_conditions.append(f"toString(ifact.model_id) IN ('{model_filter}')")
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                filter_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                filter_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         where_clause = " AND ".join(filter_conditions)
 

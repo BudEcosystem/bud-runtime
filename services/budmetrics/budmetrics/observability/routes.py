@@ -516,6 +516,7 @@ async def get_geographic_distribution(
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
     api_key_project_id: Optional[UUID] = Query(None, description="Filter by API key's project ID (for CLIENT users)"),
     country_codes: Optional[str] = Query(None, description="Comma-separated country codes to filter by"),
+    data_source: str = Query("inference", description="Data source: inference (excludes prompt analytics) or prompt (only prompt analytics)"),
 ) -> Response:
     """Get geographic distribution data from gateway analytics.
 
@@ -552,7 +553,8 @@ async def get_geographic_distribution(
             filters["country_code"] = [code.strip() for code in country_codes.split(",")]
 
         request = GeographicDataRequest(
-            from_date=from_date, to_date=to_date, group_by=group_by, limit=limit, filters=filters if filters else None
+            from_date=from_date, to_date=to_date, group_by=group_by, limit=limit, filters=filters if filters else None,
+            data_source=data_source
         )
 
         response = await service.get_geographic_data(request)
