@@ -166,7 +166,8 @@
         "thread.name": "tokio-runtime-worker",
         "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
         "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
-        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc",
+        "gen_ai.ttft_ms": "250"
       },
       "Duration": 10595349566,
       "StatusCode": "Unset",
@@ -626,7 +627,8 @@
         "model_inference_details.request_arrival_time": "2026-01-31T10:35:11.818582071+00:00",
         "model_inference_details.request_forward_time": "2026-01-31T10:35:15.061042667+00:00",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "model_inference.ttft_ms": "150"
       },
       "Duration": 3243371980,
       "StatusCode": "Unset",
@@ -1076,7 +1078,8 @@
         "model_inference_details.request_arrival_time": "2026-01-31T10:35:15.204686306+00:00",
         "model_inference_details.request_forward_time": "2026-01-31T10:35:18.812326507+00:00",
         "thread.id": "6",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "model_inference.ttft_ms": "180"
       },
       "Duration": 3608858107,
       "StatusCode": "Unset",
@@ -1526,7 +1529,8 @@
         "model_inference_details.request_arrival_time": "2026-01-31T10:35:18.829127708+00:00",
         "model_inference_details.request_forward_time": "2026-01-31T10:35:22.338710663+00:00",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "model_inference.ttft_ms": "200"
       },
       "Duration": 3510670368,
       "StatusCode": "Unset",
