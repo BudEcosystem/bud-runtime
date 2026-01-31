@@ -1604,7 +1604,13 @@ class ClickHouseMigration:
             ON g.TraceId = h.TraceId
             AND h.SpanName LIKE '%%_handler_observability'
             AND h.SpanName != 'response_create_handler_observability'
-            AND g.SpanAttributes['gateway_analytics.inference_id'] = h.SpanAttributes['model_inference_details.inference_id']
+            AND (
+                -- Precise match when both have inference_id (multi-inference traces)
+                g.SpanAttributes['gateway_analytics.inference_id'] = h.SpanAttributes['model_inference_details.inference_id']
+                OR
+                -- Fallback for handlers without inference_id (single-inference traces)
+                h.SpanAttributes['model_inference_details.inference_id'] = ''
+            )
         WHERE g.SpanName = 'gateway_analytics'
           AND g.SpanAttributes['gateway_analytics.path'] LIKE '/v1/%%'
           -- Exclude administrative endpoints (no inference)
@@ -1852,7 +1858,13 @@ class ClickHouseMigration:
         LEFT JOIN metrics.otel_traces g
             ON h.TraceId = g.TraceId
             AND g.SpanName = 'gateway_analytics'
-            AND g.SpanAttributes['gateway_analytics.inference_id'] = i.SpanAttributes['model_inference_details.inference_id']
+            AND (
+                -- Precise match when both have inference_id (multi-inference traces)
+                g.SpanAttributes['gateway_analytics.inference_id'] = h.SpanAttributes['model_inference_details.inference_id']
+                OR
+                -- Fallback for handlers without inference_id (single-inference traces)
+                h.SpanAttributes['model_inference_details.inference_id'] = ''
+            )
         WHERE h.SpanName LIKE '%%_handler_observability'
         """
 
