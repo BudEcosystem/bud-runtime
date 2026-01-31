@@ -47,7 +47,10 @@
         "idle_ns": "10590973648",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 10599780347,
       "StatusCode": "Unset",
@@ -160,7 +163,10 @@
         "idle_ns": "10591479661",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 10595349566,
       "StatusCode": "Unset",
@@ -503,7 +509,10 @@
         "idle_ns": "3238590545",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 3249922703,
       "StatusCode": "Unset",
@@ -950,7 +959,10 @@
         "idle_ns": "3603132867",
         "level": "INFO",
         "thread.id": "6",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 3744222285,
       "StatusCode": "Unset",
@@ -1397,7 +1409,10 @@
         "idle_ns": "3505676302",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 3517743857,
       "StatusCode": "Unset",
@@ -1765,7 +1780,10 @@
         "idle_ns": "5764479600",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 5774419587,
       "StatusCode": "Unset",
@@ -1878,7 +1896,10 @@
         "idle_ns": "5764789559",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 5769281273,
       "StatusCode": "Unset",
@@ -2221,7 +2242,10 @@
         "idle_ns": "2524454148",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 2535098056,
       "StatusCode": "Unset",
@@ -2668,7 +2692,10 @@
         "idle_ns": "3011233696",
         "level": "INFO",
         "thread.id": "8",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 3157941541,
       "StatusCode": "Unset",
@@ -3035,7 +3062,10 @@
         "idle_ns": "3013706938",
         "level": "INFO",
         "thread.id": "8",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 3059435323,
       "StatusCode": "Error",
@@ -3139,7 +3169,10 @@
         "idle_ns": "3012759638",
         "level": "INFO",
         "thread.id": "8",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 3015810118,
       "StatusCode": "Error",
@@ -3489,7 +3522,7 @@
         "gateway_analytics.error_type": "Bad Gateway",
         "gateway_analytics.gateway_processing_ms": "0",
         "gateway_analytics.id": "019c139f-47f7-7313-a075-c395c4f5428a",
-        "gateway_analytics.inference_id": "019c139f-47fe-7771-9763-7fbc4148977c",
+        "gateway_analytics.inference_id": "019c139f-4957-7141-83a9-b2f8f441063a",
         "gateway_analytics.is_bot": "false",
         "gateway_analytics.method": "POST",
         "gateway_analytics.os_name": "Other",
@@ -3506,7 +3539,10 @@
         "idle_ns": "341502424",
         "level": "INFO",
         "thread.id": "8",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 353949617,
       "StatusCode": "Error",
@@ -3902,7 +3938,7 @@
         "gateway_analytics.error_type": "Bad Gateway",
         "gateway_analytics.gateway_processing_ms": "0",
         "gateway_analytics.id": "019c139f-4b04-7621-b639-877707dc71ff",
-        "gateway_analytics.inference_id": "019c139f-4b0a-7ad1-8797-9f293506fb85",
+        "gateway_analytics.inference_id": "019c139f-4ee4-7742-9853-449b04db7f9c",
         "gateway_analytics.is_bot": "false",
         "gateway_analytics.method": "POST",
         "gateway_analytics.os_name": "Other",
@@ -3919,7 +3955,10 @@
         "idle_ns": "984246976",
         "level": "INFO",
         "thread.id": "6",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 995611803,
       "StatusCode": "Error",
@@ -4315,7 +4354,7 @@
         "gateway_analytics.error_type": "Bad Gateway",
         "gateway_analytics.gateway_processing_ms": "0",
         "gateway_analytics.id": "019c139f-522c-7360-b456-8a6b1c66ea4a",
-        "gateway_analytics.inference_id": "019c139f-5232-70c3-a024-5e87a28c4c42",
+        "gateway_analytics.inference_id": "019c139f-5376-7c02-b7b9-1b81f9951eb4",
         "gateway_analytics.is_bot": "false",
         "gateway_analytics.method": "POST",
         "gateway_analytics.os_name": "Other",
@@ -4332,7 +4371,10 @@
         "idle_ns": "321790043",
         "level": "INFO",
         "thread.id": "6",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 331998942,
       "StatusCode": "Error",
@@ -4709,7 +4751,10 @@
         "idle_ns": "817854968",
         "level": "INFO",
         "thread.id": "2",
-        "thread.name": "tokio-runtime-worker"
+        "thread.name": "tokio-runtime-worker",
+        "bud.api_key_id": "019787c1-3de1-7b50-969b-e0a58514aaaa",
+        "bud.api_key_project_id": "019787c1-3de1-7b50-969b-e0a58514bbbb",
+        "bud.user_id": "019787c1-3de1-7b50-969b-e0a58514cccc"
       },
       "Duration": 826622832,
       "StatusCode": "Unset",
