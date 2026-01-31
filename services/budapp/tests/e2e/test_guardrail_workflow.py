@@ -63,12 +63,16 @@ class TestWorkflowModelStatusDerivation:
         rule1.name = "Rule 1"
         rule1.model_uri = "org/model-1"
         rule1.model_id = None  # Not onboarded
+        rule1.model_provider_type = "hugging_face"
+        rule1.tags = None
 
         rule2 = Mock()
         rule2.id = uuid4()
         rule2.name = "Rule 2"
         rule2.model_uri = "org/model-2"
         rule2.model_id = uuid4()  # Onboarded
+        rule2.model_provider_type = "hugging_face"
+        rule2.tags = None
 
         probe = Mock()
         probe.id = uuid4()
@@ -90,7 +94,8 @@ class TestWorkflowModelStatusDerivation:
             # Mock endpoint query for onboarded model (model 2)
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = []  # No endpoints
-            service.session.execute = AsyncMock(return_value=mock_result)
+            mock_result.scalar_one_or_none.return_value = None  # Model lookup returns None
+            service.session.execute = MagicMock(return_value=mock_result)
 
             result = await service.derive_model_statuses(probe_selections, project_id=None)
 
@@ -115,6 +120,8 @@ class TestWorkflowModelStatusDerivation:
         rule.name = "Deployed Rule"
         rule.model_uri = "org/deployed-model"
         rule.model_id = model_id
+        rule.model_provider_type = "hugging_face"
+        rule.tags = None
 
         probe = Mock()
         probe.id = probe_id
@@ -134,6 +141,7 @@ class TestWorkflowModelStatusDerivation:
             mock_endpoint.name = "running-endpoint"
             mock_endpoint.endpoint = "http://localhost:8000"
             mock_endpoint.status = EndpointStatusEnum.RUNNING
+            mock_endpoint.url = "http://localhost:8000"
             mock_endpoint.cluster_id = uuid4()
             mock_cluster = Mock()
             mock_cluster.name = "test-cluster"
@@ -141,7 +149,7 @@ class TestWorkflowModelStatusDerivation:
 
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = [mock_endpoint]
-            service.session.execute = AsyncMock(return_value=mock_result)
+            service.session.execute = MagicMock(return_value=mock_result)
 
             result = await service.derive_model_statuses(probe_selections, project_id=None)
 
@@ -166,6 +174,8 @@ class TestWorkflowModelStatusDerivation:
         rule.name = "Onboarded Rule"
         rule.model_uri = "org/onboarded-model"
         rule.model_id = model_id
+        rule.model_provider_type = "hugging_face"
+        rule.tags = None
 
         probe = Mock()
         probe.id = probe_id
@@ -182,7 +192,7 @@ class TestWorkflowModelStatusDerivation:
             # No endpoints (model not deployed)
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = []
-            service.session.execute = AsyncMock(return_value=mock_result)
+            service.session.execute = MagicMock(return_value=mock_result)
 
             result = await service.derive_model_statuses(probe_selections, project_id=None)
 
@@ -451,6 +461,8 @@ class TestEndToEndWorkflowScenarios:
         rule.name = "Not Onboarded Rule"
         rule.model_uri = "org/new-model"
         rule.model_id = None  # Not onboarded
+        rule.model_provider_type = "hugging_face"
+        rule.tags = None
 
         probe = Mock()
         probe.id = probe_id
@@ -463,6 +475,11 @@ class TestEndToEndWorkflowScenarios:
             mock_dm = AsyncMock()
             mock_dm.get_probes_with_rules = AsyncMock(return_value=[probe])
             MockDataManager.return_value = mock_dm
+
+            # Mock session.execute for model lookup (model_id is None so it looks up by URI)
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = None  # Model not found
+            service.session.execute = MagicMock(return_value=mock_result)
 
             result = await service.derive_model_statuses(probe_selections, project_id=None)
 
@@ -485,6 +502,8 @@ class TestEndToEndWorkflowScenarios:
         rule.name = "Deployed Rule"
         rule.model_uri = "org/deployed-model"
         rule.model_id = model_id
+        rule.model_provider_type = "hugging_face"
+        rule.tags = None
 
         probe = Mock()
         probe.id = probe_id
@@ -496,6 +515,7 @@ class TestEndToEndWorkflowScenarios:
         mock_endpoint.id = endpoint_id
         mock_endpoint.name = "running-endpoint"
         mock_endpoint.endpoint = "http://localhost:8000"
+        mock_endpoint.url = "http://localhost:8000"
         mock_endpoint.status = EndpointStatusEnum.RUNNING
         mock_endpoint.cluster_id = uuid4()
         mock_cluster = Mock()
@@ -511,7 +531,7 @@ class TestEndToEndWorkflowScenarios:
 
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = [mock_endpoint]
-            service.session.execute = AsyncMock(return_value=mock_result)
+            service.session.execute = MagicMock(return_value=mock_result)
 
             result = await service.derive_model_statuses(probe_selections, project_id=None)
 
@@ -532,6 +552,8 @@ class TestEndToEndWorkflowScenarios:
         rule1.name = "Onboarded Rule"
         rule1.model_uri = "org/onboarded-model"
         rule1.model_id = uuid4()
+        rule1.model_provider_type = "hugging_face"
+        rule1.tags = None
 
         # Rule 2: Already deployed
         rule2 = Mock()
@@ -539,6 +561,8 @@ class TestEndToEndWorkflowScenarios:
         rule2.name = "Deployed Rule"
         rule2.model_uri = "org/deployed-model"
         rule2.model_id = uuid4()
+        rule2.model_provider_type = "hugging_face"
+        rule2.tags = None
 
         probe = Mock()
         probe.id = probe_id
@@ -550,6 +574,7 @@ class TestEndToEndWorkflowScenarios:
         mock_endpoint.id = uuid4()
         mock_endpoint.name = "running-endpoint"
         mock_endpoint.endpoint = "http://localhost:8000"
+        mock_endpoint.url = "http://localhost:8000"
         mock_endpoint.status = EndpointStatusEnum.RUNNING
         mock_endpoint.cluster_id = uuid4()
         mock_cluster = Mock()
@@ -570,7 +595,7 @@ class TestEndToEndWorkflowScenarios:
             mock_result_with_ep = MagicMock()
             mock_result_with_ep.scalars.return_value.all.return_value = [mock_endpoint]
 
-            service.session.execute = AsyncMock(side_effect=[mock_result_empty, mock_result_with_ep])
+            service.session.execute = MagicMock(side_effect=[mock_result_empty, mock_result_with_ep])
 
             result = await service.derive_model_statuses(probe_selections, project_id=None)
 

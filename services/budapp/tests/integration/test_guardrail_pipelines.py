@@ -21,7 +21,7 @@ with mocked external services (BudPipelineService, DaprService).
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.orm import Session
@@ -98,7 +98,7 @@ class TestGuardrailModelOnboardingPipeline:
                 # Verify step structure
                 for step in dag["steps"]:
                     assert step["action"] == "model_add"
-                    assert "uri" in step["params"]
+                    assert "model_uri" in step["params"]
                     assert step["depends_on"] == []  # Parallel execution
 
     @pytest.mark.asyncio
@@ -131,7 +131,11 @@ class TestGuardrailModelOnboardingPipeline:
 
 
 class TestGuardrailDeploymentPipeline:
-    """Tests for trigger_deployment pipeline integration."""
+    """Tests for trigger_deployment pipeline integration.
+
+    Note: trigger_deployment calls ModelService.deploy_model_by_step directly,
+    not BudPipelineService. These tests mock ModelService accordingly.
+    """
 
     @pytest.fixture
     def mock_session(self):
@@ -152,60 +156,56 @@ class TestGuardrailDeploymentPipeline:
             {
                 "model_id": str(uuid4()),
                 "model_name": "deberta-classifier",
-                "deployment_config": {
-                    "replica": 1,
-                    "tensor_parallelism": 1,
-                    "max_model_len": 4096,
+                "deploy_config": {
+                    "concurrency": 10,
+                    "input_tokens": 1024,
+                    "output_tokens": 128,
                 },
             },
             {
                 "model_id": str(uuid4()),
                 "model_name": "minilm-embeddings",
-                "deployment_config": {
-                    "replica": 2,
-                    "tensor_parallelism": 2,
+                "deploy_config": {
+                    "concurrency": 20,
+                    "input_tokens": 512,
+                    "output_tokens": 64,
                 },
             },
         ]
 
     @pytest.mark.asyncio
-    async def test_trigger_deployment_creates_dag(self, service, sample_models_for_deployment):
-        """Test that trigger_deployment creates correct DAG structure."""
+    async def test_trigger_deployment_calls_model_service(self, service, sample_models_for_deployment):
+        """Test that trigger_deployment calls ModelService.deploy_model_by_step."""
         cluster_id = uuid4()
         project_id = uuid4()
         user_id = uuid4()
-        execution_id = str(uuid4())
+        workflow_id = uuid4()
 
-        with patch.object(service, "session", MagicMock()):
-            with patch("budapp.guardrails.services.BudPipelineService") as MockPipelineService:
-                mock_pipeline = AsyncMock()
-                mock_pipeline.run_ephemeral_execution = AsyncMock(return_value={"execution_id": execution_id})
-                MockPipelineService.return_value = mock_pipeline
+        # Create mock workflow object returned by deploy_model_by_step
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
 
-                result = await service.trigger_deployment(
-                    models=sample_models_for_deployment,
-                    cluster_id=cluster_id,
-                    project_id=project_id,
-                    user_id=user_id,
-                )
+        with patch("budapp.model_ops.services.ModelService") as MockModelService:
+            mock_model_service = MagicMock()
+            mock_model_service.deploy_model_by_step = AsyncMock(return_value=mock_workflow)
+            MockModelService.return_value = mock_model_service
 
-                # Verify result
-                assert result["execution_id"] == execution_id
-                assert result["total_models"] == 2
-                assert result["cluster_id"] == str(cluster_id)
+            result = await service.trigger_deployment(
+                models=sample_models_for_deployment,
+                cluster_id=cluster_id,
+                project_id=project_id,
+                user_id=user_id,
+            )
 
-                # Verify DAG structure
-                call_args = mock_pipeline.run_ephemeral_execution.call_args
-                dag = call_args.kwargs["pipeline_definition"]
-                assert dag["name"] == "guardrail-model-deployment"
-                assert len(dag["steps"]) == 2
+            # Verify result structure
+            assert result["total_models"] == 2
+            assert result["cluster_id"] == str(cluster_id)
+            assert "successful" in result
+            assert "failed" in result
+            assert "results" in result
 
-                # Verify deployment steps
-                for step in dag["steps"]:
-                    assert step["action"] == "deployment_create"
-                    assert "model_id" in step["params"]
-                    assert "cluster_id" in step["params"]
-                    assert "project_id" in step["params"]
+            # Verify ModelService was called for each model
+            assert mock_model_service.deploy_model_by_step.call_count == 2
 
     @pytest.mark.asyncio
     async def test_trigger_deployment_empty_list(self, service):
@@ -220,37 +220,41 @@ class TestGuardrailDeploymentPipeline:
         assert result["message"] == "No models to deploy"
 
     @pytest.mark.asyncio
-    async def test_trigger_deployment_preserves_config(self, service, sample_models_for_deployment):
-        """Test that deployment config is passed correctly to DAG steps."""
+    async def test_trigger_deployment_passes_correct_params(self, service, sample_models_for_deployment):
+        """Test that deployment config is passed correctly to ModelService."""
         cluster_id = uuid4()
         project_id = uuid4()
-        execution_id = str(uuid4())
+        user_id = uuid4()
+        workflow_id = uuid4()
 
-        with patch.object(service, "session", MagicMock()):
-            with patch("budapp.guardrails.services.BudPipelineService") as MockPipelineService:
-                mock_pipeline = AsyncMock()
-                mock_pipeline.run_ephemeral_execution = AsyncMock(return_value={"execution_id": execution_id})
-                MockPipelineService.return_value = mock_pipeline
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
 
-                await service.trigger_deployment(
-                    models=sample_models_for_deployment,
-                    cluster_id=cluster_id,
-                    project_id=project_id,
-                )
+        with patch("budapp.model_ops.services.ModelService") as MockModelService:
+            mock_model_service = MagicMock()
+            mock_model_service.deploy_model_by_step = AsyncMock(return_value=mock_workflow)
+            MockModelService.return_value = mock_model_service
 
-                call_args = mock_pipeline.run_ephemeral_execution.call_args
-                dag = call_args.kwargs["pipeline_definition"]
+            await service.trigger_deployment(
+                models=sample_models_for_deployment,
+                cluster_id=cluster_id,
+                project_id=project_id,
+                user_id=user_id,
+                hardware_mode="dedicated",
+            )
 
-                # Check first model config
-                step0 = dag["steps"][0]
-                assert step0["params"]["replica"] == 1
-                assert step0["params"]["tp"] == 1
-                assert step0["params"]["max_model_len"] == 4096
+            # Verify first call parameters
+            first_call = mock_model_service.deploy_model_by_step.call_args_list[0]
+            assert first_call.kwargs["model_id"] == UUID(sample_models_for_deployment[0]["model_id"])
+            assert first_call.kwargs["project_id"] == project_id
+            assert first_call.kwargs["cluster_id"] == cluster_id
+            assert first_call.kwargs["hardware_mode"] == "dedicated"
 
-                # Check second model config
-                step1 = dag["steps"][1]
-                assert step1["params"]["replica"] == 2
-                assert step1["params"]["tp"] == 2
+            # Verify deploy_config was converted correctly
+            deploy_config = first_call.kwargs["deploy_config"]
+            assert deploy_config.concurrent_requests == 10
+            assert deploy_config.avg_context_length == 1024
+            assert deploy_config.avg_sequence_length == 128
 
 
 class TestGuardrailSimulationPipeline:
@@ -275,7 +279,7 @@ class TestGuardrailSimulationPipeline:
             {
                 "model_id": str(uuid4()),
                 "model_uri": "microsoft/deberta-v3-base",
-                "deployment_config": {
+                "deploy_config": {
                     "input_tokens": 512,
                     "output_tokens": 64,
                     "concurrency": 5,
@@ -284,7 +288,7 @@ class TestGuardrailSimulationPipeline:
             {
                 "model_id": str(uuid4()),
                 "model_uri": "sentence-transformers/all-MiniLM-L6-v2",
-                "deployment_config": {
+                "deploy_config": {
                     "input_tokens": 256,
                     "output_tokens": 32,
                 },
@@ -297,7 +301,8 @@ class TestGuardrailSimulationPipeline:
         workflow_ids = [str(uuid4()), str(uuid4())]
 
         mock_settings = MagicMock()
-        mock_settings.budsim_app_id = "budsim"
+        mock_settings.bud_simulator_app_id = "budsim"
+        mock_settings.source_topic = "test-topic"
 
         with (
             patch("budapp.commons.config.app_settings", mock_settings),
@@ -340,7 +345,8 @@ class TestGuardrailSimulationPipeline:
         workflow_id = str(uuid4())
 
         mock_settings = MagicMock()
-        mock_settings.budsim_app_id = "budsim"
+        mock_settings.bud_simulator_app_id = "budsim"
+        mock_settings.source_topic = "test-topic"
 
         with (
             patch("budapp.commons.config.app_settings", mock_settings),
@@ -374,7 +380,8 @@ class TestGuardrailSimulationPipeline:
         workflow_id = str(uuid4())
 
         mock_settings = MagicMock()
-        mock_settings.budsim_app_id = "budsim"
+        mock_settings.bud_simulator_app_id = "budsim"
+        mock_settings.source_topic = "test-topic"
 
         with (
             patch("budapp.commons.config.app_settings", mock_settings),
