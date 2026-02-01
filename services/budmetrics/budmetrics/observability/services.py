@@ -39,6 +39,9 @@ from budmetrics.observability.schemas import (
     ObservabilityMetricsResponse,
     PerformanceMetric,
     PeriodBin,
+    PromptDistributionBucket,
+    PromptDistributionRequest,
+    PromptDistributionResponse,
     TimeMetric,
     TraceDetailResponse,
     TraceEvent,
@@ -3707,6 +3710,267 @@ class ObservabilityMetricsService:
             groups=groups,
             overall_distribution=overall_buckets,
             total_requests=total_requests,
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            bucket_definitions=clean_buckets,
+        )
+
+    async def get_prompt_distribution(self, request: PromptDistributionRequest) -> PromptDistributionResponse:
+        """Get prompt analytics distribution data.
+
+        Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+        and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+
+        Args:
+            request: The prompt distribution request parameters.
+
+        Returns:
+            PromptDistributionResponse: Response containing distribution data.
+        """
+        logger.info(f"Getting prompt distribution for date range {request.from_date} to {request.to_date}")
+
+        # Build time filter
+        from_date_str = request.from_date.strftime("%Y-%m-%d %H:%M:%S")
+        to_date_str = (request.to_date or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Build filter conditions - only prompt analytics data (prompt_id is set)
+        filter_conditions = [
+            f"toDateTime('{from_date_str}') <= ifact.request_arrival_time",
+            f"ifact.request_arrival_time < toDateTime('{to_date_str}')",
+            "ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''",
+        ]
+
+        # Apply additional filters
+        if request.filters:
+            if "project_id" in request.filters:
+                project_ids = request.filters["project_id"]
+                if isinstance(project_ids, str):
+                    project_ids = [project_ids]
+                project_filter = "', '".join(str(pid) for pid in project_ids)
+                filter_conditions.append(f"toString(ifact.project_id) IN ('{project_filter}')")
+
+            if "endpoint_id" in request.filters:
+                endpoint_ids = request.filters["endpoint_id"]
+                if isinstance(endpoint_ids, str):
+                    endpoint_ids = [endpoint_ids]
+                endpoint_filter = "', '".join(str(eid) for eid in endpoint_ids)
+                filter_conditions.append(f"toString(ifact.endpoint_id) IN ('{endpoint_filter}')")
+
+            if "prompt_id" in request.filters:
+                prompt_ids = request.filters["prompt_id"]
+                if isinstance(prompt_ids, str):
+                    prompt_ids = [prompt_ids]
+                prompt_filter = "', '".join(str(pid) for pid in prompt_ids)
+                filter_conditions.append(f"ifact.prompt_id IN ('{prompt_filter}')")
+
+        where_clause = " AND ".join(filter_conditions)
+
+        # Determine the bucket_by field expression
+        if request.bucket_by == "concurrency":
+            # Concurrency is calculated as count of requests in the same second window
+            # We'll use a window function approach
+            bucket_field = "concurrent_count"
+        elif request.bucket_by == "input_tokens":
+            bucket_field = "ifact.input_tokens"
+        elif request.bucket_by == "output_tokens":
+            bucket_field = "ifact.output_tokens"
+        else:
+            bucket_field = "ifact.input_tokens"
+
+        # Determine the metric expression
+        if request.metric == "total_duration_ms":
+            metric_expr = "COALESCE(ifact.total_duration_ms, 0)"
+        elif request.metric == "ttft_ms":
+            # Return NULL for NULL or 0 values - they represent missing/invalid TTFT data
+            metric_expr = "NULLIF(ifact.ttft_ms, 0)"
+        elif request.metric == "response_time_ms":
+            metric_expr = "COALESCE(ifact.response_time_ms, 0)"
+        elif request.metric == "throughput_per_user":
+            # throughput_per_user = output_tokens * 1000 / response_time_ms / concurrent_count
+            metric_expr = (
+                "ifact.output_tokens * 1000.0 / NULLIF(COALESCE(ifact.response_time_ms, 0), 0) / "
+                "NULLIF(concurrent_count, 0)"
+            )
+        else:
+            metric_expr = "COALESCE(ifact.response_time_ms, 0)"
+
+        # Auto-generate buckets if not provided
+        buckets = request.buckets
+        if buckets is None:
+            # Query min/max of bucket_by field to auto-generate 10 buckets
+            if request.bucket_by == "concurrency":
+                # For concurrency, we need to calculate it first
+                min_max_query = f"""
+                    WITH request_counts AS (
+                        SELECT
+                            count(*) OVER (PARTITION BY toStartOfSecond(ifact.request_arrival_time)) as concurrent_count
+                        FROM InferenceFact ifact
+                        WHERE {where_clause}
+                    )
+                    SELECT
+                        min(concurrent_count) as min_val,
+                        max(concurrent_count) as max_val
+                    FROM request_counts
+                """
+            else:
+                min_max_query = f"""
+                    SELECT
+                        min({bucket_field}) as min_val,
+                        max({bucket_field}) as max_val
+                    FROM InferenceFact ifact
+                    WHERE {where_clause}
+                """
+
+            min_max_result = await self.clickhouse_client.execute_query(min_max_query)
+            if min_max_result and min_max_result[0][0] is not None:
+                min_val = float(min_max_result[0][0])
+                max_val = float(min_max_result[0][1])
+            else:
+                min_val = 0.0
+                max_val = 100.0
+
+            # Ensure we have a valid range
+            if min_val >= max_val:
+                max_val = min_val + 10.0
+
+            bucket_width = (max_val - min_val) / 10.0
+            buckets = []
+            for i in range(10):
+                bucket_start = min_val + i * bucket_width
+                bucket_end = min_val + (i + 1) * bucket_width
+                buckets.append(
+                    {
+                        "min": bucket_start,
+                        "max": bucket_end,
+                        "label": f"{bucket_start:.0f}-{bucket_end:.0f}",
+                    }
+                )
+
+        # Build bucket case expressions
+        bucket_cases = []
+        for bucket in buckets:
+            bucket_min = bucket["min"]
+            bucket_max = bucket["max"]
+            if bucket == buckets[-1]:
+                # Last bucket includes upper bound
+                condition = f"bucket_value >= {bucket_min}"
+            else:
+                condition = f"bucket_value >= {bucket_min} AND bucket_value < {bucket_max}"
+            bucket_cases.append(f"WHEN {condition} THEN '{bucket['label']}'")
+
+        bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
+
+        # Build the main query
+        if request.bucket_by == "concurrency":
+            # For concurrency, use a CTE to calculate concurrent requests per second
+            query = f"""
+                WITH request_with_concurrency AS (
+                    SELECT
+                        ifact.*,
+                        count(*) OVER (PARTITION BY toStartOfSecond(ifact.request_arrival_time)) as concurrent_count
+                    FROM InferenceFact ifact
+                    WHERE {where_clause}
+                ),
+                with_bucket AS (
+                    SELECT
+                        concurrent_count as bucket_value,
+                        {metric_expr.replace("ifact.", "")} as metric_value
+                    FROM request_with_concurrency ifact
+                )
+                SELECT
+                    {bucket_case_expr} as bucket_label,
+                    count() as request_count,
+                    avg(metric_value) as avg_metric
+                FROM with_bucket
+                WHERE metric_value IS NOT NULL AND isFinite(metric_value)
+                GROUP BY bucket_label
+                ORDER BY bucket_label
+            """
+        else:
+            # For input_tokens/output_tokens, simpler query
+            # Still need concurrency for throughput_per_user metric
+            if request.metric == "throughput_per_user":
+                query = f"""
+                    WITH request_with_concurrency AS (
+                        SELECT
+                            ifact.*,
+                            count(*) OVER (PARTITION BY toStartOfSecond(ifact.request_arrival_time)) as concurrent_count
+                        FROM InferenceFact ifact
+                        WHERE {where_clause}
+                    ),
+                    with_bucket AS (
+                        SELECT
+                            {bucket_field.replace("ifact.", "")} as bucket_value,
+                            {metric_expr.replace("ifact.", "")} as metric_value
+                        FROM request_with_concurrency ifact
+                    )
+                    SELECT
+                        {bucket_case_expr} as bucket_label,
+                        count() as request_count,
+                        avg(metric_value) as avg_metric
+                    FROM with_bucket
+                    WHERE metric_value IS NOT NULL AND isFinite(metric_value)
+                    GROUP BY bucket_label
+                    ORDER BY bucket_label
+                """
+            else:
+                query = f"""
+                    WITH with_bucket AS (
+                        SELECT
+                            {bucket_field} as bucket_value,
+                            {metric_expr} as metric_value
+                        FROM InferenceFact ifact
+                        WHERE {where_clause}
+                    )
+                    SELECT
+                        {bucket_case_expr} as bucket_label,
+                        count() as request_count,
+                        avg(metric_value) as avg_metric
+                    FROM with_bucket
+                    WHERE metric_value IS NOT NULL
+                    GROUP BY bucket_label
+                    ORDER BY bucket_label
+                """
+
+        result = await self.clickhouse_client.execute_query(query)
+
+        # Get total count
+        total_query = f"SELECT count() FROM InferenceFact ifact WHERE {where_clause}"
+        total_result = await self.clickhouse_client.execute_query(total_query)
+        total_count = total_result[0][0] if total_result else 0
+
+        # Process results into buckets
+        bucket_data = {row[0]: (row[1], row[2]) for row in result}
+        response_buckets = []
+
+        for bucket in buckets:
+            count, avg_value = bucket_data.get(bucket["label"], (0, 0.0))
+            avg_value = self._safe_float(avg_value)
+
+            response_buckets.append(
+                PromptDistributionBucket(
+                    range=bucket["label"],
+                    bucket_start=float(bucket["min"]),
+                    bucket_end=float(bucket["max"]),
+                    count=count,
+                    avg_value=round(avg_value, 2),
+                )
+            )
+
+        # Clean up bucket definitions for response (replace inf with large number)
+        clean_buckets = [
+            {
+                "min": bucket["min"],
+                "max": 999999999 if bucket["max"] == float("inf") else bucket["max"],
+                "label": bucket["label"],
+            }
+            for bucket in buckets
+        ]
+
+        return PromptDistributionResponse(
+            buckets=response_buckets,
+            total_count=total_count,
+            bucket_by=request.bucket_by,
+            metric=request.metric,
             date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
             bucket_definitions=clean_buckets,
         )

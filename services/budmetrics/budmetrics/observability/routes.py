@@ -29,6 +29,8 @@ from budmetrics.observability.schemas import (
     MetricsSyncResponse,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
+    PromptDistributionRequest,
+    PromptDistributionResponse,
     TimeSeriesRequest,
     TimeSeriesResponse,
     TraceDetailResponse,
@@ -652,6 +654,39 @@ async def get_latency_distribution(request: LatencyDistributionRequest) -> Respo
     except Exception as e:
         logger.error(f"Error getting latency distribution: {e}")
         response = ErrorResponse(message=f"Error getting latency distribution: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics/distribution", tags=["Aggregated Metrics"])
+async def get_prompt_distribution(request: PromptDistributionRequest) -> Response:
+    """Get prompt analytics distribution data.
+
+    This endpoint provides distribution analysis for prompt analytics data.
+    Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+    and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+
+    Charts supported:
+    - E2E Latency vs Concurrent Requests: bucket_by="concurrency", metric="total_duration_ms"
+    - TTFT vs Input Tokens: bucket_by="input_tokens", metric="ttft_ms"
+    - Throughput/User by Concurrency: bucket_by="concurrency", metric="throughput_per_user"
+
+    Args:
+        request (PromptDistributionRequest): The prompt distribution request parameters.
+
+    Returns:
+        HTTP response containing prompt distribution data.
+    """
+    response: Union[PromptDistributionResponse, ErrorResponse]
+
+    try:
+        response = await service.get_prompt_distribution(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting prompt distribution: {e}")
+        response = ErrorResponse(message=f"Error getting prompt distribution: {str(e)}")
 
     return response.to_http_response()
 

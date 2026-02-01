@@ -1169,6 +1169,68 @@ class LatencyDistributionResponse(ResponseBase):
 
 
 # ============================================
+# Prompt Distribution Schemas
+# ============================================
+
+
+class PromptDistributionRequest(BaseModel):
+    """Request schema for prompt analytics distribution data.
+
+    Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+    and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+    """
+
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    filters: Optional[Dict[str, Any]] = None  # project_id, endpoint_id, prompt_id
+    bucket_by: Literal["concurrency", "input_tokens", "output_tokens"]
+    metric: Literal["total_duration_ms", "ttft_ms", "response_time_ms", "throughput_per_user"]
+    buckets: Optional[List[Dict[str, Union[float, str]]]] = None  # Auto-generate 10 buckets if None
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date and within reasonable range."""
+        validate_date_range(info.data.get("from_date"), v)
+        return v
+
+    @field_validator("buckets")
+    @classmethod
+    def validate_buckets(
+        cls, v: Optional[List[Dict[str, Union[float, str]]]]
+    ) -> Optional[List[Dict[str, Union[float, str]]]]:
+        """Validate bucket format."""
+        if v is None:
+            return v
+        for bucket in v:
+            if not isinstance(bucket, dict) or "min" not in bucket or "max" not in bucket or "label" not in bucket:
+                raise ValueError("Each bucket must have 'min', 'max', and 'label' fields")
+        return v
+
+
+class PromptDistributionBucket(BaseModel):
+    """Single prompt distribution bucket."""
+
+    range: str  # e.g., "0-5", "5-10"
+    bucket_start: float
+    bucket_end: float
+    count: int
+    avg_value: float  # Average of the metric
+
+
+class PromptDistributionResponse(ResponseBase):
+    """Response schema for prompt analytics distribution data."""
+
+    object: str = "prompt_distribution"
+    buckets: List[PromptDistributionBucket]
+    total_count: int
+    bucket_by: str
+    metric: str
+    date_range: Dict[str, datetime]
+    bucket_definitions: List[Dict[str, Union[float, str]]]
+
+
+# ============================================
 # OTel Traces Schemas
 # ============================================
 
