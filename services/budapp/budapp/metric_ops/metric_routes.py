@@ -60,6 +60,8 @@ from .schemas import (
     InferenceListResponse,
     LatencyDistributionRequest,
     LatencyDistributionResponse,
+    PromptDistributionRequest,
+    PromptDistributionResponse,
     TimeSeriesRequest,
     TimeSeriesResponse,
     TopRoutesResponse,
@@ -1191,6 +1193,54 @@ async def get_latency_distribution(
         logger.exception(f"Failed to get latency distribution: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get latency distribution"
+        ).to_http_response()
+
+
+@metric_router.post(
+    "/distribution",
+    response_model=PromptDistributionResponse,
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ErrorResponse,
+            "description": "Access denied to requested projects",
+        },
+        status.HTTP_200_OK: {
+            "model": PromptDistributionResponse,
+            "description": "Successfully retrieved prompt distribution data",
+        },
+    },
+    description="Get prompt distribution analysis with access control",
+)
+async def get_prompt_distribution(
+    request: PromptDistributionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PromptDistributionResponse:
+    """Get prompt distribution analysis with access control.
+
+    Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+    and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+    """
+    try:
+        response_data = await BudMetricService(session).proxy_prompt_distribution_metrics(
+            request.model_dump(mode="json"), current_user
+        )
+        return PromptDistributionResponse(**response_data)
+    except ClientException as e:
+        logger.exception(f"Failed to get prompt distribution: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get prompt distribution: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get prompt distribution"
         ).to_http_response()
 
 

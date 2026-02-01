@@ -29,6 +29,8 @@ from budmetrics.observability.schemas import (
     MetricsSyncResponse,
     ObservabilityMetricsRequest,
     ObservabilityMetricsResponse,
+    PromptDistributionRequest,
+    PromptDistributionResponse,
     TimeSeriesRequest,
     TimeSeriesResponse,
     TraceDetailResponse,
@@ -350,10 +352,15 @@ async def get_geographical_stats(
     from_date: datetime = Query(..., description="Start date for the analysis"),
     to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    data_source: str = Query(
+        "inference", description="Data source: inference (excludes prompt analytics) or prompt (only prompt analytics)"
+    ),
 ) -> Response:
     """Get geographical distribution statistics."""
     try:
-        response = await service.get_geographical_stats(from_date=from_date, to_date=to_date, project_id=project_id)
+        response = await service.get_geographical_stats(
+            from_date=from_date, to_date=to_date, project_id=project_id, data_source=data_source
+        )
         return response.to_http_response()
     except Exception as e:
         error_response = ErrorResponse(
@@ -369,10 +376,15 @@ async def get_blocking_stats(
     from_date: datetime = Query(..., description="Start date for the analysis"),
     to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    data_source: str = Query(
+        "inference", description="Data source: inference (excludes prompt analytics) or prompt (only prompt analytics)"
+    ),
 ) -> Response:
     """Get blocking rule statistics."""
     try:
-        response = await service.get_blocking_stats(from_date=from_date, to_date=to_date, project_id=project_id)
+        response = await service.get_blocking_stats(
+            from_date=from_date, to_date=to_date, project_id=project_id, data_source=data_source
+        )
         return response.to_http_response()
     except Exception as e:
         error_response = ErrorResponse(
@@ -389,10 +401,15 @@ async def get_top_routes(
     to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
     limit: int = Query(10, description="Number of top routes to return"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    data_source: str = Query(
+        "inference", description="Data source: inference (excludes prompt analytics) or prompt (only prompt analytics)"
+    ),
 ) -> Response:
     """Get top API routes by request count."""
     try:
-        routes = await service.get_top_routes(from_date=from_date, to_date=to_date, limit=limit, project_id=project_id)
+        routes = await service.get_top_routes(
+            from_date=from_date, to_date=to_date, limit=limit, project_id=project_id, data_source=data_source
+        )
         return ORJSONResponse(content={"routes": routes}, status_code=200)
     except Exception as e:
         error_response = ErrorResponse(
@@ -409,11 +426,14 @@ async def get_client_analytics(
     to_date: Optional[datetime] = Query(None, description="End date for the analysis"),
     group_by: str = Query("device_type", description="Group by: device_type, browser, os"),
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
+    data_source: str = Query(
+        "inference", description="Data source: inference (excludes prompt analytics) or prompt (only prompt analytics)"
+    ),
 ) -> Response:
     """Get client analytics (device, browser, OS distribution)."""
     try:
         response = await service.get_client_analytics(
-            from_date=from_date, to_date=to_date, group_by=group_by, project_id=project_id
+            from_date=from_date, to_date=to_date, group_by=group_by, project_id=project_id, data_source=data_source
         )
         return ORJSONResponse(content=response, status_code=200)
     except Exception as e:
@@ -516,6 +536,9 @@ async def get_geographic_distribution(
     project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
     api_key_project_id: Optional[UUID] = Query(None, description="Filter by API key's project ID (for CLIENT users)"),
     country_codes: Optional[str] = Query(None, description="Comma-separated country codes to filter by"),
+    data_source: str = Query(
+        "inference", description="Data source: inference (excludes prompt analytics) or prompt (only prompt analytics)"
+    ),
 ) -> Response:
     """Get geographic distribution data from gateway analytics.
 
@@ -552,7 +575,12 @@ async def get_geographic_distribution(
             filters["country_code"] = [code.strip() for code in country_codes.split(",")]
 
         request = GeographicDataRequest(
-            from_date=from_date, to_date=to_date, group_by=group_by, limit=limit, filters=filters if filters else None
+            from_date=from_date,
+            to_date=to_date,
+            group_by=group_by,
+            limit=limit,
+            filters=filters if filters else None,
+            data_source=data_source,
         )
 
         response = await service.get_geographic_data(request)
@@ -626,6 +654,39 @@ async def get_latency_distribution(request: LatencyDistributionRequest) -> Respo
     except Exception as e:
         logger.error(f"Error getting latency distribution: {e}")
         response = ErrorResponse(message=f"Error getting latency distribution: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/metrics/distribution", tags=["Aggregated Metrics"])
+async def get_prompt_distribution(request: PromptDistributionRequest) -> Response:
+    """Get prompt analytics distribution data.
+
+    This endpoint provides distribution analysis for prompt analytics data.
+    Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+    and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+
+    Charts supported:
+    - E2E Latency vs Concurrent Requests: bucket_by="concurrency", metric="total_duration_ms"
+    - TTFT vs Input Tokens: bucket_by="input_tokens", metric="ttft_ms"
+    - Throughput/User by Concurrency: bucket_by="concurrency", metric="throughput_per_user"
+
+    Args:
+        request (PromptDistributionRequest): The prompt distribution request parameters.
+
+    Returns:
+        HTTP response containing prompt distribution data.
+    """
+    response: Union[PromptDistributionResponse, ErrorResponse]
+
+    try:
+        response = await service.get_prompt_distribution(request)
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        response = ErrorResponse(message=f"Validation error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error getting prompt distribution: {e}")
+        response = ErrorResponse(message=f"Error getting prompt distribution: {str(e)}")
 
     return response.to_http_response()
 
