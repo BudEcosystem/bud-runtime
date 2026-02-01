@@ -695,6 +695,45 @@ class TestDataAccuracy:
             "Buckets are not in ascending order"
         print(f"\n[accuracy] {len(data['buckets'])} buckets in correct order")
 
+    def test_concurrency_bucket_sum_equals_total(self, sync_client, prompt_ground_truth):
+        """Verify bucket counts sum exactly to total_count for concurrency.
+
+        Regression test for duplicate bucket counting bug caused by floating-point
+        bucket boundaries producing duplicate labels when formatted with .0f.
+        """
+        payload = get_base_payload(
+            to_date=TEST_TO_DATE.isoformat(),
+            bucket_by="concurrency",
+        )
+        response = sync_client.post(ENDPOINT, json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        bucket_sum = sum(b["count"] for b in data["buckets"])
+        assert bucket_sum == data["total_count"], \
+            f"Bucket sum {bucket_sum} != total {data['total_count']}"
+        print(f"\n[accuracy] Concurrency bucket sum {bucket_sum} == total {data['total_count']}")
+
+    def test_ttft_bucket_sum_equals_total(self, sync_client, prompt_ground_truth):
+        """Verify bucket counts sum exactly to total_count for ttft_ms metric.
+
+        Regression test for NULL ttft_ms values being excluded from bucket counts
+        but included in total_count.
+        """
+        payload = get_base_payload(
+            to_date=TEST_TO_DATE.isoformat(),
+            bucket_by="concurrency",
+            metric="ttft_ms",
+        )
+        response = sync_client.post(ENDPOINT, json=payload)
+        assert response.status_code == 200
+        data = response.json()
+
+        bucket_sum = sum(b["count"] for b in data["buckets"])
+        assert bucket_sum == data["total_count"], \
+            f"TTFT bucket sum {bucket_sum} != total {data['total_count']}"
+        print(f"\n[accuracy] TTFT bucket sum {bucket_sum} == total {data['total_count']}")
+
 
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""

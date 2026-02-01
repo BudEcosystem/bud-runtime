@@ -3832,25 +3832,54 @@ class ObservabilityMetricsService:
             if min_val >= max_val:
                 max_val = min_val + 10.0
 
-            bucket_width = (max_val - min_val) / 10.0
-            buckets = []
-            for i in range(10):
-                bucket_start = min_val + i * bucket_width
-                bucket_end = min_val + (i + 1) * bucket_width
-                buckets.append(
-                    {
+            # Auto-generate buckets based on bucket_by type
+            if request.bucket_by == "concurrency":
+                # Use integer buckets for concurrency since it's always a whole number
+                min_int = int(min_val)
+                max_int = int(max_val)
+                unique_values = max_int - min_int + 1
+
+                if unique_values <= 10:
+                    # One bucket per integer value
+                    buckets = [
+                        {"min": i, "max": i, "label": str(i)}
+                        for i in range(min_int, max_int + 1)
+                    ]
+                else:
+                    # Group into ranges
+                    bucket_size = math.ceil(unique_values / 10)
+                    buckets = []
+                    for i in range(10):
+                        start = min_int + i * bucket_size
+                        end = min(start + bucket_size - 1, max_int)
+                        if start <= max_int:
+                            buckets.append({
+                                "min": start,
+                                "max": end,
+                                "label": f"{start}-{end}" if start != end else str(start),
+                            })
+            else:
+                # Token bucketing - use integer labels
+                bucket_width = (max_val - min_val) / 10.0
+                buckets = []
+                for i in range(10):
+                    bucket_start = min_val + i * bucket_width
+                    bucket_end = min_val + (i + 1) * bucket_width
+                    buckets.append({
                         "min": bucket_start,
                         "max": bucket_end,
-                        "label": f"{bucket_start:.0f}-{bucket_end:.0f}",
-                    }
-                )
+                        "label": f"{int(bucket_start)}-{int(bucket_end)}",
+                    })
 
         # Build bucket case expressions
         bucket_cases = []
         for bucket in buckets:
             bucket_min = bucket["min"]
             bucket_max = bucket["max"]
-            if bucket == buckets[-1]:
+            if bucket_min == bucket_max:
+                # Single value bucket (e.g., concurrency = 2)
+                condition = f"bucket_value = {bucket_min}"
+            elif bucket == buckets[-1]:
                 # Last bucket includes upper bound
                 condition = f"bucket_value >= {bucket_min}"
             else:
@@ -3879,9 +3908,8 @@ class ObservabilityMetricsService:
                 SELECT
                     {bucket_case_expr} as bucket_label,
                     count() as request_count,
-                    avg(metric_value) as avg_metric
+                    avgIf(metric_value, metric_value IS NOT NULL AND isFinite(metric_value)) as avg_metric
                 FROM with_bucket
-                WHERE metric_value IS NOT NULL AND isFinite(metric_value)
                 GROUP BY bucket_label
                 ORDER BY bucket_label
             """
@@ -3906,9 +3934,8 @@ class ObservabilityMetricsService:
                     SELECT
                         {bucket_case_expr} as bucket_label,
                         count() as request_count,
-                        avg(metric_value) as avg_metric
+                        avgIf(metric_value, metric_value IS NOT NULL AND isFinite(metric_value)) as avg_metric
                     FROM with_bucket
-                    WHERE metric_value IS NOT NULL AND isFinite(metric_value)
                     GROUP BY bucket_label
                     ORDER BY bucket_label
                 """
@@ -3924,9 +3951,8 @@ class ObservabilityMetricsService:
                     SELECT
                         {bucket_case_expr} as bucket_label,
                         count() as request_count,
-                        avg(metric_value) as avg_metric
+                        avgIf(metric_value, metric_value IS NOT NULL AND isFinite(metric_value)) as avg_metric
                     FROM with_bucket
-                    WHERE metric_value IS NOT NULL
                     GROUP BY bucket_label
                     ORDER BY bucket_label
                 """
