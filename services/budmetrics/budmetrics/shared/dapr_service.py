@@ -56,17 +56,14 @@ class DaprServiceClient:
 
             logger.info("Requesting users with active billing from budapp service")
 
-            # Create a system/internal user token for service-to-service calls
-            # For now, we'll call without authentication and rely on internal service security
+            # Note: This call is currently unauthenticated. The 'budapp' endpoint relies on
+            # an admin user check for authorization. Proper service-to-service authentication
+            # (e.g., using OAuth2 client credentials with Dapr) should be implemented for production.
             response = await self._client.invoke_method(
                 app_id="budapp",
                 method_name="billing/users-with-billing",
                 http_verb="GET",
-                headers={
-                    "Content-Type": "application/json",
-                    # Note: In production, we should add proper service-to-service authentication
-                    # For now, budapp endpoint checks for admin user type
-                },
+                content_type="application/json",
             )
 
             if response.status_code != 200:
