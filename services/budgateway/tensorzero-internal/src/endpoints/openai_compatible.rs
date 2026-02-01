@@ -305,6 +305,10 @@ pub async fn inference_handler(
     // Capture request arrival time for observability (outside async block for error handler access)
     let request_arrival_time = chrono::Utc::now();
 
+    // Generate inference_id early so error path can use the same ID as success path.
+    // This ensures MV JOIN works correctly: gateway_analytics.inference_id = model_inference_details.inference_id
+    let request_inference_id = uuid::Uuid::now_v7();
+
     // Extract observability metadata from headers early for error handler access
     let obs_metadata_for_error = extract_observability_metadata_from_headers(&headers);
 
@@ -1303,13 +1307,13 @@ pub async fn inference_handler(
     }
     .await;
 
-    // Record error on span if request failed
-    if let Err(ref error) = result {
-        super::observability::record_error(error);
+    // Record error on span if request failed and convert to response with inference_id header
+    if let Err(error) = result {
+        super::observability::record_error(&error);
 
-        // Record ModelInferenceDetails for error case
+        // Record ModelInferenceDetails for error case using the pre-generated inference_id
+        // This ensures MV JOIN works: gateway_analytics.inference_id = model_inference_details.inference_id
         if let Some(ref obs_metadata) = obs_metadata_for_error {
-            let error_inference_id = uuid::Uuid::now_v7();
             let request_forward_time = chrono::Utc::now();
             let error_details = super::observability::ModelInferenceDetailsError {
                 error_code: error.get_details().as_ref(),
@@ -1318,7 +1322,7 @@ pub async fn inference_handler(
                 status_code: error.status_code().as_u16(),
             };
             super::observability::record_model_inference_details(
-                &error_inference_id,
+                &request_inference_id, // Use the same inference_id generated at request start
                 &obs_metadata.project_id,
                 &obs_metadata.endpoint_id,
                 &obs_metadata.model_id,
@@ -1332,6 +1336,14 @@ pub async fn inference_handler(
                 Some(error_details),
             );
         }
+
+        // Convert error to response and add inference_id header so analytics middleware can capture it
+        let mut response = error.into_response();
+        response.headers_mut().insert(
+            "x-tensorzero-inference-id",
+            request_inference_id.to_string().parse().unwrap(),
+        );
+        return Ok(response);
     }
 
     result
