@@ -2939,11 +2939,7 @@ class ClickHouseMigration:
 
             -- ===== MODEL INFO =====
             CAST(NULL AS Nullable(UUID)) AS model_inference_id,
-            coalesce(
-                nullIf(r.SpanAttributes['gen_ai.response.model'], ''),
-                nullIf(r.SpanAttributes['gen_ai.request.model'], ''),
-                ''
-            ) AS model_name,
+            '' AS model_name,
             'budprompt' AS model_provider,  -- Always budprompt for /v1/responses
             'response' AS endpoint_type,  -- Differentiate from 'chat'
 
