@@ -47,6 +47,9 @@ class CredentialUsageRequest(BaseModel):
     credential_ids: Optional[List[UUID]] = None
     """Optional list of specific credential IDs to query. If None, returns all."""
 
+    data_source: Literal["inference", "prompt"] = "inference"
+    """Filter by data source: 'inference' excludes prompt analytics (default), 'prompt' returns only prompt analytics."""
+
 
 class CredentialUsageItem(BaseModel):
     """Individual credential usage information."""
@@ -95,6 +98,9 @@ class MetricsSyncRequest(BaseModel):
 
     user_ids: Optional[List[UUID]] = None
     """For full mode: specific user IDs to sync. If None, syncs all users."""
+
+    data_source: Literal["inference", "prompt"] = "inference"
+    """Filter by data source: 'inference' excludes prompt analytics (default), 'prompt' returns only prompt analytics."""
 
 
 class UserUsageItem(BaseModel):
@@ -206,6 +212,8 @@ class ObservabilityMetricsRequest(BaseModel):
     return_delta: bool = True
     fill_time_gaps: bool = True
     topk: Optional[int] = None
+    data_source: Literal["inference", "prompt"] = "inference"
+    """Filter by data source: 'inference' excludes prompt analytics (default), 'prompt' returns only prompt analytics."""
 
     @field_validator("frequency_interval")
     @classmethod

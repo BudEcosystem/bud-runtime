@@ -538,6 +538,9 @@ class ObservabilityMetricsService:
         # Check if rollup tables can handle this request (better performance)
         use_rollup = self.query_builder.can_use_rollup(request.metrics)
 
+        # Get data_source from request, defaulting to "inference"
+        data_source = getattr(request, "data_source", "inference")
+
         if use_rollup:
             # Use rollup tables for pre-aggregated data (faster for large time ranges)
             logger.debug(f"Using rollup tables for metrics: {request.metrics}")
@@ -552,6 +555,7 @@ class ObservabilityMetricsService:
                 return_delta=request.return_delta,
                 fill_time_gaps=request.fill_time_gaps,
                 topk=request.topk,
+                data_source=data_source,
             )
         else:
             # Fall back to raw data queries (needed for percentiles, queuing_time, etc.)
@@ -567,6 +571,7 @@ class ObservabilityMetricsService:
                 return_delta=request.return_delta,
                 fill_time_gaps=request.fill_time_gaps,
                 topk=request.topk,
+                data_source=data_source,
             )
 
         # Execute query
@@ -4040,8 +4045,17 @@ class ObservabilityMetricsService:
         self._ensure_initialized()
 
         try:
+            # Get data_source from request, defaulting to "inference"
+            data_source = getattr(request, "data_source", "inference")
+
+            # Build prompt_id filter based on data_source
+            if data_source == "prompt":
+                prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+            else:  # inference (default)
+                prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
             # Build the query to get last usage per credential
-            query = """
+            query = f"""
             SELECT
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
@@ -4049,6 +4063,7 @@ class ObservabilityMetricsService:
             FROM InferenceFact
             WHERE request_arrival_time >= %(since)s
                 AND api_key_id IS NOT NULL
+                {prompt_filter}
             """
 
             params = {"since": request.since}
@@ -4133,18 +4148,21 @@ class ObservabilityMetricsService:
         user_usage = []
         stats = {"active_credentials": 0, "active_users": 0, "total_users_checked": 0}
 
+        # Get data_source from request, defaulting to "inference"
+        data_source = getattr(request, "data_source", "inference")
+
         try:
             # 1. Get credential usage data if requested
             if request.credential_sync:
                 credential_usage = await self._get_sync_credential_data(
-                    request.sync_mode, request.activity_threshold_minutes
+                    request.sync_mode, request.activity_threshold_minutes, data_source
                 )
                 stats["active_credentials"] = len(credential_usage)
 
             # 2. Get user usage data if requested
             if request.user_usage_sync:
                 user_usage = await self._get_sync_user_data(
-                    request.sync_mode, request.activity_threshold_minutes, request.user_ids
+                    request.sync_mode, request.activity_threshold_minutes, request.user_ids, data_source
                 )
                 stats["active_users"] = len(user_usage)
                 # For stats, estimate total users checked based on mode
@@ -4179,17 +4197,26 @@ class ObservabilityMetricsService:
                 stats={"active_credentials": 0, "active_users": 0, "total_users_checked": 0},
             )
 
-    async def _get_sync_credential_data(self, sync_mode: str, threshold_minutes: int) -> list[CredentialUsageItem]:
+    async def _get_sync_credential_data(
+        self, sync_mode: str, threshold_minutes: int, data_source: str = "inference"
+    ) -> list[CredentialUsageItem]:
         """Get credential usage data for sync based on mode."""
         try:
+            # Build prompt_id filter based on data_source
+            if data_source == "prompt":
+                prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+            else:  # inference (default)
+                prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
             # Base query for credential usage from InferenceFact
-            query = """
+            query = f"""
             SELECT
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
                 COUNT(*) as request_count
             FROM InferenceFact
             WHERE api_key_id IS NOT NULL
+                {prompt_filter}
             """
 
             params = {}
@@ -4231,15 +4258,22 @@ class ObservabilityMetricsService:
             return []
 
     async def _get_sync_user_data(
-        self, sync_mode: str, threshold_minutes: int, user_ids: Optional[list[UUID]] = None
+        self, sync_mode: str, threshold_minutes: int, user_ids: Optional[list[UUID]] = None, data_source: str = "inference"
     ) -> list[UserUsageItem]:
         """Get user usage data for sync based on mode."""
         try:
             from datetime import datetime, timezone
 
             logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
+
+            # Build prompt_id filter based on data_source
+            if data_source == "prompt":
+                prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+            else:  # inference (default)
+                prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
             # Base query for user usage from InferenceFact (denormalized, no JOIN needed)
-            query = """
+            query = f"""
             SELECT
                 user_id,
                 MAX(request_arrival_time) as last_activity_at,
@@ -4249,6 +4283,7 @@ class ObservabilityMetricsService:
                 AVG(CASE WHEN is_success THEN 1 ELSE 0 END) as success_rate
             FROM InferenceFact
             WHERE user_id IS NOT NULL
+                {prompt_filter}
             """
 
             params = {}
