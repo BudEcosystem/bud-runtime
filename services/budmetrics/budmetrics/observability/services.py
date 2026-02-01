@@ -2618,8 +2618,9 @@ class ObservabilityMetricsService:
         """
         to_date = request.to_date or datetime.now()
 
-        # Metrics that require raw data for percentile calculations
-        raw_data_metrics = {"p95_latency", "p99_latency"}
+        # Metrics that require raw data for percentile calculations or exact aggregations
+        # unique_users needs uniqExact which requires raw data (can't be pre-aggregated in rollups)
+        raw_data_metrics = {"p95_latency", "p99_latency", "unique_users"}
         needs_raw_data = any(m in raw_data_metrics for m in request.metrics)
 
         if needs_raw_data:
@@ -2680,6 +2681,10 @@ class ObservabilityMetricsService:
                 )
             elif metric == "error_rate":
                 select_fields.append("SUM(error_count) * 100.0 / NULLIF(SUM(request_count), 0) as error_rate")
+            elif metric == "success_count":
+                select_fields.append("SUM(success_count) as success_count")
+            elif metric == "error_count":
+                select_fields.append("SUM(error_count) as error_count")
 
         # Build WHERE clause
         where_conditions = ["time_bucket >= %(from_date)s", "time_bucket <= %(to_date)s"]
@@ -2716,6 +2721,9 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+                elif filter_key == "prompt_id":
+                    where_conditions.append("prompt_id = %(prompt_id)s")
+                    params["prompt_id"] = filter_value
 
         # Add data_source filter for prompt analytics
         if hasattr(request, "data_source"):
@@ -2802,6 +2810,12 @@ class ObservabilityMetricsService:
                 )
             elif metric == "error_rate":
                 select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+            elif metric == "unique_users":
+                select_fields.append("uniqExact(ifact.user_id) as unique_users")
+            elif metric == "success_count":
+                select_fields.append("countIf(ifact.is_success = true) as success_count")
+            elif metric == "error_count":
+                select_fields.append("countIf(ifact.is_success = false OR ifact.is_success IS NULL) as error_count")
 
         # Build WHERE clause
         where_conditions = [
@@ -2841,6 +2855,9 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+                elif filter_key == "prompt_id":
+                    where_conditions.append("ifact.prompt_id = %(prompt_id)s")
+                    params["prompt_id"] = filter_value
 
         # Add data_source filter for prompt analytics
         if hasattr(request, "data_source"):
@@ -4258,7 +4275,11 @@ class ObservabilityMetricsService:
             return []
 
     async def _get_sync_user_data(
-        self, sync_mode: str, threshold_minutes: int, user_ids: Optional[list[UUID]] = None, data_source: str = "inference"
+        self,
+        sync_mode: str,
+        threshold_minutes: int,
+        user_ids: Optional[list[UUID]] = None,
+        data_source: str = "inference",
     ) -> list[UserUsageItem]:
         """Get user usage data for sync based on mode."""
         try:

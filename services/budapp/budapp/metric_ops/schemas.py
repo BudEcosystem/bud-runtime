@@ -662,6 +662,9 @@ class TimeSeriesRequest(BaseModel):
             "cache_hit_rate",
             "throughput",
             "error_rate",
+            "unique_users",
+            "success_count",
+            "error_count",
         ]
     ] = Field(..., description="Metrics to include in time series")
     filters: Optional[Dict[str, Any]] = Field(None, description="Filters to apply")
@@ -669,6 +672,10 @@ class TimeSeriesRequest(BaseModel):
         None, description="Dimensions to group by"
     )
     fill_gaps: bool = Field(default=True, description="Fill gaps in time series data")
+    data_source: Literal["inference", "prompt"] = Field(
+        default="inference",
+        description="Filter by data source: 'inference' excludes prompt analytics (default), 'prompt' returns only prompt analytics",
+    )
 
     @field_validator("to_date")
     @classmethod

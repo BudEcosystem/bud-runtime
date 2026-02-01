@@ -991,6 +991,9 @@ class TimeSeriesRequest(BaseModel):
             "cache_hit_rate",
             "throughput",
             "error_rate",
+            "unique_users",
+            "success_count",
+            "error_count",
         ]
     ]
     filters: Optional[Dict[str, Any]] = None
