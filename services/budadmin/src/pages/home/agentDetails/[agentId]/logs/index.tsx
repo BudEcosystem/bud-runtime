@@ -80,6 +80,113 @@ interface LogsTabProps {
   projectId?: string;
 }
 
+// Chart configuration for real-time scrolling
+const CHART_CONFIG = {
+  bucketCount: 30, // Number of bars in the chart
+  updateInterval: 500, // Chart update interval in ms (faster for smoother scrolling)
+};
+
+// Get time window in ms from time range string
+const getTimeWindowMs = (range: string): number => {
+  switch (range) {
+    case "5m": return 5 * 60 * 1000;
+    case "15m": return 15 * 60 * 1000;
+    case "30m": return 30 * 60 * 1000;
+    case "1h": return 60 * 60 * 1000;
+    case "24h": return 24 * 60 * 60 * 1000;
+    case "7d": return 7 * 24 * 60 * 60 * 1000;
+    case "30d": return 30 * 24 * 60 * 60 * 1000;
+    default: return 5 * 60 * 1000;
+  }
+};
+
+// Generate time buckets based on current time (for scrolling effect)
+interface TimeBucket {
+  start: number;
+  end: number;
+  label: string;
+}
+
+const generateTimeBuckets = (timeWindowMs: number, bucketCount: number): TimeBucket[] => {
+  const now = Date.now();
+  const bucketSize = timeWindowMs / bucketCount;
+  const buckets: TimeBucket[] = [];
+
+  for (let i = 0; i < bucketCount; i++) {
+    const start = now - timeWindowMs + (i * bucketSize);
+    const end = start + bucketSize;
+    const date = new Date(end);
+
+    // Format label based on time window
+    let label: string;
+    if (timeWindowMs <= 60000) {
+      // <= 1 minute: show seconds
+      label = date.toLocaleTimeString('en-US', {
+        hour12: false,
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } else if (timeWindowMs <= 3600000) {
+      // <= 1 hour: show minutes:seconds
+      label = date.toLocaleTimeString('en-US', {
+        hour12: false,
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } else if (timeWindowMs <= 86400000) {
+      // <= 24 hours: show hours:minutes
+      label = date.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } else {
+      // > 24 hours: show date + time
+      label = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      }) + ' ' + date.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    buckets.push({ start, end, label });
+  }
+
+  return buckets;
+};
+
+// Aggregate traces into time buckets for chart
+interface ChartBucketData {
+  label: string;
+  successCount: number;
+  errorCount: number;
+  total: number;
+}
+
+const aggregateTracesIntoBuckets = (
+  traces: { timestamp: number; status?: string }[],
+  buckets: TimeBucket[]
+): ChartBucketData[] => {
+  return buckets.map(bucket => {
+    const filtered = traces.filter(
+      t => t.timestamp >= bucket.start && t.timestamp < bucket.end
+    );
+
+    const errorCount = filtered.filter(t => t.status === 'error' || t.status === 'ERROR').length;
+    const successCount = filtered.length - errorCount;
+
+    return {
+      label: bucket.label,
+      successCount,
+      errorCount,
+      total: filtered.length,
+    };
+  });
+};
+
 // Duration bar component
 const DurationBar = ({
   duration,
@@ -770,21 +877,24 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
 
 const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) => {
   const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const [timeRange, setTimeRange] = useState("5m");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [logsData, setLogsData] = useState<LogEntry[]>([]);
-  const [chartData, setChartData] = useState<{ times: string[]; values: number[] }>({
-    times: [],
-    values: [],
-  });
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [isLive, setIsLive] = useState(false);
+
+  // Live chart data - stores traces with timestamps for aggregation
+  const liveChartTracesRef = useRef<{ timestamp: number; status?: string }[]>([]);
+  const chartUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
 
   // Live streaming state
   const liveSpanIdsRef = useRef<Set<string>>(new Set());
   const MAX_LIVE_ITEMS = 200;
+  const MAX_CHART_TRACES = 10000; // Max traces to keep for chart aggregation
 
   // View mode and pagination state
   const [viewMode, setViewMode] = useState<'traces' | 'flatten'>('traces');
@@ -805,6 +915,25 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       console.warn('[LiveTrace] Invalid trace data - missing span_id:', trace);
       return;
     }
+
+    // Add to chart traces using arrival time, not trace timestamp
+    // This ensures live traces appear in the current time window
+    // Subtract a small amount to ensure it falls within the bucket boundary
+    const now = Date.now();
+    const arrivalTime = now - 1; // 1ms before now to ensure it's within bucket
+    const timeWindowMs = getTimeWindowMs(timeRange);
+    const cutoffTime = now - timeWindowMs * 2;
+
+    // Use arrival time for chart (when trace arrived), not original timestamp
+    liveChartTracesRef.current.push({
+      timestamp: arrivalTime,
+      status: trace.status_code || 'ok',
+    });
+    liveChartTracesRef.current = liveChartTracesRef.current
+      .filter(t => t.timestamp > cutoffTime)
+      .slice(-MAX_CHART_TRACES);
+
+    console.log('[LiveTrace] Chart traces count:', liveChartTracesRef.current.length);
 
     // In traces view, only show root spans (those with empty parent_span_id)
     if (viewMode === 'traces' && trace.parent_span_id && trace.parent_span_id !== '') {
@@ -839,13 +968,34 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
     console.log('[LiveTrace] Created LogEntry:', newEntry);
     setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
-  }, [viewMode]);
+  }, [viewMode, timeRange]);
 
   // Handle batch of live traces (for tree building in traces view)
   const handleLiveTraceBatch = useCallback((traces: TraceSpan[]) => {
     console.log('[LiveTrace] Received batch:', traces.length, 'spans');
 
     if (!traces || traces.length === 0) return;
+
+    // Add all traces to chart data using arrival time
+    const now = Date.now();
+    const arrivalTime = now - 1; // 1ms before now to ensure it's within bucket
+    const timeWindowMs = getTimeWindowMs(timeRange);
+    const cutoffTime = now - timeWindowMs * 2;
+
+    // Use arrival time for all traces in batch (when they arrived)
+    traces.forEach(trace => {
+      liveChartTracesRef.current.push({
+        timestamp: arrivalTime,
+        status: trace.status_code || 'ok',
+      });
+    });
+
+    // Clean up old traces
+    liveChartTracesRef.current = liveChartTracesRef.current
+      .filter(t => t.timestamp > cutoffTime)
+      .slice(-MAX_CHART_TRACES);
+
+    console.log('[LiveTrace] Batch - chart traces count:', liveChartTracesRef.current.length);
 
     if (viewMode === 'traces') {
       // In traces view, build proper tree structure from batch
@@ -894,7 +1044,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
       });
     }
-  }, [viewMode]);
+  }, [viewMode, timeRange]);
 
   // Socket hook for live streaming
   // Note: promptId (UUID) is used for socket subscription, promptName is used for API calls
@@ -982,36 +1132,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
         // Update pagination state
         setHasMore(currentPage * ITEMS_PER_PAGE < total);
-
-        // Build chart data - group by time buckets (only on initial load)
-        if (!loadMore) {
-          const bucketCount = 6;
-          const bucketSize = (latestTimestamp - earliestTimestamp) / bucketCount || 60000;
-          const buckets: { time: string; count: number }[] = [];
-
-          for (let i = 0; i < bucketCount; i++) {
-            const bucketStart = earliestTimestamp + i * bucketSize;
-            const bucketEnd = bucketStart + bucketSize;
-            const count = spans.filter((s: TraceSpan) => {
-              const ts = new Date(s.timestamp).getTime();
-              return ts >= bucketStart && ts < bucketEnd;
-            }).length;
-
-            buckets.push({
-              time: formatTime(new Date(bucketStart).toISOString()),
-              count,
-            });
-          }
-
-          setChartData({
-            times: buckets.map((b) => b.time),
-            values: buckets.map((b) => b.count),
-          });
-        }
       } else {
         if (!loadMore) {
           setLogsData([]);
-          setChartData({ times: [], values: [] });
         }
         setHasMore(false);
       }
@@ -1019,7 +1142,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       console.error("Error fetching traces:", error);
       if (!loadMore) {
         setLogsData([]);
-        setChartData({ times: [], values: [] });
       }
     } finally {
       setIsLoading(false);
@@ -1280,6 +1402,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       // If showing socket data, clear current data and allow new data to appear
       setLogsData([]);
       liveSpanIdsRef.current.clear();
+      liveChartTracesRef.current = [];
     } else {
       // If showing regular traces, reset time filter to default and refetch
       const defaultTimeRange = "5m";
@@ -1300,12 +1423,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         // Enabling live mode: clear existing traces data and deduplication set
         setLogsData([]);
         liveSpanIdsRef.current.clear();
+        liveChartTracesRef.current = [];
         setExpandedIds(new Set());
         setIsAllExpanded(false);
       } else {
         // Disabling live mode: clear live data and fetch regular traces
         setLogsData([]);
         liveSpanIdsRef.current.clear();
+        liveChartTracesRef.current = [];
         setExpandedIds(new Set());
         setIsAllExpanded(false);
         // Fetch regular traces after state update
@@ -1322,17 +1447,119 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       setIsLive(false);
       setLogsData([]);
       liveSpanIdsRef.current.clear();
+      liveChartTracesRef.current = [];
     }
     setTimeRange(newRange);
   };
 
-  // Initialize and update echarts
+  // Update chart - always regenerate buckets based on current time for scrolling effect
+  const updateChartData = useCallback(() => {
+    if (!chartInstanceRef.current) {
+      console.log('[Chart] No chart instance');
+      return;
+    }
+
+    const timeWindowMs = getTimeWindowMs(timeRange);
+    const bucketSize = timeWindowMs / CHART_CONFIG.bucketCount;
+    const now = Date.now();
+    const windowStart = now - timeWindowMs;
+
+    // Get traces to aggregate based on mode
+    let tracesToAggregate: { timestamp: number; status?: string }[];
+    if (isLive) {
+      tracesToAggregate = liveChartTracesRef.current;
+    } else {
+      tracesToAggregate = logsData.map(log => ({
+        timestamp: log.rawData?.timestamp ? new Date(log.rawData.timestamp).getTime() : Date.now(),
+        status: log.rawData?.status_code || 'ok',
+      }));
+    }
+
+    // Debug logging
+    console.log('[Chart Update] isLive:', isLive,
+      '| traces:', tracesToAggregate.length,
+      '| window:', new Date(windowStart).toLocaleTimeString(), '-', new Date(now).toLocaleTimeString());
+
+    // If we have traces, check how many are in window
+    if (tracesToAggregate.length > 0) {
+      const inWindow = tracesToAggregate.filter(t => t.timestamp >= windowStart && t.timestamp <= now);
+      console.log('[Chart Update] Traces in window:', inWindow.length, '/', tracesToAggregate.length);
+
+      // Log first trace details if any
+      if (tracesToAggregate.length > 0) {
+        const firstTrace = tracesToAggregate[0];
+        console.log('[Chart Update] First trace - timestamp:', firstTrace.timestamp,
+          '| as date:', new Date(firstTrace.timestamp).toLocaleTimeString(),
+          '| diff from now:', Math.round((now - firstTrace.timestamp) / 1000), 'seconds');
+      }
+    }
+
+    // Generate buckets based on CURRENT time (this creates the scrolling effect)
+    const labels: string[] = [];
+    const successData: number[] = [];
+    const errorData: number[] = [];
+    let totalInBuckets = 0;
+
+    for (let i = 0; i < CHART_CONFIG.bucketCount; i++) {
+      const bucketStart = now - timeWindowMs + (i * bucketSize);
+      const bucketEnd = bucketStart + bucketSize;
+
+      // Format label based on time window
+      const date = new Date(bucketEnd);
+      let label: string;
+      if (timeWindowMs <= 3600000) {
+        // <= 1 hour: show MM:SS
+        label = date.toLocaleTimeString('en-US', { hour12: false, minute: '2-digit', second: '2-digit' });
+      } else if (timeWindowMs <= 86400000) {
+        // <= 24 hours: show HH:MM
+        label = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+      } else {
+        // > 24 hours: show date
+        label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      labels.push(label);
+
+      // Count traces in this bucket
+      const inBucket = tracesToAggregate.filter(t => t.timestamp >= bucketStart && t.timestamp < bucketEnd);
+      const errorCount = inBucket.filter(t => t.status === 'error' || t.status === 'ERROR').length;
+      const successCount = inBucket.length - errorCount;
+      successData.push(successCount);
+      errorData.push(errorCount);
+      totalInBuckets += inBucket.length;
+    }
+
+    // Log total traces that ended up in buckets
+    if (tracesToAggregate.length > 0) {
+      console.log('[Chart Update] Total in buckets:', totalInBuckets,
+        '| successData:', successData.filter(x => x > 0).length, 'non-zero buckets');
+    }
+
+    // Calculate which labels to show (every Nth label for readability)
+    const labelInterval = Math.ceil(CHART_CONFIG.bucketCount / 8);
+
+    // Update chart with smooth animation
+    chartInstanceRef.current.setOption({
+      xAxis: {
+        data: labels,
+        axisLabel: {
+          interval: (index: number) => index % labelInterval === 0,
+        },
+      },
+      series: [
+        { data: successData },
+        { data: errorData },
+      ],
+    });
+  }, [timeRange, isLive, logsData]);
+
+  // Initialize echarts with stacked bar configuration
   useEffect(() => {
     if (!chartRef.current) return;
 
     const myChart = echarts.init(chartRef.current, null, {
       renderer: "canvas",
     });
+    chartInstanceRef.current = myChart;
 
     const option = {
       backgroundColor: "transparent",
@@ -1340,20 +1567,60 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         left: "3%",
         right: "3%",
         bottom: "15%",
-        top: "20%",
+        top: "15%",
         containLabel: true,
+      },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(0,0,0,0.9)",
+        borderColor: "#3f3f46",
+        borderWidth: 1,
+        textStyle: { color: "#fafafa", fontSize: 12 },
+        formatter: function(params: any) {
+          const success = params[0]?.value || 0;
+          const error = params[1]?.value || 0;
+          const total = success + error;
+          const time = params[0]?.axisValue || '';
+
+          return `
+            <div style="padding: 4px 0; min-width: 100px;">
+              <div style="font-weight: 600; margin-bottom: 6px; font-family: monospace; color: #a1a1aa;">${time}</div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="display: flex; align-items: center; gap: 6px;">
+                  <span style="display: inline-block; width: 8px; height: 8px; background: #965CDE; border-radius: 2px;"></span>
+                  Success
+                </span>
+                <span style="font-weight: 500; margin-left: 12px;">${success}</span>
+              </div>
+              ${error > 0 ? `
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="display: flex; align-items: center; gap: 6px;">
+                  <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 2px;"></span>
+                  Errors
+                </span>
+                <span style="font-weight: 500; margin-left: 12px;">${error}</span>
+              </div>
+              ` : ''}
+              <div style="color: #71717a; font-size: 11px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #27272a;">
+                Total: ${total} traces
+              </div>
+            </div>
+          `;
+        },
       },
       xAxis: {
         type: "category",
-        data: chartData.times,
-        axisLine: {
-          lineStyle: { color: "#333" },
-        },
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
         axisTick: { show: false },
         axisLabel: {
-          color: "#6A6E76",
-          fontSize: 11,
+          color: "#71717a",
+          fontSize: 10,
+          interval: 0,
         },
+        // Smooth animation for x-axis scrolling
+        animation: true,
       },
       yAxis: {
         type: "value",
@@ -1361,31 +1628,54 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         axisLine: { show: false },
         axisTick: { show: false },
         splitLine: {
-          lineStyle: { color: "#1F1F1F" },
+          lineStyle: { color: "#27272a", type: "dashed" },
         },
         axisLabel: {
-          color: "#6A6E76",
-          fontSize: 11,
-          formatter: (value: number) => value.toFixed(1),
+          color: "#71717a",
+          fontSize: 10,
         },
-      },
-      tooltip: {
-        trigger: "axis",
-        backgroundColor: "rgba(0,0,0,0.85)",
-        borderColor: "#1F1F1F",
-        textStyle: { color: "#EEEEEE", fontSize: 12 },
+        minInterval: 1,
       },
       series: [
         {
+          name: "Success",
           type: "bar",
-          data: chartData.values,
-          barWidth: "60%",
+          stack: "total",
+          data: [],
           itemStyle: {
             color: "#965CDE",
-            borderRadius: [4, 4, 0, 0],
+            borderRadius: [0, 0, 0, 0],
           },
+          emphasis: {
+            itemStyle: { color: "#a78bfa" },
+          },
+          barWidth: "70%",
+          animationDuration: 300,
+          animationEasing: "linear" as const,
+        },
+        {
+          name: "Error",
+          type: "bar",
+          stack: "total",
+          data: [],
+          itemStyle: {
+            color: "#ef4444",
+            borderRadius: [2, 2, 0, 0],
+          },
+          emphasis: {
+            itemStyle: { color: "#f87171" },
+          },
+          barWidth: "70%",
+          animationDuration: 300,
+          animationEasing: "linear" as const,
         },
       ],
+      // Global animation settings for smooth scrolling effect
+      animation: true,
+      animationDuration: 300,
+      animationDurationUpdate: 300,
+      animationEasing: "linear" as const,
+      animationEasingUpdate: "linear" as const,
     };
 
     myChart.setOption(option);
@@ -1396,8 +1686,34 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     return () => {
       window.removeEventListener("resize", handleResize);
       myChart.dispose();
+      chartInstanceRef.current = null;
     };
-  }, [chartData]);
+  }, []);
+
+  // Set up chart update interval for real-time scrolling
+  useEffect(() => {
+    // Clear existing interval
+    if (chartUpdateIntervalRef.current) {
+      clearInterval(chartUpdateIntervalRef.current);
+    }
+
+    // Always update chart immediately when dependencies change
+    updateChartData();
+
+    // In live mode, set up interval for continuous time scrolling
+    if (isLive) {
+      chartUpdateIntervalRef.current = setInterval(() => {
+        updateChartData();
+      }, CHART_CONFIG.updateInterval);
+    }
+
+    return () => {
+      if (chartUpdateIntervalRef.current) {
+        clearInterval(chartUpdateIntervalRef.current);
+        chartUpdateIntervalRef.current = null;
+      }
+    };
+  }, [isLive, timeRange, updateChartData]);
 
   const timeRangeOptions = [
     { label: "Last 5 minutes", value: "5m" },
@@ -1418,16 +1734,16 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   return (
     <div className="px-[3.5rem] pb-8">
       {/* Header */}
-      <div className="mb-6">
+      {/* <div className="mb-6">
         <Text_26_600_FFFFFF className="block mb-2">Logs</Text_26_600_FFFFFF>
         <Text_12_400_B3B3B3 className="max-w-[850px]">
           View OpenTelemetry traces and spans for this prompt. Monitor request
           flow, performance metrics, and debug issues across your AI pipeline.
         </Text_12_400_B3B3B3>
-      </div>
+      </div> */}
 
       {/* Chart Section */}
-      <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-4 mb-4">
+      <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-4 mb-4 mt-4">
         {/* Chart Controls */}
         <div className="flex justify-end items-center gap-2 mb-2">
           <CustomSelect
@@ -1478,6 +1794,27 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
         {/* Chart */}
         <div ref={chartRef} className="w-full h-[180px]" />
+
+        {/* Chart Legend */}
+        <div className="flex items-center gap-6 pt-3 border-t border-[#1F1F1F] mt-3">
+          <div className="flex items-center gap-2 text-xs text-[#B3B3B3]">
+            <span className="w-2.5 h-2.5 rounded-sm bg-[#965CDE]" />
+            Success
+          </div>
+          <div className="flex items-center gap-2 text-xs text-[#B3B3B3]">
+            <span className="w-2.5 h-2.5 rounded-sm bg-[#ef4444]" />
+            Error
+          </div>
+          {isLive && (
+            <div className="flex items-center gap-2 text-xs text-[#71717a] ml-auto">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              Real-time updates
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Logs List Section */}
