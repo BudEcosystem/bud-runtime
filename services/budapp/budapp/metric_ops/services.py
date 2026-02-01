@@ -1345,6 +1345,46 @@ class BudMetricService(SessionMixin):
         except Exception as e:
             logger.warning(f"Failed to enrich latency distribution response: {e}")
 
+    async def proxy_prompt_distribution_metrics(
+        self, request_body: Dict[str, Any], current_user: User
+    ) -> Dict[str, Any]:
+        """Proxy prompt distribution metrics request to budmetrics with access control."""
+        # Apply user's project access restrictions
+        try:
+            await self._apply_user_project_filter(request_body, current_user)
+        except Exception as e:
+            logger.warning(f"Failed to apply project filter, proceeding without: {e}")
+
+        # Proxy to budmetrics
+        metrics_endpoint = f"{app_settings.dapr_base_url}/v1.0/invoke/{app_settings.bud_metrics_app_id}/method/observability/metrics/distribution"
+
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(metrics_endpoint, json=request_body) as response,
+            ):
+                response_data = await response.json()
+
+                if response.status == status.HTTP_200_OK:
+                    if "message" not in response_data:
+                        response_data["message"] = "Successfully retrieved prompt distribution"
+                    return response_data
+                else:
+                    logger.error(f"Prompt distribution request failed: {response.status}")
+                    raise ClientException(
+                        "Failed to get prompt distribution metrics",
+                        status_code=response.status,
+                    )
+
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.exception(f"Failed to proxy prompt distribution metrics: {e}")
+            raise ClientException(
+                "Failed to get prompt distribution metrics",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ) from e
+
 
 class MetricService(SessionMixin):
     """Metric service."""

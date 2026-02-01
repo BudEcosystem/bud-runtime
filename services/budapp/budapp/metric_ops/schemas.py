@@ -983,3 +983,69 @@ class GPUTimeSeriesResponse(SuccessResponse):
     temperature: List[List[float]]
     power: List[List[float]]
     slice_activity: List[SliceActivityData]
+
+
+# ============ Prompt Distribution Schemas ============
+
+
+class PromptDistributionRequest(BaseModel):
+    """Request schema for prompt analytics distribution data.
+
+    Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+    and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+    """
+
+    from_date: datetime
+    to_date: Optional[datetime] = None
+    filters: Optional[Dict[str, Any]] = None  # project_id, endpoint_id, prompt_id
+    bucket_by: Literal["concurrency", "input_tokens", "output_tokens"]
+    metric: Literal["total_duration_ms", "ttft_ms", "response_time_ms", "throughput_per_user"]
+    buckets: Optional[List[Dict[str, Union[float, str]]]] = None  # Auto-generate 10 buckets if None
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        """Validate that to_date is after from_date."""
+        if v is None:
+            return v
+        from_date = info.data.get("from_date")
+        if from_date and v < from_date:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+    @field_validator("buckets")
+    @classmethod
+    def validate_buckets(
+        cls, v: Optional[List[Dict[str, Union[float, str]]]]
+    ) -> Optional[List[Dict[str, Union[float, str]]]]:
+        """Validate bucket format."""
+        if v is None:
+            return v
+        for bucket in v:
+            if not isinstance(bucket, dict) or "min" not in bucket or "max" not in bucket or "label" not in bucket:
+                raise ValueError("Each bucket must have 'min', 'max', and 'label' fields")
+        return v
+
+
+class PromptDistributionBucket(BaseModel):
+    """Single prompt distribution bucket."""
+
+    range: str = Field(..., description="Bucket range label (e.g., '0-5', '5-10')")
+    bucket_start: float = Field(..., description="Start value of the bucket")
+    bucket_end: float = Field(..., description="End value of the bucket")
+    count: int = Field(..., description="Number of items in this bucket")
+    avg_value: float = Field(..., description="Average of the metric within this bucket")
+
+
+class PromptDistributionResponse(SuccessResponse):
+    """Response schema for prompt analytics distribution data."""
+
+    object: str = Field(default="prompt_distribution", description="Response object type")
+    buckets: List[PromptDistributionBucket] = Field(..., description="Distribution buckets")
+    total_count: int = Field(..., description="Total number of items across all buckets")
+    bucket_by: str = Field(..., description="The dimension used for bucketing")
+    metric: str = Field(..., description="The metric being aggregated")
+    date_range: Dict[str, datetime] = Field(..., description="Date range for the analysis")
+    bucket_definitions: List[Dict[str, Union[float, str]]] = Field(
+        ..., description="The bucket ranges used for the distribution"
+    )
