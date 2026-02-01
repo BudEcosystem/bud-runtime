@@ -1885,13 +1885,13 @@ class ObservabilityMetricsService:
 
         return GatewayAnalyticsResponse(object="gateway_analytics", code=200, items=items, summary=summary)
 
-    async def get_geographical_stats(self, from_date, to_date, project_id):
+    async def get_geographical_stats(self, from_date, to_date, project_id, data_source="inference"):
         """Get geographical distribution statistics."""
         self._ensure_initialized()
 
         # Build queries for country and city stats
-        country_query = self._build_geographical_query(from_date, to_date, project_id, "country")
-        city_query = self._build_geographical_query(from_date, to_date, project_id, "city")
+        country_query = self._build_geographical_query(from_date, to_date, project_id, "country", data_source)
+        city_query = self._build_geographical_query(from_date, to_date, project_id, "city", data_source)
 
         # Execute queries in parallel
         country_result, city_result = await asyncio.gather(
@@ -1955,11 +1955,11 @@ class ObservabilityMetricsService:
             heatmap_data=heatmap_data,
         )
 
-    async def get_top_routes(self, from_date, to_date, limit, project_id):
+    async def get_top_routes(self, from_date, to_date, limit, project_id, data_source="inference"):
         """Get top API routes by request count."""
         self._ensure_initialized()
 
-        query = self._build_top_routes_query(from_date, to_date, limit, project_id)
+        query = self._build_top_routes_query(from_date, to_date, limit, project_id, data_source)
         result = await self._clickhouse_client.execute_query(query)
 
         routes = []
@@ -1977,11 +1977,11 @@ class ObservabilityMetricsService:
 
         return routes
 
-    async def get_client_analytics(self, from_date, to_date, group_by, project_id):
+    async def get_client_analytics(self, from_date, to_date, group_by, project_id, data_source="inference"):
         """Get client analytics (device, browser, OS distribution)."""
         self._ensure_initialized()
 
-        query = self._build_client_analytics_query(from_date, to_date, group_by, project_id)
+        query = self._build_client_analytics_query(from_date, to_date, group_by, project_id, data_source)
         result = await self._clickhouse_client.execute_query(query)
 
         distribution = {}
@@ -2002,8 +2002,19 @@ class ObservabilityMetricsService:
 
     def _build_gateway_analytics_query(self, request):
         """Build ClickHouse query for gateway analytics."""
+        # Build prompt_id filter based on data_source
+        data_source = getattr(request, "data_source", "inference")
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
+        # Build project_id filter
+        project_id = getattr(request, "project_id", None)
+        project_filter = f"AND project_id = '{project_id}'" if project_id else ""
+
         # This is a simplified version - you would need to implement the full query builder
-        return """
+        return f"""
             SELECT
                 toStartOfHour(timestamp) as time_bucket,
                 count(*) as request_count,
@@ -2011,12 +2022,20 @@ class ObservabilityMetricsService:
             FROM InferenceFact
             WHERE timestamp >= %(from_date)s
                 AND timestamp <= %(to_date)s
+                {prompt_filter}
+                {project_filter}
             GROUP BY time_bucket
             ORDER BY time_bucket
         """
 
-    def _build_geographical_query(self, from_date, to_date, project_id, group_type):
+    def _build_geographical_query(self, from_date, to_date, project_id, group_type, data_source="inference"):
         """Build query for geographical statistics."""
+        # Build prompt_id filter based on data_source
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
         if group_type == "country":
             return f"""
                 SELECT
@@ -2026,6 +2045,7 @@ class ObservabilityMetricsService:
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
+                    {prompt_filter}
                 GROUP BY country_code
                 ORDER BY count DESC
                 LIMIT 50
@@ -2042,6 +2062,7 @@ class ObservabilityMetricsService:
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
+                    {prompt_filter}
                     AND city IS NOT NULL
                 GROUP BY city, country_code
                 ORDER BY count DESC
@@ -2073,8 +2094,14 @@ class ObservabilityMetricsService:
                 {f"AND project_id = '{project_id}'" if project_id else ""}
         """
 
-    def _build_top_routes_query(self, from_date, to_date, limit, project_id):
+    def _build_top_routes_query(self, from_date, to_date, limit, project_id, data_source="inference"):
         """Build query for top routes."""
+        # Build prompt_id filter based on data_source
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
         return f"""
             SELECT
                 path,
@@ -2086,15 +2113,22 @@ class ObservabilityMetricsService:
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
+                {prompt_filter}
             GROUP BY path, method
             ORDER BY count DESC
             LIMIT {limit}
         """
 
-    def _build_client_analytics_query(self, from_date, to_date, group_by, project_id):
+    def _build_client_analytics_query(self, from_date, to_date, group_by, project_id, data_source="inference"):
         """Build query for client analytics."""
         field_map = {"device_type": "device_type", "browser": "browser_name", "os": "os_name"}
         field = field_map.get(group_by, "device_type")
+
+        # Build prompt_id filter based on data_source
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
 
         return f"""
             SELECT
@@ -2104,6 +2138,7 @@ class ObservabilityMetricsService:
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
+                {prompt_filter}
                 AND {field} IS NOT NULL
             GROUP BY {field}
             ORDER BY count DESC
@@ -3712,7 +3747,7 @@ class ObservabilityMetricsService:
         else:
             return f"{value:.2f}", ""
 
-    async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
+    async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None, data_source="inference"):
         """Get comprehensive blocking rule statistics from InferenceFact table.
 
         This method queries the unified InferenceFact table which contains blocking event data
@@ -3724,6 +3759,7 @@ class ObservabilityMetricsService:
             to_date: End date for the query
             project_id: Optional project filter
             rule_id: Optional specific rule filter
+            data_source: Filter by data source (inference or prompt)
 
         Returns:
             GatewayBlockingRuleStats with blocking statistics
@@ -3742,6 +3778,12 @@ class ObservabilityMetricsService:
             "timestamp >= %(from_date)s",
             "timestamp <= %(to_date)s",
         ]
+
+        # Add prompt_id filter based on data_source
+        if data_source == "prompt":
+            where_conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
+        else:  # inference (default)
+            where_conditions.append("(prompt_id IS NULL OR prompt_id = '')")
 
         if project_id:
             where_conditions.append("project_id = %(project_id)s")

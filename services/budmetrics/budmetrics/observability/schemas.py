@@ -754,6 +754,7 @@ class GatewayAnalyticsRequest(BaseModel):
     fill_time_gaps: bool = True
     topk: Optional[int] = None
     project_id: Optional[UUID] = None  # Filter by specific project
+    data_source: Literal["inference", "prompt"] = "inference"  # Filter by data source
 
     @field_validator("frequency_interval")
     @classmethod
