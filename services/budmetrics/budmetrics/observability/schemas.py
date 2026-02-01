@@ -546,7 +546,7 @@ class InferenceDetailResponse(ResponseBase):
     # Model info
     model_name: str
     model_provider: str
-    model_id: UUID
+    model_id: Optional[UUID] = None
 
     # Content
     system_prompt: Optional[str] = None
