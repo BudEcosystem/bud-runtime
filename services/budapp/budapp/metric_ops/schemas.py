@@ -209,12 +209,12 @@ class InferenceDetailResponse(SuccessResponse):
     model_name: str
     model_display_name: Optional[str] = None  # Enriched
     model_provider: str
-    model_id: UUID
+    model_id: Optional[UUID] = None  # Can be NULL for /v1/responses endpoint type
 
     # Project/Endpoint info
     project_id: UUID
     project_name: Optional[str] = None  # Enriched
-    endpoint_id: UUID
+    endpoint_id: Optional[UUID] = None  # Can be NULL for /v1/responses endpoint type
     endpoint_name: Optional[str] = None  # Enriched
 
     # Content

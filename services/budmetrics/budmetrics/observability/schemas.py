@@ -571,7 +571,7 @@ class InferenceDetailResponse(ResponseBase):
     request_forward_time: datetime
     project_id: UUID
     api_key_project_id: Optional[UUID] = None  # Project associated with API key
-    endpoint_id: UUID
+    endpoint_id: Optional[UUID] = None  # Can be NULL for /v1/responses endpoint type
 
     # Status
     is_success: bool
