@@ -3841,10 +3841,7 @@ class ObservabilityMetricsService:
 
                 if unique_values <= 10:
                     # One bucket per integer value
-                    buckets = [
-                        {"min": i, "max": i, "label": str(i)}
-                        for i in range(min_int, max_int + 1)
-                    ]
+                    buckets = [{"min": i, "max": i, "label": str(i)} for i in range(min_int, max_int + 1)]
                 else:
                     # Group into ranges
                     bucket_size = math.ceil(unique_values / 10)
@@ -3853,11 +3850,13 @@ class ObservabilityMetricsService:
                         start = min_int + i * bucket_size
                         end = min(start + bucket_size - 1, max_int)
                         if start <= max_int:
-                            buckets.append({
-                                "min": start,
-                                "max": end,
-                                "label": f"{start}-{end}" if start != end else str(start),
-                            })
+                            buckets.append(
+                                {
+                                    "min": start,
+                                    "max": end,
+                                    "label": f"{start}-{end}" if start != end else str(start),
+                                }
+                            )
             else:
                 # Token bucketing - use integer labels
                 bucket_width = (max_val - min_val) / 10.0
@@ -3865,11 +3864,13 @@ class ObservabilityMetricsService:
                 for i in range(10):
                     bucket_start = min_val + i * bucket_width
                     bucket_end = min_val + (i + 1) * bucket_width
-                    buckets.append({
-                        "min": bucket_start,
-                        "max": bucket_end,
-                        "label": f"{int(bucket_start)}-{int(bucket_end)}",
-                    })
+                    buckets.append(
+                        {
+                            "min": bucket_start,
+                            "max": bucket_end,
+                            "label": f"{int(bucket_start)}-{int(bucket_end)}",
+                        }
+                    )
 
         # Build bucket case expressions
         bucket_cases = []

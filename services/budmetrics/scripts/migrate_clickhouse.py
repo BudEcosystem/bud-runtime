@@ -2636,7 +2636,10 @@ class ClickHouseMigration:
 
         # Define the columns to add with their types and codecs
         columns_to_add = [
-            ("prompt_id", "Nullable(String) CODEC(ZSTD(1))"),  # Internal prompt ID from bud.prompt_id (can be UUID or string)
+            (
+                "prompt_id",
+                "Nullable(String) CODEC(ZSTD(1))",
+            ),  # Internal prompt ID from bud.prompt_id (can be UUID or string)
             ("client_prompt_id", "Nullable(String) CODEC(ZSTD(1))"),  # Client-provided prompt ID from gen_ai.prompt.id
             ("prompt_version", "Nullable(String) CODEC(ZSTD(1))"),
             ("prompt_variables", "Nullable(String) CODEC(ZSTD(3))"),
@@ -3663,9 +3666,7 @@ class ClickHouseMigration:
             await (
                 self.create_mv_otel_blocking_to_inference_fact()
             )  # Create MV for blocked-only requests to InferenceFact
-            await (
-                self.create_mv_otel_response_to_inference_fact()
-            )  # Create MV for /v1/responses to InferenceFact
+            await self.create_mv_otel_response_to_inference_fact()  # Create MV for /v1/responses to InferenceFact
             await (
                 self.make_metrics_dimension_columns_nullable()
             )  # Drop old tables if dimension columns aren't nullable (must be before table creation)
