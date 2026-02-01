@@ -277,6 +277,18 @@ pub struct ResponseStreamEvent {
     pub data: Value,
 }
 
+/// Wrapper for response with raw request/response data for observability
+/// Captures the actual provider communication for analytics and debugging
+#[derive(Debug, Clone)]
+pub struct ResponseWithRawData {
+    /// The parsed response object
+    pub response: OpenAIResponse,
+    /// The raw request sent to the AI provider (JSON string)
+    pub raw_request: String,
+    /// The raw response received from the AI provider (JSON string)
+    pub raw_response: String,
+}
+
 /// Result type for responses that can be either streaming or non-streaming
 /// Used by providers that need to auto-detect response format (e.g., BudPrompt)
 pub enum ResponseResult {
@@ -288,8 +300,8 @@ pub enum ResponseResult {
                 + Unpin,
         >,
     ),
-    /// Non-streaming JSON response
-    NonStreaming(OpenAIResponse),
+    /// Non-streaming JSON response with raw data for observability
+    NonStreaming(ResponseWithRawData),
 }
 
 /// Types of streaming events
@@ -315,6 +327,7 @@ pub enum ResponseEventType {
 pub trait ResponseProvider {
     /// Create a new response
     ///
+    /// Returns the response along with raw request/response data for observability.
     /// The `baggage` parameter contains business context (project_id, prompt_id, etc.)
     /// that should be propagated to downstream services via W3C Baggage headers.
     async fn create_response(
@@ -323,7 +336,7 @@ pub trait ResponseProvider {
         client: &reqwest::Client,
         api_keys: &crate::endpoints::inference::InferenceCredentials,
         baggage: Option<&BaggageData>,
-    ) -> Result<OpenAIResponse, crate::error::Error>;
+    ) -> Result<ResponseWithRawData, crate::error::Error>;
 
     /// Stream a response
     ///

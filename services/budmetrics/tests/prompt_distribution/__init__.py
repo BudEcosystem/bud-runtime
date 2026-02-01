@@ -1,0 +1,1 @@
+"""Prompt distribution test module."""
