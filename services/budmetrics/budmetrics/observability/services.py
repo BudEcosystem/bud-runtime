@@ -2725,8 +2725,14 @@ class ObservabilityMetricsService:
                     where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
                 elif filter_key == "prompt_id":
-                    where_conditions.append("prompt_id = %(prompt_id)s")
-                    params["prompt_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(prompt_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"prompt_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"prompt_{i}"] = val
+                    else:
+                        where_conditions.append("prompt_id = %(prompt_id)s")
+                        params["prompt_id"] = filter_value
 
         # Add data_source filter for prompt analytics
         if hasattr(request, "data_source"):
@@ -2859,8 +2865,14 @@ class ObservabilityMetricsService:
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
                 elif filter_key == "prompt_id":
-                    where_conditions.append("ifact.prompt_id = %(prompt_id)s")
-                    params["prompt_id"] = filter_value
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(prompt_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.prompt_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"prompt_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.prompt_id = %(prompt_id)s")
+                        params["prompt_id"] = filter_value
 
         # Add data_source filter for prompt analytics
         if hasattr(request, "data_source"):
