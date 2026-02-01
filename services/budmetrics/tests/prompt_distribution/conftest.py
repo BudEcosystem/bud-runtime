@@ -160,16 +160,18 @@ def clean_db():
     # Optional: clear after tests too for cleanliness
 
 
-@pytest.fixture(scope="class")
-def seeded_db(clean_db):
+@pytest.fixture(scope="session")
+def seeded_db():
     """Seed ALL test data after cleaning DB.
 
     This fixture is for aggregate tests that need all scenarios.
+    Runs once per session for efficiency.
     """
+    clear_all_tables()
     result = seed_otel_traces()  # Seed all data
     assert result.get("success"), f"Seeding failed: {result}"
     # Wait for MVs to process
-    time.sleep(1)
+    time.sleep(2)
     yield result
 
 
