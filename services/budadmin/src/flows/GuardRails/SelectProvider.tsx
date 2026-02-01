@@ -104,8 +104,13 @@ export default function SelectProvider() {
       // Create workflow with the selected provider and provider_type
       await createWorkflow(selectedProvider, providerType);
 
-      // Always navigate to the Probes List screen
-      openDrawerWithStep("bud-sentinel-probes");
+      // Navigate to the appropriate next step based on provider
+      if (selectedProvider === "custom-probe") {
+        openDrawerWithStep("select-probe-type");
+      } else {
+        // Navigate to the Probes List screen for other providers
+        openDrawerWithStep("bud-sentinel-probes");
+      }
     } catch (error) {
       console.error("Failed to create workflow:", error);
     } finally {
@@ -143,7 +148,17 @@ export default function SelectProvider() {
       (p) => p.type?.toLowerCase() !== "aws_comprehend"
     ) || [];
 
-  const allBudProviders = [...budProviders];
+  // Add custom probe option to bud providers
+  const customProbeOption = {
+    id: "custom-probe",
+    name: "Create custom probe",
+    description:
+      "Create your custom probe with Bud sentinel for tools, agents, prompts, models or routes.",
+    icon: "⚙️",
+    type: "custom",
+  };
+
+  const allBudProviders = [...budProviders, customProbeOption];
 
   // Keep static third-party providers for now
   const thirdPartyProviders = providers.filter(
