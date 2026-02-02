@@ -21,16 +21,16 @@ interface ProbeTypeOption {
 const probeTypes: ProbeTypeOption[] = [
   {
     id: "rule-based",
-    name: "Create Rule based Probe",
+    name: "Create probe with policy",
     description:
-      "Create probes with RegEx, Semantic, Bud Expression, Fuzzy Search",
+      "You can define your own LLM policy",
   },
-  {
-    id: "dataset",
-    name: "Custom probe with dataset",
-    description:
-      "You can upload your custom dataset to train a classifier based probe.",
-  },
+  // {
+  //   id: "dataset",
+  //   name: "Custom probe with dataset",
+  //   description:
+  //     "You can upload your custom dataset to train a classifier based probe.",
+  // },
 ];
 
 export default function SelectProbeType() {
