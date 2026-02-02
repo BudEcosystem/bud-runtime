@@ -129,7 +129,7 @@ spec:
                 name: {{ .Release.Name }}-budnotify
                 port:
                   number: 3000
-          - path: /ws/socket.io
+          - path: /ws/socket.io/
             pathType: Exact
             backend:
               service:
