@@ -166,6 +166,14 @@ interface ChartBucketData {
   total: number;
 }
 
+// Extended bucket data for tooltip display
+interface ExtendedBucketData {
+  value: number;
+  bucketStart: number;
+  bucketEnd: number;
+  totalDuration: number; // Total duration in seconds for traces in this bucket
+}
+
 const aggregateTracesIntoBuckets = (
   traces: { timestamp: number; status?: string }[],
   buckets: TimeBucket[]
@@ -372,7 +380,7 @@ const LogRow = ({
           {/* Namespace - fixed width, no indent */}
           <div style={{ flexShrink: 0 }} className="flex justify-start items-center w-[60px] 1680px:w-[90px] 1920px:w-[115px]">
             <Tooltip title={row.namespace || "-"} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#D4A853] text-[#D4A853] text-[.5rem] max-w-[80px] truncate px-[.2rem] !leading-[200%]">
+              <Tag className="bg-[#423A1A40] border-[#D1B854] text-[#D1B854] text-[.5rem] max-w-[80px] truncate px-[.2rem] !leading-[200%]">
                 {row.namespace || "-"}
               </Tag>
             </Tooltip>
@@ -887,7 +895,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const [isLive, setIsLive] = useState(false);
 
   // Live chart data - stores traces with timestamps for aggregation
-  const liveChartTracesRef = useRef<{ timestamp: number; status?: string }[]>([]);
+  const liveChartTracesRef = useRef<{ timestamp: number; status?: string; duration?: number }[]>([]);
   const chartUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
@@ -928,6 +936,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     liveChartTracesRef.current.push({
       timestamp: arrivalTime,
       status: trace.status_code || 'ok',
+      duration: (trace.duration ?? 0) / 1_000_000_000, // nanoseconds to seconds
     });
     liveChartTracesRef.current = liveChartTracesRef.current
       .filter(t => t.timestamp > cutoffTime)
@@ -987,6 +996,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       liveChartTracesRef.current.push({
         timestamp: arrivalTime,
         status: trace.status_code || 'ok',
+        duration: (trace.duration ?? 0) / 1_000_000_000, // nanoseconds to seconds
       });
     });
 
@@ -1465,13 +1475,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     const windowStart = now - timeWindowMs;
 
     // Get traces to aggregate based on mode
-    let tracesToAggregate: { timestamp: number; status?: string }[];
+    let tracesToAggregate: { timestamp: number; status?: string; duration?: number }[];
     if (isLive) {
       tracesToAggregate = liveChartTracesRef.current;
     } else {
       tracesToAggregate = logsData.map(log => ({
         timestamp: log.rawData?.timestamp ? new Date(log.rawData.timestamp).getTime() : Date.now(),
         status: log.rawData?.status_code || 'ok',
+        duration: log.duration || 0,
       }));
     }
 
@@ -1496,8 +1507,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
     // Generate buckets based on CURRENT time (this creates the scrolling effect)
     const labels: string[] = [];
-    const successData: number[] = [];
-    const errorData: number[] = [];
+    const successData: ExtendedBucketData[] = [];
+    const errorData: ExtendedBucketData[] = [];
     let totalInBuckets = 0;
 
     for (let i = 0; i < CHART_CONFIG.bucketCount; i++) {
@@ -1519,19 +1530,34 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       }
       labels.push(label);
 
-      // Count traces in this bucket
+      // Count traces in this bucket and calculate total duration
       const inBucket = tracesToAggregate.filter(t => t.timestamp >= bucketStart && t.timestamp < bucketEnd);
-      const errorCount = inBucket.filter(t => t.status === 'error' || t.status === 'ERROR').length;
-      const successCount = inBucket.length - errorCount;
-      successData.push(successCount);
-      errorData.push(errorCount);
+      const errorTraces = inBucket.filter(t => t.status === 'error' || t.status === 'ERROR');
+      const successTraces = inBucket.filter(t => t.status !== 'error' && t.status !== 'ERROR');
+
+      const successDuration = successTraces.reduce((sum, t) => sum + (t.duration || 0), 0);
+      const errorDuration = errorTraces.reduce((sum, t) => sum + (t.duration || 0), 0);
+      const totalDuration = successDuration + errorDuration;
+
+      successData.push({
+        value: successTraces.length,
+        bucketStart,
+        bucketEnd,
+        totalDuration,
+      });
+      errorData.push({
+        value: errorTraces.length,
+        bucketStart,
+        bucketEnd,
+        totalDuration,
+      });
       totalInBuckets += inBucket.length;
     }
 
     // Log total traces that ended up in buckets
     if (tracesToAggregate.length > 0) {
       console.log('[Chart Update] Total in buckets:', totalInBuckets,
-        '| successData:', successData.filter(x => x > 0).length, 'non-zero buckets');
+        '| successData:', successData.filter(x => x.value > 0).length, 'non-zero buckets');
     }
 
     // Calculate which labels to show (every Nth label for readability)
@@ -1546,8 +1572,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         },
       },
       series: [
-        { data: successData },
         { data: errorData },
+        { data: successData },
       ],
     });
   }, [timeRange, isLive, logsData]);
@@ -1573,37 +1599,102 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "shadow" },
-        backgroundColor: "rgba(0,0,0,0.9)",
+        backgroundColor: "rgba(24, 24, 27, 0.98)",
         borderColor: "#3f3f46",
         borderWidth: 1,
+        padding: [12, 14],
         textStyle: { color: "#fafafa", fontSize: 12 },
+        confine: true, // Keep tooltip within chart bounds
+        extraCssText: 'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);',
         formatter: function(params: any) {
-          const success = params[0]?.value || 0;
-          const error = params[1]?.value || 0;
+          // Extract data from the series (Error is first, Success is second)
+          const errorParam = params[0];
+          const successParam = params[1];
+
+          // Get extended bucket data (both series have the same bucket info)
+          const bucketData = errorParam?.data as ExtendedBucketData;
+          const bucketStart = bucketData?.bucketStart || Date.now();
+          const bucketEnd = bucketData?.bucketEnd || Date.now();
+          const totalDuration = bucketData?.totalDuration || 0;
+
+          // Get counts (handle both number and object data formats)
+          const error = typeof errorParam?.data === 'object' ? errorParam?.data?.value || 0 : errorParam?.value || 0;
+          const success = typeof successParam?.data === 'object' ? successParam?.data?.value || 0 : successParam?.value || 0;
           const total = success + error;
-          const time = params[0]?.axisValue || '';
+
+          // Format timestamps
+          const formatDateTime = (timestamp: number) => {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
+                   date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          };
+
+          // Format duration
+          const formatDurationTooltip = (seconds: number) => {
+            if (seconds === 0) return '0s';
+            if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
+            if (seconds < 60) return `${seconds.toFixed(2)}s`;
+            return `${(seconds / 60).toFixed(2)}m`;
+          };
+
+          // Calculate cursor point (middle of bucket)
+          const cursorPoint = (bucketStart + bucketEnd) / 2;
 
           return `
-            <div style="padding: 4px 0; min-width: 100px;">
-              <div style="font-weight: 600; margin-bottom: 6px; font-family: monospace; color: #a1a1aa;">${time}</div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="display: flex; align-items: center; gap: 6px;">
-                  <span style="display: inline-block; width: 8px; height: 8px; background: #965CDE; border-radius: 2px;"></span>
-                  Success
-                </span>
-                <span style="font-weight: 500; margin-left: 12px;">${success}</span>
-              </div>
-              ${error > 0 ? `
-              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="display: flex; align-items: center; gap: 6px;">
-                  <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 2px;"></span>
-                  Errors
-                </span>
-                <span style="font-weight: 500; margin-left: 12px;">${error}</span>
+            <div style="min-width: 200px;">
+              <table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Cursor point</td>
+                  <td style="color: #fafafa; font-family: monospace; text-align: right;">${formatDateTime(cursorPoint)}</td>
+                </tr>
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Bar period</td>
+                  <td style="color: #fafafa; font-family: monospace; text-align: right; font-size: 11px;">
+                    ${formatDateTime(bucketStart)} -<br/>${formatDateTime(bucketEnd)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Count</td>
+                  <td style="color: #fafafa; text-align: right;">${total}</td>
+                </tr>
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Duration</td>
+                  <td style="color: #fafafa; text-align: right;">${formatDurationTooltip(totalDuration)}</td>
+                </tr>
+              </table>
+              ${total > 0 ? `
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #27272a;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                  <span style="display: flex; align-items: center; gap: 6px; color: #a1a1aa;">
+                    <span style="display: inline-block; width: 8px; height: 8px; background: #965CDE; border-radius: 2px;"></span>
+                    Success
+                  </span>
+                  <span style="font-weight: 500; color: #fafafa;">${success}</span>
+                </div>
+                ${error > 0 ? `
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="display: flex; align-items: center; gap: 6px; color: #a1a1aa;">
+                    <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 2px;"></span>
+                    Errors
+                  </span>
+                  <span style="font-weight: 500; color: #fafafa;">${error}</span>
+                </div>
+                ` : ''}
               </div>
               ` : ''}
-              <div style="color: #71717a; font-size: 11px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #27272a;">
-                Total: ${total} traces
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #27272a; font-size: 11px;">
+                <div style="display: flex; align-items: center; gap: 8px; color: #71717a; margin-bottom: 4px;">
+                  <span style="color: #965CDE;">&#8857;</span>
+                  <span><strong style="color: #a1a1aa;">Double click:</strong> Jump to time</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; color: #71717a; margin-bottom: 4px;">
+                  <span style="color: #965CDE;">&#8644;</span>
+                  <span><strong style="color: #a1a1aa;">Drag area:</strong> Change active range</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; color: #71717a;">
+                  <span style="color: #965CDE;">&#9711;</span>
+                  <span><strong style="color: #a1a1aa;">Scroll:</strong> Zoom in/out active range</span>
+                </div>
               </div>
             </div>
           `;
@@ -1628,7 +1719,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         axisLine: { show: false },
         axisTick: { show: false },
         splitLine: {
-          lineStyle: { color: "#27272a", type: "dashed" },
+          lineStyle: { color: "#3D3D3D", type: "solid" },
         },
         axisLabel: {
           color: "#71717a",
@@ -1638,32 +1729,32 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       },
       series: [
         {
-          name: "Success",
-          type: "bar",
-          stack: "total",
-          data: [],
-          itemStyle: {
-            color: "#965CDE",
-            borderRadius: [0, 0, 0, 0],
-          },
-          emphasis: {
-            itemStyle: { color: "#a78bfa" },
-          },
-          barWidth: "70%",
-          animationDuration: 300,
-          animationEasing: "linear" as const,
-        },
-        {
           name: "Error",
           type: "bar",
           stack: "total",
           data: [],
           itemStyle: {
             color: "#ef4444",
-            borderRadius: [2, 2, 0, 0],
+            borderRadius: [0, 0, 0, 0],
           },
           emphasis: {
             itemStyle: { color: "#f87171" },
+          },
+          barWidth: "70%",
+          animationDuration: 300,
+          animationEasing: "linear" as const,
+        },
+        {
+          name: "Success",
+          type: "bar",
+          stack: "total",
+          data: [],
+          itemStyle: {
+            color: "#965CDE",
+            borderRadius: [2, 2, 0, 0],
+          },
+          emphasis: {
+            itemStyle: { color: "#a78bfa" },
           },
           barWidth: "70%",
           animationDuration: 300,
@@ -1743,7 +1834,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       </div> */}
 
       {/* Chart Section */}
-      <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-4 mb-4 mt-4">
+      {/* <div className="bg-[#101010] border border-[#1F1F1F]  p-4 mb-4 mt-4"> */}
+      <div className=" border-0 border-[#1F1F1F]  p-4 mb-4 mt-4">
         {/* Chart Controls */}
         <div className="flex justify-end items-center gap-2 mb-2">
           <CustomSelect
@@ -1794,31 +1886,10 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
         {/* Chart */}
         <div ref={chartRef} className="w-full h-[180px]" />
-
-        {/* Chart Legend */}
-        <div className="flex items-center gap-6 pt-3 border-t border-[#1F1F1F] mt-3">
-          <div className="flex items-center gap-2 text-xs text-[#B3B3B3]">
-            <span className="w-2.5 h-2.5 rounded-sm bg-[#965CDE]" />
-            Success
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[#B3B3B3]">
-            <span className="w-2.5 h-2.5 rounded-sm bg-[#ef4444]" />
-            Error
-          </div>
-          {isLive && (
-            <div className="flex items-center gap-2 text-xs text-[#71717a] ml-auto">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              Real-time updates
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Logs List Section */}
-      <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg overflow-hidden">
+      <div className=" border border-[#1F1F1F] border-0 border-l-0 border-r-0 overflow-hidden">
         {/* List Header */}
         <div className="px-4 py-3 border-b border-[#1F1F1F] flex justify-between items-center">
           <Text_12_400_B3B3B3>

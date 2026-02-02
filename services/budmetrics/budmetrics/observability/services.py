@@ -39,6 +39,9 @@ from budmetrics.observability.schemas import (
     ObservabilityMetricsResponse,
     PerformanceMetric,
     PeriodBin,
+    PromptDistributionBucket,
+    PromptDistributionRequest,
+    PromptDistributionResponse,
     TimeMetric,
     TraceDetailResponse,
     TraceEvent,
@@ -538,6 +541,9 @@ class ObservabilityMetricsService:
         # Check if rollup tables can handle this request (better performance)
         use_rollup = self.query_builder.can_use_rollup(request.metrics)
 
+        # Get data_source from request, defaulting to "inference"
+        data_source = getattr(request, "data_source", "inference")
+
         if use_rollup:
             # Use rollup tables for pre-aggregated data (faster for large time ranges)
             logger.debug(f"Using rollup tables for metrics: {request.metrics}")
@@ -552,6 +558,7 @@ class ObservabilityMetricsService:
                 return_delta=request.return_delta,
                 fill_time_gaps=request.fill_time_gaps,
                 topk=request.topk,
+                data_source=data_source,
             )
         else:
             # Fall back to raw data queries (needed for percentiles, queuing_time, etc.)
@@ -567,6 +574,7 @@ class ObservabilityMetricsService:
                 return_delta=request.return_delta,
                 fill_time_gaps=request.fill_time_gaps,
                 topk=request.topk,
+                data_source=data_source,
             )
 
         # Execute query
@@ -1885,13 +1893,13 @@ class ObservabilityMetricsService:
 
         return GatewayAnalyticsResponse(object="gateway_analytics", code=200, items=items, summary=summary)
 
-    async def get_geographical_stats(self, from_date, to_date, project_id):
+    async def get_geographical_stats(self, from_date, to_date, project_id, data_source="inference"):
         """Get geographical distribution statistics."""
         self._ensure_initialized()
 
         # Build queries for country and city stats
-        country_query = self._build_geographical_query(from_date, to_date, project_id, "country")
-        city_query = self._build_geographical_query(from_date, to_date, project_id, "city")
+        country_query = self._build_geographical_query(from_date, to_date, project_id, "country", data_source)
+        city_query = self._build_geographical_query(from_date, to_date, project_id, "city", data_source)
 
         # Execute queries in parallel
         country_result, city_result = await asyncio.gather(
@@ -1955,11 +1963,11 @@ class ObservabilityMetricsService:
             heatmap_data=heatmap_data,
         )
 
-    async def get_top_routes(self, from_date, to_date, limit, project_id):
+    async def get_top_routes(self, from_date, to_date, limit, project_id, data_source="inference"):
         """Get top API routes by request count."""
         self._ensure_initialized()
 
-        query = self._build_top_routes_query(from_date, to_date, limit, project_id)
+        query = self._build_top_routes_query(from_date, to_date, limit, project_id, data_source)
         result = await self._clickhouse_client.execute_query(query)
 
         routes = []
@@ -1977,11 +1985,11 @@ class ObservabilityMetricsService:
 
         return routes
 
-    async def get_client_analytics(self, from_date, to_date, group_by, project_id):
+    async def get_client_analytics(self, from_date, to_date, group_by, project_id, data_source="inference"):
         """Get client analytics (device, browser, OS distribution)."""
         self._ensure_initialized()
 
-        query = self._build_client_analytics_query(from_date, to_date, group_by, project_id)
+        query = self._build_client_analytics_query(from_date, to_date, group_by, project_id, data_source)
         result = await self._clickhouse_client.execute_query(query)
 
         distribution = {}
@@ -2002,8 +2010,19 @@ class ObservabilityMetricsService:
 
     def _build_gateway_analytics_query(self, request):
         """Build ClickHouse query for gateway analytics."""
+        # Build prompt_id filter based on data_source
+        data_source = getattr(request, "data_source", "inference")
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
+        # Build project_id filter
+        project_id = getattr(request, "project_id", None)
+        project_filter = f"AND project_id = '{project_id}'" if project_id else ""
+
         # This is a simplified version - you would need to implement the full query builder
-        return """
+        return f"""
             SELECT
                 toStartOfHour(timestamp) as time_bucket,
                 count(*) as request_count,
@@ -2011,12 +2030,20 @@ class ObservabilityMetricsService:
             FROM InferenceFact
             WHERE timestamp >= %(from_date)s
                 AND timestamp <= %(to_date)s
+                {prompt_filter}
+                {project_filter}
             GROUP BY time_bucket
             ORDER BY time_bucket
         """
 
-    def _build_geographical_query(self, from_date, to_date, project_id, group_type):
+    def _build_geographical_query(self, from_date, to_date, project_id, group_type, data_source="inference"):
         """Build query for geographical statistics."""
+        # Build prompt_id filter based on data_source
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
         if group_type == "country":
             return f"""
                 SELECT
@@ -2026,6 +2053,7 @@ class ObservabilityMetricsService:
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
+                    {prompt_filter}
                 GROUP BY country_code
                 ORDER BY count DESC
                 LIMIT 50
@@ -2042,6 +2070,7 @@ class ObservabilityMetricsService:
                 WHERE timestamp >= '{from_date.isoformat()}'
                     {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                     {f"AND project_id = '{project_id}'" if project_id else ""}
+                    {prompt_filter}
                     AND city IS NOT NULL
                 GROUP BY city, country_code
                 ORDER BY count DESC
@@ -2073,8 +2102,14 @@ class ObservabilityMetricsService:
                 {f"AND project_id = '{project_id}'" if project_id else ""}
         """
 
-    def _build_top_routes_query(self, from_date, to_date, limit, project_id):
+    def _build_top_routes_query(self, from_date, to_date, limit, project_id, data_source="inference"):
         """Build query for top routes."""
+        # Build prompt_id filter based on data_source
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
         return f"""
             SELECT
                 path,
@@ -2086,15 +2121,22 @@ class ObservabilityMetricsService:
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
+                {prompt_filter}
             GROUP BY path, method
             ORDER BY count DESC
             LIMIT {limit}
         """
 
-    def _build_client_analytics_query(self, from_date, to_date, group_by, project_id):
+    def _build_client_analytics_query(self, from_date, to_date, group_by, project_id, data_source="inference"):
         """Build query for client analytics."""
         field_map = {"device_type": "device_type", "browser": "browser_name", "os": "os_name"}
         field = field_map.get(group_by, "device_type")
+
+        # Build prompt_id filter based on data_source
+        if data_source == "prompt":
+            prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+        else:  # inference (default)
+            prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
 
         return f"""
             SELECT
@@ -2104,6 +2146,7 @@ class ObservabilityMetricsService:
             WHERE timestamp >= '{from_date.isoformat()}'
                 {f"AND timestamp <= '{to_date.isoformat()}'" if to_date else ""}
                 {f"AND project_id = '{project_id}'" if project_id else ""}
+                {prompt_filter}
                 AND {field} IS NOT NULL
             GROUP BY {field}
             ORDER BY count DESC
@@ -2323,6 +2366,13 @@ class ObservabilityMetricsService:
                     where_conditions.append("rm.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(rm.prompt_id IS NULL OR rm.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("rm.prompt_id IS NOT NULL AND rm.prompt_id != ''")
+
         # Build final query (use rm as table alias)
         order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
         query = f"""
@@ -2447,6 +2497,13 @@ class ObservabilityMetricsService:
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
 
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
+
         # Build final query (no JOINs - all data in InferenceFact)
         order_by = "total_requests DESC" if "total_requests" in request.metrics else "1"
         query = f"""
@@ -2564,8 +2621,9 @@ class ObservabilityMetricsService:
         """
         to_date = request.to_date or datetime.now()
 
-        # Metrics that require raw data for percentile calculations
-        raw_data_metrics = {"p95_latency", "p99_latency"}
+        # Metrics that require raw data for percentile calculations or exact aggregations
+        # unique_users needs uniqExact which requires raw data (can't be pre-aggregated in rollups)
+        raw_data_metrics = {"p95_latency", "p99_latency", "unique_users"}
         needs_raw_data = any(m in raw_data_metrics for m in request.metrics)
 
         if needs_raw_data:
@@ -2626,6 +2684,10 @@ class ObservabilityMetricsService:
                 )
             elif metric == "error_rate":
                 select_fields.append("SUM(error_count) * 100.0 / NULLIF(SUM(request_count), 0) as error_rate")
+            elif metric == "success_count":
+                select_fields.append("SUM(success_count) as success_count")
+            elif metric == "error_count":
+                select_fields.append("SUM(error_count) as error_count")
 
         # Build WHERE clause
         where_conditions = ["time_bucket >= %(from_date)s", "time_bucket <= %(to_date)s"]
@@ -2662,6 +2724,22 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+                elif filter_key == "prompt_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(prompt_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"prompt_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"prompt_{i}"] = val
+                    else:
+                        where_conditions.append("prompt_id = %(prompt_id)s")
+                        params["prompt_id"] = filter_value
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(prompt_id IS NULL OR prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
 
         # Build WITH FILL expression for time gap filling
         fill_expr = ""
@@ -2741,6 +2819,12 @@ class ObservabilityMetricsService:
                 )
             elif metric == "error_rate":
                 select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
+            elif metric == "unique_users":
+                select_fields.append("uniqExact(ifact.user_id) as unique_users")
+            elif metric == "success_count":
+                select_fields.append("countIf(ifact.is_success = true) as success_count")
+            elif metric == "error_count":
+                select_fields.append("countIf(ifact.is_success = false OR ifact.is_success IS NULL) as error_count")
 
         # Build WHERE clause
         where_conditions = [
@@ -2780,6 +2864,22 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+                elif filter_key == "prompt_id":
+                    if isinstance(filter_value, list):
+                        placeholders = [f"%(prompt_{i})s" for i in range(len(filter_value))]
+                        where_conditions.append(f"ifact.prompt_id IN ({','.join(placeholders)})")
+                        for i, val in enumerate(filter_value):
+                            params[f"prompt_{i}"] = val
+                    else:
+                        where_conditions.append("ifact.prompt_id = %(prompt_id)s")
+                        params["prompt_id"] = filter_value
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         # Build WITH FILL expression for time gap filling
         fill_expr = ""
@@ -3032,6 +3132,13 @@ class ObservabilityMetricsService:
                         where_conditions.append("country_code = %(country_code)s")
                         params["country_code"] = filter_value
 
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(prompt_id IS NULL OR prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
+
         where_clause = " AND ".join(where_conditions)
 
         # Query with pre-aggregated metrics
@@ -3175,6 +3282,13 @@ class ObservabilityMetricsService:
                     else:
                         where_conditions.append("ifact.country_code = %(country_code)s")
                         params["country_code"] = filter_value
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                where_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                where_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         where_clause = " AND ".join(where_conditions)
 
@@ -3322,6 +3436,13 @@ class ObservabilityMetricsService:
                     model_ids = [model_ids]
                 model_filter = "', '".join(str(mid) for mid in model_ids)
                 filter_conditions.append(f"toString(ifact.model_id) IN ('{model_filter}')")
+
+        # Add data_source filter for prompt analytics
+        if hasattr(request, "data_source"):
+            if request.data_source == "inference":
+                filter_conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
+            elif request.data_source == "prompt":
+                filter_conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
 
         where_clause = " AND ".join(filter_conditions)
 
@@ -3605,6 +3726,294 @@ class ObservabilityMetricsService:
             bucket_definitions=clean_buckets,
         )
 
+    async def get_prompt_distribution(self, request: PromptDistributionRequest) -> PromptDistributionResponse:
+        """Get prompt analytics distribution data.
+
+        Supports bucketing by concurrency, input_tokens, or output_tokens (X-axis)
+        and metrics like total_duration_ms, ttft_ms, response_time_ms, throughput_per_user (Y-axis).
+
+        Args:
+            request: The prompt distribution request parameters.
+
+        Returns:
+            PromptDistributionResponse: Response containing distribution data.
+        """
+        logger.info(f"Getting prompt distribution for date range {request.from_date} to {request.to_date}")
+
+        # Build time filter
+        from_date_str = request.from_date.strftime("%Y-%m-%d %H:%M:%S")
+        to_date_str = (request.to_date or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Build filter conditions - only prompt analytics data (prompt_id is set)
+        filter_conditions = [
+            f"toDateTime('{from_date_str}') <= ifact.request_arrival_time",
+            f"ifact.request_arrival_time < toDateTime('{to_date_str}')",
+            "ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''",
+        ]
+
+        # Apply additional filters
+        if request.filters:
+            if "project_id" in request.filters:
+                project_ids = request.filters["project_id"]
+                if isinstance(project_ids, str):
+                    project_ids = [project_ids]
+                project_filter = "', '".join(str(pid) for pid in project_ids)
+                filter_conditions.append(f"toString(ifact.project_id) IN ('{project_filter}')")
+
+            if "endpoint_id" in request.filters:
+                endpoint_ids = request.filters["endpoint_id"]
+                if isinstance(endpoint_ids, str):
+                    endpoint_ids = [endpoint_ids]
+                endpoint_filter = "', '".join(str(eid) for eid in endpoint_ids)
+                filter_conditions.append(f"toString(ifact.endpoint_id) IN ('{endpoint_filter}')")
+
+            if "prompt_id" in request.filters:
+                prompt_ids = request.filters["prompt_id"]
+                if isinstance(prompt_ids, str):
+                    prompt_ids = [prompt_ids]
+                prompt_filter = "', '".join(str(pid) for pid in prompt_ids)
+                filter_conditions.append(f"ifact.prompt_id IN ('{prompt_filter}')")
+
+        where_clause = " AND ".join(filter_conditions)
+
+        # Determine the bucket_by field expression
+        if request.bucket_by == "concurrency":
+            # Concurrency is calculated as count of requests in the same second window
+            # We'll use a window function approach
+            bucket_field = "concurrent_count"
+        elif request.bucket_by == "input_tokens":
+            bucket_field = "ifact.input_tokens"
+        elif request.bucket_by == "output_tokens":
+            bucket_field = "ifact.output_tokens"
+        else:
+            bucket_field = "ifact.input_tokens"
+
+        # Determine the metric expression
+        if request.metric == "total_duration_ms":
+            metric_expr = "COALESCE(ifact.total_duration_ms, 0)"
+        elif request.metric == "ttft_ms":
+            # Return NULL for NULL or 0 values - they represent missing/invalid TTFT data
+            metric_expr = "NULLIF(ifact.ttft_ms, 0)"
+        elif request.metric == "response_time_ms":
+            metric_expr = "COALESCE(ifact.response_time_ms, 0)"
+        elif request.metric == "throughput_per_user":
+            # throughput_per_user = output_tokens * 1000 / response_time_ms / concurrent_count
+            metric_expr = (
+                "ifact.output_tokens * 1000.0 / NULLIF(COALESCE(ifact.response_time_ms, 0), 0) / "
+                "NULLIF(concurrent_count, 0)"
+            )
+        else:
+            metric_expr = "COALESCE(ifact.response_time_ms, 0)"
+
+        # Auto-generate buckets if not provided
+        buckets = request.buckets
+        if buckets is None:
+            # Query min/max of bucket_by field to auto-generate 10 buckets
+            if request.bucket_by == "concurrency":
+                # For concurrency, we need to calculate it first
+                min_max_query = f"""
+                    WITH request_counts AS (
+                        SELECT
+                            count(*) OVER (PARTITION BY toStartOfSecond(ifact.request_arrival_time)) as concurrent_count
+                        FROM InferenceFact ifact
+                        WHERE {where_clause}
+                    )
+                    SELECT
+                        min(concurrent_count) as min_val,
+                        max(concurrent_count) as max_val
+                    FROM request_counts
+                """
+            else:
+                min_max_query = f"""
+                    SELECT
+                        min({bucket_field}) as min_val,
+                        max({bucket_field}) as max_val
+                    FROM InferenceFact ifact
+                    WHERE {where_clause}
+                """
+
+            min_max_result = await self.clickhouse_client.execute_query(min_max_query)
+            if min_max_result and min_max_result[0][0] is not None:
+                min_val = float(min_max_result[0][0])
+                max_val = float(min_max_result[0][1])
+            else:
+                min_val = 0.0
+                max_val = 100.0
+
+            # Ensure we have a valid range
+            if min_val >= max_val:
+                max_val = min_val + 10.0
+
+            # Auto-generate buckets based on bucket_by type
+            if request.bucket_by == "concurrency":
+                # Use integer buckets for concurrency since it's always a whole number
+                min_int = int(min_val)
+                max_int = int(max_val)
+                unique_values = max_int - min_int + 1
+
+                if unique_values <= 10:
+                    # One bucket per integer value
+                    buckets = [{"min": i, "max": i, "label": str(i)} for i in range(min_int, max_int + 1)]
+                else:
+                    # Group into ranges
+                    bucket_size = math.ceil(unique_values / 10)
+                    buckets = []
+                    for i in range(10):
+                        start = min_int + i * bucket_size
+                        end = min(start + bucket_size - 1, max_int)
+                        if start <= max_int:
+                            buckets.append(
+                                {
+                                    "min": start,
+                                    "max": end,
+                                    "label": f"{start}-{end}" if start != end else str(start),
+                                }
+                            )
+            else:
+                # Token bucketing - use integer labels
+                bucket_width = (max_val - min_val) / 10.0
+                buckets = []
+                for i in range(10):
+                    bucket_start = min_val + i * bucket_width
+                    bucket_end = min_val + (i + 1) * bucket_width
+                    buckets.append(
+                        {
+                            "min": bucket_start,
+                            "max": bucket_end,
+                            "label": f"{int(bucket_start)}-{int(bucket_end)}",
+                        }
+                    )
+
+        # Build bucket case expressions
+        bucket_cases = []
+        for bucket in buckets:
+            bucket_min = bucket["min"]
+            bucket_max = bucket["max"]
+            if bucket_min == bucket_max:
+                # Single value bucket (e.g., concurrency = 2)
+                condition = f"bucket_value = {bucket_min}"
+            elif bucket == buckets[-1]:
+                # Last bucket includes upper bound
+                condition = f"bucket_value >= {bucket_min}"
+            else:
+                condition = f"bucket_value >= {bucket_min} AND bucket_value < {bucket_max}"
+            bucket_cases.append(f"WHEN {condition} THEN '{bucket['label']}'")
+
+        bucket_case_expr = f"CASE {' '.join(bucket_cases)} ELSE 'Other' END"
+
+        # Build the main query
+        if request.bucket_by == "concurrency":
+            # For concurrency, use a CTE to calculate concurrent requests per second
+            query = f"""
+                WITH request_with_concurrency AS (
+                    SELECT
+                        ifact.*,
+                        count(*) OVER (PARTITION BY toStartOfSecond(ifact.request_arrival_time)) as concurrent_count
+                    FROM InferenceFact ifact
+                    WHERE {where_clause}
+                ),
+                with_bucket AS (
+                    SELECT
+                        concurrent_count as bucket_value,
+                        {metric_expr.replace("ifact.", "")} as metric_value
+                    FROM request_with_concurrency ifact
+                )
+                SELECT
+                    {bucket_case_expr} as bucket_label,
+                    count() as request_count,
+                    avgIf(metric_value, metric_value IS NOT NULL AND isFinite(metric_value)) as avg_metric
+                FROM with_bucket
+                GROUP BY bucket_label
+                ORDER BY bucket_label
+            """
+        else:
+            # For input_tokens/output_tokens, simpler query
+            # Still need concurrency for throughput_per_user metric
+            if request.metric == "throughput_per_user":
+                query = f"""
+                    WITH request_with_concurrency AS (
+                        SELECT
+                            ifact.*,
+                            count(*) OVER (PARTITION BY toStartOfSecond(ifact.request_arrival_time)) as concurrent_count
+                        FROM InferenceFact ifact
+                        WHERE {where_clause}
+                    ),
+                    with_bucket AS (
+                        SELECT
+                            {bucket_field.replace("ifact.", "")} as bucket_value,
+                            {metric_expr.replace("ifact.", "")} as metric_value
+                        FROM request_with_concurrency ifact
+                    )
+                    SELECT
+                        {bucket_case_expr} as bucket_label,
+                        count() as request_count,
+                        avgIf(metric_value, metric_value IS NOT NULL AND isFinite(metric_value)) as avg_metric
+                    FROM with_bucket
+                    GROUP BY bucket_label
+                    ORDER BY bucket_label
+                """
+            else:
+                query = f"""
+                    WITH with_bucket AS (
+                        SELECT
+                            {bucket_field} as bucket_value,
+                            {metric_expr} as metric_value
+                        FROM InferenceFact ifact
+                        WHERE {where_clause}
+                    )
+                    SELECT
+                        {bucket_case_expr} as bucket_label,
+                        count() as request_count,
+                        avgIf(metric_value, metric_value IS NOT NULL AND isFinite(metric_value)) as avg_metric
+                    FROM with_bucket
+                    GROUP BY bucket_label
+                    ORDER BY bucket_label
+                """
+
+        result = await self.clickhouse_client.execute_query(query)
+
+        # Get total count
+        total_query = f"SELECT count() FROM InferenceFact ifact WHERE {where_clause}"
+        total_result = await self.clickhouse_client.execute_query(total_query)
+        total_count = total_result[0][0] if total_result else 0
+
+        # Process results into buckets
+        bucket_data = {row[0]: (row[1], row[2]) for row in result}
+        response_buckets = []
+
+        for bucket in buckets:
+            count, avg_value = bucket_data.get(bucket["label"], (0, 0.0))
+            avg_value = self._safe_float(avg_value)
+
+            response_buckets.append(
+                PromptDistributionBucket(
+                    range=bucket["label"],
+                    bucket_start=float(bucket["min"]),
+                    bucket_end=float(bucket["max"]),
+                    count=count,
+                    avg_value=round(avg_value, 2),
+                )
+            )
+
+        # Clean up bucket definitions for response (replace inf with large number)
+        clean_buckets = [
+            {
+                "min": bucket["min"],
+                "max": 999999999 if bucket["max"] == float("inf") else bucket["max"],
+                "label": bucket["label"],
+            }
+            for bucket in buckets
+        ]
+
+        return PromptDistributionResponse(
+            buckets=response_buckets,
+            total_count=total_count,
+            bucket_by=request.bucket_by,
+            metric=request.metric,
+            date_range={"from": request.from_date, "to": request.to_date or datetime.now()},
+            bucket_definitions=clean_buckets,
+        )
+
     def _safe_float(self, value: Union[int, float, None]) -> float:
         """Convert value to safe float, handling NaN and Infinity."""
         if value is None:
@@ -3663,7 +4072,7 @@ class ObservabilityMetricsService:
         else:
             return f"{value:.2f}", ""
 
-    async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None):
+    async def get_blocking_stats(self, from_date, to_date, project_id=None, rule_id=None, data_source="inference"):
         """Get comprehensive blocking rule statistics from InferenceFact table.
 
         This method queries the unified InferenceFact table which contains blocking event data
@@ -3675,6 +4084,7 @@ class ObservabilityMetricsService:
             to_date: End date for the query
             project_id: Optional project filter
             rule_id: Optional specific rule filter
+            data_source: Filter by data source (inference or prompt)
 
         Returns:
             GatewayBlockingRuleStats with blocking statistics
@@ -3693,6 +4103,12 @@ class ObservabilityMetricsService:
             "timestamp >= %(from_date)s",
             "timestamp <= %(to_date)s",
         ]
+
+        # Add prompt_id filter based on data_source
+        if data_source == "prompt":
+            where_conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
+        else:  # inference (default)
+            where_conditions.append("(prompt_id IS NULL OR prompt_id = '')")
 
         if project_id:
             where_conditions.append("project_id = %(project_id)s")
@@ -3949,8 +4365,17 @@ class ObservabilityMetricsService:
         self._ensure_initialized()
 
         try:
+            # Get data_source from request, defaulting to "inference"
+            data_source = getattr(request, "data_source", "inference")
+
+            # Build prompt_id filter based on data_source
+            if data_source == "prompt":
+                prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+            else:  # inference (default)
+                prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
             # Build the query to get last usage per credential
-            query = """
+            query = f"""
             SELECT
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
@@ -3958,6 +4383,7 @@ class ObservabilityMetricsService:
             FROM InferenceFact
             WHERE request_arrival_time >= %(since)s
                 AND api_key_id IS NOT NULL
+                {prompt_filter}
             """
 
             params = {"since": request.since}
@@ -4042,18 +4468,21 @@ class ObservabilityMetricsService:
         user_usage = []
         stats = {"active_credentials": 0, "active_users": 0, "total_users_checked": 0}
 
+        # Get data_source from request, defaulting to "inference"
+        data_source = getattr(request, "data_source", "inference")
+
         try:
             # 1. Get credential usage data if requested
             if request.credential_sync:
                 credential_usage = await self._get_sync_credential_data(
-                    request.sync_mode, request.activity_threshold_minutes
+                    request.sync_mode, request.activity_threshold_minutes, data_source
                 )
                 stats["active_credentials"] = len(credential_usage)
 
             # 2. Get user usage data if requested
             if request.user_usage_sync:
                 user_usage = await self._get_sync_user_data(
-                    request.sync_mode, request.activity_threshold_minutes, request.user_ids
+                    request.sync_mode, request.activity_threshold_minutes, request.user_ids, data_source
                 )
                 stats["active_users"] = len(user_usage)
                 # For stats, estimate total users checked based on mode
@@ -4088,17 +4517,26 @@ class ObservabilityMetricsService:
                 stats={"active_credentials": 0, "active_users": 0, "total_users_checked": 0},
             )
 
-    async def _get_sync_credential_data(self, sync_mode: str, threshold_minutes: int) -> list[CredentialUsageItem]:
+    async def _get_sync_credential_data(
+        self, sync_mode: str, threshold_minutes: int, data_source: str = "inference"
+    ) -> list[CredentialUsageItem]:
         """Get credential usage data for sync based on mode."""
         try:
+            # Build prompt_id filter based on data_source
+            if data_source == "prompt":
+                prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+            else:  # inference (default)
+                prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
             # Base query for credential usage from InferenceFact
-            query = """
+            query = f"""
             SELECT
                 api_key_id as credential_id,
                 MAX(request_arrival_time) as last_used_at,
                 COUNT(*) as request_count
             FROM InferenceFact
             WHERE api_key_id IS NOT NULL
+                {prompt_filter}
             """
 
             params = {}
@@ -4140,15 +4578,26 @@ class ObservabilityMetricsService:
             return []
 
     async def _get_sync_user_data(
-        self, sync_mode: str, threshold_minutes: int, user_ids: Optional[list[UUID]] = None
+        self,
+        sync_mode: str,
+        threshold_minutes: int,
+        user_ids: Optional[list[UUID]] = None,
+        data_source: str = "inference",
     ) -> list[UserUsageItem]:
         """Get user usage data for sync based on mode."""
         try:
             from datetime import datetime, timezone
 
             logger.info(f"_get_sync_user_data called: mode={sync_mode}, user_ids={len(user_ids) if user_ids else 0}")
+
+            # Build prompt_id filter based on data_source
+            if data_source == "prompt":
+                prompt_filter = "AND prompt_id IS NOT NULL AND prompt_id != ''"
+            else:  # inference (default)
+                prompt_filter = "AND (prompt_id IS NULL OR prompt_id = '')"
+
             # Base query for user usage from InferenceFact (denormalized, no JOIN needed)
-            query = """
+            query = f"""
             SELECT
                 user_id,
                 MAX(request_arrival_time) as last_activity_at,
@@ -4158,6 +4607,7 @@ class ObservabilityMetricsService:
                 AVG(CASE WHEN is_success THEN 1 ELSE 0 END) as success_rate
             FROM InferenceFact
             WHERE user_id IS NOT NULL
+                {prompt_filter}
             """
 
             params = {}

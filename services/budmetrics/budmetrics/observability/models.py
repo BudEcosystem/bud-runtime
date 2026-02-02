@@ -406,6 +406,7 @@ class QueryBuilder:
         return_delta: bool = False,
         fill_time_gaps: bool = True,
         topk: Optional[int] = None,
+        data_source: str = "inference",
     ) -> tuple[str, list[str]]:
         """Build query against rollup tables (InferenceMetrics5m/1h/1d).
 
@@ -464,6 +465,12 @@ class QueryBuilder:
             f"time_bucket >= '{from_date.strftime(self.datetime_fmt)}'",
             f"time_bucket <= '{to_date.strftime(self.datetime_fmt)}'",
         ]
+
+        # Add prompt_id filter based on data_source
+        if data_source == "prompt":
+            conditions.append("prompt_id IS NOT NULL AND prompt_id != ''")
+        else:  # inference (default)
+            conditions.append("(prompt_id IS NULL OR prompt_id = '')")
 
         # Add filter conditions
         if filters:
@@ -1461,6 +1468,7 @@ class QueryBuilder:
         return_delta: bool = False,
         fill_time_gaps: bool = True,
         topk: Optional[int] = None,
+        data_source: str = "inference",
     ):
         """Build a complete ClickHouse analytics query.
 
@@ -1559,6 +1567,12 @@ class QueryBuilder:
         time_bucket_expr += f" AS {time_bucket_alias}"
 
         conditions = self._get_filter_conditions(list(required_tables), from_date, to_date, filters)
+
+        # Add prompt_id filter based on data_source
+        if data_source == "prompt":
+            conditions.append("ifact.prompt_id IS NOT NULL AND ifact.prompt_id != ''")
+        else:  # inference (default)
+            conditions.append("(ifact.prompt_id IS NULL OR ifact.prompt_id = '')")
 
         group_by_parts = [time_bucket_alias, *group_fields]
         select_parts = [time_bucket_expr, *group_fields, *select_parts]
