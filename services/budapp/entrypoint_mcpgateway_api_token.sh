@@ -40,6 +40,7 @@ api_token_get() {
 				{
 				  "name": "entrypoint-mcpgateway-api-token-sh-$(date +%s%N)",
 				  "description": "Autocreated by budprompt entrypoint_mcpgateway_api_token.sh",
+				  "expires_in_days": 0,
 				  "scope": {
 				    "permissions": [],
 				    "ip_restrictions": [],
