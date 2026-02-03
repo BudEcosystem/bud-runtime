@@ -359,29 +359,39 @@ class DeploymentCreateExecutor(BaseActionExecutor):
                         hardware_mode=hardware_mode,
                     )
 
-                    # If simulation failed with an error, fail the step
-                    # This is critical for dedicated hardware mode where simulation must succeed
+                    # If simulation failed with an error, handle based on hardware mode
+                    # Dedicated mode: fail the step (simulation is required)
+                    # Shared mode: log warning and continue (best-effort)
                     if sim_error and not sim_result:
-                        error_msg = f"Simulation failed: {sim_error}"
-                        logger.error(
-                            "deployment_create_simulation_failed_step",
-                            step_id=context.step_id,
-                            hardware_mode=hardware_mode,
-                            error=sim_error,
-                        )
-                        return ActionResult(
-                            success=False,
-                            outputs={
-                                "success": False,
-                                "endpoint_id": None,
-                                "endpoint_url": None,
-                                "endpoint_name": endpoint_name,
-                                "workflow_id": None,
-                                "status": "failed",
-                                "message": error_msg,
-                            },
-                            error=error_msg,
-                        )
+                        if hardware_mode == "dedicated":
+                            error_msg = f"Simulation failed: {sim_error}"
+                            logger.error(
+                                "deployment_create_simulation_failed_step",
+                                step_id=context.step_id,
+                                hardware_mode=hardware_mode,
+                                error=sim_error,
+                            )
+                            return ActionResult(
+                                success=False,
+                                outputs={
+                                    "success": False,
+                                    "endpoint_id": None,
+                                    "endpoint_url": None,
+                                    "endpoint_name": endpoint_name,
+                                    "workflow_id": None,
+                                    "status": "failed",
+                                    "message": error_msg,
+                                },
+                                error=error_msg,
+                            )
+                        else:
+                            # Shared mode: log warning and continue without simulation
+                            logger.warning(
+                                "deployment_create_simulation_failed_continuing",
+                                step_id=context.step_id,
+                                hardware_mode=hardware_mode,
+                                error=sim_error,
+                            )
 
                     # Extract parser configs from simulation result
                     if sim_result:

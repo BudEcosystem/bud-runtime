@@ -926,7 +926,7 @@ export function ActionConfigPanel({
                       min={minVal}
                       max={rangeValue[1] ?? maxVal}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value) || minVal;
+                        const val = parseFloat(e.target.value) || minVal;
                         handleParamChange(param.name, [val, rangeValue[1] ?? maxVal]);
                       }}
                       style={{
@@ -953,7 +953,7 @@ export function ActionConfigPanel({
                       min={rangeValue[0] ?? minVal}
                       max={maxVal}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value) || maxVal;
+                        const val = parseFloat(e.target.value) || maxVal;
                         handleParamChange(param.name, [rangeValue[0] ?? minVal, val]);
                       }}
                       style={{
