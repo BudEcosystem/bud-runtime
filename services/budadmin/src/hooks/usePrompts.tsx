@@ -12,6 +12,8 @@ export interface IPrompt {
   prompt_type: string;
   type?: string;
   status: string;
+  description?: string | null;
+  tags?: Array<{ name: string; color: string }> | null;
   model_name?: string;
   modality?: string[];
   created_at: string;

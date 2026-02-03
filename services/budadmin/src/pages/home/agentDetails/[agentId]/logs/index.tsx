@@ -1740,7 +1740,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           emphasis: {
             itemStyle: { color: "#f87171" },
           },
-          barWidth: "70%",
+          barWidth: "52%",
           animationDuration: 300,
           animationEasing: "linear" as const,
         },
@@ -1756,7 +1756,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           emphasis: {
             itemStyle: { color: "#a78bfa" },
           },
-          barWidth: "70%",
+          barWidth: "52%",
           animationDuration: 300,
           animationEasing: "linear" as const,
         },
@@ -1889,7 +1889,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       </div>
 
       {/* Logs List Section */}
-      <div className=" border border-[#1F1F1F] border-0 border-l-0 border-r-0 overflow-hidden">
+      <div className=" border border-[#1F1F1F]  overflow-hidden">
         {/* List Header */}
         <div className="px-4 py-3 border-b border-[#1F1F1F] flex justify-between items-center">
           <Text_12_400_B3B3B3>
