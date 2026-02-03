@@ -93,11 +93,11 @@ export const useCloudInfraProviders = create<CloudInfraProvidersState>(
     error: null,
     getProviders: async () => {
       try {
-        set({ isLoading: true });
+        set({ isLoading: true, error: null });
         const response = await AppRequest.Get(
           `${tempApiBaseUrl}/credentials/cloud-providers`,
         );
-        set({ providers: response.data.providers, isLoading: false });
+        set({ providers: response.data.providers, isLoading: false, error: null });
       } catch (error) {
         console.error(error);
         set({ error: error.message, isLoading: false });
@@ -105,7 +105,7 @@ export const useCloudInfraProviders = create<CloudInfraProvidersState>(
     },
     getCloudCredentials: async (filter?: CloudCredentialFilter) => {
       try {
-        set({ isLoading: true });
+        set({ isLoading: true, error: null });
         let url = `${tempApiBaseUrl}/credentials/cloud-providers/credentials`;
         if (filter) {
           const params = new URLSearchParams();
@@ -118,48 +118,72 @@ export const useCloudInfraProviders = create<CloudInfraProvidersState>(
           }
         }
         const response = await AppRequest.Get(url);
-        set({ credentials: response.data.credentials, isLoading: false });
+        set({ credentials: response.data.credentials, isLoading: false, error: null });
       } catch (error) {
         console.error(error);
         set({ error: error.message, isLoading: false });
       }
     },
     refreshCloudCredentials: async (filter?: CloudCredentialFilter) => {
-      try {
-        set({ isLoading: true, error: null });
-        // Fetch both providers and credentials in parallel
-        await Promise.all([
-          AppRequest.Get(`${tempApiBaseUrl}/credentials/cloud-providers`).then(
-            (response) => {
-              set((state) => ({
-                ...state,
-                providers: response.data.providers,
-              }));
-            },
-          ),
-          (async () => {
-            let url = `${tempApiBaseUrl}/credentials/cloud-providers/credentials`;
-            if (filter) {
-              const params = new URLSearchParams();
-              if (filter.providerId) {
-                params.append("provider_id", filter.providerId);
-              }
-              const queryString = params.toString();
-              if (queryString) {
-                url += `?${queryString}`;
-              }
-            }
-            const response = await AppRequest.Get(url);
+      set({ isLoading: true, error: null });
+
+      // Fetch providers - handle errors independently
+      const providersPromise = AppRequest.Get(
+        `${tempApiBaseUrl}/credentials/cloud-providers`,
+      )
+        .then((response) => {
+          set((state) => ({
+            ...state,
+            providers: response.data.providers,
+          }));
+          return { success: true as const, error: undefined };
+        })
+        .catch((error) => {
+          console.error("Error fetching providers:", error);
+          return { success: false as const, error };
+        });
+
+      // Fetch credentials - handle errors independently
+      const credentialsPromise = (async () => {
+        let url = `${tempApiBaseUrl}/credentials/cloud-providers/credentials`;
+        if (filter) {
+          const params = new URLSearchParams();
+          if (filter.providerId) {
+            params.append("provider_id", filter.providerId);
+          }
+          const queryString = params.toString();
+          if (queryString) {
+            url += `?${queryString}`;
+          }
+        }
+        return AppRequest.Get(url)
+          .then((response) => {
             set((state) => ({
               ...state,
               credentials: response.data.credentials,
             }));
-          })(),
-        ]);
-        set({ isLoading: false });
-      } catch (error) {
-        console.error(error);
-        set({ error: error.message, isLoading: false });
+            return { success: true as const, error: undefined };
+          })
+          .catch((error) => {
+            console.error("Error fetching credentials:", error);
+            return { success: false as const, error };
+          });
+      })();
+
+      // Wait for both to complete, but don't fail if one fails
+      const [providersResult, credentialsResult] = await Promise.all([
+        providersPromise,
+        credentialsPromise,
+      ]);
+
+      // Only set error if providers failed (credentials failing is less critical)
+      if (!providersResult.success) {
+        set({
+          error: providersResult.error?.message || "Failed to load providers",
+          isLoading: false,
+        });
+      } else {
+        set({ isLoading: false, error: null });
       }
     },
   }),
