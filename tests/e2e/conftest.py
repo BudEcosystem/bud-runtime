@@ -28,6 +28,39 @@ from tests.e2e.core.config import TimeoutConfig, get_config  # noqa: E402
 from tests.e2e.core.waiter import WorkflowWaiter  # noqa: E402
 from tests.e2e.core.retry import RetryConfig, RetryContext  # noqa: E402
 
+# Import auth fixtures to make them available to tests
+from tests.e2e.fixtures.auth import (  # noqa: E402, F401, F811
+    unique_email,
+    strong_password,
+    weak_password,
+    test_user_data,
+    admin_user_credentials,
+    registered_user,
+    authenticated_user,
+    authenticated_admin_user,
+    auth_tokens,
+    auth_headers,
+    AuthTokens,
+    TestUser,
+    AdminUser,
+)
+
+# Import model fixtures to make them available to tests
+from tests.e2e.fixtures.models import (  # noqa: E402, F401
+    unique_model_name,
+    model_tags,
+    cloud_model_provider,
+    available_cloud_model,
+    created_model,
+    model_list,
+    generate_unique_model_name,
+    generate_model_tags,
+    TestModel,
+    ModelProviderType,
+    WorkflowStatus,
+    Provider,
+)
+
 # Configure logging for E2E tests
 logging.basicConfig(
     level=logging.INFO,
@@ -276,19 +309,13 @@ async def auth_token(budapp_client, test_user_credentials) -> str:
     return login_response.json()["access_token"]
 
 
-@pytest.fixture
-async def auth_headers(auth_token) -> Dict[str, str]:
-    """Get authorization headers."""
-    return {"Authorization": f"Bearer {auth_token}"}
-
-
 # ============================================================================
 # Test Data Fixtures
 # ============================================================================
 
 
 @pytest.fixture
-async def test_project(budapp_client, auth_headers) -> Dict[str, Any]:
+async def test_project(budapp_client, auth_headers) -> Dict[str, Any]:  # noqa: F811
     """
     Create a test project.
 
@@ -320,7 +347,7 @@ async def test_project(budapp_client, auth_headers) -> Dict[str, Any]:
 
 
 @pytest.fixture
-async def test_cluster(budapp_client, auth_headers) -> Dict[str, Any]:
+async def test_cluster(budapp_client, auth_headers) -> Dict[str, Any]:  # noqa: F811
     """
     Create a test cluster.
 
