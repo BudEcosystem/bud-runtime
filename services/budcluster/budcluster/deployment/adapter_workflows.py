@@ -319,6 +319,18 @@ class AdapterWorkflow:
 
         if not adapter_success:
             error_message = adapter_error or "Adapter deployment failed"
+
+            # Cleanup: Delete the failed ModelAdapter CRD
+            logger.info(f"Cleaning up failed adapter: {add_adapter_request_json.adapter_name}")
+            cleanup_success, cleanup_error = deployment_handler.delete_adapter(
+                add_adapter_request_json.adapter_name,
+                add_adapter_request_json.namespace,
+            )
+            if cleanup_success:
+                logger.info(f"Successfully cleaned up failed adapter: {add_adapter_request_json.adapter_name}")
+            else:
+                logger.warning(f"Failed to cleanup adapter: {cleanup_error}")
+
             notification_req.payload.event = "adapter_status"
             notification_req.payload.content = NotificationContent(
                 title="Adapter deployment failed",

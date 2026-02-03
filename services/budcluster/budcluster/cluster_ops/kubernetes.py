@@ -1622,6 +1622,45 @@ class KubernetesHandler(BaseClusterHandler):
             logger.error(error_message)
             return False, error_message
 
+    def delete_adapter(self, adapter_name: str, namespace: str) -> tuple[bool, str | None]:
+        """Delete a ModelAdapter CRD from the cluster.
+
+        This is used for cleanup when an adapter deployment fails.
+
+        Args:
+            adapter_name: Name of the adapter (ModelAdapter CRD name)
+            namespace: Kubernetes namespace where the adapter is deployed
+
+        Returns:
+            tuple: (success: bool, error_message: str | None)
+                - success: True if adapter was deleted, False otherwise
+                - error_message: Error message if failed, None if successful
+        """
+        try:
+            custom_api = client.CustomObjectsApi(api_client=self.api_client)
+            custom_api.delete_namespaced_custom_object(
+                group="model.aibrix.ai",
+                version="v1alpha1",
+                namespace=namespace,
+                plural="modeladapters",
+                name=adapter_name,
+            )
+            logger.info(f"Successfully deleted adapter {adapter_name} from namespace {namespace}")
+            return True, None
+
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                # Already deleted or doesn't exist - consider this success
+                logger.info(f"Adapter {adapter_name} not found in namespace {namespace} (already deleted)")
+                return True, None
+            error_message = f"Failed to delete adapter {adapter_name}: {e.reason}"
+            logger.error(error_message)
+            return False, error_message
+        except Exception as e:
+            error_message = f"Unexpected error deleting adapter {adapter_name}: {str(e)}"
+            logger.error(error_message)
+            return False, error_message
+
     def get_storage_classes(self) -> List[Dict[str, Any]]:
         """Get all storage classes available in the Kubernetes cluster.
 

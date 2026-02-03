@@ -259,6 +259,23 @@ async def get_adapter_status(
     return cluster_handler.get_adapter_status(adapter_name, namespace)
 
 
+async def delete_adapter(config: Dict, adapter_name: str, namespace: str) -> tuple[bool, str | None]:
+    """Delete a ModelAdapter CRD from the cluster.
+
+    This is used for cleanup when an adapter deployment fails.
+
+    Args:
+        config: Kubernetes cluster configuration
+        adapter_name: Name of the adapter (ModelAdapter CRD name)
+        namespace: Kubernetes namespace where the adapter is deployed
+
+    Returns:
+        tuple: (success: bool, error_message: str | None)
+    """
+    cluster_handler = await get_cluster_handler(config, platform=ClusterPlatformEnum.KUBERNETES)
+    return cluster_handler.delete_adapter(adapter_name, namespace)
+
+
 async def identify_supported_endpoints(
     config: Dict,
     namespace: str,

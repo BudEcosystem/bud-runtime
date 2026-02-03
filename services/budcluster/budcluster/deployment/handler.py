@@ -15,6 +15,7 @@ from budmicroframe.shared.http_client import AsyncHTTPClient
 
 from ..cluster_ops import (
     apply_security_context,
+    delete_adapter,
     delete_namespace,
     delete_pod,
     deploy_quantization_job,
@@ -864,6 +865,26 @@ class DeploymentHandler:
             return asyncio.run(get_adapter_status(self.config, adapter_name, namespace, ingress_url))
         except Exception as e:
             raise Exception(f"Failed to get adapter status: {str(e)}") from e
+
+    def delete_adapter(self, adapter_name: str, namespace: str) -> tuple[bool, str | None]:
+        """Delete a ModelAdapter CRD from the cluster.
+
+        This is used for cleanup when an adapter deployment fails.
+
+        Args:
+            adapter_name: Name of the adapter (ModelAdapter CRD name)
+            namespace: Kubernetes namespace where the adapter is deployed
+
+        Returns:
+            tuple: (success: bool, error_message: str | None)
+        """
+        try:
+            logger.info(f"Deleting adapter: {adapter_name} from namespace {namespace}")
+            return asyncio.run(delete_adapter(self.config, adapter_name, namespace))
+        except Exception as e:
+            error_msg = f"Failed to delete adapter: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
 
     def identify_supported_endpoints(self, namespace: str, ingress_url: str = None):
         """Identify which endpoints are supported by checking if they return 200 status."""
