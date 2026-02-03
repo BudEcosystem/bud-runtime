@@ -336,27 +336,37 @@ class BudPipelineService(SessionMixin):
                 data=data,
             )
 
-            # Check for error response from budpipeline (HTTPException returns detail field)
-            if isinstance(result, dict) and "detail" in result:
-                detail = result["detail"]
-                # Handle structured validation error (400) - has "error" and "errors" keys
-                if isinstance(detail, dict) and "error" in detail:
-                    error_msg = detail.get("error", "Pipeline execution failed")
-                    errors = detail.get("errors", [])
-                    if errors:
-                        error_details = ", ".join(map(str, errors))
-                        error_msg = f"{error_msg}: {error_details}"
+            # Check for error response from budpipeline
+            if isinstance(result, dict):
+                # Handle ErrorResponse format: {"object": "error", "code": N, "message": "..."}
+                if result.get("object") == "error" and "message" in result:
+                    error_msg = result["message"]
+                    error_code = result.get("code", 500)
                     raise ClientException(
                         error_msg,
-                        status_code=status.HTTP_400_BAD_REQUEST,
+                        status_code=error_code,
                     )
-                # Handle generic error (500) - detail is a string or unstructured dict
-                else:
-                    error_msg = str(detail) if isinstance(detail, str) else "Pipeline execution failed"
-                    raise ClientException(
-                        error_msg,
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    )
+                # Handle HTTPException format: {"detail": ...}
+                if "detail" in result:
+                    detail = result["detail"]
+                    # Handle structured validation error (400) - has "error" and "errors" keys
+                    if isinstance(detail, dict) and "error" in detail:
+                        error_msg = detail.get("error", "Pipeline execution failed")
+                        errors = detail.get("errors", [])
+                        if errors:
+                            error_details = ", ".join(map(str, errors))
+                            error_msg = f"{error_msg}: {error_details}"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                    # Handle generic error (500) - detail is a string or unstructured dict
+                    else:
+                        error_msg = str(detail) if isinstance(detail, str) else "Pipeline execution failed"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
 
             return result
         except ClientException:
