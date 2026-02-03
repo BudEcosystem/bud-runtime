@@ -9,6 +9,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
+import { Slider, ConfigProvider } from 'antd';
+import { AppRequest } from 'src/pages/api/requests';
 import {
   getActionMeta,
   getActionParams,
@@ -614,16 +616,39 @@ export function ActionConfigPanel({
     []
   );
 
+  // State for saving
+  const [isSaving, setIsSaving] = useState(false);
+
   // Handle save
-  const handleSave = useCallback(() => {
-    // Validate
+  const handleSave = useCallback(async () => {
+    // First do local validation
     const validation = validateParams(action, localParams);
     if (!validation.valid) {
       setErrors(validation.errors);
       return;
     }
 
+    setIsSaving(true);
     setErrors([]);
+
+    try {
+      // Call backend validation API for conditional validation logic
+      const response = await AppRequest.Post('/budpipeline/actions/validate', {
+        action_type: action,
+        params: localParams,
+      });
+
+      if (response?.data && !response.data.valid) {
+        setErrors(response.data.errors || ['Validation failed']);
+        setIsSaving(false);
+        return;
+      }
+    } catch (err) {
+      // If validation API fails, log but continue (fallback to local validation)
+      console.warn('Backend validation failed, using local validation only:', err);
+    }
+
+    setIsSaving(false);
     onUpdate({
       name: localName,
       params: localParams,
@@ -872,6 +897,81 @@ export function ActionConfigPanel({
             </select>
           )}
 
+          {/* Range slider for performance targets */}
+          {param.type === 'range' && (() => {
+            const rangeValue = Array.isArray(value) ? value : (param.default as number[]) || [0, 100];
+            const minVal = param.validation?.min ?? 0;
+            const maxVal = param.validation?.max ?? 100;
+            return (
+              <ConfigProvider
+                theme={{
+                  components: {
+                    Slider: {
+                      trackBg: '#965CDE',
+                      trackHoverBg: '#7A4BC7',
+                      handleColor: '#965CDE',
+                      handleActiveColor: '#7A4BC7',
+                      dotActiveBorderColor: '#965CDE',
+                      railBg: '#333',
+                      railHoverBg: '#444',
+                    },
+                  },
+                }}
+              >
+                <div style={{ padding: '8px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <input
+                      type="number"
+                      value={rangeValue[0] ?? minVal}
+                      min={minVal}
+                      max={rangeValue[1] ?? maxVal}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || minVal;
+                        handleParamChange(param.name, [val, rangeValue[1] ?? maxVal]);
+                      }}
+                      style={{
+                        ...inputStyles,
+                        width: '70px',
+                        textAlign: 'center',
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <Slider
+                        range
+                        min={minVal}
+                        max={maxVal}
+                        value={[rangeValue[0] ?? minVal, rangeValue[1] ?? maxVal]}
+                        onChange={(vals) => handleParamChange(param.name, vals)}
+                        tooltip={{
+                          formatter: (val) => `${val}`,
+                        }}
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      value={rangeValue[1] ?? maxVal}
+                      min={rangeValue[0] ?? minVal}
+                      max={maxVal}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || maxVal;
+                        handleParamChange(param.name, [rangeValue[0] ?? minVal, val]);
+                      }}
+                      style={{
+                        ...inputStyles,
+                        width: '70px',
+                        textAlign: 'center',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#666' }}>{minVal}</span>
+                    <span style={{ fontSize: '10px', color: '#666' }}>{maxVal}</span>
+                  </div>
+                </div>
+              </ConfigProvider>
+            );
+          })()}
+
           {/* Branches (for conditional routing) */}
           {param.type === 'branches' && (
             <BranchEditor
@@ -989,18 +1089,25 @@ export function ActionConfigPanel({
           </button>
         )}
         <button
-          style={primaryButtonStyles}
+          style={{
+            ...primaryButtonStyles,
+            opacity: isSaving ? 0.7 : 1,
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+          }}
           onClick={handleSave}
+          disabled={isSaving}
           onMouseOver={(e) => {
-            e.currentTarget.style.background = '#7A4BC7';
-            e.currentTarget.style.borderColor = '#7A4BC7';
+            if (!isSaving) {
+              e.currentTarget.style.background = '#7A4BC7';
+              e.currentTarget.style.borderColor = '#7A4BC7';
+            }
           }}
           onMouseOut={(e) => {
             e.currentTarget.style.background = '#965CDE';
             e.currentTarget.style.borderColor = '#965CDE';
           }}
         >
-          Save
+          {isSaving ? 'Validating...' : 'Save'}
         </button>
       </div>
     </div>
