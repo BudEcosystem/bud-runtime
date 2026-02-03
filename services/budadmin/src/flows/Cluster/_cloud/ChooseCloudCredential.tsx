@@ -85,13 +85,8 @@ export default function ChooseCloudCredentialStep() {
             ) : (
               <NoDataFount
                 classNames="min-h-[70px] text-center p-[2rem]"
-                textMessage="Let’s start adding models to Bud Inference engine.
-                        Currently there are no models in the model repository."
+                textMessage={`No credentials found for ${selectedProvider?.name || 'this provider'}. Please add credentials first.`}
               />
-              // <div className="p-4 text-center">
-              //   No credentials found for {selectedProvider.name}. Please add
-              //   credentials first.
-              // </div>
             )}
           </div>
         </BudDrawerLayout>
