@@ -382,8 +382,10 @@ class PlaygroundService(SessionMixin):
                 search=False,
             )
 
-            # Get active prompts for playground - matching endpoint filtering pattern
-            db_prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects(
+            # Get active prompts with ALL their versions for playground - matching endpoint filtering pattern
+            prompt_versions_data = await PromptDataManager(
+                self.session
+            ).get_all_active_prompt_versions_for_projects(
                 project_ids=project_ids  # None for CLIENT (all prompts), list of IDs for ADMIN
             )
 
@@ -400,17 +402,29 @@ class PlaygroundService(SessionMixin):
                     "project_id": str(endpoint.project_id),
                 }
 
-            # Add prompts to cache data with prompt: prefix
-            for db_prompt in db_prompts:
-                # Use same naming pattern as proxy cache: prompt:{prompt_name}
-                prompt_cache_key = f"prompt:{db_prompt.name}"
+            # Add prompts to cache data with prompt: prefix and version-specific keys
+            for db_prompt, versions in prompt_versions_data:
+                # Store each version with version-specific key
+                for version in versions:
+                    versioned_key = f"prompt:{db_prompt.name}:v{version.version}"
+                    is_default = db_prompt.default_version_id == version.id
 
-                cache_data[prompt_cache_key] = {
-                    "prompt_id": str(db_prompt.id),
-                    "project_id": str(db_prompt.project_id),
-                }
+                    version_data = {
+                        "prompt_id": str(db_prompt.id),
+                        "prompt_version_id": str(version.id),
+                        "endpoint_id": str(version.endpoint_id),
+                        "model_id": str(version.model_id),
+                        "project_id": str(db_prompt.project_id),
+                        "version": version.version,
+                    }
+                    cache_data[versioned_key] = version_data
 
-            # Add draft/tryout prompts from Redis
+                    # Also store default version without version suffix for backward compatibility
+                    if is_default:
+                        default_key = f"prompt:{db_prompt.name}"
+                        cache_data[default_key] = {**version_data, "is_default": True}
+
+            # Add draft/tryout prompts from Redis with version-specific keys
             draft_prompt_count = 0
             try:
                 redis_service = RedisService()
@@ -425,11 +439,30 @@ class PlaygroundService(SessionMixin):
                     if draft_data_str:
                         draft_data = json.loads(draft_data_str)
                         draft_prompt_id = draft_data.get("prompt_id")
+                        version = draft_data.get("version", 1)  # Get dynamic version
 
                         if draft_prompt_id:
-                            # Use prompt_id as the cache key (with prompt: prefix)
-                            draft_cache_key = f"prompt:{draft_prompt_id}"
-                            cache_data[draft_cache_key] = {"prompt_id": draft_prompt_id}
+                            # Use version-specific key for cache (matches saved prompts pattern)
+                            draft_cache_key = f"prompt:{draft_prompt_id}:v{version}"
+                            cache_data[draft_cache_key] = {
+                                "prompt_id": draft_prompt_id,
+                                "prompt_version_id": None,  # Draft doesn't have version_id yet
+                                "endpoint_id": draft_data.get("endpoint_id"),
+                                "model_id": draft_data.get("model_id"),
+                                "project_id": draft_data.get("project_id"),
+                                "version": version,
+                            }
+                            # Also store at base key for backward compatibility (draft has no other versions)
+                            base_cache_key = f"prompt:{draft_prompt_id}"
+                            cache_data[base_cache_key] = {
+                                "prompt_id": draft_prompt_id,
+                                "prompt_version_id": None,
+                                "endpoint_id": draft_data.get("endpoint_id"),
+                                "model_id": draft_data.get("model_id"),
+                                "project_id": draft_data.get("project_id"),
+                                "version": version,
+                                "is_default": True,  # Draft's only version is default
+                            }
                             draft_prompt_count += 1
 
                 logger.debug(f"Added {draft_prompt_count} draft prompts to cache for user {db_user.id}")
@@ -471,7 +504,7 @@ class PlaygroundService(SessionMixin):
 
             logger.info(
                 f"Initialized playground session for user {db_user.id} with "
-                f"{len(db_endpoints)} endpoints, {len(db_prompts)} prompts, and {draft_prompt_count} draft prompts cached"
+                f"{len(db_endpoints)} endpoints, {len(prompt_versions_data)} prompts, and {draft_prompt_count} draft prompts cached"
             )
 
             # Step 10: Return response with new tokens
@@ -630,9 +663,9 @@ class PlaygroundService(SessionMixin):
                 search=False,
             )
 
-            db_prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects(
-                project_ids=project_ids
-            )
+            prompt_versions_data = await PromptDataManager(
+                self.session
+            ).get_all_active_prompt_versions_for_projects(project_ids=project_ids)
 
             # Step 8: Prepare cache data
             cache_data = {}
@@ -645,14 +678,29 @@ class PlaygroundService(SessionMixin):
                     "project_id": str(endpoint.project_id),
                 }
 
-            for db_prompt in db_prompts:
-                prompt_cache_key = f"prompt:{db_prompt.name}"
-                cache_data[prompt_cache_key] = {
-                    "prompt_id": str(db_prompt.id),
-                    "project_id": str(db_prompt.project_id),
-                }
+            # Add prompts to cache data with prompt: prefix and version-specific keys
+            for db_prompt, versions in prompt_versions_data:
+                # Store each version with version-specific key
+                for version in versions:
+                    versioned_key = f"prompt:{db_prompt.name}:v{version.version}"
+                    is_default = db_prompt.default_version_id == version.id
 
-            # Add draft prompts from Redis
+                    version_data = {
+                        "prompt_id": str(db_prompt.id),
+                        "prompt_version_id": str(version.id),
+                        "endpoint_id": str(version.endpoint_id),
+                        "model_id": str(version.model_id),
+                        "project_id": str(db_prompt.project_id),
+                        "version": version.version,
+                    }
+                    cache_data[versioned_key] = version_data
+
+                    # Also store default version without version suffix for backward compatibility
+                    if is_default:
+                        default_key = f"prompt:{db_prompt.name}"
+                        cache_data[default_key] = {**version_data, "is_default": True}
+
+            # Add draft prompts from Redis with version-specific keys
             draft_prompt_count = 0
             try:
                 redis_service = RedisService()
@@ -666,10 +714,30 @@ class PlaygroundService(SessionMixin):
                     if draft_data_str:
                         draft_data = json.loads(draft_data_str)
                         draft_prompt_id = draft_data.get("prompt_id")
+                        version = draft_data.get("version", 1)  # Get dynamic version
 
                         if draft_prompt_id:
-                            draft_cache_key = f"prompt:{draft_prompt_id}"
-                            cache_data[draft_cache_key] = {"prompt_id": draft_prompt_id}
+                            # Use version-specific key for cache
+                            draft_cache_key = f"prompt:{draft_prompt_id}:v{version}"
+                            cache_data[draft_cache_key] = {
+                                "prompt_id": draft_prompt_id,
+                                "prompt_version_id": None,
+                                "endpoint_id": draft_data.get("endpoint_id"),
+                                "model_id": draft_data.get("model_id"),
+                                "project_id": draft_data.get("project_id"),
+                                "version": version,
+                            }
+                            # Also store at base key for backward compatibility
+                            base_cache_key = f"prompt:{draft_prompt_id}"
+                            cache_data[base_cache_key] = {
+                                "prompt_id": draft_prompt_id,
+                                "prompt_version_id": None,
+                                "endpoint_id": draft_data.get("endpoint_id"),
+                                "model_id": draft_data.get("model_id"),
+                                "project_id": draft_data.get("project_id"),
+                                "version": version,
+                                "is_default": True,
+                            }
                             draft_prompt_count += 1
 
                 logger.debug(f"Added {draft_prompt_count} draft prompts to cache for user {db_user.id}")
@@ -707,7 +775,7 @@ class PlaygroundService(SessionMixin):
 
             logger.info(
                 f"Initialized playground session (access token) for user {db_user.id} with "
-                f"{len(db_endpoints)} endpoints, {len(db_prompts)} prompts, and {draft_prompt_count} draft prompts"
+                f"{len(db_endpoints)} endpoints, {len(prompt_versions_data)} prompts, and {draft_prompt_count} draft prompts"
             )
 
             return PlaygroundInitializeWithAccessTokenResponse(
