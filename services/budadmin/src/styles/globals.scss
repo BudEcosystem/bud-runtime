@@ -1655,12 +1655,13 @@ input.ant-input:-webkit-autofill {
   background-color: #1a1a1a !important;
   border: 1px solid #333333 !important;
   border-radius: 6px !important;
-
   >div {
     background-color: transparent !important;
     background: transparent !important;
   }
-
+  &.antSegmented-home {
+    background-color: transparent !important;
+  }
   label {
     border-radius: 0 !important;
     color: #B3B3B3 !important;
