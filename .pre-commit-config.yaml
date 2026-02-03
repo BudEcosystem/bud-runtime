@@ -41,6 +41,7 @@ repos:
               infra/helm/bud/example\.secrets\.yaml|
               infra/helm/bud/charts/mcp-stack/README\.md|
               services/budgateway/tensorzero-internal/src/inference/providers/gcp_vertex_gemini\.rs|
+              tests/e2e/config/values\.e2e\.yaml|
               \.env\.sample
           )$
       - id: end-of-file-fixer
