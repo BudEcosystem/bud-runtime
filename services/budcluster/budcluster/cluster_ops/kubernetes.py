@@ -1548,9 +1548,79 @@ class KubernetesHandler(BaseClusterHandler):
 
         return job_status, quantization_data
 
-    def get_adapter_status(self, adapter_name: str):
-        """Get the status of a adapter."""
-        return self.verify_ingress_health(adapter_name)
+    def _format_adapter_error_message(self, raw_message: str) -> str:
+        """Format adapter error messages to be more user-friendly.
+
+        Args:
+            raw_message: Raw error message from the CRD
+
+        Returns:
+            Formatted error message
+        """
+        # Known error message reformatting
+        if "vLLM does not yet support DoRA" in raw_message:
+            return "DoRA is not yet supported"
+
+        return raw_message
+
+    def get_adapter_status(self, adapter_name: str, namespace: str) -> tuple[bool, str | None]:
+        """Get the status of an adapter by checking the ModelAdapter CRD status.
+
+        Args:
+            adapter_name: Name of the adapter (ModelAdapter CRD name)
+            namespace: Kubernetes namespace where the adapter is deployed
+
+        Returns:
+            tuple: (success: bool, error_message: str | None)
+                - success: True if adapter is ready, False otherwise
+                - error_message: Error message if failed, None if successful
+        """
+        try:
+            custom_api = client.CustomObjectsApi(api_client=self.api_client)
+            adapter = custom_api.get_namespaced_custom_object(
+                group="model.aibrix.ai",
+                version="v1alpha1",
+                namespace=namespace,
+                plural="modeladapters",
+                name=adapter_name,
+            )
+
+            status = adapter.get("status", {})
+            phase = status.get("phase", "Unknown")
+
+            logger.info(f"Adapter {adapter_name} in namespace {namespace} has phase: {phase}")
+
+            if phase == "Failed":
+                # Extract error message from conditions
+                conditions = status.get("conditions", [])
+                error_message = "Adapter loading failed"
+                for condition in conditions:
+                    if condition.get("type") == "Ready" and condition.get("status") == "False":
+                        raw_message = condition.get("message", error_message)
+                        error_message = self._format_adapter_error_message(raw_message)
+                        break
+                logger.error(f"Adapter {adapter_name} failed: {error_message}")
+                return False, error_message
+
+            if phase in ("Running", "Ready"):
+                logger.info(f"Adapter {adapter_name} is ready")
+                return True, None
+
+            # Pending or unknown state - treat as not ready
+            logger.warning(f"Adapter {adapter_name} is in {phase} state")
+            return False, f"Adapter is in {phase} state"
+
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                error_message = f"ModelAdapter CRD '{adapter_name}' not found in namespace '{namespace}'"
+            else:
+                error_message = f"Failed to get ModelAdapter status: {e.reason}"
+            logger.error(error_message)
+            return False, error_message
+        except Exception as e:
+            error_message = f"Unexpected error checking adapter status: {str(e)}"
+            logger.error(error_message)
+            return False, error_message
 
     def get_storage_classes(self) -> List[Dict[str, Any]]:
         """Get all storage classes available in the Kubernetes cluster.
