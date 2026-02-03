@@ -103,13 +103,17 @@ const InferenceListTable: React.FC<InferenceListTableProps> = ({ projectId: prop
       dataIndex: 'endpoint_name',
       key: 'endpoint_name',
       width: 200,
-      render: (endpoint_name: string) => (
-        <Tooltip title={endpoint_name || 'N/A'}>
-          <Text_12_400_EEEEEE className="truncate max-w-[180px]">
-            {endpoint_name || '-'}
-          </Text_12_400_EEEEEE>
-        </Tooltip>
-      ),
+      render: (endpoint_name: string, record: InferenceListItem) => {
+        // Use endpoint_name for base model, model_display_name for adapters
+        const displayName = endpoint_name || record.model_display_name || '-';
+        return (
+          <Tooltip title={displayName !== '-' ? displayName : 'N/A'}>
+            <Text_12_400_EEEEEE className="truncate max-w-[180px]">
+              {displayName}
+            </Text_12_400_EEEEEE>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Prompt Preview',
