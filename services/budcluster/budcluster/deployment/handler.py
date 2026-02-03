@@ -848,11 +848,20 @@ class DeploymentHandler:
         except Exception as e:
             raise Exception(f"Failed to get quantization status: {str(e)}") from e
 
-    def get_adapter_status(self, adapter_name: str, ingress_url: str):
-        """Get the status of a adapter."""
+    def get_adapter_status(self, adapter_name: str, namespace: str, ingress_url: str) -> tuple[bool, str | None]:
+        """Get the status of an adapter by checking the ModelAdapter CRD.
+
+        Args:
+            adapter_name: Name of the adapter (ModelAdapter CRD name)
+            namespace: Kubernetes namespace where the adapter is deployed
+            ingress_url: Ingress URL for the deployment
+
+        Returns:
+            tuple: (success: bool, error_message: str | None)
+        """
         try:
-            logger.info(f"within handler: {adapter_name}")
-            return asyncio.run(get_adapter_status(self.config, adapter_name, ingress_url))
+            logger.info(f"Checking adapter status: {adapter_name} in namespace {namespace}")
+            return asyncio.run(get_adapter_status(self.config, adapter_name, namespace, ingress_url))
         except Exception as e:
             raise Exception(f"Failed to get adapter status: {str(e)}") from e
 
