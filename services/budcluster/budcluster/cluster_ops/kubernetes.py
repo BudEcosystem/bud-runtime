@@ -1557,11 +1557,11 @@ class KubernetesHandler(BaseClusterHandler):
         Returns:
             Formatted error message
         """
-        # Known error message reformatting
-        if "vLLM does not yet support DoRA" in raw_message:
-            return "DoRA is not yet supported"
-
-        return raw_message
+        # Known error message mappings for user-friendly display
+        known_errors = {
+            "vLLM does not yet support DoRA": "DoRA is not yet supported",
+        }
+        return next((msg for key, msg in known_errors.items() if key in raw_message), raw_message)
 
     def get_adapter_status(self, adapter_name: str, namespace: str) -> tuple[bool, str | None]:
         """Get the status of an adapter by checking the ModelAdapter CRD status.
