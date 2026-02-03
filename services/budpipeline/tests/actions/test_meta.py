@@ -30,6 +30,7 @@ class TestParamType:
             "json",
             "template",
             "branches",
+            "range",
             "model_ref",
             "cluster_ref",
             "project_ref",
