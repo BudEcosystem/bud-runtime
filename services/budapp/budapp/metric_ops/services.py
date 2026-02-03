@@ -563,9 +563,10 @@ class BudMetricService(SessionMixin):
                 # Check for adapters: any endpoint_ids not found might be adapter IDs
                 # (endpoint_id field can hold either endpoint or adapter UUID)
                 found_endpoint_ids = set(endpoint_names.keys())
-                missing_ids = endpoint_ids - found_endpoint_ids
+                # Convert endpoint_ids (Set[UUID]) to strings for comparison with found_endpoint_ids (Set[str])
+                missing_ids = {str(eid) for eid in endpoint_ids} - found_endpoint_ids
                 if missing_ids:
-                    stmt = select(AdapterModel).where(AdapterModel.id.in_(list(missing_ids)))
+                    stmt = select(AdapterModel).where(AdapterModel.id.in_([UUID(mid) for mid in missing_ids]))
                     result = self.session.execute(stmt)
                     adapters = result.scalars().all()
                     adapter_names.update({str(a.id): a.name for a in adapters})
