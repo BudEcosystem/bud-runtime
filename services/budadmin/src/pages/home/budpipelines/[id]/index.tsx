@@ -260,17 +260,15 @@ const WorkflowDetail = () => {
 
   const handleExecute = async () => {
     if (selectedWorkflow) {
-      // Get parameters from the current DAG (edited or original)
-      const dag = editedDag || selectedWorkflow.dag;
-
       // Frontend validation: check if pipeline has steps
-      const stepCount = dag?.steps?.length ?? selectedWorkflow.step_count ?? 0;
-      if (stepCount === 0) {
+      if (!canExecute) {
         errorToast("Cannot execute a pipeline with no steps");
         return;
       }
 
       setIsExecuting(true);
+      // Get parameters from the current DAG (edited or original)
+      const dag = editedDag || selectedWorkflow.dag;
       const params: Record<string, any> = {};
       // Populate params with default values from DAG parameters
       if (dag?.parameters) {

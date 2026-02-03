@@ -344,7 +344,8 @@ class BudPipelineService(SessionMixin):
                     error_msg = detail.get("error", "Pipeline execution failed")
                     errors = detail.get("errors", [])
                     if errors:
-                        error_msg = f"{error_msg}: {errors[0]}" if len(errors) == 1 else f"{error_msg}: {errors}"
+                        error_details = ", ".join(map(str, errors))
+                        error_msg = f"{error_msg}: {error_details}"
                     raise ClientException(
                         error_msg,
                         status_code=status.HTTP_400_BAD_REQUEST,
