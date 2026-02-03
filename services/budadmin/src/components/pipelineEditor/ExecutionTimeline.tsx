@@ -120,7 +120,7 @@ const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
 
         {/* Error message */}
         {step.error && (
-          <Box className="mt-2 p-2 rounded bg-red-500/10 border border-red-500/20 overflow-hidden h-auto">
+          <Box className="mt-2 p-2 rounded bg-red-500/10 border border-red-500/20 overflow-y-auto max-h-48 h-auto">
             <span className="text-red-400 text-xs break-all whitespace-pre-wrap block">{step.error}</span>
           </Box>
         )}
@@ -211,7 +211,7 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({
 
       {/* Error */}
       {execution.error && (
-        <Box className="mt-4 p-3 rounded bg-red-500/10 border border-red-500/20 overflow-hidden h-auto">
+        <Box className="mt-4 p-3 rounded bg-red-500/10 border border-red-500/20 overflow-y-auto max-h-48 h-auto">
           <div className="text-red-500 text-xs mb-1">Execution Error</div>
           <span className="text-red-400 text-sm break-all whitespace-pre-wrap block">{execution.error}</span>
         </Box>

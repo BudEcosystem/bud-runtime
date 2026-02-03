@@ -137,7 +137,7 @@ const StepDetailDrawer: React.FC<StepDetailDrawerProps> = ({ step, execution, on
             </Flex>
 
             {execution.error && (
-              <Box className="mt-2 p-2 rounded bg-red-500/10 overflow-hidden h-auto">
+              <Box className="mt-2 p-2 rounded bg-red-500/10 overflow-y-auto max-h-48 h-auto">
                 <span className="text-red-400 text-xs break-all whitespace-pre-wrap block">{execution.error}</span>
               </Box>
             )}
