@@ -58,6 +58,38 @@ class TestUser:
         }
 
 
+@dataclass
+class AdminUser:
+    """Container for admin user data."""
+
+    # Prevent pytest from treating this as a test class
+    __test__ = False
+
+    email: str
+    password: str
+    user_id: str = ""
+    name: str = "Admin User"
+    role: str = "admin"
+
+    @property
+    def registration_data(self) -> Dict[str, str]:
+        """Get data for user registration."""
+        return {
+            "email": self.email,
+            "password": self.password,
+            "name": self.name,
+            "role": self.role,
+        }
+
+    @property
+    def login_data(self) -> Dict[str, str]:
+        """Get data for login."""
+        return {
+            "email": self.email,
+            "password": self.password,
+        }
+
+
 @pytest.fixture
 def unique_email() -> str:
     """Generate a unique email address for testing."""
@@ -162,3 +194,41 @@ async def auth_tokens(authenticated_user) -> AuthTokens:
 async def auth_headers(auth_tokens: AuthTokens) -> Dict[str, str]:
     """Get authorization headers for authenticated requests."""
     return auth_tokens.auth_header
+
+
+@pytest.fixture
+async def authenticated_admin_user(
+    budapp_client: httpx.AsyncClient,
+    admin_user_credentials: Dict[str, str],
+) -> tuple[AdminUser, AuthTokens]:
+    """
+    Get an authenticated admin user with tokens.
+
+    Uses the super admin credentials from environment.
+    Returns tuple of (AdminUser, AuthTokens).
+    """
+    response = await budapp_client.post(
+        "/auth/login",
+        json=admin_user_credentials,
+    )
+
+    if response.status_code != 200:
+        raise AssertionError(
+            f"Failed to login admin: {response.status_code} - {response.text}"
+        )
+
+    data = response.json()
+    token_data = data.get("token", data)  # Handle nested token structure
+
+    admin = AdminUser(
+        email=admin_user_credentials["email"],
+        password=admin_user_credentials["password"],
+        user_id=data.get("user", {}).get("id", ""),
+    )
+
+    tokens = AuthTokens(
+        access_token=token_data["access_token"],
+        refresh_token=token_data["refresh_token"],
+    )
+
+    return admin, tokens

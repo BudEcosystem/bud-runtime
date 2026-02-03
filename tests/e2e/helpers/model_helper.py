@@ -10,11 +10,24 @@ Provides helper methods for model operations including:
 """
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 
 import httpx
+
+from tests.e2e.core.waiter import (
+    WorkflowWaiter,
+    WorkflowStatus,
+    WorkflowResult,
+    WaiterConfig,
+    create_model_workflow_waiter,
+)
+from tests.e2e.core.config import get_config
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -432,27 +445,30 @@ class ModelHelper:
         self,
         access_token: str,
         workflow_id: str,
-        timeout: int = 300,
-        poll_interval: int = 5,
+        timeout: Optional[int] = None,
+        poll_interval: Optional[int] = None,
     ) -> ModelResponse:
         """
         Wait for local model extraction to complete.
 
         Local model extraction is async, so we poll until complete.
+        Uses the WorkflowWaiter infrastructure for robust polling.
 
         Args:
             access_token: JWT access token
             workflow_id: Workflow UUID
-            timeout: Max wait time in seconds
-            poll_interval: Time between polls in seconds
+            timeout: Max wait time in seconds (default from config)
+            poll_interval: Time between polls in seconds (default from config)
 
         Returns:
             ModelResponse with final workflow status
         """
-        elapsed = 0
+        config = get_config()
+        timeout = timeout or config.timeouts.model_local_workflow
+        poll_interval = poll_interval or config.timeouts.poll_interval_slow
 
-        while elapsed < timeout:
-            # Check workflow status by calling the endpoint with current step
+        # Define the check function for the waiter
+        async def check_workflow_status() -> Dict[str, Any]:
             result = await self.complete_local_model_workflow(
                 access_token=access_token,
                 workflow_id=workflow_id,
@@ -461,29 +477,50 @@ class ModelHelper:
             )
 
             if not result.success:
-                return result
+                raise Exception(f"Failed to check workflow status: {result.error}")
 
-            status = result.workflow_status
-            if status == "SUCCESS":
-                return result
-            elif status == "FAILED":
-                return ModelResponse(
-                    success=False,
-                    status_code=result.status_code,
-                    error=f"Workflow failed: {result.data}",
-                    workflow_id=workflow_id,
-                    workflow_status=status,
-                )
+            return {
+                "status": result.workflow_status,
+                "current_step": result.current_step,
+                "total_steps": result.total_steps,
+                "data": result.data,
+                "model_id": result.model_id,
+            }
 
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-
-        return ModelResponse(
-            success=False,
-            status_code=408,
-            error=f"Timeout waiting for model extraction after {timeout}s",
+        # Create waiter using factory function
+        waiter = create_model_workflow_waiter(
+            check_func=check_workflow_status,
             workflow_id=workflow_id,
+            local=True,
         )
+
+        # Override timeout if specified
+        if timeout:
+            waiter.config.timeout = timeout
+        if poll_interval:
+            waiter.config.poll_interval = poll_interval
+
+        # Wait for completion
+        result = await waiter.wait()
+
+        # Convert WorkflowResult to ModelResponse
+        if result.success:
+            return ModelResponse(
+                success=True,
+                status_code=200,
+                data=result.data,
+                workflow_id=workflow_id,
+                model_id=result.data.get("model_id") if result.data else None,
+                workflow_status=result.status.value,
+            )
+        else:
+            return ModelResponse(
+                success=False,
+                status_code=408 if result.status == WorkflowStatus.TIMEOUT else 500,
+                error=result.error or f"Workflow {result.status.value}",
+                workflow_id=workflow_id,
+                workflow_status=result.status.value,
+            )
 
     # =========================================================================
     # Model CRUD Operations
