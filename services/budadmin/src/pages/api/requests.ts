@@ -262,14 +262,18 @@ const handleErrorResponse = (err) => {
     if (err.config?.url?.includes('/prompts/oauth/status') ||
         err.config?.url?.includes('/prompts/prompt-config/') ||
         err.config?.url?.includes('/benchmark/node-configurations') ||
-        err.config?.url?.includes('/models/top-leaderboards')) {
+        err.config?.url?.includes('/models/top-leaderboards') ||
+        err.config?.url?.includes('/adapters')) {
       return Promise.reject(err);
     }
 
     if (err && localStorage.getItem("access_token")) {
       // Check both 'detail' (FastAPI HTTPException) and 'message' (custom ErrorResponse)
       const errorMessage = err.response?.data?.detail || err.response?.data?.message;
-      errorToast(errorMessage);
+      // Only show toast if there's an actual error message
+      if (errorMessage) {
+        errorToast(errorMessage);
+      }
     }
     return false;
   }

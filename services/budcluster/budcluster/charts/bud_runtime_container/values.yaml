@@ -33,10 +33,6 @@ nfs:
 nodes: []
 skipMasterNodeForCpu: true  # skip master/control-plane nodes for CPU deployments
 
-imagePullSecrets:
-  name: bud-registry-secret
-  auth: {} # replaced with the actual auth
-
 modelName: "" # will be replaced by the deployment handler
 adapters: []
 

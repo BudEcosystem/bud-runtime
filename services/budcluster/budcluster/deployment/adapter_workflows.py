@@ -81,7 +81,7 @@ class AdapterWorkflow:
                     "cluster_config_dict": cluster_config,
                 },
             )
-            if status is not None:
+            if status == "successful":
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
                 if workflow_status:
                     return workflow_status
@@ -90,7 +90,9 @@ class AdapterWorkflow:
                     param={"status": status},
                 )
             else:
-                response = ErrorResponse(message="Failed to deploy adapter", code=HTTPStatus.BAD_REQUEST.value)
+                response = ErrorResponse(
+                    message=f"Failed to deploy adapter: {status}", code=HTTPStatus.BAD_REQUEST.value
+                )
         except Exception as e:
             error_msg = f"Error deploying adapter for workflow_id: {workflow_id} and task_id: {task_id}, error: {e}"
             logger.error(error_msg)
@@ -308,16 +310,31 @@ class AdapterWorkflow:
         cluster_config = json.loads(cluster_config)
         deployment_handler = DeploymentHandler(config=cluster_config)
         logger.info(f"within adapter workflow: {add_adapter_request_json.adapter_name}")
-        adapter_status = deployment_handler.get_adapter_status(
-            add_adapter_request_json.adapter_name, add_adapter_request_json.ingress_url
+        adapter_success, adapter_error = deployment_handler.get_adapter_status(
+            add_adapter_request_json.adapter_name,
+            add_adapter_request_json.namespace,
+            add_adapter_request_json.ingress_url,
         )
-        logger.info(f"adapter status: {adapter_status}")
+        logger.info(f"adapter status: success={adapter_success}, error={adapter_error}")
 
-        if not adapter_status:
+        if not adapter_success:
+            error_message = adapter_error or "Adapter deployment failed"
+
+            # Cleanup: Delete the failed ModelAdapter CRD
+            logger.info(f"Cleaning up failed adapter: {add_adapter_request_json.adapter_name}")
+            cleanup_success, cleanup_error = deployment_handler.delete_adapter(
+                add_adapter_request_json.adapter_name,
+                add_adapter_request_json.namespace,
+            )
+            if cleanup_success:
+                logger.info(f"Successfully cleaned up failed adapter: {add_adapter_request_json.adapter_name}")
+            else:
+                logger.warning(f"Failed to cleanup adapter: {cleanup_error}")
+
             notification_req.payload.event = "adapter_status"
             notification_req.payload.content = NotificationContent(
                 title="Adapter deployment failed",
-                message="Adapter deployment failed",
+                message=error_message,
                 status=WorkflowStatus.FAILED,
             )
             dapr_workflows.publish_notification(
@@ -342,7 +359,7 @@ class AdapterWorkflow:
         )
 
         results = {
-            "adapter_status": adapter_status,
+            "adapter_status": adapter_success,
             "deployment_name": add_adapter_request_json.adapter_name,
         }
 

@@ -349,19 +349,24 @@ class CreateDeploymentWorkflow:
                 default_access_mode=transfer_model_request_json.default_access_mode,
                 storage_size_gb=transfer_model_request_json.storage_size_gb,
             )
-            if status is not None:
+            if status == "successful":
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
                 if workflow_status:
-                    # cleanup the namespace if workflow is terminated
-                    deployment_handler.delete(namespace=namespace, platform=platform)
+                    # cleanup the namespace if workflow is terminated (only for new deployments)
+                    if not existing_deployment_namespace:
+                        deployment_handler.delete(namespace=namespace, platform=platform)
                     return workflow_status
                 response = SuccessResponse(
                     message="Model transferred successfully",
                     param={"status": status, "namespace": namespace},
                 )
             else:
-                deployment_handler.delete(namespace=namespace, platform=platform)
-                response = ErrorResponse(message="Failed to transfer model", code=HTTPStatus.BAD_REQUEST.value)
+                # Only delete namespace for new deployments, not for adapter transfers to existing deployments
+                if not existing_deployment_namespace:
+                    deployment_handler.delete(namespace=namespace, platform=platform)
+                response = ErrorResponse(
+                    message=f"Failed to transfer model: {status}", code=HTTPStatus.BAD_REQUEST.value
+                )
         except Exception as e:
             error_msg = f"Error transferring model for workflow_id: {workflow_id} and task_id: {task_id}, error: {e}"
             logger.error(error_msg)
@@ -433,7 +438,7 @@ class CreateDeploymentWorkflow:
                     "cluster_config_dict": cluster_config,
                 },
             )
-            if status is not None:
+            if status == "successful":
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
                 if workflow_status:
                     # cleanup the namespace if workflow is terminated
@@ -451,7 +456,9 @@ class CreateDeploymentWorkflow:
                     },
                 )
             else:
-                response = ErrorResponse(message="Failed to deploy runtime", code=HTTPStatus.BAD_REQUEST.value)
+                response = ErrorResponse(
+                    message=f"Failed to deploy runtime: {status}", code=HTTPStatus.BAD_REQUEST.value
+                )
         except Exception as e:
             import traceback
 
