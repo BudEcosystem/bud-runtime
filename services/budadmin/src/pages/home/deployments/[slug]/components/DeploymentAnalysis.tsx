@@ -2309,20 +2309,6 @@ export default function DeploymentAnalysis({
     return options;
   }, [adapters, deploymentId]);
 
-  // Get the filter IDs to pass to cards based on selected filter
-  const getFilterIds = React.useCallback(() => {
-    if (analyticsFilter === "all") {
-      // Include deployment ID and all adapter IDs
-      const ids = [deploymentId as string];
-      if (adapters && adapters.length > 0) {
-        adapters.forEach((adapter) => ids.push(adapter.id));
-      }
-      return ids;
-    }
-    // Single filter (deployment or specific adapter)
-    return [analyticsFilter];
-  }, [analyticsFilter, deploymentId, adapters]);
-
   // Check if this is an embedding-only or classify-only model (no LLM capabilities)
   // TTFT and Throughput metrics are only relevant for LLM models with chat/completion endpoints
   const supportedEndpoints = clusterDetails?.model?.supported_endpoints;
@@ -2421,8 +2407,15 @@ export default function DeploymentAnalysis({
     );
   }, [inferenceQualityAnalytics]);
 
-  // Get current filter IDs for the cards
-  const filterIds = getFilterIds();
+  // Memoize filter IDs to avoid creating new array references on each render
+  // This prevents unnecessary API calls in the analytics card useEffects
+  const filterIds = React.useMemo(() => {
+    if (analyticsFilter === "all") {
+      const adapterIds = adapters?.map((adapter) => adapter.id) ?? [];
+      return [deploymentId as string, ...adapterIds];
+    }
+    return [analyticsFilter];
+  }, [analyticsFilter, deploymentId, adapters]);
 
   return (
     <div className="flex flex-col gap-[.75rem] p-[.25rem] px-[0rem] pb-[0]">
