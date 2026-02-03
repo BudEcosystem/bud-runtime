@@ -279,12 +279,14 @@ const WorkflowDetail = () => {
         }
       }
       const result = await executeWorkflow(selectedWorkflow.id, params);
+      // Capture error message before getExecutions clears it
+      const errorMessage = useBudPipeline.getState().error;
       await getExecutions(selectedWorkflow.id);
       setIsExecuting(false);
       if (result) {
         successToast("Pipeline execution started");
       } else {
-        errorToast(useBudPipeline.getState().error || "Failed to execute pipeline");
+        errorToast(errorMessage || "Failed to execute pipeline");
       }
     }
   };

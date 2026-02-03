@@ -949,8 +949,16 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return newExecution;
     } catch (error: any) {
       console.error("Failed to execute workflow:", error);
+      // Extract error message from various possible response formats
+      const responseData = error?.response?.data;
+      const errorMessage =
+        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
+        responseData?.detail ||            // FastAPI HTTPException format: {"detail": "..."}
+        (typeof responseData === "string" ? responseData : null) ||
+        error?.message ||                  // Axios/network error
+        "Failed to execute workflow";
       set({
-        error: error?.response?.data?.message || "Failed to execute workflow",
+        error: errorMessage,
         isLoading: false,
       });
       return null;
