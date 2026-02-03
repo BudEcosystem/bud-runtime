@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Test Reports
+reports/
+*.log
+test-results/
+allure-results/
+coverage.xml
+
+# Environment
+.env
+.env.local
+*.env
+!*.env.sample
+
+# Temporary files
+*.tmp
+*.temp
