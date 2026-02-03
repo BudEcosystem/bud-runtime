@@ -335,7 +335,32 @@ class BudPipelineService(SessionMixin):
                 method="POST",
                 data=data,
             )
+
+            # Check for error response from budpipeline (HTTPException returns detail field)
+            if isinstance(result, dict) and "detail" in result:
+                detail = result["detail"]
+                # Handle structured validation error (400) - has "error" and "errors" keys
+                if isinstance(detail, dict) and "error" in detail:
+                    error_msg = detail.get("error", "Pipeline execution failed")
+                    errors = detail.get("errors", [])
+                    if errors:
+                        error_details = ", ".join(map(str, errors))
+                        error_msg = f"{error_msg}: {error_details}"
+                    raise ClientException(
+                        error_msg,
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                # Handle generic error (500) - detail is a string or unstructured dict
+                else:
+                    error_msg = str(detail) if isinstance(detail, str) else "Pipeline execution failed"
+                    raise ClientException(
+                        error_msg,
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
             return result
+        except ClientException:
+            raise
         except Exception as e:
             logger.exception(f"Failed to execute pipeline {pipeline_id}")
             raise ClientException(

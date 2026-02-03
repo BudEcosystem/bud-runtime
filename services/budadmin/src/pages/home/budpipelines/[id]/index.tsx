@@ -251,8 +251,21 @@ const WorkflowDetail = () => {
     }
   }, [selectedWorkflow]);
 
+  // Check if pipeline can be executed (has at least one step)
+  const canExecute = useMemo(() => {
+    const dag = editedDag || selectedWorkflow?.dag;
+    const stepCount = dag?.steps?.length ?? selectedWorkflow?.step_count ?? 0;
+    return stepCount > 0;
+  }, [editedDag, selectedWorkflow]);
+
   const handleExecute = async () => {
     if (selectedWorkflow) {
+      // Frontend validation: check if pipeline has steps
+      if (!canExecute) {
+        errorToast("Cannot execute a pipeline with no steps");
+        return;
+      }
+
       setIsExecuting(true);
       // Get parameters from the current DAG (edited or original)
       const dag = editedDag || selectedWorkflow.dag;
@@ -265,14 +278,34 @@ const WorkflowDetail = () => {
           }
         }
       }
-      await executeWorkflow(selectedWorkflow.id, params);
+      const result = await executeWorkflow(selectedWorkflow.id, params);
       await getExecutions(selectedWorkflow.id);
       setIsExecuting(false);
-      successToast("Pipeline execution started");
+      if (result) {
+        successToast("Pipeline execution started");
+      } else {
+        errorToast(useBudPipeline.getState().error || "Failed to execute pipeline");
+      }
     }
   };
 
   const confirmExecute = () => {
+    // Check if pipeline has steps before showing execute confirmation
+    if (!canExecute) {
+      openConfirm({
+        message: "Cannot Execute Pipeline",
+        description: "This pipeline has no steps. Add at least one step and click Save before executing.",
+        cancelAction: () => {},
+        cancelText: "Close",
+        loading: false,
+        key: "execute-pipeline-no-steps",
+        okAction: () => setActiveTab("dag"),
+        okText: "Go to Editor",
+        type: "warning",
+      });
+      return;
+    }
+
     openConfirm({
       message: `Execute "${selectedWorkflow?.name}"?`,
       description: "This will start a new execution of the pipeline with all configured steps.",
