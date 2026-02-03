@@ -744,7 +744,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
         params.workflow_id = workflowId;
       }
       const response = await AppRequest.Get(`${BUDPIPELINE_API}/executions`, { params });
-      const rawExecutions = response.data?.executions || response.data || [];
+      const rawExecutions = response.data?.executions || (Array.isArray(response.data) ? response.data : []);
       const pagination = response.data?.pagination || null;
       // Map backend field names to frontend expected names
       const executions = rawExecutions.map((e: any) => ({

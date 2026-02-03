@@ -236,7 +236,10 @@ const WorkflowDetail = () => {
   useEffect(() => {
     if (id && typeof id === "string") {
       showLoader();
-      Promise.all([getWorkflow(id), getExecutions(id, executionsPage, executionsPageSize)]).finally(() => hideLoader());
+      // Reset pagination to page 1 when the pipeline ID changes
+      setExecutionsPage(1);
+      setExecutionsPageSize(20);
+      Promise.all([getWorkflow(id), getExecutions(id, 1, 20)]).finally(() => hideLoader());
     }
     return () => clearSelection();
   }, [id]);
@@ -636,7 +639,7 @@ const WorkflowDetail = () => {
                 pagination={{
                   current: executionsPage,
                   pageSize: executionsPageSize,
-                  total: executionsPagination?.total_count || executions.length,
+                  total: executionsPagination?.total_count || 0,
                   showSizeChanger: true,
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} runs`,
                   pageSizeOptions: ["10", "20", "50", "100"],
@@ -651,7 +654,7 @@ const WorkflowDetail = () => {
                     key: "run_number",
                     render: (_: unknown, __: any, index: number) => {
                       // Calculate the correct run number based on pagination
-                      const totalCount = executionsPagination?.total_count || sortedExecutions.length;
+                      const totalCount = executionsPagination?.total_count || 0;
                       const offset = (executionsPage - 1) * executionsPageSize;
                       return (
                         <Text_11_400_808080>
