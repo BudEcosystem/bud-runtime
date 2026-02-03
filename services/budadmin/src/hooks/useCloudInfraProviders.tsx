@@ -69,6 +69,19 @@ export type CloudInfraProvidersState = {
 };
 
 /**
+ * Build the credentials URL with optional filter parameters
+ */
+const buildCredentialsUrl = (filter?: CloudCredentialFilter): string => {
+  let url = `${tempApiBaseUrl}/credentials/cloud-providers/credentials`;
+  if (filter?.providerId) {
+    const params = new URLSearchParams();
+    params.append("provider_id", filter.providerId);
+    url += `?${params.toString()}`;
+  }
+  return url;
+};
+
+/**
  * Zustand store for managing cloud infrastructure providers
  */
 export const useCloudInfraProviders = create<CloudInfraProvidersState>(
@@ -106,17 +119,7 @@ export const useCloudInfraProviders = create<CloudInfraProvidersState>(
     getCloudCredentials: async (filter?: CloudCredentialFilter) => {
       try {
         set({ isLoading: true, error: null });
-        let url = `${tempApiBaseUrl}/credentials/cloud-providers/credentials`;
-        if (filter) {
-          const params = new URLSearchParams();
-          if (filter.providerId) {
-            params.append("provider_id", filter.providerId);
-          }
-          const queryString = params.toString();
-          if (queryString) {
-            url += `?${queryString}`;
-          }
-        }
+        const url = buildCredentialsUrl(filter);
         const response = await AppRequest.Get(url);
         set({ credentials: response.data.credentials, isLoading: false, error: null });
       } catch (error) {
@@ -144,34 +147,19 @@ export const useCloudInfraProviders = create<CloudInfraProvidersState>(
         });
 
       // Fetch credentials - handle errors independently
-      const credentialsPromise = (async () => {
-        let url = `${tempApiBaseUrl}/credentials/cloud-providers/credentials`;
-        if (filter) {
-          const params = new URLSearchParams();
-          if (filter.providerId) {
-            params.append("provider_id", filter.providerId);
-          }
-          const queryString = params.toString();
-          if (queryString) {
-            url += `?${queryString}`;
-          }
-        }
-        return AppRequest.Get(url)
-          .then((response) => {
-            set((state) => ({
-              ...state,
-              credentials: response.data.credentials,
-            }));
-            return { success: true as const, error: undefined };
-          })
-          .catch((error) => {
-            console.error("Error fetching credentials:", error);
-            return { success: false as const, error };
-          });
-      })();
+      const credentialsPromise = AppRequest.Get(buildCredentialsUrl(filter))
+        .then((response) => {
+          set((state) => ({
+            ...state,
+            credentials: response.data.credentials,
+          }));
+        })
+        .catch((error) => {
+          console.error("Error fetching credentials:", error);
+        });
 
       // Wait for both to complete, but don't fail if one fails
-      const [providersResult, credentialsResult] = await Promise.all([
+      const [providersResult] = await Promise.all([
         providersPromise,
         credentialsPromise,
       ]);
