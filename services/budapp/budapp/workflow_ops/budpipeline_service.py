@@ -341,7 +341,11 @@ class BudPipelineService(SessionMixin):
                 # Handle ErrorResponse format: {"object": "error", "code": N, "message": "..."}
                 if result.get("object") == "error" and "message" in result:
                     error_msg = result["message"]
-                    error_code = result.get("code", 500)
+                    # Validate error_code is an integer to prevent FastAPI crash
+                    try:
+                        error_code = int(result.get("code", 500))
+                    except (ValueError, TypeError):
+                        error_code = 500
                     raise ClientException(
                         error_msg,
                         status_code=error_code,
