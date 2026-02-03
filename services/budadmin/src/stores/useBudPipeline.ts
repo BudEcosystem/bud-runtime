@@ -928,7 +928,20 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       const response = await AppRequest.Post(`${BUDPIPELINE_API}/${workflowId}/execute`, {
         params,
       });
-      const newExecution = response.data;
+      const data = response.data;
+
+      // Check for error response even with 2xx status (backend may return error in body)
+      if (data?.object === "error" || data?.detail) {
+        const errorMessage = data?.message || data?.detail?.error || data?.detail || "Failed to execute workflow";
+        console.error("Execute workflow error response:", data);
+        set({
+          error: errorMessage,
+          isLoading: false,
+        });
+        return null;
+      }
+
+      const newExecution = data;
       set((state) => ({
         executions: [newExecution, ...state.executions],
         isLoading: false,
