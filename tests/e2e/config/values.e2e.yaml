@@ -381,10 +381,34 @@ daprExtra:
   crypto:
     symmetricKey: "e2e-symmetric-key-32-chars-long!"
     asymmetricKey: |
-      -----BEGIN RSA PRIVATE KEY-----
-      MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MvGj2yDryPEut5hy
-      e2e-test-asymmetric-key-placeholder
-      -----END RSA PRIVATE KEY-----
+      -----BEGIN PRIVATE KEY-----
+      MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDPAEGKtIPlh673
+      Zoj7VfyCicloW0cKqIvsYeSRG8udLjyuaF/CNzSTYfdIhzycB9hIEGCXpMUripit
+      GpJdrMjas7NyNIccUi4ljjqnIbTwkLDBqu0R3XmA1SrW6Mvd/gCKvhXen0YDLukB
+      N2ARVGlovbO177nLrfRNA5xXLxZqmRO/fXmUV4P477qNsVnY4oVrIar3eJvAtoLP
+      k5EQDQP3yLmJOlCs5DfkMsVIC0e/uTaOJTY9HW74BVMpFqw6NQIydDtLFKsusYNJ
+      mlFjj2bibEYaPCaVxVdjKUowxZ+adCR0zccvKFoHuPcdWplpNr5Cc3rytcHIVTD3
+      kjOpNdOdAgMBAAECggEAD5eU2EZVow3v23nROqFU9l47mg06Ei707zbGeTmvQiUv
+      8/EvuVjgMHPSJRfutFAQ9gipxfJm2atEadGVEdJIhNTBYQpc3QDBshl/CITM9Mvp
+      TIU7+zsEAnTMF8kMRinyT4EW86BqrSW07l8F8Pg7QmT7quomRBXTz5NEjPqihR/k
+      7SUkAKoJ3UEOiqYU8jvz8RZEuioMF8GQeGNTWMRLPkM+Sk7WgYOU/I0IU8AstCav
+      oXXxwfWuZZ91vG5DCuHuofOvEvWdkrtV/l17YDz/NHozkx+6mJfZfCeKjigR5nXL
+      Zj/Ch1Akn0ga62lrwnYrHD6rwwwcDY4TUvsOgzkMjwKBgQD3Fu/VqMlArlrUWZuC
+      pyXjAP2RZkv+b8n7DudrOApnNMjJ7z68svaAHsA5PuWuloif34cZIWUMtTGlzzIZ
+      Hunej6iQxiTglR5l3qwsBSsEOAPBwxG2yJ9YyFzVB09BZ7mOTWiRqD5Xxg0VBYM2
+      URXou1yS7OTHVQxUY/ikDg5qBwKBgQDWdzt2c0R+FXTjG3IyI0ypnvK21PBx+Pau
+      zfwaA+a2P042uRC4Vjt61J13YZ4YGAfC4kp0VuTizYES3rqSD9wpN3vUE5cB/ii9
+      wQrw4Fs8PWFiOgFnuHxPJBEo0Nr/I8iR2OzOELgtEdiTKdg1Oz2CF3mlD9uNYhY6
+      XCSsCTh8OwKBgQCq62zf6S+91F30Qj/2ctUcYBUHPTIYQRAA4OBoJI3dsn+qYBqP
+      wWQOYDcr4jxTNsIvhRoY4ibaUYSUY+0Nv3qbf9hkvQvJZp1ubke+85w8ANtobx2T
+      yNehPIgqvDGw1qVesGFDUJQ/dzqZbgTDz/dN1D1HTSM8V7J9teHK6gZChQKBgQCU
+      uB3N5+TJIgvqKPApgHz66rQYwNTz09cMJN77E1V7b67HF9JWYcXhSWrgjBrbTl6j
+      b9R9lHwoIqWs9jKecs0S79y4ldUTlrGd1C3IF2xs+4t6WAr9Z9sb7kDP8vTKFIBT
+      Uv/zbXiqGEP82PmLAEeI3MqIAdUX17reQWNUwRggXQKBgQCCxCwm50EXRye89pNo
+      g4pYmWw0gofE6/4XR+vdR7PR1e+Xi5vpakMf0xjdvdmxNIdpzdgdFSUg9EjD3LtH
+      Hxl3F2jsVRZ9T6Q3gZTGyRcDeXVPqdads1O2OgBTqjqi2mTxPONM/Wuis71dssmk
+      iTLxYSm3KXE2m53n07HiKMi/eA==
+      -----END PRIVATE KEY-----
 
 # =============================================================================
 # External Services (not used - everything runs in cluster)

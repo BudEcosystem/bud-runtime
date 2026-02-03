@@ -8,6 +8,8 @@ name: bud-e2e
 
 nodes:
   - role: control-plane
+    # Pin Kubernetes version for reproducibility
+    image: kindest/node:v1.29.2
     kubeadmConfigPatches:
       - |
         kind: InitConfiguration

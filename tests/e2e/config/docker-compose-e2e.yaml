@@ -69,7 +69,7 @@ services:
   # ==========================================================================
 
   e2e-placement:
-    image: daprio/placement:edge
+    image: daprio/placement:1.14.4
     container_name: e2e-placement
     command: ["./placement", "--port", "50006"]
     ports:
@@ -78,7 +78,7 @@ services:
       - e2e-network
 
   e2e-scheduler:
-    image: daprio/dapr
+    image: daprio/dapr:1.14.4
     container_name: e2e-scheduler
     command: ["./scheduler", "--port", "50007", "--log-as-json"]
     ports:
@@ -115,6 +115,8 @@ services:
       NAMESPACE: e2e
       LOG_LEVEL: DEBUG
       APP_PORT: "9081"
+      # Disable rate limiting for E2E tests
+      RATE_LIMIT_ENABLED: "false"
       DAPR_HTTP_PORT: "3510"
       DAPR_GRPC_PORT: "50001"
       DAPR_PLACEMENT_HOST: e2e-placement
@@ -178,7 +180,7 @@ services:
       - e2e-network
 
   e2e-budapp-sidecar:
-    image: daprio/daprd:edge
+    image: daprio/daprd:1.14.4
     container_name: e2e-budapp-dapr
     command:
       - "./daprd"
