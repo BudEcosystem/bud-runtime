@@ -928,7 +928,20 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       const response = await AppRequest.Post(`${BUDPIPELINE_API}/${workflowId}/execute`, {
         params,
       });
-      const newExecution = response.data;
+      const data = response.data;
+
+      // Check for error response even with 2xx status (backend may return error in body)
+      if (data?.object === "error" || data?.detail) {
+        const errorMessage = data?.message || data?.detail?.error || (typeof data?.detail === 'object' ? JSON.stringify(data.detail) : data?.detail) || "Failed to execute workflow";
+        console.error("Execute workflow error response:", data);
+        set({
+          error: errorMessage,
+          isLoading: false,
+        });
+        return null;
+      }
+
+      const newExecution = data;
       set((state) => ({
         executions: [newExecution, ...state.executions],
         isLoading: false,
@@ -936,8 +949,16 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return newExecution;
     } catch (error: any) {
       console.error("Failed to execute workflow:", error);
+      // Extract error message from various possible response formats
+      const responseData = error?.response?.data;
+      const errorMessage =
+        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
+        (typeof responseData?.detail === 'object' ? JSON.stringify(responseData.detail) : responseData?.detail) ||  // FastAPI HTTPException format: {"detail": "..."}
+        (typeof responseData === "string" ? responseData : null) ||
+        error?.message ||                  // Axios/network error
+        "Failed to execute workflow";
       set({
-        error: error?.response?.data?.message || "Failed to execute workflow",
+        error: errorMessage,
         isLoading: false,
       });
       return null;
