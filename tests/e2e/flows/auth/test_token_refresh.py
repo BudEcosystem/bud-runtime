@@ -14,10 +14,6 @@ import httpx
 from uuid import uuid4
 
 from tests.e2e.helpers.auth_helper import AuthHelper
-from tests.e2e.helpers.assertions import (
-    assert_token_valid,
-    assert_unauthorized,
-)
 from tests.e2e.fixtures.auth import TestUser, AuthTokens
 
 

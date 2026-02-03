@@ -15,12 +15,6 @@ import httpx
 from uuid import uuid4
 
 from tests.e2e.helpers.auth_helper import AuthHelper
-from tests.e2e.helpers.assertions import (
-    assert_success_response,
-    assert_conflict,
-    assert_validation_error,
-    assert_rate_limited,
-)
 from tests.e2e.fixtures.auth import TestUser
 
 
@@ -66,7 +60,9 @@ class TestRegistrationFlow:
             email=unique_email,
             password=strong_password,
         )
-        assert login_result.success, f"Login failed after registration: {login_result.error}"
+        assert login_result.success, (
+            f"Login failed after registration: {login_result.error}"
+        )
 
     @pytest.mark.asyncio
     async def test_register_with_existing_email(
@@ -94,7 +90,9 @@ class TestRegistrationFlow:
         # Assertions
         assert not result.success, "Registration should fail for existing email"
         # API may return 400 (Bad Request) or 409 (Conflict) for existing email
-        assert result.status_code in (400, 409), f"Expected 400/409, got {result.status_code}"
+        assert result.status_code in (400, 409), (
+            f"Expected 400/409, got {result.status_code}"
+        )
 
     @pytest.mark.asyncio
     async def test_register_with_invalid_email_format(
@@ -149,10 +147,10 @@ class TestRegistrationFlow:
 
         # Test various weak passwords
         weak_passwords = [
-            "short",          # Too short
-            "12345678",       # No letters
-            "password",       # Too simple
-            "",               # Empty
+            "short",  # Too short
+            "12345678",  # No letters
+            "password",  # Too simple
+            "",  # Empty
         ]
 
         for weak_pw in weak_passwords:
@@ -163,7 +161,9 @@ class TestRegistrationFlow:
             )
 
             # Should fail with validation error
-            assert not result.success, f"Registration should fail for weak password: {weak_pw}"
+            assert not result.success, (
+                f"Registration should fail for weak password: {weak_pw}"
+            )
             assert result.status_code in (400, 422), (
                 f"Expected 400/422 for weak password, got {result.status_code}"
             )

@@ -17,7 +17,6 @@ from tests.e2e.fixtures.auth import TestUser, AuthTokens
 from tests.e2e.fixtures.models import (
     generate_unique_model_name,
     generate_model_tags,
-    Provider,
 )
 
 
@@ -199,7 +198,9 @@ class TestCloudModelOnboarding:
             trigger_workflow=True,
         )
 
-        assert complete_result.success, f"Complete workflow failed: {complete_result.error}"
+        assert complete_result.success, (
+            f"Complete workflow failed: {complete_result.error}"
+        )
         assert complete_result.workflow_status == "SUCCESS", (
             f"Expected SUCCESS status, got {complete_result.workflow_status}"
         )
@@ -276,7 +277,7 @@ class TestCloudModelOnboarding:
 
             if list_result.success and list_result.data:
                 models = list_result.data.get("models", [])
-                found = any(m.get("name") == model_name for m in models)
+                any(m.get("name") == model_name for m in models)
                 # Model may or may not appear immediately
 
             # Cleanup

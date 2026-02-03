@@ -140,13 +140,17 @@ class E2EConfig:
             test_user_password=os.getenv("E2E_TEST_USER_PASSWORD", "TestP@ssw0rd123!"),
             admin_user_email=os.getenv("E2E_ADMIN_USER_EMAIL", "admin@bud.studio"),
             admin_user_password=os.getenv("E2E_ADMIN_USER_PASSWORD", "admin-password"),
-            test_model_id=os.getenv("E2E_TEST_MODEL_ID", "meta-llama/Llama-2-7b-chat-hf"),
+            test_model_id=os.getenv(
+                "E2E_TEST_MODEL_ID", "meta-llama/Llama-2-7b-chat-hf"
+            ),
             test_model_provider=os.getenv("E2E_TEST_MODEL_PROVIDER", "huggingface"),
             test_session_id=os.getenv("E2E_TEST_SESSION_ID"),
             test_project_prefix=os.getenv("E2E_TEST_PROJECT_PREFIX", "e2e-test"),
             debug=os.getenv("E2E_DEBUG", "false").lower() in ("true", "1", "yes"),
-            cleanup_on_failure=os.getenv("E2E_CLEANUP_ON_FAILURE", "true").lower() in ("true", "1", "yes"),
-            skip_slow_tests=os.getenv("E2E_SKIP_SLOW_TESTS", "false").lower() in ("true", "1", "yes"),
+            cleanup_on_failure=os.getenv("E2E_CLEANUP_ON_FAILURE", "true").lower()
+            in ("true", "1", "yes"),
+            skip_slow_tests=os.getenv("E2E_SKIP_SLOW_TESTS", "false").lower()
+            in ("true", "1", "yes"),
             timeouts=TimeoutConfig.from_env(),
         )
 

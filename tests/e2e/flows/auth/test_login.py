@@ -17,10 +17,7 @@ from uuid import uuid4
 
 from tests.e2e.helpers.auth_helper import AuthHelper
 from tests.e2e.helpers.assertions import (
-    assert_success_response,
     assert_token_valid,
-    assert_unauthorized,
-    assert_rate_limited,
 )
 from tests.e2e.fixtures.auth import TestUser
 

@@ -7,7 +7,7 @@ Supports different workflow types with configurable timeouts and status checks.
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import (
@@ -16,13 +16,12 @@ from typing import (
     Coroutine,
     Dict,
     Generic,
-    List,
     Optional,
     TypeVar,
     Union,
 )
 
-from .config import TimeoutConfig, get_config
+from .config import get_config
 
 
 logger = logging.getLogger(__name__)
@@ -238,7 +237,9 @@ class WorkflowWaiter:
 
         return WorkflowStatus.normalize(status_str)
 
-    def _extract_progress(self, data: Dict[str, Any]) -> tuple[Optional[float], Optional[int], Optional[int]]:
+    def _extract_progress(
+        self, data: Dict[str, Any]
+    ) -> tuple[Optional[float], Optional[int], Optional[int]]:
         """Extract progress information from response data."""
         progress_percent = data.get("progress") or data.get("progress_percent")
 
@@ -308,7 +309,9 @@ class WorkflowWaiter:
 
                 # Extract status and progress
                 status = self._extract_status(data)
-                progress_percent, current_step, total_steps = self._extract_progress(data)
+                progress_percent, current_step, total_steps = self._extract_progress(
+                    data
+                )
 
                 # Calculate elapsed time
                 elapsed = (datetime.now() - self._started_at).total_seconds()
@@ -346,7 +349,11 @@ class WorkflowWaiter:
                     result.completed_at = datetime.now()
 
                     if not result.success:
-                        result.error = data.get("error") or data.get("message") or f"Workflow {status.value}"
+                        result.error = (
+                            data.get("error")
+                            or data.get("message")
+                            or f"Workflow {status.value}"
+                        )
 
                     return result
 
@@ -435,7 +442,9 @@ def create_model_workflow_waiter(
     timeouts = get_config().timeouts
 
     config = WaiterConfig(
-        timeout=timeouts.model_local_workflow if local else timeouts.model_cloud_workflow,
+        timeout=timeouts.model_local_workflow
+        if local
+        else timeouts.model_cloud_workflow,
         poll_interval=timeouts.poll_interval_slow if local else timeouts.poll_interval,
         adaptive_polling=local,  # Use adaptive for long local workflows
     )

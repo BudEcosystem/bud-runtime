@@ -77,14 +77,19 @@ class TestLocalModelOnboardingLongRunning:
                 name=unique_model_name,
                 uri=SMALL_TEST_MODEL,
                 author=SMALL_TEST_MODEL_AUTHOR,
-                tags=[{"name": "e2e-test", "color": "#0000FF"}, {"name": "small-model", "color": "#00FF00"}],
+                tags=[
+                    {"name": "e2e-test", "color": "#0000FF"},
+                    {"name": "small-model", "color": "#00FF00"},
+                ],
                 total_steps=2,
             )
 
             if start_result.status_code == 403:
                 pytest.skip("Admin user lacks MODEL_MANAGE permission")
 
-            assert start_result.success, f"Failed to start workflow: {start_result.error}"
+            assert start_result.success, (
+                f"Failed to start workflow: {start_result.error}"
+            )
             assert start_result.workflow_id is not None
 
             workflow_id = start_result.workflow_id
@@ -101,7 +106,9 @@ class TestLocalModelOnboardingLongRunning:
 
             if not complete_result.success:
                 # Model extraction service may not be available in all environments
-                if "Unable to perform model extraction" in (complete_result.error or ""):
+                if "Unable to perform model extraction" in (
+                    complete_result.error or ""
+                ):
                     pytest.skip(
                         "Model extraction service is not available in this environment. "
                         "This test requires the budmodel extraction service to be running."
@@ -109,7 +116,7 @@ class TestLocalModelOnboardingLongRunning:
                 else:
                     pytest.fail(f"Failed to complete workflow: {complete_result.error}")
 
-            print(f"Workflow triggered, waiting for extraction...")
+            print("Workflow triggered, waiting for extraction...")
 
             # Step 3: Wait for extraction to complete
             wait_result = await helper.wait_for_local_model_completion(
@@ -130,13 +137,17 @@ class TestLocalModelOnboardingLongRunning:
                     pytest.fail(f"Workflow failed: {wait_result.error}")
 
             assert wait_result.workflow_status == "SUCCESS"
-            print(f"Workflow completed successfully!")
+            print("Workflow completed successfully!")
 
             # Step 4: Get the created model and verify metadata
             # The model_id should be in the workflow response
             workflow_data = wait_result.data
             workflow_steps = workflow_data.get("workflow_steps", {})
-            model_id = str(workflow_steps.get("model_id")) if workflow_steps.get("model_id") else None
+            model_id = (
+                str(workflow_steps.get("model_id"))
+                if workflow_steps.get("model_id")
+                else None
+            )
 
             if model_id:
                 model_result = await helper.get_model(
@@ -144,7 +155,9 @@ class TestLocalModelOnboardingLongRunning:
                     model_id=model_id,
                 )
 
-                assert model_result.success, f"Failed to get model: {model_result.error}"
+                assert model_result.success, (
+                    f"Failed to get model: {model_result.error}"
+                )
 
                 model_data = model_result.data
                 assert model_data is not None
@@ -173,12 +186,16 @@ class TestLocalModelOnboardingLongRunning:
                 if storage_size is not None and storage_size > 0:
                     print(f"✓ Storage size verified: {storage_size} GB")
                 else:
-                    print(f"⚠ Storage size not set (may be calculated async): {storage_size}")
+                    print(
+                        f"⚠ Storage size not set (may be calculated async): {storage_size}"
+                    )
 
                 # 3. Verify architecture was extracted (model metadata from config.json)
                 arch_config = model_data.get("architecture_text_config")
                 if arch_config is not None:
-                    print(f"✓ Architecture extracted: {list(arch_config.keys())[:5]}...")
+                    print(
+                        f"✓ Architecture extracted: {list(arch_config.keys())[:5]}..."
+                    )
                 else:
                     # Some models may not have architecture config
                     print("⚠ Architecture config not extracted (may be model-specific)")
@@ -230,7 +247,10 @@ class TestLocalModelOnboardingLongRunning:
                 name=unique_model_name,
                 uri=SMALL_TEST_MODEL,
                 author=SMALL_TEST_MODEL_AUTHOR,
-                tags=[{"name": "e2e-test", "color": "#0000FF"}, {"name": "model-manager-test", "color": "#FF00FF"}],
+                tags=[
+                    {"name": "e2e-test", "color": "#0000FF"},
+                    {"name": "model-manager-test", "color": "#FF00FF"},
+                ],
                 total_steps=2,
             )
 
@@ -241,13 +261,17 @@ class TestLocalModelOnboardingLongRunning:
                 )
 
             # Skip if user is inactive (admin-created users need activation)
-            if start_result.status_code == 400 and "Inactive user" in (start_result.error or ""):
+            if start_result.status_code == 400 and "Inactive user" in (
+                start_result.error or ""
+            ):
                 pytest.skip(
                     "Admin-created users start as INVITED (inactive). "
                     "They need email verification or admin activation before use."
                 )
 
-            assert start_result.success, f"Failed to start workflow: {start_result.error}"
+            assert start_result.success, (
+                f"Failed to start workflow: {start_result.error}"
+            )
 
             workflow_id = start_result.workflow_id
             print(f"\nModel manager started workflow: {workflow_id}")
@@ -280,7 +304,11 @@ class TestLocalModelOnboardingLongRunning:
             # Extract model ID for cleanup
             workflow_data = wait_result.data
             workflow_steps = workflow_data.get("workflow_steps", {})
-            model_id = str(workflow_steps.get("model_id")) if workflow_steps.get("model_id") else None
+            model_id = (
+                str(workflow_steps.get("model_id"))
+                if workflow_steps.get("model_id")
+                else None
+            )
 
             print(f"Model manager successfully created model: {model_id}")
 
@@ -509,7 +537,9 @@ class TestAdminUserPermissions:
         )
 
         # Skip if user is inactive (admin-created users need activation)
-        if list_result.status_code == 400 and "Inactive user" in (list_result.error or ""):
+        if list_result.status_code == 400 and "Inactive user" in (
+            list_result.error or ""
+        ):
             pytest.skip(
                 "Admin-created users start as INVITED (inactive). "
                 "They need email verification or admin activation before use."

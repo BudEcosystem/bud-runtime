@@ -13,7 +13,7 @@ import pytest
 import httpx
 from uuid import uuid4
 
-from tests.e2e.helpers.model_helper import ModelHelper
+from tests.e2e.helpers.model_helper import ModelHelper, ModelResponse
 from tests.e2e.fixtures.auth import TestUser, AuthTokens
 from tests.e2e.fixtures.models import (
     generate_unique_model_name,
@@ -667,7 +667,7 @@ class TestModelEditEdgeCases:
             )
 
             # At least one should succeed
-            successes = [r for r in results if isinstance(r, ModelResponse) and r.success]
+            [r for r in results if isinstance(r, ModelResponse) and r.success]
             # Concurrent edits may all succeed (last write wins) or some may fail
             # Just verify no crashes
             assert len(results) == 3
@@ -677,7 +677,3 @@ class TestModelEditEdgeCases:
                 access_token=tokens.access_token,
                 model_id=model_id,
             )
-
-
-# Import for type hints
-from tests.e2e.helpers.model_helper import ModelResponse

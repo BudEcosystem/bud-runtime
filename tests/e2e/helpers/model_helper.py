@@ -9,19 +9,14 @@ Provides helper methods for model operations including:
 - Model deletion
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
-from uuid import UUID
 
 import httpx
 
 from tests.e2e.core.waiter import (
-    WorkflowWaiter,
     WorkflowStatus,
-    WorkflowResult,
-    WaiterConfig,
     create_model_workflow_waiter,
 )
 from tests.e2e.core.config import get_config
@@ -33,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ModelResponse:
     """Standard response wrapper for model operations."""
+
     success: bool
     status_code: int
     data: Optional[Dict[str, Any]] = None
@@ -229,7 +225,9 @@ class ModelHelper:
                     status_code=response.status_code,
                     data=data,
                     workflow_id=str(data.get("workflow_id")),
-                    model_id=str(workflow_steps.get("model_id")) if workflow_steps.get("model_id") else None,
+                    model_id=str(workflow_steps.get("model_id"))
+                    if workflow_steps.get("model_id")
+                    else None,
                     current_step=data.get("current_step"),
                     total_steps=data.get("total_steps"),
                     workflow_status=data.get("status"),
@@ -675,7 +673,6 @@ class ModelHelper:
             data["website_url"] = website_url
 
         # For arrays, we may need to handle JSON serialization
-        files = {}
 
         try:
             headers = self._get_headers(access_token)

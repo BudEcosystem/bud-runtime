@@ -11,10 +11,9 @@ This module provides common fixtures used across all E2E tests, including:
 """
 
 import os
-import asyncio
 import logging
 from datetime import datetime
-from typing import AsyncGenerator, Dict, Any, List, Optional
+from typing import AsyncGenerator, Dict, Any, Optional
 from uuid import uuid4
 
 import pytest
@@ -24,10 +23,10 @@ from dotenv import load_dotenv
 # Load E2E test environment variables
 load_dotenv(".env.e2e")
 
-# Import core infrastructure
-from tests.e2e.core.config import E2EConfig, TimeoutConfig, get_config
-from tests.e2e.core.waiter import WorkflowWaiter, WorkflowStatus, WorkflowResult, wait_for_workflow
-from tests.e2e.core.retry import retry, RetryConfig, RetryContext
+# Import core infrastructure (after load_dotenv to ensure env vars are available)
+from tests.e2e.core.config import TimeoutConfig, get_config  # noqa: E402
+from tests.e2e.core.waiter import WorkflowWaiter  # noqa: E402
+from tests.e2e.core.retry import RetryConfig, RetryContext  # noqa: E402
 
 # Configure logging for E2E tests
 logging.basicConfig(
@@ -35,39 +34,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("e2e")
-
-# Import auth fixtures to make them available
-from tests.e2e.fixtures.auth import (
-    unique_email,
-    strong_password,
-    weak_password,
-    test_user_data,
-    admin_user_credentials,
-    registered_user,
-    authenticated_user,
-    authenticated_admin_user,
-    auth_tokens,
-    auth_headers,
-    AuthTokens,
-    TestUser,
-    AdminUser,
-)
-
-# Import model fixtures
-from tests.e2e.fixtures.models import (
-    unique_model_name,
-    model_tags,
-    cloud_model_provider,
-    available_cloud_model,
-    created_model,
-    model_list,
-    generate_unique_model_name,
-    generate_model_tags,
-    TestModel,
-    ModelProviderType,
-    WorkflowStatus,
-    Provider,
-)
 
 
 # ============================================================================
@@ -159,6 +125,7 @@ def register_test_resource(resource_type: str, resource_id: str) -> None:
 # Configuration Fixtures
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def e2e_config() -> Dict[str, Any]:
     """Load E2E test configuration."""
@@ -203,12 +170,12 @@ def timeout_config() -> TimeoutConfig:
 # Service Client Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 async def budapp_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Create budapp HTTP client."""
     async with httpx.AsyncClient(
-        base_url=e2e_config["budapp_url"],
-        timeout=httpx.Timeout(30.0)
+        base_url=e2e_config["budapp_url"], timeout=httpx.Timeout(30.0)
     ) as client:
         yield client
 
@@ -217,8 +184,7 @@ async def budapp_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
 async def budcluster_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Create budcluster HTTP client."""
     async with httpx.AsyncClient(
-        base_url=e2e_config["budcluster_url"],
-        timeout=httpx.Timeout(30.0)
+        base_url=e2e_config["budcluster_url"], timeout=httpx.Timeout(30.0)
     ) as client:
         yield client
 
@@ -227,8 +193,7 @@ async def budcluster_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, Non
 async def budsim_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Create budsim HTTP client."""
     async with httpx.AsyncClient(
-        base_url=e2e_config["budsim_url"],
-        timeout=httpx.Timeout(30.0)
+        base_url=e2e_config["budsim_url"], timeout=httpx.Timeout(30.0)
     ) as client:
         yield client
 
@@ -237,8 +202,7 @@ async def budsim_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
 async def budmodel_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Create budmodel HTTP client."""
     async with httpx.AsyncClient(
-        base_url=e2e_config["budmodel_url"],
-        timeout=httpx.Timeout(30.0)
+        base_url=e2e_config["budmodel_url"], timeout=httpx.Timeout(30.0)
     ) as client:
         yield client
 
@@ -247,8 +211,7 @@ async def budmodel_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]
 async def budmetrics_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Create budmetrics HTTP client."""
     async with httpx.AsyncClient(
-        base_url=e2e_config["budmetrics_url"],
-        timeout=httpx.Timeout(30.0)
+        base_url=e2e_config["budmetrics_url"], timeout=httpx.Timeout(30.0)
     ) as client:
         yield client
 
@@ -257,8 +220,7 @@ async def budmetrics_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, Non
 async def budgateway_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Create budgateway HTTP client."""
     async with httpx.AsyncClient(
-        base_url=e2e_config["budgateway_url"],
-        timeout=httpx.Timeout(30.0)
+        base_url=e2e_config["budgateway_url"], timeout=httpx.Timeout(30.0)
     ) as client:
         yield client
 
@@ -266,6 +228,7 @@ async def budgateway_client(e2e_config) -> AsyncGenerator[httpx.AsyncClient, Non
 # ============================================================================
 # Authentication Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 async def test_user_credentials() -> Dict[str, str]:
@@ -285,10 +248,7 @@ async def auth_token(budapp_client, test_user_credentials) -> str:
     If the user doesn't exist, it creates one first.
     """
     # Try to login
-    response = await budapp_client.post(
-        "/auth/login",
-        json=test_user_credentials
-    )
+    response = await budapp_client.post("/auth/login", json=test_user_credentials)
 
     if response.status_code == 200:
         return response.json()["access_token"]
@@ -301,17 +261,14 @@ async def auth_token(budapp_client, test_user_credentials) -> str:
             "username": f"testuser_{uuid4().hex[:8]}",
             "first_name": "Test",
             "last_name": "User",
-        }
+        },
     )
 
     if create_response.status_code not in (200, 201):
         raise AssertionError(f"Failed to create test user: {create_response.text}")
 
     # Login again
-    login_response = await budapp_client.post(
-        "/auth/login",
-        json=test_user_credentials
-    )
+    login_response = await budapp_client.post("/auth/login", json=test_user_credentials)
 
     if login_response.status_code != 200:
         raise AssertionError(f"Failed to login: {login_response.text}")
@@ -329,6 +286,7 @@ async def auth_headers(auth_token) -> Dict[str, str]:
 # Test Data Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 async def test_project(budapp_client, auth_headers) -> Dict[str, Any]:
     """
@@ -344,9 +302,7 @@ async def test_project(budapp_client, auth_headers) -> Dict[str, Any]:
     }
 
     response = await budapp_client.post(
-        "/projects/",
-        json=project_data,
-        headers=auth_headers
+        "/projects/", json=project_data, headers=auth_headers
     )
 
     if response.status_code not in (200, 201):
@@ -358,10 +314,7 @@ async def test_project(budapp_client, auth_headers) -> Dict[str, Any]:
 
     # Cleanup: Delete project
     try:
-        await budapp_client.delete(
-            f"/projects/{project['id']}",
-            headers=auth_headers
-        )
+        await budapp_client.delete(f"/projects/{project['id']}", headers=auth_headers)
     except Exception as e:
         print(f"Warning: Failed to cleanup project {project['id']}: {e}")
 
@@ -394,6 +347,7 @@ async def test_cluster(budapp_client, auth_headers) -> Dict[str, Any]:
 # ============================================================================
 # Infrastructure Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 async def postgres_connection(e2e_config):
@@ -437,6 +391,7 @@ async def redis_client(e2e_config):
 # Utility Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def unique_id() -> str:
     """Generate unique ID for test resources."""
@@ -452,6 +407,7 @@ def test_timeout(e2e_config) -> int:
 # ============================================================================
 # Rate Limit Management
 # ============================================================================
+
 
 @pytest.fixture(scope="session", autouse=True)
 def clear_rate_limits(e2e_config):
@@ -492,6 +448,7 @@ def clear_rate_limits(e2e_config):
 # ============================================================================
 # Hooks
 # ============================================================================
+
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
@@ -545,6 +502,7 @@ def pytest_collection_modifyitems(config, items):
 # Workflow Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def workflow_waiter_factory(timeout_config):
     """
@@ -559,7 +517,7 @@ def workflow_waiter_factory(timeout_config):
             )
             result = await waiter.wait()
     """
-    from tests.e2e.core.waiter import WorkflowWaiter, WaiterConfig
+    from tests.e2e.core.waiter import WaiterConfig
 
     def factory(
         check_func,
@@ -598,7 +556,6 @@ def retry_context_factory():
                     except TransientError as e:
                         await ctx.handle_failure(e)
     """
-    from tests.e2e.core.retry import RetryContext, RetryConfig
 
     def factory(
         max_attempts: int = 3,
@@ -616,6 +573,7 @@ def retry_context_factory():
 # ============================================================================
 # Cleanup Fixtures
 # ============================================================================
+
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_resources(test_session, e2e_config):

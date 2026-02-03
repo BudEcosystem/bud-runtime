@@ -16,7 +16,6 @@ from typing import (
     Optional,
     Type,
     TypeVar,
-    Union,
 )
 
 import httpx

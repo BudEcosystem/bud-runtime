@@ -16,7 +16,6 @@ from uuid import uuid4
 from tests.e2e.helpers.auth_helper import AuthHelper
 from tests.e2e.helpers.assertions import (
     assert_unauthorized,
-    assert_user_data_valid,
 )
 from tests.e2e.fixtures.auth import TestUser, AuthTokens
 
@@ -262,7 +261,7 @@ class TestProtectedEndpointAccess:
         # Make multiple requests
         for i in range(3):
             result = await auth.get_current_user(tokens.access_token)
-            assert result.success, f"Request {i+1} failed: {result.error}"
+            assert result.success, f"Request {i + 1} failed: {result.error}"
             # User data may be nested under 'user' key
             user_data = result.data.get("user", result.data)
             assert user_data["email"] == user.email

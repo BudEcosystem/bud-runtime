@@ -5,7 +5,7 @@ Provides fixtures for user registration, login, and token management.
 """
 
 import os
-from typing import Dict, Any, Optional
+from typing import Dict
 from uuid import uuid4
 from dataclasses import dataclass
 

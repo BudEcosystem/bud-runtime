@@ -85,7 +85,9 @@ def assert_token_valid(data: Dict[str, Any]) -> None:
 
     assert "refresh_token" in token_data, "Response missing refresh_token"
     assert token_data["refresh_token"], "refresh_token is empty"
-    assert isinstance(token_data["refresh_token"], str), "refresh_token must be a string"
+    assert isinstance(token_data["refresh_token"], str), (
+        "refresh_token must be a string"
+    )
 
 
 def assert_user_data_valid(

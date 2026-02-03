@@ -17,6 +17,7 @@ from tests.e2e.helpers.model_helper import ModelHelper
 
 class ModelProviderType(str, Enum):
     """Model provider types."""
+
     HUGGING_FACE = "hugging_face"
     CLOUD_MODEL = "cloud_model"
     URL = "url"
@@ -25,6 +26,7 @@ class ModelProviderType(str, Enum):
 
 class WorkflowStatus(str, Enum):
     """Workflow status values."""
+
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     SUCCESS = "SUCCESS"
@@ -34,6 +36,7 @@ class WorkflowStatus(str, Enum):
 @dataclass
 class Tag:
     """Model tag."""
+
     name: str
     color: str = "#3B82F6"  # Default blue
 
@@ -41,6 +44,7 @@ class Tag:
 @dataclass
 class TestModel:
     """Test model data structure."""
+
     id: Optional[UUID] = None
     name: str = ""
     description: str = ""
@@ -56,6 +60,7 @@ class TestModel:
 @dataclass
 class CloudModelInfo:
     """Cloud model information for onboarding."""
+
     cloud_model_id: Optional[UUID] = None
     name: str = ""
     uri: str = ""
@@ -67,6 +72,7 @@ class CloudModelInfo:
 @dataclass
 class ModelWorkflow:
     """Model workflow tracking."""
+
     workflow_id: Optional[UUID] = None
     status: WorkflowStatus = WorkflowStatus.PENDING
     current_step: int = 0
@@ -77,6 +83,7 @@ class ModelWorkflow:
 @dataclass
 class Provider:
     """Model provider information."""
+
     id: UUID
     name: str
     type: str
@@ -88,6 +95,7 @@ class Provider:
 # ============================================================================
 # Test Data Generators
 # ============================================================================
+
 
 def generate_unique_model_name(prefix: str = "e2e-test-model") -> str:
     """Generate a unique model name for testing."""
@@ -101,16 +109,14 @@ def generate_model_tags(count: int = 2) -> List[Dict[str, str]]:
 
     tags = []
     for i in range(min(count, len(tag_names))):
-        tags.append({
-            "name": tag_names[i],
-            "color": colors[i % len(colors)]
-        })
+        tags.append({"name": tag_names[i], "color": colors[i % len(colors)]})
     return tags
 
 
 # ============================================================================
 # Pytest Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def unique_model_name() -> str:
@@ -134,14 +140,13 @@ async def cloud_model_provider(
 
     Returns the first available cloud model provider.
     """
-    from tests.e2e.fixtures.auth import AuthTokens, TestUser
 
     user, tokens = authenticated_user
 
     response = await budapp_client.get(
         "/models/providers",
         headers={"Authorization": f"Bearer {tokens.access_token}"},
-        params={"capabilities": "CHAT"}
+        params={"capabilities": "CHAT"},
     )
 
     if response.status_code != 200:
@@ -160,7 +165,7 @@ async def cloud_model_provider(
                 type=p["type"],
                 description=p.get("description", ""),
                 icon=p.get("icon", ""),
-                capabilities=p.get("capabilities", [])
+                capabilities=p.get("capabilities", []),
             )
 
     # Return first provider if no cloud provider found
@@ -172,7 +177,7 @@ async def cloud_model_provider(
             type=p["type"],
             description=p.get("description", ""),
             icon=p.get("icon", ""),
-            capabilities=p.get("capabilities", [])
+            capabilities=p.get("capabilities", []),
         )
 
     pytest.skip("No providers available for testing")
@@ -190,14 +195,13 @@ async def available_cloud_model(
 
     Returns a cloud model that hasn't been added to the registry yet.
     """
-    from tests.e2e.fixtures.auth import AuthTokens, TestUser
 
     if cloud_model_provider is None:
         pytest.skip("No provider available")
         return None
 
     user, tokens = authenticated_user
-    helper = ModelHelper(budapp_client)
+    ModelHelper(budapp_client)
 
     # This would fetch available cloud models from the provider
     # For testing, we'll create a mock cloud model reference
@@ -206,7 +210,7 @@ async def available_cloud_model(
         uri=f"test-provider/test-model-{uuid4().hex[:8]}",
         source=cloud_model_provider.type,
         modality=["text"],
-        provider_id=cloud_model_provider.id
+        provider_id=cloud_model_provider.id,
     )
 
 
@@ -222,7 +226,6 @@ async def created_model(
     This fixture creates a cloud model through the workflow and
     yields the model data. After the test, it deletes the model.
     """
-    from tests.e2e.fixtures.auth import AuthTokens, TestUser
 
     if cloud_model_provider is None:
         pytest.skip("No provider available for model creation")
@@ -264,7 +267,10 @@ async def created_model(
         provider_type=ModelProviderType.CLOUD_MODEL,
         uri=f"test-provider/{model_name}",
         provider_id=cloud_model_provider.id,
-        tags=[Tag(name=t["name"], color=t.get("color", "#3B82F6")) for t in generate_model_tags(2)],
+        tags=[
+            Tag(name=t["name"], color=t.get("color", "#3B82F6"))
+            for t in generate_model_tags(2)
+        ],
     )
 
     yield model
@@ -290,7 +296,6 @@ async def model_list(
 
     Returns a list of models currently in the registry.
     """
-    from tests.e2e.fixtures.auth import AuthTokens, TestUser
 
     user, tokens = authenticated_user
     helper = ModelHelper(budapp_client)

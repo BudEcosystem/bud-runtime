@@ -17,9 +17,6 @@ import httpx
 from uuid import uuid4
 
 from tests.e2e.helpers.auth_helper import AuthHelper
-from tests.e2e.helpers.assertions import (
-    assert_validation_error,
-)
 from tests.e2e.fixtures.auth import TestUser
 
 
@@ -111,9 +108,7 @@ class TestPasswordResetFlow:
         # Should indicate token is invalid
         if result.success:
             # Token validation endpoint returns is_valid
-            assert result.data.get("is_valid") is False, (
-                "Fake token should be invalid"
-            )
+            assert result.data.get("is_valid") is False, "Fake token should be invalid"
         else:
             # Or returns error status
             assert result.status_code in (400, 401, 404), (

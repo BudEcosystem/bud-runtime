@@ -164,7 +164,7 @@ class TestModelDelete:
         )
 
         # Verify model exists in list
-        list_before = await helper.list_models(
+        await helper.list_models(
             access_token=tokens.access_token,
             search=model_name,
         )
@@ -187,9 +187,7 @@ class TestModelDelete:
             models = list_after.data.get("models", [])
             model_ids = [m.get("id") for m in models]
             # Deleted model should not appear in active list
-            assert model_id not in model_ids, (
-                "Deleted model should not appear in list"
-            )
+            assert model_id not in model_ids, "Deleted model should not appear in list"
 
     @pytest.mark.asyncio
     async def test_delete_model_idempotent(
@@ -400,7 +398,11 @@ class TestModelList:
         second_ids = {m.get("id") for m in second_page.data.get("models", [])}
 
         # No overlap between pages
-        assert len(first_ids & second_ids) == 0 or len(first_ids) == 0 or len(second_ids) == 0
+        assert (
+            len(first_ids & second_ids) == 0
+            or len(first_ids) == 0
+            or len(second_ids) == 0
+        )
 
     @pytest.mark.asyncio
     async def test_list_models_with_search(
@@ -446,7 +448,7 @@ class TestModelList:
 
             models = search_result.data.get("models", [])
             # Should find our model
-            found = any(unique_name in m.get("name", "") for m in models)
+            any(unique_name in m.get("name", "") for m in models)
             # May or may not find immediately due to indexing
         finally:
             if create_result.model_id:
