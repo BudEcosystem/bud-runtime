@@ -29,7 +29,7 @@ const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({ value, onChange }
     options={segmentOptions}
     value={value}
     onChange={(val) => onChange(val as string)}
-    className="antSegmented rounded-md text-[#EEEEEE] text-[.75rem] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
+    className="antSegmented antSegmented-home rounded-md text-[#EEEEEE] text-[.75rem] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
   />
 );
 
@@ -481,9 +481,9 @@ const UsersChart: React.FC<UsersChartProps> = ({ promptId }) => {
         type: "line",
         data: [],
         smooth: true,
-        lineStyle: { color: "#965CDE", width: 2 },
-        itemStyle: { color: "#965CDE" },
-        areaStyle: { color: "rgba(150, 92, 222, 0.1)" },
+        lineStyle: { color: "#D1B854", width: 2 },
+        itemStyle: { color: "#D1B854" },
+        areaStyle: { color: "rgba(209, 184, 84, 0.1)" },
         symbol: "circle",
         symbolSize: 6,
         showSymbol: false,
@@ -526,7 +526,7 @@ const UsersChart: React.FC<UsersChartProps> = ({ promptId }) => {
           </div>
         )}
         <Text_20_400_FFFFFF className="mb-3">{chartData.totalUsers.toLocaleString()}</Text_20_400_FFFFFF>
-        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
@@ -744,7 +744,7 @@ const TokenUsageChart: React.FC<TokenUsageChartProps> = ({ promptId }) => {
           </div>
         )}
         <Text_20_400_FFFFFF className="mb-3">{formatTotal(chartData.totalTokens)}</Text_20_400_FFFFFF>
-        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
@@ -865,13 +865,17 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
 
     const option: echarts.EChartsOption = {
       backgroundColor: "transparent",
-      grid: { left: "0%", right: "0%", bottom: "15%", top: "10%", containLabel: true },
+      grid: { left: "0%", right: "0%", bottom: "5%", top: "25%", containLabel: true },
       legend: {
-        data: ["Success", "Errors"],
-        bottom: 0,
+        data: ["Error Requests", "Successful Requests"],
+        orient: "vertical",
+        left: 0,
+        top: 0,
+        icon: "roundRect",
         textStyle: { color: "#B3B3B3", fontSize: 11 },
-        itemWidth: 12,
-        itemHeight: 12,
+        itemWidth: 10,
+        itemHeight: 10,
+        itemGap: 20,
       },
       tooltip: {
         trigger: "axis",
@@ -883,8 +887,8 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
         textStyle: { color: "#fafafa", fontSize: 12 },
         confine: true,
         formatter: function (params: any) {
-          const errorParam = params.find((p: any) => p.seriesName === "Errors");
-          const successParam = params.find((p: any) => p.seriesName === "Success");
+          const errorParam = params.find((p: any) => p.seriesName === "Error Requests");
+          const successParam = params.find((p: any) => p.seriesName === "Successful Requests");
           const bucketData = (errorParam?.data || successParam?.data) as ExtendedBucketData;
           const bucketStart = bucketData?.bucketStart || Date.now();
           const formatDateTime = (timestamp: number) => {
@@ -895,11 +899,11 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
           return `<div style="min-width: 150px;">
             <div style="color: #71717a; font-size: 11px; margin-bottom: 8px;">${formatDateTime(bucketStart)}</div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-              <span style="color: #22C55E;">Success:</span>
+              <span style="color: #479D5F;">Successful Requests:</span>
               <span style="color: #fafafa; font-weight: 500;">${successParam?.data?.value || 0}</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
-              <span style="color: #EF4444;">Errors:</span>
+              <span style="color: #D1B854;">Error Requests:</span>
               <span style="color: #fafafa; font-weight: 500;">${errorParam?.data?.value || 0}</span>
             </div>
           </div>`;
@@ -923,23 +927,23 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
       },
       series: [
         {
-          name: "Success",
+          name: "Error Requests",
           type: "line",
           data: [],
           smooth: true,
-          lineStyle: { color: "#22C55E", width: 2 },
-          itemStyle: { color: "#22C55E" },
+          lineStyle: { color: "#D1B854", width: 2 },
+          itemStyle: { color: "#D1B854" },
           symbol: "circle",
           symbolSize: 6,
           showSymbol: false,
         },
         {
-          name: "Errors",
+          name: "Successful Requests",
           type: "line",
           data: [],
           smooth: true,
-          lineStyle: { color: "#EF4444", width: 2 },
-          itemStyle: { color: "#EF4444" },
+          lineStyle: { color: "#479D5F", width: 2 },
+          itemStyle: { color: "#479D5F" },
           symbol: "circle",
           symbolSize: 6,
           showSymbol: false,
@@ -965,8 +969,8 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
       series: [
-        { name: "Success", data: chartData.successData },
-        { name: "Errors", data: chartData.errorData },
+        { name: "Error Requests", data: chartData.errorData },
+        { name: "Successful Requests", data: chartData.successData },
       ],
     });
   }, [chartData]);
@@ -985,7 +989,7 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
             <Spin size="small" />
           </div>
         )}
-        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
@@ -1038,8 +1042,8 @@ const E2ELatencyChart: React.FC<E2ELatencyChartProps> = ({ promptId }) => {
     );
 
     if (response && response.buckets && response.buckets.length > 0) {
-      const labels = response.buckets.map(bucket => `${bucket.bucket_start}-${bucket.bucket_end}`);
-      const data = response.buckets.map(bucket => bucket.avg_metric);
+      const labels = response.buckets.map(bucket => bucket.range);
+      const data = response.buckets.map(bucket => bucket.avg_value);
       setChartData({ labels, data });
     } else {
       setChartData({ labels: [], data: [] });
@@ -1053,7 +1057,7 @@ const E2ELatencyChart: React.FC<E2ELatencyChartProps> = ({ promptId }) => {
 
     const option: echarts.EChartsOption = {
       backgroundColor: "transparent",
-      grid: { left: 50, right: 20, top: 30, bottom: 55 },
+      grid: { left: 50, right: 20, top: 30, bottom: 30 },
       tooltip: {
         trigger: "axis",
         backgroundColor: "#18181b",
@@ -1094,15 +1098,15 @@ const E2ELatencyChart: React.FC<E2ELatencyChartProps> = ({ promptId }) => {
           type: "line",
           data: [],
           smooth: true,
-          lineStyle: { color: "#965CDE", width: 2 },
-          itemStyle: { color: "#965CDE" },
+          lineStyle: { color: "#D1B854", width: 2 },
+          itemStyle: { color: "#D1B854" },
           symbol: "circle",
           symbolSize: 6,
           showSymbol: true,
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: "rgba(150, 92, 222, 0.3)" },
-              { offset: 1, color: "rgba(150, 92, 222, 0)" },
+              { offset: 0, color: "rgba(209, 184, 84, 0.3)" },
+              { offset: 1, color: "rgba(209, 184, 84, 0)" },
             ]),
           },
         },
@@ -1143,7 +1147,7 @@ const E2ELatencyChart: React.FC<E2ELatencyChartProps> = ({ promptId }) => {
             <Spin size="small" />
           </div>
         )}
-        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
@@ -1196,8 +1200,8 @@ const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
     );
 
     if (response && response.buckets && response.buckets.length > 0) {
-      const labels = response.buckets.map(bucket => `${bucket.bucket_start}-${bucket.bucket_end}`);
-      const data = response.buckets.map(bucket => bucket.avg_metric);
+      const labels = response.buckets.map(bucket => bucket.range);
+      const data = response.buckets.map(bucket => bucket.avg_value);
       setChartData({ labels, data });
     } else {
       setChartData({ labels: [], data: [] });
@@ -1211,7 +1215,7 @@ const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
 
     const option: echarts.EChartsOption = {
       backgroundColor: "transparent",
-      grid: { left: 50, right: 20, top: 30, bottom: 65 },
+      grid: { left: 50, right: 20, top: 30, bottom: 55 },
       tooltip: {
         trigger: "axis",
         backgroundColor: "#18181b",
@@ -1252,15 +1256,15 @@ const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
           type: "line",
           data: [],
           smooth: true,
-          lineStyle: { color: "#965CDE", width: 2 },
-          itemStyle: { color: "#965CDE" },
+          lineStyle: { color: "#D1B854", width: 2 },
+          itemStyle: { color: "#D1B854" },
           symbol: "circle",
           symbolSize: 6,
           showSymbol: true,
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: "rgba(150, 92, 222, 0.3)" },
-              { offset: 1, color: "rgba(150, 92, 222, 0)" },
+              { offset: 0, color: "rgba(209, 184, 84, 0.3)" },
+              { offset: 1, color: "rgba(209, 184, 84, 0)" },
             ]),
           },
         },
@@ -1290,8 +1294,14 @@ const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
   return (
     <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-full">
       <div className="flex justify-between items-center mb-4">
-        <div className="relative w-fit">
+        {/* <div className="relative w-fit">
           <Text_14_600_EEEEEE>TTFT vs Input Tokens</Text_14_600_EEEEEE>
+          <Text_14_600_EEEEEE>a</Text_14_600_EEEEEE>
+        </div> */}
+        <div className="max-w-[55%]">
+          <div className="relative min-h-[4rem]">
+            <Text_14_600_EEEEEE className="w-full">TTFT vs Input Tokens</Text_14_600_EEEEEE>
+          </div>
         </div>
         <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
       </div>
@@ -1301,7 +1311,7 @@ const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
             <Spin size="small" />
           </div>
         )}
-        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
@@ -1354,8 +1364,8 @@ const ThroughputChart: React.FC<ThroughputChartProps> = ({ promptId }) => {
     );
 
     if (response && response.buckets && response.buckets.length > 0) {
-      const labels = response.buckets.map(bucket => `${bucket.bucket_start}-${bucket.bucket_end}`);
-      const data = response.buckets.map(bucket => bucket.avg_metric);
+      const labels = response.buckets.map(bucket => bucket.range);
+      const data = response.buckets.map(bucket => bucket.avg_value);
       setChartData({ labels, data });
     } else {
       setChartData({ labels: [], data: [] });
@@ -1369,7 +1379,7 @@ const ThroughputChart: React.FC<ThroughputChartProps> = ({ promptId }) => {
 
     const option: echarts.EChartsOption = {
       backgroundColor: "transparent",
-      grid: { left: 80, right: 20, top: 30, bottom: 50 },
+      grid: { left: 80, right: 20, top: 30, bottom: 55 },
       tooltip: {
         trigger: "axis",
         backgroundColor: "#18181b",
@@ -1445,7 +1455,7 @@ const ThroughputChart: React.FC<ThroughputChartProps> = ({ promptId }) => {
     <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-full">
       <div className="flex justify-between items-start mb-4">
         <div className="max-w-[55%]">
-          <div className="relative">
+          <div className="relative min-h-[4rem]">
             <Text_14_600_EEEEEE className="w-full">Average Throughput/User by Concurrency</Text_14_600_EEEEEE>
           </div>
         </div>
@@ -1457,7 +1467,7 @@ const ThroughputChart: React.FC<ThroughputChartProps> = ({ promptId }) => {
             <Spin size="small" />
           </div>
         )}
-        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
@@ -1506,7 +1516,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
             tags: [
               { name: "tag 1", color: "#965CDE" },
               { name: "tag 2", color: "#5CADFF" },
-              { name: "tag 3", color: "#22C55E" },
+              { name: "tag 3", color: "#479D5F" },
             ],
             status: "Active",
             created_at: new Date().toISOString(),

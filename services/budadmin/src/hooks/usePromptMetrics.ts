@@ -61,15 +61,16 @@ export interface DistributionRequest {
 }
 
 export interface DistributionBucket {
+  range: string;
   bucket_start: number;
   bucket_end: number;
   count: number;
-  avg_metric: number;
-  min_metric: number;
-  max_metric: number;
-  p50_metric: number;
-  p95_metric: number;
-  p99_metric: number;
+  avg_value: number;
+  min_value?: number;
+  max_value?: number;
+  p50_value?: number;
+  p95_value?: number;
+  p99_value?: number;
 }
 
 export interface DistributionResponse {
