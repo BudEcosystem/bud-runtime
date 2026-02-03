@@ -335,7 +335,26 @@ class BudPipelineService(SessionMixin):
                 method="POST",
                 data=data,
             )
+
+            # Check for error response from budpipeline (HTTPException returns detail field)
+            if isinstance(result, dict) and "detail" in result:
+                detail = result["detail"]
+                # Handle structured error response
+                if isinstance(detail, dict):
+                    error_msg = detail.get("error", "Pipeline execution failed")
+                    errors = detail.get("errors", [])
+                    if errors:
+                        error_msg = f"{error_msg}: {errors[0]}" if len(errors) == 1 else f"{error_msg}: {errors}"
+                else:
+                    error_msg = str(detail)
+                raise ClientException(
+                    error_msg,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
             return result
+        except ClientException:
+            raise
         except Exception as e:
             logger.exception(f"Failed to execute pipeline {pipeline_id}")
             raise ClientException(

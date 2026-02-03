@@ -251,11 +251,26 @@ const WorkflowDetail = () => {
     }
   }, [selectedWorkflow]);
 
+  // Check if pipeline can be executed (has at least one step)
+  const canExecute = useMemo(() => {
+    const dag = editedDag || selectedWorkflow?.dag;
+    const stepCount = dag?.steps?.length ?? selectedWorkflow?.step_count ?? 0;
+    return stepCount > 0;
+  }, [editedDag, selectedWorkflow]);
+
   const handleExecute = async () => {
     if (selectedWorkflow) {
-      setIsExecuting(true);
       // Get parameters from the current DAG (edited or original)
       const dag = editedDag || selectedWorkflow.dag;
+
+      // Frontend validation: check if pipeline has steps
+      const stepCount = dag?.steps?.length ?? selectedWorkflow.step_count ?? 0;
+      if (stepCount === 0) {
+        errorToast("Cannot execute a pipeline with no steps");
+        return;
+      }
+
+      setIsExecuting(true);
       const params: Record<string, any> = {};
       // Populate params with default values from DAG parameters
       if (dag?.parameters) {
@@ -265,14 +280,34 @@ const WorkflowDetail = () => {
           }
         }
       }
-      await executeWorkflow(selectedWorkflow.id, params);
+      const result = await executeWorkflow(selectedWorkflow.id, params);
       await getExecutions(selectedWorkflow.id);
       setIsExecuting(false);
-      successToast("Pipeline execution started");
+      if (result) {
+        successToast("Pipeline execution started");
+      } else {
+        errorToast(useBudPipeline.getState().error || "Failed to execute pipeline");
+      }
     }
   };
 
   const confirmExecute = () => {
+    // Check if pipeline has steps before showing execute confirmation
+    if (!canExecute) {
+      openConfirm({
+        message: "Cannot Execute Pipeline",
+        description: "This pipeline has no steps. Add at least one step and click Save before executing.",
+        cancelAction: () => {},
+        cancelText: "Close",
+        loading: false,
+        key: "execute-pipeline-no-steps",
+        okAction: () => setActiveTab("dag"),
+        okText: "Go to Editor",
+        type: "warning",
+      });
+      return;
+    }
+
     openConfirm({
       message: `Execute "${selectedWorkflow?.name}"?`,
       description: "This will start a new execution of the pipeline with all configured steps.",
