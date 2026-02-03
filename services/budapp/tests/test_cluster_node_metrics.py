@@ -1,7 +1,7 @@
 import asyncio
 import json
 from datetime import datetime, timedelta
-from budapp.shared.promql_service import PromQLService
+from budapp.shared.promql_service import PrometheusMetricsClient
 
 async def test_node_metrics_and_events():
     """Test getting node metrics and events"""

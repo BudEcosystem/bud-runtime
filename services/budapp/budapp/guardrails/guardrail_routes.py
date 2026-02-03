@@ -28,8 +28,13 @@ from budapp.commons.constants import GuardrailDeploymentStatusEnum, PermissionEn
 from budapp.commons.dependencies import get_current_active_user, get_session, parse_ordering_fields
 from budapp.commons.exceptions import ClientException
 from budapp.commons.permission_handler import require_permissions
-from budapp.commons.schemas import ErrorResponse, SuccessResponse
+from budapp.commons.schemas import ErrorResponse, PaginatedSuccessResponse, SuccessResponse
+from budapp.guardrails.crud import GuardrailsDeploymentDataManager
 from budapp.guardrails.schemas import (
+    GuardrailCustomProbeCreate,
+    GuardrailCustomProbeDetailResponse,
+    GuardrailCustomProbeResponse,
+    GuardrailCustomProbeUpdate,
     GuardrailDeploymentDetailResponse,
     GuardrailDeploymentPaginatedResponse,
     GuardrailDeploymentUpdate,
@@ -318,6 +323,215 @@ async def delete_probe(
         ).to_http_response()
 
 
+# Custom probe endpoints
+
+
+class GuardrailCustomProbePaginatedResponse(PaginatedSuccessResponse):
+    """Schema for custom probe list responses."""
+
+    probes: list[GuardrailCustomProbeResponse] = []
+    object: str = "guardrail.custom_probe.list"
+
+
+@router.post(
+    "/custom-probe",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_201_CREATED: {
+            "model": SuccessResponse,
+            "description": "Successfully created custom probe",
+        },
+    },
+    description="Create a custom model-based probe with a single rule",
+    status_code=status.HTTP_201_CREATED,
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def create_custom_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: GuardrailCustomProbeCreate,
+    project_id: UUID = Query(..., description="Project ID"),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Create a custom model-based probe with a single rule."""
+    try:
+        from budapp.guardrails.services import GuardrailCustomProbeService
+
+        service = GuardrailCustomProbeService(session)
+        probe = await service.create_custom_probe(
+            request=request,
+            project_id=project_id,
+            user_id=current_user.id,
+        )
+        return GuardrailCustomProbeDetailResponse(
+            code=status.HTTP_201_CREATED,
+            object="guardrail.custom_probe.create",
+            message="Custom probe created successfully",
+            probe=GuardrailCustomProbeResponse.model_validate(probe),
+        ).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create custom probe: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create custom probe",
+        ).to_http_response()
+
+
+@router.get(
+    "/custom-probes",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_200_OK: {
+            "model": GuardrailCustomProbePaginatedResponse,
+            "description": "Successfully listed custom probes",
+        },
+    },
+    description="List custom probes created by the current user",
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_VIEW])
+async def list_custom_probes(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    project_id: Optional[UUID] = Query(None, description="Filter by project"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1),
+) -> Union[GuardrailCustomProbePaginatedResponse, ErrorResponse]:
+    """List custom probes created by the current user."""
+    offset = (page - 1) * limit
+    try:
+        data_manager = GuardrailsDeploymentDataManager(session)
+        probes, total = await data_manager.get_custom_probes(
+            user_id=current_user.id,
+            project_id=project_id,
+            offset=offset,
+            limit=limit,
+        )
+        return GuardrailCustomProbePaginatedResponse(
+            code=status.HTTP_200_OK,
+            probes=[GuardrailCustomProbeResponse.model_validate(p) for p in probes],
+            total_record=total,
+            page=page,
+            limit=limit,
+            message="Custom probes retrieved successfully",
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to list custom probes: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to list custom probes",
+        ).to_http_response()
+
+
+@router.put(
+    "/custom-probe/{probe_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully updated custom probe",
+        },
+    },
+    description="Update a custom probe (user must be owner)",
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def update_custom_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    probe_id: UUID,
+    request: GuardrailCustomProbeUpdate,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Update a custom probe (user must be owner)."""
+    try:
+        from budapp.guardrails.services import GuardrailCustomProbeService
+
+        service = GuardrailCustomProbeService(session)
+        probe = await service.update_custom_probe(
+            probe_id=probe_id,
+            request=request,
+            user_id=current_user.id,
+        )
+        return GuardrailCustomProbeDetailResponse(
+            code=status.HTTP_200_OK,
+            object="guardrail.custom_probe.update",
+            message="Custom probe updated successfully",
+            probe=GuardrailCustomProbeResponse.model_validate(probe),
+        ).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to update custom probe: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to update custom probe",
+        ).to_http_response()
+
+
+@router.delete(
+    "/custom-probe/{probe_id}",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully deleted custom probe",
+        },
+    },
+    description="Delete a custom probe (soft delete, user must be owner)",
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def delete_custom_probe(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    probe_id: UUID,
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a custom probe (soft delete, user must be owner)."""
+    try:
+        from budapp.guardrails.services import GuardrailCustomProbeService
+
+        service = GuardrailCustomProbeService(session)
+        await service.delete_custom_probe(
+            probe_id=probe_id,
+            user_id=current_user.id,
+        )
+        return SuccessResponse(
+            code=status.HTTP_200_OK,
+            object="guardrail.custom_probe.delete",
+            message="Custom probe deleted successfully",
+        ).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to delete custom probe: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to delete custom probe",
+        ).to_http_response()
+
+
 @router.get(
     "/rule/{rule_id}",
     response_model=GuardrailRuleDetailResponse,
@@ -362,7 +576,6 @@ async def create_rule(
             user_id=current_user.id,
             status=request.status,
             description=request.description,
-            scanner_types=request.scanner_types,
             modality_types=request.modality_types,
             guard_types=request.guard_types,
             examples=request.examples,
@@ -397,7 +610,6 @@ async def edit_rule(
             name=request.name,
             description=request.description,
             status=request.status,
-            scanner_types=request.scanner_types,
             modality_types=request.modality_types,
             guard_types=request.guard_types,
             examples=request.examples,
@@ -826,6 +1038,53 @@ async def retrieve_deployment(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to retrieve deployment details",
+        ).to_http_response()
+
+
+@router.get(
+    "/deployment/{deployment_id}/progress",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Successfully retrieved deployment progress",
+        },
+    },
+    description="Get progress of a guardrail deployment via BudPipeline",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_deployment_progress(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    deployment_id: UUID,
+    detail: str = Query("summary", description="Detail level: summary, steps, full"),
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Get progress of a guardrail deployment via BudPipeline."""
+    try:
+        progress = await GuardrailDeploymentWorkflowService(session).get_deployment_progress(
+            deployment_id=deployment_id,
+            detail=detail,
+        )
+        return SuccessResponse(
+            code=status.HTTP_200_OK,
+            object="guardrail.deployment.progress",
+            message="Deployment progress retrieved",
+            data=progress,
+        ).to_http_response()
+    except ClientException as e:
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get deployment progress: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to get deployment progress",
         ).to_http_response()
 
 

@@ -1223,6 +1223,7 @@ fn convert_groundedness_response_to_openai(
         category_applied_input_types: Some(category_applied_input_types),
         hallucination_details,
         ip_violation_details: None,
+        other_categories: Default::default(),
     }
 }
 
@@ -1267,6 +1268,7 @@ fn convert_prompt_shield_response_to_openai(
         category_applied_input_types: Some(category_applied_input_types),
         hallucination_details: None,
         ip_violation_details: None,
+        other_categories: Default::default(),
     }
 }
 
@@ -1296,6 +1298,7 @@ fn convert_protected_material_response_to_openai(
         category_applied_input_types: Some(category_applied_input_types),
         hallucination_details: None,
         ip_violation_details: None,
+        other_categories: Default::default(),
     }
 }
 
@@ -1347,6 +1350,7 @@ fn convert_protected_material_code_response_to_openai(
         category_applied_input_types: Some(category_applied_input_types),
         hallucination_details: None,
         ip_violation_details,
+        other_categories: Default::default(),
     }
 }
 
@@ -1421,6 +1425,7 @@ fn convert_azure_response_to_openai(
         category_applied_input_types: Some(category_applied_input_types),
         hallucination_details: None,
         ip_violation_details: None,
+        other_categories: Default::default(),
     }
 }
 

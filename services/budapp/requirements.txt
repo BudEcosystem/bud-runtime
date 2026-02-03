@@ -38,6 +38,7 @@ redis>=5.2.1
 
 # Service
 budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
+bud-sdk @ git+https://github.com/BudEcosystem/BudAIFoundry-SDK.git
 
 # Keycloak
 python-keycloak>=5.3.1
