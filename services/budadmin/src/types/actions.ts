@@ -17,6 +17,7 @@ export type ParamType =
   | 'multiselect'
   | 'json'
   | 'template'
+  | 'range'
   | 'branches'
   | 'model_ref'
   | 'cluster_ref'

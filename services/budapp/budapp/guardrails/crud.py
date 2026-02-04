@@ -26,9 +26,14 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.sql import select
 
 from budapp.commons import logging
-from budapp.commons.constants import GuardrailDeploymentStatusEnum, GuardrailStatusEnum
+from budapp.commons.constants import (
+    GuardrailDeploymentStatusEnum,
+    GuardrailProviderTypeEnum,
+    GuardrailStatusEnum,
+    ProbeTypeEnum,
+)
 from budapp.commons.db_utils import DataManagerUtils
-from budapp.commons.exceptions import DatabaseException
+from budapp.commons.exceptions import ClientException, DatabaseException
 from budapp.guardrails.models import (
     GuardrailDeployment,
     GuardrailProbe,
@@ -36,6 +41,7 @@ from budapp.guardrails.models import (
     GuardrailProfileProbe,
     GuardrailProfileRule,
     GuardrailRule,
+    GuardrailRuleDeployment,
 )
 
 
@@ -194,6 +200,50 @@ class GuardrailsProbeRulesDataManager(DataManagerUtils):
         result = self.execute_all(stmt)
 
         return result, count
+
+    async def get_probes_with_rules(self, probe_ids: list[UUID]) -> list[GuardrailProbe]:
+        """Get probes by IDs with their rules eagerly loaded.
+
+        Args:
+            probe_ids: List of probe IDs to fetch
+
+        Returns:
+            List of GuardrailProbe objects with rules relationship loaded
+        """
+        # Query probes
+        probe_stmt = (
+            select(GuardrailProbe)
+            .where(GuardrailProbe.id.in_(probe_ids))
+            .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+        )
+        probe_result = self.session.execute(probe_stmt)
+        probes = list(probe_result.scalars().all())
+
+        if not probes:
+            return []
+
+        # Query rules for these probes
+        probe_id_list = [p.id for p in probes]
+        rule_stmt = (
+            select(GuardrailRule)
+            .where(GuardrailRule.probe_id.in_(probe_id_list))
+            .where(GuardrailRule.status == GuardrailStatusEnum.ACTIVE)
+        )
+        rule_result = self.session.execute(rule_stmt)
+        rules = list(rule_result.scalars().all())
+
+        # Group rules by probe_id
+        rules_by_probe: dict[UUID, list[GuardrailRule]] = {}
+        for rule in rules:
+            if rule.probe_id not in rules_by_probe:
+                rules_by_probe[rule.probe_id] = []
+            rules_by_probe[rule.probe_id].append(rule)
+
+        # Attach rules to probes
+        for probe in probes:
+            probe.rules = rules_by_probe.get(probe.id, [])
+
+        return probes
 
     async def get_all_probe_rules(
         self,
@@ -1033,3 +1083,159 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
                 existing_deployments[deployment[0].endpoint_id] = deployment[0]
 
         return existing_deployments
+
+    async def create_custom_probe_with_rule(
+        self,
+        name: str,
+        description: str | None,
+        scanner_type: str,
+        model_id: UUID,
+        model_config: dict,
+        model_uri: str,
+        model_provider_type: str,
+        is_gated: bool,
+        project_id: UUID,
+        user_id: UUID,
+        provider_id: UUID,
+    ) -> GuardrailProbe:
+        """Create a custom probe with a single model-based rule atomically."""
+        # Generate URI for uniqueness check
+        probe_uri = f"custom.{user_id}.{name.lower().replace(' ', '_')}"
+
+        # Check for existing probe with same URI (same user + same name)
+        existing = self.session.query(GuardrailProbe).filter_by(uri=probe_uri).first()
+        if existing:
+            raise ClientException(
+                message=f"A custom probe with name '{name}' already exists for this user",
+                status_code=409,
+            )
+
+        savepoint = None
+        try:
+            # Start a new transaction savepoint
+            savepoint = self.session.begin_nested()
+
+            # Create probe
+            probe = GuardrailProbe(
+                name=name,
+                uri=probe_uri,
+                description=description,
+                probe_type=ProbeTypeEnum.CUSTOM,
+                provider_type=GuardrailProviderTypeEnum.BUD,
+                provider_id=provider_id,
+                created_by=user_id,
+                status=GuardrailStatusEnum.ACTIVE,
+            )
+            self.session.add(probe)
+            self.session.flush()
+
+            # Create single rule for the probe
+            rule = GuardrailRule(
+                probe_id=probe.id,
+                name=name,
+                uri=f"{probe_uri}.rule",
+                description=description,
+                scanner_type=scanner_type,
+                model_uri=model_uri,
+                model_provider_type=model_provider_type,
+                is_gated=is_gated,
+                model_config_json=model_config,
+                model_id=model_id,
+                created_by=user_id,
+                status=GuardrailStatusEnum.ACTIVE,
+            )
+            self.session.add(rule)
+            self.session.flush()
+
+            # Commit the savepoint and the session
+            if savepoint:
+                savepoint.commit()
+            self.session.commit()
+
+            # Refresh probe to load the rules relationship
+            self.session.refresh(probe)
+
+            return probe
+
+        except Exception as e:
+            # Rollback the savepoint on any error
+            if savepoint and savepoint.is_active:
+                savepoint.rollback()
+            self.session.rollback()
+            logger.exception(f"Failed to create custom probe with rule: {e}")
+            raise
+
+    async def get_custom_probes(
+        self,
+        user_id: UUID,
+        project_id: UUID | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[GuardrailProbe], int]:
+        """Get custom probes created by user."""
+        query = (
+            select(GuardrailProbe)
+            .options(selectinload(GuardrailProbe.rules))
+            .where(GuardrailProbe.probe_type == ProbeTypeEnum.CUSTOM)
+            .where(GuardrailProbe.created_by == user_id)
+            .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+        )
+        count_query = (
+            select(func.count())
+            .select_from(GuardrailProbe)
+            .where(GuardrailProbe.probe_type == ProbeTypeEnum.CUSTOM)
+            .where(GuardrailProbe.created_by == user_id)
+            .where(GuardrailProbe.status == GuardrailStatusEnum.ACTIVE)
+        )
+
+        total = self.session.scalar(count_query)
+        result = self.session.execute(query.offset(offset).limit(limit))
+        probes = result.scalars().all()
+
+        return list(probes), total or 0
+
+    async def get_model_probes_from_selections(
+        self,
+        probe_ids: list[UUID],
+    ) -> list[GuardrailProbe]:
+        """Get probes that are model-based (model_scanner or custom) from selection."""
+        query = (
+            select(GuardrailProbe)
+            .where(GuardrailProbe.id.in_(probe_ids))
+            .where(GuardrailProbe.probe_type.in_([ProbeTypeEnum.MODEL_SCANNER, ProbeTypeEnum.CUSTOM]))
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def create_rule_deployment(
+        self,
+        guardrail_deployment_id: UUID,
+        rule_id: UUID,
+        model_id: UUID,
+        endpoint_id: UUID,
+        cluster_id: UUID,
+        config_override: dict | None = None,
+    ) -> GuardrailRuleDeployment:
+        """Create a rule deployment record."""
+        deployment = GuardrailRuleDeployment(
+            guardrail_deployment_id=guardrail_deployment_id,
+            rule_id=rule_id,
+            model_id=model_id,
+            endpoint_id=endpoint_id,
+            cluster_id=cluster_id,
+            config_override_json=config_override,
+        )
+        self.session.add(deployment)
+        await self.session.flush()
+        return deployment
+
+    async def get_rule_deployments_for_guardrail(
+        self,
+        guardrail_deployment_id: UUID,
+    ) -> list[GuardrailRuleDeployment]:
+        """Get all rule deployments for a guardrail deployment."""
+        query = select(GuardrailRuleDeployment).where(
+            GuardrailRuleDeployment.guardrail_deployment_id == guardrail_deployment_id
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())

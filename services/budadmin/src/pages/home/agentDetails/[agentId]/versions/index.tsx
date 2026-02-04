@@ -25,7 +25,9 @@ interface VersionsTabProps {
 
 const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
   const router = useRouter();
-  const { id, projectId, name } = router.query;
+  // Support both 'id' (from rewrite rule) and 'agentId' (from folder name)
+  const { id, agentId, projectId, name } = router.query;
+  const promptId = (id || agentId) as string;
   const promptName = useMemo(
     () => (typeof name === "string" ? name : undefined),
     [name]
@@ -49,18 +51,18 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
   } = useAgentStore();
   const [settingDefaultVersionId, setSettingDefaultVersionId] = useState<string | null>(null);
 
-  // Fetch data when component mounts or agentId changes
+  // Fetch data when component mounts or promptId changes
   useEffect(() => {
-    if (id && typeof id === "string") {
-      getPromptVersions(id, projectId as string);
+    if (promptId) {
+      getPromptVersions(promptId, projectId as string);
     }
-  }, [id, projectId]);
+  }, [promptId, projectId]);
 
   // Listen for version created event to refresh the list
   useEffect(() => {
     const handleVersionCreated = () => {
-      if (id && typeof id === "string") {
-        getPromptVersions(id, projectId as string);
+      if (promptId) {
+        getPromptVersions(promptId, projectId as string);
       }
     };
 
@@ -69,18 +71,18 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
     return () => {
       window.removeEventListener('versionCreated', handleVersionCreated);
     };
-  }, [id, projectId, getPromptVersions]);
+  }, [promptId, projectId, getPromptVersions]);
 
   // Handle Add Version button click
   const handleAddVersion = async () => {
-    if (!id || typeof id !== "string") {
+    if (!promptId) {
       errorToast("Invalid prompt ID");
       return;
     }
 
     try {
       // Fetch the prompt data
-      const promptData = await getPromptById(id, projectId as string);
+      const promptData = await getPromptById(promptId, projectId as string);
 
       if (!promptData) {
         errorToast("Failed to load prompt data");
@@ -96,7 +98,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       };
 
       // Load prompt data into agent store for add version mode
-      loadPromptForAddVersion(id, sessionData);
+      loadPromptForAddVersion(promptId, sessionData);
 
       // Open the agent drawer
       openAgentDrawer();
@@ -108,14 +110,14 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
 
   // Handle Edit Version button click
   const handleEditVersion = async (versionData: IPromptVersion) => {
-    if (!id || typeof id !== "string") {
+    if (!promptId) {
       errorToast("Invalid prompt ID");
       return;
     }
 
     try {
       // Fetch the prompt data
-      const promptData = await getPromptById(id, projectId as string);
+      const promptData = await getPromptById(promptId, projectId as string);
 
       if (!promptData) {
         errorToast("Failed to load prompt data");
@@ -125,7 +127,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       const resolvedPromptName = promptName || promptData.name || promptData.prompt_name;
 
       // Load baseline session data from prompt
-      const sessionData = await loadPromptForEditing(id, projectId as string);
+      const sessionData = await loadPromptForEditing(promptId, projectId as string);
       if (resolvedPromptName) {
         sessionData.name = resolvedPromptName;
       }
@@ -248,7 +250,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       };
 
       // Load prompt data into agent store for edit version mode
-      loadPromptForEditVersion(id, versionMetadata, sessionData);
+      loadPromptForEditVersion(promptId, versionMetadata, sessionData);
 
       // Open the agent drawer
       openAgentDrawer();
@@ -259,7 +261,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
   };
 
   const handleSetDefaultVersion = async (versionData: IPromptVersion) => {
-    if (!id || typeof id !== "string") {
+    if (!promptId) {
       errorToast("Invalid prompt ID");
       return;
     }
@@ -307,10 +309,10 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       };
 
       await AppRequest.Patch(
-        `${tempApiBaseUrl}/prompts/${id}/versions/${versionData.id}`,
+        `${tempApiBaseUrl}/prompts/${promptId}/versions/${versionData.id}`,
         payload
       );
-      await getPromptVersions(id, projectId as string);
+      await getPromptVersions(promptId, projectId as string);
     } catch (error) {
       console.error("Error setting default version:", error);
       errorToast("Failed to set default version");

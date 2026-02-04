@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::time::Duration;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
@@ -22,6 +23,7 @@ use axum::Json;
 use futures::{Stream, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use tonic::Code;
 use url::Url;
 use uuid::Uuid;
 
@@ -167,6 +169,125 @@ fn create_guardrail_error_response(
     });
 
     (status_code, error_json)
+}
+
+/// Number of guardrail execution attempts before returning a failure.
+const GUARDRAIL_RETRY_ATTEMPTS: usize = 3;
+/// Backoff schedule in milliseconds for guardrail retries.
+///
+/// Small delays reduce load spikes while keeping latency reasonable for user requests.
+const GUARDRAIL_RETRY_BACKOFF_MS: [u64; GUARDRAIL_RETRY_ATTEMPTS] = [200, 400, 800];
+
+fn create_guardrail_failure_response(message: &str) -> (StatusCode, serde_json::Value) {
+    let error_json = json!({
+        "error": {
+            "message": message,
+            "type": "server_error",
+            "code": "guardrail_failure"
+        }
+    });
+
+    (StatusCode::BAD_GATEWAY, error_json)
+}
+
+fn guardrail_retry_backoff(attempt: usize) -> Duration {
+    let millis = GUARDRAIL_RETRY_BACKOFF_MS
+        .get(attempt)
+        .copied()
+        .unwrap_or(0);
+    Duration::from_millis(millis)
+}
+
+fn parse_grpc_status_code(raw_response: &str) -> Option<Code> {
+    let value: serde_json::Value = serde_json::from_str(raw_response).ok()?;
+    let code = value.get("code").and_then(|v| v.as_i64())?;
+    Some(Code::from_i32(code as i32))
+}
+
+fn is_retryable_guardrail_error(error: &Error) -> bool {
+    match error.get_details() {
+        ErrorDetails::InferenceTimeout { .. }
+        | ErrorDetails::ProviderTimeout { .. }
+        | ErrorDetails::Inference { .. }
+        | ErrorDetails::InferenceServer { .. } => {
+            if let ErrorDetails::InferenceServer { raw_response, .. } = error.get_details() {
+                if let Some(raw) = raw_response {
+                    if let Some(code) = parse_grpc_status_code(raw) {
+                        return match code {
+                            Code::Unavailable | Code::DeadlineExceeded | Code::Unknown => true,
+                            Code::Unauthenticated | Code::PermissionDenied => false,
+                            _ => true,
+                        };
+                    }
+                }
+            }
+            true
+        }
+        ErrorDetails::InferenceClient { status_code, .. } => {
+            if let Some(code) = status_code {
+                if *code == StatusCode::UNAUTHORIZED || *code == StatusCode::FORBIDDEN {
+                    return false;
+                }
+                return code.is_server_error() || *code == StatusCode::BAD_GATEWAY;
+            }
+            false
+        }
+        ErrorDetails::ApiKeyMissing { .. }
+        | ErrorDetails::BadCredentialsPreInference { .. }
+        | ErrorDetails::Config { .. }
+        | ErrorDetails::InvalidProviderConfig { .. }
+        | ErrorDetails::InvalidOpenAICompatibleRequest { .. }
+        | ErrorDetails::InvalidRequest { .. }
+        | ErrorDetails::InvalidModel { .. }
+        | ErrorDetails::InvalidModelProvider { .. } => false,
+        _ => false,
+    }
+}
+
+fn guardrail_result_has_errors(result: &crate::guardrail_table::GuardrailResult) -> bool {
+    result
+        .provider_results
+        .iter()
+        .any(|provider| provider.error.is_some())
+}
+
+async fn execute_guardrail_with_retries<'a>(
+    guardrail_config: &crate::guardrail_table::GuardrailConfig,
+    input: crate::moderation::ModerationInput,
+    guard_type: crate::guardrail_table::GuardType,
+    clients: &InferenceClients<'a>,
+    provider_params: Option<serde_json::Value>,
+    skip_guard_type_validation: bool,
+) -> Result<crate::guardrail_table::GuardrailResult, Error> {
+    let mut last_error = None;
+    for attempt in 0..GUARDRAIL_RETRY_ATTEMPTS {
+        match crate::guardrail::execute_guardrail(
+            guardrail_config,
+            input.clone(),
+            guard_type,
+            clients,
+            provider_params.clone(),
+            skip_guard_type_validation,
+        )
+        .await
+        {
+            Ok(result) => return Ok(result),
+            Err(err) => {
+                let retryable = is_retryable_guardrail_error(&err);
+                last_error = Some(err);
+                if !retryable || attempt + 1 >= GUARDRAIL_RETRY_ATTEMPTS {
+                    break;
+                }
+                tokio::time::sleep(guardrail_retry_backoff(attempt)).await;
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        Error::new(ErrorDetails::InternalError {
+            message: "Guardrail execution failed without error context".to_string(),
+        })
+    }))
 }
 
 /// Helper function to serialize JSON without null values
@@ -524,7 +645,7 @@ pub async fn inference_handler(
 
                     // Execute input guardrail with timing
                     let input_scan_start = tokio::time::Instant::now();
-                    let guardrail_result = crate::guardrail::execute_guardrail(
+                    let guardrail_result = match execute_guardrail_with_retries(
                         &guardrail_config,
                         moderation_input.clone(),
                         crate::guardrail_table::GuardType::Input,
@@ -532,7 +653,19 @@ pub async fn inference_handler(
                         None,
                         false,
                     )
-                    .await?;
+                    .await
+                    {
+                        Ok(result) => result,
+                        Err(_) => {
+                            let (status_code, error_response) =
+                                create_guardrail_failure_response("Guardrail execution failed");
+                            return Ok(Response::builder()
+                                .status(status_code)
+                                .header("Content-Type", "application/json")
+                                .body(Body::from(error_response.to_string()))
+                                .unwrap());
+                        }
+                    };
                     let input_scan_duration = input_scan_start.elapsed();
 
                     // Store the input guardrail result for later (we need the inference_id from the response)
@@ -553,6 +686,16 @@ pub async fn inference_handler(
                                 None,
                             );
                         guardrail_context.add_scan_record(scan_record);
+                    }
+
+                    if guardrail_result_has_errors(&guardrail_result) {
+                        let (status_code, error_response) =
+                            create_guardrail_failure_response("Guardrail execution failed");
+                        return Ok(Response::builder()
+                            .status(status_code)
+                            .header("Content-Type", "application/json")
+                            .body(Body::from(error_response.to_string()))
+                            .unwrap());
                     }
 
                     // If input is flagged, handle the blocked request with full observability
@@ -912,7 +1055,7 @@ pub async fn inference_handler(
 
                             // Execute output guardrail with timing
                             let output_scan_start = tokio::time::Instant::now();
-                            let guardrail_result = crate::guardrail::execute_guardrail(
+                            let guardrail_result = match execute_guardrail_with_retries(
                                 &guardrail_config,
                                 moderation_input.clone(),
                                 crate::guardrail_table::GuardType::Output,
@@ -920,7 +1063,21 @@ pub async fn inference_handler(
                                 None,
                                 false,
                             )
-                            .await?;
+                            .await
+                            {
+                                Ok(result) => result,
+                                Err(_) => {
+                                    let (status_code, error_response) =
+                                        create_guardrail_failure_response(
+                                            "Guardrail execution failed",
+                                        );
+                                    return Ok(Response::builder()
+                                        .status(status_code)
+                                        .header("Content-Type", "application/json")
+                                        .body(Body::from(error_response.to_string()))
+                                        .unwrap());
+                                }
+                            };
                             let output_scan_duration = output_scan_start.elapsed();
 
                             if !guardrail_result.provider_results.is_empty() {
@@ -939,6 +1096,18 @@ pub async fn inference_handler(
                                         None,
                                     );
                                 guardrail_context.add_scan_record(scan_record);
+                            }
+
+                            if guardrail_result_has_errors(&guardrail_result) {
+                                let (status_code, error_response) =
+                                    create_guardrail_failure_response(
+                                        "Guardrail execution failed",
+                                    );
+                                return Ok(Response::builder()
+                                    .status(status_code)
+                                    .header("Content-Type", "application/json")
+                                    .body(Body::from(error_response.to_string()))
+                                    .unwrap());
                             }
 
                             // If output is flagged, return an error
@@ -2493,7 +2662,7 @@ impl StreamingGuardrailState {
         };
 
         let scan_start = tokio::time::Instant::now();
-        let guardrail_result = crate::guardrail::execute_guardrail(
+        let guardrail_result = execute_guardrail_with_retries(
             self.guardrail_config.as_ref(),
             crate::moderation::ModerationInput::Single(window_text.to_string()),
             crate::guardrail_table::GuardType::Output,
@@ -2524,6 +2693,16 @@ impl StreamingGuardrailState {
                     context.response_terminated = true;
                 }
             }
+        }
+
+        if guardrail_result_has_errors(&guardrail_result) {
+            return Err(Error::new(ErrorDetails::InferenceClient {
+                message: "Guardrail execution failed".to_string(),
+                status_code: Some(StatusCode::BAD_GATEWAY),
+                provider_type: "guardrail".to_string(),
+                raw_request: None,
+                raw_response: None,
+            }));
         }
 
         Ok(guardrail_result)
@@ -3252,7 +3431,8 @@ pub async fn completion_handler(
         })?;
 
     // Merge credentials from the credential store
-    let credentials = merge_credentials_from_store(&model_credential_store);
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+    merge_credentials_from_headers(&headers, &mut credentials);
 
     // Create inference clients
     let cache_options: crate::cache::CacheOptions = (
@@ -4579,7 +4759,7 @@ pub async fn moderation_handler(
 
         // Execute the guardrail
         let start_time = tokio::time::Instant::now();
-        let guardrail_result = crate::guardrail::execute_guardrail(
+        let guardrail_result = match execute_guardrail_with_retries(
             &guardrail_config,
             moderation_request.input.clone(),
             crate::guardrail_table::GuardType::Input,
@@ -4587,8 +4767,30 @@ pub async fn moderation_handler(
             moderation_request.provider_params.clone(),
             true,
         )
-        .await?;
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                let (status_code, error_response) =
+                    create_guardrail_failure_response("Guardrail execution failed");
+                return Ok(Response::builder()
+                    .status(status_code)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(error_response.to_string()))
+                    .unwrap());
+            }
+        };
         let latency = start_time.elapsed();
+
+        if guardrail_result_has_errors(&guardrail_result) {
+            let (status_code, error_response) =
+                create_guardrail_failure_response("Guardrail execution failed");
+            return Ok(Response::builder()
+                .status(status_code)
+                .header("Content-Type", "application/json")
+                .body(Body::from(error_response.to_string()))
+                .unwrap());
+        }
 
         // Convert guardrail result to moderation response
         let results = vec![crate::moderation::ModerationResult {
@@ -4600,6 +4802,7 @@ pub async fn moderation_handler(
                 .clone(),
             hallucination_details: guardrail_result.hallucination_details.clone(),
             ip_violation_details: guardrail_result.ip_violation_details.clone(),
+            other_categories: guardrail_result.merged_other_categories.clone(),
         }];
 
         let provider_response = crate::moderation::ModerationProviderResponse {
@@ -8877,6 +9080,62 @@ mod tests {
 
     use crate::cache::CacheEnabledMode;
     use crate::inference::types::{Text, TextChunk};
+    use crate::guardrail_table::{GuardrailResult, ProviderGuardrailResult};
+
+    #[test]
+    fn guardrail_retry_policy_classifies_errors() {
+        let retryable = Error::new(ErrorDetails::InferenceServer {
+            message: "transient".to_string(),
+            provider_type: "bud_sentinel".to_string(),
+            raw_request: None,
+            raw_response: Some("{\"code\":14,\"message\":\"Unavailable\"}".to_string()),
+        });
+
+        let non_retryable = Error::new(ErrorDetails::ApiKeyMissing {
+            provider_name: "Bud Sentinel".to_string(),
+        });
+
+        assert!(is_retryable_guardrail_error(&retryable));
+        assert!(!is_retryable_guardrail_error(&non_retryable));
+    }
+
+    #[test]
+    fn guardrail_result_with_provider_error_is_failure() {
+        let result = GuardrailResult {
+            guardrail_id: "g1".to_string(),
+            flagged: false,
+            provider_results: vec![ProviderGuardrailResult {
+                provider_type: "bud_sentinel".to_string(),
+                flagged: false,
+                executed_probes: vec![],
+                enabled_rules: HashMap::new(),
+                raw_result: crate::moderation::ModerationResult {
+                    flagged: false,
+                    categories: crate::moderation::ModerationCategories::default(),
+                    category_scores: crate::moderation::ModerationCategoryScores::default(),
+                    category_applied_input_types: None,
+                    hallucination_details: None,
+                    ip_violation_details: None,
+                    other_categories: Default::default(),
+                },
+                error: Some("boom".to_string()),
+            }],
+            merged_categories: crate::moderation::ModerationCategories::default(),
+            merged_scores: crate::moderation::ModerationCategoryScores::default(),
+            merged_category_applied_input_types: None,
+            merged_other_categories: Default::default(),
+            hallucination_details: None,
+            ip_violation_details: None,
+        };
+
+        assert!(guardrail_result_has_errors(&result));
+    }
+
+    #[test]
+    fn moderation_guardrail_failure_returns_502() {
+        let (status, _) = create_guardrail_failure_response("Guardrail execution failed");
+        assert_eq!(status, StatusCode::BAD_GATEWAY);
+    }
 
     #[test]
     fn test_try_from_openai_compatible_params() {

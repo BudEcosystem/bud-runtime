@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
-import { Card, Row, Col, Statistic, Segmented, Spin } from "antd";
+import { Row, Col, Segmented, Spin } from "antd";
+import * as echarts from "echarts";
+import dayjs from "dayjs";
 import {
   Text_14_600_EEEEEE,
   Text_12_400_B3B3B3,
@@ -8,32 +10,1479 @@ import {
   Text_20_400_FFFFFF,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
 import Tags from "src/flows/components/DrawerTags";
 import { usePrompts } from "src/hooks/usePrompts";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
+import { usePromptMetrics } from "src/hooks/usePromptMetrics";
 
-const segmentOptions = ["LAST 24 HRS", "LAST 7 DAYS", "LAST 30 DAYS"];
+const segmentOptions = ["daily", "weekly", "monthly"];
+
+// Shared TimeRangeSelector component for independent chart controls
+interface TimeRangeSelectorProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({ value, onChange }) => (
+  <Segmented
+    options={segmentOptions}
+    value={value}
+    onChange={(val) => onChange(val as string)}
+    className="antSegmented antSegmented-home rounded-md text-[#EEEEEE] text-[.75rem] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
+  />
+);
+
+// Extended bucket data for tooltip display
+interface ExtendedBucketData {
+  value: number;
+  bucketStart: number;
+  bucketEnd: number;
+  timestamp: string;
+}
 
 interface OverviewTabProps {}
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
+// Calls Chart Component using ECharts
+interface CallsChartProps {
+  promptId: string;
+}
+
+const CallsChart: React.FC<CallsChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchPromptTimeSeries, PROMPT_METRICS, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: ExtendedBucketData[];
+    totalCalls: number;
+  }>({ labels: [], data: [], totalCalls: 0 });
+
+  // Get date range based on time range selection
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs; interval: string } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily":
+        return { from: to.subtract(24, "hour"), to, interval: "1h" };
+      case "weekly":
+        return { from: to.subtract(7, "day"), to, interval: "6h" };
+      case "monthly":
+        return { from: to.subtract(30, "day"), to, interval: "1d" };
+      default:
+        return { from: to.subtract(7, "day"), to, interval: "6h" };
+    }
+  }, []);
+
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+
+    const { from, to, interval } = getDateRange(timeRange);
+
+    const response = await fetchPromptTimeSeries(
+      from,
+      to,
+      [PROMPT_METRICS.requests],
+      { prompt_id: [promptId] },
+      { interval, dataSource: "prompt", fillGaps: true }
+    );
+
+    if (response && response.groups && response.groups.length > 0) {
+      // Aggregate data points from all groups
+      const aggregatedData: Map<string, number> = new Map();
+
+      response.groups.forEach((group) => {
+        group.data_points.forEach((point) => {
+          const timestamp = point.timestamp;
+          const value = point.values[PROMPT_METRICS.requests] || 0;
+          const existing = aggregatedData.get(timestamp) || 0;
+          aggregatedData.set(timestamp, existing + value);
+        });
+      });
+
+      // Sort by timestamp
+      const sortedEntries = Array.from(aggregatedData.entries()).sort(
+        (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
+      );
+
+      // Calculate total calls
+      const totalCalls = sortedEntries.reduce((sum, [, value]) => sum + value, 0);
+
+      // Format labels based on interval
+      const labels = sortedEntries.map(([timestamp]) => {
+        const date = new Date(timestamp);
+        const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+
+        if (hoursDiff <= 24) {
+          return date.toLocaleTimeString("en-US", {
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        } else if (hoursDiff <= 24 * 7) {
+          return (
+            date.toLocaleDateString("en-US", { weekday: "short" }) +
+            " " +
+            date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+          );
+        } else {
+          return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        }
+      });
+
+      const data: ExtendedBucketData[] = sortedEntries.map(([timestamp, value], index) => {
+        const currentTime = new Date(timestamp).getTime();
+        const nextTime = index < sortedEntries.length - 1
+          ? new Date(sortedEntries[index + 1][0]).getTime()
+          : currentTime + (interval === "1h" ? 3600000 : interval === "6h" ? 21600000 : 86400000);
+
+        return {
+          value,
+          bucketStart: currentTime,
+          bucketEnd: nextTime,
+          timestamp,
+        };
+      });
+
+      setChartData({ labels, data, totalCalls });
+    } else {
+      setChartData({ labels: [], data: [], totalCalls: 0 });
+    }
+  }, [promptId, timeRange, fetchPromptTimeSeries, PROMPT_METRICS.requests, getDateRange]);
+
+  // Initialize ECharts
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const myChart = echarts.init(chartRef.current, null, { renderer: "canvas" });
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: {
+        left: "0%",
+        right: "0%",
+        bottom: "10%",
+        top: "10%",
+        containLabel: true,
+      },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(24, 24, 27, 0.98)",
+        borderColor: "#3f3f46",
+        borderWidth: 1,
+        padding: [12, 14],
+        textStyle: { color: "#fafafa", fontSize: 12 },
+        confine: true,
+        extraCssText: "box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);",
+        formatter: function (params: any) {
+          const param = params[0];
+          const bucketData = param?.data as ExtendedBucketData;
+          const count = bucketData?.value || 0;
+          const bucketStart = bucketData?.bucketStart || Date.now();
+          const bucketEnd = bucketData?.bucketEnd || Date.now();
+
+          const formatDateTime = (timestamp: number) => {
+            const date = new Date(timestamp);
+            return (
+              date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+              ", " +
+              date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
+            );
+          };
+
+          const cursorPoint = (bucketStart + bucketEnd) / 2;
+
+          return `
+            <div style="min-width: 200px;">
+              <table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Cursor point</td>
+                  <td style="color: #fafafa; font-family: monospace; text-align: right;">${formatDateTime(cursorPoint)}</td>
+                </tr>
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Bar period</td>
+                  <td style="color: #fafafa; font-family: monospace; text-align: right; font-size: 11px;">
+                    ${formatDateTime(bucketStart)} -<br/>${formatDateTime(bucketEnd)}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Request Count</td>
+                  <td style="color: #fafafa; text-align: right; font-weight: 500;">${count}</td>
+                </tr>
+              </table>
+            </div>
+          `;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#71717a",
+          fontSize: 10,
+          interval: 0,
+          rotate: 0,
+        },
+        animation: true,
+      },
+      yAxis: {
+        type: "value",
+        name: "Request Count",
+        nameLocation: "middle",
+        nameGap: 40,
+        nameTextStyle: { color: "#71717a", fontSize: 11 },
+        min: 0,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: {
+          lineStyle: { color: "#3D3D3D", type: "solid" },
+        },
+        axisLabel: {
+          color: "#71717a",
+          fontSize: 10,
+        },
+        minInterval: 1,
+      },
+      series: [
+        {
+          name: "Requests",
+          type: "bar",
+          data: [],
+          itemStyle: {
+            color: "#965CDE",
+            borderRadius: [2, 2, 0, 0],
+          },
+          emphasis: {
+            itemStyle: { color: "#a78bfa" },
+          },
+          barWidth: "52%",
+          animationDuration: 300,
+          animationEasing: "linear" as const,
+        },
+      ],
+      animation: true,
+      animationDuration: 300,
+      animationDurationUpdate: 300,
+      animationEasing: "linear" as const,
+      animationEasingUpdate: "linear" as const,
+    };
+
+    myChart.setOption(option);
+
+    // Handle resize
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Update chart when data changes
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+
+    // Calculate which labels to show (every Nth label for readability)
+    const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 10));
+
+    chartInstanceRef.current.setOption({
+      xAxis: {
+        data: chartData.labels,
+        axisLabel: {
+          interval: (index: number) => index % labelInterval === 0,
+        },
+      },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.57rem] pb-[1rem]">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-fit">
+          <Text_14_600_EEEEEE>Calls</Text_14_600_EEEEEE>
+          <div className="absolute h-[3px] w-[90%] bg-[#965CDE]"></div>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <Text_20_400_FFFFFF className="mb-3 mt-6">
+          {chartData.totalCalls.toLocaleString()} Calls
+        </Text_20_400_FFFFFF>
+        <div ref={chartRef} style={{ width: "100%", height: 200 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available for this time period</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Users Chart Component using ECharts
+interface UsersChartProps {
+  promptId: string;
+}
+
+const UsersChart: React.FC<UsersChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchPromptTimeSeries, PROMPT_METRICS, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: ExtendedBucketData[];
+    totalUsers: number;
+  }>({ labels: [], data: [], totalUsers: 0 });
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs; interval: string } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily":
+        return { from: to.subtract(24, "hour"), to, interval: "1h" };
+      case "weekly":
+        return { from: to.subtract(7, "day"), to, interval: "6h" };
+      case "monthly":
+        return { from: to.subtract(30, "day"), to, interval: "1d" };
+      default:
+        return { from: to.subtract(7, "day"), to, interval: "6h" };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+
+    const { from, to, interval } = getDateRange(timeRange);
+
+    const response = await fetchPromptTimeSeries(
+      from,
+      to,
+      [PROMPT_METRICS.unique_users],
+      { prompt_id: [promptId] },
+      { interval, dataSource: "prompt", fillGaps: true }
+    );
+
+    if (response && response.groups && response.groups.length > 0) {
+      const aggregatedData: Map<string, number> = new Map();
+
+      response.groups.forEach((group) => {
+        group.data_points.forEach((point) => {
+          const timestamp = point.timestamp;
+          const value = point.values[PROMPT_METRICS.unique_users] || 0;
+          const existing = aggregatedData.get(timestamp) || 0;
+          aggregatedData.set(timestamp, existing + value);
+        });
+      });
+
+      const sortedEntries = Array.from(aggregatedData.entries()).sort(
+        (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
+      );
+
+      const totalUsers = Math.max(...sortedEntries.map(([, value]) => value), 0);
+
+      const labels = sortedEntries.map(([timestamp]) => {
+        const date = new Date(timestamp);
+        const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+        if (hoursDiff <= 24) {
+          return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+        } else if (hoursDiff <= 24 * 7) {
+          return date.toLocaleDateString("en-US", { weekday: "short" }) + " " +
+            date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+        } else {
+          return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        }
+      });
+
+      const data: ExtendedBucketData[] = sortedEntries.map(([timestamp, value], index) => {
+        const currentTime = new Date(timestamp).getTime();
+        const nextTime = index < sortedEntries.length - 1
+          ? new Date(sortedEntries[index + 1][0]).getTime()
+          : currentTime + (interval === "1h" ? 3600000 : interval === "6h" ? 21600000 : 86400000);
+        return { value, bucketStart: currentTime, bucketEnd: nextTime, timestamp };
+      });
+
+      setChartData({ labels, data, totalUsers });
+    } else {
+      setChartData({ labels: [], data: [], totalUsers: 0 });
+    }
+  }, [promptId, timeRange, fetchPromptTimeSeries, PROMPT_METRICS.unique_users, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const myChart = echarts.init(chartRef.current, null, { renderer: "canvas" });
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: "0%", right: "0%", bottom: "10%", top: "10%", containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "line" },
+        backgroundColor: "rgba(24, 24, 27, 0.98)",
+        borderColor: "#3f3f46",
+        borderWidth: 1,
+        padding: [12, 14],
+        textStyle: { color: "#fafafa", fontSize: 12 },
+        confine: true,
+        formatter: function (params: any) {
+          const param = params[0];
+          const bucketData = param?.data as ExtendedBucketData;
+          const count = bucketData?.value || 0;
+          const bucketStart = bucketData?.bucketStart || Date.now();
+          const formatDateTime = (timestamp: number) => {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " +
+              date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+          };
+          return `<div style="min-width: 150px;">
+            <div style="color: #71717a; font-size: 11px; margin-bottom: 4px;">${formatDateTime(bucketStart)}</div>
+            <div style="color: #fafafa; font-weight: 500;">${count} Users</div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, interval: 0 },
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: { color: "#71717a", fontSize: 10 },
+        minInterval: 1,
+      },
+      series: [{
+        name: "Users",
+        type: "line",
+        data: [],
+        smooth: true,
+        lineStyle: { color: "#D1B854", width: 2 },
+        itemStyle: { color: "#D1B854" },
+        areaStyle: { color: "rgba(209, 184, 84, 0.1)" },
+        symbol: "circle",
+        symbolSize: 6,
+        showSymbol: false,
+      }],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 8));
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.57rem] pb-[1rem]">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-fit">
+          <Text_14_600_EEEEEE>Users</Text_14_600_EEEEEE>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <Text_20_400_FFFFFF className="mb-3">{chartData.totalUsers.toLocaleString()}</Text_20_400_FFFFFF>
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Token Usage Chart Component using ECharts
+interface TokenUsageChartProps {
+  promptId: string;
+}
+
+const TokenUsageChart: React.FC<TokenUsageChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchPromptTimeSeries, PROMPT_METRICS, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: ExtendedBucketData[];
+    totalTokens: number;
+  }>({ labels: [], data: [], totalTokens: 0 });
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs; interval: string } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily": return { from: to.subtract(24, "hour"), to, interval: "1h" };
+      case "weekly": return { from: to.subtract(7, "day"), to, interval: "6h" };
+      case "monthly": return { from: to.subtract(30, "day"), to, interval: "1d" };
+      default: return { from: to.subtract(7, "day"), to, interval: "6h" };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+
+    const { from, to, interval } = getDateRange(timeRange);
+
+    const response = await fetchPromptTimeSeries(
+      from,
+      to,
+      [PROMPT_METRICS.tokens],
+      { prompt_id: [promptId] },
+      { interval, dataSource: "prompt", fillGaps: true }
+    );
+
+    if (response && response.groups && response.groups.length > 0) {
+      const aggregatedData: Map<string, number> = new Map();
+
+      // Debug: log first data point to see the structure
+      const firstPoint = response.groups[0]?.data_points?.[0];
+      console.log("TokenUsage API response - first data point values:", firstPoint?.values);
+      console.log("TokenUsage - tokens value:", firstPoint?.values?.[PROMPT_METRICS.tokens]);
+
+      response.groups.forEach((group) => {
+        group.data_points.forEach((point) => {
+          const timestamp = point.timestamp;
+          const rawValue = point.values?.[PROMPT_METRICS.tokens];
+          // Handle both number values and potential nested objects
+          const value = typeof rawValue === "number" ? rawValue
+            : typeof rawValue === "object" && rawValue !== null ? (rawValue as any).value ?? (rawValue as any).count ?? 0
+            : Number(rawValue) || 0;
+          const existing = aggregatedData.get(timestamp) || 0;
+          aggregatedData.set(timestamp, existing + value);
+        });
+      });
+
+      const sortedEntries = Array.from(aggregatedData.entries()).sort(
+        (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
+      );
+
+      const totalTokens = sortedEntries.reduce((sum, [, value]) => sum + value, 0);
+
+      const labels = sortedEntries.map(([timestamp]) => {
+        const date = new Date(timestamp);
+        const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+        if (hoursDiff <= 24) {
+          return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+        } else if (hoursDiff <= 24 * 7) {
+          return date.toLocaleDateString("en-US", { weekday: "short" }) + " " +
+            date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+        } else {
+          return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        }
+      });
+
+      const data: ExtendedBucketData[] = sortedEntries.map(([timestamp, value], index) => {
+        const currentTime = new Date(timestamp).getTime();
+        const nextTime = index < sortedEntries.length - 1
+          ? new Date(sortedEntries[index + 1][0]).getTime()
+          : currentTime + (interval === "1h" ? 3600000 : interval === "6h" ? 21600000 : 86400000);
+        return { value, bucketStart: currentTime, bucketEnd: nextTime, timestamp };
+      });
+
+      setChartData({ labels, data, totalTokens });
+    } else {
+      setChartData({ labels: [], data: [], totalTokens: 0 });
+    }
+  }, [promptId, timeRange, fetchPromptTimeSeries, PROMPT_METRICS.tokens, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const myChart = echarts.init(chartRef.current, null, { renderer: "canvas" });
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: "0%", right: "0%", bottom: "10%", top: "10%", containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(24, 24, 27, 0.98)",
+        borderColor: "#3f3f46",
+        borderWidth: 1,
+        padding: [12, 14],
+        textStyle: { color: "#fafafa", fontSize: 12 },
+        confine: true,
+        formatter: function (params: any) {
+          const param = params[0];
+          const bucketData = param?.data as ExtendedBucketData;
+          const count = bucketData?.value || 0;
+          const bucketStart = bucketData?.bucketStart || Date.now();
+          const formatDateTime = (timestamp: number) => {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " +
+              date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+          };
+          const formatNumber = (num: number) => {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+            if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+            return num.toString();
+          };
+          return `<div style="min-width: 150px;">
+            <div style="color: #71717a; font-size: 11px; margin-bottom: 4px;">${formatDateTime(bucketStart)}</div>
+            <div style="color: #fafafa; font-weight: 500;">${formatNumber(count)} Tokens</div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, interval: 0 },
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: {
+          color: "#71717a",
+          fontSize: 10,
+          formatter: (value: number) => {
+            if (value >= 1000000) return (value / 1000000).toFixed(0) + "M";
+            if (value >= 1000) return (value / 1000).toFixed(0) + "K";
+            return value.toString();
+          },
+        },
+      },
+      series: [{
+        name: "Tokens",
+        type: "bar",
+        data: [],
+        itemStyle: { color: "#965CDE", borderRadius: [2, 2, 0, 0] },
+        emphasis: { itemStyle: { color: "#a78bfa" } },
+        barWidth: "52%",
+      }],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 8));
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  const formatTotal = (num: number) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return num.toString();
+  };
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.57rem] pb-[1rem]">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-fit">
+          <Text_14_600_EEEEEE>Token Usage</Text_14_600_EEEEEE>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <Text_20_400_FFFFFF className="mb-3">{formatTotal(chartData.totalTokens)}</Text_20_400_FFFFFF>
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Error vs Success Chart Component using ECharts
+interface ErrorSuccessChartProps {
+  promptId: string;
+}
+
+const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchPromptTimeSeries, PROMPT_METRICS, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    errorData: ExtendedBucketData[];
+    successData: ExtendedBucketData[];
+  }>({ labels: [], errorData: [], successData: [] });
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs; interval: string } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily": return { from: to.subtract(24, "hour"), to, interval: "1h" };
+      case "weekly": return { from: to.subtract(7, "day"), to, interval: "6h" };
+      case "monthly": return { from: to.subtract(30, "day"), to, interval: "1d" };
+      default: return { from: to.subtract(7, "day"), to, interval: "6h" };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+
+    const { from, to, interval } = getDateRange(timeRange);
+
+    const response = await fetchPromptTimeSeries(
+      from,
+      to,
+      [PROMPT_METRICS.error_count, PROMPT_METRICS.success_count],
+      { prompt_id: [promptId] },
+      { interval, dataSource: "prompt", fillGaps: true }
+    );
+
+    if (response && response.groups && response.groups.length > 0) {
+      const errorAggregated: Map<string, number> = new Map();
+      const successAggregated: Map<string, number> = new Map();
+
+      response.groups.forEach((group) => {
+        group.data_points.forEach((point) => {
+          const timestamp = point.timestamp;
+          const errorVal = point.values[PROMPT_METRICS.error_count] || 0;
+          const successVal = point.values[PROMPT_METRICS.success_count] || 0;
+          errorAggregated.set(timestamp, (errorAggregated.get(timestamp) || 0) + errorVal);
+          successAggregated.set(timestamp, (successAggregated.get(timestamp) || 0) + successVal);
+        });
+      });
+
+      const allTimestamps = Array.from(new Set([...Array.from(errorAggregated.keys()), ...Array.from(successAggregated.keys())])).sort(
+        (a, b) => new Date(a).getTime() - new Date(b).getTime()
+      );
+
+      const labels = allTimestamps.map((timestamp) => {
+        const date = new Date(timestamp);
+        const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+        if (hoursDiff <= 24) {
+          return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+        } else if (hoursDiff <= 24 * 7) {
+          return date.toLocaleDateString("en-US", { weekday: "short" }) + " " +
+            date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+        } else {
+          return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        }
+      });
+
+      const errorData: ExtendedBucketData[] = allTimestamps.map((timestamp, index) => {
+        const currentTime = new Date(timestamp).getTime();
+        const nextTime = index < allTimestamps.length - 1
+          ? new Date(allTimestamps[index + 1]).getTime()
+          : currentTime + (interval === "1h" ? 3600000 : interval === "6h" ? 21600000 : 86400000);
+        return {
+          value: errorAggregated.get(timestamp) || 0,
+          bucketStart: currentTime,
+          bucketEnd: nextTime,
+          timestamp,
+        };
+      });
+
+      const successData: ExtendedBucketData[] = allTimestamps.map((timestamp, index) => {
+        const currentTime = new Date(timestamp).getTime();
+        const nextTime = index < allTimestamps.length - 1
+          ? new Date(allTimestamps[index + 1]).getTime()
+          : currentTime + (interval === "1h" ? 3600000 : interval === "6h" ? 21600000 : 86400000);
+        return {
+          value: successAggregated.get(timestamp) || 0,
+          bucketStart: currentTime,
+          bucketEnd: nextTime,
+          timestamp,
+        };
+      });
+
+      setChartData({ labels, errorData, successData });
+    } else {
+      setChartData({ labels: [], errorData: [], successData: [] });
+    }
+  }, [promptId, timeRange, fetchPromptTimeSeries, PROMPT_METRICS.error_count, PROMPT_METRICS.success_count, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const myChart = echarts.init(chartRef.current, null, { renderer: "canvas" });
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: "0%", right: "0%", bottom: "5%", top: "25%", containLabel: true },
+      legend: {
+        data: ["Error Requests", "Successful Requests"],
+        orient: "vertical",
+        left: 0,
+        top: 0,
+        icon: "roundRect",
+        textStyle: { color: "#B3B3B3", fontSize: 11 },
+        itemWidth: 10,
+        itemHeight: 10,
+        itemGap: 20,
+      },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "line" },
+        backgroundColor: "rgba(24, 24, 27, 0.98)",
+        borderColor: "#3f3f46",
+        borderWidth: 1,
+        padding: [12, 14],
+        textStyle: { color: "#fafafa", fontSize: 12 },
+        confine: true,
+        formatter: function (params: any) {
+          const errorParam = params.find((p: any) => p.seriesName === "Error Requests");
+          const successParam = params.find((p: any) => p.seriesName === "Successful Requests");
+          const bucketData = (errorParam?.data || successParam?.data) as ExtendedBucketData;
+          const bucketStart = bucketData?.bucketStart || Date.now();
+          const formatDateTime = (timestamp: number) => {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + ", " +
+              date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+          };
+          return `<div style="min-width: 150px;">
+            <div style="color: #71717a; font-size: 11px; margin-bottom: 8px;">${formatDateTime(bucketStart)}</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #479D5F;">Successful Requests:</span>
+              <span style="color: #fafafa; font-weight: 500;">${successParam?.data?.value || 0}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #D1B854;">Error Requests:</span>
+              <span style="color: #fafafa; font-weight: 500;">${errorParam?.data?.value || 0}</span>
+            </div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, interval: 0 },
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: { color: "#71717a", fontSize: 10 },
+        minInterval: 1,
+      },
+      series: [
+        {
+          name: "Error Requests",
+          type: "line",
+          data: [],
+          smooth: true,
+          lineStyle: { color: "#D1B854", width: 2 },
+          itemStyle: { color: "#D1B854" },
+          symbol: "circle",
+          symbolSize: 6,
+          showSymbol: false,
+        },
+        {
+          name: "Successful Requests",
+          type: "line",
+          data: [],
+          smooth: true,
+          lineStyle: { color: "#479D5F", width: 2 },
+          itemStyle: { color: "#479D5F" },
+          symbol: "circle",
+          symbolSize: 6,
+          showSymbol: false,
+        },
+      ],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 8));
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
+      series: [
+        { name: "Error Requests", data: chartData.errorData },
+        { name: "Successful Requests", data: chartData.successData },
+      ],
+    });
+  }, [chartData]);
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.57rem] pb-[1rem] h-full">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-fit">
+          <Text_14_600_EEEEEE>Error vs Successful requests</Text_14_600_EEEEEE>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// E2E Latency vs Concurrent Requests Chart Component using ECharts
+interface E2ELatencyChartProps {
+  promptId: string;
+}
+
+const E2ELatencyChart: React.FC<E2ELatencyChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchDistribution, DISTRIBUTION_METRICS, DISTRIBUTION_BUCKET_BY, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: number[];
+  }>({ labels: [], data: [] });
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily":
+        return { from: to.subtract(24, "hour"), to };
+      case "weekly":
+        return { from: to.subtract(7, "day"), to };
+      case "monthly":
+        return { from: to.subtract(30, "day"), to };
+      default:
+        return { from: to.subtract(7, "day"), to };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+    const { from, to } = getDateRange(timeRange);
+
+    const response = await fetchDistribution(
+      from,
+      to,
+      DISTRIBUTION_BUCKET_BY.concurrency as "concurrency",
+      DISTRIBUTION_METRICS.total_duration_ms,
+      { prompt_id: [promptId] }
+    );
+
+    if (response && response.buckets && response.buckets.length > 0) {
+      const labels = response.buckets.map(bucket => bucket.range);
+      const data = response.buckets.map(bucket => bucket.avg_value);
+      setChartData({ labels, data });
+    } else {
+      setChartData({ labels: [], data: [] });
+    }
+  }, [promptId, timeRange, fetchDistribution, DISTRIBUTION_METRICS, DISTRIBUTION_BUCKET_BY, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const myChart = echarts.init(chartRef.current, "dark");
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: 50, right: 20, top: 30, bottom: 30 },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#18181b",
+        borderColor: "#3f3f46",
+        textStyle: { color: "#fafafa" },
+        formatter: (params: any) => {
+          const param = Array.isArray(params) ? params[0] : params;
+          return `<div style="padding: 4px 8px;">
+            <div style="color: #71717a; margin-bottom: 4px;">Concurrency: ${param.name}</div>
+            <div style="color: #fafafa; font-weight: 500;">Avg Latency: ${param.value?.toFixed(2) || 0} ms</div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        name: "Concurrency",
+        nameLocation: "middle",
+        nameGap: 35,
+        nameTextStyle: { color: "#B3B3B3", fontSize: 11 },
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, rotate: 45 },
+      },
+      yAxis: {
+        type: "value",
+        name: "E2E Latency (ms)",
+        nameLocation: "middle",
+        nameGap: 40,
+        nameTextStyle: { color: "#B3B3B3", fontSize: 11 },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: { color: "#71717a", fontSize: 10 },
+      },
+      series: [
+        {
+          type: "line",
+          data: [],
+          smooth: true,
+          lineStyle: { color: "#D1B854", width: 2 },
+          itemStyle: { color: "#D1B854" },
+          symbol: "circle",
+          symbolSize: 6,
+          showSymbol: true,
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(209, 184, 84, 0.3)" },
+              { offset: 1, color: "rgba(209, 184, 84, 0)" },
+            ]),
+          },
+        },
+      ],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-full">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-fit">
+          <Text_14_600_EEEEEE>E2E Latency vs Concurrent Requests</Text_14_600_EEEEEE>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// TTFT vs Input Tokens Chart Component using ECharts
+interface TTFTChartProps {
+  promptId: string;
+}
+
+const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchDistribution, DISTRIBUTION_METRICS, DISTRIBUTION_BUCKET_BY, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: number[];
+  }>({ labels: [], data: [] });
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily":
+        return { from: to.subtract(24, "hour"), to };
+      case "weekly":
+        return { from: to.subtract(7, "day"), to };
+      case "monthly":
+        return { from: to.subtract(30, "day"), to };
+      default:
+        return { from: to.subtract(7, "day"), to };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+    const { from, to } = getDateRange(timeRange);
+
+    const response = await fetchDistribution(
+      from,
+      to,
+      DISTRIBUTION_BUCKET_BY.input_tokens as "input_tokens",
+      DISTRIBUTION_METRICS.ttft_ms,
+      { prompt_id: [promptId] }
+    );
+
+    if (response && response.buckets && response.buckets.length > 0) {
+      const labels = response.buckets.map(bucket => bucket.range);
+      const data = response.buckets.map(bucket => bucket.avg_value);
+      setChartData({ labels, data });
+    } else {
+      setChartData({ labels: [], data: [] });
+    }
+  }, [promptId, timeRange, fetchDistribution, DISTRIBUTION_METRICS, DISTRIBUTION_BUCKET_BY, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const myChart = echarts.init(chartRef.current, "dark");
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: 50, right: 20, top: 30, bottom: 55 },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#18181b",
+        borderColor: "#3f3f46",
+        textStyle: { color: "#fafafa" },
+        formatter: (params: any) => {
+          const param = Array.isArray(params) ? params[0] : params;
+          return `<div style="padding: 4px 8px;">
+            <div style="color: #71717a; margin-bottom: 4px;">Input Tokens: ${param.name}</div>
+            <div style="color: #fafafa; font-weight: 500;">Avg TTFT: ${param.value?.toFixed(2) || 0} ms</div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        name: "Input Tokens",
+        nameLocation: "middle",
+        nameGap: 45,
+        nameTextStyle: { color: "#B3B3B3", fontSize: 11 },
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, rotate: 45 },
+      },
+      yAxis: {
+        type: "value",
+        name: "TTFT (ms)",
+        nameLocation: "middle",
+        nameGap: 40,
+        nameTextStyle: { color: "#B3B3B3", fontSize: 11 },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: { color: "#71717a", fontSize: 10 },
+      },
+      series: [
+        {
+          type: "line",
+          data: [],
+          smooth: true,
+          lineStyle: { color: "#D1B854", width: 2 },
+          itemStyle: { color: "#D1B854" },
+          symbol: "circle",
+          symbolSize: 6,
+          showSymbol: true,
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "rgba(209, 184, 84, 0.3)" },
+              { offset: 1, color: "rgba(209, 184, 84, 0)" },
+            ]),
+          },
+        },
+      ],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-full">
+      <div className="flex justify-between items-center mb-4">
+        {/* <div className="relative w-fit">
+          <Text_14_600_EEEEEE>TTFT vs Input Tokens</Text_14_600_EEEEEE>
+          <Text_14_600_EEEEEE>a</Text_14_600_EEEEEE>
+        </div> */}
+        <div className="max-w-[55%]">
+          <div className="relative min-h-[4rem]">
+            <Text_14_600_EEEEEE className="w-full">TTFT vs Input Tokens</Text_14_600_EEEEEE>
+          </div>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Average Throughput/User by Concurrency Chart Component using ECharts
+interface ThroughputChartProps {
+  promptId: string;
+}
+
+const ThroughputChart: React.FC<ThroughputChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const { fetchDistribution, DISTRIBUTION_METRICS, DISTRIBUTION_BUCKET_BY, isLoading } = usePromptMetrics();
+  const [timeRange, setTimeRange] = useState("weekly");
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: number[];
+  }>({ labels: [], data: [] });
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs } => {
+    const to = dayjs();
+    switch (range) {
+      case "daily":
+        return { from: to.subtract(24, "hour"), to };
+      case "weekly":
+        return { from: to.subtract(7, "day"), to };
+      case "monthly":
+        return { from: to.subtract(30, "day"), to };
+      default:
+        return { from: to.subtract(7, "day"), to };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+    const { from, to } = getDateRange(timeRange);
+
+    const response = await fetchDistribution(
+      from,
+      to,
+      DISTRIBUTION_BUCKET_BY.concurrency as "concurrency",
+      DISTRIBUTION_METRICS.throughput_per_user,
+      { prompt_id: [promptId] }
+    );
+
+    if (response && response.buckets && response.buckets.length > 0) {
+      const labels = response.buckets.map(bucket => bucket.range);
+      const data = response.buckets.map(bucket => bucket.avg_value);
+      setChartData({ labels, data });
+    } else {
+      setChartData({ labels: [], data: [] });
+    }
+  }, [promptId, timeRange, fetchDistribution, DISTRIBUTION_METRICS, DISTRIBUTION_BUCKET_BY, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const myChart = echarts.init(chartRef.current, "dark");
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: 80, right: 20, top: 30, bottom: 55 },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#18181b",
+        borderColor: "#3f3f46",
+        textStyle: { color: "#fafafa" },
+        formatter: (params: any) => {
+          const param = Array.isArray(params) ? params[0] : params;
+          return `<div style="padding: 4px 8px;">
+            <div style="color: #71717a; margin-bottom: 4px;">Concurrency: ${param.name}</div>
+            <div style="color: #fafafa; font-weight: 500;">Avg Throughput: ${param.value?.toFixed(2) || 0} tokens/s</div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        name: "Concurrency",
+        nameLocation: "middle",
+        nameGap: 30,
+        nameTextStyle: { color: "#B3B3B3", fontSize: 11 },
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, rotate: 45 },
+      },
+      yAxis: {
+        type: "value",
+        name: "Avg Throughput/User",
+        nameLocation: "middle",
+        nameGap: 55,
+        nameTextStyle: { color: "#B3B3B3", fontSize: 11 },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: { color: "#71717a", fontSize: 10 },
+      },
+      series: [
+        {
+          type: "bar",
+          data: [],
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "#965CDE" },
+              { offset: 1, color: "rgba(150, 92, 222, 0.4)" },
+            ]),
+            borderRadius: [4, 4, 0, 0],
+          },
+          barWidth: "60%",
+        },
+      ],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-full">
+      <div className="flex justify-between items-start mb-4">
+        <div className="max-w-[55%]">
+          <div className="relative min-h-[4rem]">
+            <Text_14_600_EEEEEE className="w-full">Average Throughput/User by Concurrency</Text_14_600_EEEEEE>
+          </div>
+        </div>
+        <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const OverviewTab: React.FC<OverviewTabProps> = () => {
   const router = useRouter();
-  const { id, projectId } = router.query;
-  const [timeRange, setTimeRange] = useState("weekly");
+  // Support both 'id' (from rewrite rule) and 'agentId' (from folder name)
+  const { id, agentId, projectId } = router.query;
+  const promptId = id || agentId;
   const [agentData, setAgentData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +1493,11 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
                            process.env.NODE_ENV === "development";
 
   const fetchAgentDetails = async () => {
-    if (id && typeof id === "string") {
+    if (promptId && typeof promptId === "string") {
       try {
         setLoading(true);
         setError(null);
-        const data = await getPromptById(id, projectId as string);
+        const data = await getPromptById(promptId, projectId as string);
         setAgentData(data);
       } catch (error: any) {
         console.error("Error fetching agent details:", error);
@@ -61,13 +1510,13 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
         if (isDevelopmentMode) {
           console.warn("Development mode: Using fallback data");
           setAgentData({
-            id: id,
+            id: promptId,
             name: "Agent Name (Dev Fallback)",
             description: "LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.",
             tags: [
               { name: "tag 1", color: "#965CDE" },
               { name: "tag 2", color: "#5CADFF" },
-              { name: "tag 3", color: "#22C55E" },
+              { name: "tag 3", color: "#479D5F" },
             ],
             status: "Active",
             created_at: new Date().toISOString(),
@@ -83,95 +1532,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
   useEffect(() => {
     fetchAgentDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, projectId]);
-
-  const handleChartFilter = (val: string) => {
-    if (val === "LAST 24 HRS") return "daily";
-    if (val === "LAST 7 DAYS") return "weekly";
-    if (val === "LAST 30 DAYS") return "monthly";
-    return "weekly"; // Default fallback
-  };
-
-  const handleTimeRangeChange = (value: string) => {
-    setTimeRange(handleChartFilter(value));
-  };
-
-  // Mock data for charts
-  const callsData = [
-    { time: "03:13:55", value: 0.5 },
-    { time: "09:32:55", value: 1.0 },
-    { time: "09:33:55", value: 1.5 },
-    { time: "09:34:55", value: 1.2 },
-    { time: "09:35:55", value: 1.8 },
-    { time: "09:38:55", value: 2.0 },
-  ];
-
-  const usersData = [
-    { day: "Day 1", value: 10 },
-    { day: "Day 2", value: 25 },
-    { day: "Day 3", value: 45 },
-    { day: "Day 4", value: 60 },
-    { day: "Day 5", value: 75 },
-    { day: "Day 6", value: 80 },
-  ];
-
-  const tokenUsageData = [
-    { req: "Req 1", value: 60 },
-    { req: "Req 2", value: 45 },
-    { req: "Req 3", value: 55 },
-    { req: "Req 4", value: 50 },
-    { req: "Req 5", value: 62 },
-    { req: "Req 6", value: 58 },
-  ];
-
-  const errorVsSuccessData = [
-    { day: "Day 1", errors: 10, success: 40 },
-    { day: "Day 2", errors: 15, success: 50 },
-    { day: "Day 3", errors: 12, success: 60 },
-    { day: "Day 4", errors: 18, success: 65 },
-    { day: "Day 5", errors: 20, success: 70 },
-    { day: "Day 6", errors: 25, success: 80 },
-  ];
-
-  const latencyData = [
-    { req: "Req 1", value: 20 },
-    { req: "Req 2", value: 35 },
-    { req: "Req 3", value: 45 },
-    { req: "Req 4", value: 60 },
-    { req: "Req 5", value: 65 },
-    { req: "Req 6", value: 70 },
-  ];
-
-  const ttftData = [
-    { input: 10, value: 20 },
-    { input: 20, value: 30 },
-    { input: 30, value: 40 },
-    { input: 40, value: 50 },
-    { input: 50, value: 60 },
-    { input: 60, value: 80 },
-  ];
-
-  const throughputData = [
-    { concurrency: 10, value: 70 },
-    { concurrency: 20, value: 60 },
-    { concurrency: 30, value: 55 },
-    { concurrency: 40, value: 58 },
-    { concurrency: 50, value: 62 },
-    { concurrency: 60, value: 65 },
-  ];
-
-  const TimeRangeSelector = () => (
-    <Segmented
-      options={segmentOptions}
-      value={segmentOptions.find(
-        (opt) => handleChartFilter(opt) === timeRange,
-      )}
-      onChange={(value) => {
-        handleTimeRangeChange(value);
-      }}
-      className="antSegmented rounded-md text-[#EEEEEE] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
-    />
-  );
+  }, [promptId, projectId]);
 
   if (loading) {
     return (
@@ -238,7 +1599,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
           <ProjectTags color={endpointStatusMapping[capitalize(agentData?.status)]} name={capitalize(agentData?.status)}/>
         </div>
         <Text_12_400_B3B3B3 className="max-w-[850px] mb-3">
-          {agentData?.description || 'LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.'}
+          {agentData?.description}
         </Text_12_400_B3B3B3>
         <div className="flex items-center gap-2 flex-wrap">
           {agentData?.tags?.map((tag: any, index: number) => (
@@ -253,7 +1614,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
       </div>
 
       {/* Cost Metrics */}
-      <Row gutter={[16, 16]} className="mb-6">
+      <Row gutter={[16, 16]} className="mb-6 hidden">
         <Col span={8}>
           <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
             <Text_12_400_B3B3B3 className="mb-2">P 95 Cost / Request</Text_12_400_B3B3B3>
@@ -276,225 +1637,81 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
 
       {/* Charts Grid */}
       <Row gutter={[16, 16]}>
-        {/* Calls Chart */}
+        {/* Calls Chart - Now using ECharts with API data */}
         <Col span={24}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Calls</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Description</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <CallsChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <Text_20_400_FFFFFF className="mb-4">127 Calls</Text_20_400_FFFFFF>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={callsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="time" stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Line type="monotone" dataKey="value" stroke="#965CDE" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Col>
 
-        {/* Users Chart */}
+        {/* Users Chart - Now using ECharts with API data */}
         <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Users</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Description</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <UsersChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <div className="mb-2">
-              <Text_20_400_FFFFFF>50</Text_20_400_FFFFFF>
-              <Text_12_400_B3B3B3 className="text-green-500 ml-2">+61.05%</Text_12_400_B3B3B3>
-            </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={usersData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="day" stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Line type="monotone" dataKey="value" stroke="#965CDE" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Col>
 
-        {/* Token Usage Chart */}
+        {/* Token Usage Chart - Now using ECharts with API data */}
         <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Token Usage</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">For the top 6 models</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <TokenUsageChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <div className="mb-2">
-              <Text_20_400_FFFFFF>127K</Text_20_400_FFFFFF>
-              <Text_12_400_B3B3B3 className="text-green-500 ml-2">+17.01%</Text_12_400_B3B3B3>
-            </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={tokenUsageData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="req" stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Bar dataKey="value" fill="#965CDE" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Col>
 
-        {/* Error vs Successful Requests */}
+        {/* Error vs Successful Requests - Now using ECharts with API data */}
         <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Error vs Successful requests</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Description</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <ErrorSuccessChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={errorVsSuccessData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="day" stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Legend wrapperStyle={{ color: "#B3B3B3", fontSize: "12px" }} />
-                <Line type="monotone" dataKey="errors" stroke="#EF4444" strokeWidth={2} name="Error Requests" />
-                <Line type="monotone" dataKey="success" stroke="#22C55E" strokeWidth={2} name="Successful Requests" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Col>
 
-        {/* E2E Latency vs Requests */}
+        {/* E2E Latency vs Concurrent Requests */}
         <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>E2E Latency vs Requests</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Description</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <E2ELatencyChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={latencyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="req" stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Line type="monotone" dataKey="value" stroke="#965CDE" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Col>
 
-        {/* TTFT vs Inputs */}
+        {/* TTFT vs Input Tokens */}
         <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>TTFT vs Inputs</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Description</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <TTFTChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={ttftData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="input" label={{ value: "Input Tokens", position: "insideBottom", offset: -5, fill: "#B3B3B3" }} stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis label={{ value: "TTFT", angle: -90, position: "insideLeft", fill: "#B3B3B3" }} stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Line type="monotone" dataKey="value" stroke="#965CDE" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Col>
 
         {/* Average Throughput/User by Concurrency */}
         <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Average Throughput/User by Concurrency</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Description</Text_12_400_B3B3B3>
-              </div>
-              <TimeRangeSelector />
+          {promptId && typeof promptId === "string" ? (
+            <ThroughputChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={throughputData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
-                <XAxis dataKey="concurrency" label={{ value: "Average Throughput/User", position: "insideBottom", offset: -5, fill: "#B3B3B3" }} stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <YAxis label={{ value: "Concurrency", angle: -90, position: "insideLeft", fill: "#B3B3B3" }} stroke="#B3B3B3" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#101010", border: "1px solid #1F1F1F" }}
-                  labelStyle={{ color: "#EEEEEE" }}
-                />
-                <Bar dataKey="value" fill="#965CDE" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Col>
-
-        {/* Placeholder Charts */}
-        <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Lorem Ipsum</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Once the data is available, we will populate a line chart for you representing.</Text_12_400_B3B3B3>
-              </div>
-            </div>
-            <div className="h-[200px] flex items-center justify-center border border-dashed border-[#2F2F2F] rounded">
-              <div className="text-center">
-                <div className="text-[#606060] text-4xl mb-2">📊</div>
-                <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
-              </div>
-            </div>
-          </div>
-        </Col>
-
-        <Col span={12}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <Text_14_600_EEEEEE>Lorem Ipsum</Text_14_600_EEEEEE>
-                <Text_12_400_B3B3B3 className="block mt-1">Once the data is available, we will populate a line chart for you representing.</Text_12_400_B3B3B3>
-              </div>
-            </div>
-            <div className="h-[200px] flex items-center justify-center border border-dashed border-[#2F2F2F] rounded">
-              <div className="text-center">
-                <div className="text-[#606060] text-4xl mb-2">📊</div>
-                <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
-              </div>
-            </div>
-          </div>
+          )}
         </Col>
       </Row>
     </div>

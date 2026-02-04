@@ -18,8 +18,9 @@ import BackButton from "@/components/ui/bud/drawer/BackButton";
 
 const AgentDetailsPage = () => {
   const router = useRouter();
-  // Note: 'id' comes from the rewrite rule in next.config.mjs (:id -> [agentId] folder)
-  const { id, projectId, name } = router.query;
+  // Support both 'id' (from rewrite rule) and 'agentId' (from folder name)
+  const { id, agentId, projectId, name } = router.query;
+  const promptId = (id || agentId) as string;
   const [activeTab, setActiveTab] = useState("1");
 
   const handleGoBack = () => {
@@ -34,44 +35,44 @@ const AgentDetailsPage = () => {
   };
 
   const agentTabs = [
-    // {
-    //   label: (
-    //     <div className="flex items-center gap-[0.375rem]">
-    //       {activeTab === "1" ? (
-    //         <Text_14_600_EEEEEE>Prompt Home</Text_14_600_EEEEEE>
-    //       ) : (
-    //         <Text_14_600_B3B3B3>Prompt Home</Text_14_600_B3B3B3>
-    //       )}
-    //     </div>
-    //   ),
-    //   key: "1",
-    //   children: <OverviewTab />,
-    // },
     {
       label: (
         <div className="flex items-center gap-[0.375rem]">
           {activeTab === "1" ? (
+            <Text_14_600_EEEEEE>Home</Text_14_600_EEEEEE>
+          ) : (
+            <Text_14_600_B3B3B3>Home</Text_14_600_B3B3B3>
+          )}
+        </div>
+      ),
+      key: "1",
+      children: <OverviewTab />,
+    },
+    {
+      label: (
+        <div className="flex items-center gap-[0.375rem]">
+          {activeTab === "2" ? (
             <Text_14_600_EEEEEE>Versions</Text_14_600_EEEEEE>
           ) : (
             <Text_14_600_B3B3B3>Versions</Text_14_600_B3B3B3>
           )}
         </div>
       ),
-      key: "1",
+      key: "2",
       children: <VersionsTab />,
     },
     {
       label: (
         <div className="flex items-center gap-[0.375rem]">
-          {activeTab === "2" ? (
-            <Text_14_600_EEEEEE>Logs</Text_14_600_EEEEEE>
+          {activeTab === "3" ? (
+            <Text_14_600_EEEEEE>Observability</Text_14_600_EEEEEE>
           ) : (
-            <Text_14_600_B3B3B3>Logs</Text_14_600_B3B3B3>
+            <Text_14_600_B3B3B3>Observability</Text_14_600_B3B3B3>
           )}
         </div>
       ),
-      key: "2",
-      children: <LogsTab promptName={name as string} promptId={id as string} projectId={projectId as string} />,
+      key: "3",
+      children: <LogsTab promptName={name as string} promptId={promptId} projectId={projectId as string} />,
     },
     // {
     //   label: (

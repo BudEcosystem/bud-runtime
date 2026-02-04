@@ -43,6 +43,7 @@ const WorkflowDetail = () => {
     selectedWorkflow,
     getWorkflow,
     executions,
+    executionsPagination,
     getExecutions,
     selectedExecution,
     executeWorkflow,
@@ -61,6 +62,8 @@ const WorkflowDetail = () => {
   const [selectedStep, setSelectedStep] = useState<PipelineStep | null>(null);
   const [editedDag, setEditedDag] = useState<DAGDefinition | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [executionsPage, setExecutionsPage] = useState(1);
+  const [executionsPageSize, setExecutionsPageSize] = useState(20);
 
   // Always in edit mode
   const isEditing = true;
@@ -233,10 +236,22 @@ const WorkflowDetail = () => {
   useEffect(() => {
     if (id && typeof id === "string") {
       showLoader();
-      Promise.all([getWorkflow(id), getExecutions(id)]).finally(() => hideLoader());
+      // Reset pagination to page 1 when the pipeline ID changes
+      setExecutionsPage(1);
+      setExecutionsPageSize(20);
+      Promise.all([getWorkflow(id), getExecutions(id, 1, 20)]).finally(() => hideLoader());
     }
     return () => clearSelection();
   }, [id]);
+
+  // Handle executions pagination change
+  const handleExecutionsPaginationChange = (page: number, pageSize: number) => {
+    setExecutionsPage(page);
+    setExecutionsPageSize(pageSize);
+    if (id && typeof id === "string") {
+      getExecutions(id, page, pageSize);
+    }
+  };
 
   // Initialize editedDag when workflow loads
   useEffect(() => {
@@ -251,8 +266,21 @@ const WorkflowDetail = () => {
     }
   }, [selectedWorkflow]);
 
+  // Check if pipeline can be executed (has at least one step)
+  const canExecute = useMemo(() => {
+    const dag = editedDag || selectedWorkflow?.dag;
+    const stepCount = dag?.steps?.length ?? selectedWorkflow?.step_count ?? 0;
+    return stepCount > 0;
+  }, [editedDag, selectedWorkflow]);
+
   const handleExecute = async () => {
     if (selectedWorkflow) {
+      // Frontend validation: check if pipeline has steps
+      if (!canExecute) {
+        errorToast("Cannot execute a pipeline with no steps");
+        return;
+      }
+
       setIsExecuting(true);
       // Get parameters from the current DAG (edited or original)
       const dag = editedDag || selectedWorkflow.dag;
@@ -265,14 +293,38 @@ const WorkflowDetail = () => {
           }
         }
       }
-      await executeWorkflow(selectedWorkflow.id, params);
-      await getExecutions(selectedWorkflow.id);
+      const result = await executeWorkflow(selectedWorkflow.id, params);
+      // Capture error message before getExecutions clears it
+      const errorMessage = useBudPipeline.getState().error;
+      // Reset to page 1 to show the new execution at the top
+      setExecutionsPage(1);
+      await getExecutions(selectedWorkflow.id, 1, executionsPageSize);
       setIsExecuting(false);
-      successToast("Pipeline execution started");
+      if (result) {
+        successToast("Pipeline execution started");
+      } else {
+        errorToast(errorMessage || "Failed to execute pipeline");
+      }
     }
   };
 
   const confirmExecute = () => {
+    // Check if pipeline has steps before showing execute confirmation
+    if (!canExecute) {
+      openConfirm({
+        message: "Cannot Execute Pipeline",
+        description: "This pipeline has no steps. Add at least one step and click Save before executing.",
+        cancelAction: () => {},
+        cancelText: "Close",
+        loading: false,
+        key: "execute-pipeline-no-steps",
+        okAction: () => setActiveTab("dag"),
+        okText: "Go to Editor",
+        type: "warning",
+      });
+      return;
+    }
+
     openConfirm({
       message: `Execute "${selectedWorkflow?.name}"?`,
       description: "This will start a new execution of the pipeline with all configured steps.",
@@ -580,22 +632,36 @@ const WorkflowDetail = () => {
         )}
 
         {activeTab === "executions" && (
-          <Box className="p-6">
+          <Box className="p-6 CommonCustomPagination">
             {executions.length > 0 ? (
               <Table
                 rowKey="execution_id"
-                pagination={false}
+                pagination={{
+                  current: executionsPage,
+                  pageSize: executionsPageSize,
+                  total: executionsPagination?.total_count || 0,
+                  showSizeChanger: true,
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} runs`,
+                  pageSizeOptions: ["10", "20", "50", "100"],
+                  onChange: handleExecutionsPaginationChange,
+                  onShowSizeChange: handleExecutionsPaginationChange,
+                }}
                 dataSource={sortedExecutions}
                 className="workflow-executions-table"
                 columns={[
                   {
                     title: "Run #",
                     key: "run_number",
-                    render: (_: unknown, __: any, index: number) => (
-                      <Text_11_400_808080>
-                        #{sortedExecutions.length - index}
-                      </Text_11_400_808080>
-                    ),
+                    render: (_: unknown, __: any, index: number) => {
+                      // Calculate the correct run number based on pagination
+                      const totalCount = executionsPagination?.total_count || 0;
+                      const offset = (executionsPage - 1) * executionsPageSize;
+                      return (
+                        <Text_11_400_808080>
+                          #{totalCount - offset - index}
+                        </Text_11_400_808080>
+                      );
+                    },
                   },
                   {
                     title: "Execution ID",

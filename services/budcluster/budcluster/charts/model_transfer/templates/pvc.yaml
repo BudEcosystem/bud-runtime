@@ -1,4 +1,5 @@
 {{- if eq $.Values.volumeType "local" }}
+{{- if not (lookup "v1" "PersistentVolumeClaim" .Values.namespace .Values.pvcName) }}
 ---
 # PVC for model storage - created if it doesn't exist
 # This PVC is shared between model transfer, runtime container, and quantization jobs
@@ -17,4 +18,5 @@ spec:
       storage: {{ .Values.pvcSize }}Gi
   storageClassName: {{ .Values.storageClass | default "default" }}
   volumeMode: Filesystem
+{{- end }}
 {{- end }}

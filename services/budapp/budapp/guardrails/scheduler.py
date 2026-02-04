@@ -304,7 +304,7 @@ class GuardrailSyncScheduler:
                 provider_type=provider_type,
                 status=GuardrailStatusEnum.ACTIVE,
                 tags=tag_objects,
-            ).model_dump()
+            ).model_dump(mode="json", exclude_none=True)
 
             # Upsert probe
             with Session(engine) as session:
@@ -353,6 +353,15 @@ class GuardrailSyncScheduler:
                     if not rule_uri:
                         continue
 
+                    # Log raw rule data from bud connect for debugging
+                    logger.debug(
+                        "Raw rule from bud connect: scanner_type=%s, model_id=%s, model_provider_type=%s, is_gated=%s",
+                        rule.get("scanner_type"),
+                        rule.get("model_id"),
+                        rule.get("model_provider_type"),
+                        rule.get("is_gated"),
+                    )
+
                     rule_data = GuardrailRuleCreate(
                         name=rule.get("name", ""),
                         uri=rule_uri,
@@ -360,10 +369,17 @@ class GuardrailSyncScheduler:
                         probe_id=UUID(probe_id),
                         status=GuardrailStatusEnum.ACTIVE,
                         guard_types=rule.get("guard_types", []),
-                        scanner_types=rule.get("scanner_types", []),
                         modality_types=rule.get("modality_types", []),
                         examples=rule.get("examples", []),
-                    ).model_dump()
+                        # Model-based rule fields
+                        scanner_type=rule.get("scanner_type"),
+                        model_uri=rule.get("model_id"),  # bud connect uses model_id for the URI
+                        model_provider_type=rule.get("model_provider_type"),
+                        is_gated=rule.get("is_gated", False),
+                        model_config_json=rule.get("model_config_json"),
+                    ).model_dump(mode="json", exclude_none=True)
+
+                    logger.debug("Rule data after model_dump: %s", rule_data)
 
                     with Session(engine) as session:
                         data_manager = GuardrailsProbeRulesDataManager(session)

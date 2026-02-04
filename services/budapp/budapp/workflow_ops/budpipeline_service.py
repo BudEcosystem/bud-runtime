@@ -335,7 +335,46 @@ class BudPipelineService(SessionMixin):
                 method="POST",
                 data=data,
             )
+
+            # Check for error response from budpipeline
+            if isinstance(result, dict):
+                # Handle ErrorResponse format: {"object": "error", "code": N, "message": "..."}
+                if result.get("object") == "error" and "message" in result:
+                    error_msg = result["message"]
+                    # Validate error_code is an integer to prevent FastAPI crash
+                    try:
+                        error_code = int(result.get("code", 500))
+                    except (ValueError, TypeError):
+                        error_code = 500
+                    raise ClientException(
+                        error_msg,
+                        status_code=error_code,
+                    )
+                # Handle HTTPException format: {"detail": ...}
+                if "detail" in result:
+                    detail = result["detail"]
+                    # Handle structured validation error (400) - has "error" and "errors" keys
+                    if isinstance(detail, dict) and "error" in detail:
+                        error_msg = detail.get("error", "Pipeline execution failed")
+                        errors = detail.get("errors", [])
+                        if errors:
+                            error_details = ", ".join(map(str, errors))
+                            error_msg = f"{error_msg}: {error_details}"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                    # Handle generic error (500) - detail is a string or unstructured dict
+                    else:
+                        error_msg = str(detail) if isinstance(detail, str) else "Pipeline execution failed"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
             return result
+        except ClientException:
+            raise
         except Exception as e:
             logger.exception(f"Failed to execute pipeline {pipeline_id}")
             raise ClientException(
@@ -395,13 +434,37 @@ class BudPipelineService(SessionMixin):
                 data["user_id"] = user_id
                 data["initiator"] = user_id
 
+            logger.debug(
+                "Sending ephemeral execution request",
+                pipeline_name=pipeline_definition.get("name"),
+                step_count=len(pipeline_definition.get("steps", [])),
+            )
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
                 method_path="executions/run",
                 method="POST",
                 data=data,
             )
+
+            # Check if the response is an error response
+            if isinstance(result, dict) and ("error" in result or "errors" in result):
+                error_msg = result.get("error", "Unknown error")
+                errors = result.get("errors", [])
+                logger.error(
+                    "Ephemeral execution failed with validation errors",
+                    error=error_msg,
+                    errors=errors,
+                    pipeline_name=pipeline_definition.get("name"),
+                )
+                raise ClientException(
+                    f"Pipeline validation failed: {error_msg}. Errors: {errors}",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
             return result
+        except ClientException:
+            raise
         except Exception as e:
             logger.exception("Failed to run ephemeral execution")
             raise ClientException(
