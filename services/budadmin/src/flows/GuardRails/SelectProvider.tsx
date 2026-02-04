@@ -158,7 +158,9 @@ export default function SelectProvider() {
     type: "custom",
   };
 
-  const allBudProviders = [...budProviders, customProbeOption];
+  const allBudProviders = budProviders.length > 0
+    ? [budProviders[0], customProbeOption, ...budProviders.slice(1)]
+    : [customProbeOption];
 
   // Keep static third-party providers for now
   const thirdPartyProviders = providers.filter(
@@ -184,8 +186,8 @@ export default function SelectProvider() {
 
           <div className="px-[1.35rem] pb-[1.35rem]">
             {/* Bud Section */}
-            <div className="mb-[1.5rem]">
-              <Text_14_600_FFFFFF className="mb-[1rem]">Bud</Text_14_600_FFFFFF>
+            <div className="mb-[1.5rem] mt-[1.5rem]">
+              {/* <Text_14_600_FFFFFF className="mb-[1rem]">Bud</Text_14_600_FFFFFF> */}
               {loading ? (
                 <div className="flex justify-center py-[2rem]">
                   <Spin size="default" />

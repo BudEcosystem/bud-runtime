@@ -553,7 +553,7 @@ export default function AddCustomGuardRail() {
             descriptionClass="pt-[.3rem]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem] space-y-[1.5rem]">
+          <div className="px-[1.35rem] pb-[1.35rem] space-y-[1.5rem] pt-[1.5rem]">
             {/* Task Section */}
             <div>
               <Text_14_600_FFFFFF className="mb-[0.75rem]">

@@ -72,7 +72,7 @@ export default function SelectProbeType() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="px-[1.35rem] pb-[1.35rem] pt-[1.5rem]">
             <div className="space-y-[0.75rem]">
               {probeTypes.map((type) => (
                 <div

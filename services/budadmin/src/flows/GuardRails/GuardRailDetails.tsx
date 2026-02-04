@@ -2,22 +2,17 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Input, Select, ConfigProvider } from "antd";
+import { Input } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { successToast } from "@/components/toast";
 // import { errorToast } from "@/components/toast"; // TODO: Re-enable when validation is enabled
 import { Text_12_400_757575 } from "@/components/ui/text";
+import CustomSelect from "../components/CustomSelect";
+import GuardTypeSelect from "../components/GuardTypeSelect";
+import TextInput from "../components/TextInput";
 
 const { TextArea } = Input;
-
-// Guard type options (multi-select)
-const GUARD_TYPE_OPTIONS = [
-  { label: "Input", value: "input" },
-  { label: "Output", value: "output" },
-  { label: "Agents", value: "agents" },
-  { label: "Retrieval", value: "retrieval" },
-];
 
 // Modality options (single select)
 const MODALITY_OPTIONS = [
@@ -95,18 +90,15 @@ export default function GuardRailDetails() {
             descriptionClass="pt-[.3rem]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="px-[1.35rem] pb-[1.35rem] pt-[1.5rem]">
             {/* Guard rail Name */}
             <div className="mb-[1.5rem]">
-              <Text_12_400_757575 className="mb-[0.5rem] block">
-                Guard rail Name
-              </Text_12_400_757575>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+              <TextInput
+                name="name"
+                label="Guard rail Name"
                 placeholder="Enter guard rail name"
-                className={inputClassName}
-                style={inputStyle}
+                onChange={(value) => setName(value)}
+                rules={[]}
               />
             </div>
 
@@ -125,65 +117,25 @@ export default function GuardRailDetails() {
               />
             </div>
 
-            {/* Guard Type (Multi-select) */}
+            {/* Guard Type (Multi-select with colored tags) */}
             <div className="mb-[1.5rem]">
-              <Text_12_400_757575 className="mb-[0.5rem] block">
-                Guard type
-              </Text_12_400_757575>
-              <Text_12_400_757575 className="mb-[0.5rem] block text-[10px]">
-                Multi-select: Input / Output / Agents / Retrieval
-              </Text_12_400_757575>
-              <ConfigProvider
-                theme={{
-                  token: {
-                    colorTextPlaceholder: "#808080",
-                    colorBgElevated: "#101010",
-                    colorBorder: "#757575",
-                    colorText: "#EEEEEE",
-                    colorBgContainer: "transparent",
-                  },
-                }}
-              >
-                <Select
-                  mode="multiple"
-                  value={guardTypes}
-                  onChange={(values) => setGuardTypes(values)}
-                  placeholder="Select guard types"
-                  options={GUARD_TYPE_OPTIONS}
-                  className="w-full"
-                  style={{ backgroundColor: "transparent" }}
-                />
-              </ConfigProvider>
+              <GuardTypeSelect
+                value={guardTypes}
+                onChange={(values) => setGuardTypes(values)}
+                placeholder="Select guard types"
+              />
             </div>
 
             {/* Modality (Single select) */}
             <div className="mb-[1.5rem]">
-              <Text_12_400_757575 className="mb-[0.5rem] block">
-                Modality
-              </Text_12_400_757575>
-              <Text_12_400_757575 className="mb-[0.5rem] block text-[10px]">
-                Single Select: Text, Video, Image, Actions / Code / Math
-              </Text_12_400_757575>
-              <ConfigProvider
-                theme={{
-                  token: {
-                    colorTextPlaceholder: "#808080",
-                    colorBgElevated: "#101010",
-                    colorBorder: "#757575",
-                    colorText: "#EEEEEE",
-                    colorBgContainer: "transparent",
-                  },
-                }}
-              >
-                <Select
-                  value={modality || undefined}
-                  onChange={(value) => setModality(value)}
-                  placeholder="Select modality"
-                  options={MODALITY_OPTIONS}
-                  className="w-full"
-                  style={{ backgroundColor: "transparent" }}
-                />
-              </ConfigProvider>
+              <CustomSelect
+                name="modality"
+                label="Modality"
+                value={modality}
+                onChange={(value) => setModality(value)}
+                placeholder="Select modality"
+                selectOptions={MODALITY_OPTIONS}
+              />
             </div>
           </div>
         </BudDrawerLayout>
