@@ -193,6 +193,14 @@ Add to `.claude/settings.json` for automatic reminders:
 ### budcluster
 ### budsim
 ### budgateway
+### budmodel
+### budmetrics
+### budnotify
+### ask-bud
+### budeval
+### budplayground
+### budCustomer
+### general
 ## Anti-patterns
 ```
 
