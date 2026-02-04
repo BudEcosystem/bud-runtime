@@ -1247,7 +1247,8 @@ class ClickHouseMigration:
             -- ===== PROMPT ANALYTICS (for /v1/responses) =====
             prompt_id Nullable(String) CODEC(ZSTD(1)),  -- Internal prompt ID from bud.prompt_id (can be UUID or string)
             client_prompt_id Nullable(String) CODEC(ZSTD(1)),  -- Client-provided prompt ID from gen_ai.prompt.id
-            prompt_version Nullable(String) CODEC(ZSTD(1)),
+            prompt_version Nullable(String) CODEC(ZSTD(1)),  -- Client-provided version string from gen_ai.prompt.version
+            prompt_version_id Nullable(UUID) CODEC(ZSTD(1)),  -- Internal UUID from bud.prompt_version_id
             prompt_variables Nullable(String) CODEC(ZSTD(3)),
             response_id Nullable(String) CODEC(ZSTD(1)),
             response_status LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
@@ -2641,7 +2642,8 @@ class ClickHouseMigration:
                 "Nullable(String) CODEC(ZSTD(1))",
             ),  # Internal prompt ID from bud.prompt_id (can be UUID or string)
             ("client_prompt_id", "Nullable(String) CODEC(ZSTD(1))"),  # Client-provided prompt ID from gen_ai.prompt.id
-            ("prompt_version", "Nullable(String) CODEC(ZSTD(1))"),
+            ("prompt_version", "Nullable(String) CODEC(ZSTD(1))"),  # Client-provided version string
+            ("prompt_version_id", "Nullable(UUID) CODEC(ZSTD(1))"),  # Internal UUID from bud.prompt_version_id
             ("prompt_variables", "Nullable(String) CODEC(ZSTD(3))"),
             ("response_id", "Nullable(String) CODEC(ZSTD(1))"),
             ("response_status", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
@@ -2913,7 +2915,7 @@ class ClickHouseMigration:
             toUUIDOrNull(nullIf(r.SpanAttributes['gen_ai.inference_id'], '')) AS inference_id,
             toUUIDOrNull(nullIf(r.SpanAttributes['bud.project_id'], '')) AS project_id,
             toUUIDOrNull(nullIf(r.SpanAttributes['bud.endpoint_id'], '')) AS endpoint_id,
-            CAST(NULL AS Nullable(UUID)) AS model_id,  -- Model resolved dynamically
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.model_id'], '')) AS model_id,  -- Model ID from baggage
             toUUIDOrNull(nullIf(r.SpanAttributes['bud.api_key_id'], '')) AS api_key_id,
             toUUIDOrNull(nullIf(r.SpanAttributes['bud.api_key_project_id'], '')) AS api_key_project_id,
             nullIf(r.SpanAttributes['bud.user_id'], '') AS user_id,
@@ -2942,7 +2944,7 @@ class ClickHouseMigration:
 
             -- ===== MODEL INFO =====
             CAST(NULL AS Nullable(UUID)) AS model_inference_id,
-            '' AS model_name,
+            coalesce(nullIf(r.SpanAttributes['bud.model_id'], ''), '') AS model_name,
             'budprompt' AS model_provider,  -- Always budprompt for /v1/responses
             'response' AS endpoint_type,  -- Differentiate from 'chat'
 
@@ -3051,7 +3053,8 @@ class ClickHouseMigration:
             -- ===== PROMPT ANALYTICS COLUMNS =====
             nullIf(r.SpanAttributes['bud.prompt_id'], '') AS prompt_id,  -- Internal prompt ID (UUID or string)
             nullIf(r.SpanAttributes['gen_ai.prompt.id'], '') AS client_prompt_id,  -- Client-provided prompt ID
-            nullIf(r.SpanAttributes['gen_ai.prompt.version'], '') AS prompt_version,
+            nullIf(r.SpanAttributes['gen_ai.prompt.version'], '') AS prompt_version,  -- Client version string
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.prompt_version_id'], '')) AS prompt_version_id,  -- Internal UUID
             nullIf(r.SpanAttributes['gen_ai.prompt.variables'], '') AS prompt_variables,
             nullIf(r.SpanAttributes['gen_ai.response.id'], '') AS response_id,
             nullIf(r.SpanAttributes['gen_ai.response.status'], '') AS response_status

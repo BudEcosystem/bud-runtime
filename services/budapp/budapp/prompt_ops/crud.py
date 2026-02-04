@@ -256,6 +256,50 @@ class PromptDataManager(DataManagerUtils):
 
         return result, count
 
+    async def get_all_active_prompt_versions_for_projects(
+        self, project_ids: Optional[List[UUID]] = None
+    ) -> List[Tuple[PromptModel, List[PromptVersionModel]]]:
+        """Get active prompts with ALL their active versions for Redis caching.
+
+        This method is used by the API key cache to store version-specific
+        metadata (endpoint_id, model_id) for each prompt version, enabling
+        the gateway to look up these values when routing prompt-based requests.
+
+        Args:
+            project_ids: Optional list of project IDs to filter by.
+                         If None, returns all active prompts.
+                         If provided, returns prompts from those projects only.
+
+        Returns:
+            List of tuples: (prompt, list_of_active_versions)
+            Each prompt includes default_version_id to identify which version is default.
+            Each version provides: id, endpoint_id, model_id, version number.
+        """
+        # Get active prompts with optional project filtering
+        if project_ids is not None:
+            stmt = (
+                select(PromptModel)
+                .filter(and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE))
+                .options(joinedload(PromptModel.default_version))
+            )
+        else:
+            stmt = (
+                select(PromptModel)
+                .filter(PromptModel.status == PromptStatusEnum.ACTIVE)
+                .options(joinedload(PromptModel.default_version))
+            )
+
+        prompts = self.scalars_all(stmt)
+
+        # For each prompt, get all active versions
+        result = []
+        version_data_manager = PromptVersionDataManager(self.session)
+        for prompt in prompts:
+            versions = await version_data_manager.get_active_versions_by_prompt_id(prompt.id)
+            result.append((prompt, versions))
+
+        return result
+
 
 class PromptVersionDataManager(DataManagerUtils):
     """CRUD operations for PromptVersion model."""
