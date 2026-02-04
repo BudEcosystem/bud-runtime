@@ -83,6 +83,31 @@ const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
 const isRedirectUriField = (fieldName: string) =>
   REDIRECT_URI_FIELDS.includes(fieldName.toLowerCase());
 
+// Helper to validate a single field value (handles key-value-array and regular fields)
+const isFieldValueValid = (
+  fieldType: string | undefined,
+  value: string | undefined
+): boolean => {
+  // For key-value-array fields, check if there's at least one valid pair with a non-empty key
+  if (fieldType === 'key-value-array') {
+    if (!value) return false;
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.some((pair: { key?: string; value?: string }) =>
+          pair && pair.key?.trim()
+        );
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // For other fields, just check if value exists
+  return !!value;
+};
+
 const buildDefaultModelSettings = (session: AgentSession) => ({
   temperature: session.settings?.temperature ?? 0.7,
   max_tokens: session.settings?.maxTokens ?? 2000,
@@ -594,28 +619,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     // Validate required fields before continuing
     const credentialSchema = selectedConnectorDetails?.credential_schema || [];
     const visibleRequiredFields = getVisibleFields(credentialSchema).filter(field => field.required);
-    const allRequiredFieldsFilled = visibleRequiredFields.every(field => {
-      const value = formData[field.field];
-
-      // For key-value-array fields, check if there's at least one valid pair with a non-empty key
-      if (field.type === 'key-value-array') {
-        if (!value) return false;
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed)) {
-            return parsed.some((pair: { key?: string; value?: string }) =>
-              pair && pair.key?.trim()
-            );
-          }
-          return false;
-        } catch {
-          return false;
-        }
-      }
-
-      // For other fields, just check if value exists
-      return !!value;
-    });
+    const allRequiredFieldsFilled = visibleRequiredFields.every(field =>
+      isFieldValueValid(field.type, formData[field.field])
+    );
 
     if (!allRequiredFieldsFilled) {
       errorToast('Please fill in all required fields');
@@ -974,28 +980,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     return visibleFields
       .filter(field => field.required)
-      .every(field => {
-        const value = formData[field.field];
-
-        // For key-value-array fields, check if there's at least one valid pair with a non-empty key
-        if (field.type === 'key-value-array') {
-          if (!value) return false;
-          try {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed)) {
-              return parsed.some((pair: { key?: string; value?: string }) =>
-                pair && pair.key?.trim()
-              );
-            }
-            return false;
-          } catch {
-            return false;
-          }
-        }
-
-        // For other fields, just check if value exists
-        return !!value;
-      });
+      .every(field => isFieldValueValid(field.type, formData[field.field]));
   };
 
   // Render tool details view
