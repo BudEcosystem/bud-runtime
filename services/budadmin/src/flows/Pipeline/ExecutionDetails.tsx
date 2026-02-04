@@ -57,7 +57,7 @@ const PipelineExecutionDetails = () => {
     if (totalSeconds < 60) {
       return totalSeconds === 1 ? "1 sec" : `${totalSeconds} sec`;
     }
-    const totalMinutes = Math.round(totalSeconds / 60);
+    const totalMinutes = Math.floor(totalSeconds / 60);
     return totalMinutes === 1 ? "1 min" : `${totalMinutes} min`;
   }, [selectedExecution?.started_at, selectedExecution?.completed_at]);
 
