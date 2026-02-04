@@ -88,6 +88,8 @@ kubectl get pods -n ${NAMESPACE} -l app=<app_name>
 
 ```bash
 # Build, push, and deploy in one go
+# NOTE: This script is an example for 'budapp'. The Dockerfile path (-f flag)
+# must be adjusted for other services.
 SERVICE=budapp
 docker build -t ${REGISTRY}/$SERVICE:${IMAGE_TAG} -f services/$SERVICE/deploy/Dockerfile services/$SERVICE && \
 docker push ${REGISTRY}/$SERVICE:${IMAGE_TAG} && \
