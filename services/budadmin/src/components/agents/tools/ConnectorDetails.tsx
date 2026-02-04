@@ -483,8 +483,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       } finally {
         // Clean up OAuth-specific URL params (always runs whether success or error)
         cleanupOAuthParams();
-
-        // Clear saved state
         clearOAuthState();
 
         setIsRegistering(false);
