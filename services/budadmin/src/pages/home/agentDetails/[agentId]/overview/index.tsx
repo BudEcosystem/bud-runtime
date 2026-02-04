@@ -15,6 +15,9 @@ import { usePrompts } from "src/hooks/usePrompts";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
 import { usePromptMetrics } from "src/hooks/usePromptMetrics";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import { useDrawer } from "src/hooks/useDrawer";
+import { PermissionEnum, useUser } from "src/stores/useUser";
 
 const segmentOptions = ["daily", "weekly", "monthly"];
 
@@ -1487,6 +1490,8 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { getPromptById } = usePrompts();
+  const { openDrawer } = useDrawer();
+  const { hasPermission } = useUser();
 
   // Check if we're in development mode
   const isDevelopmentMode = process.env.NEXT_PUBLIC_VERCEL_ENV === "development" ||
@@ -1592,11 +1597,21 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
       )}
       {/* Agent Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2 pt-[.5rem]">
+        <div className="flex items-center gap-3 mb-2 pt-[1.5rem]">
           <Text_26_600_FFFFFF className="text-[#EEE]">
             {agentData?.name}
           </Text_26_600_FFFFFF>
           <ProjectTags color={endpointStatusMapping[capitalize(agentData?.status)]} name={capitalize(agentData?.status)}/>
+          <div className="ml-auto">
+            <PrimaryButton
+              permission={hasPermission(PermissionEnum.ModelManage)}
+              onClick={() => {
+                openDrawer("use-agent", { endpoint: agentData });
+              }}
+            >
+              Use this agent
+            </PrimaryButton>
+          </div>
         </div>
         <Text_12_400_B3B3B3 className="max-w-[850px] mb-3">
           {agentData?.description}
