@@ -1902,6 +1902,7 @@ class ClickHouseMigration:
             endpoint_id Nullable(UUID) CODEC(ZSTD(1)),
             model_id Nullable(UUID) CODEC(ZSTD(1)),
             api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
+            api_key_id Nullable(UUID) CODEC(ZSTD(1)),
 
             -- Prompt dimension (for filtering by prompt)
             prompt_id Nullable(String) CODEC(ZSTD(1)),
@@ -1958,7 +1959,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, api_key_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1975,7 +1976,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, api_key_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1992,7 +1993,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, api_key_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -2053,6 +2054,7 @@ class ClickHouseMigration:
             endpoint_id,
             model_id,
             api_key_project_id,
+            api_key_id,
 
             -- Prompt dimension
             prompt_id,
@@ -2099,7 +2101,7 @@ class ClickHouseMigration:
         FROM InferenceFact
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
+            project_id, endpoint_id, model_id, api_key_project_id, api_key_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2114,6 +2116,7 @@ class ClickHouseMigration:
             endpoint_id,
             model_id,
             api_key_project_id,
+            api_key_id,
 
             -- Prompt dimension
             prompt_id,
@@ -2160,7 +2163,7 @@ class ClickHouseMigration:
         FROM InferenceMetrics5m
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
+            project_id, endpoint_id, model_id, api_key_project_id, api_key_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2175,6 +2178,7 @@ class ClickHouseMigration:
             endpoint_id,
             model_id,
             api_key_project_id,
+            api_key_id,
 
             -- Prompt dimension
             prompt_id,
@@ -2221,7 +2225,7 @@ class ClickHouseMigration:
         FROM InferenceMetrics1h
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
+            project_id, endpoint_id, model_id, api_key_project_id, api_key_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -3213,6 +3217,59 @@ class ClickHouseMigration:
 
         logger.info("Prompt analytics columns migration to rollup tables completed successfully")
 
+    async def add_api_key_id_to_rollup_tables(self):
+        """Add api_key_id dimension column to InferenceMetrics rollup tables.
+
+        This migration adds api_key_id as a dimension (not just unique count aggregate) to:
+        - InferenceMetrics5m
+        - InferenceMetrics1h
+        - InferenceMetrics1d
+
+        This enables grouping analytics by api_key_id for API key performance monitoring.
+        Note: MVs need to be recreated to include api_key_id in SELECT/GROUP BY.
+        """
+        logger.info("Adding api_key_id dimension column to rollup tables...")
+
+        tables = ["InferenceMetrics5m", "InferenceMetrics1h", "InferenceMetrics1d"]
+
+        for table_name in tables:
+            try:
+                # Check if table exists
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    logger.info(f"{table_name} table does not exist. Skipping api_key_id migration.")
+                    continue
+
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = '{table_name}'
+                  AND database = currentDatabase()
+                  AND name = 'api_key_id'
+                """
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    # Add api_key_id column after api_key_project_id
+                    alter_query = f"""
+                    ALTER TABLE {table_name}
+                    ADD COLUMN IF NOT EXISTS api_key_id Nullable(UUID) CODEC(ZSTD(1)) AFTER api_key_project_id
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column api_key_id to {table_name} table")
+                else:
+                    logger.debug(f"Column api_key_id already exists in {table_name} table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.debug(f"Column api_key_id already exists in {table_name}")
+                else:
+                    logger.error(f"Error adding api_key_id to {table_name}: {e}")
+
+        logger.info("api_key_id dimension column migration to rollup tables completed successfully")
+
     async def make_metrics_dimension_columns_nullable(self):
         """Make dimension columns nullable in InferenceMetrics rollup tables.
 
@@ -3676,6 +3733,7 @@ class ClickHouseMigration:
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
             await self.add_blocking_metrics_to_rollup_tables()  # Add blocking metrics columns to rollup tables
             await self.add_prompt_analytics_to_rollup_tables()  # Add prompt analytics columns to rollup tables
+            await self.add_api_key_id_to_rollup_tables()  # Add api_key_id dimension for grouping by API key
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
             await self.migrate_inference_tables_ttl_90_days()  # Update TTL to 90 days for inference tables
             await self.verify_tables()

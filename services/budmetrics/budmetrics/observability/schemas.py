@@ -193,6 +193,7 @@ class MetricsData(BaseModel):
     model_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     endpoint_id: Optional[UUID] = None
+    api_key_id: Optional[UUID] = None  # For api_key grouping
     data: dict[MetricType, Union[CountMetric, TimeMetric, PerformanceMetric, CacheMetric]]
 
 
@@ -208,7 +209,7 @@ class ObservabilityMetricsRequest(BaseModel):
     frequency_unit: Literal["hour", "day", "week", "month", "quarter", "year"] = "day"
     frequency_interval: Optional[int] = None
     filters: Optional[dict[Literal["model", "project", "endpoint"], Union[list[UUID], UUID]]] = None
-    group_by: Optional[list[Literal["model", "project", "endpoint", "user_project"]]] = None
+    group_by: Optional[list[Literal["model", "project", "endpoint", "user_project", "api_key"]]] = None
     return_delta: bool = True
     fill_time_gaps: bool = True
     topk: Optional[int] = None
