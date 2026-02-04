@@ -53,7 +53,7 @@ docker build -t ${REGISTRY}/<image_name>:${IMAGE_TAG} -f deploy/Dockerfile .
 
 # Examples:
 docker build -t ${REGISTRY}/budapp:${IMAGE_TAG} -f deploy/Dockerfile .
-docker build -t ${REGISTRY}/budadmin:${IMAGE_TAG} -f deploy/Dockerfile .
+docker build -t ${REGISTRY}/budadmin:${IMAGE_TAG} .
 docker build -t ${REGISTRY}/budgateway:${IMAGE_TAG} -f gateway/Dockerfile .
 ```
 
