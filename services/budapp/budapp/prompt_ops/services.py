@@ -552,14 +552,11 @@ class PromptService(SessionMixin):
         db_prompt_version = None
         if request.deployment_name:
             db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-                EndpointModel,
-                {"name": request.deployment_name},
-                exclude_fields={"status": EndpointStatusEnum.DELETED}
+                EndpointModel, {"name": request.deployment_name}, exclude_fields={"status": EndpointStatusEnum.DELETED}
             )
 
             db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
-                PromptModel,
-                {"name": request.prompt_id, "status": PromptStatusEnum.ACTIVE},
+                PromptModel, {"name": request.prompt_id, "status": PromptStatusEnum.ACTIVE}, missing_ok=True
             )
 
             if db_prompt and db_endpoint:
@@ -574,6 +571,7 @@ class PromptService(SessionMixin):
                     PromptVersionModel,
                     {"prompt_id": db_prompt.id, "version": request.version},
                     exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+                    missing_ok=True,
                 )
 
         # Perform the request to budprompt service
@@ -619,7 +617,6 @@ class PromptService(SessionMixin):
             except Exception as e:
                 logger.warning(f"Failed to update proxy cache: {e}", exc_info=True)
                 # Don't fail the request if cache update fails - DB is already updated
-
 
         # Save draft prompt reference for playground access with version-specific key
         try:
