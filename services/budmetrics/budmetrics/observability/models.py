@@ -280,6 +280,7 @@ class QueryBuilder:
         "endpoint": "ifact.endpoint_id",
         "user_project": "ifact.api_key_project_id",
         "api_key": "ifact.api_key_id",
+        "prompt": "ifact.prompt_id",
     }
 
     # Rollup table column mappings (for rollup queries)
@@ -289,6 +290,7 @@ class QueryBuilder:
         "endpoint": "endpoint_id",
         "user_project": "api_key_project_id",
         "api_key": "api_key_id",
+        "prompt": "prompt_id",
     }
 
     # Metrics that can be served from rollup tables (pre-aggregated)
