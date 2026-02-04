@@ -12,7 +12,7 @@ import { useBudPipeline, BudPipelineItem } from "src/stores/useBudPipeline";
 import { successToast, errorToast } from "@/components/toast";
 
 export default function EditPipeline() {
-  const { updateWorkflow, getWorkflows } = useBudPipeline();
+  const { updateWorkflow } = useBudPipeline();
   const { closeDrawer, drawerProps } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,8 +54,6 @@ export default function EditPipeline() {
           if (result) {
             successToast("Pipeline updated successfully");
             closeDrawer();
-            // Refresh the workflows list
-            getWorkflows();
           } else {
             errorToast("Failed to update pipeline");
           }

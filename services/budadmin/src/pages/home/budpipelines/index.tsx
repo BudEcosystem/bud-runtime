@@ -225,14 +225,16 @@ const BudPipelines = () => {
       key: "delete-pipeline",
       okAction: async () => {
         setConfirmLoading(true);
-        const success = await deleteWorkflow(workflow.id);
-        if (success) {
-          successToast("Pipeline deleted successfully");
-          getWorkflows();
-        } else {
-          errorToast("Failed to delete pipeline");
+        try {
+          const success = await deleteWorkflow(workflow.id);
+          if (success) {
+            successToast("Pipeline deleted successfully");
+          } else {
+            errorToast("Failed to delete pipeline");
+          }
+        } finally {
+          setConfirmLoading(false);
         }
-        setConfirmLoading(false);
       },
       okText: "Delete",
       type: "warning",
