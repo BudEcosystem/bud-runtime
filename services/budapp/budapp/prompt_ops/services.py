@@ -548,6 +548,34 @@ class PromptService(SessionMixin):
         Returns:
             PromptConfigResponse containing the bud_prompt_id and bud_prompt_version
         """
+        db_endpoint = None
+        db_prompt_version = None
+        if request.deployment_name:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel,
+                {"name": request.deployment_name},
+                exclude_fields={"status": EndpointStatusEnum.DELETED}
+            )
+
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptModel,
+                {"name": request.prompt_id, "status": PromptStatusEnum.ACTIVE},
+            )
+
+            if db_prompt and db_endpoint:
+                # Validate endpoint's project matches
+                if db_endpoint.project_id != db_prompt.project_id:
+                    raise ClientException(
+                        message="Endpoint and prompt must belong to the same project",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                # Fetch prompt version
+                db_prompt_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+                    PromptVersionModel,
+                    {"prompt_id": db_prompt.id, "version": request.version},
+                    exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+                )
+
         # Perform the request to budprompt service
         response_data = await self._perform_prompt_config_request(request)
 
@@ -560,21 +588,38 @@ class PromptService(SessionMixin):
         model_id = None
         project_id = None
 
-        if request.deployment_name:
-            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
-                EndpointModel,
-                {"name": request.deployment_name},
-                exclude_fields={"status": EndpointStatusEnum.DELETED},
-                missing_ok=True,
+        if db_endpoint:
+            endpoint_id = str(db_endpoint.id)
+            model_id = str(db_endpoint.model_id)
+            project_id = str(db_endpoint.project_id)
+            logger.debug(
+                f"Resolved endpoint for draft prompt {prompt_id}: endpoint_id={endpoint_id}, "
+                f"model_id={model_id}, project_id={project_id}"
             )
-            if db_endpoint:
-                endpoint_id = str(db_endpoint.id)
-                model_id = str(db_endpoint.model_id)
-                project_id = str(db_endpoint.project_id)
-                logger.debug(
-                    f"Resolved endpoint for draft prompt {prompt_id}: endpoint_id={endpoint_id}, "
-                    f"model_id={model_id}, project_id={project_id}"
-                )
+
+        if db_prompt_version:
+            self.session.refresh(db_prompt_version)
+            db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
+                db_prompt_version,
+                {
+                    "endpoint_id": db_endpoint.id,
+                    "model_id": db_endpoint.model_id,
+                    "cluster_id": db_endpoint.cluster_id,
+                },
+            )
+            logger.debug(
+                f"Updated prompt version {request.version} for prompt '{request.prompt_id}' "
+                f"with endpoint_id={db_endpoint.id}"
+            )
+
+            # Update Redis Cache
+            try:
+                await CredentialService(self.session).update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.warning(f"Failed to update proxy cache: {e}", exc_info=True)
+                # Don't fail the request if cache update fails - DB is already updated
+
 
         # Save draft prompt reference for playground access with version-specific key
         try:
