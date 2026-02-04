@@ -860,8 +860,16 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return newWorkflow;
     } catch (error: any) {
       console.error("Failed to create workflow:", error);
+      // Extract error message from various possible response formats
+      const responseData = error?.response?.data;
+      const errorMessage =
+        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
+        responseData?.detail?.message ||   // FastAPI HTTPException with object: {"detail": {"message": "..."}}
+        (typeof responseData?.detail === 'string' ? responseData?.detail : null) || // FastAPI HTTPException with string
+        error?.message ||                  // Axios/network error
+        "Failed to create workflow";
       set({
-        error: error?.response?.data?.message || "Failed to create workflow",
+        error: errorMessage,
         isLoading: false,
       });
       return null;
@@ -907,8 +915,16 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return updatedWorkflow;
     } catch (error: any) {
       console.error("Failed to update workflow:", error);
+      // Extract error message from various possible response formats
+      const responseData = error?.response?.data;
+      const errorMessage =
+        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
+        responseData?.detail?.message ||   // FastAPI HTTPException with object: {"detail": {"message": "..."}}
+        (typeof responseData?.detail === 'string' ? responseData?.detail : null) || // FastAPI HTTPException with string
+        error?.message ||                  // Axios/network error
+        "Failed to update workflow";
       set({
-        error: error?.response?.data?.message || "Failed to update workflow",
+        error: errorMessage,
         isLoading: false,
       });
       return null;
