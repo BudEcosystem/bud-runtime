@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'BUDMEM: Context compacting. Run /budmem flush to save learnings.'"
+          }
+        ]
+      }
+    ]
+  }
+}
