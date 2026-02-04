@@ -42,6 +42,7 @@ from ..commons.constants import (
     ProjectStatusEnum,
     UserTypeEnum,
 )
+from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import AdapterDataManager, EndpointDataManager
 from ..endpoint_ops.models import Adapter as AdapterModel
 from ..endpoint_ops.models import Endpoint as EndpointModel
@@ -140,6 +141,7 @@ class BudMetricService(SessionMixin):
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
+            api_key_ids = set()
 
             # Extract IDs from the response structure
             items_list = response_data.get("items", [])
@@ -162,12 +164,15 @@ class BudMetricService(SessionMixin):
                         model_ids.add(model_id)
                     if endpoint_id := item.get("endpoint_id"):
                         endpoint_ids.add(endpoint_id)
+                    if api_key_id := item.get("api_key_id"):
+                        api_key_ids.add(api_key_id)
 
             # Fetch names for all IDs
             project_names = {}
             model_names = {}
             endpoint_names = {}
             adapter_names = {}
+            credential_names = {}
 
             if project_ids:
                 # Query projects
@@ -199,6 +204,13 @@ class BudMetricService(SessionMixin):
                     adapters = result.scalars().all()
                     adapter_names.update({str(a.id): a.name for a in adapters})
 
+            if api_key_ids:
+                # Query credentials (API keys)
+                stmt = select(CredentialModel).where(CredentialModel.id.in_(list(api_key_ids)))
+                result = self.session.execute(stmt)
+                credentials = result.scalars().all()
+                credential_names = {str(c.id): c.name for c in credentials}
+
             # Add names to the response items
             for time_bucket in items_list:
                 if not isinstance(time_bucket, dict):
@@ -224,6 +236,8 @@ class BudMetricService(SessionMixin):
                             item["is_adapter"] = True
                         else:
                             item["endpoint_name"] = "Unknown"
+                    if api_key_id := item.get("api_key_id"):
+                        item["api_key_name"] = credential_names.get(str(api_key_id), "Unknown")
 
         except Exception as e:
             logger.warning(f"Failed to enrich response with names: {e}")
