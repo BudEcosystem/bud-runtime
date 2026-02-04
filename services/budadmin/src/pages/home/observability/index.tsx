@@ -297,11 +297,11 @@ const ObservabilityPage: React.FC = () => {
         // Use endpoint_name for base model, model_display_name for adapters
         const displayName = endpoint_name || record.model_display_name || "-";
         return (
-          <CustomPopover title= {displayName}>
-          <Text_12_400_EEEEEE className="truncate max-w-[180px]">
-             {displayName}
-          </Text_12_400_EEEEEE>
-        </CustomPopover>
+          <CustomPopover title={displayName !== "-" ? displayName : "N/A"}>
+            <Text_12_400_EEEEEE className="truncate max-w-[180px]">
+              {displayName}
+            </Text_12_400_EEEEEE>
+          </CustomPopover>
         );
       },
     },
