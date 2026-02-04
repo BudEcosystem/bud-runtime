@@ -137,6 +137,21 @@ class WorkflowNotFoundError(WorkflowException):
         self.workflow_id = workflow_id
 
 
+class DuplicatePipelineNameError(WorkflowException):
+    """Pipeline with this name already exists for the user."""
+
+    def __init__(self, name: str, user_id: str | None = None) -> None:
+        details: dict[str, Any] = {"name": name}
+        if user_id:
+            details["user_id"] = user_id
+        super().__init__(
+            f"A pipeline with the name '{name}' already exists",
+            details=details,
+        )
+        self.name = name
+        self.user_id = user_id
+
+
 class ExecutionNotFoundError(WorkflowException):
     """Execution not found."""
 

@@ -20,6 +20,7 @@ from budpipeline.commons.database import get_db
 from budpipeline.commons.dependencies import UserContext, get_user_context
 from budpipeline.commons.exceptions import (
     DAGValidationError,
+    DuplicatePipelineNameError,
     WorkflowNotFoundError,
 )
 from budpipeline.pipeline.crud import OptimisticLockError
@@ -107,6 +108,11 @@ async def create_pipeline(
             step_count=pipeline["step_count"],
             user_id=pipeline.get("user_id"),
             system_owned=pipeline.get("system_owned", False),
+        )
+    except DuplicatePipelineNameError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "Duplicate pipeline name", "message": str(e.message)},
         )
     except DAGValidationError as e:
         raise HTTPException(
@@ -260,6 +266,11 @@ async def update_pipeline(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Concurrent modification detected: {e}",
+        )
+    except DuplicatePipelineNameError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "Duplicate pipeline name", "message": str(e.message)},
         )
     except DAGValidationError as e:
         raise HTTPException(
