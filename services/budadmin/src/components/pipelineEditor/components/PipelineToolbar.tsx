@@ -45,21 +45,25 @@ const AutoLayoutIcon = () => (
   </svg>
 );
 
-const ZoomInIcon = () => (
+const MagnifyingGlassIcon = ({ children }: { children?: React.ReactNode }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="8" />
     <path d="M21 21l-4.35-4.35" />
-    <path d="M11 8v6" />
-    <path d="M8 11h6" />
+    {children}
   </svg>
 );
 
-const ZoomOutIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="11" cy="11" r="8" />
-    <path d="M21 21l-4.35-4.35" />
+const ZoomInIcon = () => (
+  <MagnifyingGlassIcon>
+    <path d="M11 8v6" />
     <path d="M8 11h6" />
-  </svg>
+  </MagnifyingGlassIcon>
+);
+
+const ZoomOutIcon = () => (
+  <MagnifyingGlassIcon>
+    <path d="M8 11h6" />
+  </MagnifyingGlassIcon>
 );
 
 // ============================================================================
@@ -227,14 +231,14 @@ function PipelineToolbarComponent({
       {showZoomControls && (
         <>
           <ToolbarButton
-            icon={<ZoomOutIcon />}
-            onClick={handleZoomOut}
-            tooltip="Zoom Out"
-          />
-          <ToolbarButton
             icon={<ZoomInIcon />}
             onClick={handleZoomIn}
             tooltip="Zoom In"
+          />
+          <ToolbarButton
+            icon={<ZoomOutIcon />}
+            onClick={handleZoomOut}
+            tooltip="Zoom Out"
           />
         </>
       )}
