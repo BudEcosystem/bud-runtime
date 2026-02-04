@@ -153,9 +153,14 @@ const NewPipeline = () => {
       if (result) {
         successToast("Pipeline created successfully");
         router.push(`/pipelines/${result.id}`);
+      } else {
+        // Get error from store - createWorkflow returns null on failure
+        const storeError = useBudPipeline.getState().error;
+        errorToast(storeError || "Failed to create pipeline");
       }
-    } catch (error) {
-      console.error("Validation failed:", error);
+    } catch (err) {
+      console.error("Validation failed:", err);
+      errorToast("Failed to create pipeline");
     }
   };
 
