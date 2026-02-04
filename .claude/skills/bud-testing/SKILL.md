@@ -132,12 +132,12 @@ npm run dev  # Starts on localhost:3001
 **IMPORTANT:** Before running UI tests, check if the dev server is running. If not, start it automatically:
 
 ```bash
-# Check if localhost:3000 is accessible, if not start the dev server
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null | grep -q "200\|301\|302" || \
+# Check if ${FRONTEND_DEV_URL} is accessible, if not start the dev server
+curl -s -o /dev/null -w "%{http_code}" "${FRONTEND_DEV_URL}" 2>/dev/null | grep -q "200\|301\|302" || \
   (cd services/budadmin && npm install && npm run dev &)
 
 # Wait for server to be ready (up to 60 seconds)
-timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 2; done'
+timeout 60 bash -c 'until curl -s "${FRONTEND_DEV_URL}" > /dev/null 2>&1; do sleep 2; done'
 ```
 
 **Auto-start procedure:**
