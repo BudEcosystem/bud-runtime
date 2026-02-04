@@ -14,11 +14,13 @@ import PageHeader from "@/components/ui/pageHeader";
 import { useLoader } from "src/context/appContext";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
-import { PlusOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { PlusOutlined, ClockCircleOutlined, MoreOutlined } from "@ant-design/icons";
 import { useBudPipeline, BudPipelineItem } from "src/stores/useBudPipeline";
-import { Tag, Tooltip } from "antd";
+import { Tag, Tooltip, Dropdown, ConfigProvider } from "antd";
 import { formatDistanceToNow } from "date-fns";
 import { useDrawer } from "src/hooks/useDrawer";
+import { useConfirmAction } from "src/hooks/useConfirmAction";
+import { successToast, errorToast } from "@/components/toast";
 
 // Status badge colors
 const statusColors: Record<string, string> = {
@@ -27,7 +29,17 @@ const statusColors: Record<string, string> = {
   draft: "#faad14",
 };
 
-const WorkflowCard = ({ workflow, onClick }: { workflow: BudPipelineItem; onClick: () => void }) => {
+const WorkflowCard = ({
+  workflow,
+  onClick,
+  onEdit,
+  onDelete,
+}: {
+  workflow: BudPipelineItem;
+  onClick: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -51,6 +63,49 @@ const WorkflowCard = ({ workflow, onClick }: { workflow: BudPipelineItem; onClic
           <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center text-xl">
             🔄
           </div>
+          <ConfigProvider
+            theme={{
+              token: {
+                colorBgElevated: "#111113",
+                colorText: "#EEEEEE",
+                controlItemBgHover: "#1F1F1F",
+                boxShadowSecondary: "0 0 0 1px #1F1F1F",
+              },
+            }}
+          >
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: "edit",
+                    label: "Edit",
+                    onClick: (e) => {
+                      e.domEvent.stopPropagation();
+                      onEdit();
+                    },
+                  },
+                  {
+                    key: "delete",
+                    label: "Delete",
+                    danger: true,
+                    onClick: (e) => {
+                      e.domEvent.stopPropagation();
+                      onDelete();
+                    },
+                  },
+                ],
+              }}
+              trigger={["hover"]}
+              placement="bottomRight"
+            >
+              <div
+                className="w-[1.5rem] h-[1.5rem] flex items-center justify-center rounded hover:bg-[#1F1F1F] transition-colors cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreOutlined className="text-[#B3B3B3] text-[1.2rem]" rotate={180} />
+              </div>
+            </Dropdown>
+          </ConfigProvider>
         </div>
 
         {/* Date */}
@@ -132,9 +187,11 @@ const WorkflowCard = ({ workflow, onClick }: { workflow: BudPipelineItem; onClic
 const BudPipelines = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const { showLoader, hideLoader } = useLoader();
-  const { workflows, getWorkflows, isLoading } = useBudPipeline();
-  const { openDrawerWithStep } = useDrawer();
+  const { workflows, getWorkflows, deleteWorkflow, isLoading } = useBudPipeline();
+  const { openDrawerWithStep, openDrawer } = useDrawer();
+  const { contextHolder, openConfirm } = useConfirmAction();
 
   const filteredWorkflows = React.useMemo(() => {
     // Filter out any undefined/null items first
@@ -151,6 +208,35 @@ const BudPipelines = () => {
 
   const goToDetails = (workflow: BudPipelineItem) => {
     router.push(`/pipelines/${workflow.id}`);
+  };
+
+  const handleEditClick = (workflow: BudPipelineItem) => {
+    // Open the edit drawer with the pipeline data
+    openDrawer("edit-pipeline", { pipeline: workflow });
+  };
+
+  const handleDeleteClick = (workflow: BudPipelineItem) => {
+    openConfirm({
+      message: `You're about to delete the ${workflow.name} pipeline`,
+      description: "Once you delete the pipeline, it cannot be recovered. All associated schedules, webhooks, and event triggers will also be deleted. Are you sure?",
+      cancelAction: () => {},
+      cancelText: "Cancel",
+      loading: confirmLoading,
+      key: "delete-pipeline",
+      okAction: async () => {
+        setConfirmLoading(true);
+        const success = await deleteWorkflow(workflow.id);
+        if (success) {
+          successToast("Pipeline deleted successfully");
+          getWorkflows();
+        } else {
+          errorToast("Failed to delete pipeline");
+        }
+        setConfirmLoading(false);
+      },
+      okText: "Delete",
+      type: "warning",
+    });
   };
 
   useEffect(() => {
@@ -211,11 +297,16 @@ const BudPipelines = () => {
                 key={workflow.id}
                 workflow={workflow}
                 onClick={() => goToDetails(workflow)}
+                onEdit={() => handleEditClick(workflow)}
+                onDelete={() => handleDeleteClick(workflow)}
               />
             ))}
           </div>
         </Box>
       </Box>
+
+      {/* Confirmation dialog context */}
+      {contextHolder}
     </DashBoardLayout>
   );
 };

@@ -5035,6 +5035,28 @@ const newPipeline: DrawerFlowType = {
   ],
 };
 
+// Flow For Edit Workflow
+const editPipeline: DrawerFlowType = {
+  title: "Edit Pipeline",
+  description: "Edit pipeline name and description",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Pipelines", "Edit Pipeline"],
+      id: "edit-pipeline",
+      step: 1,
+      component: StepComponents["edit-pipeline"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Edit Pipeline",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 const viewTool: DrawerFlowType = {
   title: "View Tool",
   description: "View tool details",
@@ -5371,6 +5393,7 @@ const flows = {
   "edit-agent": editAgent,
   // workflows
   "new-pipeline": newPipeline,
+  "edit-pipeline": editPipeline,
   "pipeline-execution-details": pipelineExecutionDetails,
   "pipeline-create-schedule": pipelineCreateSchedule,
   // tools
