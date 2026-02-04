@@ -4,9 +4,7 @@ import {
   Button,
   Table,
   Tag,
-  Tooltip,
   Typography,
-  message,
   Card,
   Row,
   Col,
@@ -66,6 +64,7 @@ import RulesTab from "./RulesTab";
 import type { RangePickerProps } from "antd/es/date-picker";
 import dayjs from "dayjs";
 import { errorToast, successToast } from "@/components/toast";
+import CustomPopover from "src/flows/components/customPopover";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -282,11 +281,11 @@ const ObservabilityPage: React.FC = () => {
       key: "project_name",
       width: 150,
       render: (project_name: string) => (
-        <Tooltip title={project_name || "N/A"}>
+        <CustomPopover title={project_name || "N/A"}>
           <Text_12_400_EEEEEE className="truncate max-w-[130px]">
             {project_name || "-"}
           </Text_12_400_EEEEEE>
-        </Tooltip>
+        </CustomPopover>
       ),
     },
     {
@@ -295,11 +294,11 @@ const ObservabilityPage: React.FC = () => {
       key: "endpoint_name",
       width: 200,
       render: (endpoint_name: string) => (
-        <Tooltip title={endpoint_name || "N/A"}>
+        <CustomPopover title={endpoint_name || "N/A"}>
           <Text_12_400_EEEEEE className="truncate max-w-[180px]">
             {endpoint_name || "-"}
           </Text_12_400_EEEEEE>
-        </Tooltip>
+        </CustomPopover>
       ),
     },
     {
@@ -308,11 +307,11 @@ const ObservabilityPage: React.FC = () => {
       key: "prompt_preview",
       width: 350,
       render: (prompt: string) => (
-        <Tooltip title={prompt}>
+        <CustomPopover title={prompt}>
           <Text_12_300_EEEEEE className="truncate max-w-[330px]">
             {prompt}
           </Text_12_300_EEEEEE>
-        </Tooltip>
+        </CustomPopover>
       ),
     },
     {
