@@ -308,7 +308,9 @@ const InferenceDetailPage: React.FC = () => {
                     Endpoint
                   </Text_12_400_B3B3B3>
                   <Text_12_600_EEEEEE>
-                    {inferenceData.endpoint_name || "Unknown Endpoint"}
+                    {inferenceData.endpoint_name ||
+                      inferenceData.model_display_name ||
+                      "Unknown Endpoint"}
                   </Text_12_600_EEEEEE>
                 </div>
 

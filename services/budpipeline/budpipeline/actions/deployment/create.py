@@ -75,18 +75,19 @@ async def _run_simulation(
     deploy_config: dict[str, Any],
     cluster_id: str | None,
     hardware_mode: str,
-) -> tuple[dict[str, Any] | None, str | None]:
+) -> tuple[dict[str, Any] | None, str | None, str | None]:
     """Run budsim simulation to get parser configs and simulator_id.
 
     Uses debug=True for synchronous execution.
-    Returns tuple of (top_recommendation, simulator_id) from simulation results.
+    Returns tuple of (top_recommendation, simulator_id, error_message) from simulation results.
     The simulator_id is used by budcluster to fetch deployment configurations.
+    If simulation fails, error_message contains the failure reason.
     """
     # Check if this is a local model
     provider_type = model_info.get("provider_type", "")
     if provider_type == "CLOUD_MODEL":
         logger.info("deployment_create_skip_simulation_cloud_model")
-        return None, None
+        return None, None, None
 
     # Get the local model path (needed for simulation)
     # Try multiple fields in order of preference
@@ -110,7 +111,7 @@ async def _run_simulation(
             "deployment_create_skip_simulation_no_local_path",
             available_fields=list(model_info.keys()),
         )
-        return None, None
+        return None, None, None
 
     # Get SLO targets from deploy_config
     ttft = deploy_config.get("ttft")
@@ -123,7 +124,7 @@ async def _run_simulation(
     # For shared hardware mode, SLO targets are optional (use defaults)
     if hardware_mode == "dedicated" and not has_slo_targets:
         logger.warning("deployment_create_skip_simulation_missing_slo_targets")
-        return None, None
+        return None, None, None
 
     # Build simulation request
     # Extract target values (use min for ttft/e2e_latency, max for throughput)
@@ -183,7 +184,11 @@ async def _run_simulation(
         recommendations = response.get("recommendations", [])
         if not recommendations:
             logger.warning("deployment_create_simulation_no_recommendations")
-            return None, simulator_id
+            # Check if there's an error message in the response
+            error_msg = (
+                response.get("message") or "No deployment recommendations found from simulation"
+            )
+            return None, simulator_id, error_msg
 
         # Return the top recommendation and simulator_id
         top_rec = recommendations[0]
@@ -195,14 +200,15 @@ async def _run_simulation(
             reasoning_parser_type=top_rec.get("reasoning_parser_type"),
             supports_lora=top_rec.get("supports_lora"),
         )
-        return top_rec, simulator_id
+        return top_rec, simulator_id, None
 
     except Exception as e:
+        error_msg = str(e)
         logger.warning(
             "deployment_create_simulation_failed",
-            error=str(e),
+            error=error_msg,
         )
-        return None, None
+        return None, None, error_msg
 
 
 def _needs_simulation(params: dict) -> bool:
@@ -344,14 +350,48 @@ class DeploymentCreateExecutor(BaseActionExecutor):
                 model_info = await _get_model_info(context, model_id, initiator_user_id)
 
                 if model_info:
-                    # Run simulation - returns (recommendation, simulator_id)
-                    sim_result, simulator_id = await _run_simulation(
+                    # Run simulation - returns (recommendation, simulator_id, error_message)
+                    sim_result, simulator_id, sim_error = await _run_simulation(
                         context=context,
                         model_info=model_info,
                         deploy_config=deploy_config,
                         cluster_id=cluster_id,
                         hardware_mode=hardware_mode,
                     )
+
+                    # If simulation failed with an error, handle based on hardware mode
+                    # Dedicated mode: fail the step (simulation is required)
+                    # Shared mode: log warning and continue (best-effort)
+                    if sim_error and not sim_result:
+                        if hardware_mode == "dedicated":
+                            error_msg = f"Simulation failed: {sim_error}"
+                            logger.error(
+                                "deployment_create_simulation_failed_step",
+                                step_id=context.step_id,
+                                hardware_mode=hardware_mode,
+                                error=sim_error,
+                            )
+                            return ActionResult(
+                                success=False,
+                                outputs={
+                                    "success": False,
+                                    "endpoint_id": None,
+                                    "endpoint_url": None,
+                                    "endpoint_name": endpoint_name,
+                                    "workflow_id": None,
+                                    "status": "failed",
+                                    "message": error_msg,
+                                },
+                                error=error_msg,
+                            )
+                        else:
+                            # Shared mode: log warning and continue without simulation
+                            logger.warning(
+                                "deployment_create_simulation_failed_continuing",
+                                step_id=context.step_id,
+                                hardware_mode=hardware_mode,
+                                error=sim_error,
+                            )
 
                     # Extract parser configs from simulation result
                     if sim_result:
@@ -840,27 +880,30 @@ META = ActionMeta(
         ),
         ParamDefinition(
             name="ttft",
-            label="Target TTFT",
-            type=ParamType.JSON,
+            label="Target TTFT (ms)",
+            type=ParamType.RANGE,
             description="Time to first token range [min, max] in milliseconds. Required for local model simulation.",
             required=False,
-            placeholder="[500, 1000]",
+            default=[50, 200],
+            validation=ValidationRules(min=10, max=10000),
         ),
         ParamDefinition(
             name="per_session_tokens_per_sec",
             label="Tokens/Sec Target",
-            type=ParamType.JSON,
+            type=ParamType.RANGE,
             description="Tokens per second range [min, max]. Required for local model simulation.",
             required=False,
-            placeholder="[10, 100]",
+            default=[10, 50],
+            validation=ValidationRules(min=1, max=500),
         ),
         ParamDefinition(
             name="e2e_latency",
-            label="E2E Latency Target",
-            type=ParamType.JSON,
+            label="E2E Latency (sec)",
+            type=ParamType.RANGE,
             description="End-to-end latency range [min, max] in seconds. Required for local model simulation.",
             required=False,
-            placeholder="[10, 60]",
+            default=[10, 60],
+            validation=ValidationRules(min=1, max=600),
         ),
         ParamDefinition(
             name="budaiscaler_specification",

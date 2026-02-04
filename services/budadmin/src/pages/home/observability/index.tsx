@@ -293,13 +293,17 @@ const ObservabilityPage: React.FC = () => {
       dataIndex: "endpoint_name",
       key: "endpoint_name",
       width: 200,
-      render: (endpoint_name: string) => (
-        <CustomPopover title={endpoint_name || "N/A"}>
+      render: (endpoint_name: string, record: InferenceListItem) => {
+        // Use endpoint_name for base model, model_display_name for adapters
+        const displayName = endpoint_name || record.model_display_name || "-";
+        return (
+          <CustomPopover title= {displayName}>
           <Text_12_400_EEEEEE className="truncate max-w-[180px]">
-            {endpoint_name || "-"}
+             {displayName}
           </Text_12_400_EEEEEE>
         </CustomPopover>
-      ),
+        );
+      },
     },
     {
       title: "Prompt Preview",
