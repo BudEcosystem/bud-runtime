@@ -9,14 +9,26 @@ const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_WORKFLOW_DATA === "true";
 
 /**
  * Extract error message from various API error response formats.
- * Handles FastAPI ClientException, HTTPException, and standard error formats.
+ * Handles FastAPI ClientException, HTTPException, validation errors, and standard error formats.
  */
 const extractErrorMessage = (error: any, fallback: string): string => {
   const responseData = error?.response?.data;
+  const detail = responseData?.detail;
+
+  // Handle validation errors array format: {"detail": {"error": "...", "errors": [...]}}
+  if (detail?.errors && Array.isArray(detail.errors)) {
+    return detail.errors.join('; ');
+  }
+
+  // Handle error field: {"detail": {"error": "..."}}
+  if (detail?.error && typeof detail.error === 'string') {
+    return detail.error;
+  }
+
   return (
     responseData?.message ||                    // FastAPI ClientException format: {"message": "..."}
-    responseData?.detail?.message ||            // FastAPI HTTPException with object: {"detail": {"message": "..."}}
-    (typeof responseData?.detail === 'string' ? responseData?.detail : null) ||  // FastAPI HTTPException with string
+    detail?.message ||                          // FastAPI HTTPException with object: {"detail": {"message": "..."}}
+    (typeof detail === 'string' ? detail : null) ||  // FastAPI HTTPException with string
     error?.message ||                           // Axios/network error
     fallback
   );
