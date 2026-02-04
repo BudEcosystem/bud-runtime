@@ -83,6 +83,31 @@ const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url'];
 const isRedirectUriField = (fieldName: string) =>
   REDIRECT_URI_FIELDS.includes(fieldName.toLowerCase());
 
+// Helper to validate a single field value (handles key-value-array and regular fields)
+const isFieldValueValid = (
+  fieldType: string | undefined,
+  value: string | undefined
+): boolean => {
+  // For key-value-array fields, check if there's at least one valid pair with a non-empty key
+  if (fieldType === 'key-value-array') {
+    if (!value) return false;
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.some((pair: { key?: string; value?: string }) =>
+          pair && pair.key?.trim()
+        );
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // For other fields, just check if value exists
+  return !!value;
+};
+
 const buildDefaultModelSettings = (session: AgentSession) => ({
   temperature: session.settings?.temperature ?? 0.7,
   max_tokens: session.settings?.maxTokens ?? 2000,
@@ -168,7 +193,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   sessionIndex = 0,
   totalSessions = 1,
 }) => {
-  const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
   const {
     getSessionByPromptId,
     sessions,
@@ -177,6 +201,26 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     isEditMode,
     isEditVersionMode,
   } = useAgentStore();
+
+  // Compute session-scoped promptId for connector operations (same logic as ToolsHome)
+  const promptIdForConnectors = React.useMemo(() => {
+    if (!promptId) return undefined;
+    const session = getSessionByPromptId(promptId);
+    if ((isEditMode || isEditVersionMode) && session?.name) {
+      return session.name;
+    }
+    return promptId;
+  }, [promptId, getSessionByPromptId, isEditMode, isEditVersionMode]);
+
+  // Use session-scoped selectors for connector details (NOT global state)
+  // This ensures each agent session has its own connector details and prevents stale data
+  const fetchConnectorDetails = useConnectors((state) => state.fetchConnectorDetails);
+  const selectedConnectorDetails = useConnectors((state) =>
+    promptIdForConnectors ? state.connectorDetailsByPromptId[promptIdForConnectors] || null : state.selectedConnectorDetails
+  );
+  const isLoadingDetails = useConnectors((state) =>
+    promptIdForConnectors ? state.loadingDetailsByPromptId[promptIdForConnectors] || false : state.isLoadingDetails
+  );
   const { currentWorkflow, selectedProject } = useAddAgent();
 
   // Determine initial step - check if this is an OAuth callback for this connector
@@ -252,10 +296,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       // CRITICAL FIX: If this is an OAuth callback, ALWAYS try fetchOAuthTools first
       // because selectedConnectorDetails might not be loaded yet when this is called
       // after OAuth redirect. We know it's an OAuth connector since we came from OAuth flow.
-      const shouldFetchOAuthTools = isOAuthCallback || (authType && authType.toLowerCase() !== 'open');
+      // Call fetchOAuthTools ONLY when auth_type is specifically 'OAuth' (case-insensitive).
+      const shouldFetchOAuthTools = isOAuthCallback || authType?.toLowerCase() === 'oauth';
 
-      // If auth_type is "Open" or empty/undefined (and not OAuth callback), only call fetchTools
-      // If auth_type is "OAuth" or any other value (or is OAuth callback), call fetchOAuthTools
+      // If auth_type is NOT 'OAuth' (and not OAuth callback), only call regular fetchTools (GET /prompts/tools)
+      // If auth_type is specifically 'OAuth' (or is OAuth callback), call fetchOAuthTools (POST /prompts/oauth/fetch-tools)
       if (shouldFetchOAuthTools) {
         try {
           console.log('[ConnectorDetails] Calling fetchOAuthTools with:', {
@@ -341,6 +386,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   }, [promptId, connector.id, selectedConnectorDetails?.auth_type, getSessionByPromptId]);
 
   // Fetch connector details on mount (only if not already loaded)
+  // CRITICAL: Pass promptIdForConnectors to store in session-scoped state
   useEffect(() => {
     // Don't fetch if we already have the details for this connector
     if (selectedConnectorDetails && selectedConnectorDetails.id === connector.id) {
@@ -350,8 +396,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     if (isLoadingDetails) {
       return;
     }
-    fetchConnectorDetails(connector.id);
-  }, [connector.id, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
+    // Pass promptIdForConnectors to store in session-scoped state (not global)
+    fetchConnectorDetails(connector.id, promptIdForConnectors);
+  }, [connector.id, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails, promptIdForConnectors]);
 
   // Handle OAuth callback on mount
   useEffect(() => {
@@ -436,8 +483,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       } finally {
         // Clean up OAuth-specific URL params (always runs whether success or error)
         cleanupOAuthParams();
-
-        // Clear saved state
         clearOAuthState();
 
         setIsRegistering(false);
@@ -572,9 +617,10 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const handleContinue = async () => {
     // Validate required fields before continuing
     const credentialSchema = selectedConnectorDetails?.credential_schema || [];
-    const allRequiredFieldsFilled = credentialSchema
-      .filter(field => field.required)
-      .every(field => formData[field.field]);
+    const visibleRequiredFields = getVisibleFields(credentialSchema).filter(field => field.required);
+    const allRequiredFieldsFilled = visibleRequiredFields.every(field =>
+      isFieldValueValid(field.type, formData[field.field])
+    );
 
     if (!allRequiredFieldsFilled) {
       errorToast('Please fill in all required fields');
@@ -594,9 +640,37 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       // Format the credentials object based on the form data
       const credentials: Record<string, any> = {};
 
+      // Build a map of field types from credential_schema for proper formatting
+      const fieldTypeMap = new Map<string, string>();
+      credentialSchema.forEach(field => {
+        fieldTypeMap.set(field.field, field.type);
+      });
+
       for (const [key, value] of Object.entries(formData)) {
+        const fieldType = fieldTypeMap.get(key);
+
+        // Handle key-value-array fields - parse JSON string to array of {key, value} objects
+        if (fieldType === 'key-value-array') {
+          if (value) {
+            try {
+              const parsed = JSON.parse(value);
+              // Filter out empty pairs and ensure proper structure
+              if (Array.isArray(parsed)) {
+                const validPairs = parsed.filter(
+                  (pair: { key?: string; value?: string }) =>
+                    pair && (pair.key?.trim() || pair.value?.trim())
+                );
+                if (validPairs.length > 0) {
+                  credentials[key] = validPairs;
+                }
+              }
+            } catch {
+              // If parsing fails, skip this field
+            }
+          }
+        }
         // Convert comma-separated strings to arrays for specific fields
-        if (key === 'passthrough_headers' || key === 'scopes') {
+        else if (key === 'passthrough_headers' || key === 'scopes') {
           if (value) {
             credentials[key] = value.split(',').map(item => item.trim()).filter(Boolean);
           }
@@ -905,7 +979,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     return visibleFields
       .filter(field => field.required)
-      .every(field => formData[field.field]);
+      .every(field => isFieldValueValid(field.type, formData[field.field]));
   };
 
   // Render tool details view
