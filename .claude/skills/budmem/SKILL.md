@@ -56,7 +56,7 @@ Add a new learning to today's file.
 
 **Auto-detected metadata:**
 - **Category**: correction | pattern | preference | architecture | convention
-- **Service**: budapp | budadmin | budcluster | budsim | budgateway | general
+**Service**: budapp | budadmin | budcluster | budsim | budgateway | budmodel | budmetrics | budnotify | ask-bud | budeval | budplayground | budCustomer | general
 - **Tags**: Extract key terms from content
 
 ---
