@@ -279,9 +279,7 @@ class PromptDataManager(DataManagerUtils):
         if project_ids is not None:
             stmt = (
                 select(PromptModel)
-                .filter(
-                    and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE)
-                )
+                .filter(and_(PromptModel.project_id.in_(project_ids), PromptModel.status == PromptStatusEnum.ACTIVE))
                 .options(joinedload(PromptModel.default_version))
             )
         else:

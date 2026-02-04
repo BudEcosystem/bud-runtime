@@ -581,14 +581,16 @@ class PromptService(SessionMixin):
             redis_service = RedisService()
             # Include version in draft key (similar to regular prompts: prompt:{name}:v{version})
             draft_key = f"draft_prompt:{current_user_id}:{prompt_id}:v{version}"
-            draft_value = json.dumps({
-                "prompt_id": prompt_id,
-                "user_id": str(current_user_id),
-                "endpoint_id": endpoint_id,       # From endpoint lookup
-                "model_id": model_id,             # From endpoint lookup
-                "project_id": project_id,         # From endpoint lookup
-                "version": version,               # Dynamic version from budprompt response
-            })
+            draft_value = json.dumps(
+                {
+                    "prompt_id": prompt_id,
+                    "user_id": str(current_user_id),
+                    "endpoint_id": endpoint_id,  # From endpoint lookup
+                    "model_id": model_id,  # From endpoint lookup
+                    "project_id": project_id,  # From endpoint lookup
+                    "version": version,  # Dynamic version from budprompt response
+                }
+            )
             # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
             await redis_service.set(draft_key, draft_value, ex=app_settings.prompt_config_redis_ttl)
 

@@ -383,9 +383,7 @@ class PlaygroundService(SessionMixin):
             )
 
             # Get active prompts with ALL their versions for playground - matching endpoint filtering pattern
-            prompt_versions_data = await PromptDataManager(
-                self.session
-            ).get_all_active_prompt_versions_for_projects(
+            prompt_versions_data = await PromptDataManager(self.session).get_all_active_prompt_versions_for_projects(
                 project_ids=project_ids  # None for CLIENT (all prompts), list of IDs for ADMIN
             )
 
@@ -663,9 +661,9 @@ class PlaygroundService(SessionMixin):
                 search=False,
             )
 
-            prompt_versions_data = await PromptDataManager(
-                self.session
-            ).get_all_active_prompt_versions_for_projects(project_ids=project_ids)
+            prompt_versions_data = await PromptDataManager(self.session).get_all_active_prompt_versions_for_projects(
+                project_ids=project_ids
+            )
 
             # Step 8: Prepare cache data
             cache_data = {}
