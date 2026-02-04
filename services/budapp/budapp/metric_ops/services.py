@@ -42,12 +42,12 @@ from ..commons.constants import (
     ProjectStatusEnum,
     UserTypeEnum,
 )
+from ..credential_ops.models import Credential as CredentialModel
 from ..endpoint_ops.crud import AdapterDataManager, EndpointDataManager
 from ..endpoint_ops.models import Adapter as AdapterModel
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
-from ..credential_ops.models import Credential as CredentialModel
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..project_ops.services import ProjectService
