@@ -16,6 +16,8 @@ pub struct ApiKeyMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_version_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
@@ -320,6 +322,15 @@ pub async fn require_api_key(
             }
         }
 
+        // Add prompt_version_id header if present (for prompt-based requests)
+        if let Some(ref prompt_version_id) = metadata.prompt_version_id {
+            if let Ok(header_value) = prompt_version_id.parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-version-id", header_value);
+            }
+        }
+
         // Add auth metadata headers if available
         if let Some(auth_meta) = auth.get_auth_metadata(&key) {
             if let Some(api_key_id) = auth_meta.api_key_id {
@@ -365,8 +376,11 @@ pub async fn require_api_key(
             let baggage_data = BaggageData {
                 project_id: metadata.project_id.clone(),
                 prompt_id: metadata.prompt_id.clone(),
+                prompt_version_id: metadata.prompt_version_id.clone(),
                 endpoint_id: metadata.endpoint_id.clone(),
+                model_id: metadata.model_id.clone(),
                 api_key_id: auth_meta.as_ref().and_then(|m| m.api_key_id.clone()),
+                api_key_project_id: auth_meta.as_ref().and_then(|m| m.api_key_project_id.clone()),
                 user_id: auth_meta.as_ref().and_then(|m| m.user_id.clone()),
             };
 
@@ -379,11 +393,20 @@ pub async fn require_api_key(
                 if let Some(ref id) = baggage_data.prompt_id {
                     span.set_attribute(keys::PROMPT_ID, id.clone());
                 }
+                if let Some(ref id) = baggage_data.prompt_version_id {
+                    span.set_attribute(keys::PROMPT_VERSION_ID, id.clone());
+                }
                 if let Some(ref id) = baggage_data.endpoint_id {
                     span.set_attribute(keys::ENDPOINT_ID, id.clone());
                 }
+                if let Some(ref id) = baggage_data.model_id {
+                    span.set_attribute(keys::MODEL_ID, id.clone());
+                }
                 if let Some(ref id) = baggage_data.api_key_id {
                     span.set_attribute(keys::API_KEY_ID, id.clone());
+                }
+                if let Some(ref id) = baggage_data.api_key_project_id {
+                    span.set_attribute(keys::API_KEY_PROJECT_ID, id.clone());
                 }
                 if let Some(ref id) = baggage_data.user_id {
                     span.set_attribute(keys::USER_ID, id.clone());
