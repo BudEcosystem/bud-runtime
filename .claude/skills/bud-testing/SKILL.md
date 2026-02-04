@@ -124,7 +124,7 @@ Access services via their ingress URLs when available for integration testing.
 ```bash
 cd services/budadmin
 npm install
-npm run dev  # Starts on localhost:3000
+npm run dev  # Starts on localhost:3001
 ```
 
 ### UI Testing with Playwright
