@@ -1379,7 +1379,7 @@ impl ModelConfig {
         model_name: &str,
         clients: &InferenceClients<'_>,
         baggage: Option<&crate::baggage::BaggageData>,
-    ) -> Result<crate::responses::OpenAIResponse, Error> {
+    ) -> Result<crate::responses::ResponseWithRawData, Error> {
         let mut provider_errors: HashMap<String, Error> = HashMap::new();
         for provider_name in &self.routing {
             let provider = self.providers.get(provider_name).ok_or_else(|| {
@@ -2942,7 +2942,7 @@ impl ModelProvider {
         client: &Client,
         dynamic_api_keys: &InferenceCredentials,
         baggage: Option<&crate::baggage::BaggageData>,
-    ) -> Result<crate::responses::OpenAIResponse, Error> {
+    ) -> Result<crate::responses::ResponseWithRawData, Error> {
         use crate::responses::ResponseProvider;
 
         match &self.config {

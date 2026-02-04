@@ -340,17 +340,32 @@ class CredentialService(SessionMixin):
                 "project_id": str(deployment[0].project_id),
             }
 
-        # Get active prompts for the project
-        prompts, _ = await PromptDataManager(self.session).get_all_active_prompts_for_projects([project_id])
-        for prompt in prompts:
-            # For prompts, endpoint_id is the prompt id itself
-            # We don't have a direct model_id for prompts, so we'll use prompt_id as both
-            # NOTE: To allow prompt name same as other resources, Added a prefix 'prompt:'
-            prompt_key_name = f"prompt:{prompt.name}"
-            models[prompt_key_name] = {
-                "prompt_id": str(prompt.id),
-                "project_id": str(project_id),
-            }
+        # Get active prompts with ALL their versions for version-specific caching
+        # This enables the gateway to look up endpoint_id and model_id for each prompt version
+        prompt_versions_data = await PromptDataManager(self.session).get_all_active_prompt_versions_for_projects(
+            [project_id]
+        )
+        for prompt, versions in prompt_versions_data:
+            # Store each version with version-specific key
+            for version in versions:
+                versioned_key = f"prompt:{prompt.name}:v{version.version}"
+                is_default = prompt.default_version_id == version.id
+
+                version_data = {
+                    "prompt_id": str(prompt.id),
+                    "prompt_version_id": str(version.id),
+                    "endpoint_id": str(version.endpoint_id),
+                    "model_id": str(version.model_id),
+                    "project_id": str(project_id),
+                    "version": version.version,
+                }
+                models[versioned_key] = version_data
+
+                # Also store default version without version suffix for backward compatibility
+                # When a request doesn't specify a version, it should use the default
+                if is_default:
+                    default_key = f"prompt:{prompt.name}"
+                    models[default_key] = {**version_data, "is_default": True}
 
         redis_service = RedisService()
 

@@ -128,6 +128,33 @@ class RetrieveWorkflowStepData(BaseModel):
     supports_lora: bool | None = None
     supports_pipeline_parallelism: bool | None = None
 
+    # Guardrail model status fields (Step 4)
+    model_statuses: list[dict] | None = None
+    models_requiring_onboarding: int | None = None
+    models_requiring_deployment: int | None = None
+    models_reusable: int | None = None
+
+    # Skip logic
+    skip_to_step: int | None = None
+    credential_required: bool | None = None
+
+    # Onboarding events: {execution_id, status, results}
+    onboarding_events: dict | None = None
+    # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
+    simulation_events: dict | None = None
+    # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
+    deployment_events: dict | None = None
+    # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
+    pending_profile_data: dict | None = None
+
+    # Cluster recommendation results
+    recommended_clusters: list[dict] | None = None
+    per_model_deployment_configs: list[dict] | None = None  # Per-model configs
+
+    # Models categorization for deployment
+    models_to_deploy: list[dict] | None = None
+    models_to_reuse: list[dict] | None = None
+
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
     """Retrieve Workflow Data Response."""

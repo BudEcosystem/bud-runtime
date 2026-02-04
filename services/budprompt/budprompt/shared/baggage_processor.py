@@ -32,8 +32,11 @@ from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 BAGGAGE_KEYS = [
     "bud.project_id",
     "bud.prompt_id",
+    "bud.prompt_version_id",
     "bud.endpoint_id",
+    "bud.model_id",
     "bud.api_key_id",
+    "bud.api_key_project_id",
     "bud.user_id",
 ]
 

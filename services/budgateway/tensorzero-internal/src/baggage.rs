@@ -17,10 +17,16 @@ pub mod keys {
     pub const PROJECT_ID: &str = "bud.project_id";
     /// Prompt ID key for baggage
     pub const PROMPT_ID: &str = "bud.prompt_id";
+    /// Prompt version ID key for baggage
+    pub const PROMPT_VERSION_ID: &str = "bud.prompt_version_id";
     /// Endpoint ID key for baggage
     pub const ENDPOINT_ID: &str = "bud.endpoint_id";
+    /// Model ID key for baggage
+    pub const MODEL_ID: &str = "bud.model_id";
     /// API Key ID key for baggage
     pub const API_KEY_ID: &str = "bud.api_key_id";
+    /// API Key Project ID key for baggage (the project the API key belongs to)
+    pub const API_KEY_PROJECT_ID: &str = "bud.api_key_project_id";
     /// User ID key for baggage
     pub const USER_ID: &str = "bud.user_id";
     /// Marker indicating auth middleware has processed this request and set the correct endpoint_id.
@@ -40,18 +46,25 @@ pub mod keys {
 /// * `base_context` - The existing context (typically with trace propagation and possibly existing baggage)
 /// * `project_id` - Optional project identifier (overrides existing if Some)
 /// * `prompt_id` - Optional prompt identifier (overrides existing if Some)
+/// * `prompt_version_id` - Optional prompt version identifier (overrides existing if Some)
 /// * `endpoint_id` - Optional endpoint identifier (overrides existing if Some)
+/// * `model_id` - Optional model identifier (overrides existing if Some)
 /// * `api_key_id` - Optional API key identifier (overrides existing if Some)
+/// * `api_key_project_id` - Optional API key project identifier (overrides existing if Some)
 /// * `user_id` - Optional user identifier (overrides existing if Some)
 ///
 /// # Returns
 /// A new Context with merged baggage entries attached
+#[allow(clippy::too_many_arguments)]
 pub fn context_with_baggage(
     base_context: Context,
     project_id: Option<&str>,
     prompt_id: Option<&str>,
+    prompt_version_id: Option<&str>,
     endpoint_id: Option<&str>,
+    model_id: Option<&str>,
     api_key_id: Option<&str>,
+    api_key_project_id: Option<&str>,
     user_id: Option<&str>,
 ) -> Context {
     // Step 1: Read existing baggage from the base context
@@ -65,8 +78,11 @@ pub fn context_with_baggage(
         let will_override = match key_str {
             k if k == keys::PROJECT_ID => project_id.is_some(),
             k if k == keys::PROMPT_ID => prompt_id.is_some(),
+            k if k == keys::PROMPT_VERSION_ID => prompt_version_id.is_some(),
             k if k == keys::ENDPOINT_ID => endpoint_id.is_some(),
+            k if k == keys::MODEL_ID => model_id.is_some(),
             k if k == keys::API_KEY_ID => api_key_id.is_some(),
+            k if k == keys::API_KEY_PROJECT_ID => api_key_project_id.is_some(),
             k if k == keys::USER_ID => user_id.is_some(),
             // Always override AUTH_PROCESSED - we set it below
             k if k == keys::AUTH_PROCESSED => true,
@@ -84,11 +100,20 @@ pub fn context_with_baggage(
     if let Some(id) = prompt_id {
         baggage_items.push(KeyValue::new(keys::PROMPT_ID, id.to_string()));
     }
+    if let Some(id) = prompt_version_id {
+        baggage_items.push(KeyValue::new(keys::PROMPT_VERSION_ID, id.to_string()));
+    }
     if let Some(id) = endpoint_id {
         baggage_items.push(KeyValue::new(keys::ENDPOINT_ID, id.to_string()));
     }
+    if let Some(id) = model_id {
+        baggage_items.push(KeyValue::new(keys::MODEL_ID, id.to_string()));
+    }
     if let Some(id) = api_key_id {
         baggage_items.push(KeyValue::new(keys::API_KEY_ID, id.to_string()));
+    }
+    if let Some(id) = api_key_project_id {
+        baggage_items.push(KeyValue::new(keys::API_KEY_PROJECT_ID, id.to_string()));
     }
     if let Some(id) = user_id {
         baggage_items.push(KeyValue::new(keys::USER_ID, id.to_string()));
@@ -142,8 +167,11 @@ pub fn remove_auth_marker_from_context(ctx: Context) -> Context {
 pub struct BaggageData {
     pub project_id: Option<String>,
     pub prompt_id: Option<String>,
+    pub prompt_version_id: Option<String>,
     pub endpoint_id: Option<String>,
+    pub model_id: Option<String>,
     pub api_key_id: Option<String>,
+    pub api_key_project_id: Option<String>,
     pub user_id: Option<String>,
 }
 
@@ -159,12 +187,24 @@ impl BaggageData {
                 .get("x-tensorzero-prompt-id")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string()),
+            prompt_version_id: headers
+                .get("x-tensorzero-prompt-version-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
             endpoint_id: headers
                 .get("x-tensorzero-endpoint-id")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string()),
+            model_id: headers
+                .get("x-tensorzero-model-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
             api_key_id: headers
                 .get("x-tensorzero-api-key-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
+            api_key_project_id: headers
+                .get("x-tensorzero-api-key-project-id")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string()),
             user_id: headers
@@ -180,8 +220,11 @@ impl BaggageData {
             base_context,
             self.project_id.as_deref(),
             self.prompt_id.as_deref(),
+            self.prompt_version_id.as_deref(),
             self.endpoint_id.as_deref(),
+            self.model_id.as_deref(),
             self.api_key_id.as_deref(),
+            self.api_key_project_id.as_deref(),
             self.user_id.as_deref(),
         )
     }
@@ -190,8 +233,11 @@ impl BaggageData {
     pub fn has_data(&self) -> bool {
         self.project_id.is_some()
             || self.prompt_id.is_some()
+            || self.prompt_version_id.is_some()
             || self.endpoint_id.is_some()
+            || self.model_id.is_some()
             || self.api_key_id.is_some()
+            || self.api_key_project_id.is_some()
             || self.user_id.is_some()
     }
 }
@@ -218,8 +264,11 @@ mod tests {
             base_ctx,
             Some("proj-123"),
             Some("prompt-456"),
+            Some("version-1"),
             Some("endpoint-789"),
+            Some("model-abc"),
             Some("key-abc"),
+            Some("key-proj-def"),
             Some("user-xyz"),
         );
 
@@ -233,12 +282,24 @@ mod tests {
             Some("prompt-456")
         );
         assert_eq!(
+            baggage.get(keys::PROMPT_VERSION_ID).map(|v| v.as_str()),
+            Some("version-1")
+        );
+        assert_eq!(
             baggage.get(keys::ENDPOINT_ID).map(|v| v.as_str()),
             Some("endpoint-789")
         );
         assert_eq!(
+            baggage.get(keys::MODEL_ID).map(|v| v.as_str()),
+            Some("model-abc")
+        );
+        assert_eq!(
             baggage.get(keys::API_KEY_ID).map(|v| v.as_str()),
             Some("key-abc")
+        );
+        assert_eq!(
+            baggage.get(keys::API_KEY_PROJECT_ID).map(|v| v.as_str()),
+            Some("key-proj-def")
         );
         assert_eq!(
             baggage.get(keys::USER_ID).map(|v| v.as_str()),
@@ -249,7 +310,17 @@ mod tests {
     #[test]
     fn test_context_with_baggage_partial_values() {
         let base_ctx = Context::new();
-        let ctx = context_with_baggage(base_ctx, Some("proj-123"), None, None, None, None);
+        let ctx = context_with_baggage(
+            base_ctx,
+            Some("proj-123"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         let baggage = ctx.baggage();
         assert_eq!(
@@ -257,15 +328,18 @@ mod tests {
             Some("proj-123")
         );
         assert!(baggage.get(keys::PROMPT_ID).is_none());
+        assert!(baggage.get(keys::PROMPT_VERSION_ID).is_none());
         assert!(baggage.get(keys::ENDPOINT_ID).is_none());
+        assert!(baggage.get(keys::MODEL_ID).is_none());
         assert!(baggage.get(keys::API_KEY_ID).is_none());
+        assert!(baggage.get(keys::API_KEY_PROJECT_ID).is_none());
         assert!(baggage.get(keys::USER_ID).is_none());
     }
 
     #[test]
     fn test_context_with_baggage_no_values() {
         let base_ctx = Context::new();
-        let ctx = context_with_baggage(base_ctx.clone(), None, None, None, None, None);
+        let ctx = context_with_baggage(base_ctx.clone(), None, None, None, None, None, None, None, None);
 
         // Should return the same context when no values provided
         let baggage = ctx.baggage();
@@ -288,11 +362,14 @@ mod tests {
         // Call context_with_baggage with only project_id (prompt_id is None)
         let ctx = context_with_baggage(
             base_ctx,
-            Some("new-project"), // Override existing
-            None,                // Keep existing prompt_id
+            Some("new-project"),  // Override existing
+            None,                 // Keep existing prompt_id
+            None,                 // Not set
             Some("new-endpoint"), // Add new
-            None,                // Not set
-            None,                // Not set
+            None,                 // Not set
+            None,                 // Not set
+            None,                 // Not set
+            None,                 // Not set
         );
 
         let baggage = ctx.baggage();
@@ -327,16 +404,34 @@ mod tests {
         let mut headers = http::HeaderMap::new();
         headers.insert("x-tensorzero-project-id", "proj-123".parse().unwrap());
         headers.insert("x-tensorzero-prompt-id", "prompt-456".parse().unwrap());
+        headers.insert(
+            "x-tensorzero-prompt-version-id",
+            "version-1".parse().unwrap(),
+        );
         headers.insert("x-tensorzero-endpoint-id", "endpoint-789".parse().unwrap());
+        headers.insert("x-tensorzero-model-id", "model-abc".parse().unwrap());
         headers.insert("x-tensorzero-api-key-id", "key-abc".parse().unwrap());
+        headers.insert(
+            "x-tensorzero-api-key-project-id",
+            "key-proj-def".parse().unwrap(),
+        );
         headers.insert("x-tensorzero-user-id", "user-xyz".parse().unwrap());
 
         let baggage_data = BaggageData::from_headers(&headers);
 
         assert_eq!(baggage_data.project_id, Some("proj-123".to_string()));
         assert_eq!(baggage_data.prompt_id, Some("prompt-456".to_string()));
+        assert_eq!(
+            baggage_data.prompt_version_id,
+            Some("version-1".to_string())
+        );
         assert_eq!(baggage_data.endpoint_id, Some("endpoint-789".to_string()));
+        assert_eq!(baggage_data.model_id, Some("model-abc".to_string()));
         assert_eq!(baggage_data.api_key_id, Some("key-abc".to_string()));
+        assert_eq!(
+            baggage_data.api_key_project_id,
+            Some("key-proj-def".to_string())
+        );
         assert_eq!(baggage_data.user_id, Some("user-xyz".to_string()));
         assert!(baggage_data.has_data());
     }
@@ -348,8 +443,11 @@ mod tests {
 
         assert!(baggage_data.project_id.is_none());
         assert!(baggage_data.prompt_id.is_none());
+        assert!(baggage_data.prompt_version_id.is_none());
         assert!(baggage_data.endpoint_id.is_none());
+        assert!(baggage_data.model_id.is_none());
         assert!(baggage_data.api_key_id.is_none());
+        assert!(baggage_data.api_key_project_id.is_none());
         assert!(baggage_data.user_id.is_none());
         assert!(!baggage_data.has_data());
     }
@@ -359,8 +457,11 @@ mod tests {
         let baggage_data = BaggageData {
             project_id: Some("proj-123".to_string()),
             prompt_id: Some("prompt-456".to_string()),
+            prompt_version_id: None,
             endpoint_id: None,
+            model_id: None,
             api_key_id: None,
+            api_key_project_id: None,
             user_id: None,
         };
 

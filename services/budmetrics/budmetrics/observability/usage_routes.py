@@ -102,6 +102,7 @@ async def get_usage_summary(
             WHERE timestamp >= %(start_date)s
             AND timestamp <= %(end_date)s
             AND user_id = %(user_id)s
+            AND (prompt_id IS NULL OR prompt_id = '')
             """
             params["user_id"] = str(user_id)
 
@@ -121,6 +122,7 @@ async def get_usage_summary(
             FROM {table}
             WHERE time_bucket >= %(start_date)s
             AND time_bucket <= %(end_date)s
+            AND (prompt_id IS NULL OR prompt_id = '')
             """
 
             if project_id:
@@ -220,6 +222,7 @@ async def get_usage_history(
             WHERE timestamp >= %(start_date)s
             AND timestamp <= %(end_date)s
             AND user_id = %(user_id)s
+            AND (prompt_id IS NULL OR prompt_id = '')
             """
             params["user_id"] = str(user_id)
 
@@ -251,6 +254,7 @@ async def get_usage_history(
             FROM {table}
             WHERE time_bucket >= %(start_date)s
             AND time_bucket <= %(end_date)s
+            AND (prompt_id IS NULL OR prompt_id = '')
             """
 
             if project_id:
@@ -326,6 +330,7 @@ async def get_usage_by_project(
         WHERE user_id = %(user_id)s
         AND timestamp >= %(start_date)s
         AND timestamp <= %(end_date)s
+        AND (prompt_id IS NULL OR prompt_id = '')
         GROUP BY api_key_project_id
         ORDER BY total_cost DESC
         """
@@ -459,6 +464,7 @@ async def get_bulk_usage_summary(
         WHERE timestamp >= %(start_date)s
         AND timestamp <= %(end_date)s
         AND user_id IS NOT NULL
+        AND (prompt_id IS NULL OR prompt_id = '')
         """
 
         params = {

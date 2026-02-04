@@ -280,6 +280,39 @@ class PipelineDefinitionCRUD:
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
+    async def exists_by_name_for_user(
+        self,
+        name: str,
+        user_id: UUID | None,
+        exclude_id: UUID | None = None,
+    ) -> bool:
+        """Check if a pipeline with the given name already exists for the user.
+
+        Args:
+            name: Pipeline name to check.
+            user_id: User UUID to check within. If None, checks for system/anonymous pipelines.
+            exclude_id: Optional pipeline ID to exclude from the check (for updates).
+
+        Returns:
+            True if a pipeline with the name exists, False otherwise.
+        """
+        from sqlalchemy import and_
+
+        conditions = [PipelineDefinition.name == name]
+
+        if user_id is not None:
+            conditions.append(PipelineDefinition.user_id == user_id)
+        else:
+            conditions.append(PipelineDefinition.user_id.is_(None))
+
+        if exclude_id is not None:
+            conditions.append(PipelineDefinition.id != exclude_id)
+
+        stmt = select(func.count()).select_from(PipelineDefinition).where(and_(*conditions))
+        result = await self.session.execute(stmt)
+        count = result.scalar_one()
+        return count > 0
+
 
 class PipelineExecutionCRUD:
     """CRUD operations for PipelineExecution with optimistic locking."""

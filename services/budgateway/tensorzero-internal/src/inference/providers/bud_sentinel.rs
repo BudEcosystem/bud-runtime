@@ -112,13 +112,26 @@ impl BudSentinelProvider {
         request: &mut Request<T>,
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<(), Error> {
+        if let Some(bearer_token) = dynamic_api_keys.get("authorization") {
+            let value = MetadataValue::try_from(format!(
+                "Bearer {}",
+                bearer_token.expose_secret()
+            ))
+            .map_err(|e| {
+                Error::new(ErrorDetails::Config {
+                    message: format!("Invalid Bud Sentinel bearer token metadata value: {e}"),
+                })
+            })?;
+            request.metadata_mut().insert("authorization", value);
+        }
+
         if let Some(api_key) = self.credentials.get_api_key(dynamic_api_keys)? {
             let value = MetadataValue::try_from(api_key.expose_secret()).map_err(|e| {
                 Error::new(ErrorDetails::Config {
                     message: format!("Invalid Bud Sentinel API key metadata value: {e}"),
                 })
             })?;
-            request.metadata_mut().insert("x-api-key", value);
+            request.metadata_mut().insert("x-api-token", value);
         }
 
         request.metadata_mut().insert(
@@ -258,7 +271,7 @@ impl TryFrom<Credential> for BudSentinelCredentials {
         match credentials {
             Credential::Static(key) => Ok(BudSentinelCredentials::Static(key)),
             Credential::Dynamic(key_name) => Ok(BudSentinelCredentials::Dynamic(key_name)),
-            Credential::Missing => Ok(BudSentinelCredentials::None),
+            Credential::Missing | Credential::None => Ok(BudSentinelCredentials::None),
             _ => Err(Error::new(ErrorDetails::Config {
                 message: "Invalid api_key_location for Bud Sentinel provider".to_string(),
             })),
@@ -347,8 +360,13 @@ fn map_categories(categories: &HashMap<String, bool>) -> ModerationCategories {
     mapped
 }
 
-fn map_scores(scores: &HashMap<String, f64>) -> ModerationCategoryScores {
+fn map_scores_with_other_categories(
+    scores: &HashMap<String, f64>,
+) -> (ModerationCategoryScores, HashMap<String, f32>, f32) {
     let mut mapped = ModerationCategoryScores::default();
+    let mut other_categories = HashMap::new();
+    let mut other_score = 0.0_f32;
+
     for (key, value) in scores {
         let v = *value as f32;
         match key.as_str() {
@@ -373,15 +391,24 @@ fn map_scores(scores: &HashMap<String, f64>) -> ModerationCategoryScores {
             "malicious" => mapped.malicious = v,
             "pii" => mapped.pii = v,
             "secrets" => mapped.secrets = v,
-            _ => {}
+            _ => {
+                other_categories.insert(key.clone(), v);
+                if v > other_score {
+                    other_score = v;
+                }
+            }
         }
     }
-    mapped
+
+    mapped.other = other_score;
+    (mapped, other_categories, other_score)
 }
 
 fn map_result(result: &BudModerationResult) -> ModerationResult {
-    let categories = map_categories(&result.categories);
-    let scores = map_scores(&result.category_scores);
+    let mut categories = map_categories(&result.categories);
+    let (scores, other_categories, _other_score) =
+        map_scores_with_other_categories(&result.category_scores);
+    categories.other = !other_categories.is_empty();
 
     ModerationResult {
         flagged: result.flagged,
@@ -390,6 +417,7 @@ fn map_result(result: &BudModerationResult) -> ModerationResult {
         category_applied_input_types: None,
         hallucination_details: None,
         ip_violation_details: None,
+        other_categories,
     }
 }
 
@@ -432,6 +460,7 @@ impl ModerationProvider for BudSentinelProvider {
         let mut grpc_request = Request::new(BudModerationRequest {
             profile_id: profile_id.clone(),
             inputs: inputs.clone(),
+            conversations: Vec::new(),
             severity_threshold,
         });
 
@@ -498,5 +527,32 @@ impl ModerationProvider for BudSentinelProvider {
         };
 
         Ok(provider_response)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{map_result, BudModerationResult};
+    use std::collections::HashMap;
+
+    #[test]
+    fn bud_sentinel_maps_other_categories() {
+        let mut categories = HashMap::new();
+        categories.insert("high_risk_spam".to_string(), true);
+
+        let mut scores = HashMap::new();
+        scores.insert("high_risk_spam".to_string(), 1.0);
+
+        let result = BudModerationResult {
+            flagged: true,
+            categories,
+            category_scores: scores,
+            ..Default::default()
+        };
+
+        let mapped = map_result(&result);
+        assert_eq!(mapped.other_categories.get("high_risk_spam"), Some(&1.0));
+        assert!((mapped.category_scores.other - 1.0).abs() < 1e-6);
+        assert!(mapped.categories.other);
     }
 }

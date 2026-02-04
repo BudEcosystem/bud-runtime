@@ -1244,6 +1244,15 @@ class ClickHouseMigration:
             action_taken LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
             blocked_at Nullable(DateTime64(3)) CODEC(Delta, ZSTD(1)),
 
+            -- ===== PROMPT ANALYTICS (for /v1/responses) =====
+            prompt_id Nullable(String) CODEC(ZSTD(1)),  -- Internal prompt ID from bud.prompt_id (can be UUID or string)
+            client_prompt_id Nullable(String) CODEC(ZSTD(1)),  -- Client-provided prompt ID from gen_ai.prompt.id
+            prompt_version Nullable(String) CODEC(ZSTD(1)),  -- Client-provided version string from gen_ai.prompt.version
+            prompt_version_id Nullable(UUID) CODEC(ZSTD(1)),  -- Internal UUID from bud.prompt_version_id
+            prompt_variables Nullable(String) CODEC(ZSTD(3)),
+            response_id Nullable(String) CODEC(ZSTD(1)),
+            response_status LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
+
             -- ===== AUDIO ENDPOINT DATA (from audio_inference.* attributes) =====
             audio_duration_seconds Nullable(Float32) CODEC(Gorilla, ZSTD(1)),
             audio_language LowCardinality(Nullable(String)) CODEC(ZSTD(1)),
@@ -1274,7 +1283,7 @@ class ClickHouseMigration:
         )
         ENGINE = ReplacingMergeTree(timestamp)
         PARTITION BY toYYYYMMDD(timestamp)
-        ORDER BY (trace_id)
+        ORDER BY (trace_id, span_id)
         TTL toDateTime(timestamp) + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1316,6 +1325,10 @@ class ClickHouseMigration:
                 "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_rule_id (rule_id) TYPE bloom_filter(0.01) GRANULARITY 4",
                 "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_rule_type (rule_type) TYPE set(20) GRANULARITY 4",
                 "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_action_taken (action_taken) TYPE set(10) GRANULARITY 4",
+                # Prompt analytics
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_prompt_id (prompt_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_client_prompt_id (client_prompt_id) TYPE bloom_filter(0.01) GRANULARITY 4",
+                "ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS idx_response_status (response_status) TYPE set(10) GRANULARITY 4",
             ]
 
             for index_query in indexes:
@@ -1361,7 +1374,7 @@ class ClickHouseMigration:
             -- ===== OTel TRACE IDENTIFIERS =====
             generateUUIDv4() AS id,
             g.TraceId AS trace_id,
-            COALESCE(h.SpanId, g.SpanId) AS span_id,
+            COALESCE(nullIf(h.SpanId, ''), g.SpanId) AS span_id,
 
             -- ===== CORE IDENTIFIERS (prefer handler, fallback to gateway) =====
             -- inference_id: check model_inference_details, classify_inference (strip infinity- prefix), then gateway
@@ -1591,12 +1604,22 @@ class ClickHouseMigration:
         LEFT JOIN metrics.otel_traces h
             ON g.TraceId = h.TraceId
             AND h.SpanName LIKE '%%_handler_observability'
+            AND h.SpanName != 'response_create_handler_observability'
+            AND (
+                -- Precise match when both have inference_id (multi-inference traces)
+                g.SpanAttributes['gateway_analytics.inference_id'] = h.SpanAttributes['model_inference_details.inference_id']
+                OR
+                -- Fallback for handlers without inference_id (single-inference traces)
+                h.SpanAttributes['model_inference_details.inference_id'] = ''
+            )
         WHERE g.SpanName = 'gateway_analytics'
           AND g.SpanAttributes['gateway_analytics.path'] LIKE '/v1/%%'
           -- Exclude administrative endpoints (no inference)
           AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/files%%'
           AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/batches%%'
           AND g.SpanAttributes['gateway_analytics.path'] NOT LIKE '/v1/models%%'
+          -- Exclude /v1/responses (handled by mv_otel_response_to_inference_fact)
+          AND g.SpanAttributes['gateway_analytics.path'] != '/v1/responses'
         """
 
         try:
@@ -1836,6 +1859,13 @@ class ClickHouseMigration:
         LEFT JOIN metrics.otel_traces g
             ON h.TraceId = g.TraceId
             AND g.SpanName = 'gateway_analytics'
+            AND (
+                -- Precise match when both have inference_id (multi-inference traces)
+                g.SpanAttributes['gateway_analytics.inference_id'] = h.SpanAttributes['model_inference_details.inference_id']
+                OR
+                -- Fallback for handlers without inference_id (single-inference traces)
+                h.SpanAttributes['model_inference_details.inference_id'] = ''
+            )
         WHERE h.SpanName LIKE '%%_handler_observability'
         """
 
@@ -1873,6 +1903,9 @@ class ClickHouseMigration:
             model_id Nullable(UUID) CODEC(ZSTD(1)),
             api_key_project_id Nullable(UUID) CODEC(ZSTD(1)),
 
+            -- Prompt dimension (for filtering by prompt)
+            prompt_id Nullable(String) CODEC(ZSTD(1)),
+
             -- String dimensions (for grouping)
             model_name LowCardinality(String) CODEC(ZSTD(1)),
             model_provider LowCardinality(String) CODEC(ZSTD(1)),
@@ -1905,6 +1938,9 @@ class ClickHouseMigration:
             unique_episodes AggregateFunction(uniq, Nullable(UUID)),
             unique_api_keys AggregateFunction(uniq, Nullable(UUID)),
 
+            -- Prompt analytics aggregate
+            unique_prompts AggregateFunction(uniq, Nullable(String)),
+
             -- Blocking metrics
             block_count UInt64 DEFAULT 0 CODEC(Delta, ZSTD(1)),
             unique_blocked_ips AggregateFunction(uniq, IPv4)
@@ -1922,7 +1958,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1939,7 +1975,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -1956,7 +1992,7 @@ class ClickHouseMigration:
              sum_response_time_ms, sum_ttft_ms)
         )
         PARTITION BY toYYYYMM(time_bucket)
-        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, time_bucket, is_success, country_code)
+        ORDER BY (project_id, endpoint_id, model_id, api_key_project_id, prompt_id, time_bucket, is_success, country_code)
         TTL time_bucket + INTERVAL 90 DAY
         SETTINGS index_granularity = 8192, allow_nullable_key = 1
         """
@@ -2018,6 +2054,9 @@ class ClickHouseMigration:
             model_id,
             api_key_project_id,
 
+            -- Prompt dimension
+            prompt_id,
+
             -- String dimensions
             model_name,
             model_provider,
@@ -2050,6 +2089,9 @@ class ClickHouseMigration:
             uniqState(episode_id) AS unique_episodes,
             uniqState(api_key_id) AS unique_api_keys,
 
+            -- Prompt analytics aggregate
+            uniqState(prompt_id) AS unique_prompts,
+
             -- Blocking metrics
             countIf(is_blocked = true) AS block_count,
             uniqStateIf(client_ip, is_blocked = true) AS unique_blocked_ips
@@ -2057,7 +2099,7 @@ class ClickHouseMigration:
         FROM InferenceFact
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id,
+            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2073,6 +2115,9 @@ class ClickHouseMigration:
             model_id,
             api_key_project_id,
 
+            -- Prompt dimension
+            prompt_id,
+
             -- String dimensions
             model_name,
             model_provider,
@@ -2105,6 +2150,9 @@ class ClickHouseMigration:
             uniqMergeState(unique_episodes) AS unique_episodes,
             uniqMergeState(unique_api_keys) AS unique_api_keys,
 
+            -- Prompt analytics aggregate
+            uniqMergeState(unique_prompts) AS unique_prompts,
+
             -- Blocking metrics
             sum(block_count) AS block_count,
             uniqMergeState(unique_blocked_ips) AS unique_blocked_ips
@@ -2112,7 +2160,7 @@ class ClickHouseMigration:
         FROM InferenceMetrics5m
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id,
+            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2128,6 +2176,9 @@ class ClickHouseMigration:
             model_id,
             api_key_project_id,
 
+            -- Prompt dimension
+            prompt_id,
+
             -- String dimensions
             model_name,
             model_provider,
@@ -2160,6 +2211,9 @@ class ClickHouseMigration:
             uniqMergeState(unique_episodes) AS unique_episodes,
             uniqMergeState(unique_api_keys) AS unique_api_keys,
 
+            -- Prompt analytics aggregate
+            uniqMergeState(unique_prompts) AS unique_prompts,
+
             -- Blocking metrics
             sum(block_count) AS block_count,
             uniqMergeState(unique_blocked_ips) AS unique_blocked_ips
@@ -2167,7 +2221,7 @@ class ClickHouseMigration:
         FROM InferenceMetrics1h
         GROUP BY
             time_bucket,
-            project_id, endpoint_id, model_id, api_key_project_id,
+            project_id, endpoint_id, model_id, api_key_project_id, prompt_id,
             model_name, model_provider, endpoint_type, is_success, country_code
         """
 
@@ -2558,6 +2612,90 @@ class ClickHouseMigration:
 
         logger.info("Endpoint-specific columns migration to InferenceFact completed successfully")
 
+    async def add_prompt_analytics_columns(self):
+        """Add prompt analytics columns to existing InferenceFact table.
+
+        These columns capture prompt-specific data from response_create_handler_observability spans
+        for /v1/responses API requests:
+        - prompt_id: UUID of the prompt template
+        - prompt_version: Version string of the prompt
+        - prompt_variables: JSON string of variable substitutions
+        - response_id: Response identifier from gen_ai.response.id
+        - response_status: Status: completed/failed/in_progress
+        """
+        logger.info("Adding prompt analytics columns to InferenceFact table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceFact")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceFact table does not exist. Skipping prompt analytics columns migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if InferenceFact table exists: {e}")
+            return
+
+        # Define the columns to add with their types and codecs
+        columns_to_add = [
+            (
+                "prompt_id",
+                "Nullable(String) CODEC(ZSTD(1))",
+            ),  # Internal prompt ID from bud.prompt_id (can be UUID or string)
+            ("client_prompt_id", "Nullable(String) CODEC(ZSTD(1))"),  # Client-provided prompt ID from gen_ai.prompt.id
+            ("prompt_version", "Nullable(String) CODEC(ZSTD(1))"),  # Client-provided version string
+            ("prompt_version_id", "Nullable(UUID) CODEC(ZSTD(1))"),  # Internal UUID from bud.prompt_version_id
+            ("prompt_variables", "Nullable(String) CODEC(ZSTD(3))"),
+            ("response_id", "Nullable(String) CODEC(ZSTD(1))"),
+            ("response_status", "LowCardinality(Nullable(String)) CODEC(ZSTD(1))"),
+        ]
+
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column already exists
+                check_column_query = f"""
+                SELECT COUNT(*)
+                FROM system.columns
+                WHERE table = 'InferenceFact'
+                  AND database = currentDatabase()
+                  AND name = '{column_name}'
+                """
+                result = await self.client.execute_query(check_column_query)
+                column_exists = result[0][0] > 0 if result else False
+
+                if not column_exists:
+                    alter_query = f"""
+                    ALTER TABLE InferenceFact
+                    ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                    """
+                    await self.client.execute_query(alter_query)
+                    logger.info(f"Added column {column_name} to InferenceFact table")
+                else:
+                    logger.debug(f"Column {column_name} already exists in InferenceFact table")
+
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    logger.debug(f"Column {column_name} already exists")
+                else:
+                    logger.error(f"Error adding column {column_name}: {e}")
+
+        # Add indexes for prompt analytics columns
+        indexes = [
+            ("idx_prompt_id", "prompt_id", "bloom_filter(0.01)", 4),
+            ("idx_client_prompt_id", "client_prompt_id", "bloom_filter(0.01)", 4),
+            ("idx_response_status", "response_status", "set(10)", 4),
+        ]
+
+        for index_name, column, index_type, granularity in indexes:
+            index_query = f"ALTER TABLE InferenceFact ADD INDEX IF NOT EXISTS {index_name} ({column}) TYPE {index_type} GRANULARITY {granularity}"
+            try:
+                await self.client.execute_query(index_query)
+                logger.debug(f"Index {index_name} created or already exists")
+            except Exception as e:
+                if "already exists" not in str(e).lower():
+                    logger.warning(f"Index creation warning for {index_name}: {e}")
+
+        logger.info("Prompt analytics columns migration to InferenceFact completed successfully")
+
     async def create_mv_otel_blocking_to_inference_fact(self):
         """Create Materialized View for blocked-only requests to InferenceFact.
 
@@ -2746,6 +2884,197 @@ class ClickHouseMigration:
             logger.error(f"Error creating mv_otel_blocking_to_inference_fact: {e}")
             raise
 
+    async def create_mv_otel_response_to_inference_fact(self):
+        """Create Materialized View to transform response_create_handler_observability spans to InferenceFact.
+
+        This MV captures /v1/responses (prompt analytics) data:
+        - response_create_handler_observability span: gen_ai.* attributes for prompt/response data
+        - gateway_analytics span: gateway_analytics.* attributes (via LEFT JOIN on path=/v1/responses)
+
+        Uses path-based filtering to match the correct gateway_analytics span for /v1/responses.
+        The endpoint_type is set to 'response' to differentiate from 'chat' and 'blocked' entries.
+        """
+        logger.info("Creating mv_otel_response_to_inference_fact materialized view...")
+
+        # First drop existing view if it exists to ensure clean state
+        try:
+            await self.client.execute_query("DROP VIEW IF EXISTS mv_otel_response_to_inference_fact")
+            logger.info("Dropped existing mv_otel_response_to_inference_fact (if any)")
+        except Exception as e:
+            logger.warning(f"Could not drop existing view: {e}")
+
+        query = """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_otel_response_to_inference_fact TO InferenceFact AS
+        SELECT
+            -- ===== OTel TRACE IDENTIFIERS =====
+            generateUUIDv4() AS id,
+            r.TraceId AS trace_id,
+            r.SpanId AS span_id,
+
+            -- ===== CORE IDENTIFIERS (from baggage) =====
+            toUUIDOrNull(nullIf(r.SpanAttributes['gen_ai.inference_id'], '')) AS inference_id,
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.project_id'], '')) AS project_id,
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.endpoint_id'], '')) AS endpoint_id,
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.model_id'], '')) AS model_id,  -- Model ID from baggage
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.api_key_id'], '')) AS api_key_id,
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.api_key_project_id'], '')) AS api_key_project_id,
+            nullIf(r.SpanAttributes['bud.user_id'], '') AS user_id,
+
+            -- ===== TIMESTAMPS =====
+            toDateTime64(r.Timestamp, 3) AS timestamp,
+            parseDateTime64BestEffortOrNull(r.SpanAttributes['gen_ai.request_arrival_time']) AS request_arrival_time,
+            parseDateTime64BestEffortOrNull(r.SpanAttributes['gen_ai.request_forward_time']) AS request_forward_time,
+
+            -- ===== STATUS & COST =====
+            -- is_success: false if error fields are present OR response status is failed
+            if(
+                r.SpanAttributes['error.type'] != '' OR r.SpanAttributes['error.message'] != '' OR r.SpanAttributes['gen_ai.response.status'] = 'failed',
+                false,
+                true
+            ) AS is_success,
+            CAST(NULL AS Nullable(Float64)) AS cost,  -- Cost calculated separately if needed
+            toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code']) AS status_code,
+            toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip']) AS request_ip,
+            CAST(NULL AS Nullable(String)) AS response_analysis,
+
+            -- ===== ERROR TRACKING =====
+            nullIf(r.SpanAttributes['error.type'], '') AS error_code,
+            nullIf(r.SpanAttributes['error.message'], '') AS error_message,
+            nullIf(r.SpanAttributes['error.type'], '') AS error_type,
+
+            -- ===== MODEL INFO =====
+            CAST(NULL AS Nullable(UUID)) AS model_inference_id,
+            coalesce(nullIf(r.SpanAttributes['bud.model_id'], ''), '') AS model_name,
+            'budprompt' AS model_provider,  -- Always budprompt for /v1/responses
+            'response' AS endpoint_type,  -- Differentiate from 'chat'
+
+            -- ===== PERFORMANCE METRICS =====
+            toUInt32OrNull(r.SpanAttributes['gen_ai.usage.input_tokens']) AS input_tokens,
+            toUInt32OrNull(r.SpanAttributes['gen_ai.usage.output_tokens']) AS output_tokens,
+            toUInt32OrNull(r.SpanAttributes['gen_ai.response_time_ms']) AS response_time_ms,  -- Uses provider latency from span attribute
+            toUInt32OrNull(r.SpanAttributes['gen_ai.ttft_ms']) AS ttft_ms,  -- TTFT for streaming responses
+            false AS cached,
+            CAST(NULL AS Nullable(String)) AS finish_reason,
+
+            -- ===== CONTENT =====
+            nullIf(r.SpanAttributes['gen_ai.system.instructions'], '') AS system_prompt,
+            nullIf(r.SpanAttributes['gen_ai.input.messages'], '') AS input_messages,
+            nullIf(r.SpanAttributes['gen_ai.output.messages'], '') AS output,
+            nullIf(r.SpanAttributes['gen_ai.raw_request'], '') AS raw_request,
+            nullIf(r.SpanAttributes['gen_ai.raw_response'], '') AS raw_response,
+            nullIf(r.SpanAttributes['gen_ai.gateway_request'], '') AS gateway_request,
+            nullIf(r.SpanAttributes['gen_ai.gateway_response'], '') AS gateway_response,
+            CAST(NULL AS Nullable(String)) AS guardrail_scan_summary,
+            CAST(NULL AS Nullable(UInt64)) AS model_inference_timestamp,
+
+            -- ===== CHAT INFERENCE (not applicable for /v1/responses) =====
+            CAST(NULL AS Nullable(UUID)) AS chat_inference_id,
+            CAST(NULL AS Nullable(UUID)) AS episode_id,
+            CAST(NULL AS Nullable(String)) AS function_name,
+            CAST(NULL AS Nullable(String)) AS variant_name,
+            toUInt32OrNull(r.SpanAttributes['gen_ai.processing_time_ms']) AS processing_time_ms,
+            CAST(NULL AS Nullable(String)) AS chat_input,
+            CAST(NULL AS Nullable(String)) AS chat_output,
+            CAST(NULL AS Nullable(String)) AS tags,
+            -- Build inference_params from gen_ai.request.* attributes
+            if(
+                r.SpanAttributes['gen_ai.request.temperature'] != '' OR r.SpanAttributes['gen_ai.request.max_tokens'] != '',
+                concat(
+                    '{',
+                    if(r.SpanAttributes['gen_ai.request.temperature'] != '', concat('"temperature":', r.SpanAttributes['gen_ai.request.temperature']), ''),
+                    if(r.SpanAttributes['gen_ai.request.temperature'] != '' AND r.SpanAttributes['gen_ai.request.max_tokens'] != '', ',', ''),
+                    if(r.SpanAttributes['gen_ai.request.max_tokens'] != '', concat('"max_tokens":', r.SpanAttributes['gen_ai.request.max_tokens']), ''),
+                    '}'
+                ),
+                CAST(NULL AS Nullable(String))
+            ) AS inference_params,
+            CAST(NULL AS Nullable(String)) AS extra_body,
+            nullIf(r.SpanAttributes['gen_ai.request.tools'], '') AS tool_params,
+
+            -- ===== GATEWAY ANALYTICS (from gateway_analytics.* span via LEFT JOIN) =====
+            -- Geographic
+            nullIf(g.SpanAttributes['gateway_analytics.country_code'], '') AS country_code,
+            nullIf(g.SpanAttributes['gateway_analytics.country_name'], '') AS country_name,
+            nullIf(g.SpanAttributes['gateway_analytics.region'], '') AS region,
+            nullIf(g.SpanAttributes['gateway_analytics.city'], '') AS city,
+            toFloat32OrNull(g.SpanAttributes['gateway_analytics.latitude']) AS latitude,
+            toFloat32OrNull(g.SpanAttributes['gateway_analytics.longitude']) AS longitude,
+            nullIf(g.SpanAttributes['gateway_analytics.timezone'], '') AS timezone,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.asn']) AS asn,
+            nullIf(g.SpanAttributes['gateway_analytics.isp'], '') AS isp,
+
+            -- Client metadata
+            toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip']) AS client_ip,
+            nullIf(g.SpanAttributes['gateway_analytics.user_agent'], '') AS user_agent,
+            nullIf(g.SpanAttributes['gateway_analytics.device_type'], '') AS device_type,
+            nullIf(g.SpanAttributes['gateway_analytics.browser_name'], '') AS browser_name,
+            nullIf(g.SpanAttributes['gateway_analytics.browser_version'], '') AS browser_version,
+            nullIf(g.SpanAttributes['gateway_analytics.os_name'], '') AS os_name,
+            nullIf(g.SpanAttributes['gateway_analytics.os_version'], '') AS os_version,
+            g.SpanAttributes['gateway_analytics.is_bot'] = 'true' AS is_bot,
+
+            -- Request context
+            nullIf(g.SpanAttributes['gateway_analytics.method'], '') AS method,
+            nullIf(g.SpanAttributes['gateway_analytics.path'], '') AS path,
+            nullIf(g.SpanAttributes['gateway_analytics.query_params'], '') AS query_params,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.body_size']) AS body_size,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.response_size']) AS response_size,
+            nullIf(g.SpanAttributes['gateway_analytics.protocol_version'], '') AS protocol_version,
+
+            -- Performance
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.gateway_processing_ms']) AS gateway_processing_ms,
+            toUInt32OrNull(g.SpanAttributes['gateway_analytics.total_duration_ms']) AS total_duration_ms,
+
+            -- Routing & blocking
+            nullIf(g.SpanAttributes['gateway_analytics.model_version'], '') AS model_version,
+            nullIf(g.SpanAttributes['gateway_analytics.routing_decision'], '') AS routing_decision,
+            g.SpanAttributes['gateway_analytics.is_blocked'] = 'true' AS is_blocked,
+            nullIf(g.SpanAttributes['gateway_analytics.block_reason'], '') AS block_reason,
+            nullIf(g.SpanAttributes['gateway_analytics.block_rule_id'], '') AS block_rule_id,
+            nullIf(g.SpanAttributes['gateway_analytics.proxy_chain'], '') AS proxy_chain,
+
+            -- Headers & timestamps
+            nullIf(g.SpanAttributes['gateway_analytics.request_headers'], '') AS request_headers,
+            nullIf(g.SpanAttributes['gateway_analytics.response_headers'], '') AS response_headers,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.request_timestamp']) AS request_timestamp,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_analytics.response_timestamp']) AS response_timestamp,
+            nullIf(g.SpanAttributes['gateway_analytics.tags'], '') AS gateway_tags,
+
+            -- ===== BLOCKING EVENT DATA (from gateway_blocking_events.*) =====
+            toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.id'], '')) AS blocking_event_id,
+            toUUIDOrNull(nullIf(g.SpanAttributes['gateway_blocking_events.rule_id'], '')) AS rule_id,
+            nullIf(g.SpanAttributes['gateway_blocking_events.rule_type'], '') AS rule_type,
+            nullIf(g.SpanAttributes['gateway_blocking_events.rule_name'], '') AS rule_name,
+            toInt32OrNull(g.SpanAttributes['gateway_blocking_events.rule_priority']) AS rule_priority,
+            nullIf(g.SpanAttributes['gateway_blocking_events.block_reason'], '') AS block_reason_detail,
+            nullIf(g.SpanAttributes['gateway_blocking_events.action_taken'], '') AS action_taken,
+            parseDateTime64BestEffortOrNull(g.SpanAttributes['gateway_blocking_events.blocked_at']) AS blocked_at,
+
+            -- ===== PROMPT ANALYTICS COLUMNS =====
+            nullIf(r.SpanAttributes['bud.prompt_id'], '') AS prompt_id,  -- Internal prompt ID (UUID or string)
+            nullIf(r.SpanAttributes['gen_ai.prompt.id'], '') AS client_prompt_id,  -- Client-provided prompt ID
+            nullIf(r.SpanAttributes['gen_ai.prompt.version'], '') AS prompt_version,  -- Client version string
+            toUUIDOrNull(nullIf(r.SpanAttributes['bud.prompt_version_id'], '')) AS prompt_version_id,  -- Internal UUID
+            nullIf(r.SpanAttributes['gen_ai.prompt.variables'], '') AS prompt_variables,
+            nullIf(r.SpanAttributes['gen_ai.response.id'], '') AS response_id,
+            nullIf(r.SpanAttributes['gen_ai.response.status'], '') AS response_status
+
+        FROM otel_traces r
+        LEFT JOIN otel_traces g
+            ON r.TraceId = g.TraceId
+            AND g.SpanName = 'gateway_analytics'
+            AND g.SpanAttributes['gateway_analytics.path'] = '/v1/responses'
+        WHERE r.SpanName = 'response_create_handler_observability'
+          AND r.SpanAttributes['bud.project_id'] != ''
+        """
+
+        try:
+            await self.client.execute_query(query)
+            logger.info("mv_otel_response_to_inference_fact materialized view created successfully")
+        except Exception as e:
+            logger.error(f"Error creating mv_otel_response_to_inference_fact: {e}")
+            raise
+
     async def add_blocking_metrics_to_rollup_tables(self):
         """Add blocking metrics columns to InferenceMetrics rollup tables.
 
@@ -2807,6 +3136,82 @@ class ClickHouseMigration:
                 logger.error(f"Error adding blocking metrics to {table_name}: {e}")
 
         logger.info("Blocking metrics columns migration to rollup tables completed successfully")
+
+    async def add_prompt_analytics_to_rollup_tables(self):
+        """Add prompt analytics columns to InferenceMetrics rollup tables.
+
+        This migration adds prompt_id dimension and unique_prompts aggregate to:
+        - InferenceMetrics5m
+        - InferenceMetrics1h
+        - InferenceMetrics1d
+
+        These columns enable efficient querying of prompt-specific analytics for /v1/responses.
+        """
+        logger.info("Adding prompt analytics columns to rollup tables...")
+
+        tables = ["InferenceMetrics5m", "InferenceMetrics1h", "InferenceMetrics1d"]
+
+        for table_name in tables:
+            try:
+                # Check if table exists
+                table_exists = await self.client.execute_query(f"EXISTS TABLE {table_name}")
+                if not table_exists or not table_exists[0][0]:
+                    logger.info(f"{table_name} table does not exist. Skipping prompt analytics migration.")
+                    continue
+
+                # Define columns to add
+                columns_to_add = [
+                    ("prompt_id", "Nullable(String) CODEC(ZSTD(1))"),
+                    ("unique_prompts", "AggregateFunction(uniq, Nullable(String))"),
+                ]
+
+                for column_name, column_type in columns_to_add:
+                    try:
+                        # Check if column already exists
+                        check_column_query = f"""
+                        SELECT COUNT(*)
+                        FROM system.columns
+                        WHERE table = '{table_name}'
+                          AND database = currentDatabase()
+                          AND name = '{column_name}'
+                        """
+                        result = await self.client.execute_query(check_column_query)
+                        column_exists = result[0][0] > 0 if result else False
+
+                        if not column_exists:
+                            alter_query = f"""
+                            ALTER TABLE {table_name}
+                            ADD COLUMN IF NOT EXISTS {column_name} {column_type}
+                            """
+                            await self.client.execute_query(alter_query)
+                            logger.info(f"Added column {column_name} to {table_name} table")
+                        else:
+                            logger.debug(f"Column {column_name} already exists in {table_name} table")
+
+                    except Exception as e:
+                        if "already exists" in str(e).lower():
+                            logger.debug(f"Column {column_name} already exists in {table_name}")
+                        else:
+                            logger.error(f"Error adding column {column_name} to {table_name}: {e}")
+
+                # Add bloom filter index for prompt_id
+                try:
+                    index_query = f"""
+                    ALTER TABLE {table_name}
+                    ADD INDEX IF NOT EXISTS idx_prompt_id (prompt_id) TYPE bloom_filter(0.01) GRANULARITY 4
+                    """
+                    await self.client.execute_query(index_query)
+                    logger.info(f"Added idx_prompt_id index to {table_name} table")
+                except Exception as e:
+                    if "already exists" in str(e).lower():
+                        logger.debug(f"Index idx_prompt_id already exists in {table_name}")
+                    else:
+                        logger.warning(f"Could not add idx_prompt_id index to {table_name}: {e}")
+
+            except Exception as e:
+                logger.error(f"Error adding prompt analytics to {table_name}: {e}")
+
+        logger.info("Prompt analytics columns migration to rollup tables completed successfully")
 
     async def make_metrics_dimension_columns_nullable(self):
         """Make dimension columns nullable in InferenceMetrics rollup tables.
@@ -3258,16 +3663,19 @@ class ClickHouseMigration:
             await (
                 self.add_endpoint_specific_columns_to_inference_fact()
             )  # Add audio/image/embedding/TTS/document columns
+            await self.add_prompt_analytics_columns()  # Add prompt analytics columns for /v1/responses
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
             # NOTE: mv_handler_to_inference_fact was removed to avoid duplicates - the main MV handles both cases
             await (
                 self.create_mv_otel_blocking_to_inference_fact()
             )  # Create MV for blocked-only requests to InferenceFact
+            await self.create_mv_otel_response_to_inference_fact()  # Create MV for /v1/responses to InferenceFact
             await (
                 self.make_metrics_dimension_columns_nullable()
             )  # Drop old tables if dimension columns aren't nullable (must be before table creation)
             await self.create_inference_metrics_rollup_tables()  # Create InferenceMetrics rollup tables (5m, 1h, 1d)
             await self.add_blocking_metrics_to_rollup_tables()  # Add blocking metrics columns to rollup tables
+            await self.add_prompt_analytics_to_rollup_tables()  # Add prompt analytics columns to rollup tables
             await self.create_inference_metrics_materialized_views()  # Create MVs for cascading rollup
             await self.migrate_inference_tables_ttl_90_days()  # Update TTL to 90 days for inference tables
             await self.verify_tables()

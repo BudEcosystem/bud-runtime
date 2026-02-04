@@ -485,7 +485,7 @@ async def get_user_cloud_credentials(
                 credential_name=cred.credential_name,
                 # Mask sensitive information in credential values
                 credential_summary=_get_masked_credential_summary(
-                    cred.credential, provider.schema_definition if provider else {}
+                    cred.encrypted_credential, provider.schema_definition if provider else {}
                 ),
             )
             credential_schemas.append(credential_schema)
@@ -558,7 +558,7 @@ async def get_user_cloud_credential(
             created_at=credential.created_at,
             # For individual credential view, provide more detailed but still masked info
             credential_summary=_get_masked_credential_summary(
-                credential.credential, provider.schema_definition if provider else {}, detailed=True
+                credential.encrypted_credential, provider.schema_definition if provider else {}, detailed=True
             ),
         )
 

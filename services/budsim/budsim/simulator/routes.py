@@ -61,7 +61,7 @@ async def run_simulation(request: ClusterRecommendationRequest) -> Response:
             response = SimulationService().__call__(request, workflow_id=str(uuid.uuid4()))
         except Exception as e:
             logger.exception("Error running simulation: %s", str(e))
-            response = ErrorResponse(message="Error running simulation", code=500)
+            response = ErrorResponse(message=str(e), code=500)
     else:
         response = await SimulationWorkflows().__call__(request)
 

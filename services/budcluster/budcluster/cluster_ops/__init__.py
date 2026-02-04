@@ -239,12 +239,41 @@ async def get_quantization_status(config: Dict, values: Dict, platform: Optional
     return cluster_handler.get_quantization_status(values)
 
 
-async def get_adapter_status(config: Dict, adapter_name: str, ingress_url: str) -> None:
-    """Get the status of a adapter."""
+async def get_adapter_status(
+    config: Dict, adapter_name: str, namespace: str, ingress_url: str
+) -> tuple[bool, str | None]:
+    """Get the status of an adapter by checking the ModelAdapter CRD.
+
+    Args:
+        config: Kubernetes cluster configuration
+        adapter_name: Name of the adapter (ModelAdapter CRD name)
+        namespace: Kubernetes namespace where the adapter is deployed
+        ingress_url: Ingress URL for the deployment
+
+    Returns:
+        tuple: (success: bool, error_message: str | None)
+    """
     cluster_handler = await get_cluster_handler(
         config, ingress_url=ingress_url, platform=ClusterPlatformEnum.KUBERNETES
     )
-    return cluster_handler.get_adapter_status(adapter_name)
+    return cluster_handler.get_adapter_status(adapter_name, namespace)
+
+
+async def delete_adapter(config: Dict, adapter_name: str, namespace: str) -> tuple[bool, str | None]:
+    """Delete a ModelAdapter CRD from the cluster.
+
+    This is used for cleanup when an adapter deployment fails.
+
+    Args:
+        config: Kubernetes cluster configuration
+        adapter_name: Name of the adapter (ModelAdapter CRD name)
+        namespace: Kubernetes namespace where the adapter is deployed
+
+    Returns:
+        tuple: (success: bool, error_message: str | None)
+    """
+    cluster_handler = await get_cluster_handler(config, platform=ClusterPlatformEnum.KUBERNETES)
+    return cluster_handler.delete_adapter(adapter_name, namespace)
 
 
 async def identify_supported_endpoints(

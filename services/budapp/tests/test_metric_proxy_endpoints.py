@@ -375,6 +375,7 @@ class TestMetricProxyEndpoints:
             Mock(scalar_one_or_none=Mock(return_value=mock_project)),  # Project query
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[mock_project])))),  # Projects batch
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[])))),  # No endpoints found
+            Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[])))),  # No adapters found (endpoint_id might be adapter)
             Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[])))),  # No models found
         ]
 

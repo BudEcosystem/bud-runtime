@@ -423,11 +423,20 @@ pub async fn analytics_middleware(
             if let Some(ref id) = baggage_data.prompt_id {
                 span.set_attribute(keys::PROMPT_ID, id.clone());
             }
+            if let Some(ref id) = baggage_data.prompt_version_id {
+                span.set_attribute(keys::PROMPT_VERSION_ID, id.clone());
+            }
             if let Some(ref id) = baggage_data.endpoint_id {
                 span.set_attribute(keys::ENDPOINT_ID, id.clone());
             }
+            if let Some(ref id) = baggage_data.model_id {
+                span.set_attribute(keys::MODEL_ID, id.clone());
+            }
             if let Some(ref id) = baggage_data.api_key_id {
                 span.set_attribute(keys::API_KEY_ID, id.clone());
+            }
+            if let Some(ref id) = baggage_data.api_key_project_id {
+                span.set_attribute(keys::API_KEY_PROJECT_ID, id.clone());
             }
             if let Some(ref id) = baggage_data.user_id {
                 span.set_attribute(keys::USER_ID, id.clone());

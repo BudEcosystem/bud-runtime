@@ -12,8 +12,6 @@ spec:
       labels:
         {{- include "quantization-job.selectorLabels" . | nindent 8 }}
     spec:
-      imagePullSecrets:
-        - name: {{ .Values.imagePullSecrets.name }}
       serviceAccountName: {{ include "quantization-job.serviceAccountName" . }}
       restartPolicy: {{ .Values.job.restartPolicy }}
       containers:

@@ -225,7 +225,7 @@ class PromptService(SessionMixin):
                 logger.error(f"Failed to delete Redis configuration for prompt {db_prompt.name}: {str(e)}")
                 raise
 
-        # Delete from proxy cache
+        # Delete from proxy cache (model_table:{prompt_id} - legacy key format)
         try:
             await self.delete_prompt_from_proxy_cache(prompt_id)
             logger.debug(f"Deleted prompt {db_prompt.name} from proxy cache")
@@ -233,14 +233,8 @@ class PromptService(SessionMixin):
             logger.error(f"Failed to delete prompt from proxy cache: {e}")
             # Continue - cache cleanup is non-critical
 
-        # Update credential proxy cache to remove deleted prompt
-        try:
-            credential_service = CredentialService(self.session)
-            await credential_service.update_proxy_cache(db_prompt.project_id)
-            logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
-        except Exception as e:
-            logger.error(f"Failed to update credential proxy cache: {e}")
-            # Continue - cache cleanup is non-critical
+        # NOTE: update_proxy_cache is called AFTER soft delete below, not here
+        # This ensures the prompt is deleted from DB before cache rebuild
 
         # Delete MCP Foundry gateways from all versions before soft-deleting
         # Query all active versions of this prompt via CRUD layer
@@ -297,6 +291,16 @@ class PromptService(SessionMixin):
         # Soft delete all associated prompt versions
         deleted_count = await PromptVersionDataManager(self.session).soft_delete_by_prompt_id(prompt_id)
         logger.debug(f"Soft deleted {deleted_count} prompt versions for prompt {prompt_id}")
+
+        # Update credential proxy cache AFTER soft delete to remove deleted prompt entries
+        # This ensures prompt:{name} and prompt:{name}:v{version} keys are removed from cache
+        try:
+            credential_service = CredentialService(self.session)
+            await credential_service.update_proxy_cache(db_prompt.project_id)
+            logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+        except Exception as e:
+            logger.error(f"Failed to update credential proxy cache: {e}")
+            # Continue - cache cleanup is non-critical
 
         return db_prompt
 
@@ -356,6 +360,15 @@ class PromptService(SessionMixin):
 
         # Update the prompt
         db_prompt = await PromptDataManager(self.session).update_by_fields(db_prompt, data)
+
+        # If default_version_id was changed, update API key cache for the project
+        if "default_version_id" in data and data["default_version_id"]:
+            try:
+                await CredentialService(self.session).update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to update credential proxy cache: {e}")
+                # Continue - cache update is non-critical
 
         # Convert to response model
         prompt_response = PromptResponse.model_validate(db_prompt)
@@ -535,18 +548,91 @@ class PromptService(SessionMixin):
         Returns:
             PromptConfigResponse containing the bud_prompt_id and bud_prompt_version
         """
+        db_endpoint = None
+        db_prompt_version = None
+        if request.deployment_name:
+            db_endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"name": request.deployment_name}, exclude_fields={"status": EndpointStatusEnum.DELETED}
+            )
+
+            db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptModel, {"name": request.prompt_id, "status": PromptStatusEnum.ACTIVE}, missing_ok=True
+            )
+
+            if db_prompt and db_endpoint:
+                # Validate endpoint's project matches
+                if db_endpoint.project_id != db_prompt.project_id:
+                    raise ClientException(
+                        message="Endpoint and prompt must belong to the same project",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                # Fetch prompt version
+                db_prompt_version = await PromptVersionDataManager(self.session).retrieve_by_fields(
+                    PromptVersionModel,
+                    {"prompt_id": db_prompt.id, "version": request.version},
+                    exclude_fields={"status": PromptVersionStatusEnum.DELETED},
+                    missing_ok=True,
+                )
+
         # Perform the request to budprompt service
         response_data = await self._perform_prompt_config_request(request)
 
-        # Extract prompt_id and version from the response
+        # Extract prompt_id and version from the response (dynamic version from budprompt)
         prompt_id = response_data.get("prompt_id")
         version = response_data.get("version")
 
-        # Save draft prompt reference for playground access
+        # Look up endpoint details from deployment_name for observability
+        endpoint_id = None
+        model_id = None
+        project_id = None
+
+        if db_endpoint:
+            endpoint_id = str(db_endpoint.id)
+            model_id = str(db_endpoint.model_id)
+            project_id = str(db_endpoint.project_id)
+            logger.debug(
+                f"Resolved endpoint for draft prompt {prompt_id}: endpoint_id={endpoint_id}, "
+                f"model_id={model_id}, project_id={project_id}"
+            )
+
+        if db_prompt_version:
+            self.session.refresh(db_prompt_version)
+            db_prompt_version = await PromptVersionDataManager(self.session).update_by_fields(
+                db_prompt_version,
+                {
+                    "endpoint_id": db_endpoint.id,
+                    "model_id": db_endpoint.model_id,
+                    "cluster_id": db_endpoint.cluster_id,
+                },
+            )
+            logger.debug(
+                f"Updated prompt version {request.version} for prompt '{request.prompt_id}' "
+                f"with endpoint_id={db_endpoint.id}"
+            )
+
+            # Update Redis Cache
+            try:
+                await CredentialService(self.session).update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.warning(f"Failed to update proxy cache: {e}", exc_info=True)
+                # Don't fail the request if cache update fails - DB is already updated
+
+        # Save draft prompt reference for playground access with version-specific key
         try:
             redis_service = RedisService()
-            draft_key = f"draft_prompt:{current_user_id}:{prompt_id}"
-            draft_value = json.dumps({"prompt_id": prompt_id, "user_id": str(current_user_id)})
+            # Include version in draft key (similar to regular prompts: prompt:{name}:v{version})
+            draft_key = f"draft_prompt:{current_user_id}:{prompt_id}:v{version}"
+            draft_value = json.dumps(
+                {
+                    "prompt_id": prompt_id,
+                    "user_id": str(current_user_id),
+                    "endpoint_id": endpoint_id,  # From endpoint lookup
+                    "model_id": model_id,  # From endpoint lookup
+                    "project_id": project_id,  # From endpoint lookup
+                    "version": version,  # Dynamic version from budprompt response
+                }
+            )
             # Set TTL to 24 hours (86400 seconds) - matching budprompt temporary storage
             await redis_service.set(draft_key, draft_value, ex=app_settings.prompt_config_redis_ttl)
 
@@ -554,7 +640,7 @@ class PromptService(SessionMixin):
             await PromptWorkflowService(self.session).add_prompt_to_proxy_cache(
                 prompt_id, prompt_id, ex=app_settings.prompt_config_redis_ttl
             )
-            logger.debug(f"Added draft prompt {prompt_id} to cache for user {current_user_id}")
+            logger.debug(f"Added draft prompt {prompt_id} v{version} to cache for user {current_user_id}")
         except Exception as e:
             logger.error(f"Failed to cache draft prompt: {e}")
             # Don't fail the request if caching fails
@@ -3305,6 +3391,13 @@ class PromptVersionService(SessionMixin):
             await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
             # Reload the prompt to get the updated default_version
             self.session.refresh(db_prompt)
+            # Update API key cache for the project with new default version
+            try:
+                await CredentialService(self.session).update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to update credential proxy cache: {e}")
+                # Continue - cache update is non-critical
 
         # Load relationships for the response
         self.session.refresh(db_version)
@@ -3385,6 +3478,13 @@ class PromptVersionService(SessionMixin):
 
             # THEN: Update database after Redis is successfully updated
             await PromptDataManager(self.session).update_by_fields(db_prompt, {"default_version_id": db_version.id})
+            # Update API key cache for the project with new default version
+            try:
+                await CredentialService(self.session).update_proxy_cache(db_prompt.project_id)
+                logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+            except Exception as e:
+                logger.error(f"Failed to update credential proxy cache: {e}")
+                # Continue - cache update is non-critical
 
         # Update the prompt version with remaining fields
         if data:  # Only update if there are fields to update
@@ -3484,6 +3584,15 @@ class PromptVersionService(SessionMixin):
         await PromptVersionDataManager(self.session).update_by_fields(
             db_version, {"status": PromptVersionStatusEnum.DELETED}
         )
+
+        # Update credential proxy cache to remove the deleted version's entry
+        # This ensures the gateway cache no longer contains prompt:{name}:v{version} for the deleted version
+        try:
+            await CredentialService(self.session).update_proxy_cache(db_prompt.project_id)
+            logger.debug(f"Updated credential proxy cache for project {db_prompt.project_id}")
+        except Exception as e:
+            logger.error(f"Failed to update credential proxy cache: {e}")
+            # Continue - cache cleanup is non-critical
 
         logger.debug(f"Soft deleted prompt version {version_id} for prompt {prompt_id}")
 

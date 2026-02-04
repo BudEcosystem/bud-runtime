@@ -45,6 +45,9 @@ impl SpanProcessor for BaggageSpanProcessor {
         if let Some(value) = baggage.get(keys::PROMPT_ID) {
             span.set_attribute(KeyValue::new(keys::PROMPT_ID, value.as_str().to_string()));
         }
+        if let Some(value) = baggage.get(keys::PROMPT_VERSION_ID) {
+            span.set_attribute(KeyValue::new(keys::PROMPT_VERSION_ID, value.as_str().to_string()));
+        }
         // Only set endpoint_id if auth has processed the request (baggage has correct value).
         // For spans created before auth (gateway_analytics), analytics_middleware sets endpoint_id.
         if auth_processed {
@@ -52,8 +55,14 @@ impl SpanProcessor for BaggageSpanProcessor {
                 span.set_attribute(KeyValue::new(keys::ENDPOINT_ID, value.as_str().to_string()));
             }
         }
+        if let Some(value) = baggage.get(keys::MODEL_ID) {
+            span.set_attribute(KeyValue::new(keys::MODEL_ID, value.as_str().to_string()));
+        }
         if let Some(value) = baggage.get(keys::API_KEY_ID) {
             span.set_attribute(KeyValue::new(keys::API_KEY_ID, value.as_str().to_string()));
+        }
+        if let Some(value) = baggage.get(keys::API_KEY_PROJECT_ID) {
+            span.set_attribute(KeyValue::new(keys::API_KEY_PROJECT_ID, value.as_str().to_string()));
         }
         if let Some(value) = baggage.get(keys::USER_ID) {
             span.set_attribute(KeyValue::new(keys::USER_ID, value.as_str().to_string()));
@@ -83,6 +92,9 @@ mod tests {
         let ctx = Context::new().with_baggage(vec![
             KeyValue::new(keys::PROJECT_ID, "proj-123"),
             KeyValue::new(keys::PROMPT_ID, "prompt-456"),
+            KeyValue::new(keys::PROMPT_VERSION_ID, "version-789"),
+            KeyValue::new(keys::MODEL_ID, "model-abc"),
+            KeyValue::new(keys::API_KEY_PROJECT_ID, "key-proj-def"),
         ]);
 
         let baggage = ctx.baggage();
@@ -93,6 +105,18 @@ mod tests {
         assert_eq!(
             baggage.get(keys::PROMPT_ID).map(|v| v.as_str()),
             Some("prompt-456")
+        );
+        assert_eq!(
+            baggage.get(keys::PROMPT_VERSION_ID).map(|v| v.as_str()),
+            Some("version-789")
+        );
+        assert_eq!(
+            baggage.get(keys::MODEL_ID).map(|v| v.as_str()),
+            Some("model-abc")
+        );
+        assert_eq!(
+            baggage.get(keys::API_KEY_PROJECT_ID).map(|v| v.as_str()),
+            Some("key-proj-def")
         );
     }
 

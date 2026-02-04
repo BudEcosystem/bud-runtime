@@ -279,16 +279,18 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
         params,
         headers,
       });
-      const listData = response.data;
+      const listData = response?.data;
       // const updatedListData =
       //   listData.map((item) => {
       //     return {
       //       ...item,
       //     };
       //   });
-      set({ endPoints: listData.endpoints });
-      set({ endPointsCount: listData.total_record });
-      successToast(response.message);
+      if (listData?.endpoints) {
+        set({ endPoints: listData.endpoints });
+        set({ endPointsCount: listData.total_record });
+        successToast(response.message);
+      }
     } catch (error) {
       console.error("Error creating model:", error);
     } finally {
@@ -351,9 +353,11 @@ getAdapters: async (params: GetAdapterParams, projectId?) => {
         },
       });
 
-      const listData = response.data;
-      set({ adapters: listData.adapters });
-      successToast(response.message);
+      const listData = response?.data;
+      if (listData?.adapters) {
+        set({ adapters: listData.adapters });
+        successToast(response.message);
+      }
     } catch (error) {
       console.error("Error creating model:", error);
     } finally {

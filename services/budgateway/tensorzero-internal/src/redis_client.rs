@@ -15,7 +15,7 @@ use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{Error, ErrorDetails};
 use crate::gateway_util::AppStateData;
-use crate::guardrail::build_bud_sentinel_profile;
+use crate::guardrail::{build_bud_sentinel_profile, custom_rules_to_value};
 use crate::guardrail_table::GuardrailConfig;
 use crate::inference::providers::bud_sentinel::BudSentinelProvider;
 use crate::model::{CredentialLocation, ModelTable, UninitializedModelConfig};
@@ -513,6 +513,9 @@ impl RedisClient {
                 "rule_overrides_json".to_string(),
                 serde_json::Value::String(profile.rule_overrides_json.clone()),
             );
+            let custom_rules_value =
+                custom_rules_to_value(&profile.custom_rules, guardrail_id)?;
+            config_obj.insert("custom_rules".to_string(), custom_rules_value);
             config_obj.insert(
                 "profile_sync_pending".to_string(),
                 serde_json::Value::Bool(sync_pending),

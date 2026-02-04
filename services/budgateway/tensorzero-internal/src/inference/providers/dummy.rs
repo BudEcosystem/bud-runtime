@@ -37,7 +37,7 @@ use crate::moderation::{
 };
 use crate::responses::{
     OpenAIResponse, OpenAIResponseCreateParams, ResponseError, ResponseInputItemsList,
-    ResponseProvider, ResponseStatus, ResponseStreamEvent, ResponseUsage,
+    ResponseProvider, ResponseStatus, ResponseStreamEvent, ResponseUsage, ResponseWithRawData,
 };
 use crate::tool::{ToolCall, ToolCallChunk};
 
@@ -821,6 +821,7 @@ impl ModerationProvider for DummyProvider {
                 category_applied_input_types: None,
                 hallucination_details: None,
                 ip_violation_details: None,
+                other_categories: Default::default(),
             });
         }
 
@@ -1177,7 +1178,10 @@ impl ResponseProvider for DummyProvider {
         _client: &reqwest::Client,
         _dynamic_api_keys: &InferenceCredentials,
         _baggage: Option<&crate::baggage::BaggageData>,
-    ) -> Result<OpenAIResponse, Error> {
+    ) -> Result<ResponseWithRawData, Error> {
+        // Serialize the request for raw_request capture
+        let raw_request = serde_json::to_string(&request).unwrap_or_default();
+
         // Generate a dummy response matching the actual OpenAI format
         let response = OpenAIResponse {
             id: format!("resp_{}", Uuid::now_v7()),
@@ -1241,7 +1245,14 @@ impl ResponseProvider for DummyProvider {
             metadata: request.metadata.clone().or(Some(HashMap::new())),
         };
 
-        Ok(response)
+        // Serialize the response for raw_response capture
+        let raw_response = serde_json::to_string(&response).unwrap_or_default();
+
+        Ok(ResponseWithRawData {
+            response,
+            raw_request,
+            raw_response,
+        })
     }
 
     async fn stream_response(

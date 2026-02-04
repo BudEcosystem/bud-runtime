@@ -45,6 +45,27 @@ const AutoLayoutIcon = () => (
   </svg>
 );
 
+const MagnifyingGlassIcon = ({ children }: { children?: React.ReactNode }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="11" cy="11" r="8" />
+    <path d="M21 21l-4.35-4.35" />
+    {children}
+  </svg>
+);
+
+const ZoomInIcon = () => (
+  <MagnifyingGlassIcon>
+    <path d="M11 8v6" />
+    <path d="M8 11h6" />
+  </MagnifyingGlassIcon>
+);
+
+const ZoomOutIcon = () => (
+  <MagnifyingGlassIcon>
+    <path d="M8 11h6" />
+  </MagnifyingGlassIcon>
+);
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -61,6 +82,8 @@ export interface ToolbarAction {
 export interface PipelineToolbarProps {
   /** Show fit view button */
   showFitView?: boolean;
+  /** Show zoom controls (zoom in/out buttons) */
+  showZoomControls?: boolean;
   /** Show auto layout button */
   showAutoLayout?: boolean;
   /** Callback for auto layout */
@@ -159,6 +182,7 @@ function ToolbarButton({ icon, onClick, disabled, tooltip }: ToolbarButtonProps)
 
 function PipelineToolbarComponent({
   showFitView = true,
+  showZoomControls = true,
   showAutoLayout = true,
   onAutoLayout,
   customActions = [],
@@ -169,6 +193,14 @@ function PipelineToolbarComponent({
 
   const handleFitView = () => {
     reactFlow.fitView({ padding: 0.2 });
+  };
+
+  const handleZoomIn = () => {
+    reactFlow.zoomIn({ duration: 200 });
+  };
+
+  const handleZoomOut = () => {
+    reactFlow.zoomOut({ duration: 200 });
   };
 
   // Position styles
@@ -193,6 +225,22 @@ function PipelineToolbarComponent({
           onClick={onAutoLayout}
           tooltip="Auto Layout"
         />
+      )}
+
+      {/* Zoom Controls */}
+      {showZoomControls && (
+        <>
+          <ToolbarButton
+            icon={<ZoomInIcon />}
+            onClick={handleZoomIn}
+            tooltip="Zoom In"
+          />
+          <ToolbarButton
+            icon={<ZoomOutIcon />}
+            onClick={handleZoomOut}
+            tooltip="Zoom Out"
+          />
+        </>
       )}
 
       {/* Fit View */}

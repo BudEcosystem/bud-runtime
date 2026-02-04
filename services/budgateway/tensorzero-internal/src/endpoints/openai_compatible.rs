@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::time::Duration;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
@@ -22,6 +23,7 @@ use axum::Json;
 use futures::{Stream, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use tonic::Code;
 use url::Url;
 use uuid::Uuid;
 
@@ -169,6 +171,125 @@ fn create_guardrail_error_response(
     (status_code, error_json)
 }
 
+/// Number of guardrail execution attempts before returning a failure.
+const GUARDRAIL_RETRY_ATTEMPTS: usize = 3;
+/// Backoff schedule in milliseconds for guardrail retries.
+///
+/// Small delays reduce load spikes while keeping latency reasonable for user requests.
+const GUARDRAIL_RETRY_BACKOFF_MS: [u64; GUARDRAIL_RETRY_ATTEMPTS] = [200, 400, 800];
+
+fn create_guardrail_failure_response(message: &str) -> (StatusCode, serde_json::Value) {
+    let error_json = json!({
+        "error": {
+            "message": message,
+            "type": "server_error",
+            "code": "guardrail_failure"
+        }
+    });
+
+    (StatusCode::BAD_GATEWAY, error_json)
+}
+
+fn guardrail_retry_backoff(attempt: usize) -> Duration {
+    let millis = GUARDRAIL_RETRY_BACKOFF_MS
+        .get(attempt)
+        .copied()
+        .unwrap_or(0);
+    Duration::from_millis(millis)
+}
+
+fn parse_grpc_status_code(raw_response: &str) -> Option<Code> {
+    let value: serde_json::Value = serde_json::from_str(raw_response).ok()?;
+    let code = value.get("code").and_then(|v| v.as_i64())?;
+    Some(Code::from_i32(code as i32))
+}
+
+fn is_retryable_guardrail_error(error: &Error) -> bool {
+    match error.get_details() {
+        ErrorDetails::InferenceTimeout { .. }
+        | ErrorDetails::ProviderTimeout { .. }
+        | ErrorDetails::Inference { .. }
+        | ErrorDetails::InferenceServer { .. } => {
+            if let ErrorDetails::InferenceServer { raw_response, .. } = error.get_details() {
+                if let Some(raw) = raw_response {
+                    if let Some(code) = parse_grpc_status_code(raw) {
+                        return match code {
+                            Code::Unavailable | Code::DeadlineExceeded | Code::Unknown => true,
+                            Code::Unauthenticated | Code::PermissionDenied => false,
+                            _ => true,
+                        };
+                    }
+                }
+            }
+            true
+        }
+        ErrorDetails::InferenceClient { status_code, .. } => {
+            if let Some(code) = status_code {
+                if *code == StatusCode::UNAUTHORIZED || *code == StatusCode::FORBIDDEN {
+                    return false;
+                }
+                return code.is_server_error() || *code == StatusCode::BAD_GATEWAY;
+            }
+            false
+        }
+        ErrorDetails::ApiKeyMissing { .. }
+        | ErrorDetails::BadCredentialsPreInference { .. }
+        | ErrorDetails::Config { .. }
+        | ErrorDetails::InvalidProviderConfig { .. }
+        | ErrorDetails::InvalidOpenAICompatibleRequest { .. }
+        | ErrorDetails::InvalidRequest { .. }
+        | ErrorDetails::InvalidModel { .. }
+        | ErrorDetails::InvalidModelProvider { .. } => false,
+        _ => false,
+    }
+}
+
+fn guardrail_result_has_errors(result: &crate::guardrail_table::GuardrailResult) -> bool {
+    result
+        .provider_results
+        .iter()
+        .any(|provider| provider.error.is_some())
+}
+
+async fn execute_guardrail_with_retries<'a>(
+    guardrail_config: &crate::guardrail_table::GuardrailConfig,
+    input: crate::moderation::ModerationInput,
+    guard_type: crate::guardrail_table::GuardType,
+    clients: &InferenceClients<'a>,
+    provider_params: Option<serde_json::Value>,
+    skip_guard_type_validation: bool,
+) -> Result<crate::guardrail_table::GuardrailResult, Error> {
+    let mut last_error = None;
+    for attempt in 0..GUARDRAIL_RETRY_ATTEMPTS {
+        match crate::guardrail::execute_guardrail(
+            guardrail_config,
+            input.clone(),
+            guard_type,
+            clients,
+            provider_params.clone(),
+            skip_guard_type_validation,
+        )
+        .await
+        {
+            Ok(result) => return Ok(result),
+            Err(err) => {
+                let retryable = is_retryable_guardrail_error(&err);
+                last_error = Some(err);
+                if !retryable || attempt + 1 >= GUARDRAIL_RETRY_ATTEMPTS {
+                    break;
+                }
+                tokio::time::sleep(guardrail_retry_backoff(attempt)).await;
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| {
+        Error::new(ErrorDetails::InternalError {
+            message: "Guardrail execution failed without error context".to_string(),
+        })
+    }))
+}
+
 /// Helper function to serialize JSON without null values
 pub(crate) fn serialize_without_nulls<T: Serialize>(
     value: &T,
@@ -304,6 +425,10 @@ pub async fn inference_handler(
 ) -> Result<Response<Body>, Error> {
     // Capture request arrival time for observability (outside async block for error handler access)
     let request_arrival_time = chrono::Utc::now();
+
+    // Generate inference_id early so error path can use the same ID as success path.
+    // This ensures MV JOIN works correctly: gateway_analytics.inference_id = model_inference_details.inference_id
+    let request_inference_id = uuid::Uuid::now_v7();
 
     // Extract observability metadata from headers early for error handler access
     let obs_metadata_for_error = extract_observability_metadata_from_headers(&headers);
@@ -520,7 +645,7 @@ pub async fn inference_handler(
 
                     // Execute input guardrail with timing
                     let input_scan_start = tokio::time::Instant::now();
-                    let guardrail_result = crate::guardrail::execute_guardrail(
+                    let guardrail_result = match execute_guardrail_with_retries(
                         &guardrail_config,
                         moderation_input.clone(),
                         crate::guardrail_table::GuardType::Input,
@@ -528,7 +653,19 @@ pub async fn inference_handler(
                         None,
                         false,
                     )
-                    .await?;
+                    .await
+                    {
+                        Ok(result) => result,
+                        Err(_) => {
+                            let (status_code, error_response) =
+                                create_guardrail_failure_response("Guardrail execution failed");
+                            return Ok(Response::builder()
+                                .status(status_code)
+                                .header("Content-Type", "application/json")
+                                .body(Body::from(error_response.to_string()))
+                                .unwrap());
+                        }
+                    };
                     let input_scan_duration = input_scan_start.elapsed();
 
                     // Store the input guardrail result for later (we need the inference_id from the response)
@@ -549,6 +686,16 @@ pub async fn inference_handler(
                                 None,
                             );
                         guardrail_context.add_scan_record(scan_record);
+                    }
+
+                    if guardrail_result_has_errors(&guardrail_result) {
+                        let (status_code, error_response) =
+                            create_guardrail_failure_response("Guardrail execution failed");
+                        return Ok(Response::builder()
+                            .status(status_code)
+                            .header("Content-Type", "application/json")
+                            .body(Body::from(error_response.to_string()))
+                            .unwrap());
                     }
 
                     // If input is flagged, handle the blocked request with full observability
@@ -908,7 +1055,7 @@ pub async fn inference_handler(
 
                             // Execute output guardrail with timing
                             let output_scan_start = tokio::time::Instant::now();
-                            let guardrail_result = crate::guardrail::execute_guardrail(
+                            let guardrail_result = match execute_guardrail_with_retries(
                                 &guardrail_config,
                                 moderation_input.clone(),
                                 crate::guardrail_table::GuardType::Output,
@@ -916,7 +1063,21 @@ pub async fn inference_handler(
                                 None,
                                 false,
                             )
-                            .await?;
+                            .await
+                            {
+                                Ok(result) => result,
+                                Err(_) => {
+                                    let (status_code, error_response) =
+                                        create_guardrail_failure_response(
+                                            "Guardrail execution failed",
+                                        );
+                                    return Ok(Response::builder()
+                                        .status(status_code)
+                                        .header("Content-Type", "application/json")
+                                        .body(Body::from(error_response.to_string()))
+                                        .unwrap());
+                                }
+                            };
                             let output_scan_duration = output_scan_start.elapsed();
 
                             if !guardrail_result.provider_results.is_empty() {
@@ -935,6 +1096,18 @@ pub async fn inference_handler(
                                         None,
                                     );
                                 guardrail_context.add_scan_record(scan_record);
+                            }
+
+                            if guardrail_result_has_errors(&guardrail_result) {
+                                let (status_code, error_response) =
+                                    create_guardrail_failure_response(
+                                        "Guardrail execution failed",
+                                    );
+                                return Ok(Response::builder()
+                                    .status(status_code)
+                                    .header("Content-Type", "application/json")
+                                    .body(Body::from(error_response.to_string()))
+                                    .unwrap());
                             }
 
                             // If output is flagged, return an error
@@ -1303,13 +1476,13 @@ pub async fn inference_handler(
     }
     .await;
 
-    // Record error on span if request failed
-    if let Err(ref error) = result {
-        super::observability::record_error(error);
+    // Record error on span if request failed and convert to response with inference_id header
+    if let Err(error) = result {
+        super::observability::record_error(&error);
 
-        // Record ModelInferenceDetails for error case
+        // Record ModelInferenceDetails for error case using the pre-generated inference_id
+        // This ensures MV JOIN works: gateway_analytics.inference_id = model_inference_details.inference_id
         if let Some(ref obs_metadata) = obs_metadata_for_error {
-            let error_inference_id = uuid::Uuid::now_v7();
             let request_forward_time = chrono::Utc::now();
             let error_details = super::observability::ModelInferenceDetailsError {
                 error_code: error.get_details().as_ref(),
@@ -1318,7 +1491,7 @@ pub async fn inference_handler(
                 status_code: error.status_code().as_u16(),
             };
             super::observability::record_model_inference_details(
-                &error_inference_id,
+                &request_inference_id, // Use the same inference_id generated at request start
                 &obs_metadata.project_id,
                 &obs_metadata.endpoint_id,
                 &obs_metadata.model_id,
@@ -1332,6 +1505,14 @@ pub async fn inference_handler(
                 Some(error_details),
             );
         }
+
+        // Convert error to response and add inference_id header so analytics middleware can capture it
+        let mut response = error.into_response();
+        response.headers_mut().insert(
+            "x-tensorzero-inference-id",
+            request_inference_id.to_string().parse().unwrap(),
+        );
+        return Ok(response);
     }
 
     result
@@ -2481,7 +2662,7 @@ impl StreamingGuardrailState {
         };
 
         let scan_start = tokio::time::Instant::now();
-        let guardrail_result = crate::guardrail::execute_guardrail(
+        let guardrail_result = execute_guardrail_with_retries(
             self.guardrail_config.as_ref(),
             crate::moderation::ModerationInput::Single(window_text.to_string()),
             crate::guardrail_table::GuardType::Output,
@@ -2512,6 +2693,16 @@ impl StreamingGuardrailState {
                     context.response_terminated = true;
                 }
             }
+        }
+
+        if guardrail_result_has_errors(&guardrail_result) {
+            return Err(Error::new(ErrorDetails::InferenceClient {
+                message: "Guardrail execution failed".to_string(),
+                status_code: Some(StatusCode::BAD_GATEWAY),
+                provider_type: "guardrail".to_string(),
+                raw_request: None,
+                raw_response: None,
+            }));
         }
 
         Ok(guardrail_result)
@@ -3240,7 +3431,8 @@ pub async fn completion_handler(
         })?;
 
     // Merge credentials from the credential store
-    let credentials = merge_credentials_from_store(&model_credential_store);
+    let mut credentials = merge_credentials_from_store(&model_credential_store);
+    merge_credentials_from_headers(&headers, &mut credentials);
 
     // Create inference clients
     let cache_options: crate::cache::CacheOptions = (
@@ -4567,7 +4759,7 @@ pub async fn moderation_handler(
 
         // Execute the guardrail
         let start_time = tokio::time::Instant::now();
-        let guardrail_result = crate::guardrail::execute_guardrail(
+        let guardrail_result = match execute_guardrail_with_retries(
             &guardrail_config,
             moderation_request.input.clone(),
             crate::guardrail_table::GuardType::Input,
@@ -4575,8 +4767,30 @@ pub async fn moderation_handler(
             moderation_request.provider_params.clone(),
             true,
         )
-        .await?;
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                let (status_code, error_response) =
+                    create_guardrail_failure_response("Guardrail execution failed");
+                return Ok(Response::builder()
+                    .status(status_code)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(error_response.to_string()))
+                    .unwrap());
+            }
+        };
         let latency = start_time.elapsed();
+
+        if guardrail_result_has_errors(&guardrail_result) {
+            let (status_code, error_response) =
+                create_guardrail_failure_response("Guardrail execution failed");
+            return Ok(Response::builder()
+                .status(status_code)
+                .header("Content-Type", "application/json")
+                .body(Body::from(error_response.to_string()))
+                .unwrap());
+        }
 
         // Convert guardrail result to moderation response
         let results = vec![crate::moderation::ModerationResult {
@@ -4588,6 +4802,7 @@ pub async fn moderation_handler(
                 .clone(),
             hallucination_details: guardrail_result.hallucination_details.clone(),
             ip_violation_details: guardrail_result.ip_violation_details.clone(),
+            other_categories: guardrail_result.merged_other_categories.clone(),
         }];
 
         let provider_response = crate::moderation::ModerationProviderResponse {
@@ -7322,6 +7537,28 @@ fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Optio
         gen_ai.usage.total_tokens = tracing::field::Empty,
         gen_ai.openai.response.service_tier = tracing::field::Empty,
         gen_ai.response.top_p = tracing::field::Empty,
+
+        // Model inference timing (for ClickHouse response_time_ms)
+        gen_ai.response_time_ms = tracing::field::Empty,
+
+        // Total handler processing time (for ClickHouse processing_time_ms)
+        gen_ai.processing_time_ms = tracing::field::Empty,
+
+        // Time to first token for streaming (for ClickHouse ttft_ms)
+        gen_ai.ttft_ms = tracing::field::Empty,
+
+        // Inference ID (for ClickHouse InferenceFact table)
+        gen_ai.inference_id = tracing::field::Empty,
+
+        // Timing fields (for ClickHouse InferenceFact table)
+        gen_ai.request_arrival_time = tracing::field::Empty,
+        gen_ai.request_forward_time = tracing::field::Empty,
+
+        // Request/Response content fields (for ClickHouse InferenceFact table)
+        gen_ai.raw_request = tracing::field::Empty,
+        gen_ai.raw_response = tracing::field::Empty,
+        gen_ai.gateway_request = tracing::field::Empty,
+        gen_ai.gateway_response = tracing::field::Empty,
     )
 )]
 #[debug_handler(state = AppStateData)]
@@ -7338,8 +7575,20 @@ pub async fn response_create_handler(
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
 ) -> Result<Response<Body>, Error> {
+    // Capture request arrival time for observability
+    let request_arrival_time = chrono::Utc::now();
+
+    // Capture start time for processing_time_ms calculation (total handler time)
+    let processing_start_time = std::time::Instant::now();
+
     // Record request fields for observability
     super::observability::record_response_request(&params);
+
+    // Generate inference_id for this request (same pattern as /v1/chat/completions)
+    let inference_id = uuid::Uuid::now_v7();
+    let span = tracing::Span::current();
+    span.record("gen_ai.inference_id", inference_id.to_string().as_str());
+    span.record("gen_ai.request_arrival_time", request_arrival_time.to_rfc3339().as_str());
 
     // Capture prompt info for analytics headers (before params is moved into async block)
     let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());
@@ -7359,6 +7608,16 @@ pub async fn response_create_handler(
     let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
         std::sync::Arc::new(std::sync::Mutex::new(None));
     let captured_usage_clone = captured_usage.clone();
+
+    // Capture model latency for analytics (will be populated inside async block)
+    // This is used to calculate gateway_processing_ms = total_duration_ms - model_latency_ms
+    let captured_latency: std::sync::Arc<std::sync::Mutex<Option<u32>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_latency_clone = captured_latency.clone();
+
+    // Capture gateway_request before async block so it's available for error handling
+    // This must be captured here since params is moved into the async block
+    let gateway_request_for_error = serialize_without_nulls(&params).ok();
 
     let result = async {
         if !params.unknown_fields.is_empty() {
@@ -7454,6 +7713,8 @@ pub async fn response_create_handler(
         // Use automatic format detection for BudPrompt with prompt parameter
         use crate::responses::ResponseResult;
 
+        // Measure provider latency for analytics
+        let provider_start = std::time::Instant::now();
         let result = model
             .execute_response_with_detection(
                 &params,
@@ -7462,21 +7723,45 @@ pub async fn response_create_handler(
                 Some(&baggage_data),
             )
             .await?;
+        let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
 
         match result {
             ResponseResult::Streaming(stream) => {
+                // Clone gateway_request for use in async stream closure
+                // For responses API, raw_request is the same as gateway_request since we pass through to provider
+                let gateway_request_clone = gateway_request.clone();
+                let raw_request = gateway_request.clone().unwrap_or_default();
+
+                // Clone processing_start_time for use in async stream closure (for processing_time_ms calculation)
+                let processing_start_time_clone = processing_start_time;
+
+                // Capture latency for analytics (gateway_processing_ms calculation)
+                // For streaming, this is the time to initiate the stream (before streaming starts)
+                if let Ok(mut guard) = captured_latency_clone.lock() {
+                    *guard = Some(provider_latency_ms);
+                }
+
                 // Wrap stream to capture events and record observability after completion
                 let sse_stream = async_stream::stream! {
                     use futures::StreamExt;
 
                     let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
                     let mut had_streaming_error = false;
+                    // Use provider_start (captured before execute_response_with_detection) for accurate TTFT
+                    let mut ttft_recorded = false;
                     futures::pin_mut!(stream);
 
                     while let Some(result) = stream.next().await {
                         // Buffer successful events for post-stream observability
                         if let Ok(event) = &result {
                             buffer.push(event.clone());
+
+                            // Record TTFT on first successful event (includes full provider latency)
+                            if !ttft_recorded {
+                                let ttft_ms = provider_start.elapsed().as_millis() as i64;
+                                observability_span.record("gen_ai.ttft_ms", ttft_ms);
+                                ttft_recorded = true;
+                            }
                         }
 
                         // Convert to SSE Event and yield
@@ -7513,6 +7798,34 @@ pub async fn response_create_handler(
                                 response.id
                             );
                             super::observability::record_response_result(&response);
+
+                            // Record timing and request/response fields for streaming
+                            // (Follows same pattern as chat completions in inference.rs)
+                            let request_forward_time = chrono::Utc::now();
+                            let span = tracing::Span::current();
+
+                            // Record timing
+                            span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+                            // Record raw_request (for responses API, this is the serialized params)
+                            span.record("gen_ai.raw_request", raw_request.as_str());
+
+                            // For streaming, raw_response and gateway_response are the reconstructed response JSON
+                            // (Similar to how chat completions joins gateway_response_chunks)
+                            if let Ok(response_json) = serde_json::to_string(&response) {
+                                span.record("gen_ai.raw_response", response_json.as_str());
+                                span.record("gen_ai.gateway_response", response_json.as_str());
+                            }
+
+                            // Record gateway_request
+                            if let Some(ref gw_req) = gateway_request_clone {
+                                span.record("gen_ai.gateway_request", gw_req.as_str());
+                            }
+
+                            // Record total processing time (handler start to stream complete)
+                            span.record("gen_ai.processing_time_ms", processing_start_time_clone.elapsed().as_millis() as i64);
+                            // Record response_time_ms (provider start to stream complete) for streaming analytics
+                            span.record("gen_ai.response_time_ms", provider_start.elapsed().as_millis() as i64);
                         } else {
                             tracing::warn!(
                                 "Could not reconstruct response from {} buffered stream events",
@@ -7524,23 +7837,54 @@ pub async fn response_create_handler(
 
                 Ok(Sse::new(sse_stream).into_response())
             }
-            ResponseResult::NonStreaming(response) => {
+            ResponseResult::NonStreaming(result) => {
+                // Capture request_forward_time (when gateway completed processing)
+                let request_forward_time = chrono::Utc::now();
+
                 // Log the response size for debugging
-                if let Ok(response_json) = serde_json::to_string(&response) {
+                if let Ok(response_json) = serde_json::to_string(&result.response) {
                     tracing::debug!("Response size: {} bytes", response_json.len());
                 }
 
                 // Record response fields for observability
-                super::observability::record_response_result(&response);
+                super::observability::record_response_result(&result.response);
+
+                // Record provider latency as span attribute for ClickHouse materialized view
+                // This is the gateway-calculated latency: time from request to provider until response received
+                let span = tracing::Span::current();
+                span.record("gen_ai.response_time_ms", provider_latency_ms as i64);
+
+                // Record timing fields
+                span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+                // Record raw request/response from provider
+                span.record("gen_ai.raw_request", result.raw_request.as_str());
+                span.record("gen_ai.raw_response", result.raw_response.as_str());
+
+                // Record gateway request/response
+                if let Some(ref gw_req) = gateway_request {
+                    span.record("gen_ai.gateway_request", gw_req.as_str());
+                }
+                if let Ok(gateway_response) = serde_json::to_string(&result.response) {
+                    span.record("gen_ai.gateway_response", gateway_response.as_str());
+                }
+
+                // Record total processing time (handler start to response ready)
+                span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
 
                 // Capture usage for analytics headers
-                if let Some(ref usage) = response.usage {
+                if let Some(ref usage) = result.response.usage {
                     if let Ok(mut guard) = captured_usage_clone.lock() {
                         *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
                     }
                 }
 
-                Ok(Json(response).into_response())
+                // Capture latency for analytics (gateway_processing_ms calculation)
+                if let Ok(mut guard) = captured_latency_clone.lock() {
+                    *guard = Some(provider_latency_ms);
+                }
+
+                Ok(Json(result.response).into_response())
             }
         }
     } else {
@@ -7550,10 +7894,28 @@ pub async fn response_create_handler(
             // This ensures the span stays alive until streaming completes
             let observability_span = tracing::Span::current();
 
+            // Clone gateway_request for use in async stream closure
+            // For responses API, raw_request is the same as gateway_request since we pass through to provider
+            let gateway_request_clone = gateway_request.clone();
+            let raw_request = gateway_request.clone().unwrap_or_default();
+
+            // Clone processing_start_time for use in async stream closure (for processing_time_ms calculation)
+            let processing_start_time_clone = processing_start_time;
+
+            // Measure provider latency for analytics (time to initiate stream)
+            let provider_start = std::time::Instant::now();
+
             // Handle streaming response
             let stream = model
                 .stream_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
+            let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
+
+            // Capture latency for analytics (gateway_processing_ms calculation)
+            // For streaming, this is the time to initiate the stream (before streaming starts)
+            if let Ok(mut guard) = captured_latency_clone.lock() {
+                *guard = Some(provider_latency_ms);
+            }
 
             // Wrap stream to capture events and record observability after completion
             let sse_stream = async_stream::stream! {
@@ -7561,12 +7923,21 @@ pub async fn response_create_handler(
 
                 let mut buffer: Vec<ResponseStreamEvent> = Vec::new();
                 let mut had_streaming_error = false;
+                // Use provider_start (captured before stream_response) for accurate TTFT
+                let mut ttft_recorded = false;
                 futures::pin_mut!(stream);
 
                 while let Some(result) = stream.next().await {
                     // Buffer successful events for post-stream observability
                     if let Ok(event) = &result {
                         buffer.push(event.clone());
+
+                        // Record TTFT on first successful event (includes full provider latency)
+                        if !ttft_recorded {
+                            let ttft_ms = provider_start.elapsed().as_millis() as i64;
+                            observability_span.record("gen_ai.ttft_ms", ttft_ms);
+                            ttft_recorded = true;
+                        }
                     }
 
                     // Convert to SSE Event and yield
@@ -7604,6 +7975,34 @@ pub async fn response_create_handler(
                             response.id
                         );
                         super::observability::record_response_result(&response);
+
+                        // Record timing and request/response fields for streaming
+                        // (Follows same pattern as chat completions in inference.rs)
+                        let request_forward_time = chrono::Utc::now();
+                        let span = tracing::Span::current();
+
+                        // Record timing
+                        span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+                        // Record raw_request (for responses API, this is the serialized params)
+                        span.record("gen_ai.raw_request", raw_request.as_str());
+
+                        // For streaming, raw_response and gateway_response are the reconstructed response JSON
+                        // (Similar to how chat completions joins gateway_response_chunks)
+                        if let Ok(response_json) = serde_json::to_string(&response) {
+                            span.record("gen_ai.raw_response", response_json.as_str());
+                            span.record("gen_ai.gateway_response", response_json.as_str());
+                        }
+
+                        // Record gateway_request
+                        if let Some(ref gw_req) = gateway_request_clone {
+                            span.record("gen_ai.gateway_request", gw_req.as_str());
+                        }
+
+                        // Record total processing time (handler start to stream complete)
+                        span.record("gen_ai.processing_time_ms", processing_start_time_clone.elapsed().as_millis() as i64);
+                        // Record response_time_ms (provider start to stream complete) for streaming analytics
+                        span.record("gen_ai.response_time_ms", provider_start.elapsed().as_millis() as i64);
                     } else {
                         tracing::warn!(
                             "Could not reconstruct response from {} buffered stream events",
@@ -7616,26 +8015,60 @@ pub async fn response_create_handler(
             Ok(Sse::new(sse_stream).into_response())
         } else {
             // Handle non-streaming response
-            let response = model
+            // Measure provider latency for analytics
+            let provider_start = std::time::Instant::now();
+            let result = model
                 .create_response(&params, &model_resolution.original_model_name, &clients, Some(&baggage_data))
                 .await?;
+            let provider_latency_ms = provider_start.elapsed().as_millis() as u32;
+
+            // Capture request_forward_time (when gateway completed processing)
+            let request_forward_time = chrono::Utc::now();
 
             // Log the response size for debugging
-            if let Ok(response_json) = serde_json::to_string(&response) {
+            if let Ok(response_json) = serde_json::to_string(&result.response) {
                 tracing::debug!("Response size: {} bytes", response_json.len());
             }
 
             // Record response fields for observability
-            super::observability::record_response_result(&response);
+            super::observability::record_response_result(&result.response);
+
+            // Record provider latency as span attribute for ClickHouse materialized view
+            // This is the gateway-calculated latency: time from request to provider until response received
+            let span = tracing::Span::current();
+            span.record("gen_ai.response_time_ms", provider_latency_ms as i64);
+
+            // Record timing fields
+            span.record("gen_ai.request_forward_time", request_forward_time.to_rfc3339().as_str());
+
+            // Record raw request/response from provider
+            span.record("gen_ai.raw_request", result.raw_request.as_str());
+            span.record("gen_ai.raw_response", result.raw_response.as_str());
+
+            // Record gateway request/response
+            if let Some(ref gw_req) = gateway_request {
+                span.record("gen_ai.gateway_request", gw_req.as_str());
+            }
+            if let Ok(gateway_response) = serde_json::to_string(&result.response) {
+                span.record("gen_ai.gateway_response", gateway_response.as_str());
+            }
+
+            // Record total processing time (handler start to response ready)
+            span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
 
             // Capture usage for analytics headers
-            if let Some(ref usage) = response.usage {
+            if let Some(ref usage) = result.response.usage {
                 if let Ok(mut guard) = captured_usage_clone.lock() {
                     *guard = Some((usage.input_tokens, usage.output_tokens, usage.total_tokens));
                 }
             }
 
-            Ok(Json(response).into_response())
+            // Capture latency for analytics (gateway_processing_ms calculation)
+            if let Ok(mut guard) = captured_latency_clone.lock() {
+                *guard = Some(provider_latency_ms);
+            }
+
+            Ok(Json(result.response).into_response())
         }
     }
     }
@@ -7644,6 +8077,33 @@ pub async fn response_create_handler(
     // Record error on span if request failed
     if let Err(ref error) = result {
         super::observability::record_error(error);
+
+        // Record request/response fields for parity with /v1/chat/completions in error scenarios
+        // This ensures ClickHouse InferenceFact has the same fields populated for both endpoints
+        let span = tracing::Span::current();
+
+        // Record gateway_request (client's request to the gateway)
+        if let Some(ref gw_req) = gateway_request_for_error {
+            span.record("gen_ai.gateway_request", gw_req.as_str());
+        }
+
+        // For responses API, raw_request is the same as gateway_request (the request is passed through to provider)
+        if let Some(ref gw_req) = gateway_request_for_error {
+            span.record("gen_ai.raw_request", gw_req.as_str());
+        }
+
+        // raw_response contains the error message (matches chat completions pattern from extract_failure_model_inference)
+        span.record("gen_ai.raw_response", error.to_string().as_str());
+
+        // gateway_response contains the JSON error response sent to the client
+        // This is what error.into_response() would serialize
+        let (_status_code, error_body) = error.to_response_json();
+        if let Ok(gateway_response_json) = serde_json::to_string(&error_body) {
+            span.record("gen_ai.gateway_response", gateway_response_json.as_str());
+        }
+
+        // Record total processing time even for errors (handler start to error)
+        span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
     }
 
     // Helper to add analytics headers to a response
@@ -7688,6 +8148,17 @@ pub async fn response_create_handler(
                     response
                         .headers_mut()
                         .insert("x-tensorzero-total-tokens", value);
+                }
+            }
+        }
+        // Add model latency header for gateway_processing_ms calculation
+        // This is used by analytics middleware: gateway_processing_ms = total_duration_ms - model_latency_ms
+        if let Ok(guard) = captured_latency.lock() {
+            if let Some(latency_ms) = *guard {
+                if let Ok(value) = axum::http::HeaderValue::from_str(&latency_ms.to_string()) {
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-model-latency-ms", value);
                 }
             }
         }
@@ -8609,6 +9080,62 @@ mod tests {
 
     use crate::cache::CacheEnabledMode;
     use crate::inference::types::{Text, TextChunk};
+    use crate::guardrail_table::{GuardrailResult, ProviderGuardrailResult};
+
+    #[test]
+    fn guardrail_retry_policy_classifies_errors() {
+        let retryable = Error::new(ErrorDetails::InferenceServer {
+            message: "transient".to_string(),
+            provider_type: "bud_sentinel".to_string(),
+            raw_request: None,
+            raw_response: Some("{\"code\":14,\"message\":\"Unavailable\"}".to_string()),
+        });
+
+        let non_retryable = Error::new(ErrorDetails::ApiKeyMissing {
+            provider_name: "Bud Sentinel".to_string(),
+        });
+
+        assert!(is_retryable_guardrail_error(&retryable));
+        assert!(!is_retryable_guardrail_error(&non_retryable));
+    }
+
+    #[test]
+    fn guardrail_result_with_provider_error_is_failure() {
+        let result = GuardrailResult {
+            guardrail_id: "g1".to_string(),
+            flagged: false,
+            provider_results: vec![ProviderGuardrailResult {
+                provider_type: "bud_sentinel".to_string(),
+                flagged: false,
+                executed_probes: vec![],
+                enabled_rules: HashMap::new(),
+                raw_result: crate::moderation::ModerationResult {
+                    flagged: false,
+                    categories: crate::moderation::ModerationCategories::default(),
+                    category_scores: crate::moderation::ModerationCategoryScores::default(),
+                    category_applied_input_types: None,
+                    hallucination_details: None,
+                    ip_violation_details: None,
+                    other_categories: Default::default(),
+                },
+                error: Some("boom".to_string()),
+            }],
+            merged_categories: crate::moderation::ModerationCategories::default(),
+            merged_scores: crate::moderation::ModerationCategoryScores::default(),
+            merged_category_applied_input_types: None,
+            merged_other_categories: Default::default(),
+            hallucination_details: None,
+            ip_violation_details: None,
+        };
+
+        assert!(guardrail_result_has_errors(&result));
+    }
+
+    #[test]
+    fn moderation_guardrail_failure_returns_502() {
+        let (status, _) = create_guardrail_failure_response("Guardrail execution failed");
+        assert_eq!(status, StatusCode::BAD_GATEWAY);
+    }
 
     #[test]
     fn test_try_from_openai_compatible_params() {

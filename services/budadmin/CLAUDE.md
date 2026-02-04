@@ -107,3 +107,19 @@ The project uses these path aliases configured in tsconfig.json:
 - Complex workflows in `/src/flows/` have multiple interdependent steps
 - API error responses show toast notifications via `handleErrorResponse`
 - File uploads use FormData with automatic content-type switching
+
+### Toast Notifications
+Always use the custom toast functions from `@/components/toast` instead of Ant Design's `message` API to maintain consistent theming:
+
+```typescript
+import { successToast, errorToast } from "@/components/toast";
+
+// Correct - uses themed toast
+successToast("Pipeline updated successfully");
+errorToast("Failed to update pipeline");
+
+// Incorrect - do NOT use antd message
+import { message } from "antd";
+message.success("..."); // Don't use this
+message.error("...");   // Don't use this
+```

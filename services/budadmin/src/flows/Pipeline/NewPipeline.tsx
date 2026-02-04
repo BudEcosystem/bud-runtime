@@ -10,11 +10,11 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { BudFormContext } from "@/components/ui/bud/context/BudFormContext";
 import { useBudPipeline, DAGDefinition } from "src/stores/useBudPipeline";
 import { useRouter } from "next/router";
-import { message } from "antd";
+import { successToast, errorToast } from "@/components/toast";
 
 export default function NewPipeline() {
   const router = useRouter();
-  const { createWorkflow } = useBudPipeline();
+  const { createWorkflow, error } = useBudPipeline();
   const { closeDrawer } = useDrawer();
   const { form, submittable } = useContext(BudFormContext);
   const [isCreating, setIsCreating] = useState(false);
@@ -50,14 +50,18 @@ export default function NewPipeline() {
 
           const result = await createWorkflow(dag);
           if (result) {
-            message.success("Pipeline draft created");
+            successToast("Pipeline draft created");
             closeDrawer();
             // Redirect to the detail page for visual editing
             router.push(`/pipelines/${result.id}`);
+          } else {
+            // Get error from store - createWorkflow returns null on failure
+            const storeError = useBudPipeline.getState().error;
+            errorToast(storeError || "Failed to create pipeline");
           }
-        } catch (error) {
-          console.error("Error creating pipeline:", error);
-          message.error("Failed to create pipeline");
+        } catch (err) {
+          console.error("Error creating pipeline:", err);
+          errorToast("Failed to create pipeline");
         } finally {
           setIsCreating(false);
         }

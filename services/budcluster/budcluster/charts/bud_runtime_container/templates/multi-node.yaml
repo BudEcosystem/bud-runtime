@@ -71,8 +71,6 @@ spec:
               {{- include "bud-runtime-container.cpu-node-affinity" . | nindent 14 }}
               {{- end }}
             {{- end }}
-            imagePullSecrets:
-            - name: {{ $.Values.imagePullSecrets.name }}
             {{- if eq .node.type "cuda" }}
             runtimeClassName: nvidia
             schedulerName: hami-scheduler
@@ -145,8 +143,6 @@ spec:
                 {{- if eq .node.type "cpu_high" }}
                 {{- include "bud-runtime-container.cpu-node-affinity" . | nindent 16 }}
                 {{- end }}
-              imagePullSecrets:
-              - name: {{ $.Values.imagePullSecrets.name }}
               {{- if eq .node.type "cuda" }}
               runtimeClassName: nvidia
               schedulerName: hami-scheduler
