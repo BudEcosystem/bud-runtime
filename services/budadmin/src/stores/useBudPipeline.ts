@@ -7,6 +7,21 @@ const BUDPIPELINE_API = "/budpipeline";
 // Use real API or fallback to mock data (for development without backend)
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_WORKFLOW_DATA === "true";
 
+/**
+ * Extract error message from various API error response formats.
+ * Handles FastAPI ClientException, HTTPException, and standard error formats.
+ */
+const extractErrorMessage = (error: any, fallback: string): string => {
+  const responseData = error?.response?.data;
+  return (
+    responseData?.message ||                    // FastAPI ClientException format: {"message": "..."}
+    responseData?.detail?.message ||            // FastAPI HTTPException with object: {"detail": {"message": "..."}}
+    (typeof responseData?.detail === 'string' ? responseData?.detail : null) ||  // FastAPI HTTPException with string
+    error?.message ||                           // Axios/network error
+    fallback
+  );
+};
+
 // Types for budpipeline DAG orchestration
 export type PipelineParameter = {
   name: string;
@@ -860,16 +875,8 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return newWorkflow;
     } catch (error: any) {
       console.error("Failed to create workflow:", error);
-      // Extract error message from various possible response formats
-      const responseData = error?.response?.data;
-      const errorMessage =
-        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
-        responseData?.detail?.message ||   // FastAPI HTTPException with object: {"detail": {"message": "..."}}
-        (typeof responseData?.detail === 'string' ? responseData?.detail : null) || // FastAPI HTTPException with string
-        error?.message ||                  // Axios/network error
-        "Failed to create workflow";
       set({
-        error: errorMessage,
+        error: extractErrorMessage(error, "Failed to create workflow"),
         isLoading: false,
       });
       return null;
@@ -915,16 +922,8 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return updatedWorkflow;
     } catch (error: any) {
       console.error("Failed to update workflow:", error);
-      // Extract error message from various possible response formats
-      const responseData = error?.response?.data;
-      const errorMessage =
-        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
-        responseData?.detail?.message ||   // FastAPI HTTPException with object: {"detail": {"message": "..."}}
-        (typeof responseData?.detail === 'string' ? responseData?.detail : null) || // FastAPI HTTPException with string
-        error?.message ||                  // Axios/network error
-        "Failed to update workflow";
       set({
-        error: errorMessage,
+        error: extractErrorMessage(error, "Failed to update workflow"),
         isLoading: false,
       });
       return null;
@@ -989,16 +988,8 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       return newExecution;
     } catch (error: any) {
       console.error("Failed to execute workflow:", error);
-      // Extract error message from various possible response formats
-      const responseData = error?.response?.data;
-      const errorMessage =
-        responseData?.message ||           // FastAPI ClientException format: {"message": "..."}
-        (typeof responseData?.detail === 'object' ? JSON.stringify(responseData.detail) : responseData?.detail) ||  // FastAPI HTTPException format: {"detail": "..."}
-        (typeof responseData === "string" ? responseData : null) ||
-        error?.message ||                  // Axios/network error
-        "Failed to execute workflow";
       set({
-        error: errorMessage,
+        error: extractErrorMessage(error, "Failed to execute workflow"),
         isLoading: false,
       });
       return null;

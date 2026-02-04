@@ -28,7 +28,7 @@ from dapr.conf import settings as dapr_settings
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings, secrets_settings
-from budapp.commons.exceptions import SuppressAndLog
+from budapp.commons.exceptions import ClientException, SuppressAndLog
 from budapp.commons.resiliency import retry
 
 from .http_client import AsyncHTTPClient
@@ -492,8 +492,6 @@ class DaprService(DaprClient):
 
             # Check for error status codes and raise appropriate exceptions
             if response.status_code >= 400:
-                from budapp.commons.exceptions import ClientException
-
                 # Extract error message from response
                 error_message = "Service invocation failed"
                 if isinstance(response_data, dict):
