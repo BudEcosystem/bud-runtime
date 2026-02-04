@@ -53,8 +53,12 @@ const PipelineExecutionDetails = () => {
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
       return "—";
     }
-    const totalMinutes = Math.max(0, Math.round((end - start) / 60000));
-    return totalMinutes === 1 ? "1 min ago" : `${totalMinutes} min ago`;
+    const totalSeconds = Math.max(0, Math.round((end - start) / 1000));
+    if (totalSeconds < 60) {
+      return totalSeconds === 1 ? "1 sec" : `${totalSeconds} sec`;
+    }
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    return totalMinutes === 1 ? "1 min" : `${totalMinutes} min`;
   }, [selectedExecution?.started_at, selectedExecution?.completed_at]);
 
   const executionSpecs = useMemo(
