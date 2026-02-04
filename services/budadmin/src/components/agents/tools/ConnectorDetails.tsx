@@ -168,7 +168,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   sessionIndex = 0,
   totalSessions = 1,
 }) => {
-  const { fetchConnectorDetails, selectedConnectorDetails, isLoadingDetails } = useConnectors();
   const {
     getSessionByPromptId,
     sessions,
@@ -177,6 +176,26 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     isEditMode,
     isEditVersionMode,
   } = useAgentStore();
+
+  // Compute session-scoped promptId for connector operations (same logic as ToolsHome)
+  const promptIdForConnectors = React.useMemo(() => {
+    if (!promptId) return undefined;
+    const session = getSessionByPromptId(promptId);
+    if ((isEditMode || isEditVersionMode) && session?.name) {
+      return session.name;
+    }
+    return promptId;
+  }, [promptId, getSessionByPromptId, isEditMode, isEditVersionMode]);
+
+  // Use session-scoped selectors for connector details (NOT global state)
+  // This ensures each agent session has its own connector details and prevents stale data
+  const fetchConnectorDetails = useConnectors((state) => state.fetchConnectorDetails);
+  const selectedConnectorDetails = useConnectors((state) =>
+    promptIdForConnectors ? state.connectorDetailsByPromptId[promptIdForConnectors] || null : state.selectedConnectorDetails
+  );
+  const isLoadingDetails = useConnectors((state) =>
+    promptIdForConnectors ? state.loadingDetailsByPromptId[promptIdForConnectors] || false : state.isLoadingDetails
+  );
   const { currentWorkflow, selectedProject } = useAddAgent();
 
   // Determine initial step - check if this is an OAuth callback for this connector
@@ -341,6 +360,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   }, [promptId, connector.id, selectedConnectorDetails?.auth_type, getSessionByPromptId]);
 
   // Fetch connector details on mount (only if not already loaded)
+  // CRITICAL: Pass promptIdForConnectors to store in session-scoped state
   useEffect(() => {
     // Don't fetch if we already have the details for this connector
     if (selectedConnectorDetails && selectedConnectorDetails.id === connector.id) {
@@ -350,8 +370,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     if (isLoadingDetails) {
       return;
     }
-    fetchConnectorDetails(connector.id);
-  }, [connector.id, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails]);
+    // Pass promptIdForConnectors to store in session-scoped state (not global)
+    fetchConnectorDetails(connector.id, promptIdForConnectors);
+  }, [connector.id, fetchConnectorDetails, isLoadingDetails, selectedConnectorDetails, promptIdForConnectors]);
 
   // Handle OAuth callback on mount
   useEffect(() => {
