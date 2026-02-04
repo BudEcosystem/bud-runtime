@@ -29,7 +29,7 @@ export interface Connector {
 }
 
 export interface CredentialSchemaField {
-  type: 'text' | 'password' | 'url' | 'dropdown';
+  type: 'text' | 'password' | 'url' | 'dropdown' | 'key-value-array';
   field: string;
   label: string;
   order: number;
@@ -37,6 +37,12 @@ export interface CredentialSchemaField {
   description: string;
   options?: string[];
   visible_when?: string[];
+}
+
+// Type for key-value pair entries (used with key-value-array field type)
+export interface KeyValuePair {
+  key: string;
+  value: string;
 }
 
 export interface ConnectorsListParams {

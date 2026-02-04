@@ -593,9 +593,29 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   const handleContinue = async () => {
     // Validate required fields before continuing
     const credentialSchema = selectedConnectorDetails?.credential_schema || [];
-    const allRequiredFieldsFilled = credentialSchema
-      .filter(field => field.required)
-      .every(field => formData[field.field]);
+    const visibleRequiredFields = getVisibleFields(credentialSchema).filter(field => field.required);
+    const allRequiredFieldsFilled = visibleRequiredFields.every(field => {
+      const value = formData[field.field];
+
+      // For key-value-array fields, check if there's at least one valid pair with a non-empty key
+      if (field.type === 'key-value-array') {
+        if (!value) return false;
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            return parsed.some((pair: { key?: string; value?: string }) =>
+              pair && pair.key?.trim()
+            );
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      }
+
+      // For other fields, just check if value exists
+      return !!value;
+    });
 
     if (!allRequiredFieldsFilled) {
       errorToast('Please fill in all required fields');
@@ -615,9 +635,37 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       // Format the credentials object based on the form data
       const credentials: Record<string, any> = {};
 
+      // Build a map of field types from credential_schema for proper formatting
+      const fieldTypeMap = new Map<string, string>();
+      credentialSchema.forEach(field => {
+        fieldTypeMap.set(field.field, field.type);
+      });
+
       for (const [key, value] of Object.entries(formData)) {
+        const fieldType = fieldTypeMap.get(key);
+
+        // Handle key-value-array fields - parse JSON string to array of {key, value} objects
+        if (fieldType === 'key-value-array') {
+          if (value) {
+            try {
+              const parsed = JSON.parse(value);
+              // Filter out empty pairs and ensure proper structure
+              if (Array.isArray(parsed)) {
+                const validPairs = parsed.filter(
+                  (pair: { key?: string; value?: string }) =>
+                    pair && (pair.key?.trim() || pair.value?.trim())
+                );
+                if (validPairs.length > 0) {
+                  credentials[key] = validPairs;
+                }
+              }
+            } catch {
+              // If parsing fails, skip this field
+            }
+          }
+        }
         // Convert comma-separated strings to arrays for specific fields
-        if (key === 'passthrough_headers' || key === 'scopes') {
+        else if (key === 'passthrough_headers' || key === 'scopes') {
           if (value) {
             credentials[key] = value.split(',').map(item => item.trim()).filter(Boolean);
           }
@@ -926,7 +974,28 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
     return visibleFields
       .filter(field => field.required)
-      .every(field => formData[field.field]);
+      .every(field => {
+        const value = formData[field.field];
+
+        // For key-value-array fields, check if there's at least one valid pair with a non-empty key
+        if (field.type === 'key-value-array') {
+          if (!value) return false;
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+              return parsed.some((pair: { key?: string; value?: string }) =>
+                pair && pair.key?.trim()
+              );
+            }
+            return false;
+          } catch {
+            return false;
+          }
+        }
+
+        // For other fields, just check if value exists
+        return !!value;
+      });
   };
 
   // Render tool details view
