@@ -45,15 +45,11 @@ const statusConfig: Record<string, { icon: React.ReactNode; color: string; bgCol
 interface StepTimelineItemProps {
   step: PipelineStepExecution;
   isLast: boolean;
-  onSelect?: (step: PipelineStepExecution) => void;
-  isSelected?: boolean;
 }
 
 const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
   step,
   isLast,
-  onSelect,
-  isSelected,
 }) => {
   const normalizedStatus = step.status?.toLowerCase() || 'pending';
   const config = statusConfig[normalizedStatus] || statusConfig.pending;
@@ -87,12 +83,7 @@ const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
 
       {/* Content */}
       <Box
-        className={`
-          ml-3 flex-1 mb-4 p-3 rounded-lg border cursor-pointer transition-all
-          ${isSelected ? "border-blue-500 bg-[#1a2744]" : "border-[#2F3035] bg-[#1A1A1A]"}
-          hover:border-blue-400
-        `}
-        onClick={() => onSelect?.(step)}
+        className="ml-3 flex-1 mb-4 p-3 rounded-lg border border-[#2F3035] bg-[#1A1A1A]"
       >
         <Flex justify="between" align="center">
           <Flex align="center" gap="2">
@@ -156,14 +147,10 @@ const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
 
 interface ExecutionTimelineProps {
   execution: PipelineExecution;
-  onStepSelect?: (step: PipelineStepExecution) => void;
-  selectedStepId?: string;
 }
 
 export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({
   execution,
-  onStepSelect,
-  selectedStepId,
 }) => {
   const normalizedExecStatus = execution.status?.toLowerCase() || 'pending';
   const overallConfig = statusConfig[normalizedExecStatus] || statusConfig.pending;
@@ -186,8 +173,6 @@ export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({
               key={step.step_id}
               step={step}
               isLast={index === execution.steps.length - 1}
-              onSelect={onStepSelect}
-              isSelected={selectedStepId === step.step_id}
             />
           ))
         ) : (

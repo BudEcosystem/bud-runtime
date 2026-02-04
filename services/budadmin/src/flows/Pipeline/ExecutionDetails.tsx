@@ -2,7 +2,6 @@ import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import DrawerCard from "@/components/ui/bud/card/DrawerCard";
-import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
 import { ExecutionTimeline } from "@/components/pipelineEditor";
 import {
   Text_11_400_808080,
@@ -10,8 +9,8 @@ import {
 } from "@/components/ui/text";
 import { Empty, Tag } from "antd";
 import { useDrawer } from "src/hooks/useDrawer";
-import { useBudPipeline, PipelineStep, PipelineStepExecution } from "src/stores/useBudPipeline";
-import { useEffect, useMemo, useState } from "react";
+import { useBudPipeline } from "src/stores/useBudPipeline";
+import { useEffect, useMemo } from "react";
 import { differenceInMinutes } from "date-fns";
 import { SpecificationTableItem } from "../components/SpecificationTableItem";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
@@ -19,7 +18,6 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 const PipelineExecutionDetails = () => {
   const { drawerProps } = useDrawer();
   const { getExecution, selectedExecution } = useBudPipeline();
-  const [selectedStep, setSelectedStep] = useState<PipelineStep | null>(null);
 
   const executionId = drawerProps?.executionId as string | undefined;
   const workflow = drawerProps?.workflow;
@@ -29,11 +27,6 @@ const PipelineExecutionDetails = () => {
       getExecution(executionId);
     }
   }, [executionId, getExecution]);
-
-  const selectedStepExecution = useMemo<PipelineStepExecution | undefined>(() => {
-    if (!selectedExecution || !selectedStep) return undefined;
-    return selectedExecution.steps?.find((step) => step.step_id === selectedStep.id);
-  }, [selectedExecution, selectedStep]);
 
   const formatMinutesAgo = (value?: string) => {
     if (!value) return "—";
@@ -116,16 +109,7 @@ const PipelineExecutionDetails = () => {
               />
               <DrawerCard>
                 <div className="mt-3">
-                  <ExecutionTimeline
-                    execution={selectedExecution}
-                    onStepSelect={(step) => {
-                      const workflowStep = workflow?.dag?.steps?.find(
-                        (entry) => entry.id === step.step_id
-                      );
-                      if (workflowStep) setSelectedStep(workflowStep);
-                    }}
-                    selectedStepId={selectedStep?.id}
-                  />
+                  <ExecutionTimeline execution={selectedExecution} />
                 </div>
               </DrawerCard>
             </BudDrawerLayout>
@@ -147,11 +131,6 @@ const PipelineExecutionDetails = () => {
           </div>
         )}
       </BudWraperBox>
-      <StepDetailDrawer
-        step={selectedStep}
-        execution={selectedStepExecution}
-        onClose={() => setSelectedStep(null)}
-      />
     </BudForm>
   );
 };
