@@ -55,10 +55,12 @@ export default function EditPipeline() {
             successToast("Pipeline updated successfully");
             closeDrawer();
           } else {
-            errorToast("Failed to update pipeline");
+            // Get error from store - updateWorkflow returns null on failure
+            const storeError = useBudPipeline.getState().error;
+            errorToast(storeError || "Failed to update pipeline");
           }
-        } catch (error) {
-          console.error("Error updating pipeline:", error);
+        } catch (err) {
+          console.error("Error updating pipeline:", err);
           errorToast("Failed to update pipeline");
         } finally {
           setIsSaving(false);

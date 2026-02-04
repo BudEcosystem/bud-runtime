@@ -257,6 +257,9 @@ const handleErrorResponse = (err) => {
       }
     }
     return false;
+  } else if (err.response && err.response.status === 409) {
+    // Handle 409 Conflict errors - reject so component can handle it
+    return Promise.reject(err);
   } else {
     // Don't show error toast for silent endpoints - let the component handle the error
     if (err.config?.url?.includes('/prompts/oauth/status') ||

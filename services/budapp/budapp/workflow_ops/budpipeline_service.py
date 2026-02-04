@@ -101,6 +101,9 @@ class BudPipelineService(SessionMixin):
                 },
             )
             return result
+        except ClientException:
+            # Re-raise ClientException as-is to preserve status code
+            raise
         except Exception as e:
             logger.exception("Failed to create pipeline")
             raise ClientException(
@@ -243,6 +246,9 @@ class BudPipelineService(SessionMixin):
                 headers=headers,
             )
             return result
+        except ClientException:
+            # Re-raise ClientException as-is to preserve status code
+            raise
         except Exception as e:
             logger.exception(f"Failed to update pipeline {pipeline_id}")
             raise ClientException(
