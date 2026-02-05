@@ -765,79 +765,57 @@ const formatDuration = (seconds: number): string => {
   return `${seconds.toFixed(2)}s`;
 };
 
+// Helper function to convert a TraceSpan to a LogEntry
+// Centralizes the mapping logic to avoid duplication across build functions
+const traceSpanToLogEntry = (
+  span: TraceSpan,
+  earliestTimestamp: number,
+  overrides?: Partial<LogEntry>
+): LogEntry => {
+  const timestamp = new Date(span.timestamp).getTime();
+  const attrs = span.span_attributes || {};
+
+  const baseEntry: LogEntry = {
+    id: span.span_id,
+    time: formatTime(span.timestamp),
+    namespace: span.resource_attributes?.["service.name"] || "",
+    title: span.span_name || "Unknown Span",
+    childCount: span.child_span_count,
+    metrics: {
+      tag: span.service_name || "",
+    },
+    duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
+    startOffsetSec: (timestamp - earliestTimestamp) / 1000,
+    traceId: span.trace_id,
+    spanId: span.span_id,
+    parentSpanId: span.parent_span_id || "",
+    canExpand: (span.child_span_count ?? 0) > 0,
+    rawData: span as unknown as Record<string, any>,
+    // Logfire-style fields
+    level: attrs.level || "INFO",
+    scopeName: span.scope_name || "",
+    inputTokens: attrs["gen_ai.usage.input_tokens"],
+    outputTokens: attrs["gen_ai.usage.output_tokens"],
+    serviceName: span.service_name,
+  };
+
+  // Apply any overrides provided by the caller
+  return overrides ? { ...baseEntry, ...overrides } : baseEntry;
+};
+
 // Helper function to extract only root spans (those with empty parent_span_id)
 const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogEntry[] => {
-  const result: LogEntry[] = [];
-
-  spans.forEach((span) => {
-    // Only include spans with empty parent_span_id (root spans)
-    if (!span.parent_span_id || span.parent_span_id === "") {
-      const timestamp = new Date(span.timestamp).getTime();
-      const attrs = span.span_attributes || {};
-
-      const entry: LogEntry = {
-        id: span.span_id,
-        time: formatTime(span.timestamp),
-        namespace: span.resource_attributes?.["service.name"] || "",
-        title: span.span_name,
-        childCount: span.child_span_count,
-        metrics: {
-          tag: span.service_name,
-        },
-        duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
-        startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-        traceId: span.trace_id,
-        spanId: span.span_id,
-        parentSpanId: span.parent_span_id,
-        canExpand: (span.child_span_count ?? 0) > 0, // Only expandable if has children
-        rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
-        // Logfire-style fields
-        level: attrs.level || "INFO",
-        scopeName: span.scope_name || "",
-        inputTokens: attrs["gen_ai.usage.input_tokens"],
-        outputTokens: attrs["gen_ai.usage.output_tokens"],
-        serviceName: span.service_name,
-      };
-
-      result.push(entry);
-    }
-  });
-
-  // Sort by timestamp
-  result.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
-
-  return result;
+  return spans
+    .filter((span) => !span.parent_span_id || span.parent_span_id === "")
+    .map((span) => traceSpanToLogEntry(span, earliestTimestamp))
+    .sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 };
 
 // Helper function to build flat list of all spans (for flatten view)
 const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogEntry[] => {
-  return spans.map((span) => {
-    const timestamp = new Date(span.timestamp).getTime();
-    const attrs = span.span_attributes || {};
-    return {
-      id: span.span_id,
-      time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.name"] || "",
-      title: span.span_name,
-      childCount: span.child_span_count,
-      metrics: {
-        tag: span.service_name,
-      },
-      duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
-      startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-      traceId: span.trace_id,
-      spanId: span.span_id,
-      parentSpanId: span.parent_span_id,
-      canExpand: false, // No expansion in flatten mode
-      rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
-      // Logfire-style fields
-      level: attrs.level || "INFO",
-      scopeName: span.scope_name || "",
-      inputTokens: attrs["gen_ai.usage.input_tokens"],
-      outputTokens: attrs["gen_ai.usage.output_tokens"],
-      serviceName: span.service_name,
-    };
-  }).sort((a, b) => a.startOffsetSec - b.startOffsetSec);
+  return spans
+    .map((span) => traceSpanToLogEntry(span, earliestTimestamp, { canExpand: false }))
+    .sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 };
 
 // Helper function to build hierarchical tree from trace detail spans
@@ -849,36 +827,9 @@ const buildChildrenFromTraceDetail = (
   // Build a map of span_id to LogEntry
   const spanMap = new Map<string, LogEntry>();
 
-  // First pass: create all LogEntry nodes (excluding the root span itself)
+  // First pass: create all LogEntry nodes with empty children array for tree building
   spans.forEach((span) => {
-    const timestamp = new Date(span.timestamp).getTime();
-    const attrs = span.span_attributes || {};
-
-    const entry: LogEntry = {
-      id: span.span_id,
-      time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.name"] || "",
-      title: span.span_name,
-      childCount: span.child_span_count, // Use child_span_count from API
-      metrics: {
-        tag: span.service_name,
-      },
-      duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
-      startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-      children: [],
-      traceId: span.trace_id,
-      spanId: span.span_id,
-      parentSpanId: span.parent_span_id,
-      canExpand: (span.child_span_count ?? 0) > 0, // Set canExpand based on child_span_count
-      rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
-      // Logfire-style fields
-      level: attrs.level || "INFO",
-      scopeName: span.scope_name || "",
-      inputTokens: attrs["gen_ai.usage.input_tokens"],
-      outputTokens: attrs["gen_ai.usage.output_tokens"],
-      serviceName: span.service_name,
-    };
-
+    const entry = traceSpanToLogEntry(span, earliestTimestamp, { children: [] });
     spanMap.set(span.span_id, entry);
   });
 
@@ -962,37 +913,17 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
       // Sort children by timestamp
       childNodes.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 
-      const timestamp = new Date(span.timestamp).getTime();
-      const attrs = span.span_attributes || {};
-
       // Calculate total descendant count (all children + grandchildren + etc.)
       const totalDescendants = childNodes.reduce(
         (sum, child) => sum + 1 + countDescendants(child),
         0
       );
 
-      return {
-        id: span.span_id,
-        time: formatTime(span.timestamp),
-        namespace: span.resource_attributes?.["service.name"] || "",
-        title: span.span_name || 'Unknown Span',
+      return traceSpanToLogEntry(span, earliestTimestamp, {
         childCount: totalDescendants,
-        metrics: { tag: span.service_name || '' },
-        duration: (span.duration ?? 0) / 1_000_000_000,
-        startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-        traceId: span.trace_id,
-        spanId: span.span_id,
-        parentSpanId: span.parent_span_id || '',
         canExpand: childNodes.length > 0,
         children: childNodes.length > 0 ? childNodes : undefined,
-        rawData: span as unknown as Record<string, any>,
-        // Logfire-style fields
-        level: attrs.level || "INFO",
-        scopeName: span.scope_name || "",
-        inputTokens: attrs["gen_ai.usage.input_tokens"],
-        outputTokens: attrs["gen_ai.usage.output_tokens"],
-        serviceName: span.service_name,
-      };
+      });
     };
 
     result.push(buildNode(rootSpan));
