@@ -32,7 +32,6 @@ from uuid import uuid4
 
 import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from budapp.commons.constants import (
@@ -77,15 +76,6 @@ class TestCustomProbeWorkflowIntegration:
         user.is_superuser = True
         user.status = "active"
         return user
-
-    @pytest.fixture
-    def auth_headers(self):
-        """Create authorization headers."""
-        return {
-            "Authorization": "Bearer test-token",
-            "X-Resource-Type": "project",
-            "X-Entity-Id": str(uuid4()),
-        }
 
     @pytest.fixture
     def mock_project(self):
@@ -175,7 +165,7 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
 
     @pytest.mark.asyncio
     async def test_full_workflow_step1_step2_step3_creates_probe(
-        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy, auth_headers
+        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy
     ):
         """Test full workflow: Step 1 -> Step 2 -> Step 3 with trigger creates probe."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
