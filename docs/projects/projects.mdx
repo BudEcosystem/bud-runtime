@@ -5,7 +5,7 @@ description: "Projects module for organizing deployments, teams, analytics, and 
 
 ## 1. Description
 
-The Projects module in Bud Admin groups every artifact—models, deployments, routes, analytics, and guardrails—into collaborative workspaces. Each project anchors cloud and local model deployments (Hugging Face, URL-based, and disk-based) so teams can ship GPU-optional GenAI experiences with shared governance, observability, and access control. Projects expose structured tabs for Deployments, Agents, Routes, Analytics, Clusters, Observability, and Guardrails, mirroring the Bud platform’s focus on running production workloads without costly GPU dependence.
+The Projects module in Bud Admin groups every artifact—models, deployments, routes, analytics, and guardrails—into collaborative workspaces. Each project anchors cloud and local model deployments (Hugging Face, URL-based, and disk-based) so teams can ship GPU-optional GenAI experiences with shared governance, observability, and access control. Projects expose structured tabs for Deployments, Agents, Routes, Analytics, Clusters, Observability, and Guardrails, plus deployment-level Settings that include SLO-aware autoscaling to keep latency, throughput, and cost goals aligned with real workload demand.
 
 ## 2. USPs (Unique Selling Propositions)
 
@@ -28,6 +28,10 @@ Guardrail tab centralizes safety policies, while project-level delete/edit actio
 ### 5. Built-in observability and benchmarking
 
 Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and inference timelines so teams can benchmark backends and route traffic confidently.
+
+### 6. SLO-aware autoscaling controls
+
+Deployments can scale based on SLO-driven metrics such as queue depth, TTFT, end-to-end latency, and utilization. Bud AI Foundry’s autoscaler lets teams set replica limits, metric thresholds, and predictive or schedule-driven scaling so performance objectives and costs stay balanced.
 
 ## 3. Features
 
@@ -82,6 +86,14 @@ Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and 
 
 - Delete action prompts warnings when deployments exist, blocking removal until endpoints are removed.
 - Overlay confirmation keeps observability overlays and notifications synchronized with the action result.
+
+### 3.11 SLO-aware autoscaling
+
+- Auto-scaling is essential for delivering fast and cost-effective GenAI workloads, but every application has different service level objectives, some prioritize time to first token, others focus on end-to-end latency, throughput, or resource utilization. That’s why Bud AI Foundry supports SLO-aware autoscaling, enabling deployments to scale based on the SLOs and business priorities that matter most. The result is smarter scaling, predictable performance, and optimized costs tailored to your specific SLO demands.
+- Enable autoscaling in deployment Settings to scale replicas between a min/max range.
+- Pick model-specific metrics (queue depth, TTFT, TPOT, end-to-end latency, embedding/classify latency) as scaling triggers.
+- Add schedule hints for predictable traffic windows and enable predictive scaling for demand forecasting.
+- Tune scale-up/scale-down stabilization windows and policies to prevent thrashing.
 
 ## 4. How-to Guides
 
@@ -154,6 +166,10 @@ Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and 
 1. View Settings to configure rate limits, retries, and fallback chains per deployment.
 2. Toggle Rate Limit and choose the algorithm (fixed, sliding, or token bucket), then set per-second/minute/hour quotas and burst size.
 3. Add Fallback deployment and Retry limits to harden reliability, then Save to persist the policy.
+4. Enable Autoscaling to activate SLO-aware scaling controls inside Settings.
+5. Set min/max replicas and choose the metric sources (queue depth, TTFT, TPOT, end-to-end latency, or embedding/classify latency) that should trigger scaling.
+6. Add Schedule Hints for planned traffic windows, or enable Predictive Scaling to look ahead using historical demand.
+7. Tune scaling behavior (stabilization windows and scaling policies) to keep capacity changes smooth, then save the autoscale configuration.
 
 #### 4.6.5 Benchmarks
 
@@ -325,3 +341,7 @@ Open Use this model from the deployment row to copy ready-made snippets in cURL,
 **Q10. What happens when I publish a model?**
 
 Publishing sets token pricing (input/output, USD per selected token block) and makes the endpoint available in the Bud customer dashboard for org users. You can revisit Publish Details to review pricing history, adjust prices, or unpublish without deleting the deployment.
+
+**Q11. How does autoscaling work for deployments?**
+
+Autoscaling is configured in the deployment Settings tab. Enable it to set min/max replicas, choose SLO-driven metrics (queue depth, TTFT, TPOT, end-to-end latency, embedding/classify latency), and optionally add schedule hints or predictive scaling. These controls let the deployment scale intelligently against performance and cost objectives.
