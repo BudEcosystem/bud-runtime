@@ -129,6 +129,9 @@ class MCPToolConfig(BaseModel):
     gateway_config: Dict[str, str] = Field(
         default_factory=dict, description="Gateway configuration with connector_id as key and gateway_id as value"
     )
+    gateway_slugs: Dict[str, str] = Field(
+        default_factory=dict, description="Gateway slugs with connector_id as key and gateway_slug as value"
+    )
     server_config: Dict[str, List[str]] = Field(
         default_factory=dict, description="Server configuration with connector_id as key and list of tool IDs as value"
     )

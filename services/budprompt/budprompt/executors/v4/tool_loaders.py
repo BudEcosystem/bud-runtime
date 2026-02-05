@@ -54,14 +54,19 @@ class MCPToolLoader(ToolLoader):
         self.base_url = app_settings.mcp_foundry_base_url
         self.api_key = app_settings.mcp_foundry_api_key
 
-    async def load_tools(self, tool_config: MCPToolConfig) -> Optional[MCPServerStreamableHTTP]:
-        """Load MCP tools from configuration.
+    async def load_tools(self, tool_config: MCPToolConfig) -> Optional[Any]:
+        """Load MCP tools from configuration with optional name shortening.
+
+        When gateway_slugs are provided, tool names are shortened by stripping
+        the gateway prefix. This helps with:
+        1. OpenAI's 64-character limit on function/tool names
+        2. Improved accuracy in smaller LLMs with cleaner tool names
 
         Args:
             tool_config: MCP tool configuration
 
         Returns:
-            MCPServerStreamableHTTP instance or None if server_url is missing
+            MCPServerStreamableHTTP instance (possibly renamed) or None if server_url is missing
         """
         # Only create toolset if server_url is present
         if not tool_config.server_url:
@@ -80,6 +85,37 @@ class MCPToolLoader(ToolLoader):
             # Create MCPServerStreamableHTTP instance
             mcp_server = MCPServerStreamableHTTP(url=mcp_url, headers=headers if headers else None)
 
+            # Get all gateway slugs (multiple connectors = multiple slugs)
+            gateway_slugs = self._get_gateway_slugs(tool_config)
+
+            if gateway_slugs:
+                # Fetch tool list to get original names
+                tool_list = await self.get_tool_list(mcp_server, tool_config.server_label or "unknown")
+                if tool_list and tool_list.get("tools"):
+                    original_names = [tool.name for tool in tool_list["tools"]]
+
+                    # Generate mapping: short_name -> original_name
+                    # Try each slug to find matching prefix
+                    name_map = {}
+                    for original in original_names:
+                        short = original  # Default: keep original if no prefix matches
+                        for slug in gateway_slugs:
+                            prefix = f"{slug}-"
+                            if original.startswith(prefix):
+                                short = original[len(prefix) :]
+                                break  # Found matching prefix, stop searching
+                        name_map[short] = original
+
+                    # Update allowed_tool_names with SHORT names
+                    tool_config.allowed_tool_names = list(name_map.keys())
+
+                    logger.info(
+                        f"Stripped gateway prefixes from {len(name_map)} tools "
+                        f"for server '{tool_config.server_label}' using {len(gateway_slugs)} slug(s)"
+                    )
+
+                    return mcp_server.renamed(name_map)
+
             logger.debug(
                 f"Loaded MCP tool '{tool_config.server_label}' from {mcp_url} "
                 f"with {len(tool_config.allowed_tools)} allowed tools"
@@ -90,6 +126,24 @@ class MCPToolLoader(ToolLoader):
         except Exception as e:
             logger.error(f"Failed to load MCP tool '{tool_config.server_label}': {str(e)}")
             return None
+
+    def _get_gateway_slugs(self, tool_config: MCPToolConfig) -> List[str]:
+        """Extract all gateway slugs from tool config.
+
+        When multiple connectors are registered, gateway_slugs contains:
+        {connector1: slug1, connector2: slug2, ...}
+
+        Returns all slugs so we can strip any matching prefix.
+
+        Args:
+            tool_config: MCP tool configuration
+
+        Returns:
+            List of gateway slugs
+        """
+        if tool_config.gateway_slugs:
+            return list(tool_config.gateway_slugs.values())
+        return []
 
     async def get_tool_list(self, mcp_server: MCPServerStreamableHTTP, server_label: str) -> Optional[Dict]:
         """Fetch the list of available tools from an MCP server.
