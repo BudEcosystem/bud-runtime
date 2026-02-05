@@ -4552,10 +4552,6 @@ class GuardrailCustomProbeService(SessionMixin):
         Returns:
             The workflow model instance
         """
-        from budapp.commons.constants import ModelStatusEnum
-        from budapp.model_ops.crud import ModelDataManager
-        from budapp.model_ops.models import Model
-
         step_number = request.step_number
         workflow_id = request.workflow_id
         workflow_total_steps = request.workflow_total_steps
@@ -4608,6 +4604,15 @@ class GuardrailCustomProbeService(SessionMixin):
                     workflow_step_data["handler"] = config.handler
                     workflow_step_data["model_provider_type"] = config.model_provider_type
             if request.project_id:
+                # Validate project exists and is ACTIVE
+                db_project = await ProjectDataManager(self.session).retrieve_by_fields(
+                    Project, {"id": request.project_id, "status": ProjectStatusEnum.ACTIVE}, missing_ok=True
+                )
+                if not db_project:
+                    raise ClientException(
+                        message="Project not found or is not active",
+                        status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+                    )
                 workflow_step_data["project_id"] = str(request.project_id)
 
         elif step_number == 2:
@@ -4654,6 +4659,14 @@ class GuardrailCustomProbeService(SessionMixin):
 
         # Execute workflow if triggered at step 3
         if trigger_workflow and step_number == 3:
+            # Validate required fields before workflow execution
+            required_keys = ["name", "scanner_type", "project_id", "policy"]
+            missing_keys = [key for key in required_keys if key not in workflow_step_data]
+            if missing_keys:
+                raise ClientException(
+                    message=f"Missing required data for custom probe workflow: {', '.join(missing_keys)}",
+                    status_code=HTTPStatus.HTTP_400_BAD_REQUEST,
+                )
             await self._execute_custom_probe_workflow(
                 data=workflow_step_data,
                 workflow_id=db_workflow.id,

@@ -118,6 +118,11 @@ class TestCustomProbeWorkflowServiceStep1:
         user_id = uuid4()
         project_id = uuid4()
 
+        # Mock project for validation
+        mock_project = Mock()
+        mock_project.id = project_id
+        mock_project.status = "ACTIVE"
+
         request = CustomProbeWorkflowRequest(
             workflow_total_steps=3,
             step_number=1,
@@ -142,18 +147,26 @@ class TestCustomProbeWorkflowServiceStep1:
                     mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
                     MockWorkflowDM.return_value = mock_wf_dm
 
-                    result = await service.add_custom_probe_workflow(
-                        current_user_id=user_id,
-                        request=request,
-                    )
+                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
+                        mock_proj_dm = AsyncMock()
+                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=mock_project)
+                        MockProjectDM.return_value = mock_proj_dm
 
-                    # Verify workflow was created
-                    assert result == mock_workflow
+                        result = await service.add_custom_probe_workflow(
+                            current_user_id=user_id,
+                            request=request,
+                        )
 
-                    # Verify step data was updated with derived config
-                    update_call = mock_step_dm.update_by_fields.call_args
-                    if update_call:
-                        step_data = update_call[0][1].get("data", {})
+                        # Verify workflow was created
+                        assert result == mock_workflow
+
+                        # Verify project was validated
+                        mock_proj_dm.retrieve_by_fields.assert_called_once()
+
+                        # Verify step data was stored via insert_one (new step)
+                        mock_step_dm.insert_one.assert_called()
+                        insert_call = mock_step_dm.insert_one.call_args
+                        step_data = insert_call[0][0].data
                         assert step_data.get("probe_type_option") == "llm_policy"
                         assert step_data.get("model_uri") == "openai/gpt-oss-safeguard-20b"
                         assert step_data.get("scanner_type") == "llm"
@@ -194,6 +207,51 @@ class TestCustomProbeWorkflowServiceStep1:
                     )
 
                     assert result == mock_workflow
+
+    @pytest.mark.asyncio
+    async def test_step1_raises_error_for_invalid_project(self, service, mock_workflow, mock_workflow_step):
+        """Test Step 1 raises ClientException when project is not found or inactive."""
+        from budapp.commons.exceptions import ClientException
+
+        user_id = uuid4()
+        project_id = uuid4()
+
+        request = CustomProbeWorkflowRequest(
+            workflow_total_steps=3,
+            step_number=1,
+            probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
+            project_id=project_id,
+        )
+
+        with patch("budapp.guardrails.services.WorkflowService") as MockWorkflowService:
+            mock_wf_service = AsyncMock()
+            mock_wf_service.retrieve_or_create_workflow = AsyncMock(return_value=mock_workflow)
+            MockWorkflowService.return_value = mock_wf_service
+
+            with patch("budapp.guardrails.services.WorkflowStepDataManager") as MockStepDM:
+                mock_step_dm = AsyncMock()
+                mock_step_dm.get_all_workflow_steps = AsyncMock(return_value=[])
+                mock_step_dm.insert_one = AsyncMock(return_value=mock_workflow_step)
+                MockStepDM.return_value = mock_step_dm
+
+                with patch("budapp.guardrails.services.WorkflowDataManager") as MockWorkflowDM:
+                    mock_wf_dm = AsyncMock()
+                    mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
+                    MockWorkflowDM.return_value = mock_wf_dm
+
+                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
+                        mock_proj_dm = AsyncMock()
+                        # Return None to simulate project not found
+                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=None)
+                        MockProjectDM.return_value = mock_proj_dm
+
+                        with pytest.raises(ClientException) as exc_info:
+                            await service.add_custom_probe_workflow(
+                                current_user_id=user_id,
+                                request=request,
+                            )
+
+                        assert "Project not found or is not active" in str(exc_info.value.message)
 
 
 class TestCustomProbeWorkflowServiceStep2:
@@ -275,8 +333,14 @@ class TestCustomProbeWorkflowServiceStep2:
             MockWorkflowService.return_value = mock_wf_service
 
             with patch("budapp.guardrails.services.WorkflowStepDataManager") as MockStepDM:
+                mock_step2 = Mock()
+                mock_step2.id = uuid4()
+                mock_step2.step_number = 2
+                mock_step2.data = {}
+
                 mock_step_dm = AsyncMock()
                 mock_step_dm.get_all_workflow_steps = AsyncMock(return_value=[mock_step])
+                mock_step_dm.insert_one = AsyncMock(return_value=mock_step2)
                 mock_step_dm.update_by_fields = AsyncMock(return_value=mock_step)
                 MockStepDM.return_value = mock_step_dm
 
@@ -292,12 +356,12 @@ class TestCustomProbeWorkflowServiceStep2:
 
                     assert result == mock_workflow
 
-                    # Verify policy was stored
-                    update_call = mock_step_dm.update_by_fields.call_args
-                    if update_call:
-                        step_data = update_call[0][1].get("data", {})
-                        assert "policy" in step_data
-                        assert step_data["policy"]["task"] == "Evaluate content for harmful material"
+                    # Verify policy was stored - step 2 uses insert_one for new step
+                    mock_step_dm.insert_one.assert_called()
+                    insert_call = mock_step_dm.insert_one.call_args
+                    step_data = insert_call[0][0].data
+                    assert "policy" in step_data
+                    assert step_data["policy"]["task"] == "Evaluate content for harmful material"
 
 
 class TestCustomProbeWorkflowServiceStep3:
@@ -381,8 +445,14 @@ class TestCustomProbeWorkflowServiceStep3:
             MockWorkflowService.return_value = mock_wf_service
 
             with patch("budapp.guardrails.services.WorkflowStepDataManager") as MockStepDM:
+                mock_step3 = Mock()
+                mock_step3.id = uuid4()
+                mock_step3.step_number = 3
+                mock_step3.data = {}
+
                 mock_step_dm = AsyncMock()
                 mock_step_dm.get_all_workflow_steps = AsyncMock(return_value=[mock_step])
+                mock_step_dm.insert_one = AsyncMock(return_value=mock_step3)
                 mock_step_dm.update_by_fields = AsyncMock(return_value=mock_step)
                 MockStepDM.return_value = mock_step_dm
 
@@ -398,14 +468,14 @@ class TestCustomProbeWorkflowServiceStep3:
 
                     assert result == mock_workflow
 
-                    # Verify metadata was stored
-                    update_call = mock_step_dm.update_by_fields.call_args
-                    if update_call:
-                        step_data = update_call[0][1].get("data", {})
-                        assert step_data.get("name") == "My Custom Probe"
-                        assert step_data.get("description") == "Detects harmful content"
-                        assert step_data.get("guard_types") == ["input", "output"]
-                        assert step_data.get("modality_types") == ["text"]
+                    # Verify metadata was stored via insert_one (new step 3)
+                    mock_step_dm.insert_one.assert_called()
+                    insert_call = mock_step_dm.insert_one.call_args
+                    step_data = insert_call[0][0].data
+                    assert step_data.get("name") == "My Custom Probe"
+                    assert step_data.get("description") == "Detects harmful content"
+                    assert step_data.get("guard_types") == ["input", "output"]
+                    assert step_data.get("modality_types") == ["text"]
 
     @pytest.mark.asyncio
     async def test_step3_trigger_workflow_creates_probe(self, service, mock_workflow, accumulated_step_data):
@@ -485,6 +555,68 @@ class TestCustomProbeWorkflowServiceStep3:
 
                                 # Verify workflow was marked complete
                                 mock_wf_dm.update_by_fields.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_step3_trigger_raises_error_for_missing_required_data(self, service, mock_workflow):
+        """Test Step 3 with trigger_workflow=True raises error when required data is missing."""
+        from budapp.commons.exceptions import ClientException
+
+        user_id = uuid4()
+
+        # Incomplete step data - missing 'policy' and 'name'
+        incomplete_step_data = {
+            "probe_type_option": "llm_policy",
+            "model_uri": "openai/gpt-oss-safeguard-20b",
+            "scanner_type": "llm",
+            "handler": "gpt_safeguard",
+            "model_provider_type": "openai",
+            "project_id": str(uuid4()),
+            # Missing: policy, name
+        }
+
+        mock_step = Mock()
+        mock_step.id = uuid4()
+        mock_step.step_number = 2
+        mock_step.data = incomplete_step_data
+
+        request = CustomProbeWorkflowRequest(
+            workflow_id=mock_workflow.id,
+            step_number=3,
+            trigger_workflow=True,  # Trigger the workflow
+            # Not providing name or policy
+        )
+
+        with patch("budapp.guardrails.services.WorkflowService") as MockWorkflowService:
+            mock_wf_service = AsyncMock()
+            mock_wf_service.retrieve_or_create_workflow = AsyncMock(return_value=mock_workflow)
+            MockWorkflowService.return_value = mock_wf_service
+
+            with patch("budapp.guardrails.services.WorkflowStepDataManager") as MockStepDM:
+                mock_step3 = Mock()
+                mock_step3.id = uuid4()
+                mock_step3.step_number = 3
+                mock_step3.data = {}
+
+                mock_step_dm = AsyncMock()
+                mock_step_dm.get_all_workflow_steps = AsyncMock(return_value=[mock_step])
+                mock_step_dm.insert_one = AsyncMock(return_value=mock_step3)
+                mock_step_dm.update_by_fields = AsyncMock(return_value=mock_step)
+                MockStepDM.return_value = mock_step_dm
+
+                with patch("budapp.guardrails.services.WorkflowDataManager") as MockWorkflowDM:
+                    mock_wf_dm = AsyncMock()
+                    mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
+                    MockWorkflowDM.return_value = mock_wf_dm
+
+                    with pytest.raises(ClientException) as exc_info:
+                        await service.add_custom_probe_workflow(
+                            current_user_id=user_id,
+                            request=request,
+                        )
+
+                    assert "Missing required data for custom probe workflow" in str(exc_info.value.message)
+                    assert "name" in str(exc_info.value.message)
+                    assert "policy" in str(exc_info.value.message)
 
 
 class TestExecuteCustomProbeWorkflow:
