@@ -1766,6 +1766,10 @@ class PromptService(SessionMixin):
         # Step 5: Update gateway_config - remove connector
         del gateway_config[connector_id]
 
+        # Step 5b: Update gateway_slugs - remove connector's slug
+        gateway_slugs = mcp_tool.get("gateway_slugs", {})
+        gateway_slugs.pop(connector_id, None)
+
         # Step 6: Update server_config - remove connector's tools
         server_config.pop(connector_id, None)
 
@@ -1800,6 +1804,7 @@ class PromptService(SessionMixin):
         else:
             # Update MCP tool config (connectors still remain)
             mcp_tool["gateway_config"] = gateway_config
+            mcp_tool["gateway_slugs"] = gateway_slugs
             mcp_tool["server_config"] = server_config
             mcp_tool["allowed_tools"] = updated_allowed_tools
             mcp_tool["allowed_tool_names"] = updated_allowed_tool_names
