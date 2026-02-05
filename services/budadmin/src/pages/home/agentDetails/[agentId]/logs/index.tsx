@@ -2076,7 +2076,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         </div>
 
         {/* Chart */}
-        <div ref={chartRef} className="w-full h-[180px]" />
+        <div ref={chartRef} className="w-full h-[180px] 1680px:h-[250px] 1920px:h-[320px] 2048px:h-[400px] 2560px:h-[500px]" />
       </div>
 
       {/* Logs List Section */}
@@ -2155,7 +2155,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         <div className="relative">
 
           {/* Log Rows */}
-          <div className="max-h-[500px] overflow-auto">
+          <div className="max-h-[calc(100vh-400px)] min-h-[300px] overflow-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Spin size="large" />
