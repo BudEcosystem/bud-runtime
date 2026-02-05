@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Tag, Spin, Tooltip, Popover } from "antd";
 import * as echarts from "echarts";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import {
   Text_10_400_B3B3B3,
   Text_10_600_EEEEEE,
@@ -8,7 +10,7 @@ import {
   Text_12_600_EEEEEE,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
-import CustomSelect from "src/flows/components/CustomSelect";
+import LogfireDateRangePicker, { DateRangeValue, PRESET_OPTIONS } from "@/components/ui/LogfireDateRangePicker";
 import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useObservabilitySocket } from "@/hooks/useObservabilitySocket";
@@ -690,8 +692,19 @@ const formatDateForApi = (date: Date): string => {
   return date.toISOString().replace(/\.\d{3}Z$/, "Z");
 };
 
-// Helper function to get time range dates
-const getTimeRangeDates = (range: string): { from_date: string; to_date: string } => {
+// Helper function to get time range dates - supports both presets and custom ranges
+const getTimeRangeDates = (
+  range: string,
+  customRange?: [Dayjs, Dayjs] | null
+): { from_date: string; to_date: string } => {
+  // If custom range is provided, use it
+  if (customRange) {
+    return {
+      from_date: formatDateForApi(customRange[0].toDate()),
+      to_date: formatDateForApi(customRange[1].toDate()),
+    };
+  }
+
   const now = new Date();
   let from_date: Date;
 
@@ -708,11 +721,23 @@ const getTimeRangeDates = (range: string): { from_date: string; to_date: string 
     case "1h":
       from_date = new Date(now.getTime() - 60 * 60 * 1000);
       break;
+    case "6h":
+      from_date = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+      break;
+    case "12h":
+      from_date = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+      break;
     case "24h":
       from_date = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       break;
+    case "2d":
+      from_date = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+      break;
     case "7d":
       from_date = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case "14d":
+      from_date = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
       break;
     case "30d":
       from_date = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -995,6 +1020,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const [timeRange, setTimeRange] = useState("5m");
+  const [customDateRange, setCustomDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -1201,7 +1227,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
     try {
       const currentPage = loadMore ? page + 1 : 1;
-      const { from_date, to_date } = getTimeRangeDates(timeRange);
+      const { from_date, to_date } = getTimeRangeDates(timeRange, customDateRange);
 
       // Build params based on view mode
       const params: Record<string, any> = {
@@ -1265,12 +1291,12 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [promptName, projectId, timeRange, viewMode, page]);
+  }, [promptName, projectId, timeRange, customDateRange, viewMode, page]);
 
   // Fetch traces when dependencies change (except page - that's handled by loadMore)
   useEffect(() => {
     fetchTraces();
-  }, [promptName, projectId, timeRange, viewMode]);
+  }, [promptName, projectId, timeRange, customDateRange, viewMode]);
 
   // Reset state when view mode changes
   useEffect(() => {
@@ -1558,8 +1584,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     });
   };
 
-  // Handle time range change - disables live mode if active
-  const handleTimeRangeChange = (newRange: string) => {
+  // Handle preset time range change - disables live mode if active
+  const handlePresetChange = (newRange: string) => {
     if (isLive) {
       // Disable live mode and clear live data when changing time filter
       setIsLive(false);
@@ -1568,6 +1594,29 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       liveChartTracesRef.current = [];
     }
     setTimeRange(newRange);
+    setCustomDateRange(null); // Clear custom range when preset is selected
+  };
+
+  // Handle custom date range change
+  const handleCustomRangeChange = (startDate: Dayjs, endDate: Dayjs) => {
+    if (isLive) {
+      // Disable live mode and clear live data when changing time filter
+      setIsLive(false);
+      setLogsData([]);
+      liveSpanIdsRef.current.clear();
+      liveChartTracesRef.current = [];
+    }
+    setCustomDateRange([startDate, endDate]);
+    setTimeRange(""); // Clear preset when custom range is selected
+  };
+
+  // Handle combined date range picker change
+  const handleDateRangeChange = (value: DateRangeValue) => {
+    if (value.preset) {
+      handlePresetChange(value.preset);
+    } else if (value.startDate && value.endDate) {
+      handleCustomRangeChange(value.startDate, value.endDate);
+    }
   };
 
   // Update chart - always regenerate buckets based on current time for scrolling effect
@@ -1914,20 +1963,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     };
   }, [isLive, timeRange, updateChartData]);
 
-  const timeRangeOptions = [
-    { label: "Last 5 minutes", value: "5m" },
-    { label: "Last 15 minutes", value: "15m" },
-    { label: "Last 30 minutes", value: "30m" },
-    { label: "Last 1 hour", value: "1h" },
-    { label: "Last 24 hours", value: "24h" },
-    { label: "Last 1 week", value: "7d" },
-    { label: "Last 1 month", value: "30d" },
-  ];
-
   // Get time range label for display
   const getTimeRangeLabel = () => {
-    const option = timeRangeOptions.find((o) => o.value === timeRange);
-    return option?.label?.replace("Last ", "") || "5 minutes";
+    if (customDateRange) {
+      const [start, end] = customDateRange;
+      return `${start.format("MMM D")} - ${end.format("MMM D")}`;
+    }
+    const preset = PRESET_OPTIONS.find((o) => o.value === timeRange);
+    return preset?.label?.replace("Last ", "") || "5 minutes";
   };
 
   return (
@@ -1946,14 +1989,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       <div className=" border-0 border-[#1F1F1F]  p-4 mb-4 mt-4">
         {/* Chart Controls */}
         <div className="flex justify-end items-center gap-2 mb-2">
-          <CustomSelect
-            name="timeRange"
-            value={timeRange}
-            onChange={handleTimeRangeChange}
-            selectOptions={timeRangeOptions}
-            ClassNames="w-[160px] !py-[.1rem]"
-            InputClasses="!text-[.625rem] !py-[.1rem] !min-h-[1.6rem] !h-[1.6rem]"
-            placeholder="Select time range"
+          <LogfireDateRangePicker
+            value={
+              customDateRange
+                ? { startDate: customDateRange[0], endDate: customDateRange[1] }
+                : { preset: timeRange || "5m" }
+            }
+            onChange={handleDateRangeChange}
           />
           <div className="flex items-center border border-[#3a3a3a] rounded-md overflow-hidden max-h-[1.6rem]">
             <button
