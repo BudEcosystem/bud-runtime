@@ -334,39 +334,33 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
             </div>
           </div>
 
-          {/* Range Picker Calendar */}
+          {/* Range Picker - with onOk to handle OK button click */}
           <ConfigProvider theme={datePickerTheme}>
             <RangePicker
               value={customRange}
               onChange={handleCustomRangeChange}
+              onOk={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  setCustomRange([dates[0], dates[1]]);
+                  setIsCustom(true);
+                  setOpen(false);
+                  if (onCustomRangeChange) {
+                    onCustomRangeChange(dates[0], dates[1]);
+                  }
+                  if (onChange) {
+                    onChange({ startDate: dates[0], endDate: dates[1] });
+                  }
+                }
+              }}
               showTime={{ format: "HH:mm:ss" }}
               format="YYYY-MM-DD HH:mm:ss"
               className="w-full bg-[#0d0d0d] border-[#3a3a3a] hover:border-[#965CDE]"
-              popupClassName="logfire-range-picker-popup"
-              open
+              placeholder={["Start Date", "End Date"]}
               getPopupContainer={(trigger) => trigger.parentElement || document.body}
-              style={{ visibility: "hidden", height: 0, padding: 0, border: "none" }}
-              panelRender={(panelNode) => (
-                <div className="bg-[#1A1A1A]">{panelNode}</div>
-              )}
             />
           </ConfigProvider>
 
-          {/* Inline Calendar Display */}
-          <div className="mt-4">
-            <ConfigProvider theme={datePickerTheme}>
-              <RangePicker
-                value={customRange}
-                onChange={handleCustomRangeChange}
-                showTime={{ format: "HH:mm:ss" }}
-                format="YYYY-MM-DD HH:mm:ss"
-                className="w-full bg-[#0d0d0d] border-[#3a3a3a] hover:border-[#965CDE]"
-                placeholder={["Start Date", "End Date"]}
-              />
-            </ConfigProvider>
-          </div>
-
-          {/* Select Button */}
+          {/* Select Button - fallback for when user picks dates without clicking OK */}
           <button
             className="w-full mt-4 py-3 bg-[#965CDE] hover:bg-[#a873e5] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSelectCustomRange}
