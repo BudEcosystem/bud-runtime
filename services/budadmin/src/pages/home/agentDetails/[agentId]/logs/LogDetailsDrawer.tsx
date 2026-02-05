@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { Tabs, Tag, Spin, Tooltip } from "antd";
+import { Tabs, Spin, Tooltip } from "antd";
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
@@ -14,6 +14,7 @@ import {
 import { useDrawer } from "src/hooks/useDrawer";
 import { AppRequest } from "src/pages/api/requests";
 import { DrawerLogTree, DrawerLogEntry } from "./components/DrawerLogTree";
+import Tags from "src/flows/components/DrawerTags";
 
 // Types
 interface SpanData {
@@ -63,7 +64,8 @@ const JsonTreeView = ({
   const [isExpanded, setIsExpanded] = useState(depth < 2);
 
   const INDENT_SIZE = 20;
-  const LINE_HEIGHT = 24;
+  const LINE_HEIGHT = 22;
+  const FONT_SIZE = "0.75rem";
 
   const renderIndentLines = (currentDepth: number) => {
     const lines = [];
@@ -89,13 +91,12 @@ const JsonTreeView = ({
     onClick?: () => void;
   }) => (
     <div
-      className={`relative flex items-start ${clickable ? "cursor-pointer hover:bg-[rgba(255,255,255,0.03)]" : ""}`}
-      style={{ minHeight: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px` }}
+      className={`relative ${clickable ? "cursor-pointer hover:bg-[rgba(255,255,255,0.03)]" : ""}`}
+      style={{ minHeight: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px`, fontSize: FONT_SIZE }}
       onClick={onClick}
     >
       {renderIndentLines(depth)}
       <div
-        className="flex items-start flex-1"
         style={{ paddingLeft: `${depth * INDENT_SIZE}px` }}
       >
         {children}
@@ -722,6 +723,7 @@ export default function LogDetailsDrawer() {
       onNext={async () => {
         closeDrawer();
       }}
+      ShowMinimizeButton = {false}
     >
       <BudWraperBox classNames="mt-[2.2rem]">
         <BudDrawerLayout>
@@ -760,13 +762,21 @@ export default function LogDetailsDrawer() {
             {/* Metadata Tags */}
             <div className="flex flex-wrap gap-2 mb-4">
               {metadataTags.map((tag, index) => (
-                <Tag
+                <Tags
                   key={index}
-                  className="bg-[#1a1a1a] border-[#3a3a3a] text-[#B3B3B3] text-xs rounded-full px-3 py-1"
-                >
-                  <span className="text-[#757575]">{tag.label}</span>{" "}
-                  <span className="text-[#EEEEEE]">{tag.value}</span>
-                </Tag>
+                  copyText={`${tag.label}: ${tag.value}`}
+                  onTagClick={() => {}}
+                  showTooltip
+                  tooltipText="Copy"
+                  name={
+                    <>
+                      <span className="text-[#757575]">{tag.label}</span>{" "}
+                      <span className="text-[#EEEEEE]">{tag.value}</span>
+                    </>
+                  }
+                  color="#B3B3B3"
+                  classNames="rounded-full px-3 py-1"
+                />
               ))}
             </div>
 
