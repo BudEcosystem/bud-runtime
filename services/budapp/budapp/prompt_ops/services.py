@@ -1406,14 +1406,18 @@ class PromptService(SessionMixin):
                 name=gateway_name, url=connector.url, transport=transport, visibility="public", auth_config=auth_config
             )
 
+            gateway_id = gateway_response.get("id", gateway_response.get("gateway_id"))
+            gateway_slug = gateway_response.get("slug")
+
             logger.debug(
                 f"Successfully created gateway for connector {connector_id} and prompt {budprompt_id}",
-                gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+                gateway_id=gateway_id,
+                gateway_slug=gateway_slug,
             )
 
             # Create GatewayResponse object
             gateway = GatewayResponse(
-                gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+                gateway_id=gateway_id,
                 name=gateway_name,
                 url=connector.url,
                 transport="SSE",
@@ -1421,7 +1425,9 @@ class PromptService(SessionMixin):
             )
 
             # Store MCP tool configuration in Redis via budprompt service
-            await self._store_mcp_tool_config(budprompt_id, connector_id, gateway.gateway_id, version, permanent)
+            await self._store_mcp_tool_config(
+                budprompt_id, connector_id, gateway.gateway_id, gateway_slug, version, permanent
+            )
 
             # Update PromptVersion metadata with gateway_id (if prompt and version exist in DB)
             try:
@@ -1930,6 +1936,7 @@ class PromptService(SessionMixin):
         budprompt_id: str,
         connector_id: str,
         gateway_id: str,
+        gateway_slug: Optional[str] = None,
         version: Optional[int] = None,
         permanent: bool = False,
     ) -> None:
@@ -1939,6 +1946,7 @@ class PromptService(SessionMixin):
             budprompt_id: The bud prompt ID (can be UUID or draft prompt ID)
             connector_id: The connector ID
             gateway_id: The gateway ID from MCP Foundry
+            gateway_slug: The gateway slug from MCP Foundry (used for tool name shortening)
             version: Optional version to update. If None, updates default version
             permanent: Store configuration permanently without expiration
 
@@ -1946,6 +1954,7 @@ class PromptService(SessionMixin):
             ClientException: If storing configuration fails
         """
         # 1. Create MCPToolConfig using Pydantic schema
+        gateway_slugs = {connector_id: gateway_slug} if gateway_slug else {}
         mcp_tool = MCPToolConfig(
             type="mcp",
             server_label=None,
@@ -1955,6 +1964,7 @@ class PromptService(SessionMixin):
             allowed_tools=[],
             connector_id=None,  # Set to None as requested
             gateway_config={connector_id: gateway_id},
+            gateway_slugs=gateway_slugs,
         )
         mcp_tool_dict = mcp_tool.model_dump(exclude_none=True)
 
@@ -2010,6 +2020,12 @@ class PromptService(SessionMixin):
             # Merge new connector into existing MCP tool config
             gateway_config[connector_id] = gateway_id
             existing_mcp_tool["gateway_config"] = gateway_config
+
+            # Also merge gateway_slugs for tool name shortening
+            gateway_slugs_dict = existing_mcp_tool.get("gateway_slugs", {})
+            if gateway_slug:
+                gateway_slugs_dict[connector_id] = gateway_slug
+            existing_mcp_tool["gateway_slugs"] = gateway_slugs_dict
 
             # Also update server_config to maintain consistency
             server_config = existing_mcp_tool.get("server_config", {})
