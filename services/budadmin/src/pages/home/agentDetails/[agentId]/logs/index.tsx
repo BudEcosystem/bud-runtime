@@ -203,6 +203,62 @@ const aggregateTracesIntoBuckets = (
   });
 };
 
+// Token metrics popover component - reusable for LogRow and FlatLogRow
+const TokenMetricsPopover = ({
+  inputTokens,
+  outputTokens,
+  scopeName,
+}: {
+  inputTokens?: string;
+  outputTokens?: string;
+  scopeName?: string;
+}) => {
+  if (!inputTokens && !outputTokens) return null;
+
+  return (
+    <Popover
+      placement="top"
+      arrow={false}
+      styles={{ body: { padding: 0, background: '#1F1F1F', border: '1px solid #3a3a3a', borderRadius: '6px' } }}
+      content={
+        <div className="min-w-[180px]">
+          <div className="px-3 py-2 border-b border-[#3a3a3a]">
+            <Text_10_600_EEEEEE className="block">LLM Tokens (aggregated)</Text_10_600_EEEEEE>
+            {scopeName && (
+              <Text_10_400_B3B3B3 className="block mt-1">{scopeName}</Text_10_400_B3B3B3>
+            )}
+          </div>
+          <div className="px-3 py-2">
+            <div className="flex justify-between items-center text-[.625rem] border-b border-[#2a2a2a] pb-1 mb-1">
+              <span className="text-[#757575]">Type</span>
+              <span className="text-[#757575]">Amount</span>
+            </div>
+            <div className="flex justify-between items-center text-[.625rem] py-1">
+              <span className="text-[#B3B3B3]">Input</span>
+              <span className="text-[#EEEEEE]">↗ {inputTokens || 0}</span>
+            </div>
+            <div className="flex justify-between items-center text-[.625rem] py-1">
+              <span className="text-[#B3B3B3]">Output</span>
+              <span className="text-[#EEEEEE]">↙ {outputTokens || 0}</span>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <div className="cursor-pointer">
+        <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center flex justify-center items-center gap-x-[.3rem] leading-[200%]">
+          <div className="text-[.75rem]">∅</div>
+          <div className="flex justify-center items-center gap-x-[.1rem]">
+            <div className="text-[.4rem]">∑</div>
+            <div className="text-[.4rem]">↗</div>{inputTokens || 0}
+            <div className="text-[.4rem]">↙</div>{outputTokens || 0}
+          </div>
+        </Tag>
+      </div>
+    </Popover>
+  );
+};
+
 // Duration bar component
 const DurationBar = ({
   duration,
@@ -434,43 +490,11 @@ const LogRow = ({
           {/* Metrics tags */}
           <div className="flex gap-2 items-center flex-shrink-0 mr-3">
             {/* Token metrics with original icon style */}
-            {(row.inputTokens || row.outputTokens) && (
-              <Popover
-                placement="top"
-                arrow={false}
-                styles={{ body: { padding: 0, background: '#1F1F1F', border: '1px solid #3a3a3a', borderRadius: '6px' } }}
-                content={
-                  <div className="min-w-[180px]">
-                    <div className="px-3 py-2 border-b border-[#3a3a3a]">
-                      <Text_10_600_EEEEEE className="block">LLM Tokens (aggregated)</Text_10_600_EEEEEE>
-                      {row.scopeName && (
-                        <Text_10_400_B3B3B3 className="block mt-1">{row.scopeName}</Text_10_400_B3B3B3>
-                      )}
-                    </div>
-                    <div className="px-3 py-2">
-                      <div className="flex justify-between items-center text-[.625rem] border-b border-[#2a2a2a] pb-1 mb-1">
-                        <span className="text-[#757575]">Type</span>
-                        <span className="text-[#757575]">Amount</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[.625rem] py-1">
-                        <span className="text-[#B3B3B3]">Input</span>
-                        <span className="text-[#EEEEEE]">↗ {row.inputTokens || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[.625rem] py-1">
-                        <span className="text-[#B3B3B3]">Output</span>
-                        <span className="text-[#EEEEEE]">↙ {row.outputTokens || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                }
-              >
-                <div className="cursor-pointer">
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center flex justify-center items-center gap-x-[.3rem] leading-[200%]">
-                    <div className="text-[.75rem]">∅</div> <div className="flex justify-center items-center gap-x-[.1rem]"><div className="text-[.4rem]">∑</div><div className="text-[.4rem]">↗</div>{row.inputTokens || 0} <div className="text-[.4rem]">↙</div>{row.outputTokens || 0}</div>
-                  </Tag>
-                </div>
-              </Popover>
-            )}
+            <TokenMetricsPopover
+              inputTokens={row.inputTokens}
+              outputTokens={row.outputTokens}
+              scopeName={row.scopeName}
+            />
             {row.metrics.tag && (
               <Tooltip title={row.metrics.tag} placement="top">
                 <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
@@ -554,43 +578,11 @@ const FlatLogRow = ({
           {/* Metrics tags */}
           <div className="flex gap-2 items-center flex-shrink-0 mr-3">
             {/* Token metrics with original icon style */}
-            {(row.inputTokens || row.outputTokens) && (
-              <Popover
-                placement="top"
-                arrow={false}
-                styles={{ body: { padding: 0, background: '#1F1F1F', border: '1px solid #3a3a3a', borderRadius: '6px' } }}
-                content={
-                  <div className="min-w-[180px]">
-                    <div className="px-3 py-2 border-b border-[#3a3a3a]">
-                      <Text_10_600_EEEEEE className="block">LLM Tokens (aggregated)</Text_10_600_EEEEEE>
-                      {row.scopeName && (
-                        <Text_10_400_B3B3B3 className="block mt-1">{row.scopeName}</Text_10_400_B3B3B3>
-                      )}
-                    </div>
-                    <div className="px-3 py-2">
-                      <div className="flex justify-between items-center text-[.625rem] border-b border-[#2a2a2a] pb-1 mb-1">
-                        <span className="text-[#757575]">Type</span>
-                        <span className="text-[#757575]">Amount</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[.625rem] py-1">
-                        <span className="text-[#B3B3B3]">Input</span>
-                        <span className="text-[#EEEEEE]">↗ {row.inputTokens || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[.625rem] py-1">
-                        <span className="text-[#B3B3B3]">Output</span>
-                        <span className="text-[#EEEEEE]">↙ {row.outputTokens || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                }
-              >
-                <div className="cursor-pointer">
-                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
-                    ∅ ∑ ↗{row.inputTokens || 0} ↙{row.outputTokens || 0}
-                  </Tag>
-                </div>
-              </Popover>
-            )}
+            <TokenMetricsPopover
+              inputTokens={row.inputTokens}
+              outputTokens={row.outputTokens}
+              scopeName={row.scopeName}
+            />
             {row.metrics.tag && (
               <Tooltip title={row.metrics.tag} placement="top">
                 <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
@@ -1252,10 +1244,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         const spans: TraceSpan[] = response.data.items;
         const total = response.data.total_record || 0;
 
-        // Find earliest and latest timestamps for offset calculation and chart
+        // Find earliest timestamp for offset calculation
         const timestamps = spans.map((s: TraceSpan) => new Date(s.timestamp).getTime());
         const earliestTimestamp = Math.min(...timestamps);
-        const latestTimestamp = Math.max(...timestamps);
 
         // Build data based on view mode
         let newData: LogEntry[];
