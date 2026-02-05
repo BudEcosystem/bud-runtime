@@ -372,16 +372,28 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
       ) : (
         <div className="p-4">
           {/* Timezone Display */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <Text_12_400_757575>{timezone} Local timezone</Text_12_400_757575>
           </div>
 
-          {/* Editable Date/Time Inputs */}
           <ConfigProvider theme={datePickerTheme}>
+            {/* Date Range Picker - at top for visibility */}
+            <RangePicker
+              value={customRange}
+              onChange={handleCalendarChange}
+              format="YYYY-MM-DD"
+              className="w-full bg-[#0d0d0d] border-[#3a3a3a] hover:border-[#965CDE] mb-4"
+              placeholder={["Select start date", "Select end date"]}
+              getPopupContainer={() => document.body}
+              allowClear={false}
+              popupClassName="logfire-range-picker-popup"
+            />
+
+            {/* Editable Date/Time Inputs - below calendar for fine-tuning */}
             <div className="flex gap-4 mb-4">
               {/* Start Date/Time */}
               <div className="flex-1">
-                <Text_10_400_B3B3B3 className="block mb-1">Start date</Text_10_400_B3B3B3>
+                <Text_10_400_B3B3B3 className="block mb-1">Start date & time</Text_10_400_B3B3B3>
                 <div className="flex gap-2">
                   <Input
                     value={startDateStr}
@@ -393,14 +405,14 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
                     value={startTimeStr}
                     onChange={(e) => handleStartTimeInput(e.target.value)}
                     placeholder="HH:mm:ss"
-                    className="w-24 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
+                    className="w-20 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
                   />
                 </div>
               </div>
 
               {/* End Date/Time */}
               <div className="flex-1">
-                <Text_10_400_B3B3B3 className="block mb-1">End date</Text_10_400_B3B3B3>
+                <Text_10_400_B3B3B3 className="block mb-1">End date & time</Text_10_400_B3B3B3>
                 <div className="flex gap-2">
                   <Input
                     value={endDateStr}
@@ -412,34 +424,21 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
                     value={endTimeStr}
                     onChange={(e) => handleEndTimeInput(e.target.value)}
                     placeholder="HH:mm:ss"
-                    className="w-24 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
+                    className="w-20 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
                   />
                 </div>
               </div>
             </div>
-
-            {/* Date Range Picker - date only, time is handled by inputs above */}
-            <RangePicker
-              value={customRange}
-              onChange={handleCalendarChange}
-              format="YYYY-MM-DD"
-              className="w-full bg-[#0d0d0d] border-[#3a3a3a] hover:border-[#965CDE]"
-              placeholder={["Select start date", "Select end date"]}
-              getPopupContainer={(trigger) => trigger.parentElement || document.body}
-              allowClear={false}
-            />
           </ConfigProvider>
 
           {/* Select Button */}
-          <div className="mt-4">
-            <PrimaryButton
-              className="w-full"
-              onClick={handleSelectCustomRange}
-              disabled={!customRange}
-            >
-              Select
-            </PrimaryButton>
-          </div>
+          <PrimaryButton
+            className="w-full"
+            onClick={handleSelectCustomRange}
+            disabled={!customRange}
+          >
+            Select
+          </PrimaryButton>
         </div>
       )}
     </div>
