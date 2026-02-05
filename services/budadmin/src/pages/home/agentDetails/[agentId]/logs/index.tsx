@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Tag, Spin, Tooltip } from "antd";
+import { Tag, Spin, Tooltip, Popover } from "antd";
 import * as echarts from "echarts";
 import {
   Text_10_400_B3B3B3,
@@ -72,6 +72,12 @@ interface LogEntry {
   canExpand?: boolean; // true if this is a root span that can be expanded
   isLoadingChildren?: boolean;
   rawData?: Record<string, any>; // Raw span data for details drawer
+  // Logfire-style fields
+  level?: string; // INFO, WARN, ERROR, DEBUG
+  scopeName?: string; // otel scope name
+  inputTokens?: string; // gen_ai.usage.input_tokens
+  outputTokens?: string; // gen_ai.usage.output_tokens
+  serviceName?: string; // service_name for badge
 }
 
 interface LogsTabProps {
@@ -425,10 +431,43 @@ const LogRow = ({
         <div className="flex justify-end items-center min-w-[30%] pr-[12px] pl-[12px] flex-shrink-0">
           {/* Metrics tags */}
           <div className="flex gap-2 items-center flex-shrink-0 mr-3">
-            {row.metrics.sum !== undefined && (
-              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
-                ∅ ∑ ↗{row.metrics.sum} ↙{row.metrics.rate}
-              </Tag>
+            {/* Token metrics with original icon style */}
+            {(row.inputTokens || row.outputTokens) && (
+              <Popover
+                placement="top"
+                arrow={false}
+                styles={{ body: { padding: 0, background: '#1F1F1F', border: '1px solid #3a3a3a', borderRadius: '6px' } }}
+                content={
+                  <div className="min-w-[180px]">
+                    <div className="px-3 py-2 border-b border-[#3a3a3a]">
+                      <Text_10_600_EEEEEE className="block">LLM Tokens (aggregated)</Text_10_600_EEEEEE>
+                      {row.scopeName && (
+                        <Text_10_400_B3B3B3 className="block mt-1">{row.scopeName}</Text_10_400_B3B3B3>
+                      )}
+                    </div>
+                    <div className="px-3 py-2">
+                      <div className="flex justify-between items-center text-[.625rem] border-b border-[#2a2a2a] pb-1 mb-1">
+                        <span className="text-[#757575]">Type</span>
+                        <span className="text-[#757575]">Amount</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[.625rem] py-1">
+                        <span className="text-[#B3B3B3]">Input</span>
+                        <span className="text-[#EEEEEE]">↗ {row.inputTokens || 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[.625rem] py-1">
+                        <span className="text-[#B3B3B3]">Output</span>
+                        <span className="text-[#EEEEEE]">↙ {row.outputTokens || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
+                <div className="cursor-pointer">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center flex justify-center items-center gap-x-[.3rem] leading-[200%]">
+                    <div className="text-[.75rem]">∅</div> <div className="flex justify-center items-center gap-x-[.1rem]"><div className="text-[.4rem]">∑</div><div className="text-[.4rem]">↗</div>{row.inputTokens || 0} <div className="text-[.4rem]">↙</div>{row.outputTokens || 0}</div>
+                  </Tag>
+                </div>
+              </Popover>
             )}
             {row.metrics.tag && (
               <Tooltip title={row.metrics.tag} placement="top">
@@ -510,14 +549,54 @@ const FlatLogRow = ({
           </div>
         </div>
         <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 ">
-          {/* Metrics tag */}
-          {row.metrics.tag && (
-            <Tooltip title={row.metrics.tag} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[11px] max-w-[80px] truncate mr-3">
-                {row.metrics.tag}
-              </Tag>
-            </Tooltip>
-          )}
+          {/* Metrics tags */}
+          <div className="flex gap-2 items-center flex-shrink-0 mr-3">
+            {/* Token metrics with original icon style */}
+            {(row.inputTokens || row.outputTokens) && (
+              <Popover
+                placement="top"
+                arrow={false}
+                styles={{ body: { padding: 0, background: '#1F1F1F', border: '1px solid #3a3a3a', borderRadius: '6px' } }}
+                content={
+                  <div className="min-w-[180px]">
+                    <div className="px-3 py-2 border-b border-[#3a3a3a]">
+                      <Text_10_600_EEEEEE className="block">LLM Tokens (aggregated)</Text_10_600_EEEEEE>
+                      {row.scopeName && (
+                        <Text_10_400_B3B3B3 className="block mt-1">{row.scopeName}</Text_10_400_B3B3B3>
+                      )}
+                    </div>
+                    <div className="px-3 py-2">
+                      <div className="flex justify-between items-center text-[.625rem] border-b border-[#2a2a2a] pb-1 mb-1">
+                        <span className="text-[#757575]">Type</span>
+                        <span className="text-[#757575]">Amount</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[.625rem] py-1">
+                        <span className="text-[#B3B3B3]">Input</span>
+                        <span className="text-[#EEEEEE]">↗ {row.inputTokens || 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[.625rem] py-1">
+                        <span className="text-[#B3B3B3]">Output</span>
+                        <span className="text-[#EEEEEE]">↙ {row.outputTokens || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
+                <div className="cursor-pointer">
+                  <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                    ∅ ∑ ↗{row.inputTokens || 0} ↙{row.outputTokens || 0}
+                  </Tag>
+                </div>
+              </Popover>
+            )}
+            {row.metrics.tag && (
+              <Tooltip title={row.metrics.tag} placement="top">
+                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                  {row.metrics.tag}
+                </Tag>
+              </Tooltip>
+            )}
+          </div>
 
           {/* Timeline */}
           <DurationBar duration={row.duration} referenceDuration={referenceDuration} />
@@ -677,6 +756,7 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
     // Only include spans with empty parent_span_id (root spans)
     if (!span.parent_span_id || span.parent_span_id === "") {
       const timestamp = new Date(span.timestamp).getTime();
+      const attrs = span.span_attributes || {};
 
       const entry: LogEntry = {
         id: span.span_id,
@@ -694,6 +774,12 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
         parentSpanId: span.parent_span_id,
         canExpand: (span.child_span_count ?? 0) > 0, // Only expandable if has children
         rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
+        // Logfire-style fields
+        level: attrs.level || "INFO",
+        scopeName: span.scope_name || "",
+        inputTokens: attrs["gen_ai.usage.input_tokens"],
+        outputTokens: attrs["gen_ai.usage.output_tokens"],
+        serviceName: span.service_name,
       };
 
       result.push(entry);
@@ -710,11 +796,13 @@ const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
 const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogEntry[] => {
   return spans.map((span) => {
     const timestamp = new Date(span.timestamp).getTime();
+    const attrs = span.span_attributes || {};
     return {
       id: span.span_id,
       time: formatTime(span.timestamp),
       namespace: span.resource_attributes?.["service.name"] || "",
       title: span.span_name,
+      childCount: span.child_span_count,
       metrics: {
         tag: span.service_name,
       },
@@ -725,6 +813,12 @@ const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogE
       parentSpanId: span.parent_span_id,
       canExpand: false, // No expansion in flatten mode
       rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
+      // Logfire-style fields
+      level: attrs.level || "INFO",
+      scopeName: span.scope_name || "",
+      inputTokens: attrs["gen_ai.usage.input_tokens"],
+      outputTokens: attrs["gen_ai.usage.output_tokens"],
+      serviceName: span.service_name,
     };
   }).sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 };
@@ -741,6 +835,7 @@ const buildChildrenFromTraceDetail = (
   // First pass: create all LogEntry nodes (excluding the root span itself)
   spans.forEach((span) => {
     const timestamp = new Date(span.timestamp).getTime();
+    const attrs = span.span_attributes || {};
 
     const entry: LogEntry = {
       id: span.span_id,
@@ -759,6 +854,12 @@ const buildChildrenFromTraceDetail = (
       parentSpanId: span.parent_span_id,
       canExpand: (span.child_span_count ?? 0) > 0, // Set canExpand based on child_span_count
       rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
+      // Logfire-style fields
+      level: attrs.level || "INFO",
+      scopeName: span.scope_name || "",
+      inputTokens: attrs["gen_ai.usage.input_tokens"],
+      outputTokens: attrs["gen_ai.usage.output_tokens"],
+      serviceName: span.service_name,
     };
 
     spanMap.set(span.span_id, entry);
@@ -845,6 +946,7 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
       childNodes.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 
       const timestamp = new Date(span.timestamp).getTime();
+      const attrs = span.span_attributes || {};
 
       // Calculate total descendant count (all children + grandchildren + etc.)
       const totalDescendants = childNodes.reduce(
@@ -867,6 +969,12 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
         canExpand: childNodes.length > 0,
         children: childNodes.length > 0 ? childNodes : undefined,
         rawData: span as unknown as Record<string, any>,
+        // Logfire-style fields
+        level: attrs.level || "INFO",
+        scopeName: span.scope_name || "",
+        inputTokens: attrs["gen_ai.usage.input_tokens"],
+        outputTokens: attrs["gen_ai.usage.output_tokens"],
+        serviceName: span.service_name,
       };
     };
 
