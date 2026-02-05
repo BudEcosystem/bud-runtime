@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { DatePicker, ConfigProvider, Popover } from "antd";
+import { DatePicker, ConfigProvider, Popover, Input } from "antd";
 import { Calendar, ChevronDown } from "lucide-react";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import {
   Text_10_400_B3B3B3,
-  Text_10_600_EEEEEE,
   Text_12_400_757575,
   Text_12_400_EEEEEE,
   Text_12_600_EEEEEE,
 } from "@/components/ui/text";
+import { PrimaryButton } from "./bud/form/Buttons";
 
 const { RangePicker } = DatePicker;
 
 // Preset time range options matching Logfire
 interface PresetOption {
   label: string;
-  value: string; // e.g., "5m", "15m", "1h"
+  value: string;
   getDates: () => [Dayjs, Dayjs];
 }
 
@@ -78,7 +78,6 @@ const PRESET_OPTIONS: PresetOption[] = [
   },
 ];
 
-// Map preset values to labels for display
 const PRESET_LABEL_MAP: Record<string, string> = PRESET_OPTIONS.reduce(
   (acc, opt) => {
     acc[opt.value] = opt.label;
@@ -88,9 +87,7 @@ const PRESET_LABEL_MAP: Record<string, string> = PRESET_OPTIONS.reduce(
 );
 
 export interface DateRangeValue {
-  // For preset mode
   preset?: string;
-  // For custom mode
   startDate?: Dayjs;
   endDate?: Dayjs;
 }
@@ -98,10 +95,8 @@ export interface DateRangeValue {
 export interface LogfireDateRangePickerProps {
   value?: DateRangeValue;
   onChange?: (value: DateRangeValue) => void;
-  // For backward compatibility with simple string presets
   presetValue?: string;
   onPresetChange?: (preset: string) => void;
-  // Custom date range change
   onCustomRangeChange?: (startDate: Dayjs, endDate: Dayjs) => void;
   className?: string;
 }
@@ -117,7 +112,6 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"preset" | "custom">("preset");
 
-  // Internal state for the picker
   const [selectedPreset, setSelectedPreset] = useState<string>(
     presetValue || value?.preset || "5m"
   );
@@ -127,12 +121,26 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
       : null
   );
 
-  // Track if using custom range
+  // Separate state for date and time inputs (for manual editing)
+  const [startDateStr, setStartDateStr] = useState("");
+  const [startTimeStr, setStartTimeStr] = useState("00:00:00");
+  const [endDateStr, setEndDateStr] = useState("");
+  const [endTimeStr, setEndTimeStr] = useState("00:00:00");
+
   const [isCustom, setIsCustom] = useState(
     !!(value?.startDate && value?.endDate && !value?.preset)
   );
 
-  // Sync with external value changes
+  // Sync input strings when customRange changes
+  useEffect(() => {
+    if (customRange) {
+      setStartDateStr(customRange[0].format("YYYY/MM/DD"));
+      setStartTimeStr(customRange[0].format("HH:mm:ss"));
+      setEndDateStr(customRange[1].format("YYYY/MM/DD"));
+      setEndTimeStr(customRange[1].format("HH:mm:ss"));
+    }
+  }, [customRange]);
+
   useEffect(() => {
     if (presetValue) {
       setSelectedPreset(presetValue);
@@ -150,22 +158,19 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
     }
   }, [value]);
 
-  // Get display text for the trigger button
   const displayText = useMemo(() => {
     if (isCustom && customRange) {
       const [start, end] = customRange;
-      return `${start.format("MMM D, HH:mm:ss")} - ${end.format("MMM D, HH:mm:ss")}`;
+      return `${start.format("MMM D, HH:mm")} - ${end.format("MMM D, HH:mm")}`;
     }
     return PRESET_LABEL_MAP[selectedPreset] || "Last 5 minutes";
   }, [isCustom, customRange, selectedPreset]);
 
-  // Handle preset selection
   const handlePresetSelect = (preset: PresetOption) => {
     setSelectedPreset(preset.value);
     setIsCustom(false);
     setOpen(false);
 
-    // Emit changes
     if (onPresetChange) {
       onPresetChange(preset.value);
     }
@@ -174,16 +179,81 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
     }
   };
 
-  // Handle custom range selection
-  const handleCustomRangeChange = (
+  // Handle calendar date range selection - sets time to 00:00:00 for start and 23:59:59 for end
+  const handleCalendarChange = (
     dates: [Dayjs | null, Dayjs | null] | null
   ) => {
     if (dates && dates[0] && dates[1]) {
-      setCustomRange([dates[0], dates[1]]);
+      // Preserve existing time if already set, otherwise use defaults
+      const startTime = startTimeStr || "00:00:00";
+      const endTime = endTimeStr || "23:59:59";
+
+      const [sh, sm, ss] = startTime.split(":").map(Number);
+      const [eh, em, es] = endTime.split(":").map(Number);
+
+      const newStart = dates[0].hour(sh || 0).minute(sm || 0).second(ss || 0);
+      const newEnd = dates[1].hour(eh || 23).minute(em || 59).second(es || 59);
+
+      setCustomRange([newStart, newEnd]);
     }
   };
 
-  // Handle Select button click in custom range mode
+  // Handle manual date input change
+  const handleStartDateInput = (value: string) => {
+    setStartDateStr(value);
+    const parsed = dayjs(value, "YYYY/MM/DD", true);
+    if (parsed.isValid()) {
+      const [h, m, s] = startTimeStr.split(":").map(Number);
+      const newStart = parsed.hour(h || 0).minute(m || 0).second(s || 0);
+      if (customRange) {
+        setCustomRange([newStart, customRange[1]]);
+      } else {
+        setCustomRange([newStart, dayjs().endOf("day")]);
+      }
+    }
+  };
+
+  const handleEndDateInput = (value: string) => {
+    setEndDateStr(value);
+    const parsed = dayjs(value, "YYYY/MM/DD", true);
+    if (parsed.isValid()) {
+      const [h, m, s] = endTimeStr.split(":").map(Number);
+      const newEnd = parsed.hour(h || 23).minute(m || 59).second(s || 59);
+      if (customRange) {
+        setCustomRange([customRange[0], newEnd]);
+      } else {
+        setCustomRange([dayjs().startOf("day"), newEnd]);
+      }
+    }
+  };
+
+  // Handle manual time input change
+  const handleStartTimeInput = (value: string) => {
+    setStartTimeStr(value);
+    const timeRegex = /^(\d{1,2}):(\d{1,2}):(\d{1,2})$/;
+    const match = value.match(timeRegex);
+    if (match && customRange) {
+      const [, h, m, s] = match.map(Number);
+      if (h <= 23 && m <= 59 && s <= 59) {
+        const newStart = customRange[0].hour(h).minute(m).second(s);
+        setCustomRange([newStart, customRange[1]]);
+      }
+    }
+  };
+
+  const handleEndTimeInput = (value: string) => {
+    setEndTimeStr(value);
+    const timeRegex = /^(\d{1,2}):(\d{1,2}):(\d{1,2})$/;
+    const match = value.match(timeRegex);
+    if (match && customRange) {
+      const [, h, m, s] = match.map(Number);
+      if (h <= 23 && m <= 59 && s <= 59) {
+        const newEnd = customRange[1].hour(h).minute(m).second(s);
+        setCustomRange([customRange[0], newEnd]);
+      }
+    }
+  };
+
   const handleSelectCustomRange = () => {
     if (customRange) {
       setIsCustom(true);
@@ -198,7 +268,6 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
     }
   };
 
-  // Get current timezone display
   const timezone = useMemo(() => {
     const offset = new Date().getTimezoneOffset();
     const hours = Math.abs(Math.floor(offset / 60));
@@ -207,7 +276,6 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
     return `(GMT${sign}${hours}:${minutes.toString().padStart(2, "0")})`;
   }, []);
 
-  // DatePicker theme configuration
   const datePickerTheme = {
     token: {
       colorPrimary: "#965CDE",
@@ -233,12 +301,17 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
         cellHoverBg: "#2a2a2a",
         cellRangeBorderColor: "#965CDE",
       },
+      Input: {
+        colorBgContainer: "#0d0d0d",
+        colorBorder: "#3a3a3a",
+        colorText: "#EEEEEE",
+        colorTextPlaceholder: "#666666",
+      },
     },
   };
 
-  // Popover content
   const popoverContent = (
-    <div className="w-[580px] bg-[#1A1A1A] rounded-lg overflow-hidden">
+    <div className="w-[600px] bg-[#1A1A1A] rounded-lg overflow-hidden">
       {/* Tab Header */}
       <div className="flex border-b border-[#3a3a3a]">
         <button
@@ -273,7 +346,6 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
 
       {/* Tab Content */}
       {activeTab === "preset" ? (
-        // Preset List
         <div className="py-2">
           {PRESET_OPTIONS.map((preset) => (
             <button
@@ -298,76 +370,76 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
           ))}
         </div>
       ) : (
-        // Custom Range
         <div className="p-4">
           {/* Timezone Display */}
           <div className="flex items-center justify-between mb-4">
             <Text_12_400_757575>{timezone} Local timezone</Text_12_400_757575>
           </div>
 
-          {/* Date Inputs Display */}
-          <div className="flex gap-4 mb-4">
-            {/* Start Date */}
-            <div className="flex-1">
-              <Text_10_400_B3B3B3 className="block mb-1">Start date</Text_10_400_B3B3B3>
-              <div className="bg-[#0d0d0d] border border-[#3a3a3a] rounded px-3 py-2">
-                <Text_12_400_EEEEEE>
-                  {customRange
-                    ? customRange[0].format("YYYY / MM / DD , HH : mm : ss")
-                    : "Select start date"}
-                </Text_12_400_EEEEEE>
-              </div>
-              <Text_10_400_B3B3B3 className="block mt-1">YYYY/MM/DD</Text_10_400_B3B3B3>
-            </div>
-
-            {/* End Date */}
-            <div className="flex-1">
-              <Text_10_400_B3B3B3 className="block mb-1">End date</Text_10_400_B3B3B3>
-              <div className="bg-[#0d0d0d] border border-[#3a3a3a] rounded px-3 py-2">
-                <Text_12_400_EEEEEE>
-                  {customRange
-                    ? customRange[1].format("YYYY / MM / DD , HH : mm : ss")
-                    : "Select end date"}
-                </Text_12_400_EEEEEE>
-              </div>
-              <Text_10_400_B3B3B3 className="block mt-1">YYYY/MM/DD</Text_10_400_B3B3B3>
-            </div>
-          </div>
-
-          {/* Range Picker - with onOk to handle OK button click */}
+          {/* Editable Date/Time Inputs */}
           <ConfigProvider theme={datePickerTheme}>
+            <div className="flex gap-4 mb-4">
+              {/* Start Date/Time */}
+              <div className="flex-1">
+                <Text_10_400_B3B3B3 className="block mb-1">Start date</Text_10_400_B3B3B3>
+                <div className="flex gap-2">
+                  <Input
+                    value={startDateStr}
+                    onChange={(e) => handleStartDateInput(e.target.value)}
+                    placeholder="YYYY/MM/DD"
+                    className="flex-1 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
+                  />
+                  <Input
+                    value={startTimeStr}
+                    onChange={(e) => handleStartTimeInput(e.target.value)}
+                    placeholder="HH:mm:ss"
+                    className="w-24 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* End Date/Time */}
+              <div className="flex-1">
+                <Text_10_400_B3B3B3 className="block mb-1">End date</Text_10_400_B3B3B3>
+                <div className="flex gap-2">
+                  <Input
+                    value={endDateStr}
+                    onChange={(e) => handleEndDateInput(e.target.value)}
+                    placeholder="YYYY/MM/DD"
+                    className="flex-1 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
+                  />
+                  <Input
+                    value={endTimeStr}
+                    onChange={(e) => handleEndTimeInput(e.target.value)}
+                    placeholder="HH:mm:ss"
+                    className="w-24 bg-[#0d0d0d] border-[#3a3a3a] text-[#EEEEEE] text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Date Range Picker - date only, time is handled by inputs above */}
             <RangePicker
               value={customRange}
-              onChange={handleCustomRangeChange}
-              onOk={(dates) => {
-                if (dates && dates[0] && dates[1]) {
-                  setCustomRange([dates[0], dates[1]]);
-                  setIsCustom(true);
-                  setOpen(false);
-                  if (onCustomRangeChange) {
-                    onCustomRangeChange(dates[0], dates[1]);
-                  }
-                  if (onChange) {
-                    onChange({ startDate: dates[0], endDate: dates[1] });
-                  }
-                }
-              }}
-              showTime={{ format: "HH:mm:ss" }}
-              format="YYYY-MM-DD HH:mm:ss"
+              onChange={handleCalendarChange}
+              format="YYYY-MM-DD"
               className="w-full bg-[#0d0d0d] border-[#3a3a3a] hover:border-[#965CDE]"
-              placeholder={["Start Date", "End Date"]}
+              placeholder={["Select start date", "Select end date"]}
               getPopupContainer={(trigger) => trigger.parentElement || document.body}
+              allowClear={false}
             />
           </ConfigProvider>
 
-          {/* Select Button - fallback for when user picks dates without clicking OK */}
-          <button
-            className="w-full mt-4 py-3 bg-[#965CDE] hover:bg-[#a873e5] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleSelectCustomRange}
-            disabled={!customRange}
-          >
-            Select
-          </button>
+          {/* Select Button */}
+          <div className="mt-4">
+            <PrimaryButton
+              className="w-full"
+              onClick={handleSelectCustomRange}
+              disabled={!customRange}
+            >
+              Select
+            </PrimaryButton>
+          </div>
         </div>
       )}
     </div>
@@ -381,12 +453,13 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
       onOpenChange={setOpen}
       placement="bottomRight"
       arrow={false}
-      overlayClassName="logfire-date-picker-popover"
-      overlayInnerStyle={{
-        padding: 0,
-        background: "#1A1A1A",
-        border: "1px solid #3a3a3a",
-        borderRadius: "8px",
+      styles={{
+        body: {
+          padding: 0,
+          background: "#1A1A1A",
+          border: "1px solid #3a3a3a",
+          borderRadius: "8px",
+        },
       }}
     >
       <button
@@ -404,5 +477,4 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
 
 export default LogfireDateRangePicker;
 
-// Export preset options for use in parent components
 export { PRESET_OPTIONS, PRESET_LABEL_MAP };
