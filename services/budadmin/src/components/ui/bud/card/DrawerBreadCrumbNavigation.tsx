@@ -106,10 +106,10 @@ export function DeawerCustomBreadcrumb({
 // Deploy Model
 function DrawerBreadCrumbNavigation({
   items: data,
-  ShowMinimizeButton : ShowMinimizeButton,
+  showMinimizeButton,
 }: {
   items: string[];
-  ShowMinimizeButton?: boolean;
+  showMinimizeButton?: boolean;
 }) {
   const { closeDrawer, setCancelAlert, step, minimizeProcess } = useDrawer();
   const { currentWorkflow } = useDeployModel();
@@ -131,7 +131,7 @@ function DrawerBreadCrumbNavigation({
             <path fillRule="evenodd" clipRule="evenodd" d="M13.8103 5.09188C14.0601 4.8421 14.0601 4.43712 13.8103 4.18734C13.5606 3.93755 13.1556 3.93755 12.9058 4.18734L8.99884 8.0943L5.09188 4.18734C4.8421 3.93755 4.43712 3.93755 4.18734 4.18734C3.93755 4.43712 3.93755 4.8421 4.18734 5.09188L8.0943 8.99884L4.18734 12.9058C3.93755 13.1556 3.93755 13.5606 4.18734 13.8103C4.43712 14.0601 4.8421 14.0601 5.09188 13.8103L8.99884 9.90338L12.9058 13.8103C13.1556 14.0601 13.5606 14.0601 13.8103 13.8103C14.0601 13.5606 14.0601 13.1556 13.8103 12.9058L9.90338 8.99884L13.8103 5.09188Z" fill="#B3B3B3" />
           </svg>
         </button>
-        {ShowMinimizeButton && (
+        {showMinimizeButton && (
           <button onClick={() => {
           if (!currentWorkflow) {
             return closeDrawer();

@@ -723,7 +723,7 @@ export default function LogDetailsDrawer() {
       onNext={async () => {
         closeDrawer();
       }}
-      ShowMinimizeButton = {false}
+      showMinimizeButton={false}
     >
       <BudWraperBox classNames="mt-[2.2rem]">
         <BudDrawerLayout>
