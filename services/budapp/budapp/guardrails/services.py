@@ -18,6 +18,7 @@
 
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
@@ -66,6 +67,8 @@ from budapp.guardrails.models import (
 )
 from budapp.guardrails.schemas import (
     BudSentinelConfig,
+    CustomProbeWorkflowRequest,
+    CustomProbeWorkflowSteps,
     GuardrailCustomProbeCreate,
     GuardrailCustomProbeUpdate,
     GuardrailDeploymentCreate,
@@ -85,7 +88,9 @@ from budapp.guardrails.schemas import (
     GuardrailProfileRuleResponse,
     GuardrailRuleDetailResponse,
     GuardrailRuleResponse,
+    LLMConfig,
     ModelDeploymentStatus,
+    PolicyConfig,
     ProxyGuardrailConfig,
 )
 from budapp.model_ops.crud import ProviderDataManager
@@ -103,6 +108,29 @@ from budapp.workflow_ops.services import WorkflowService, WorkflowStepService
 
 
 logger = logging.get_logger(__name__)
+
+
+@dataclass
+class ProbeTypeConfig:
+    """Configuration for a custom probe type.
+
+    Maps probe type options to their model configurations.
+    """
+
+    model_uri: str
+    scanner_type: str
+    handler: str
+    model_provider_type: str
+
+
+PROBE_TYPE_CONFIGS: dict[str, ProbeTypeConfig] = {
+    "llm_policy": ProbeTypeConfig(
+        model_uri="openai/gpt-oss-safeguard-20b",
+        scanner_type="llm",
+        handler="gpt_safeguard",
+        model_provider_type="openai",
+    ),
+}
 
 
 class GuardrailDeploymentWorkflowService(SessionMixin):
@@ -4503,3 +4531,237 @@ class GuardrailCustomProbeService(SessionMixin):
 
         # Soft delete the probe and its rules
         await GuardrailsProbeRulesDataManager(self.session).soft_delete_deprecated_probes([str(probe_id)])
+
+    async def add_custom_probe_workflow(
+        self,
+        current_user_id: UUID,
+        request: CustomProbeWorkflowRequest,
+    ) -> WorkflowModel:
+        """Add custom probe workflow (multi-step).
+
+        Similar to add_guardrail_deployment_workflow but for creating custom probes.
+
+        Step 1: Select probe type -> auto-derive model_uri, scanner_type, etc.
+        Step 2: Configure policy
+        Step 3: Probe metadata + trigger_workflow -> create probe
+
+        Args:
+            current_user_id: ID of the user creating the workflow
+            request: Custom probe workflow request with step data
+
+        Returns:
+            The workflow model instance
+        """
+        from budapp.commons.constants import ModelStatusEnum
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.models import Model
+
+        step_number = request.step_number
+        workflow_id = request.workflow_id
+        workflow_total_steps = request.workflow_total_steps
+        trigger_workflow = request.trigger_workflow
+
+        current_step_number = step_number
+
+        # Retrieve or create workflow
+        workflow_create = WorkflowUtilCreate(
+            workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
+            title="Custom Probe Creation",
+            total_steps=workflow_total_steps,
+            icon=APP_ICONS["general"]["deployment_mono"],
+            tag="Custom Probe",
+        )
+
+        db_workflow = await WorkflowService(self.session).retrieve_or_create_workflow(
+            workflow_id, workflow_create, current_user_id
+        )
+
+        # Get workflow steps to check for existing data
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": db_workflow.id}
+        )
+
+        # Find current workflow step or create one
+        db_current_workflow_step = None
+        for db_step in db_workflow_steps:
+            if db_step.step_number == current_step_number:
+                db_current_workflow_step = db_step
+                break
+
+        # Get existing step data or initialize empty
+        workflow_step_data: Dict[str, Any] = {}
+
+        # Merge data from all previous steps
+        for db_step in db_workflow_steps:
+            if db_step.data:
+                workflow_step_data.update(db_step.data)
+
+        # Process step data based on step_number
+        if step_number == 1:
+            # Step 1: Probe type selection
+            if request.probe_type_option:
+                config = PROBE_TYPE_CONFIGS.get(request.probe_type_option.value)
+                if config:
+                    workflow_step_data["probe_type_option"] = request.probe_type_option.value
+                    workflow_step_data["model_uri"] = config.model_uri
+                    workflow_step_data["scanner_type"] = config.scanner_type
+                    workflow_step_data["handler"] = config.handler
+                    workflow_step_data["model_provider_type"] = config.model_provider_type
+            if request.project_id:
+                workflow_step_data["project_id"] = str(request.project_id)
+
+        elif step_number == 2:
+            # Step 2: Policy configuration
+            if request.policy:
+                workflow_step_data["policy"] = request.policy.model_dump()
+
+        elif step_number == 3:
+            # Step 3: Probe metadata
+            if request.name:
+                workflow_step_data["name"] = request.name
+                # Update workflow title
+                await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"title": request.name})
+            if request.description:
+                workflow_step_data["description"] = request.description
+            if request.guard_types:
+                workflow_step_data["guard_types"] = request.guard_types
+            if request.modality_types:
+                workflow_step_data["modality_types"] = request.modality_types
+
+        # Create or update workflow step
+        if db_current_workflow_step:
+            # Merge new data with existing step data
+            existing_data = db_current_workflow_step.data or {}
+            merged_data = {**existing_data, **workflow_step_data}
+            workflow_step_data = merged_data
+
+            await WorkflowStepDataManager(self.session).update_by_fields(
+                db_current_workflow_step, {"data": workflow_step_data}
+            )
+        else:
+            db_current_workflow_step = await WorkflowStepDataManager(self.session).insert_one(
+                WorkflowStepModel(
+                    workflow_id=db_workflow.id,
+                    step_number=current_step_number,
+                    data=workflow_step_data,
+                )
+            )
+
+        # Update workflow current step
+        db_max_workflow_step_number = max(step.step_number for step in db_workflow_steps) if db_workflow_steps else 0
+        workflow_current_step = max(current_step_number, db_max_workflow_step_number)
+        await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"current_step": workflow_current_step})
+
+        # Execute workflow if triggered at step 3
+        if trigger_workflow and step_number == 3:
+            await self._execute_custom_probe_workflow(
+                data=workflow_step_data,
+                workflow_id=db_workflow.id,
+                current_user_id=current_user_id,
+            )
+
+        return db_workflow
+
+    async def _execute_custom_probe_workflow(
+        self,
+        data: Dict[str, Any],
+        workflow_id: UUID,
+        current_user_id: UUID,
+    ) -> None:
+        """Execute custom probe workflow - create the probe.
+
+        This method is called when trigger_workflow=True at step 3.
+
+        Args:
+            data: Accumulated workflow step data
+            workflow_id: ID of the workflow
+            current_user_id: ID of the user executing the workflow
+        """
+        from budapp.commons.constants import ModelStatusEnum
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.models import Model
+
+        db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(WorkflowModel, {"id": workflow_id})
+        db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+            {"workflow_id": workflow_id}
+        )
+        db_latest_workflow_step = db_workflow_steps[-1] if db_workflow_steps else None
+
+        execution_status_data: Dict[str, Any] = {
+            "workflow_execution_status": {
+                "status": "success",
+                "message": "Custom probe created successfully",
+            },
+            "probe_id": None,
+        }
+
+        try:
+            # Look up model by URI - assign model_id if found
+            model_id = None
+            model_uri = data.get("model_uri")
+            if model_uri:
+                model_data_manager = ModelDataManager(self.session)
+                existing_model = await model_data_manager.retrieve_by_fields(
+                    Model,
+                    {"uri": model_uri, "status": ModelStatusEnum.ACTIVE},
+                    missing_ok=True,
+                )
+                if existing_model:
+                    model_id = existing_model.id
+
+            # Get BudSentinel provider
+            provider = await ProviderDataManager(self.session).retrieve_by_fields(Provider, {"type": "bud_sentinel"})
+            if not provider:
+                raise ClientException(
+                    message="BudSentinel provider not found",
+                    status_code=HTTPStatus.HTTP_404_NOT_FOUND,
+                )
+
+            # Build LLMConfig with handler and policy
+            model_config = LLMConfig(
+                handler=data.get("handler", "gpt_safeguard"),
+                policy=PolicyConfig(**data["policy"]),
+            ).model_dump()
+
+            # Create probe via CRUD method
+            probe = await GuardrailsDeploymentDataManager(self.session).create_custom_probe_with_rule(
+                name=data["name"],
+                description=data.get("description"),
+                scanner_type=data["scanner_type"],
+                model_id=model_id,
+                model_config=model_config,
+                model_uri=model_uri,
+                model_provider_type=data.get("model_provider_type", "openai"),
+                is_gated=False,
+                project_id=UUID(data["project_id"]),
+                user_id=current_user_id,
+                provider_id=provider.id,
+                guard_types=data.get("guard_types"),
+                modality_types=data.get("modality_types"),
+            )
+
+            execution_status_data["probe_id"] = str(probe.id)
+            execution_status_data["model_id"] = str(model_id) if model_id else None
+
+            # Mark workflow COMPLETED
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.COMPLETED}
+            )
+
+        except Exception as e:
+            logger.exception(f"Failed to create custom probe: {e}")
+            execution_status_data["workflow_execution_status"] = {
+                "status": "error",
+                "message": str(e),
+            }
+
+            # Mark workflow FAILED
+            await WorkflowDataManager(self.session).update_by_fields(
+                db_workflow, {"status": WorkflowStatusEnum.FAILED, "reason": str(e)}
+            )
+
+        # Update step data with execution status
+        if db_latest_workflow_step:
+            await WorkflowStepDataManager(self.session).update_by_fields(
+                db_latest_workflow_step, {"data": {**data, **execution_status_data}}
+            )
