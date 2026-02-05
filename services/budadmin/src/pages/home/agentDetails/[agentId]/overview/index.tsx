@@ -18,6 +18,8 @@ import { usePromptMetrics } from "src/hooks/usePromptMetrics";
 import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import { PermissionEnum, useUser } from "src/stores/useUser";
+import { AppRequest } from "src/pages/api/requests";
+import { tempApiBaseUrl } from "@/components/environment";
 
 const segmentOptions = ["daily", "weekly", "monthly"];
 
@@ -747,6 +749,245 @@ const TokenUsageChart: React.FC<TokenUsageChartProps> = ({ promptId }) => {
           </div>
         )}
         <Text_20_400_FFFFFF className="mb-3">{formatTotal(chartData.totalTokens)}</Text_20_400_FFFFFF>
+        <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
+        {chartData.labels.length === 0 && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Text_12_400_B3B3B3>No data available</Text_12_400_B3B3B3>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Request Count by API Key Chart Component using ECharts
+interface RequestCountByApiKeyChartProps {
+  promptId: string;
+}
+
+interface ApiKeyRequestData {
+  api_key_id: string;
+  api_key_name?: string;
+  count: number;
+  delta: number;
+  delta_percent: number;
+}
+
+const RequestCountByApiKeyChart: React.FC<RequestCountByApiKeyChartProps> = ({ promptId }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const [timeRange, setTimeRange] = useState("LAST 7 DAYS");
+  const [isLoading, setIsLoading] = useState(false);
+  const [chartData, setChartData] = useState<{
+    labels: string[];
+    data: number[];
+    totalCount: number;
+    avgDeltaPercent: number;
+  }>({ labels: [], data: [], totalCount: 0, avgDeltaPercent: 0 });
+
+  const timeRangeOptions = ["LAST 24 HRS", "LAST 7 DAYS", "LAST 30 DAYS"];
+
+  const getDateRange = useCallback((range: string): { from: dayjs.Dayjs; to: dayjs.Dayjs; frequencyUnit: string; frequencyInterval: number } => {
+    const to = dayjs();
+    switch (range) {
+      case "LAST 24 HRS":
+        return { from: to.subtract(24, "hour"), to, frequencyUnit: "hour", frequencyInterval: 1 };
+      case "LAST 7 DAYS":
+        return { from: to.subtract(7, "day"), to, frequencyUnit: "day", frequencyInterval: 1 };
+      case "LAST 30 DAYS":
+        return { from: to.subtract(30, "day"), to, frequencyUnit: "day", frequencyInterval: 1 };
+      default:
+        return { from: to.subtract(7, "day"), to, frequencyUnit: "day", frequencyInterval: 1 };
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    if (!promptId) return;
+    setIsLoading(true);
+
+    try {
+      const { from, to, frequencyUnit, frequencyInterval } = getDateRange(timeRange);
+
+      const response = await AppRequest.Post(`${tempApiBaseUrl}/metrics/analytics`, {
+        metrics: ["request_count"],
+        from_date: from.toISOString(),
+        to_date: to.toISOString(),
+        frequency_unit: frequencyUnit,
+        frequency_interval: frequencyInterval,
+        return_delta: true,
+        fill_time_gaps: true,
+        filters: {
+          prompt: [promptId]
+        },
+        group_by: ["api_key"],
+        data_source: "prompt"
+      });
+
+      if (response && response.data) {
+        // Response structure: { object: "observability_metrics", items: [...time_periods] }
+        const apiKeyData: Map<string, ApiKeyRequestData> = new Map();
+        const timePeriods = response.data.items || [];
+
+        // Aggregate data across all time periods per API key
+        timePeriods.forEach((period: any) => {
+          if (period.items && Array.isArray(period.items)) {
+            period.items.forEach((item: any) => {
+              const apiKeyId = item.api_key_id || "unknown";
+              const apiKeyName = item.api_key_name || apiKeyId;
+              const requestCount = item.data?.request_count?.count || 0;
+              const delta = item.data?.request_count?.delta || 0;
+              const deltaPercent = item.data?.request_count?.delta_percent || 0;
+
+              const existing = apiKeyData.get(apiKeyId);
+              if (existing) {
+                existing.count += requestCount;
+                // Keep the most recent delta_percent (first non-zero one)
+                if (existing.delta_percent === 0 && deltaPercent !== 0) {
+                  existing.delta_percent = deltaPercent;
+                }
+              } else {
+                apiKeyData.set(apiKeyId, {
+                  api_key_id: apiKeyId,
+                  api_key_name: apiKeyName,
+                  count: requestCount,
+                  delta,
+                  delta_percent: deltaPercent
+                });
+              }
+            });
+          }
+        });
+
+        const sortedData = Array.from(apiKeyData.values()).sort((a, b) => b.count - a.count);
+
+        const labels = sortedData.map(item => {
+          const name = item.api_key_name || item.api_key_id;
+          return name.length > 10 ? name.substring(0, 10) + "..." : name;
+        });
+        const data = sortedData.map(item => item.count);
+        const totalCount = data.reduce((sum, val) => sum + val, 0);
+
+        // Calculate weighted average delta percent based on count
+        let avgDeltaPercent = 0;
+        if (totalCount > 0) {
+          const weightedSum = sortedData.reduce((sum, item) => sum + (item.delta_percent * item.count), 0);
+          avgDeltaPercent = weightedSum / totalCount;
+        }
+
+        setChartData({ labels, data, totalCount, avgDeltaPercent });
+      } else {
+        setChartData({ labels: [], data: [], totalCount: 0, avgDeltaPercent: 0 });
+      }
+    } catch (err) {
+      console.error("Error fetching request count by API key:", err);
+      setChartData({ labels: [], data: [], totalCount: 0, avgDeltaPercent: 0 });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [promptId, timeRange, getDateRange]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const myChart = echarts.init(chartRef.current, null, { renderer: "canvas" });
+    chartInstanceRef.current = myChart;
+
+    const option: echarts.EChartsOption = {
+      backgroundColor: "transparent",
+      grid: { left: "0%", right: "0%", bottom: "15%", top: "10%", containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        backgroundColor: "rgba(24, 24, 27, 0.98)",
+        borderColor: "#3f3f46",
+        borderWidth: 1,
+        padding: [12, 14],
+        textStyle: { color: "#fafafa", fontSize: 12 },
+        confine: true,
+        formatter: function (params: any) {
+          const param = params[0];
+          const apiKey = param?.name || "";
+          const count = param?.value || 0;
+          return `<div style="min-width: 150px;">
+            <div style="color: #71717a; font-size: 11px; margin-bottom: 4px;">API Key: ${apiKey}</div>
+            <div style="color: #fafafa; font-weight: 500;">Request Count: ${count}</div>
+          </div>`;
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: [],
+        axisLine: { lineStyle: { color: "#3f3f46" } },
+        axisTick: { show: false },
+        axisLabel: { color: "#71717a", fontSize: 10, interval: 0, rotate: 0 },
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: "#3D3D3D", type: "solid" } },
+        axisLabel: { color: "#71717a", fontSize: 10 },
+        minInterval: 1,
+      },
+      series: [{
+        name: "Request Count",
+        type: "bar",
+        data: [],
+        itemStyle: { color: "#965CDE", borderRadius: [2, 2, 0, 0] },
+        emphasis: { itemStyle: { color: "#a78bfa" } },
+        barMaxWidth: 20,
+      }],
+    };
+
+    myChart.setOption(option);
+    const handleResize = () => myChart.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      myChart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    chartInstanceRef.current.setOption({
+      xAxis: { data: chartData.labels },
+      series: [{ data: chartData.data }],
+    });
+  }, [chartData]);
+
+  const formatDelta = (delta: number) => {
+    const arrow = delta >= 0 ? "\u2197" : "\u2198";
+    return `Avg. ${delta.toFixed(2)}% ${arrow}`;
+  };
+
+  return (
+    <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-[1.57rem] pb-[1rem]">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-fit">
+          <Text_14_600_EEEEEE>Request count</Text_14_600_EEEEEE>
+        </div>
+        <Segmented
+          options={timeRangeOptions}
+          value={timeRange}
+          onChange={(val) => setTimeRange(val as string)}
+          className="antSegmented antSegmented-home rounded-md text-[#EEEEEE] text-[.75rem] font-[400] bg-[transparent] border border-[#4D4D4D] border-[.53px] p-[0]"
+        />
+      </div>
+      <div className="relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#101010] bg-opacity-50 z-10">
+            <Spin size="small" />
+          </div>
+        )}
+        <Text_20_400_FFFFFF className="mb-1">{chartData.totalCount.toFixed(2)}</Text_20_400_FFFFFF>
+        <div className={`text-[.75rem] mb-3 ${chartData.avgDeltaPercent >= 0 ? "text-[#479D5F]" : "text-[#EF4444]"}`}>
+          {formatDelta(chartData.avgDeltaPercent)}
+        </div>
         <div ref={chartRef} style={{ width: "100%", aspectRatio: 1.3122 }} />
         {chartData.labels.length === 0 && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -1678,6 +1919,17 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
         <Col span={12}>
           {promptId && typeof promptId === "string" ? (
             <TokenUsageChart promptId={promptId} />
+          ) : (
+            <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
+              <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>
+            </div>
+          )}
+        </Col>
+
+        {/* Request Count by API Key - Bar chart grouped by API key */}
+        <Col span={12}>
+          {promptId && typeof promptId === "string" ? (
+            <RequestCountByApiKeyChart promptId={promptId} />
           ) : (
             <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 h-[200px] flex items-center justify-center">
               <Text_12_400_B3B3B3>No prompt ID available</Text_12_400_B3B3B3>

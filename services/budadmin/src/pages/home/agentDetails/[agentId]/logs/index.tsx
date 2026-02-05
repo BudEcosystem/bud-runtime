@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Tag, Spin, Tooltip } from "antd";
+import { Tag, Spin, Tooltip, Popover } from "antd";
 import * as echarts from "echarts";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import {
   Text_10_400_B3B3B3,
   Text_10_600_EEEEEE,
@@ -8,12 +10,19 @@ import {
   Text_12_600_EEEEEE,
   Text_26_600_FFFFFF,
 } from "@/components/ui/text";
-import CustomSelect from "src/flows/components/CustomSelect";
+import LogfireDateRangePicker, { DateRangeValue, PRESET_OPTIONS } from "@/components/ui/LogfireDateRangePicker";
 import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useObservabilitySocket } from "@/hooks/useObservabilitySocket";
+import ProjectTags from "src/flows/components/ProjectTags";
 
 // API Response Types
+interface SpanEvent {
+  timestamp: string;
+  name: string;
+  attributes: Record<string, any>;
+}
+
 interface TraceSpan {
   timestamp: string;
   trace_id: string;
@@ -30,7 +39,9 @@ interface TraceSpan {
   duration_ms?: number;
   duration?: number; // Duration in nanoseconds (from OpenTelemetry)
   status_code?: string;
+  status_message?: string;
   child_span_count?: number;
+  events?: SpanEvent[];
 }
 
 interface TracesResponse {
@@ -72,6 +83,15 @@ interface LogEntry {
   canExpand?: boolean; // true if this is a root span that can be expanded
   isLoadingChildren?: boolean;
   rawData?: Record<string, any>; // Raw span data for details drawer
+  // Logfire-style fields
+  level?: string; // INFO, WARN, ERROR, DEBUG
+  scopeName?: string; // otel scope name
+  inputTokens?: string; // gen_ai.usage.input_tokens
+  outputTokens?: string; // gen_ai.usage.output_tokens
+  serviceName?: string; // service_name for badge
+  // Exception fields
+  hasException?: boolean; // true if this span has an exception/error
+  errorType?: string; // e.g., "Internal Server Error", "Not Found", "Bad Request"
 }
 
 interface LogsTabProps {
@@ -193,6 +213,62 @@ const aggregateTracesIntoBuckets = (
       total: filtered.length,
     };
   });
+};
+
+// Token metrics popover component - reusable for LogRow and FlatLogRow
+const TokenMetricsPopover = ({
+  inputTokens,
+  outputTokens,
+  scopeName,
+}: {
+  inputTokens?: string;
+  outputTokens?: string;
+  scopeName?: string;
+}) => {
+  if (!inputTokens && !outputTokens) return null;
+
+  return (
+    <Popover
+      placement="top"
+      arrow={false}
+      styles={{ body: { padding: 0, background: '#1F1F1F', border: '1px solid #3a3a3a', borderRadius: '6px' } }}
+      content={
+        <div className="min-w-[180px]">
+          <div className="px-3 py-2 border-b border-[#3a3a3a]">
+            <Text_10_600_EEEEEE className="block">LLM Tokens (aggregated)</Text_10_600_EEEEEE>
+            {scopeName && (
+              <Text_10_400_B3B3B3 className="block mt-1">{scopeName}</Text_10_400_B3B3B3>
+            )}
+          </div>
+          <div className="px-3 py-2">
+            <div className="flex justify-between items-center text-[.625rem] border-b border-[#2a2a2a] pb-1 mb-1">
+              <span className="text-[#757575]">Type</span>
+              <span className="text-[#757575]">Amount</span>
+            </div>
+            <div className="flex justify-between items-center text-[.625rem] py-1">
+              <span className="text-[#B3B3B3]">Input</span>
+              <span className="text-[#EEEEEE]">↗ {inputTokens || 0}</span>
+            </div>
+            <div className="flex justify-between items-center text-[.625rem] py-1">
+              <span className="text-[#B3B3B3]">Output</span>
+              <span className="text-[#EEEEEE]">↙ {outputTokens || 0}</span>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <div className="cursor-pointer">
+        <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center flex justify-center items-center gap-x-[.3rem] leading-[200%]">
+          <div className="text-[.75rem]">∅</div>
+          <div className="flex justify-center items-center gap-x-[.1rem]">
+            {/* <div className="text-[.4rem]">∑</div> */}
+            <div className="text-[.4rem]">↗</div>{inputTokens || 0}
+            <div className="text-[.4rem]">↙</div>{outputTokens || 0}
+          </div>
+        </Tag>
+      </div>
+    </Popover>
+  );
 };
 
 // Duration bar component
@@ -425,10 +501,23 @@ const LogRow = ({
         <div className="flex justify-end items-center min-w-[30%] pr-[12px] pl-[12px] flex-shrink-0">
           {/* Metrics tags */}
           <div className="flex gap-2 items-center flex-shrink-0 mr-3">
-            {row.metrics.sum !== undefined && (
-              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
-                ∅ ∑ ↗{row.metrics.sum} ↙{row.metrics.rate}
-              </Tag>
+            {/* Token metrics with original icon style */}
+            <TokenMetricsPopover
+              inputTokens={row.inputTokens}
+              outputTokens={row.outputTokens}
+              scopeName={row.scopeName}
+            />
+            {/* Exception tag */}
+            {row.hasException && (
+              <Tooltip title={row.errorType || "Exception"} placement="top">
+                <div>
+                  <ProjectTags
+                    name="exception"
+                    color="#EC7575"
+                    textClass="text-[.5rem] leading-[90%]"
+                  />
+                </div>
+              </Tooltip>
             )}
             {row.metrics.tag && (
               <Tooltip title={row.metrics.tag} placement="top">
@@ -437,6 +526,14 @@ const LogRow = ({
                 </Tag>
               </Tooltip>
             )}
+            {/* Scope tag (like Logfire's auto_tracing, logfire, etc.) */}
+            {/* {row.scopeName && (
+              <Tooltip title={row.scopeName} placement="top">
+                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                  {row.scopeName}
+                </Tag>
+              </Tooltip>
+            )} */}
           </div>
 
           {/* Timeline */}
@@ -510,14 +607,42 @@ const FlatLogRow = ({
           </div>
         </div>
         <div className="flex justify-end items-center min-w-[30%] pr-3 pl-3 flex-shrink-0 ">
-          {/* Metrics tag */}
-          {row.metrics.tag && (
-            <Tooltip title={row.metrics.tag} placement="top">
-              <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[#B3B3B3] text-[11px] max-w-[80px] truncate mr-3">
-                {row.metrics.tag}
-              </Tag>
-            </Tooltip>
-          )}
+          {/* Metrics tags */}
+          <div className="flex gap-2 items-center flex-shrink-0 mr-3">
+            {/* Token metrics with original icon style */}
+            <TokenMetricsPopover
+              inputTokens={row.inputTokens}
+              outputTokens={row.outputTokens}
+              scopeName={row.scopeName}
+            />
+            {/* Exception tag */}
+            {row.hasException && (
+              <Tooltip title={row.errorType || "Exception"} placement="top">
+                <div>
+                  <ProjectTags
+                    name="exception"
+                    color="#EC7575"
+                    textClass="text-[.5rem]"
+                  />
+                </div>
+              </Tooltip>
+            )}
+            {row.metrics.tag && (
+              <Tooltip title={row.metrics.tag} placement="top">
+                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                  {row.metrics.tag}
+                </Tag>
+              </Tooltip>
+            )}
+            {/* Scope tag (like Logfire's auto_tracing, logfire, etc.) */}
+            {row.scopeName && (
+              <Tooltip title={row.scopeName} placement="top">
+                <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] max-w-[80px] truncate w-fit pointer-events-none px-[.2rem] w-full text-center !leading-[200%]">
+                  {row.scopeName}
+                </Tag>
+              </Tooltip>
+            )}
+          </div>
 
           {/* Timeline */}
           <DurationBar duration={row.duration} referenceDuration={referenceDuration} />
@@ -611,8 +736,19 @@ const formatDateForApi = (date: Date): string => {
   return date.toISOString().replace(/\.\d{3}Z$/, "Z");
 };
 
-// Helper function to get time range dates
-const getTimeRangeDates = (range: string): { from_date: string; to_date: string } => {
+// Helper function to get time range dates - supports both presets and custom ranges
+const getTimeRangeDates = (
+  range: string,
+  customRange?: [Dayjs, Dayjs] | null
+): { from_date: string; to_date: string } => {
+  // If custom range is provided, use it
+  if (customRange) {
+    return {
+      from_date: formatDateForApi(customRange[0].toDate()),
+      to_date: formatDateForApi(customRange[1].toDate()),
+    };
+  }
+
   const now = new Date();
   let from_date: Date;
 
@@ -629,11 +765,23 @@ const getTimeRangeDates = (range: string): { from_date: string; to_date: string 
     case "1h":
       from_date = new Date(now.getTime() - 60 * 60 * 1000);
       break;
+    case "6h":
+      from_date = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+      break;
+    case "12h":
+      from_date = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+      break;
     case "24h":
       from_date = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       break;
+    case "2d":
+      from_date = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+      break;
     case "7d":
       from_date = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case "14d":
+      from_date = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
       break;
     case "30d":
       from_date = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -669,64 +817,114 @@ const formatDuration = (seconds: number): string => {
   return `${seconds.toFixed(2)}s`;
 };
 
+// Helper function to detect exception/error status from a span
+const detectSpanException = (span: TraceSpan): { hasException: boolean; errorType?: string } => {
+  const attrs = span.span_attributes || {};
+
+  // Check 1: status_code is STATUS_CODE_ERROR
+  if (span.status_code === "STATUS_CODE_ERROR") {
+    // Try to extract error type from various sources
+    const errorType = attrs["gateway_analytics.error_type"]
+      || (span.events?.[0]?.attributes?.error_type)
+      || "Error";
+    return { hasException: true, errorType };
+  }
+
+  // Check 2: events array contains exception events
+  if (span.events && span.events.length > 0) {
+    const exceptionEvent = span.events.find(event =>
+      event.name?.toLowerCase().includes("exception") ||
+      event.attributes?.level === "ERROR"
+    );
+    if (exceptionEvent) {
+      const errorType = exceptionEvent.attributes?.error_type || "Exception";
+      return { hasException: true, errorType };
+    }
+  }
+
+  // Check 3: span_attributes has gateway_analytics.error_type
+  if (attrs["gateway_analytics.error_type"]) {
+    return { hasException: true, errorType: attrs["gateway_analytics.error_type"] };
+  }
+
+  // Check 4: HTTP error status code in span_attributes (400+)
+  const httpStatusCode = attrs["gateway_analytics.status_code"];
+  if (httpStatusCode) {
+    const statusNum = parseInt(httpStatusCode, 10);
+    if (statusNum >= 400) {
+      const errorType = attrs["gateway_analytics.error_type"]
+        || (statusNum >= 500 ? "Server Error" : "Client Error");
+      return { hasException: true, errorType };
+    }
+  }
+
+  // Check 5: status_message contains error information
+  if (span.status_message && span.status_message.length > 0) {
+    // If there's a non-empty status_message, it usually indicates an error
+    const errorType = attrs["gateway_analytics.error_type"] || "Error";
+    return { hasException: true, errorType };
+  }
+
+  return { hasException: false };
+};
+
+// Helper function to convert a TraceSpan to a LogEntry
+// Centralizes the mapping logic to avoid duplication across build functions
+const traceSpanToLogEntry = (
+  span: TraceSpan,
+  earliestTimestamp: number,
+  overrides?: Partial<LogEntry>
+): LogEntry => {
+  const timestamp = new Date(span.timestamp).getTime();
+  const attrs = span.span_attributes || {};
+
+  // Detect exception status
+  const { hasException, errorType } = detectSpanException(span);
+
+  const baseEntry: LogEntry = {
+    id: span.span_id,
+    time: formatTime(span.timestamp),
+    namespace: span.resource_attributes?.["service.name"] || "",
+    title: span.span_name || "Unknown Span",
+    childCount: span.child_span_count,
+    metrics: {
+      tag: span.service_name || "",
+    },
+    duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
+    startOffsetSec: (timestamp - earliestTimestamp) / 1000,
+    traceId: span.trace_id,
+    spanId: span.span_id,
+    parentSpanId: span.parent_span_id || "",
+    canExpand: (span.child_span_count ?? 0) > 0,
+    rawData: span as unknown as Record<string, any>,
+    // Logfire-style fields
+    level: attrs.level || "INFO",
+    scopeName: span.scope_name || "",
+    inputTokens: attrs["gen_ai.usage.input_tokens"],
+    outputTokens: attrs["gen_ai.usage.output_tokens"],
+    serviceName: span.service_name,
+    // Exception fields
+    hasException,
+    errorType,
+  };
+
+  // Apply any overrides provided by the caller
+  return overrides ? { ...baseEntry, ...overrides } : baseEntry;
+};
+
 // Helper function to extract only root spans (those with empty parent_span_id)
 const buildRootSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogEntry[] => {
-  const result: LogEntry[] = [];
-
-  spans.forEach((span) => {
-    // Only include spans with empty parent_span_id (root spans)
-    if (!span.parent_span_id || span.parent_span_id === "") {
-      const timestamp = new Date(span.timestamp).getTime();
-
-      const entry: LogEntry = {
-        id: span.span_id,
-        time: formatTime(span.timestamp),
-        namespace: span.resource_attributes?.["service.name"] || "",
-        title: span.span_name,
-        childCount: span.child_span_count,
-        metrics: {
-          tag: span.service_name,
-        },
-        duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
-        startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-        traceId: span.trace_id,
-        spanId: span.span_id,
-        parentSpanId: span.parent_span_id,
-        canExpand: (span.child_span_count ?? 0) > 0, // Only expandable if has children
-        rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
-      };
-
-      result.push(entry);
-    }
-  });
-
-  // Sort by timestamp
-  result.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
-
-  return result;
+  return spans
+    .filter((span) => !span.parent_span_id || span.parent_span_id === "")
+    .map((span) => traceSpanToLogEntry(span, earliestTimestamp))
+    .sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 };
 
 // Helper function to build flat list of all spans (for flatten view)
 const buildFlatSpansList = (spans: TraceSpan[], earliestTimestamp: number): LogEntry[] => {
-  return spans.map((span) => {
-    const timestamp = new Date(span.timestamp).getTime();
-    return {
-      id: span.span_id,
-      time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.name"] || "",
-      title: span.span_name,
-      metrics: {
-        tag: span.service_name,
-      },
-      duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
-      startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-      traceId: span.trace_id,
-      spanId: span.span_id,
-      parentSpanId: span.parent_span_id,
-      canExpand: false, // No expansion in flatten mode
-      rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
-    };
-  }).sort((a, b) => a.startOffsetSec - b.startOffsetSec);
+  return spans
+    .map((span) => traceSpanToLogEntry(span, earliestTimestamp, { canExpand: false }))
+    .sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 };
 
 // Helper function to build hierarchical tree from trace detail spans
@@ -738,29 +936,9 @@ const buildChildrenFromTraceDetail = (
   // Build a map of span_id to LogEntry
   const spanMap = new Map<string, LogEntry>();
 
-  // First pass: create all LogEntry nodes (excluding the root span itself)
+  // First pass: create all LogEntry nodes with empty children array for tree building
   spans.forEach((span) => {
-    const timestamp = new Date(span.timestamp).getTime();
-
-    const entry: LogEntry = {
-      id: span.span_id,
-      time: formatTime(span.timestamp),
-      namespace: span.resource_attributes?.["service.name"] || "",
-      title: span.span_name,
-      childCount: span.child_span_count, // Use child_span_count from API
-      metrics: {
-        tag: span.service_name,
-      },
-      duration: (span.duration ?? 0) / 1_000_000_000, // Convert nanoseconds to seconds
-      startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-      children: [],
-      traceId: span.trace_id,
-      spanId: span.span_id,
-      parentSpanId: span.parent_span_id,
-      canExpand: (span.child_span_count ?? 0) > 0, // Set canExpand based on child_span_count
-      rawData: span as unknown as Record<string, any>, // Include raw span data for details drawer
-    };
-
+    const entry = traceSpanToLogEntry(span, earliestTimestamp, { children: [] });
     spanMap.set(span.span_id, entry);
   });
 
@@ -844,30 +1022,17 @@ const buildTreeFromLiveSpans = (spans: TraceSpan[]): LogEntry[] => {
       // Sort children by timestamp
       childNodes.sort((a, b) => a.startOffsetSec - b.startOffsetSec);
 
-      const timestamp = new Date(span.timestamp).getTime();
-
       // Calculate total descendant count (all children + grandchildren + etc.)
       const totalDescendants = childNodes.reduce(
         (sum, child) => sum + 1 + countDescendants(child),
         0
       );
 
-      return {
-        id: span.span_id,
-        time: formatTime(span.timestamp),
-        namespace: span.resource_attributes?.["service.name"] || "",
-        title: span.span_name || 'Unknown Span',
+      return traceSpanToLogEntry(span, earliestTimestamp, {
         childCount: totalDescendants,
-        metrics: { tag: span.service_name || '' },
-        duration: (span.duration ?? 0) / 1_000_000_000,
-        startOffsetSec: (timestamp - earliestTimestamp) / 1000,
-        traceId: span.trace_id,
-        spanId: span.span_id,
-        parentSpanId: span.parent_span_id || '',
         canExpand: childNodes.length > 0,
         children: childNodes.length > 0 ? childNodes : undefined,
-        rawData: span as unknown as Record<string, any>,
-      };
+      });
     };
 
     result.push(buildNode(rootSpan));
@@ -887,6 +1052,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const [timeRange, setTimeRange] = useState("5m");
+  const [customDateRange, setCustomDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -959,6 +1125,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
     // Transform to LogEntry and prepend to list
     // Handle both snake_case (from socket) and potential variations
+    // Detect exception status
+    const { hasException, errorType } = detectSpanException(trace);
+
     const newEntry: LogEntry = {
       id: trace.span_id,
       time: trace.timestamp ? formatTime(trace.timestamp) : 'N/A',
@@ -973,6 +1142,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       parentSpanId: trace.parent_span_id || '',
       canExpand: (trace.child_span_count ?? 0) > 0,
       rawData: trace as unknown as Record<string, any>,
+      hasException,
+      errorType,
     };
 
     console.log('[LiveTrace] Created LogEntry:', newEntry);
@@ -1035,6 +1206,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         if (liveSpanIdsRef.current.has(trace.span_id)) return;
         liveSpanIdsRef.current.add(trace.span_id);
 
+        // Detect exception status
+        const { hasException, errorType } = detectSpanException(trace);
+
         const newEntry: LogEntry = {
           id: trace.span_id,
           time: trace.timestamp ? formatTime(trace.timestamp) : 'N/A',
@@ -1049,6 +1223,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           parentSpanId: trace.parent_span_id || '',
           canExpand: false,
           rawData: trace as unknown as Record<string, any>,
+          hasException,
+          errorType,
         };
 
         setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
@@ -1068,7 +1244,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     onError: (err) => console.error('[LiveTrace] Socket error:', err),
   });
 
-  const ITEMS_PER_PAGE = 15;
+  const ITEMS_PER_PAGE = 20;
 
   // Open drawer with selected log
   const openLogDetailsDrawer = (log: LogEntry) => {
@@ -1093,7 +1269,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
     try {
       const currentPage = loadMore ? page + 1 : 1;
-      const { from_date, to_date } = getTimeRangeDates(timeRange);
+      const { from_date, to_date } = getTimeRangeDates(timeRange, customDateRange);
 
       // Build params based on view mode
       const params: Record<string, any> = {
@@ -1118,10 +1294,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         const spans: TraceSpan[] = response.data.items;
         const total = response.data.total_record || 0;
 
-        // Find earliest and latest timestamps for offset calculation and chart
+        // Find earliest timestamp for offset calculation
         const timestamps = spans.map((s: TraceSpan) => new Date(s.timestamp).getTime());
         const earliestTimestamp = Math.min(...timestamps);
-        const latestTimestamp = Math.max(...timestamps);
 
         // Build data based on view mode
         let newData: LogEntry[];
@@ -1157,12 +1332,12 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [promptName, projectId, timeRange, viewMode, page]);
+  }, [promptName, projectId, timeRange, customDateRange, viewMode, page]);
 
   // Fetch traces when dependencies change (except page - that's handled by loadMore)
   useEffect(() => {
     fetchTraces();
-  }, [promptName, projectId, timeRange, viewMode]);
+  }, [promptName, projectId, timeRange, customDateRange, viewMode]);
 
   // Reset state when view mode changes
   useEffect(() => {
@@ -1450,8 +1625,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     });
   };
 
-  // Handle time range change - disables live mode if active
-  const handleTimeRangeChange = (newRange: string) => {
+  // Handle preset time range change - disables live mode if active
+  const handlePresetChange = (newRange: string) => {
     if (isLive) {
       // Disable live mode and clear live data when changing time filter
       setIsLive(false);
@@ -1460,6 +1635,29 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       liveChartTracesRef.current = [];
     }
     setTimeRange(newRange);
+    setCustomDateRange(null); // Clear custom range when preset is selected
+  };
+
+  // Handle custom date range change
+  const handleCustomRangeChange = (startDate: Dayjs, endDate: Dayjs) => {
+    if (isLive) {
+      // Disable live mode and clear live data when changing time filter
+      setIsLive(false);
+      setLogsData([]);
+      liveSpanIdsRef.current.clear();
+      liveChartTracesRef.current = [];
+    }
+    setCustomDateRange([startDate, endDate]);
+    setTimeRange(""); // Clear preset when custom range is selected
+  };
+
+  // Handle combined date range picker change
+  const handleDateRangeChange = (value: DateRangeValue) => {
+    if (value.preset) {
+      handlePresetChange(value.preset);
+    } else if (value.startDate && value.endDate) {
+      handleCustomRangeChange(value.startDate, value.endDate);
+    }
   };
 
   // Update chart - always regenerate buckets based on current time for scrolling effect
@@ -1806,20 +2004,14 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     };
   }, [isLive, timeRange, updateChartData]);
 
-  const timeRangeOptions = [
-    { label: "Last 5 minutes", value: "5m" },
-    { label: "Last 15 minutes", value: "15m" },
-    { label: "Last 30 minutes", value: "30m" },
-    { label: "Last 1 hour", value: "1h" },
-    { label: "Last 24 hours", value: "24h" },
-    { label: "Last 1 week", value: "7d" },
-    { label: "Last 1 month", value: "30d" },
-  ];
-
   // Get time range label for display
   const getTimeRangeLabel = () => {
-    const option = timeRangeOptions.find((o) => o.value === timeRange);
-    return option?.label?.replace("Last ", "") || "5 minutes";
+    if (customDateRange) {
+      const [start, end] = customDateRange;
+      return `${start.format("MMM D")} - ${end.format("MMM D")}`;
+    }
+    const preset = PRESET_OPTIONS.find((o) => o.value === timeRange);
+    return preset?.label?.replace("Last ", "") || "5 minutes";
   };
 
   return (
@@ -1838,14 +2030,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       <div className=" border-0 border-[#1F1F1F]  p-4 mb-4 mt-4">
         {/* Chart Controls */}
         <div className="flex justify-end items-center gap-2 mb-2">
-          <CustomSelect
-            name="timeRange"
-            value={timeRange}
-            onChange={handleTimeRangeChange}
-            selectOptions={timeRangeOptions}
-            ClassNames="w-[160px] !py-[.1rem]"
-            InputClasses="!text-[.625rem] !py-[.1rem] !min-h-[1.6rem] !h-[1.6rem]"
-            placeholder="Select time range"
+          <LogfireDateRangePicker
+            value={
+              customDateRange
+                ? { startDate: customDateRange[0], endDate: customDateRange[1] }
+                : { preset: timeRange || "5m" }
+            }
+            onChange={handleDateRangeChange}
           />
           <div className="flex items-center border border-[#3a3a3a] rounded-md overflow-hidden max-h-[1.6rem]">
             <button
@@ -1885,7 +2076,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         </div>
 
         {/* Chart */}
-        <div ref={chartRef} className="w-full h-[180px]" />
+        <div ref={chartRef} className="w-full h-[180px] 1680px:h-[250px] 1920px:h-[320px] 2048px:h-[400px] 2560px:h-[500px]" />
       </div>
 
       {/* Logs List Section */}
@@ -1964,7 +2155,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         <div className="relative">
 
           {/* Log Rows */}
-          <div className="max-h-[500px] overflow-auto">
+          <div className="max-h-[calc(100vh-400px)] min-h-[300px] overflow-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Spin size="large" />
@@ -1991,17 +2182,21 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
               </div>
             ) : (
               <div className="min-w-max">
-                {/* Flatten view - flat list of all spans */}
-                {logsData.map((log) => (
-                  <FlatLogRow
-                    key={log.id}
-                    row={log}
-                    referenceDuration={Math.max(...logsData.map(l => l.duration), 1)}
-                    isSelected={selectedId === log.id}
-                    onSelect={() => setSelectedId(log.id)}
-                    onViewDetails={openLogDetailsDrawer}
-                  />
-                ))}
+                {/* Flatten view - flat list of all spans sorted chronologically */}
+                {(() => {
+                  // Calculate max duration once for all rows (memoized within render)
+                  const maxDuration = Math.max(...logsData.map(l => l.duration), 1);
+                  return logsData.map((log) => (
+                    <FlatLogRow
+                      key={log.id}
+                      row={log}
+                      referenceDuration={maxDuration}
+                      isSelected={selectedId === log.id}
+                      onSelect={() => setSelectedId(log.id)}
+                      onViewDetails={openLogDetailsDrawer}
+                    />
+                  ));
+                })()}
                 {/* Infinite scroll trigger */}
                 <div ref={loadMoreRef} className="h-4">
                   {isLoadingMore && (
