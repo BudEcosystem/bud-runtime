@@ -60,6 +60,18 @@ class ModelDeploymentStatus(str, Enum):
     DELETING = "deleting"
 
 
+class CustomProbeTypeEnum(str, Enum):
+    """Available custom probe type options.
+
+    Each option maps to a specific model_uri, scanner_type, handler, and provider.
+    """
+
+    LLM_POLICY = "llm_policy"
+    # Future extensions:
+    # CLASSIFIER = "classifier"
+    # REGEX = "regex"
+
+
 class GuardrailModelStatus(BaseModel):
     """Status of a model required by guardrail rules."""
 
@@ -373,6 +385,8 @@ class GuardrailCustomProbeResponse(BaseModel):
     model_id: UUID4 | None = None
     model_uri: str | None = None
     model_config_json: dict | None = None
+    guard_types: list[str] | None = None
+    modality_types: list[str] | None = None
     status: str
     created_at: datetime
     modified_at: datetime
@@ -397,6 +411,8 @@ class GuardrailCustomProbeResponse(BaseModel):
                 "model_id": getattr(rule, "model_id", None),
                 "model_uri": getattr(rule, "model_uri", None),
                 "model_config_json": getattr(rule, "model_config_json", None),
+                "guard_types": getattr(rule, "guard_types", None),
+                "modality_types": getattr(rule, "modality_types", None),
                 "status": data.status,
                 "created_at": data.created_at,
                 "modified_at": data.modified_at,
@@ -743,6 +759,83 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     deployment_events: dict | None = None
     # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
     pending_profile_data: dict | None = None
+
+
+class CustomProbeWorkflowRequest(BaseModel):
+    """Custom probe workflow request schema (multi-step).
+
+    Similar to GuardrailDeploymentWorkflowRequest but for creating custom probes.
+    Follows the probe-first pattern where the probe is created with model_uri only,
+    and model_id gets assigned later during deployment (or immediately if model is already onboarded).
+
+    Workflow Steps:
+    - Step 1: Select probe type (llm_policy, etc.) - system auto-derives model_uri, scanner_type, etc.
+    - Step 2: Configure policy (PolicyConfig)
+    - Step 3: Probe metadata + trigger_workflow=true creates probe
+    """
+
+    # Workflow management
+    workflow_id: UUID4 | None = None
+    workflow_total_steps: int | None = None  # Should be 3 for new workflows
+    step_number: int = Field(..., gt=0)
+    trigger_workflow: bool = False
+
+    # Step 1: Probe type selection
+    probe_type_option: CustomProbeTypeEnum | None = None
+    project_id: UUID4 | None = None
+
+    # Step 2: Policy configuration
+    policy: PolicyConfig | None = None
+
+    # Step 3: Probe metadata
+    name: str | None = None
+    description: str | None = None
+    guard_types: list[str] | None = None
+    modality_types: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> "CustomProbeWorkflowRequest":
+        """Validate workflow request fields.
+
+        Either workflow_id OR workflow_total_steps must be provided, but not both.
+        """
+        if self.workflow_id is None and self.workflow_total_steps is None:
+            raise ValueError("workflow_total_steps is required when workflow_id is not provided")
+
+        if self.workflow_id is not None and self.workflow_total_steps is not None:
+            raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
+
+        return self
+
+
+class CustomProbeWorkflowSteps(BaseModel):
+    """Custom probe workflow step data schema.
+
+    Tracks accumulated data across workflow steps for custom probe creation.
+    """
+
+    # Step 1 data
+    probe_type_option: CustomProbeTypeEnum | None = None
+    project_id: UUID4 | None = None
+    # Auto-derived from probe_type_option
+    model_uri: str | None = None
+    scanner_type: str | None = None
+    handler: str | None = None
+    model_provider_type: str | None = None
+
+    # Step 2 data
+    policy: dict | None = None  # PolicyConfig as dict
+
+    # Step 3 data
+    name: str | None = None
+    description: str | None = None
+    guard_types: list[str] | None = None
+    modality_types: list[str] | None = None
+
+    # Result data (after trigger_workflow)
+    probe_id: UUID4 | None = None
+    model_id: UUID4 | None = None  # Assigned if model exists
+    workflow_execution_status: dict | None = None
 
 
 class BudSentinelConfig(BaseModel):
