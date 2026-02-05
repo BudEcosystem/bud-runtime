@@ -432,13 +432,15 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
           </ConfigProvider>
 
           {/* Select Button */}
-          <PrimaryButton
+          <div className="flex justify-end">
+            <PrimaryButton
             className="w-full"
             onClick={handleSelectCustomRange}
             disabled={!customRange}
           >
             Select
           </PrimaryButton>
+          </div>
         </div>
       )}
     </div>
@@ -462,7 +464,7 @@ const LogfireDateRangePicker: React.FC<LogfireDateRangePickerProps> = ({
       }}
     >
       <button
-        className={`flex items-center gap-2 px-3 py-1.5 bg-[#1A1A1A] border border-[#3a3a3a] rounded-md hover:border-[#965CDE] transition-colors ${className}`}
+        className={`flex items-center gap-2 px-3 py-[.25rem] bg-[#1A1A1A] border border-[#3a3a3a] rounded-md hover:border-[#965CDE] transition-colors ${className}`}
       >
         <Calendar className="w-4 h-4 text-[#B3B3B3]" />
         <Text_12_400_EEEEEE className="whitespace-nowrap">
