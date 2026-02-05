@@ -89,7 +89,7 @@ Deployments can scale based on SLO-driven metrics such as queue depth, TTFT, end
 
 ### 3.11 SLO-aware autoscaling
 
-- Auto-scaling is essential for delivering fast and cost-effective GenAI workloads, but every application has different service level objectives—some prioritize time to first token, others focus on end-to-end latency, throughput, or resource utilization. That’s why Bud AI Foundry supports SLO-aware autoscaling, enabling deployments to scale based on the SLOs and business priorities that matter most. The result is smarter scaling, predictable performance, and optimized costs tailored to your specific SLO demands.
+- Auto-scaling is essential for delivering fast and cost-effective GenAI workloads, but every application has different service level objectives, some prioritize time to first token, others focus on end-to-end latency, throughput, or resource utilization. That’s why Bud AI Foundry supports SLO-aware autoscaling, enabling deployments to scale based on the SLOs and business priorities that matter most. The result is smarter scaling, predictable performance, and optimized costs tailored to your specific SLO demands.
 - Enable autoscaling in deployment Settings to scale replicas between a min/max range.
 - Pick model-specific metrics (queue depth, TTFT, TPOT, end-to-end latency, embedding/classify latency) as scaling triggers.
 - Add schedule hints for predictable traffic windows and enable predictive scaling for demand forecasting.
@@ -166,6 +166,10 @@ Deployments can scale based on SLO-driven metrics such as queue depth, TTFT, end
 1. View Settings to configure rate limits, retries, and fallback chains per deployment.
 2. Toggle Rate Limit and choose the algorithm (fixed, sliding, or token bucket), then set per-second/minute/hour quotas and burst size.
 3. Add Fallback deployment and Retry limits to harden reliability, then Save to persist the policy.
+4. Enable Autoscaling to activate SLO-aware scaling controls inside Settings.
+5. Set min/max replicas and choose the metric sources (queue depth, TTFT, TPOT, end-to-end latency, or embedding/classify latency) that should trigger scaling.
+6. Add Schedule Hints for planned traffic windows, or enable Predictive Scaling to look ahead using historical demand.
+7. Tune scaling behavior (stabilization windows and scaling policies) to keep capacity changes smooth, then save the autoscale configuration.
 
 #### 4.6.5 Benchmarks
 
@@ -337,3 +341,7 @@ Open Use this model from the deployment row to copy ready-made snippets in cURL,
 **Q10. What happens when I publish a model?**
 
 Publishing sets token pricing (input/output, USD per selected token block) and makes the endpoint available in the Bud customer dashboard for org users. You can revisit Publish Details to review pricing history, adjust prices, or unpublish without deleting the deployment.
+
+**Q11. How does autoscaling work for deployments?**
+
+Autoscaling is configured in the deployment Settings tab. Enable it to set min/max replicas, choose SLO-driven metrics (queue depth, TTFT, TPOT, end-to-end latency, embedding/classify latency), and optionally add schedule hints or predictive scaling. These controls let the deployment scale intelligently against performance and cost objectives.
