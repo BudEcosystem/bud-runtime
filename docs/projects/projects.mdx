@@ -29,6 +29,10 @@ Guardrail tab centralizes safety policies, while project-level delete/edit actio
 
 Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and inference timelines so teams can benchmark backends and route traffic confidently.
 
+### 6. SLO-aware autoscaling controls
+
+Deployments can scale based on SLO-driven metrics such as queue depth, TTFT, end-to-end latency, and utilization. Bud AI Foundry’s autoscaler lets teams set replica limits, metric thresholds, and predictive or schedule-driven scaling so performance objectives and costs stay balanced.
+
 ## 3. Features
 
 ### 3.1 Project creation and metadata
@@ -82,6 +86,14 @@ Analytics and Observability tabs expose latency, throughput, TTFT, queuing, and 
 
 - Delete action prompts warnings when deployments exist, blocking removal until endpoints are removed.
 - Overlay confirmation keeps observability overlays and notifications synchronized with the action result.
+
+### 3.11 SLO-aware autoscaling
+
+- Auto-scaling is essential for delivering fast and cost-effective GenAI workloads, but every application has different service level objectives—some prioritize time to first token, others focus on end-to-end latency, throughput, or resource utilization. That’s why Bud AI Foundry supports SLO-aware autoscaling, enabling deployments to scale based on the SLOs and business priorities that matter most. The result is smarter scaling, predictable performance, and optimized costs tailored to your specific SLO demands.
+- Enable autoscaling in deployment Settings to scale replicas between a min/max range.
+- Pick model-specific metrics (queue depth, TTFT, TPOT, end-to-end latency, embedding/classify latency) as scaling triggers.
+- Add schedule hints for predictable traffic windows and enable predictive scaling for demand forecasting.
+- Tune scale-up/scale-down stabilization windows and policies to prevent thrashing.
 
 ## 4. How-to Guides
 
