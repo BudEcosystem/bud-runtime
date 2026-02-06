@@ -4560,7 +4560,7 @@ class GuardrailCustomProbeService(SessionMixin):
 
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
-            workflow_type=WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT,
+            workflow_type=WorkflowTypeEnum.CUSTOM_PROBE_CREATION,
             title="Custom Probe Creation",
             total_steps=workflow_total_steps,
             icon=APP_ICONS["general"]["deployment_mono"],
