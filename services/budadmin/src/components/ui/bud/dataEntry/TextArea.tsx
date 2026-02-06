@@ -32,6 +32,7 @@ function TextAreaInput(props: BudInputProps) {
             text={props.label}
             content={props.info}
             required={props.required}
+            classNames="textarea-info-label"
           />
         }
       >
