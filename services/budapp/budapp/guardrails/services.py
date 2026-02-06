@@ -128,7 +128,7 @@ PROBE_TYPE_CONFIGS: dict[str, ProbeTypeConfig] = {
         model_uri="openai/gpt-oss-safeguard-20b",
         scanner_type="llm",
         handler="gpt_safeguard",
-        model_provider_type="openai",
+        model_provider_type="cloud_model",
     ),
 }
 
@@ -4560,7 +4560,7 @@ class GuardrailCustomProbeService(SessionMixin):
 
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
-            workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
+            workflow_type=WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT,
             title="Custom Probe Creation",
             total_steps=workflow_total_steps,
             icon=APP_ICONS["general"]["deployment_mono"],
@@ -4591,35 +4591,39 @@ class GuardrailCustomProbeService(SessionMixin):
             if db_step.data:
                 workflow_step_data.update(db_step.data)
 
-        # Process step data based on step_number
-        if step_number == 1:
-            # Step 1: Probe type selection
-            if request.probe_type_option:
-                config = PROBE_TYPE_CONFIGS.get(request.probe_type_option.value)
-                if config:
-                    workflow_step_data["probe_type_option"] = request.probe_type_option.value
-                    workflow_step_data["model_uri"] = config.model_uri
-                    workflow_step_data["scanner_type"] = config.scanner_type
-                    workflow_step_data["handler"] = config.handler
-                    workflow_step_data["model_provider_type"] = config.model_provider_type
+        # Step 1 validation: probe_type_option is required at step 1
+        if step_number == 1 and not request.probe_type_option:
+            raise ClientException(
+                message="probe_type_option is required at step 1",
+                status_code=HTTPStatus.HTTP_400_BAD_REQUEST,
+            )
 
-        elif step_number == 2:
-            # Step 2: Policy configuration
-            if request.policy:
-                workflow_step_data["policy"] = request.policy.model_dump()
+        # Process all provided request fields (not gated by step_number)
+        if request.probe_type_option:
+            config = PROBE_TYPE_CONFIGS.get(request.probe_type_option.value)
+            if not config:
+                raise ClientException(
+                    message=f"Unsupported probe type: {request.probe_type_option.value}",
+                    status_code=HTTPStatus.HTTP_400_BAD_REQUEST,
+                )
+            workflow_step_data["probe_type_option"] = request.probe_type_option.value
+            workflow_step_data["model_uri"] = config.model_uri
+            workflow_step_data["scanner_type"] = config.scanner_type
+            workflow_step_data["handler"] = config.handler
+            workflow_step_data["model_provider_type"] = config.model_provider_type
 
-        elif step_number == 3:
-            # Step 3: Probe metadata
-            if request.name:
-                workflow_step_data["name"] = request.name
-                # Update workflow title
-                await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"title": request.name})
-            if request.description:
-                workflow_step_data["description"] = request.description
-            if request.guard_types:
-                workflow_step_data["guard_types"] = request.guard_types
-            if request.modality_types:
-                workflow_step_data["modality_types"] = request.modality_types
+        if request.policy:
+            workflow_step_data["policy"] = request.policy.model_dump()
+
+        if request.name:
+            workflow_step_data["name"] = request.name
+            await WorkflowDataManager(self.session).update_by_fields(db_workflow, {"title": request.name})
+        if request.description:
+            workflow_step_data["description"] = request.description
+        if request.guard_types:
+            workflow_step_data["guard_types"] = request.guard_types
+        if request.modality_types:
+            workflow_step_data["modality_types"] = request.modality_types
 
         # Create or update workflow step
         if db_current_workflow_step:
@@ -4732,7 +4736,7 @@ class GuardrailCustomProbeService(SessionMixin):
                 model_id=model_id,
                 model_config=model_config,
                 model_uri=model_uri,
-                model_provider_type=data.get("model_provider_type", "openai"),
+                model_provider_type=data.get("model_provider_type", "cloud_model"),
                 is_gated=False,
                 user_id=current_user_id,
                 provider_id=provider.id,
