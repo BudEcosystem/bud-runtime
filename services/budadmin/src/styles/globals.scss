@@ -1476,7 +1476,7 @@ textArea {
     left: .75rem;
     transition: 0.2s ease all;
     color: white;
-    background: #101010;
+    background: var(--color-background);
     padding: 0 4px;
     font-size: .75rem;
     z-index: 1111;
