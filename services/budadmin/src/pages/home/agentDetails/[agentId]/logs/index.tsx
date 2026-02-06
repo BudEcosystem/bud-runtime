@@ -2027,7 +2027,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
       {/* Chart Section */}
       {/* <div className="bg-[#101010] border border-[#1F1F1F]  p-4 mb-4 mt-4"> */}
-      <div className=" border-0 border-[#1F1F1F]  p-4 mb-4 mt-4">
+      <div className=" border-0 border-[#1F1F1F]  p-3 mt-4">
         {/* Chart Controls */}
         <div className="flex justify-end items-center gap-2 mb-2">
           <LogfireDateRangePicker
@@ -2082,7 +2082,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       {/* Logs List Section */}
       <div className=" border border-[#1F1F1F]  overflow-hidden">
         {/* List Header */}
-        <div className="px-4 py-3 border-b border-[#1F1F1F] flex justify-between items-center">
+        <div className="px-4 py-3 pb-[1rem] border-b border-[#1F1F1F] flex justify-between items-center">
           <Text_12_400_B3B3B3>
             {isLoading
               ? "Loading traces..."
