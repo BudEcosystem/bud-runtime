@@ -24,6 +24,7 @@ from fastapi import HTTPException, Request, status
 
 from ..shared.redis_service import RedisService
 from . import logging
+from .config import app_settings
 
 
 logger = logging.get_logger(__name__)
@@ -126,11 +127,20 @@ def rate_limit(max_requests: int, window_seconds: int, use_user_id: bool = False
         @rate_limit(max_requests=10, window_seconds=60)
         async def my_endpoint(request: Request):
             return {"message": "Hello"}
+
+    Note:
+        Rate limiting can be disabled by setting RATE_LIMIT_ENABLED=false
+        environment variable. This is useful for testing environments.
     """
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
+            # Skip rate limiting if disabled via app settings
+            if not app_settings.rate_limit_enabled:
+                logger.debug(f"Rate limiting disabled for {func.__name__}")
+                return await func(*args, **kwargs)
+
             # Find request object in args/kwargs
             request = None
             # Check positional args

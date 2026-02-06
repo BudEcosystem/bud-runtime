@@ -54,14 +54,19 @@ class MCPToolLoader(ToolLoader):
         self.base_url = app_settings.mcp_foundry_base_url
         self.api_key = app_settings.mcp_foundry_api_key
 
-    async def load_tools(self, tool_config: MCPToolConfig) -> Optional[MCPServerStreamableHTTP]:
-        """Load MCP tools from configuration.
+    async def load_tools(self, tool_config: MCPToolConfig) -> Optional[Any]:
+        """Load MCP tools from configuration with optional name shortening.
+
+        When gateway_slugs are provided, tool names are shortened by stripping
+        the gateway prefix. This helps with:
+        1. OpenAI's 64-character limit on function/tool names
+        2. Improved accuracy in smaller LLMs with cleaner tool names
 
         Args:
             tool_config: MCP tool configuration
 
         Returns:
-            MCPServerStreamableHTTP instance or None if server_url is missing
+            MCPServerStreamableHTTP instance (possibly renamed) or None if server_url is missing
         """
         # Only create toolset if server_url is present
         if not tool_config.server_url:
@@ -80,6 +85,38 @@ class MCPToolLoader(ToolLoader):
             # Create MCPServerStreamableHTTP instance
             mcp_server = MCPServerStreamableHTTP(url=mcp_url, headers=headers if headers else None)
 
+            # Get all gateway slugs (multiple connectors = multiple slugs)
+            gateway_slugs = self._get_gateway_slugs(tool_config)
+
+            if gateway_slugs:
+                # Fetch tool list to get original names directly from mcp_server
+                # (not via get_tool_list() which strips prefixes)
+                tools_list = await mcp_server.list_tools()
+                if tools_list:
+                    original_names = [tool.name for tool in tools_list]
+
+                    # Generate mapping: short_name -> original_name
+                    # Try each slug to find matching prefix
+                    name_map = {}
+                    for original in original_names:
+                        short = original  # Default: keep original if no prefix matches
+                        for slug in gateway_slugs:
+                            prefix = f"{slug}-"
+                            if original.startswith(prefix):
+                                short = original[len(prefix) :]
+                                break  # Found matching prefix, stop searching
+                        name_map[short] = original
+
+                    # Update allowed_tool_names with SHORT names
+                    tool_config.allowed_tool_names = list(name_map.keys())
+
+                    logger.debug(
+                        f"Stripped gateway prefixes from {len(name_map)} tools "
+                        f"for server '{tool_config.server_label}' using {len(gateway_slugs)} slug(s)"
+                    )
+
+                    return mcp_server.renamed(name_map)
+
             logger.debug(
                 f"Loaded MCP tool '{tool_config.server_label}' from {mcp_url} "
                 f"with {len(tool_config.allowed_tools)} allowed tools"
@@ -91,22 +128,77 @@ class MCPToolLoader(ToolLoader):
             logger.error(f"Failed to load MCP tool '{tool_config.server_label}': {str(e)}")
             return None
 
-    async def get_tool_list(self, mcp_server: MCPServerStreamableHTTP, server_label: str) -> Optional[Dict]:
-        """Fetch the list of available tools from an MCP server.
+    def _get_gateway_slugs(self, tool_config: MCPToolConfig) -> List[str]:
+        """Extract all gateway slugs from tool config.
+
+        When multiple connectors are registered, gateway_slugs contains:
+        {connector1: slug1, connector2: slug2, ...}
+
+        Returns all slugs so we can strip any matching prefix.
 
         Args:
-            mcp_server: The MCP server instance
-            server_label: Label for the server (for logging)
+            tool_config: MCP tool configuration
 
         Returns:
-            Dictionary with tools list or None on error
+            List of gateway slugs
         """
+        if tool_config.gateway_slugs:
+            return list(tool_config.gateway_slugs.values())
+        return []
+
+    async def get_tool_list(self, tool_config: MCPToolConfig) -> Optional[Dict]:
+        """Fetch the list of available tools from an MCP server.
+
+        Creates its own MCP connection and strips gateway slugs from tool names.
+        This is a self-contained method that can be called independently of load_tools().
+
+        Args:
+            tool_config: MCP tool configuration
+
+        Returns:
+            Dictionary with tools list (renamed if gateway_slugs present) or None on error
+        """
+        server_label = tool_config.server_label or "unknown"
+
+        if not tool_config.server_url:
+            logger.warning(f"Skipping MCP tool list '{server_label}': server_url is missing")
+            return {"server_label": server_label, "tools": [], "error": "server_url is missing"}
+
         try:
-            # Use the MCP server's list_tools method
-            # This is provided by pydantic-ai's MCPServerStreamableHTTP
+            # Create fresh MCP server connection
+            mcp_url = f"{self.base_url}servers/{tool_config.server_url}/mcp"
+            headers = {}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+
+            mcp_server = MCPServerStreamableHTTP(url=mcp_url, headers=headers if headers else None)
+
+            # Fetch tool list
             tools_list = await mcp_server.list_tools()
 
             logger.debug(f"Retrieved {len(tools_list)} tools from MCP server '{server_label}'")
+
+            # Get gateway slugs for name stripping
+            gateway_slugs = self._get_gateway_slugs(tool_config)
+
+            if gateway_slugs:
+                # Strip gateway slugs from tool names
+                # Create new Tool objects with renamed names
+                renamed_tools = []
+                for tool in tools_list:
+                    short_name = tool.name
+                    for slug in gateway_slugs:
+                        prefix = f"{slug}-"
+                        if tool.name.startswith(prefix):
+                            short_name = tool.name[len(prefix) :]
+                            break
+
+                    # Create a modified copy with the short name
+                    renamed_tool = tool.model_copy(update={"name": short_name})
+                    renamed_tools.append(renamed_tool)
+
+                logger.debug(f"Stripped gateway prefixes from {len(renamed_tools)} tools for '{server_label}'")
+                return {"server_label": server_label, "tools": renamed_tools, "error": None}
 
             return {"server_label": server_label, "tools": tools_list, "error": None}
 

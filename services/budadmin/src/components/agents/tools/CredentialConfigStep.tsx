@@ -2,10 +2,30 @@
 
 import React, { useState } from 'react';
 import { Input, Tooltip } from 'antd';
-import { CredentialSchemaField } from '@/stores/useConnectors';
+import { CredentialSchemaField, KeyValuePair } from '@/stores/useConnectors';
 import { Text_12_400_EEEEEE } from '@/components/ui/text';
 import { PrimaryButton } from '@/components/ui/bud/form/Buttons';
 import CustomSelect from 'src/flows/components/CustomSelect';
+
+// Helper functions for key-value-array field type
+const DEFAULT_KEY_VALUE_PAIR: KeyValuePair = { key: '', value: 'Bearer ' };
+
+const parseKeyValueArray = (value: string | undefined): KeyValuePair[] => {
+  if (!value) return [{ ...DEFAULT_KEY_VALUE_PAIR }]; // Default with one pair with "Bearer " prefix
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return [{ ...DEFAULT_KEY_VALUE_PAIR }];
+  } catch {
+    return [{ ...DEFAULT_KEY_VALUE_PAIR }];
+  }
+};
+
+const stringifyKeyValueArray = (pairs: KeyValuePair[]): string => {
+  return JSON.stringify(pairs);
+};
 
 // Helper to identify redirect URI fields - check both field name and common patterns
 const REDIRECT_URI_FIELDS = ['redirect_uri', 'redirect_url', 'callback_url', 'redirecturi', 'redirecturl', 'callbackurl'];
@@ -115,6 +135,106 @@ export const CredentialConfigStep: React.FC<CredentialConfigStepProps> = ({
             />
           </div>
         );
+
+      case 'key-value-array': {
+        const pairs = parseKeyValueArray(formData[field.field]);
+
+        const handlePairChange = (index: number, pairField: 'key' | 'value', newValue: string) => {
+          const updatedPairs = [...pairs];
+          updatedPairs[index] = { ...updatedPairs[index], [pairField]: newValue };
+          onInputChange(field.field, stringifyKeyValueArray(updatedPairs));
+        };
+
+        const handleAddPair = () => {
+          const updatedPairs = [...pairs, { ...DEFAULT_KEY_VALUE_PAIR }];
+          onInputChange(field.field, stringifyKeyValueArray(updatedPairs));
+        };
+
+        const handleRemovePair = (index: number) => {
+          if (pairs.length <= 1) {
+            // Keep at least one pair with default value
+            onInputChange(field.field, stringifyKeyValueArray([{ ...DEFAULT_KEY_VALUE_PAIR }]));
+            return;
+          }
+          const updatedPairs = pairs.filter((_, i) => i !== index);
+          onInputChange(field.field, stringifyKeyValueArray(updatedPairs));
+        };
+
+        return (
+          <div key={field.field}>
+            {renderLabel()}
+            <div className="space-y-3">
+              {pairs.map((pair, index) => (
+                <div key={index} className="relative p-[.5rem] rounded-[.5rem] bg-[#141414] border border-[#1F1F1F]">
+                  {/* Delete button in top-right corner */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePair(index)}
+                    className="absolute top-2 right-1 flex items-center justify-center w-[1.25rem] h-[1.25rem] rounded-[.25rem] hover:bg-[#E82E2E1A] transition-colors"
+                    title="Remove"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-[#808080] hover:text-[#E82E2E]"
+                    >
+                      <path d="M18 6L6 18" />
+                      <path d="M6 6l12 12" />
+                    </svg>
+                  </button>
+                  {/* Stacked Key and Value inputs */}
+                  <div className="space-y-2 pr-5">
+                    <Input
+                      placeholder="Key"
+                      value={pair.key}
+                      onChange={(e) => handlePairChange(index, 'key', e.target.value)}
+                      className={inputClassName}
+                      style={inputStyle}
+                      autoComplete="off"
+                    />
+                    <Input
+                      placeholder="Value"
+                      value={pair.value}
+                      onChange={(e) => handlePairChange(index, 'value', e.target.value)}
+                      className={inputClassName}
+                      style={inputStyle}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={handleAddPair}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[.5rem] border border-dashed border-[#2A2A2A] hover:border-[#965CDE] hover:bg-[#965CDE1A] transition-colors text-[#808080] hover:text-[#965CDE] text-[0.6875rem]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+                Add {field.label || 'Header'}
+              </button>
+            </div>
+          </div>
+        );
+      }
 
       case 'url':
       case 'text':

@@ -9,8 +9,8 @@ export interface ObservabilityMetricsRequest {
   frequency_interval?: number;
   filters?: {
     project?: string[];
-    model?: string;
-    endpoint?: string;
+    model?: string[];
+    endpoint?: string[];
   };
   group_by?: Array<"project" | "model" | "endpoint">;
   return_delta?: boolean;
@@ -139,9 +139,9 @@ export const convertToObservabilityRequest = (params: {
     if (params.filter_by === "project" && !params.project_id) {
       request.filters.project = params.filter_conditions;
     } else if (params.filter_by === "model") {
-      request.filters.model = params.filter_conditions[0];
+      request.filters.model = params.filter_conditions;
     } else if (params.filter_by === "endpoint") {
-      request.filters.endpoint = params.filter_conditions[0];
+      request.filters.endpoint = params.filter_conditions;
     }
   }
 

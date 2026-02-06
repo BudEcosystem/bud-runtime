@@ -17,6 +17,7 @@ from budpipeline.commons.exceptions import (
     CyclicDependencyError,
     DAGParseError,
     DAGValidationError,
+    DuplicatePipelineNameError,
     ExecutionNotFoundError,
     WorkflowNotFoundError,
 )
@@ -287,6 +288,13 @@ class PipelineService:
 
         # Create in database
         crud = PipelineDefinitionCRUD(session)
+
+        # Check for duplicate pipeline name within user scope
+        if await crud.exists_by_name_for_user(name=name, user_id=user_id):
+            raise DuplicatePipelineNameError(
+                name=name,
+                user_id=str(user_id) if user_id else None,
+            )
         status = PipelineStatus.DRAFT if is_draft else PipelineStatus.ACTIVE
 
         definition = await crud.create(
@@ -538,6 +546,18 @@ class PipelineService:
                 raise DAGValidationError("DAG validation failed", errors=errors)
             dag = DAGParser.parse(dag_dict)
             name = name_override or dag.name
+
+        # Check for duplicate pipeline name within user scope (exclude current pipeline)
+        if name != existing.name:
+            if await crud.exists_by_name_for_user(
+                name=name,
+                user_id=existing.user_id,
+                exclude_id=definition_id,
+            ):
+                raise DuplicatePipelineNameError(
+                    name=name,
+                    user_id=str(existing.user_id) if existing.user_id else None,
+                )
 
         status = PipelineStatus.DRAFT if is_draft else PipelineStatus.ACTIVE
 

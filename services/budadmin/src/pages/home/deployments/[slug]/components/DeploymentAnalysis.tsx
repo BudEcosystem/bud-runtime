@@ -5,6 +5,7 @@ import {
   Typography,
   Image,
   Segmented,
+  Select,
 } from "antd";
 import React, { use, useEffect, useRef, useState } from "react";
 import NoChartData from "@/components/ui/noChartData";
@@ -817,7 +818,7 @@ function ComputeHoursCard() {
   );
 }
 
-function APICallsCard(endpoint) {
+function APICallsCard(endpoint: { deploymentId: string | string[]; filterIds?: string[] }) {
   const [apiChartData, setApiChartData] = useState<any>();
   const [requestCounts, setRequestCounts] = useState();
   const [apiRequestInterval, setApiRequestInterval] = useState<any>("weekly");
@@ -843,10 +844,13 @@ function APICallsCard(endpoint) {
         frequency = "weekly"; // Last 30 days -> weekly data
       }
 
+      // Use filterIds if provided, otherwise fall back to deploymentId
+      const filterConditions = endpoint.filterIds || [endpoint.deploymentId as string];
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
-        filter_conditions: [endpoint.deploymentId],
+        filter_conditions: filterConditions,
         from_date: calculateFromDate(numberOfDaysForDelta[apiRequestInterval]),
         top_k: 5,
         metrics: "overall",
@@ -948,7 +952,7 @@ function APICallsCard(endpoint) {
 
   useEffect(() => {
     load();
-  }, [apiRequestInterval]);
+  }, [apiRequestInterval, endpoint.filterIds]);
 
   const handleChartFilter = (val: any) => {
     if (val === "LAST 24 HRS") return "daily";
@@ -1051,7 +1055,7 @@ function PlaceholderCard() {
 }
 
 // TTFT Card Component
-function TTFTCard(endpoint) {
+function TTFTCard(endpoint: { deploymentId: string | string[]; filterIds?: string[] }) {
   const [ttftData, setTtftData] = useState<any>();
   const [requestData, setRequestData] = useState();
   const [ttftInterval, setTtftInterval] = useState<any>("weekly");
@@ -1077,10 +1081,13 @@ function TTFTCard(endpoint) {
         frequency = "weekly"; // Last 30 days -> weekly data
       }
 
+      // Use filterIds if provided, otherwise fall back to deploymentId
+      const filterConditions = endpoint.filterIds || [endpoint.deploymentId as string];
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
-        filter_conditions: [endpoint.deploymentId],
+        filter_conditions: filterConditions,
         from_date: calculateFromDate(numberOfDaysForDelta[ttftInterval]),
         metrics: "ttft",
         to_date: to_date,
@@ -1183,7 +1190,7 @@ function TTFTCard(endpoint) {
 
   useEffect(() => {
     load();
-  }, [ttftInterval]);
+  }, [ttftInterval, endpoint.filterIds]);
 
   const handleChartFilter = (val: any) => {
     if (val === "LAST 24 HRS") return "daily";
@@ -1277,7 +1284,7 @@ function TTFTCard(endpoint) {
 }
 
 // Latency Card Component
-function LatencyCard(endpoint) {
+function LatencyCard(endpoint: { deploymentId: string | string[]; filterIds?: string[] }) {
   const [latencyData, setLatencyData] = useState<any>();
   const [requestData, setRequestData] = useState();
   const [latencyInterval, setLatencyInterval] = useState<any>("weekly");
@@ -1303,10 +1310,13 @@ function LatencyCard(endpoint) {
         frequency = "weekly";
       }
 
+      // Use filterIds if provided, otherwise fall back to deploymentId
+      const filterConditions = endpoint.filterIds || [endpoint.deploymentId as string];
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
-        filter_conditions: [endpoint.deploymentId],
+        filter_conditions: filterConditions,
         from_date: calculateFromDate(numberOfDaysForDelta[latencyInterval]),
         metrics: "latency",
         to_date: to_date,
@@ -1399,7 +1409,7 @@ function LatencyCard(endpoint) {
 
   useEffect(() => {
     load();
-  }, [latencyInterval]);
+  }, [latencyInterval, endpoint.filterIds]);
 
   const handleChartFilter = (val: any) => {
     if (val === "LAST 24 HRS") return "daily";
@@ -1494,7 +1504,7 @@ function LatencyCard(endpoint) {
 }
 
 // Throughput Card Component
-function ThroughputCard(endpoint) {
+function ThroughputCard(endpoint: { deploymentId: string | string[]; filterIds?: string[] }) {
   const [throughputData, setThroughputData] = useState<any>();
   const [requestData, setRequestData] = useState();
   const [throughputInterval, setThroughputInterval] = useState<any>("weekly");
@@ -1519,10 +1529,13 @@ function ThroughputCard(endpoint) {
         frequency = "weekly";
       }
 
+      // Use filterIds if provided, otherwise fall back to deploymentId
+      const filterConditions = endpoint.filterIds || [endpoint.deploymentId as string];
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
-        filter_conditions: [endpoint.deploymentId],
+        filter_conditions: filterConditions,
         from_date: calculateFromDate(numberOfDaysForDelta[throughputInterval]),
         metrics: "throughput",
         to_date: to_date,
@@ -1615,7 +1628,7 @@ function ThroughputCard(endpoint) {
 
   useEffect(() => {
     load();
-  }, [throughputInterval]);
+  }, [throughputInterval, endpoint.filterIds]);
 
   const handleChartFilter = (val: any) => {
     if (val === "LAST 24 HRS") return "daily";
@@ -1711,7 +1724,7 @@ function ThroughputCard(endpoint) {
 }
 
 // Token Metrics Card Component
-function TokenMetricsCard(endpoint) {
+function TokenMetricsCard(endpoint: { deploymentId: string | string[]; filterIds?: string[] }) {
   const [tokenData, setTokenData] = useState<any>();
   const [requestData, setRequestData] = useState();
   const [tokenInterval, setTokenInterval] = useState<any>("weekly");
@@ -1738,10 +1751,13 @@ function TokenMetricsCard(endpoint) {
         frequency = "weekly";
       }
 
+      // Use filterIds if provided, otherwise fall back to deploymentId
+      const filterConditions = endpoint.filterIds || [endpoint.deploymentId as string];
+
       const params = {
         frequency: frequency,
         filter_by: "endpoint",
-        filter_conditions: [endpoint.deploymentId],
+        filter_conditions: filterConditions,
         from_date: calculateFromDate(numberOfDaysForDelta[tokenInterval]),
         metrics: "input_output_tokens",
         to_date: to_date,
@@ -1844,7 +1860,7 @@ function TokenMetricsCard(endpoint) {
 
   useEffect(() => {
     load();
-  }, [tokenInterval]);
+  }, [tokenInterval, endpoint.filterIds]);
 
   const handleChartFilter = (val: any) => {
     if (val === "LAST 24 HRS") return "daily";
@@ -2262,7 +2278,36 @@ export default function DeploymentAnalysis({
     setPromptPage,
     getInferenceQualityPrompts,
     clusterDetails,
+    adapters,
+    getAdapters,
   } = useEndPoints();
+
+  // State for filtering analytics by adapter
+  const [analyticsFilter, setAnalyticsFilter] = useState<string>("all");
+
+  // Fetch adapters when deploymentId is available
+  useEffect(() => {
+    if (deploymentId) {
+      getAdapters({ endpointId: deploymentId as string, page: 1, limit: 100 });
+    }
+  }, [deploymentId]);
+
+  // Build filter options for the dropdown
+  const filterOptions = React.useMemo(() => {
+    const options = [
+      { value: "all", label: "All (Base + Adapters)" },
+      { value: deploymentId as string, label: "Base Model Only" },
+    ];
+    if (adapters && adapters.length > 0) {
+      adapters.forEach((adapter) => {
+        options.push({
+          value: adapter.id,
+          label: `Adapter: ${adapter.name}`,
+        });
+      });
+    }
+    return options;
+  }, [adapters, deploymentId]);
 
   // Check if this is an embedding-only or classify-only model (no LLM capabilities)
   // TTFT and Throughput metrics are only relevant for LLM models with chat/completion endpoints
@@ -2362,15 +2407,64 @@ export default function DeploymentAnalysis({
     );
   }, [inferenceQualityAnalytics]);
 
+  // Memoize filter IDs to avoid creating new array references on each render
+  // This prevents unnecessary API calls in the analytics card useEffects
+  const filterIds = React.useMemo(() => {
+    if (analyticsFilter === "all") {
+      const adapterIds = adapters?.map((adapter) => adapter.id) ?? [];
+      return [deploymentId as string, ...adapterIds];
+    }
+    return [analyticsFilter];
+  }, [analyticsFilter, deploymentId, adapters]);
+
   return (
     <div className="flex flex-col gap-[.75rem] p-[.25rem] px-[0rem] pb-[0]">
-      <div>
-        <Text_20_400_EEEEEE className="w-full mb-[.1rem] tracking-[.025rem]">
-          Deployment Analytics
-        </Text_20_400_EEEEEE>
-        <Text_16_400_757575>
-          Start adding the cluster by entering the details{" "}
-        </Text_16_400_757575>
+      <div className="flex items-center justify-between">
+        <div>
+          <Text_20_400_EEEEEE className="w-full mb-[.1rem] tracking-[.025rem]">
+            Deployment Analytics
+          </Text_20_400_EEEEEE>
+          <Text_16_400_757575>
+            Start adding the cluster by entering the details{" "}
+          </Text_16_400_757575>
+        </div>
+        {/* Adapter filter dropdown - only show if there are adapters */}
+        {adapters && adapters.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Text_12_400_B3B3B3>Filter by:</Text_12_400_B3B3B3>
+            <ConfigProvider
+              theme={{
+                components: {
+                  Select: {
+                    colorBgContainer: "#1A1A1A",
+                    colorBorder: "#1F1F1F",
+                    colorText: "#EEEEEE",
+                    colorTextPlaceholder: "#666666",
+                    colorBgElevated: "#1A1A1A",
+                    controlItemBgHover: "#2F2F2F",
+                    optionSelectedBg: "#2A1F3D",
+                    selectorBg: "#1A1A1A",
+                  },
+                },
+              }}
+            >
+              <Select
+                value={analyticsFilter}
+                onChange={(value) => setAnalyticsFilter(value)}
+                options={filterOptions}
+                className="min-w-[200px]"
+                dropdownStyle={{ backgroundColor: "#1A1A1A" }}
+                suffixIcon={
+                  <img
+                    src="/images/icons/dropD.png"
+                    alt="dropdown"
+                    style={{ width: "10px", height: "6px" }}
+                  />
+                }
+              />
+            </ConfigProvider>
+          </div>
+        )}
       </div>
       <div className="flex gap-[.75rem] mt-[.5rem] justify-between items-stretch	">
         {/* {inferenceQualityAnalytics?.harmfulness_score != undefined && ( */}
@@ -2393,15 +2487,15 @@ export default function DeploymentAnalysis({
       {!isNonLLMModel ? (
         <>
           <div className="flex  gap-[.8rem]">
-            {deploymentId && <APICallsCard deploymentId={deploymentId} />}
-            {deploymentId && <TTFTCard deploymentId={deploymentId} />}
+            {deploymentId && <APICallsCard deploymentId={deploymentId} filterIds={filterIds} />}
+            {deploymentId && <TTFTCard deploymentId={deploymentId} filterIds={filterIds} />}
           </div>
           <div className="flex  gap-[.8rem]">
-            {deploymentId && <LatencyCard deploymentId={deploymentId} />}
-            {deploymentId && <ThroughputCard deploymentId={deploymentId} />}
+            {deploymentId && <LatencyCard deploymentId={deploymentId} filterIds={filterIds} />}
+            {deploymentId && <ThroughputCard deploymentId={deploymentId} filterIds={filterIds} />}
           </div>
           <div className="flex  gap-[.8rem]">
-            {deploymentId && <TokenMetricsCard deploymentId={deploymentId} />}
+            {deploymentId && <TokenMetricsCard deploymentId={deploymentId} filterIds={filterIds} />}
             <PlaceholderCard />
           </div>
         </>
@@ -2409,11 +2503,11 @@ export default function DeploymentAnalysis({
         <>
           {/* Embedding/Classify models: compact layout without TTFT and Throughput */}
           <div className="flex  gap-[.8rem]">
-            {deploymentId && <APICallsCard deploymentId={deploymentId} />}
-            {deploymentId && <LatencyCard deploymentId={deploymentId} />}
+            {deploymentId && <APICallsCard deploymentId={deploymentId} filterIds={filterIds} />}
+            {deploymentId && <LatencyCard deploymentId={deploymentId} filterIds={filterIds} />}
           </div>
           <div className="flex  gap-[.8rem]">
-            {deploymentId && <TokenMetricsCard deploymentId={deploymentId} />}
+            {deploymentId && <TokenMetricsCard deploymentId={deploymentId} filterIds={filterIds} />}
             <PlaceholderCard />
           </div>
         </>

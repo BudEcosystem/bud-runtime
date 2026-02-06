@@ -3,10 +3,6 @@ image:
   repository: your-registry/quantization-image:latest
   pullPolicy: IfNotPresent
 
-imagePullSecrets:
-  name: bud-registry-secret
-  auth: {} # replaced with the actual auth
-
 serviceAccount:
   create: true
   name: quantization-job-sa

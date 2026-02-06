@@ -410,8 +410,11 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
   }
 
   // Render details view
+  // CRITICAL: Use key={selectedConnector.id} to force React to remount the component
+  // when a different connector is selected. This resets all internal state (formData, step, etc.)
+  // and prevents stale data from previous connectors being displayed.
   if (viewMode === 'details' && selectedConnector) {
-    return <ConnectorDetails connector={selectedConnector} onBack={handleBackToList} promptId={promptId} workflowId={workflowId} sessionIndex={sessionIndex} totalSessions={totalSessions} />;
+    return <ConnectorDetails key={selectedConnector.id} connector={selectedConnector} onBack={handleBackToList} promptId={promptId} workflowId={workflowId} sessionIndex={sessionIndex} totalSessions={totalSessions} />;
   }
 
   // Render list view

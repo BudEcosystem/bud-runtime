@@ -101,6 +101,9 @@ class BudPipelineService(SessionMixin):
                 },
             )
             return result
+        except ClientException:
+            # Re-raise ClientException as-is to preserve status code
+            raise
         except Exception as e:
             logger.exception("Failed to create pipeline")
             raise ClientException(
@@ -243,6 +246,9 @@ class BudPipelineService(SessionMixin):
                 headers=headers,
             )
             return result
+        except ClientException:
+            # Re-raise ClientException as-is to preserve status code
+            raise
         except Exception as e:
             logger.exception(f"Failed to update pipeline {pipeline_id}")
             raise ClientException(
@@ -335,7 +341,46 @@ class BudPipelineService(SessionMixin):
                 method="POST",
                 data=data,
             )
+
+            # Check for error response from budpipeline
+            if isinstance(result, dict):
+                # Handle ErrorResponse format: {"object": "error", "code": N, "message": "..."}
+                if result.get("object") == "error" and "message" in result:
+                    error_msg = result["message"]
+                    # Validate error_code is an integer to prevent FastAPI crash
+                    try:
+                        error_code = int(result.get("code", 500))
+                    except (ValueError, TypeError):
+                        error_code = 500
+                    raise ClientException(
+                        error_msg,
+                        status_code=error_code,
+                    )
+                # Handle HTTPException format: {"detail": ...}
+                if "detail" in result:
+                    detail = result["detail"]
+                    # Handle structured validation error (400) - has "error" and "errors" keys
+                    if isinstance(detail, dict) and "error" in detail:
+                        error_msg = detail.get("error", "Pipeline execution failed")
+                        errors = detail.get("errors", [])
+                        if errors:
+                            error_details = ", ".join(map(str, errors))
+                            error_msg = f"{error_msg}: {error_details}"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                    # Handle generic error (500) - detail is a string or unstructured dict
+                    else:
+                        error_msg = str(detail) if isinstance(detail, str) else "Pipeline execution failed"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
             return result
+        except ClientException:
+            raise
         except Exception as e:
             logger.exception(f"Failed to execute pipeline {pipeline_id}")
             raise ClientException(

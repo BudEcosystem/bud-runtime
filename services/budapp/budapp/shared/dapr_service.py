@@ -28,7 +28,7 @@ from dapr.conf import settings as dapr_settings
 
 from budapp.commons import logging
 from budapp.commons.config import app_settings, secrets_settings
-from budapp.commons.exceptions import SuppressAndLog
+from budapp.commons.exceptions import ClientException, SuppressAndLog
 from budapp.commons.resiliency import retry
 
 from .http_client import AsyncHTTPClient
@@ -483,8 +483,33 @@ class DaprService(DaprClient):
                 raise_for_status=False,
             )
 
-            # Try to parse as JSON, fall back to returning raw response
+            # Parse the response body as JSON if possible
+            response_data = None
             try:
-                return json.loads(response.body)
+                response_data = json.loads(response.body)
             except (json.JSONDecodeError, TypeError, AttributeError):
-                return response
+                response_data = response.body
+
+            # Check for error status codes and raise appropriate exceptions
+            if response.status_code >= 400:
+                # Extract error message from response
+                error_message = "Service invocation failed"
+                if isinstance(response_data, dict):
+                    # Handle various error response formats
+                    error_message = (
+                        response_data.get("detail", {}).get("message")
+                        if isinstance(response_data.get("detail"), dict)
+                        else response_data.get("detail")
+                        or response_data.get("message")
+                        or response_data.get("error")
+                        or str(response_data)
+                    )
+                elif isinstance(response_data, (str, bytes)):
+                    error_message = response_data.decode() if isinstance(response_data, bytes) else response_data
+
+                raise ClientException(
+                    message=error_message,
+                    status_code=response.status_code,
+                )
+
+            return response_data

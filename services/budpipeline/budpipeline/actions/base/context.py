@@ -105,7 +105,30 @@ class ActionContext:
                     timeout=timeout_seconds,
                 )
 
-            response.raise_for_status()
+            # Check for HTTP errors and extract error message from response body
+            if response.status_code >= 400:
+                error_detail = ""
+                try:
+                    # Try to parse JSON error response
+                    error_body = response.json()
+                    # Common error response formats
+                    error_detail = (
+                        error_body.get("detail")
+                        or error_body.get("message")
+                        or error_body.get("error")
+                        or str(error_body)
+                    )
+                except Exception:
+                    # Fall back to text response
+                    error_detail = response.text[:500] if response.text else ""
+
+                # Raise with the actual error message from the service
+                raise httpx.HTTPStatusError(
+                    message=error_detail or f"HTTP {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+
             return response.json() if response.content else {}
         finally:
             # Only close client if we created it

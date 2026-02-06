@@ -257,19 +257,29 @@ const handleErrorResponse = (err) => {
       }
     }
     return false;
+  } else if (err.response && err.response.status === 409) {
+    // Handle 409 Conflict errors - reject so component can handle it
+    return Promise.reject(err);
+  } else if (err.response && err.response.status === 400) {
+    // Handle 400 Bad Request errors - reject so component can handle validation errors
+    return Promise.reject(err);
   } else {
     // Don't show error toast for silent endpoints - let the component handle the error
     if (err.config?.url?.includes('/prompts/oauth/status') ||
         err.config?.url?.includes('/prompts/prompt-config/') ||
         err.config?.url?.includes('/benchmark/node-configurations') ||
-        err.config?.url?.includes('/models/top-leaderboards')) {
+        err.config?.url?.includes('/models/top-leaderboards') ||
+        err.config?.url?.includes('/adapters')) {
       return Promise.reject(err);
     }
 
     if (err && localStorage.getItem("access_token")) {
       // Check both 'detail' (FastAPI HTTPException) and 'message' (custom ErrorResponse)
       const errorMessage = err.response?.data?.detail || err.response?.data?.message;
-      errorToast(errorMessage);
+      // Only show toast if there's an actual error message
+      if (errorMessage) {
+        errorToast(errorMessage);
+      }
     }
     return false;
   }

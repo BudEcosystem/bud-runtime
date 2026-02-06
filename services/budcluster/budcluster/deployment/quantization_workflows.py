@@ -90,7 +90,7 @@ class DeployQuantizationWorkflow:
                     "cluster_config_dict": cluster_config,
                 },
             )
-            if status is not None:
+            if status == "successful":
                 workflow_status = check_workflow_status_in_statestore(workflow_id)
                 if workflow_status:
                     # cleanup the namespace if workflow is terminated
@@ -106,7 +106,7 @@ class DeployQuantizationWorkflow:
                 )
             else:
                 response = ErrorResponse(
-                    message="Failed to deploy quantization job", code=HTTPStatus.BAD_REQUEST.value
+                    message=f"Failed to deploy quantization job: {status}", code=HTTPStatus.BAD_REQUEST.value
                 )
         except Exception as e:
             error_msg = f"Error deploying engine for workflow_id: {workflow_id} and task_id: {task_id}, error: {e}"

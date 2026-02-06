@@ -42,7 +42,9 @@ from ..commons.constants import (
     ProjectStatusEnum,
     UserTypeEnum,
 )
-from ..endpoint_ops.crud import EndpointDataManager
+from ..credential_ops.models import Credential as CredentialModel
+from ..endpoint_ops.crud import AdapterDataManager, EndpointDataManager
+from ..endpoint_ops.models import Adapter as AdapterModel
 from ..endpoint_ops.models import Endpoint as EndpointModel
 from ..model_ops.crud import ModelDataManager
 from ..model_ops.models import Model
@@ -139,6 +141,7 @@ class BudMetricService(SessionMixin):
             project_ids = set()
             model_ids = set()
             endpoint_ids = set()
+            api_key_ids = set()
 
             # Extract IDs from the response structure
             items_list = response_data.get("items", [])
@@ -161,11 +164,15 @@ class BudMetricService(SessionMixin):
                         model_ids.add(model_id)
                     if endpoint_id := item.get("endpoint_id"):
                         endpoint_ids.add(endpoint_id)
+                    if api_key_id := item.get("api_key_id"):
+                        api_key_ids.add(api_key_id)
 
             # Fetch names for all IDs
             project_names = {}
             model_names = {}
             endpoint_names = {}
+            adapter_names = {}
+            credential_names = {}
 
             if project_ids:
                 # Query projects
@@ -188,6 +195,22 @@ class BudMetricService(SessionMixin):
                 endpoints = result.scalars().all()
                 endpoint_names = {str(e.id): e.name for e in endpoints}
 
+                # Check for adapters: any endpoint_ids not found might be adapter IDs
+                found_endpoint_ids = set(endpoint_names.keys())
+                missing_ids = {str(eid) for eid in endpoint_ids} - found_endpoint_ids
+                if missing_ids:
+                    stmt = select(AdapterModel).where(AdapterModel.id.in_([UUID(mid) for mid in missing_ids]))
+                    result = self.session.execute(stmt)
+                    adapters = result.scalars().all()
+                    adapter_names.update({str(a.id): a.name for a in adapters})
+
+            if api_key_ids:
+                # Query credentials (API keys)
+                stmt = select(CredentialModel).where(CredentialModel.id.in_(list(api_key_ids)))
+                result = self.session.execute(stmt)
+                credentials = result.scalars().all()
+                credential_names = {str(c.id): c.name for c in credentials}
+
             # Add names to the response items
             for time_bucket in items_list:
                 if not isinstance(time_bucket, dict):
@@ -204,7 +227,17 @@ class BudMetricService(SessionMixin):
                     if model_id := item.get("model_id"):
                         item["model_name"] = model_names.get(str(model_id), "Unknown")
                     if endpoint_id := item.get("endpoint_id"):
-                        item["endpoint_name"] = endpoint_names.get(str(endpoint_id), "Unknown")
+                        endpoint_id_str = str(endpoint_id)
+                        if endpoint_name := endpoint_names.get(endpoint_id_str):
+                            item["endpoint_name"] = endpoint_name
+                        elif adapter_name := adapter_names.get(endpoint_id_str):
+                            item["endpoint_name"] = adapter_name
+                            item["adapter_name"] = adapter_name
+                            item["is_adapter"] = True
+                        else:
+                            item["endpoint_name"] = "Unknown"
+                    if api_key_id := item.get("api_key_id"):
+                        item["api_key_name"] = credential_names.get(str(api_key_id), "Unknown")
 
         except Exception as e:
             logger.warning(f"Failed to enrich response with names: {e}")
@@ -511,6 +544,7 @@ class BudMetricService(SessionMixin):
             # Fetch names for all IDs
             project_names = {}
             endpoint_names = {}
+            adapter_names = {}
             model_names = {}
 
             # Fetch project names based on user type
@@ -540,6 +574,17 @@ class BudMetricService(SessionMixin):
                 endpoints = result.scalars().all()
                 endpoint_names = {str(e.id): e.name for e in endpoints}
 
+                # Check for adapters: any endpoint_ids not found might be adapter IDs
+                # (endpoint_id field can hold either endpoint or adapter UUID)
+                found_endpoint_ids = set(endpoint_names.keys())
+                # Convert endpoint_ids (Set[UUID]) to strings for comparison with found_endpoint_ids (Set[str])
+                missing_ids = {str(eid) for eid in endpoint_ids} - found_endpoint_ids
+                if missing_ids:
+                    stmt = select(AdapterModel).where(AdapterModel.id.in_([UUID(mid) for mid in missing_ids]))
+                    result = self.session.execute(stmt)
+                    adapters = result.scalars().all()
+                    adapter_names.update({str(a.id): a.name for a in adapters})
+
             if model_ids:
                 # Query models (including all statuses, even deleted)
                 from sqlalchemy import select
@@ -561,7 +606,14 @@ class BudMetricService(SessionMixin):
                         item["project_name"] = project_names.get(str(project_id))
 
                 if endpoint_id := item.get("endpoint_id"):
-                    item["endpoint_name"] = endpoint_names.get(str(endpoint_id))
+                    endpoint_id_str = str(endpoint_id)
+                    if endpoint_name := endpoint_names.get(endpoint_id_str):
+                        item["endpoint_name"] = endpoint_name
+                    elif adapter_name := adapter_names.get(endpoint_id_str):
+                        # endpoint_id is actually an adapter ID
+                        item["endpoint_name"] = adapter_name
+                        item["adapter_name"] = adapter_name
+                        item["is_adapter"] = True
                 if model_id := item.get("model_id"):
                     item["model_display_name"] = model_names.get(str(model_id))
 
@@ -654,6 +706,15 @@ class BudMetricService(SessionMixin):
                 )
                 if endpoint:
                     response_data["endpoint_name"] = endpoint.name
+                else:
+                    # endpoint_id might be an adapter ID - check Adapter table
+                    adapter = await AdapterDataManager(self.session).retrieve_by_fields(
+                        AdapterModel, {"id": UUID(endpoint_id)}, missing_ok=True
+                    )
+                    if adapter:
+                        response_data["endpoint_name"] = adapter.name
+                        response_data["adapter_name"] = adapter.name
+                        response_data["is_adapter"] = True
 
             if model_id:
                 model = await ModelDataManager(self.session).retrieve_by_fields(
@@ -1679,6 +1740,7 @@ class GatewayAnalyticsService(SessionMixin):
             project_names = {}
             model_names = {}
             endpoint_names = {}
+            adapter_names = {}
 
             if project_ids:
                 stmt = select(ProjectModel).where(ProjectModel.id.in_(list(project_ids)))
@@ -1698,6 +1760,15 @@ class GatewayAnalyticsService(SessionMixin):
                 endpoints = result.scalars().all()
                 endpoint_names = {str(e.id): e.name for e in endpoints}
 
+                # Check for adapters: any endpoint_ids not found might be adapter IDs
+                found_endpoint_ids = set(endpoint_names.keys())
+                missing_ids = {str(eid) for eid in endpoint_ids} - found_endpoint_ids
+                if missing_ids:
+                    stmt = select(AdapterModel).where(AdapterModel.id.in_([UUID(mid) for mid in missing_ids]))
+                    result = await self.session.execute(stmt)
+                    adapters = result.scalars().all()
+                    adapter_names.update({str(a.id): a.name for a in adapters})
+
             # Helper function to add names to items
             def add_names(items: List[Dict[str, Any]]) -> None:
                 for item in items:
@@ -1707,7 +1778,15 @@ class GatewayAnalyticsService(SessionMixin):
                         if model_id := item.get("model_id"):
                             item["model_name"] = model_names.get(str(model_id), "Unknown")
                         if endpoint_id := item.get("endpoint_id"):
-                            item["endpoint_name"] = endpoint_names.get(str(endpoint_id), "Unknown")
+                            endpoint_id_str = str(endpoint_id)
+                            if endpoint_name := endpoint_names.get(endpoint_id_str):
+                                item["endpoint_name"] = endpoint_name
+                            elif adapter_name := adapter_names.get(endpoint_id_str):
+                                item["endpoint_name"] = adapter_name
+                                item["adapter_name"] = adapter_name
+                                item["is_adapter"] = True
+                            else:
+                                item["endpoint_name"] = "Unknown"
 
             # Add names based on response structure
             if "items" in data:

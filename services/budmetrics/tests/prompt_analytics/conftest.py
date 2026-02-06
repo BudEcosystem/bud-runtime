@@ -13,6 +13,15 @@ import time
 
 import pytest
 
+
+# =============================================================================
+# TEST CONSTANTS - API Key IDs for group_by tests
+# =============================================================================
+# Primary API key (used by most scenarios)
+TEST_API_KEY_ID = "019787c1-3de1-7b50-969b-e0a58514aaaa"
+# Secondary API key (used by some scenarios for group_by variation)
+TEST_API_KEY_ID_2 = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
 # Import seeding functions from standalone seeder
 from tests.prompt_analytics.seed_otel_traces import (
     DEFAULT_CONTAINER,

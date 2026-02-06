@@ -9,6 +9,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
+import { Slider, ConfigProvider } from 'antd';
+import { AppRequest } from 'src/pages/api/requests';
+import { errorToast } from '@/components/toast';
 import {
   getActionMeta,
   getActionParams,
@@ -436,12 +439,6 @@ const helpTextStyles: React.CSSProperties = {
   marginTop: '4px',
 };
 
-const errorTextStyles: React.CSSProperties = {
-  fontSize: '11px',
-  color: '#ff4d4f',
-  marginTop: '4px',
-};
-
 const footerStyles: React.CSSProperties = {
   padding: '12px 16px',
   borderTop: '1px solid #1a1a1a',
@@ -502,7 +499,6 @@ export function ActionConfigPanel({
   const [localParams, setLocalParams] = useState<Record<string, unknown>>(mergedParams);
   const [localName, setLocalName] = useState(stepName);
   const [localCondition, setLocalCondition] = useState(condition || '');
-  const [errors, setErrors] = useState<string[]>([]);
   // Track which ref fields are in template mode (for dynamic references like {{ steps.x.outputs.y }})
   const [templateModeFields, setTemplateModeFields] = useState<Set<string>>(() => {
     // Initialize based on existing values - if value looks like a template, enable template mode
@@ -521,7 +517,6 @@ export function ActionConfigPanel({
     setLocalParams(newMergedParams);
     setLocalName(stepName);
     setLocalCondition(condition || '');
-    setErrors([]);
     // Update template mode fields based on new params
     const templateFields = new Set<string>();
     Object.entries(newMergedParams).forEach(([key, value]) => {
@@ -614,23 +609,53 @@ export function ActionConfigPanel({
     []
   );
 
+  // State for saving
+  const [isSaving, setIsSaving] = useState(false);
+
   // Handle save
-  const handleSave = useCallback(() => {
-    // Validate
+  // Show validation errors as a toast notification
+  const showValidationErrors = useCallback((errors: string[]) => {
+    const message = errors.length === 1
+      ? errors[0]
+      : `Validation failed: ${errors.join(', ')}`;
+    errorToast(message);
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    // First do local validation
     const validation = validateParams(action, localParams);
     if (!validation.valid) {
-      setErrors(validation.errors);
+      showValidationErrors(validation.errors);
       return;
     }
 
-    setErrors([]);
+    setIsSaving(true);
+
+    try {
+      // Call backend validation API for conditional validation logic
+      const response = await AppRequest.Post('/budpipeline/actions/validate', {
+        action_type: action,
+        params: localParams,
+      });
+
+      if (response?.data && !response.data.valid) {
+        showValidationErrors(response.data.errors || ['Validation failed']);
+        setIsSaving(false);
+        return;
+      }
+    } catch (err) {
+      // If validation API fails, log but continue (fallback to local validation)
+      console.warn('Backend validation failed, using local validation only:', err);
+    }
+
+    setIsSaving(false);
     onUpdate({
       name: localName,
       params: localParams,
       condition: localCondition || undefined,
     });
     onClose();
-  }, [action, localParams, localName, localCondition, onUpdate, onClose]);
+  }, [action, localParams, localName, localCondition, onUpdate, onClose, showValidationErrors]);
 
   // Get options for ref types
   const getRefOptions = useCallback(
@@ -872,6 +897,81 @@ export function ActionConfigPanel({
             </select>
           )}
 
+          {/* Range slider for performance targets */}
+          {param.type === 'range' && (() => {
+            const rangeValue = Array.isArray(value) ? value : (param.default as number[]) || [0, 100];
+            const minVal = param.validation?.min ?? 0;
+            const maxVal = param.validation?.max ?? 100;
+            return (
+              <ConfigProvider
+                theme={{
+                  components: {
+                    Slider: {
+                      trackBg: '#965CDE',
+                      trackHoverBg: '#7A4BC7',
+                      handleColor: '#965CDE',
+                      handleActiveColor: '#7A4BC7',
+                      dotActiveBorderColor: '#965CDE',
+                      railBg: '#333',
+                      railHoverBg: '#444',
+                    },
+                  },
+                }}
+              >
+                <div style={{ padding: '8px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <input
+                      type="number"
+                      value={rangeValue[0] ?? minVal}
+                      min={minVal}
+                      max={rangeValue[1] ?? maxVal}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || minVal;
+                        handleParamChange(param.name, [val, rangeValue[1] ?? maxVal]);
+                      }}
+                      style={{
+                        ...inputStyles,
+                        width: '70px',
+                        textAlign: 'center',
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <Slider
+                        range
+                        min={minVal}
+                        max={maxVal}
+                        value={[rangeValue[0] ?? minVal, rangeValue[1] ?? maxVal]}
+                        onChange={(vals) => handleParamChange(param.name, vals)}
+                        tooltip={{
+                          formatter: (val) => `${val}`,
+                        }}
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      value={rangeValue[1] ?? maxVal}
+                      min={rangeValue[0] ?? minVal}
+                      max={maxVal}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || maxVal;
+                        handleParamChange(param.name, [rangeValue[0] ?? minVal, val]);
+                      }}
+                      style={{
+                        ...inputStyles,
+                        width: '70px',
+                        textAlign: 'center',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#666' }}>{minVal}</span>
+                    <span style={{ fontSize: '10px', color: '#666' }}>{maxVal}</span>
+                  </div>
+                </div>
+              </ConfigProvider>
+            );
+          })()}
+
           {/* Branches (for conditional routing) */}
           {param.type === 'branches' && (
             <BranchEditor
@@ -957,17 +1057,6 @@ export function ActionConfigPanel({
             {params.map(renderField)}
           </div>
         ))}
-
-        {/* Validation Errors */}
-        {errors.length > 0 && (
-          <div style={sectionStyles}>
-            {errors.map((error, i) => (
-              <div key={i} style={errorTextStyles}>
-                {error}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Footer */}
@@ -989,18 +1078,25 @@ export function ActionConfigPanel({
           </button>
         )}
         <button
-          style={primaryButtonStyles}
+          style={{
+            ...primaryButtonStyles,
+            opacity: isSaving ? 0.7 : 1,
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+          }}
           onClick={handleSave}
+          disabled={isSaving}
           onMouseOver={(e) => {
-            e.currentTarget.style.background = '#7A4BC7';
-            e.currentTarget.style.borderColor = '#7A4BC7';
+            if (!isSaving) {
+              e.currentTarget.style.background = '#7A4BC7';
+              e.currentTarget.style.borderColor = '#7A4BC7';
+            }
           }}
           onMouseOut={(e) => {
             e.currentTarget.style.background = '#965CDE';
             e.currentTarget.style.borderColor = '#965CDE';
           }}
         >
-          Save
+          {isSaving ? 'Validating...' : 'Save'}
         </button>
       </div>
     </div>

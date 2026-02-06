@@ -70,8 +70,9 @@
         release_namespace: "{{ namespace }}"
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
-        wait: true
-        atomic: true
+        # Don't use Helm wait - it doesn't properly track one-shot Pods
+        # The playbook has its own wait logic below that checks for Running OR Succeeded
+        wait: false
         state: present
         values:
           namespace: "{{ namespace }}"
@@ -101,7 +102,7 @@
         validate_certs: "{{ validate_certs }}"
       register: all_pods
 
-    - name: Wait for pod to be running
+    - name: Wait for model transfer to complete
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ namespace }}"
@@ -111,17 +112,17 @@
         validate_certs: "{{ validate_certs }}"
       register: pod_info
       until: pod_info.resources is defined and
-        ((pod_info.resources | type_debug == "list" and
         pod_info.resources | length > 0 and
         pod_info.resources[0].status is defined and
-        (pod_info.resources[0].status.phase == "Running" or
-        pod_info.resources[0].status.phase == "Succeeded")) or
-        (pod_info.resources | type_debug == "dict" and
-        pod_info.resources.status is defined and
-        (pod_info.resources.status.phase == "Running" or
-        pod_info.resources.status.phase == "Succeeded")))
-      retries: 30
+        (pod_info.resources[0].status.phase == "Succeeded" or
+         pod_info.resources[0].status.phase == "Failed")
+      retries: 60
       delay: 10
+
+    - name: Fail if model transfer pod failed
+      ansible.builtin.fail:
+        msg: "Model transfer pod failed"
+      when: pod_info.resources[0].status.phase == "Failed"
 
     - name: Get pod name
       set_fact:

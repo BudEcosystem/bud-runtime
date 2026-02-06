@@ -350,6 +350,7 @@ class ObservabilityMetricsService:
         "project": "project_id",
         "endpoint": "endpoint_id",
         "user_project": "api_key_project_id",
+        "api_key": "api_key_id",
     }
 
     def _extract_single_resource_ids_from_filters(
@@ -510,6 +511,7 @@ class ObservabilityMetricsService:
                 model_id=dimensions.get("model_id"),
                 project_id=dimensions.get("project_id"),
                 endpoint_id=dimensions.get("endpoint_id"),
+                api_key_id=dimensions.get("api_key_id"),
                 data=metrics_data,
             )
 

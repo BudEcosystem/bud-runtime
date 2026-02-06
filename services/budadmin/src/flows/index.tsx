@@ -157,6 +157,7 @@ import AddAgentSelectType from "./AddAgent/SelectAgentType";
 import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
 import LogDetailsDrawer from "src/pages/home/agentDetails/[agentId]/logs/LogDetailsDrawer";
 import NewPipeline from "./Pipeline/NewPipeline";
+import EditPipeline from "./Pipeline/EditPipeline";
 import ViewToolDetails from "./ViewTool/ViewToolDetails";
 import ViewVirtualServerDetails from "./ViewVirtualServer/ViewVirtualServerDetails";
 import SelectToolSource from "./AddTool/SelectToolSource";
@@ -344,6 +345,7 @@ export const StepComponents = {
 
   // Pipelines
   "new-pipeline": NewPipeline,
+  "edit-pipeline": EditPipeline,
 
   // Tools
   "view-tool-details": ViewToolDetails,

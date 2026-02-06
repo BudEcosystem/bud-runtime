@@ -22,6 +22,7 @@ class ParamType(str, Enum):
     JSON = "json"
     TEMPLATE = "template"  # Jinja2 template string
     BRANCHES = "branches"  # Conditional branches
+    RANGE = "range"  # Range slider [min, max] for performance targets
     MODEL_REF = "model_ref"  # Model reference (fetched from API)
     CLUSTER_REF = "cluster_ref"  # Cluster reference
     PROJECT_REF = "project_ref"  # Project reference

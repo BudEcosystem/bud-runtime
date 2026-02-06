@@ -7,6 +7,33 @@ const BUDPIPELINE_API = "/budpipeline";
 // Use real API or fallback to mock data (for development without backend)
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_WORKFLOW_DATA === "true";
 
+/**
+ * Extract error message from various API error response formats.
+ * Handles FastAPI ClientException, HTTPException, validation errors, and standard error formats.
+ */
+const extractErrorMessage = (error: any, fallback: string): string => {
+  const responseData = error?.response?.data;
+  const detail = responseData?.detail;
+
+  // Handle validation errors array format: {"detail": {"error": "...", "errors": [...]}}
+  if (detail?.errors && Array.isArray(detail.errors)) {
+    return detail.errors.join('; ');
+  }
+
+  // Handle error field: {"detail": {"error": "..."}}
+  if (detail?.error && typeof detail.error === 'string') {
+    return detail.error;
+  }
+
+  return (
+    responseData?.message ||                    // FastAPI ClientException format: {"message": "..."}
+    detail?.message ||                          // FastAPI HTTPException with object: {"detail": {"message": "..."}}
+    (typeof detail === 'string' ? detail : null) ||  // FastAPI HTTPException with string
+    error?.message ||                           // Axios/network error
+    fallback
+  );
+};
+
 // Types for budpipeline DAG orchestration
 export type PipelineParameter = {
   name: string;
@@ -589,11 +616,20 @@ export const SUPPORTED_EVENT_TYPES = [
   { value: "deployment.failed", label: "Deployment Failed", description: "When a deployment fails" },
 ];
 
+// Pagination info returned by backend
+export type PaginationInfo = {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
+};
+
 type BudPipelineStore = {
   // State
   workflows: BudPipelineItem[];
   selectedWorkflow: BudPipelineItem | null;
   executions: PipelineExecution[];
+  executionsPagination: PaginationInfo | null;
   selectedExecution: PipelineExecution | null;
   isLoading: boolean;
   error: string | null;
@@ -607,7 +643,7 @@ type BudPipelineStore = {
   // Actions
   getWorkflows: () => Promise<void>;
   getWorkflow: (id: string) => Promise<void>;
-  getExecutions: (workflowId?: string) => Promise<void>;
+  getExecutions: (workflowId?: string, page?: number, pageSize?: number) => Promise<void>;
   getExecution: (executionId: string) => Promise<void>;
   createWorkflow: (dag: DAGDefinition) => Promise<BudPipelineItem | null>;
   updateWorkflow: (id: string, dag: DAGDefinition) => Promise<BudPipelineItem | null>;
@@ -642,6 +678,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
   workflows: [],
   selectedWorkflow: null,
   executions: [],
+  executionsPagination: null,
   selectedExecution: null,
   isLoading: false,
   error: null,
@@ -706,23 +743,36 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
     }
   },
 
-  // Get executions
-  getExecutions: async (workflowId?: string) => {
+  // Get executions with pagination support
+  getExecutions: async (workflowId?: string, page: number = 1, pageSize: number = 20) => {
     set({ isLoading: true, error: null });
 
     if (USE_MOCK_DATA) {
       await new Promise((resolve) => setTimeout(resolve, 400));
-      const executions = workflowId
+      const allExecutions = workflowId
         ? DUMMY_EXECUTIONS.filter((e) => e.workflow_id === workflowId)
         : DUMMY_EXECUTIONS;
-      set({ executions, isLoading: false });
+      // Simulate pagination for mock data
+      const start = (page - 1) * pageSize;
+      const executions = allExecutions.slice(start, start + pageSize);
+      const pagination: PaginationInfo = {
+        page,
+        page_size: pageSize,
+        total_count: allExecutions.length,
+        total_pages: Math.ceil(allExecutions.length / pageSize),
+      };
+      set({ executions, executionsPagination: pagination, isLoading: false });
       return;
     }
 
     try {
-      const params = workflowId ? { workflow_id: workflowId } : {};
+      const params: Record<string, any> = { page, page_size: pageSize };
+      if (workflowId) {
+        params.workflow_id = workflowId;
+      }
       const response = await AppRequest.Get(`${BUDPIPELINE_API}/executions`, { params });
-      const rawExecutions = response.data?.executions || response.data || [];
+      const rawExecutions = response.data?.executions || (Array.isArray(response.data) ? response.data : []);
+      const pagination = response.data?.pagination || null;
       // Map backend field names to frontend expected names
       const executions = rawExecutions.map((e: any) => ({
         execution_id: e.execution_id || e.id,
@@ -736,13 +786,14 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
         error: e.error || e.error_info?.message,
         steps: e.steps || [],
       }));
-      set({ executions, isLoading: false });
+      set({ executions, executionsPagination: pagination, isLoading: false });
     } catch (error: any) {
       console.error("Failed to fetch executions:", error);
       set({
         error: error?.response?.data?.message || "Failed to fetch executions",
         isLoading: false,
         executions: [],
+        executionsPagination: null,
       });
     }
   },
@@ -837,7 +888,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
     } catch (error: any) {
       console.error("Failed to create workflow:", error);
       set({
-        error: error?.response?.data?.message || "Failed to create workflow",
+        error: extractErrorMessage(error, "Failed to create workflow"),
         isLoading: false,
       });
       return null;
@@ -884,7 +935,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
     } catch (error: any) {
       console.error("Failed to update workflow:", error);
       set({
-        error: error?.response?.data?.message || "Failed to update workflow",
+        error: extractErrorMessage(error, "Failed to update workflow"),
         isLoading: false,
       });
       return null;
@@ -928,7 +979,20 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       const response = await AppRequest.Post(`${BUDPIPELINE_API}/${workflowId}/execute`, {
         params,
       });
-      const newExecution = response.data;
+      const data = response.data;
+
+      // Check for error response even with 2xx status (backend may return error in body)
+      if (data?.object === "error" || data?.detail) {
+        const errorMessage = data?.message || data?.detail?.error || (typeof data?.detail === 'object' ? JSON.stringify(data.detail) : data?.detail) || "Failed to execute workflow";
+        console.error("Execute workflow error response:", data);
+        set({
+          error: errorMessage,
+          isLoading: false,
+        });
+        return null;
+      }
+
+      const newExecution = data;
       set((state) => ({
         executions: [newExecution, ...state.executions],
         isLoading: false,
@@ -937,7 +1001,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
     } catch (error: any) {
       console.error("Failed to execute workflow:", error);
       set({
-        error: error?.response?.data?.message || "Failed to execute workflow",
+        error: extractErrorMessage(error, "Failed to execute workflow"),
         isLoading: false,
       });
       return null;
