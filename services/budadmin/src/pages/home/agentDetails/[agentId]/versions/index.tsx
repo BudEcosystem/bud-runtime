@@ -431,18 +431,14 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       </div>
 
       {/* Previous Versions Section */}
-      <div>
-        <Text_24_600_FFFFFF className="block mb-6">Previous Version</Text_24_600_FFFFFF>
-        {previousVersions.length > 0 ? (
-          previousVersions.map((version) => (
+      {previousVersions.length > 0 && (
+        <div>
+          <Text_24_600_FFFFFF className="block mb-6">Previous Version</Text_24_600_FFFFFF>
+          {previousVersions.map((version) => (
             <VersionCard key={version.id} versionData={version} />
-          ))
-        ) : (
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 text-center">
-            <Text_14_600_EEEEEE>No previous versions available</Text_14_600_EEEEEE>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
