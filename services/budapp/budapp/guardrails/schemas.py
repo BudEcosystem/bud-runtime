@@ -782,7 +782,6 @@ class CustomProbeWorkflowRequest(BaseModel):
 
     # Step 1: Probe type selection
     probe_type_option: CustomProbeTypeEnum | None = None
-    project_id: UUID4 | None = None
 
     # Step 2: Policy configuration
     policy: PolicyConfig | None = None
@@ -816,7 +815,6 @@ class CustomProbeWorkflowSteps(BaseModel):
 
     # Step 1 data
     probe_type_option: CustomProbeTypeEnum | None = None
-    project_id: UUID4 | None = None
     # Auto-derived from probe_type_option
     model_uri: str | None = None
     scanner_type: str | None = None

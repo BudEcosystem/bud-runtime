@@ -1094,7 +1094,6 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         model_uri: str,
         model_provider_type: str,
         is_gated: bool,
-        project_id: UUID,
         user_id: UUID,
         provider_id: UUID,
         guard_types: list[str] | None = None,
@@ -1111,7 +1110,6 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
             model_uri: URI of the model
             model_provider_type: Provider type for the model
             is_gated: Whether the model requires gated access
-            project_id: Project ID for the probe
             user_id: User ID creating the probe
             provider_id: Provider ID for the probe
             guard_types: Optional list of guard types (e.g., ["input", "output"])

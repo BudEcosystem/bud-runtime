@@ -53,7 +53,6 @@ class TestCreateCustomProbeWithRule:
             "model_uri": "openai/gpt-test",
             "model_provider_type": "openai",
             "is_gated": False,
-            "project_id": uuid4(),
             "user_id": uuid4(),
             "provider_id": uuid4(),
         }

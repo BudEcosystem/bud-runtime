@@ -17,7 +17,7 @@
 """Integration tests for the full 3-step custom probe workflow.
 
 These tests verify the complete flow through the API endpoint:
-- Step 1: POST with probe_type_option and project_id
+- Step 1: POST with probe_type_option
 - Step 2: POST with policy configuration
 - Step 3: POST with name, description, guard_types, modality_types, trigger_workflow=True
 
@@ -38,7 +38,6 @@ from budapp.commons.constants import (
     GuardrailStatusEnum,
     ModelStatusEnum,
     ProbeTypeEnum,
-    ProjectStatusEnum,
     ScannerTypeEnum,
     WorkflowStatusEnum,
     WorkflowTypeEnum,
@@ -76,15 +75,6 @@ class TestCustomProbeWorkflowIntegration:
         user.is_superuser = True
         user.status = "active"
         return user
-
-    @pytest.fixture
-    def mock_project(self):
-        """Create a mock project."""
-        project = Mock()
-        project.id = uuid4()
-        project.name = "Test Project"
-        project.status = ProjectStatusEnum.ACTIVE
-        return project
 
     @pytest.fixture
     def mock_provider(self):
@@ -165,7 +155,7 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
 
     @pytest.mark.asyncio
     async def test_full_workflow_step1_step2_step3_creates_probe(
-        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy
+        self, mock_session, mock_current_user, mock_provider, mock_workflow, sample_policy
     ):
         """Test full workflow: Step 1 -> Step 2 -> Step 3 with trigger creates probe."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
@@ -173,7 +163,6 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
         from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 
         workflow_id = mock_workflow.id
-        project_id = mock_project.id
         probe_id = uuid4()
 
         # === STEP 1: Probe type selection ===
@@ -181,7 +170,6 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
             workflow_total_steps=3,
             step_number=1,
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
         )
 
         # Mock workflow step data accumulation
@@ -191,7 +179,6 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(project_id),
         }
 
         mock_workflow_step1 = Mock(spec=WorkflowStep)
@@ -216,34 +203,29 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
                     mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
                     MockWorkflowDM.return_value = mock_wf_dm
 
-                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
-                        mock_proj_dm = AsyncMock()
-                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=mock_project)
-                        MockProjectDM.return_value = mock_proj_dm
-
-                        with patch("budapp.guardrails.guardrail_routes.WorkflowService") as MockRouteWorkflowService:
-                            mock_route_wf_service = AsyncMock()
-                            mock_route_wf_service.retrieve_workflow_data = AsyncMock(
-                                return_value=RetrieveWorkflowDataResponse(
-                                    code=status.HTTP_200_OK,
-                                    message="Workflow data retrieved",
-                                    workflow_id=workflow_id,
-                                    status=WorkflowStatusEnum.IN_PROGRESS,
-                                    current_step=1,
-                                    total_steps=3,
-                                )
+                    with patch("budapp.guardrails.guardrail_routes.WorkflowService") as MockRouteWorkflowService:
+                        mock_route_wf_service = AsyncMock()
+                        mock_route_wf_service.retrieve_workflow_data = AsyncMock(
+                            return_value=RetrieveWorkflowDataResponse(
+                                code=status.HTTP_200_OK,
+                                message="Workflow data retrieved",
+                                workflow_id=workflow_id,
+                                status=WorkflowStatusEnum.IN_PROGRESS,
+                                current_step=1,
+                                total_steps=3,
                             )
-                            MockRouteWorkflowService.return_value = mock_route_wf_service
+                        )
+                        MockRouteWorkflowService.return_value = mock_route_wf_service
 
-                            result = await add_custom_probe_workflow(
-                                current_user=mock_current_user,
-                                session=mock_session,
-                                request=step1_request,
-                            )
+                        result = await add_custom_probe_workflow(
+                            current_user=mock_current_user,
+                            session=mock_session,
+                            request=step1_request,
+                        )
 
-                            # Verify step 1 response
-                            assert result.code == status.HTTP_200_OK
-                            assert result.current_step == 1
+                        # Verify step 1 response
+                        assert result.code == status.HTTP_200_OK
+                        assert result.current_step == 1
 
         # === STEP 2: Policy configuration ===
         step2_request = CustomProbeWorkflowRequest(
@@ -422,7 +404,7 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
 
     @pytest.mark.asyncio
     async def test_workflow_creates_rule_with_correct_fields(
-        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy
+        self, mock_session, mock_current_user, mock_provider, mock_workflow, sample_policy
     ):
         """Test that the created rule has correct scanner_type, model_uri, model_config_json, guard_types, modality_types."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
@@ -430,7 +412,6 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
         from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 
         workflow_id = mock_workflow.id
-        project_id = mock_project.id
 
         mock_probe = Mock(spec=GuardrailProbe)
         mock_probe.id = uuid4()
@@ -456,7 +437,6 @@ class TestFullWorkflowExecution(TestCustomProbeWorkflowIntegration):
             "model_uri": "openai/gpt-oss-safeguard-20b",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(project_id),
         }
 
         mock_step2 = Mock(spec=WorkflowStep)
@@ -544,7 +524,6 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
                 workflow_total_steps=3,
                 step_number=1,
                 probe_type_option="invalid_type",  # Invalid probe type
-                project_id=uuid4(),
             )
 
         errors = exc_info.value.errors()
@@ -575,10 +554,10 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
         from budapp.guardrails.schemas import CustomProbeWorkflowRequest
 
-        # Step data missing "name", "scanner_type", "project_id", "policy"
+        # Step data missing "name", "scanner_type", "policy"
         incomplete_step_data = {
             "probe_type_option": "llm_policy",
-            # Missing: name, scanner_type, project_id, policy
+            # Missing: name, scanner_type, policy
         }
 
         mock_workflow_step = Mock(spec=WorkflowStep)
@@ -621,7 +600,7 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
 
     @pytest.mark.asyncio
     async def test_bud_sentinel_provider_not_found(
-        self, mock_session, mock_current_user, mock_project, mock_workflow, sample_policy
+        self, mock_session, mock_current_user, mock_workflow, sample_policy
     ):
         """Test error when BudSentinel provider is not found."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
@@ -635,7 +614,6 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(mock_project.id),
             "policy": sample_policy.model_dump(),
             "name": "Test Probe",
         }
@@ -675,9 +653,7 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
                         mock_prov_dm.retrieve_by_fields = AsyncMock(return_value=None)
                         MockProviderDM.return_value = mock_prov_dm
 
-                        with patch(
-                            "budapp.guardrails.guardrail_routes.WorkflowService"
-                        ) as MockRouteWorkflowService:
+                        with patch("budapp.guardrails.guardrail_routes.WorkflowService") as MockRouteWorkflowService:
                             mock_route_wf_service = AsyncMock()
                             # The workflow should be marked FAILED when provider is not found
                             mock_route_wf_service.retrieve_workflow_data = AsyncMock(
@@ -715,55 +691,7 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
                             assert failed_status_update, "Workflow should be updated to FAILED status"
 
     @pytest.mark.asyncio
-    async def test_project_not_found_at_step1(self, mock_session, mock_current_user, mock_workflow):
-        """Test error when project is not found at step 1."""
-        from starlette.responses import JSONResponse
-
-        from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
-        from budapp.guardrails.schemas import CustomProbeWorkflowRequest
-
-        request = CustomProbeWorkflowRequest(
-            workflow_total_steps=3,
-            step_number=1,
-            probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=uuid4(),  # Non-existent project
-        )
-
-        with patch("budapp.guardrails.services.WorkflowService") as MockWorkflowService:
-            mock_wf_service = AsyncMock()
-            mock_wf_service.retrieve_or_create_workflow = AsyncMock(return_value=mock_workflow)
-            MockWorkflowService.return_value = mock_wf_service
-
-            with patch("budapp.guardrails.services.WorkflowStepDataManager") as MockStepDM:
-                mock_step_dm = AsyncMock()
-                mock_step_dm.get_all_workflow_steps = AsyncMock(return_value=[])
-                MockStepDM.return_value = mock_step_dm
-
-                with patch("budapp.guardrails.services.WorkflowDataManager") as MockWorkflowDM:
-                    mock_wf_dm = AsyncMock()
-                    mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
-                    MockWorkflowDM.return_value = mock_wf_dm
-
-                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
-                        mock_proj_dm = AsyncMock()
-                        # Return None to simulate project not found
-                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=None)
-                        MockProjectDM.return_value = mock_proj_dm
-
-                        result = await add_custom_probe_workflow(
-                            current_user=mock_current_user,
-                            session=mock_session,
-                            request=request,
-                        )
-
-                        # Should return 404 error response
-                        assert isinstance(result, JSONResponse)
-                        assert result.status_code == status.HTTP_404_NOT_FOUND
-
-    @pytest.mark.asyncio
-    async def test_step2_without_policy_proceeds_normally(
-        self, mock_session, mock_current_user, mock_project, mock_workflow
-    ):
+    async def test_step2_without_policy_proceeds_normally(self, mock_session, mock_current_user, mock_workflow):
         """Test that step 2 without policy proceeds normally.
 
         Step 2 is for policy configuration but policy is optional at this step.
@@ -774,7 +702,6 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
         from budapp.workflow_ops.schemas import RetrieveWorkflowDataResponse
 
         workflow_id = mock_workflow.id
-        project_id = mock_project.id
 
         # Step 1 data from previous step
         step1_data = {
@@ -783,7 +710,6 @@ class TestErrorScenarios(TestCustomProbeWorkflowIntegration):
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(project_id),
         }
 
         mock_workflow_step1 = Mock(spec=WorkflowStep)
@@ -853,7 +779,7 @@ class TestModelIdAssignment(TestCustomProbeWorkflowIntegration):
 
     @pytest.mark.asyncio
     async def test_model_id_assigned_when_model_exists(
-        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy
+        self, mock_session, mock_current_user, mock_provider, mock_workflow, sample_policy
     ):
         """Test that model_id is assigned when a model with matching URI exists."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
@@ -872,7 +798,6 @@ class TestModelIdAssignment(TestCustomProbeWorkflowIntegration):
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(mock_project.id),
             "policy": sample_policy.model_dump(),
             "name": "Test Probe",
         }
@@ -954,7 +879,7 @@ class TestModelIdAssignment(TestCustomProbeWorkflowIntegration):
 
     @pytest.mark.asyncio
     async def test_model_id_is_none_when_model_not_found(
-        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy
+        self, mock_session, mock_current_user, mock_provider, mock_workflow, sample_policy
     ):
         """Test that model_id is None when no model with matching URI exists."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
@@ -967,7 +892,6 @@ class TestModelIdAssignment(TestCustomProbeWorkflowIntegration):
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(mock_project.id),
             "policy": sample_policy.model_dump(),
             "name": "Test Probe",
         }
@@ -1052,9 +976,7 @@ class TestWorkflowStatusTransitions(TestCustomProbeWorkflowIntegration):
     """Test workflow status transitions during the workflow."""
 
     @pytest.mark.asyncio
-    async def test_workflow_status_in_progress_during_steps(
-        self, mock_session, mock_current_user, mock_project, mock_workflow
-    ):
+    async def test_workflow_status_in_progress_during_steps(self, mock_session, mock_current_user, mock_workflow):
         """Test that workflow status is IN_PROGRESS during intermediate steps."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
         from budapp.guardrails.schemas import CustomProbeWorkflowRequest
@@ -1066,7 +988,6 @@ class TestWorkflowStatusTransitions(TestCustomProbeWorkflowIntegration):
             workflow_total_steps=3,
             step_number=1,
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=mock_project.id,
         )
 
         mock_workflow_step = Mock(spec=WorkflowStep)
@@ -1089,37 +1010,32 @@ class TestWorkflowStatusTransitions(TestCustomProbeWorkflowIntegration):
                     mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
                     MockWorkflowDM.return_value = mock_wf_dm
 
-                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
-                        mock_proj_dm = AsyncMock()
-                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=mock_project)
-                        MockProjectDM.return_value = mock_proj_dm
-
-                        with patch("budapp.guardrails.guardrail_routes.WorkflowService") as MockRouteWorkflowService:
-                            mock_route_wf_service = AsyncMock()
-                            mock_route_wf_service.retrieve_workflow_data = AsyncMock(
-                                return_value=RetrieveWorkflowDataResponse(
-                                    code=status.HTTP_200_OK,
-                                    message="Success",
-                                    workflow_id=mock_workflow.id,
-                                    status=WorkflowStatusEnum.IN_PROGRESS,
-                                    current_step=1,
-                                    total_steps=3,
-                                )
+                    with patch("budapp.guardrails.guardrail_routes.WorkflowService") as MockRouteWorkflowService:
+                        mock_route_wf_service = AsyncMock()
+                        mock_route_wf_service.retrieve_workflow_data = AsyncMock(
+                            return_value=RetrieveWorkflowDataResponse(
+                                code=status.HTTP_200_OK,
+                                message="Success",
+                                workflow_id=mock_workflow.id,
+                                status=WorkflowStatusEnum.IN_PROGRESS,
+                                current_step=1,
+                                total_steps=3,
                             )
-                            MockRouteWorkflowService.return_value = mock_route_wf_service
+                        )
+                        MockRouteWorkflowService.return_value = mock_route_wf_service
 
-                            result = await add_custom_probe_workflow(
-                                current_user=mock_current_user,
-                                session=mock_session,
-                                request=request,
-                            )
+                        result = await add_custom_probe_workflow(
+                            current_user=mock_current_user,
+                            session=mock_session,
+                            request=request,
+                        )
 
-                            # Verify status is IN_PROGRESS
-                            assert result.status == WorkflowStatusEnum.IN_PROGRESS
+                        # Verify status is IN_PROGRESS
+                        assert result.status == WorkflowStatusEnum.IN_PROGRESS
 
     @pytest.mark.asyncio
     async def test_workflow_status_completed_after_successful_trigger(
-        self, mock_session, mock_current_user, mock_project, mock_provider, mock_workflow, sample_policy
+        self, mock_session, mock_current_user, mock_provider, mock_workflow, sample_policy
     ):
         """Test that workflow status is COMPLETED after successful trigger."""
         from budapp.guardrails.guardrail_routes import add_custom_probe_workflow
@@ -1132,7 +1048,6 @@ class TestWorkflowStatusTransitions(TestCustomProbeWorkflowIntegration):
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(mock_project.id),
             "policy": sample_policy.model_dump(),
             "name": "Test Probe",
         }

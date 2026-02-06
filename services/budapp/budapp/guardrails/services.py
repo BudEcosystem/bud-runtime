@@ -4425,7 +4425,6 @@ class GuardrailCustomProbeService(SessionMixin):
             model_uri=db_model.uri or f"model://{db_model.id}",
             model_provider_type=db_model.provider_type,
             is_gated=False,
-            project_id=project_id,
             user_id=user_id,
             provider_id=provider.id,
         )
@@ -4603,17 +4602,6 @@ class GuardrailCustomProbeService(SessionMixin):
                     workflow_step_data["scanner_type"] = config.scanner_type
                     workflow_step_data["handler"] = config.handler
                     workflow_step_data["model_provider_type"] = config.model_provider_type
-            if request.project_id:
-                # Validate project exists and is ACTIVE
-                db_project = await ProjectDataManager(self.session).retrieve_by_fields(
-                    Project, {"id": request.project_id, "status": ProjectStatusEnum.ACTIVE}, missing_ok=True
-                )
-                if not db_project:
-                    raise ClientException(
-                        message="Project not found or is not active",
-                        status_code=HTTPStatus.HTTP_404_NOT_FOUND,
-                    )
-                workflow_step_data["project_id"] = str(request.project_id)
 
         elif step_number == 2:
             # Step 2: Policy configuration
@@ -4660,7 +4648,7 @@ class GuardrailCustomProbeService(SessionMixin):
         # Execute workflow if triggered at step 3
         if trigger_workflow and step_number == 3:
             # Validate required fields before workflow execution
-            required_keys = ["name", "scanner_type", "project_id", "policy"]
+            required_keys = ["name", "scanner_type", "policy"]
             missing_keys = [key for key in required_keys if key not in workflow_step_data]
             if missing_keys:
                 raise ClientException(
@@ -4746,7 +4734,6 @@ class GuardrailCustomProbeService(SessionMixin):
                 model_uri=model_uri,
                 model_provider_type=data.get("model_provider_type", "openai"),
                 is_gated=False,
-                project_id=UUID(data["project_id"]),
                 user_id=current_user_id,
                 provider_id=provider.id,
                 guard_types=data.get("guard_types"),

@@ -116,18 +116,11 @@ class TestCustomProbeWorkflowServiceStep1:
     async def test_step1_derives_config_from_probe_type(self, service, mock_workflow, mock_workflow_step):
         """Test Step 1 derives model_uri, scanner_type, handler from probe_type_option."""
         user_id = uuid4()
-        project_id = uuid4()
-
-        # Mock project for validation
-        mock_project = Mock()
-        mock_project.id = project_id
-        mock_project.status = "ACTIVE"
 
         request = CustomProbeWorkflowRequest(
             workflow_total_steps=3,
             step_number=1,
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
         )
 
         with patch("budapp.guardrails.services.WorkflowService") as MockWorkflowService:
@@ -147,32 +140,23 @@ class TestCustomProbeWorkflowServiceStep1:
                     mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
                     MockWorkflowDM.return_value = mock_wf_dm
 
-                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
-                        mock_proj_dm = AsyncMock()
-                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=mock_project)
-                        MockProjectDM.return_value = mock_proj_dm
+                    result = await service.add_custom_probe_workflow(
+                        current_user_id=user_id,
+                        request=request,
+                    )
 
-                        result = await service.add_custom_probe_workflow(
-                            current_user_id=user_id,
-                            request=request,
-                        )
+                    # Verify workflow was created
+                    assert result == mock_workflow
 
-                        # Verify workflow was created
-                        assert result == mock_workflow
-
-                        # Verify project was validated
-                        mock_proj_dm.retrieve_by_fields.assert_called_once()
-
-                        # Verify step data was stored via insert_one (new step)
-                        mock_step_dm.insert_one.assert_called()
-                        insert_call = mock_step_dm.insert_one.call_args
-                        step_data = insert_call[0][0].data
-                        assert step_data.get("probe_type_option") == "llm_policy"
-                        assert step_data.get("model_uri") == "openai/gpt-oss-safeguard-20b"
-                        assert step_data.get("scanner_type") == "llm"
-                        assert step_data.get("handler") == "gpt_safeguard"
-                        assert step_data.get("model_provider_type") == "openai"
-                        assert step_data.get("project_id") == str(project_id)
+                    # Verify step data was stored via insert_one (new step)
+                    mock_step_dm.insert_one.assert_called()
+                    insert_call = mock_step_dm.insert_one.call_args
+                    step_data = insert_call[0][0].data
+                    assert step_data.get("probe_type_option") == "llm_policy"
+                    assert step_data.get("model_uri") == "openai/gpt-oss-safeguard-20b"
+                    assert step_data.get("scanner_type") == "llm"
+                    assert step_data.get("handler") == "gpt_safeguard"
+                    assert step_data.get("model_provider_type") == "openai"
 
     @pytest.mark.asyncio
     async def test_step1_with_existing_workflow(self, service, mock_workflow, mock_workflow_step):
@@ -207,51 +191,6 @@ class TestCustomProbeWorkflowServiceStep1:
                     )
 
                     assert result == mock_workflow
-
-    @pytest.mark.asyncio
-    async def test_step1_raises_error_for_invalid_project(self, service, mock_workflow, mock_workflow_step):
-        """Test Step 1 raises ClientException when project is not found or inactive."""
-        from budapp.commons.exceptions import ClientException
-
-        user_id = uuid4()
-        project_id = uuid4()
-
-        request = CustomProbeWorkflowRequest(
-            workflow_total_steps=3,
-            step_number=1,
-            probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
-        )
-
-        with patch("budapp.guardrails.services.WorkflowService") as MockWorkflowService:
-            mock_wf_service = AsyncMock()
-            mock_wf_service.retrieve_or_create_workflow = AsyncMock(return_value=mock_workflow)
-            MockWorkflowService.return_value = mock_wf_service
-
-            with patch("budapp.guardrails.services.WorkflowStepDataManager") as MockStepDM:
-                mock_step_dm = AsyncMock()
-                mock_step_dm.get_all_workflow_steps = AsyncMock(return_value=[])
-                mock_step_dm.insert_one = AsyncMock(return_value=mock_workflow_step)
-                MockStepDM.return_value = mock_step_dm
-
-                with patch("budapp.guardrails.services.WorkflowDataManager") as MockWorkflowDM:
-                    mock_wf_dm = AsyncMock()
-                    mock_wf_dm.update_by_fields = AsyncMock(return_value=mock_workflow)
-                    MockWorkflowDM.return_value = mock_wf_dm
-
-                    with patch("budapp.guardrails.services.ProjectDataManager") as MockProjectDM:
-                        mock_proj_dm = AsyncMock()
-                        # Return None to simulate project not found
-                        mock_proj_dm.retrieve_by_fields = AsyncMock(return_value=None)
-                        MockProjectDM.return_value = mock_proj_dm
-
-                        with pytest.raises(ClientException) as exc_info:
-                            await service.add_custom_probe_workflow(
-                                current_user_id=user_id,
-                                request=request,
-                            )
-
-                        assert "Project not found or is not active" in str(exc_info.value.message)
 
 
 class TestCustomProbeWorkflowServiceStep2:
@@ -313,7 +252,6 @@ class TestCustomProbeWorkflowServiceStep2:
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(uuid4()),
         }
 
         mock_step = Mock()
@@ -398,7 +336,6 @@ class TestCustomProbeWorkflowServiceStep3:
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(uuid4()),
             "policy": {
                 "task": "Evaluate content",
                 "definitions": [{"term": "harmful", "definition": "Content that causes harm"}],
@@ -570,7 +507,6 @@ class TestCustomProbeWorkflowServiceStep3:
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(uuid4()),
             # Missing: policy, name
         }
 
@@ -645,7 +581,6 @@ class TestExecuteCustomProbeWorkflow:
             "scanner_type": "llm",
             "handler": "gpt_safeguard",
             "model_provider_type": "openai",
-            "project_id": str(uuid4()),
             "policy": {
                 "task": "Evaluate content",
                 "definitions": [{"term": "harmful", "definition": "Content that causes harm"}],

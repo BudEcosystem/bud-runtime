@@ -70,19 +70,16 @@ class TestCustomProbeWorkflowRequest:
 
     def test_create_new_workflow_step1(self):
         """Test creating a new workflow at step 1."""
-        project_id = uuid4()
         request = CustomProbeWorkflowRequest(
             workflow_total_steps=3,
             step_number=1,
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
         )
 
         assert request.workflow_id is None
         assert request.workflow_total_steps == 3
         assert request.step_number == 1
         assert request.probe_type_option == CustomProbeTypeEnum.LLM_POLICY
-        assert request.project_id == project_id
         assert request.trigger_workflow is False
 
     def test_continue_workflow_step2(self):
@@ -193,7 +190,6 @@ class TestCustomProbeWorkflowRequest:
         )
 
         assert request.probe_type_option is None
-        assert request.project_id is None
         assert request.policy is None
         assert request.name is None
         assert request.description is None
@@ -202,12 +198,10 @@ class TestCustomProbeWorkflowRequest:
 
     def test_serialization(self):
         """Test request serializes correctly."""
-        project_id = uuid4()
         request = CustomProbeWorkflowRequest(
             workflow_total_steps=3,
             step_number=1,
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
         )
 
         data = request.model_dump(mode="json")
@@ -215,7 +209,6 @@ class TestCustomProbeWorkflowRequest:
         assert data["workflow_total_steps"] == 3
         assert data["step_number"] == 1
         assert data["probe_type_option"] == "llm_policy"
-        assert data["project_id"] == str(project_id)
         assert data["trigger_workflow"] is False
 
 
@@ -227,7 +220,6 @@ class TestCustomProbeWorkflowSteps:
         steps = CustomProbeWorkflowSteps()
 
         assert steps.probe_type_option is None
-        assert steps.project_id is None
         assert steps.model_uri is None
         assert steps.scanner_type is None
         assert steps.handler is None
@@ -243,10 +235,8 @@ class TestCustomProbeWorkflowSteps:
 
     def test_create_steps_with_step1_data(self):
         """Test creating workflow steps with step 1 data."""
-        project_id = uuid4()
         steps = CustomProbeWorkflowSteps(
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
             model_uri="openai/gpt-oss-safeguard-20b",
             scanner_type="llm",
             handler="gpt_safeguard",
@@ -254,7 +244,6 @@ class TestCustomProbeWorkflowSteps:
         )
 
         assert steps.probe_type_option == CustomProbeTypeEnum.LLM_POLICY
-        assert steps.project_id == project_id
         assert steps.model_uri == "openai/gpt-oss-safeguard-20b"
         assert steps.scanner_type == "llm"
         assert steps.handler == "gpt_safeguard"
@@ -262,14 +251,12 @@ class TestCustomProbeWorkflowSteps:
 
     def test_create_steps_with_all_data(self):
         """Test creating workflow steps with all data accumulated."""
-        project_id = uuid4()
         probe_id = uuid4()
         model_id = uuid4()
         policy_dict = {"task": "Test task", "definitions": []}
 
         steps = CustomProbeWorkflowSteps(
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
             model_uri="openai/gpt-oss-safeguard-20b",
             scanner_type="llm",
             handler="gpt_safeguard",
@@ -294,17 +281,14 @@ class TestCustomProbeWorkflowSteps:
 
     def test_serialization(self):
         """Test workflow steps serializes correctly."""
-        project_id = uuid4()
         steps = CustomProbeWorkflowSteps(
             probe_type_option=CustomProbeTypeEnum.LLM_POLICY,
-            project_id=project_id,
             model_uri="openai/gpt-oss-safeguard-20b",
         )
 
         data = steps.model_dump(mode="json")
 
         assert data["probe_type_option"] == "llm_policy"
-        assert data["project_id"] == str(project_id)
         assert data["model_uri"] == "openai/gpt-oss-safeguard-20b"
 
 
