@@ -1089,16 +1089,35 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
         name: str,
         description: str | None,
         scanner_type: str,
-        model_id: UUID,
+        model_id: UUID | None,
         model_config: dict,
         model_uri: str,
         model_provider_type: str,
         is_gated: bool,
-        project_id: UUID,
         user_id: UUID,
         provider_id: UUID,
+        guard_types: list[str] | None = None,
+        modality_types: list[str] | None = None,
     ) -> GuardrailProbe:
-        """Create a custom probe with a single model-based rule atomically."""
+        """Create a custom probe with a single model-based rule atomically.
+
+        Args:
+            name: Name of the custom probe
+            description: Description of the probe
+            scanner_type: Type of scanner (e.g., "llm")
+            model_id: Optional model ID (can be None if model lookup happens at deployment)
+            model_config: Configuration dictionary for the model
+            model_uri: URI of the model
+            model_provider_type: Provider type for the model
+            is_gated: Whether the model requires gated access
+            user_id: User ID creating the probe
+            provider_id: Provider ID for the probe
+            guard_types: Optional list of guard types (e.g., ["input", "output"])
+            modality_types: Optional list of modality types (e.g., ["text", "image"])
+
+        Returns:
+            The created GuardrailProbe with its rule
+        """
         # Generate URI for uniqueness check
         probe_uri = f"custom.{user_id}.{name.lower().replace(' ', '_')}"
 
@@ -1141,6 +1160,8 @@ class GuardrailsDeploymentDataManager(DataManagerUtils):
                 is_gated=is_gated,
                 model_config_json=model_config,
                 model_id=model_id,
+                guard_types=guard_types,
+                modality_types=modality_types,
                 created_by=user_id,
                 status=GuardrailStatusEnum.ACTIVE,
             )

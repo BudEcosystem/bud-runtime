@@ -155,6 +155,16 @@ class RetrieveWorkflowStepData(BaseModel):
     models_to_deploy: list[dict] | None = None
     models_to_reuse: list[dict] | None = None
 
+    # Custom probe workflow fields
+    probe_type_option: str | None = None
+    model_uri: str | None = None
+    scanner_type: str | None = None
+    handler: str | None = None
+    model_provider_type: str | None = None
+    policy: dict | None = None
+    modality_types: list[str] | None = None
+    probe_id: UUID4 | None = None
+
 
 class RetrieveWorkflowDataResponse(SuccessResponse):
     """Retrieve Workflow Data Response."""

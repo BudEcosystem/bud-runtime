@@ -304,7 +304,7 @@ class WorkflowService(SessionMixin):
                 await ModelDataManager(self.session).retrieve_by_fields(
                     Model, {"id": UUID(required_data["model_id"])}, missing_ok=True
                 )
-                if "model_id" in required_data
+                if required_data.get("model_id")
                 else None
             )
 
@@ -496,6 +496,15 @@ class WorkflowService(SessionMixin):
                 enable_reasoning=enable_reasoning if enable_reasoning else None,
                 hardware_mode=hardware_mode if hardware_mode else None,
                 dataset_ids=dataset_ids,
+                # Custom probe workflow fields
+                probe_type_option=required_data.get("probe_type_option"),
+                model_uri=required_data.get("model_uri"),
+                scanner_type=required_data.get("scanner_type"),
+                handler=required_data.get("handler"),
+                model_provider_type=required_data.get("model_provider_type"),
+                policy=required_data.get("policy"),
+                modality_types=required_data.get("modality_types"),
+                probe_id=required_data.get("probe_id"),
             )
         else:
             workflow_steps = RetrieveWorkflowStepData()
@@ -700,6 +709,21 @@ class WorkflowService(SessionMixin):
                 "bud_prompt_id",
                 "bud_prompt_version",
                 BudServeWorkflowStepEventName.PROMPT_SCHEMA_EVENTS.value,
+            ],
+            "custom_probe_creation": [
+                "probe_type_option",
+                "model_uri",
+                "scanner_type",
+                "handler",
+                "model_provider_type",
+                "policy",
+                "name",
+                "description",
+                "guard_types",
+                "modality_types",
+                "probe_id",
+                "model_id",
+                "workflow_execution_status",
             ],
         }
 

@@ -1,4 +1,6 @@
-# Step 1: User selects the guardrail provider id and type
+# /gaurdrails/deploy-workflow
+
+## Step 1: User selects the guardrail provider id and type
 
 ```json
 {
@@ -9,7 +11,7 @@
 }
 ```
 
-# Step 2: User selects the required probes from the selected provider
+## Step 2: User selects the required probes from the selected provider
 
 ```json
 {
@@ -26,7 +28,7 @@
 }
 ```
 
-# Step 2 (cont): (Optional) User selects the rules for any of the selected probe if necessary
+## Step 2 (cont): (Optional) User selects the rules for any of the selected probe if necessary
 
 ```json
 {
@@ -50,7 +52,7 @@
 
 Steps 2-3 are recursive and user could jump between them as required.
 
-# Step 3: User selects project. This is required at this stage because module statuses need to be checked per project
+## Step 3: User selects project. This is required at this stage because module statuses need to be checked per project
 
 ```json
 {
@@ -73,7 +75,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 3 (cont): The guardrail models won't be onboarded initially so we need to show the selected models for deployment.
+## Step 3 (cont): The guardrail models won't be onboarded initially so we need to show the selected models for deployment.
 
 ```json
 {
@@ -96,7 +98,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 4: user will need to select available credentials similar to the model onboard flow. Since we've the model uri we could set the name, author name and tags in backend
+## Step 4: user will need to select available credentials similar to the model onboard flow. Since we've the model uri we could set the name, author name and tags in backend
 
 **Important:** Model statuses are only derived when BOTH `project_id` AND `probe_selections` are available. This ensures accurate status checks for the specific project.
 
@@ -122,7 +124,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 5: User selects the hardware resource mode same as the one in model deployment workflow
+## Step 5: User selects the hardware resource mode same as the one in model deployment workflow
 
 ```json
 {
@@ -147,7 +149,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 6: User sets deployment specifications, this is similar to the model deployment workflow step but done for all the models to be deployed so each could get its own name and concurrency config or a shared one for all. Once done, cluster recommendation simulation will be run and results will be available from the workflow response
+## Step 6: User sets deployment specifications, this is similar to the model deployment workflow step but done for all the models to be deployed so each could get its own name and concurrency config or a shared one for all. Once done, cluster recommendation simulation will be run and results will be available from the workflow response
 
 ## Shared config for all models
 ```json
@@ -226,7 +228,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 7: Once the recommendations are available users can select a single cluster for all models (based on recommendation) or select cluster per model
+## Step 7: Once the recommendations are available users can select a single cluster for all models (based on recommendation) or select cluster per model
 
 ## Shared cluster for all models
 ```json
@@ -308,7 +310,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 8: User selects deployment types, same as the is_standalone concept in the current guardrail deploy workflow
+## Step 8: User selects deployment types, same as the is_standalone concept in the current guardrail deploy workflow
 
 ```json
 {
@@ -342,7 +344,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 9: User selects endpoints if not is_standalone
+## Step 9: User selects endpoints if not is_standalone
 
 ```json
 {
@@ -379,7 +381,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 10: User configure profile settings - name, description, guard_type, strictness level
+## Step 10: User configure profile settings - name, description, guard_type, strictness level
 
 ```json
 {
@@ -420,7 +422,7 @@ Steps 2-3 are recursive and user could jump between them as required.
 }
 ```
 
-# Step 11: Trigger the deployment. Like in step 4 we might've multiple model deployments so we need to see how we can handle this with pipeline and enable notifications
+## Step 11: Trigger the deployment. Like in step 4 we might've multiple model deployments so we need to see how we can handle this with pipeline and enable notifications
 
 
 ```json

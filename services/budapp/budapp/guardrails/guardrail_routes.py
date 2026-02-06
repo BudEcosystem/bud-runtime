@@ -31,6 +31,7 @@ from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, PaginatedSuccessResponse, SuccessResponse
 from budapp.guardrails.crud import GuardrailsDeploymentDataManager
 from budapp.guardrails.schemas import (
+    CustomProbeWorkflowRequest,
     GuardrailCustomProbeCreate,
     GuardrailCustomProbeDetailResponse,
     GuardrailCustomProbeResponse,
@@ -57,6 +58,7 @@ from budapp.guardrails.schemas import (
     TagsListResponse,
 )
 from budapp.guardrails.services import (
+    GuardrailCustomProbeService,
     GuardrailDeploymentWorkflowService,
     GuardrailProbeRuleService,
     GuardrailProfileDeploymentService,
@@ -1010,6 +1012,54 @@ async def add_guardrail_deployment_workflow(
         logger.exception(f"Failed to add guardrail deployment workflow: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add guardrail deployment workflow"
+        ).to_http_response()
+
+
+@router.post(
+    "/custom-probe-workflow",
+    responses={
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to server error",
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "Service is unavailable due to client error",
+        },
+        status.HTTP_200_OK: {
+            "model": RetrieveWorkflowDataResponse,
+            "description": "Successfully add custom probe workflow",
+        },
+    },
+    description="Add custom probe workflow",
+)
+@require_permissions(permissions=[PermissionEnum.MODEL_MANAGE])
+async def add_custom_probe_workflow(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+    request: CustomProbeWorkflowRequest,
+) -> Union[RetrieveWorkflowDataResponse, ErrorResponse]:
+    """Add custom probe workflow.
+
+    Multi-step workflow for creating custom probes:
+    - Step 1: Select probe type (llm_policy, etc.) - auto-derives model_uri, scanner_type
+    - Step 2: Configure policy (PolicyConfig)
+    - Step 3: Probe metadata + trigger_workflow=true creates probe
+    """
+    try:
+        db_workflow = await GuardrailCustomProbeService(session).add_custom_probe_workflow(
+            current_user_id=current_user.id,
+            request=request,
+        )
+
+        return await WorkflowService(session).retrieve_workflow_data(db_workflow.id)
+    except ClientException as e:
+        logger.exception(f"Failed to add custom probe workflow: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to add custom probe workflow: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to add custom probe workflow"
         ).to_http_response()
 
 
