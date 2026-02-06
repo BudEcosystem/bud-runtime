@@ -1469,24 +1469,23 @@ textArea {
   }
 
   .label {
-    top: 0;
+    top: -10px;
     display: block;
     font-weight: 300;
     position: absolute;
     left: .75rem;
-    // top: -0.5rem;
     transition: 0.2s ease all;
     color: white;
-    padding: 0 0.025rem;
+    background: #101010;
+    padding: 0 4px;
     font-size: .75rem;
     z-index: 1111;
   }
 
   .ant-input {
-    padding: 1.3rem 1rem;
+    padding: 0.75rem 1rem;
     background: transparent !important;
     font-size: 0.75rem;
-    border: 0px solid #757575 !important;
   }
 
   .ant-input::placeholder {
