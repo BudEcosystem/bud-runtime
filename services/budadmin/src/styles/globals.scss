@@ -1469,7 +1469,7 @@ textArea {
   }
 
   .label {
-    top: -10px;
+    top: -8px;
     display: block;
     font-weight: 300;
     position: absolute;
@@ -1480,10 +1480,16 @@ textArea {
     padding: 0 4px;
     font-size: .75rem;
     z-index: 1111;
+    line-height: 1;
+
+    .textarea-info-label {
+      height: auto !important;
+      background: var(--color-background) !important;
+    }
   }
 
   .ant-input {
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1rem;
     background: transparent !important;
     font-size: 0.75rem;
   }
