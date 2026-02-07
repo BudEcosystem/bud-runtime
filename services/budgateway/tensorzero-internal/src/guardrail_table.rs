@@ -165,14 +165,13 @@ impl GuardrailConfig {
 
         for provider in &self.providers {
             if !SUPPORTED_PROVIDERS.contains(&provider.provider_type.as_str()) {
-                return Err(crate::error::Error::new(
-                    crate::error::ErrorDetails::Config {
-                        message: format!(
-                            "Unsupported provider type '{}' in guardrail '{}'",
-                            provider.provider_type, self.id
-                        ),
-                    },
-                ));
+                // Log warning instead of returning error for unknown providers
+                tracing::warn!(
+                    "Unsupported provider type '{}' in guardrail '{}' - this provider will be skipped during execution",
+                    provider.provider_type,
+                    self.id
+                );
+                continue; // Skip validation for unsupported providers
             }
 
             // Validate that enabled probes are not empty
