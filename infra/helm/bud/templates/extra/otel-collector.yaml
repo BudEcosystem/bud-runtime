@@ -106,14 +106,13 @@ data:
           address: 0.0.0.0:8888
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: {{ .Release.Name }}-otel-collector
   labels:
     app: {{ .Release.Name }}-otel-collector
     component: observability
 spec:
-  replicas: {{ .Values.otelCollector.replicas | default 1 }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-otel-collector
@@ -134,6 +133,16 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      {{- with .Values.otelCollector.tolerations }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       containers:
       - name: otel-collector
         image: {{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}
@@ -144,9 +153,11 @@ spec:
         ports:
         - name: otlp-grpc
           containerPort: 4317
+          hostPort: 4317
           protocol: TCP
         - name: otlp-http
           containerPort: 4318
+          hostPort: 4318
           protocol: TCP
         - name: metrics
           containerPort: 8888
@@ -159,11 +170,11 @@ spec:
           value: "80"
         resources:
           limits:
-            memory: {{ .Values.otelCollector.resources.limits.memory | default "2Gi" }}
-            cpu: {{ .Values.otelCollector.resources.limits.cpu | default "1000m" }}
+            memory: {{ .Values.otelCollector.resources.limits.memory | default "512Mi" }}
+            cpu: {{ .Values.otelCollector.resources.limits.cpu | default "500m" }}
           requests:
-            memory: {{ .Values.otelCollector.resources.requests.memory | default "512Mi" }}
-            cpu: {{ .Values.otelCollector.resources.requests.cpu | default "100m" }}
+            memory: {{ .Values.otelCollector.resources.requests.memory | default "128Mi" }}
+            cpu: {{ .Values.otelCollector.resources.requests.cpu | default "50m" }}
         livenessProbe:
           httpGet:
             path: /

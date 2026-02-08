@@ -204,7 +204,8 @@ microservices:
     enabled: true
     image: budstudio/budgateway:0.6.0
     env:
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4317"
+      # Uses NODE_IP injected via Kubernetes Downward API in template
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://$(NODE_IP):4317"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration for budgateway
@@ -323,8 +324,8 @@ microservices:
       METRICS_COLLECTION_ENABLED: "true"
       METRICS_COLLECTION_TIMEOUT: "30"
       METRICS_BATCH_SIZE: "20000"
-      # OpenTelemetry Collector configuration
-      OTEL_COLLECTOR_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
+      # OpenTelemetry Collector configuration - Uses NODE_IP injected via Kubernetes Downward API
+      OTEL_COLLECTOR_ENDPOINT: "http://$(NODE_IP):4318"
       # Prometheus configuration
       PROMETHEUS_SERVICE_NAME: "bud-metrics-kube-prometheu-prometheus"
       PROMETHEUS_NAMESPACE: "bud-system"
@@ -470,7 +471,8 @@ microservices:
       REDIS_DB_INDEX: "10"
       REDIS_PASSWORD: "{{ .Values.valkey.auth.password }}"
       OTEL_SDK_DISABLED: "false"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
+      # Uses NODE_IP injected via Kubernetes Downward API in template
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://$(NODE_IP):4318"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration
