@@ -149,7 +149,6 @@ import ProbeDetails from "./GuardRails/ProbeDetails";
 import ViewGuardRailDetails from "./GuardRails/ViewGuardRailDetails";
 import UseGuardrail from "./GuardRails/UseGuardrail";
 import AddAgentSelectProject from "./AddAgent";
-import AddAgentSelectModel from "./AddAgent/SelectModel";
 import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
 import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
 import AddAgentSuccess from "./AddAgent/AgentSuccess";
@@ -336,7 +335,6 @@ export const StepComponents = {
   // AddAgent
   "add-agent-select-type": AddAgentSelectType,
   "add-agent-select-project": AddAgentSelectProject,
-  "add-agent-select-model": AddAgentSelectModel,
   "add-agent-configuration": AddAgentConfiguration,
   "add-agent-deployment-warning": AddAgentDeploymentWarning,
   "add-agent-success": AddAgentSuccess,
