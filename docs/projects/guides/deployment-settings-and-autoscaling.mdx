@@ -36,16 +36,3 @@ In deployment **Settings**:
 <Check>Pair autoscaling thresholds with realistic SLO targets.</Check>
 <Check>Use fallback only when secondary deployments are validated.</Check>
 <Check>Review settings after model or traffic profile changes.</Check>
-
-## Deployment Controls Flow
-
-```mermaid
-flowchart LR
-    A[Deployment Settings] --> B[Rate Limiting]
-    A --> C[Retry & Fallback]
-    A --> D[Autoscaling]
-    D --> E[Min/Max Replicas]
-    D --> F[SLO Trigger Metrics]
-    D --> G[Stabilization Policies]
-```
-

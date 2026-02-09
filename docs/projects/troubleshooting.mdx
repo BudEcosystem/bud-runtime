@@ -92,18 +92,3 @@ If issues persist, collect:
 - Relevant deployment/route IDs
 
 Share these details with your platform administrator or support channel.
-
-## Troubleshooting Decision Flow
-
-```mermaid
-flowchart TD
-    A[Issue in Projects Module] --> B{Permission Error?}
-    B -->|Yes| C[Review role & project access]
-    B -->|No| D{Lifecycle Error?}
-    D -->|Delete blocked| E[Remove active deployments]
-    D -->|Route/Analytics issue| F[Validate targets, filters, and traffic]
-    C --> G[Retry operation]
-    E --> G
-    F --> G
-```
-
