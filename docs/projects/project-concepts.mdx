@@ -7,6 +7,20 @@ description: "Understand project structure, permissions, and operational boundar
 
 A project is the primary boundary for organizing AI assets and operations in Bud AI Foundry. Most day-to-day activities—deployment lifecycle, routing, analytics, and safety controls—are scoped to a project.
 
+## Project Scope Diagram
+
+```mermaid
+flowchart TB
+    P[Project Boundary] --> PM[Metadata]
+    P --> RBAC[Permissions]
+    P --> TABS[Operational Tabs]
+    TABS --> DEP[Deployments]
+    TABS --> ROU[Routes]
+    TABS --> OBS[Observability]
+    TABS --> GUA[Guardrails]
+```
+
+
 ## Core Concepts
 
 ### 1. Project Metadata

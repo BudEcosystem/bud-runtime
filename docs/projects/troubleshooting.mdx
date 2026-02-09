@@ -3,6 +3,18 @@ title: "Troubleshooting"
 description: "Common issues when creating and managing projects"
 ---
 
+## Troubleshooting Decision Flow
+
+```mermaid
+flowchart TD
+    A[Project Issue] --> B{Issue Type}
+    B -->|Access| C[Verify RBAC / Role]
+    B -->|Creation/Update| D[Check validation + uniqueness]
+    B -->|Members| E[Verify identity and invite state]
+    B -->|Deletion| F[Remove active deployments]
+    B -->|Runtime Tabs| G[Check traffic, filters, health]
+```
+
 ## Project Access Issues
 
 ### Can't see Projects in navigation

@@ -70,3 +70,15 @@ Open deployment **Settings** and configure:
 - [x] Route configured to active deployment
 - [x] Analytics and observability validated
 - [x] Guardrails applied
+
+
+## Creation-to-Readiness Flow
+
+```mermaid
+flowchart LR
+    A[Create Project] --> B[Set Metadata]
+    B --> C[Invite Team]
+    C --> D[Open Deployments]
+    D --> E[Create Endpoint]
+    E --> F[Review Health & Settings]
+```
