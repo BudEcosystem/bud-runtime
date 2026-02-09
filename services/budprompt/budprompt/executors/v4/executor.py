@@ -803,7 +803,14 @@ class SimplePromptExecutor_V4:
         except ModelHTTPError as e:
             # HTTP errors from MCP servers or model providers
             logger.error(f"Received error from model: {str(e)}")
-            raise PromptExecutionException(e.message, status_code=e.status_code, param=e.model_name) from e
+            # Extract clean message from body instead of using auto-generated e.message
+            clean_message = e.body.get("message") if isinstance(e.body, dict) else str(e.message)
+            raise PromptExecutionException(
+                message=clean_message,
+                status_code=500,
+                err_type="internal_server_error",
+                param=e.model_name,
+            ) from e
         except ConnectTimeout as e:
             logger.error(f"Connection timed out: {str(e)}")
             raise PromptExecutionException("Connection timed out to model", status_code=500) from e

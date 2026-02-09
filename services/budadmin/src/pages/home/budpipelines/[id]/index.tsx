@@ -29,7 +29,7 @@ import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useConfirmAction } from "src/hooks/useConfirmAction";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
-import { Button, Tag, Empty, Table } from "antd";
+import { Button, Tag, Empty, Table, notification } from "antd";
 import { successToast, errorToast } from "@/components/toast";
 import { PipelineEditor, PipelineTriggersPanel } from "@/components/pipelineEditor";
 import { formatDistanceToNow } from "date-fns";
@@ -366,7 +366,34 @@ const WorkflowDetail = () => {
           // Refresh the pipeline to get the updated data
           await getWorkflow(id);
         } else {
-          errorToast("Failed to save pipeline");
+          // Get the actual error message from the store (includes validation errors)
+          const storeError = useBudPipeline.getState().error;
+          const errorMessage = storeError || "Failed to save pipeline";
+
+          // Check if this looks like validation errors (contains semicolons from joined array)
+          if (errorMessage.includes(';') || errorMessage.includes('required') || errorMessage.includes('Validation')) {
+            // Show validation errors prominently using notification
+            const errors = errorMessage.split(';').map((e: string) => e.trim()).filter(Boolean);
+            notification.error({
+              message: 'Validation Failed',
+              description: (
+                <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                  {errors.map((err: string, idx: number) => (
+                    <li key={idx} style={{ marginBottom: '4px' }}>{err}</li>
+                  ))}
+                </ul>
+              ),
+              duration: 6,
+              placement: 'top',
+              style: {
+                width: '400px',
+                marginTop: '60px',
+              },
+            });
+          } else {
+            errorToast(errorMessage);
+          }
+          // Don't refresh the workflow on error - keep the local editedDag state intact
         }
       } catch (error) {
         errorToast("Failed to save pipeline");

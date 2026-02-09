@@ -579,7 +579,7 @@ class OpenAIResponseFormatter_V4:
                     formatted_tools.append(
                         Mcp(
                             type="mcp",
-                            server_label=tool_config.server_label,
+                            server_label=tool_config.server_label or "unknown",
                             server_url=tool_config.server_url,
                             allowed_tools=list(tool_config.allowed_tools) if tool_config.allowed_tools else None,
                             headers=None,
@@ -607,15 +607,12 @@ class OpenAIResponseFormatter_V4:
 
         for tool_config in tools:
             if tool_config.type == "mcp":
-                # Load the MCP server
-                mcp_server = await loader.load_tools(tool_config)
-                if not mcp_server:
+                # Fetch tool list directly from server (get_tool_list is self-contained)
+                tool_list_data = await loader.get_tool_list(tool_config)
+                if not tool_list_data:
                     continue
 
-                # Fetch tool list from server
-                tool_list_data = await loader.get_tool_list(mcp_server, tool_config.server_label or "unknown")
-
-                if tool_list_data:
+                if tool_list_data.get("tools"):
                     # Parse tools from MCP response
                     tools_list: List[McpListToolsTool] = []
                     for tool_info in tool_list_data.get("tools", []):

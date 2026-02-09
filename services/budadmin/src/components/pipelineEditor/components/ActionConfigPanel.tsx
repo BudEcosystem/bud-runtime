@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { Slider, ConfigProvider } from 'antd';
 import { AppRequest } from 'src/pages/api/requests';
+import { errorToast } from '@/components/toast';
 import {
   getActionMeta,
   getActionParams,
@@ -438,12 +439,6 @@ const helpTextStyles: React.CSSProperties = {
   marginTop: '4px',
 };
 
-const errorTextStyles: React.CSSProperties = {
-  fontSize: '11px',
-  color: '#ff4d4f',
-  marginTop: '4px',
-};
-
 const footerStyles: React.CSSProperties = {
   padding: '12px 16px',
   borderTop: '1px solid #1a1a1a',
@@ -504,7 +499,6 @@ export function ActionConfigPanel({
   const [localParams, setLocalParams] = useState<Record<string, unknown>>(mergedParams);
   const [localName, setLocalName] = useState(stepName);
   const [localCondition, setLocalCondition] = useState(condition || '');
-  const [errors, setErrors] = useState<string[]>([]);
   // Track which ref fields are in template mode (for dynamic references like {{ steps.x.outputs.y }})
   const [templateModeFields, setTemplateModeFields] = useState<Set<string>>(() => {
     // Initialize based on existing values - if value looks like a template, enable template mode
@@ -523,7 +517,6 @@ export function ActionConfigPanel({
     setLocalParams(newMergedParams);
     setLocalName(stepName);
     setLocalCondition(condition || '');
-    setErrors([]);
     // Update template mode fields based on new params
     const templateFields = new Set<string>();
     Object.entries(newMergedParams).forEach(([key, value]) => {
@@ -620,16 +613,23 @@ export function ActionConfigPanel({
   const [isSaving, setIsSaving] = useState(false);
 
   // Handle save
+  // Show validation errors as a toast notification
+  const showValidationErrors = useCallback((errors: string[]) => {
+    const message = errors.length === 1
+      ? errors[0]
+      : `Validation failed: ${errors.join(', ')}`;
+    errorToast(message);
+  }, []);
+
   const handleSave = useCallback(async () => {
     // First do local validation
     const validation = validateParams(action, localParams);
     if (!validation.valid) {
-      setErrors(validation.errors);
+      showValidationErrors(validation.errors);
       return;
     }
 
     setIsSaving(true);
-    setErrors([]);
 
     try {
       // Call backend validation API for conditional validation logic
@@ -639,7 +639,7 @@ export function ActionConfigPanel({
       });
 
       if (response?.data && !response.data.valid) {
-        setErrors(response.data.errors || ['Validation failed']);
+        showValidationErrors(response.data.errors || ['Validation failed']);
         setIsSaving(false);
         return;
       }
@@ -655,7 +655,7 @@ export function ActionConfigPanel({
       condition: localCondition || undefined,
     });
     onClose();
-  }, [action, localParams, localName, localCondition, onUpdate, onClose]);
+  }, [action, localParams, localName, localCondition, onUpdate, onClose, showValidationErrors]);
 
   // Get options for ref types
   const getRefOptions = useCallback(
@@ -1057,17 +1057,6 @@ export function ActionConfigPanel({
             {params.map(renderField)}
           </div>
         ))}
-
-        {/* Validation Errors */}
-        {errors.length > 0 && (
-          <div style={sectionStyles}>
-            {errors.map((error, i) => (
-              <div key={i} style={errorTextStyles}>
-                {error}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Footer */}

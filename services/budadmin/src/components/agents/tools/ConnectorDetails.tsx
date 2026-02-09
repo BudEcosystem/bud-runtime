@@ -296,10 +296,11 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       // CRITICAL FIX: If this is an OAuth callback, ALWAYS try fetchOAuthTools first
       // because selectedConnectorDetails might not be loaded yet when this is called
       // after OAuth redirect. We know it's an OAuth connector since we came from OAuth flow.
-      const shouldFetchOAuthTools = isOAuthCallback || (authType && authType.toLowerCase() !== 'open');
+      // Call fetchOAuthTools ONLY when auth_type is specifically 'OAuth' (case-insensitive).
+      const shouldFetchOAuthTools = isOAuthCallback || authType?.toLowerCase() === 'oauth';
 
-      // If auth_type is "Open" or empty/undefined (and not OAuth callback), only call fetchTools
-      // If auth_type is "OAuth" or any other value (or is OAuth callback), call fetchOAuthTools
+      // If auth_type is NOT 'OAuth' (and not OAuth callback), only call regular fetchTools (GET /prompts/tools)
+      // If auth_type is specifically 'OAuth' (or is OAuth callback), call fetchOAuthTools (POST /prompts/oauth/fetch-tools)
       if (shouldFetchOAuthTools) {
         try {
           console.log('[ConnectorDetails] Calling fetchOAuthTools with:', {
@@ -482,8 +483,6 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       } finally {
         // Clean up OAuth-specific URL params (always runs whether success or error)
         cleanupOAuthParams();
-
-        // Clear saved state
         clearOAuthState();
 
         setIsRegistering(false);

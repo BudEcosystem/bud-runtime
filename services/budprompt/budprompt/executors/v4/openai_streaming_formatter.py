@@ -289,14 +289,8 @@ class OpenAIStreamingFormatter_V4:
                 continue
 
             try:
-                # Load MCP server
-                mcp_server = await loader.load_tools(tool_config)
-                if not mcp_server:
-                    logger.warning(f"Failed to load MCP server: {tool_config.server_label}")
-                    continue
-
-                # Fetch tool list
-                tool_list_data = await loader.get_tool_list(mcp_server, tool_config.server_label or "unknown")
+                # Fetch tool list directly (get_tool_list is self-contained)
+                tool_list_data = await loader.get_tool_list(tool_config)
                 if not tool_list_data:
                     logger.warning(f"No tool list data from MCP server: {tool_config.server_label}")
                     continue
