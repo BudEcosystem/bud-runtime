@@ -42,7 +42,24 @@
             "group": "Projects",
             "icon": "folder-tree",
             "pages": [
-              "projects/projects"
+              "projects/introduction",
+              "projects/quickstart",
+              "projects/project-concepts",
+              "projects/creating-first-project",
+              {
+                "group": "Guides",
+                "pages": [
+                  "projects/guides/managing-project-members",
+                  "projects/guides/deployment-settings-and-autoscaling"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "projects/reference/project-tabs-reference"
+                ]
+              },
+              "projects/troubleshooting"
             ]
           },
           {
