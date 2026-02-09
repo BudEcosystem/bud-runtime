@@ -127,7 +127,7 @@ export default function NavBar({ chatId, onToggleLeftSidebar, onToggleRightSideb
             )}
           </div>
         )}
-        {!isSingleChat && <button
+        {!isSingleChat && !hasPromptIds && <button
           style={{
             display: isRightSidebarOpen ? "none" : "block",
           }}
@@ -170,7 +170,7 @@ export default function NavBar({ chatId, onToggleLeftSidebar, onToggleRightSideb
             </Tooltip>
           </div>
         </button>}
-        {!isSingleChat && <DropdownMenu
+        {!isSingleChat && !hasPromptIds && <DropdownMenu
           open={openDropdown}
           onOpenChange={(isOpen) => setOpenDropdown(isOpen)}
         >
