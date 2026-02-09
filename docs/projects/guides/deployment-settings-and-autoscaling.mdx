@@ -10,14 +10,13 @@ Project deployments support operational controls for reliability and cost effici
 ## Reliability and Scaling Flow
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[Open Deployment Settings] --> B[Configure Rate Limits]
     B --> C[Set Retry/Fallback]
     C --> D[Enable Autoscaling]
     D --> E[Monitor Scale Events]
     E --> F[Iterate Using SLOs]
 ```
-
 
 ## Configure Rate Limiting
 
@@ -44,7 +43,18 @@ In deployment **Settings**:
 
 ## Best Practices
 
-<Check>Start with conservative max replica values, then scale after observing load.</Check>
-<Check>Pair autoscaling thresholds with realistic SLO targets.</Check>
-<Check>Use fallback only when secondary deployments are validated.</Check>
-<Check>Review settings after model or traffic profile changes.</Check>
+<Check>
+  Start with conservative max replica values, then scale after observing load.
+</Check>
+
+ <Check>
+  Pair autoscaling thresholds with realistic SLO targets.
+</Check>
+
+ <Check>
+  Use fallback only when secondary deployments are validated.
+</Check>
+
+ <Check>
+  Review settings after model or traffic profile changes.
+</Check>
