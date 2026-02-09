@@ -54,7 +54,7 @@ function TextAreaInput(props: BudInputProps) {
             onBlur={props.onBlur}
             maxLength={400}
             autoSize={{ minRows: 3, maxRows: 8 }}
-            className="!border !border-[#757575] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080]"
+            className="!border-none !shadow-none !border-[0] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080]"
           />
         </Form.Item>
       </FloatLabel>
