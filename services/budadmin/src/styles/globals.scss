@@ -1469,7 +1469,7 @@ textArea {
   }
 
   .label {
-    top: -10px;
+    top: 0px;
     display: block;
     font-weight: 300;
     position: absolute;
@@ -1477,13 +1477,13 @@ textArea {
     transition: 0.2s ease all;
     color: white;
     background: var(--color-background);
-    padding: 0 4px;
+    padding: 0 0.025rem;
     font-size: .75rem;
     z-index: 1111;
   }
 
   .ant-input {
-    padding: 0.75rem 1rem;
+    padding: 1.3rem 1rem;
     background: transparent !important;
     font-size: 0.75rem;
   }
@@ -1501,7 +1501,10 @@ textArea {
 .ant-input-outlined {
   background: transparent !important;
   // background: black !important;
-  border: 0.5px solid #757575 !important;
+  border-width: 0.5px !important;
+  border-style: solid !important;
+  border-color: #757575 !important;
+  // border: 0.5px solid #757575 !important;
   color: white;
   border-radius: 6px !important;
 
