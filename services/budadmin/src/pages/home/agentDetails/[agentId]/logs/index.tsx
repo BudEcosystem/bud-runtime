@@ -1085,8 +1085,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
   // Handle incoming live trace data
   const handleLiveTrace = useCallback((trace: TraceSpan) => {
-    console.log('[LiveTrace] Received trace:', trace);
-
     // Validate required fields
     if (!trace || !trace.span_id) {
       console.warn('[LiveTrace] Invalid trace data - missing span_id:', trace);
@@ -1111,17 +1109,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       .filter(t => t.timestamp > cutoffTime)
       .slice(-MAX_CHART_TRACES);
 
-    console.log('[LiveTrace] Chart traces count:', liveChartTracesRef.current.length);
-
     // In traces view, only show root spans (those with empty parent_span_id)
     if (viewMode === 'traces' && trace.parent_span_id && trace.parent_span_id !== '') {
-      console.log('[LiveTrace] Skipping non-root span:', trace.span_id);
       return;
     }
 
     // Deduplicate by span_id
     if (liveSpanIdsRef.current.has(trace.span_id)) {
-      console.log('[LiveTrace] Duplicate span, skipping:', trace.span_id);
       return;
     }
     liveSpanIdsRef.current.add(trace.span_id);
@@ -1148,14 +1142,11 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       errorType,
     };
 
-    console.log('[LiveTrace] Created LogEntry:', newEntry);
-    setLogsData(prev => [...prev, newEntry]);
+    setLogsData(prev => [...prev, newEntry].slice(-200));
   }, [viewMode, timeRange]);
 
   // Handle batch of live traces (for tree building in traces view)
   const handleLiveTraceBatch = useCallback((traces: TraceSpan[]) => {
-    console.log('[LiveTrace] Received batch:', traces.length, 'spans');
-
     if (!traces || traces.length === 0) return;
 
     // Add all traces to chart data using arrival time
@@ -1178,13 +1169,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       .filter(t => t.timestamp > cutoffTime)
       .slice(-MAX_CHART_TRACES);
 
-    console.log('[LiveTrace] Batch - chart traces count:', liveChartTracesRef.current.length);
-
     if (viewMode === 'traces') {
       // In traces view, build proper tree structure from batch
       const newTrees = buildTreeFromLiveSpans(traces);
-      console.log('[LiveTrace] Built', newTrees.length, 'trees from batch');
-
       if (newTrees.length === 0) return;
 
       // Track trace IDs for deduplication
@@ -1229,14 +1216,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           errorType,
         };
 
-        setLogsData(prev => [...prev, newEntry]);
+        setLogsData(prev => [...prev, newEntry].slice(-200));
       });
     }
   }, [viewMode, timeRange]);
 
   // Socket hook for live streaming
   // Note: promptId (UUID) is used for socket subscription, promptName is used for API calls
-  console.log('[LogsTab] Socket params:', { projectId, promptId, promptName, isLive });
   const { isSubscribed, connectionStatus, error: socketError } = useObservabilitySocket({
     projectId: projectId || '',
     promptId: promptId || '',
