@@ -2097,7 +2097,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         </div>
 
         {/* Chart */}
-        <div ref={chartRef} className="w-full h-[180px] 1680px:h-[250px] 1920px:h-[320px] 2048px:h-[400px] 2560px:h-[500px]" />
+        <div ref={chartRef} className="w-full h-[130px] 1680px:h-[200px] 1920px:h-[270px] 2048px:h-[350px] 2560px:h-[450px]" />
       </div>
 
       {/* Logs List Section */}
