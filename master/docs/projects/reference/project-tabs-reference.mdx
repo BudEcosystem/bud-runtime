@@ -44,3 +44,15 @@ Some actions (create/edit/delete/publish/settings) appear only for users with ma
 ## Notes on Deletion Behavior
 
 Project deletion can be restricted when active deployments exist to prevent accidental service disruption.
+
+## Project Tabs Interaction Diagram
+
+```mermaid
+flowchart LR
+    A[Deployments] --> B[Routes]
+    A --> C[Analytics]
+    A --> D[Observability]
+    E[Agents] --> B
+    F[Guardrails] --> B
+    G[Clusters] --> A
+```

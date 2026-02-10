@@ -609,6 +609,7 @@ class WorkflowTypeEnum(StrEnum):
     PROMPT_CREATION = auto()
     PROMPT_SCHEMA_CREATION = auto()
     TOOL_CREATION = auto()
+    CUSTOM_PROBE_CREATION = auto()
 
 
 class NotificationType(Enum):

@@ -7,16 +7,6 @@ description: "Invite collaborators and manage project-level permissions"
 
 Project member management lets you control who can view and operate project resources.
 
-## Member Management Flow
-
-```mermaid
-flowchart LR
-    A[Open Project] --> B[Invite Member]
-    B --> C[Assign View/Manage]
-    C --> D[Review Effective Access]
-    D --> E[Update or Remove if Needed]
-```
-
 ## Invite Members
 
 1. Open the target project.
@@ -49,3 +39,13 @@ flowchart LR
 
 - [Project Concepts](/projects/project-concepts)
 - [Troubleshooting](/projects/troubleshooting)
+
+## Member Management Workflow
+
+```mermaid
+flowchart LR
+    A[Open Project] --> B[Invite Member]
+    B --> C[Assign Scope]
+    C --> D[Review Access]
+    D --> E[Update or Remove Member]
+```

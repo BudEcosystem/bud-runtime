@@ -9,9 +9,7 @@ This quick start shows how to create a project, add collaborators, and validate 
 
 1. Sign in to Bud AI Foundry.
 2. In the left navigation, click **Projects**.
-3. Click **\+ Project**.
-
-![Image](/images/image-3.png)
+3. Click **+ Project**.
 
 ## Step 2: Create the Project
 
@@ -21,7 +19,7 @@ This quick start shows how to create a project, add collaborators, and validate 
 4. Click **Create**.
 
 <Info>
-  Use names that map to a product or business capability. This makes routing, access reviews, and observability easier at scale.
+Use names that map to a product or business capability. This makes routing, access reviews, and observability easier at scale.
 </Info>
 
 ## Step 3: Add Members
@@ -30,8 +28,6 @@ This quick start shows how to create a project, add collaborators, and validate 
 2. Use **Share/Invite** to add collaborators.
 3. Assign permissions (view/manage) based on responsibilities.
 4. Save changes and verify members appear in the project header or member list.
-
-![Image](/images/image-4.png)
 
 ## Step 4: Validate Project Tabs
 
@@ -48,11 +44,9 @@ Open each core tab and confirm it loads correctly:
 ## Step 5: Prepare for First Deployment
 
 1. Go to **Deployments**.
-2. Click **Deploy Model** (or equivalent action in your environment).
+2. Click **Create Deployment** (or equivalent action in your environment).
 3. Select a model and target cluster.
 4. Review status once deployment starts.
-
-![Image](/images/image-5.png)
 
 ## Step 6: Configure Baseline Reliability
 
@@ -70,7 +64,19 @@ You now have a project ready for production-oriented workflows. 🎉
   <Card title="Project Concepts" icon="book" href="/projects/project-concepts">
     Learn how projects map to permissions, operations, and governance
   </Card>
+
   <Card title="Troubleshooting" icon="wrench" href="/projects/troubleshooting">
     Resolve common issues when creating and managing projects
   </Card>
 </CardGroup>
+
+## Quick Start Flow
+
+```mermaid
+flowchart TD
+    A[Open Projects] --> B[Create Project]
+    B --> C[Invite Members]
+    C --> D[Review Project Tabs]
+    D --> E[Create First Deployment]
+    E --> F[Configure Reliability Settings]
+```

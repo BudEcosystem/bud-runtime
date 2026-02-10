@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Tag, Spin, Tooltip, Popover } from "antd";
 import * as echarts from "echarts";
 import dayjs from "dayjs";
@@ -1067,7 +1067,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
 
   // Live streaming state
   const liveSpanIdsRef = useRef<Set<string>>(new Set());
-  const MAX_LIVE_ITEMS = 200;
   const MAX_CHART_TRACES = 10000; // Max traces to keep for chart aggregation
 
   // View mode and pagination state
@@ -1075,15 +1074,17 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
+  // Reverse scroll refs (scroll to top to load more)
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreTopRef = useRef<HTMLDivElement>(null);
+  const prevScrollHeightRef = useRef<number>(0);
+  const isPrependingRef = useRef<boolean>(false);
 
   // Drawer hook
   const { openDrawer } = useDrawer();
 
   // Handle incoming live trace data
   const handleLiveTrace = useCallback((trace: TraceSpan) => {
-    console.log('[LiveTrace] Received trace:', trace);
-
     // Validate required fields
     if (!trace || !trace.span_id) {
       console.warn('[LiveTrace] Invalid trace data - missing span_id:', trace);
@@ -1108,23 +1109,18 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       .filter(t => t.timestamp > cutoffTime)
       .slice(-MAX_CHART_TRACES);
 
-    console.log('[LiveTrace] Chart traces count:', liveChartTracesRef.current.length);
-
     // In traces view, only show root spans (those with empty parent_span_id)
     if (viewMode === 'traces' && trace.parent_span_id && trace.parent_span_id !== '') {
-      console.log('[LiveTrace] Skipping non-root span:', trace.span_id);
       return;
     }
 
     // Deduplicate by span_id
     if (liveSpanIdsRef.current.has(trace.span_id)) {
-      console.log('[LiveTrace] Duplicate span, skipping:', trace.span_id);
       return;
     }
     liveSpanIdsRef.current.add(trace.span_id);
 
-    // Transform to LogEntry and prepend to list
-    // Handle both snake_case (from socket) and potential variations
+    // Transform to LogEntry and append to list (live data appears at the bottom)
     // Detect exception status
     const { hasException, errorType } = detectSpanException(trace);
 
@@ -1146,14 +1142,11 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       errorType,
     };
 
-    console.log('[LiveTrace] Created LogEntry:', newEntry);
-    setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
+    setLogsData(prev => [...prev, newEntry].slice(-200));
   }, [viewMode, timeRange]);
 
   // Handle batch of live traces (for tree building in traces view)
   const handleLiveTraceBatch = useCallback((traces: TraceSpan[]) => {
-    console.log('[LiveTrace] Received batch:', traces.length, 'spans');
-
     if (!traces || traces.length === 0) return;
 
     // Add all traces to chart data using arrival time
@@ -1176,13 +1169,9 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       .filter(t => t.timestamp > cutoffTime)
       .slice(-MAX_CHART_TRACES);
 
-    console.log('[LiveTrace] Batch - chart traces count:', liveChartTracesRef.current.length);
-
     if (viewMode === 'traces') {
       // In traces view, build proper tree structure from batch
       const newTrees = buildTreeFromLiveSpans(traces);
-      console.log('[LiveTrace] Built', newTrees.length, 'trees from batch');
-
       if (newTrees.length === 0) return;
 
       // Track trace IDs for deduplication
@@ -1192,12 +1181,12 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         }
       });
 
-      // Merge with existing data (prepend new trees, replace existing with same trace_id)
+      // Merge with existing data (append new trees at the bottom, replace existing with same trace_id)
       setLogsData(prev => {
         const newTraceIds = new Set(newTrees.map(t => t.traceId));
         // Filter out existing trees with same trace_id (update scenario)
         const filteredPrev = prev.filter(p => !newTraceIds.has(p.traceId));
-        return [...newTrees, ...filteredPrev].slice(0, MAX_LIVE_ITEMS);
+        return [...filteredPrev, ...newTrees];
       });
     } else {
       // In flatten view, process each span individually (existing behavior)
@@ -1227,14 +1216,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           errorType,
         };
 
-        setLogsData(prev => [newEntry, ...prev].slice(0, MAX_LIVE_ITEMS));
+        setLogsData(prev => [...prev, newEntry].slice(-200));
       });
     }
   }, [viewMode, timeRange]);
 
   // Socket hook for live streaming
   // Note: promptId (UUID) is used for socket subscription, promptName is used for API calls
-  console.log('[LogsTab] Socket params:', { projectId, promptId, promptName, isLive });
   const { isSubscribed, connectionStatus, error: socketError } = useObservabilitySocket({
     projectId: projectId || '',
     promptId: promptId || '',
@@ -1245,6 +1233,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   });
 
   const ITEMS_PER_PAGE = 20;
+  const TRACES_PER_PAGE = 10;
 
   // Open drawer with selected log
   const openLogDetailsDrawer = (log: LogEntry) => {
@@ -1276,8 +1265,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         project_id: projectId,
         from_date,
         to_date,
-        limit: viewMode === 'flatten' ? ITEMS_PER_PAGE : 1000,
-        page: viewMode === 'flatten' ? currentPage : 1,
+        limit: viewMode === 'flatten' ? ITEMS_PER_PAGE : TRACES_PER_PAGE,
+        page: currentPage,
       };
 
       // Add flatten parameter when in flatten mode
@@ -1307,16 +1296,21 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           newData = buildRootSpansList(spans, earliestTimestamp);
         }
 
-        // Handle append vs replace for infinite scroll
-        if (loadMore && viewMode === 'flatten') {
-          setLogsData(prev => [...prev, ...newData]);
+        // Handle prepend vs replace for reverse infinite scroll (scroll to top to load more)
+        if (loadMore) {
+          if (scrollContainerRef.current) {
+            prevScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+            isPrependingRef.current = true;
+          }
+          setLogsData(prev => [...newData, ...prev]);
           setPage(currentPage);
         } else {
           setLogsData(newData);
         }
 
         // Update pagination state
-        setHasMore(currentPage * ITEMS_PER_PAGE < total);
+        const perPage = viewMode === 'flatten' ? ITEMS_PER_PAGE : TRACES_PER_PAGE;
+        setHasMore(currentPage * perPage < total);
       } else {
         if (!loadMore) {
           setLogsData([]);
@@ -1349,22 +1343,32 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     setIsAllExpanded(false);
   }, [viewMode]);
 
-  // Infinite scroll observer for flatten view
+  // Reverse scroll observer - scroll to top to load more (both views)
   useEffect(() => {
-    if (!loadMoreRef.current || viewMode !== 'flatten') return;
+    if (!loadMoreTopRef.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isLoading) {
-          fetchTraces(true); // Load more
+          fetchTraces(true);
         }
       },
       { threshold: 0.1 }
     );
 
-    observer.observe(loadMoreRef.current);
+    observer.observe(loadMoreTopRef.current);
     return () => observer.disconnect();
   }, [hasMore, isLoadingMore, isLoading, viewMode, fetchTraces]);
+
+  // Preserve scroll position after prepending items
+  useLayoutEffect(() => {
+    if (isPrependingRef.current && scrollContainerRef.current) {
+      const newScrollHeight = scrollContainerRef.current.scrollHeight;
+      const addedHeight = newScrollHeight - prevScrollHeightRef.current;
+      scrollContainerRef.current.scrollTop += addedHeight;
+      isPrependingRef.current = false;
+    }
+  }, [logsData]);
 
   // Fetch trace details for a specific trace
   const fetchTraceDetails = useCallback(
@@ -1605,12 +1609,13 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const handleToggleLive = () => {
     setIsLive((prev) => {
       if (!prev) {
-        // Enabling live mode: clear existing traces data and deduplication set
-        setLogsData([]);
+        // Enabling live mode: keep existing data, seed dedup set with current span IDs
         liveSpanIdsRef.current.clear();
+        logsData.forEach(log => {
+          if (log.spanId) liveSpanIdsRef.current.add(log.spanId);
+          if (log.traceId) liveSpanIdsRef.current.add(log.traceId);
+        });
         liveChartTracesRef.current = [];
-        setExpandedIds(new Set());
-        setIsAllExpanded(false);
       } else {
         // Disabling live mode: clear live data and fetch regular traces
         setLogsData([]);
@@ -1618,6 +1623,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         liveChartTracesRef.current = [];
         setExpandedIds(new Set());
         setIsAllExpanded(false);
+        setPage(1);
+        setHasMore(true);
         // Fetch regular traces after state update
         setTimeout(() => fetchTraces(), 0);
       }
@@ -2076,7 +2083,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         </div>
 
         {/* Chart */}
-        <div ref={chartRef} className="w-full h-[180px] 1680px:h-[250px] 1920px:h-[320px] 2048px:h-[400px] 2560px:h-[500px]" />
+        <div ref={chartRef} className="w-full h-[130px] 1680px:h-[200px] 1920px:h-[270px] 2048px:h-[350px] 2560px:h-[450px]" />
       </div>
 
       {/* Logs List Section */}
@@ -2155,7 +2162,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         <div className="relative">
 
           {/* Log Rows */}
-          <div className="max-h-[calc(100vh-400px)] min-h-[300px] overflow-auto">
+          <div ref={scrollContainerRef} className="max-h-[calc(100vh-400px)] min-h-[300px] overflow-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Spin size="large" />
@@ -2171,6 +2178,19 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
               </div>
             ) : viewMode === 'traces' ? (
               <div className="min-w-max">
+                {/* Reverse scroll trigger - scroll to top to load more */}
+                <div ref={loadMoreTopRef} className="h-4">
+                  {isLoadingMore && (
+                    <div className="flex justify-center py-2">
+                      <Spin size="small" />
+                    </div>
+                  )}
+                  {!hasMore && logsData.length > 0 && (
+                    <div className="flex justify-center py-2">
+                      <Text_12_400_B3B3B3>No more records</Text_12_400_B3B3B3>
+                    </div>
+                  )}
+                </div>
                 <LogTree
                   logs={logsData}
                   selectedId={selectedId}
@@ -2182,6 +2202,19 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
               </div>
             ) : (
               <div className="min-w-max">
+                {/* Reverse scroll trigger - scroll to top to load more */}
+                <div ref={loadMoreTopRef} className="h-4">
+                  {isLoadingMore && (
+                    <div className="flex justify-center py-2">
+                      <Spin size="small" />
+                    </div>
+                  )}
+                  {!hasMore && logsData.length > 0 && (
+                    <div className="flex justify-center py-2">
+                      <Text_12_400_B3B3B3>No more records</Text_12_400_B3B3B3>
+                    </div>
+                  )}
+                </div>
                 {/* Flatten view - flat list of all spans sorted chronologically */}
                 {(() => {
                   // Calculate max duration once for all rows (memoized within render)
@@ -2197,19 +2230,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
                     />
                   ));
                 })()}
-                {/* Infinite scroll trigger */}
-                <div ref={loadMoreRef} className="h-4">
-                  {isLoadingMore && (
-                    <div className="flex justify-center py-2">
-                      <Spin size="small" />
-                    </div>
-                  )}
-                  {!hasMore && logsData.length > 0 && (
-                    <div className="flex justify-center py-2">
-                      <Text_12_400_B3B3B3>No more records</Text_12_400_B3B3B3>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>

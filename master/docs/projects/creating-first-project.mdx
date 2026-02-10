@@ -71,14 +71,14 @@ Open deployment **Settings** and configure:
 - [x] Analytics and observability validated
 - [x] Guardrails applied
 
-
-## Creation-to-Readiness Flow
+## End-to-End Setup Flow
 
 ```mermaid
-flowchart LR
-    A[Create Project] --> B[Set Metadata]
-    B --> C[Invite Team]
-    C --> D[Open Deployments]
-    D --> E[Create Endpoint]
-    E --> F[Review Health & Settings]
+flowchart TD
+    A[Create Project] --> B[Add Members]
+    B --> C[Create Deployment]
+    C --> D[Configure Settings]
+    D --> E[Create Route]
+    E --> F[Validate Analytics & Observability]
+    F --> G[Enable Guardrails]
 ```
