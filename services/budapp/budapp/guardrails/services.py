@@ -173,7 +173,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         # Retrieve or create workflow
         workflow_create = WorkflowUtilCreate(
-            workflow_type=WorkflowTypeEnum.CLOUD_MODEL_ONBOARDING,
+            workflow_type=WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT,
             title="Guardrail Deployment",
             total_steps=workflow_total_steps,
             icon=APP_ICONS["general"]["deployment_mono"],
