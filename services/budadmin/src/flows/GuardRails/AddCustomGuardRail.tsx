@@ -18,11 +18,12 @@ import {
 import React, { useState, useCallback } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast, successToast } from "@/components/toast";
+import useGuardrails from "src/hooks/useGuardrails";
 import {
   Text_12_400_757575,
   Text_12_400_B3B3B3,
   Text_14_400_EEEEEE,
-  Text_14_600_FFFFFF,
+  Text_14_600_EEEEEE,
 } from "@/components/ui/text";
 
 const { TextArea } = Input;
@@ -122,6 +123,7 @@ const inputStyle = { backgroundColor: "transparent", color: "#EEEEEE" };
 
 export default function AddCustomGuardRail() {
   const { openDrawerWithStep } = useDrawer();
+  const { updateCustomProbeWorkflow, setCustomProbePolicy, workflowLoading } = useGuardrails();
 
   // Form state
   const [formData, setFormData] = useState<CustomGuardRailFormData>({
@@ -212,12 +214,11 @@ export default function AddCustomGuardRail() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
-    // TODO: Re-enable validation when ready
-    // if (!validateForm()) {
-    //   errorToast("Please fill in all required fields");
-    //   return;
-    // }
+  const handleSave = async () => {
+    if (!validateForm()) {
+      errorToast("Please fill in all required fields");
+      return;
+    }
 
     // Build the output JSON according to the schema
     const outputJson = {
@@ -264,7 +265,17 @@ export default function AddCustomGuardRail() {
       })),
     };
 
-    console.log("Custom GuardRail JSON:", JSON.stringify(outputJson, null, 2));
+    setCustomProbePolicy(outputJson);
+
+    const success = await updateCustomProbeWorkflow({
+      step_number: 2,
+      trigger_workflow: false,
+      probe_type_option: "llm_policy",
+      policy: outputJson,
+    });
+
+    if (!success) return;
+
     successToast("Custom guardrail configuration saved");
     openDrawerWithStep("guardrail-details");
   };
@@ -539,10 +550,11 @@ export default function AddCustomGuardRail() {
   return (
     <BudForm
       data={{}}
+      disableNext={workflowLoading}
       onBack={handleBack}
       onNext={handleSave}
       backText="Back"
-      nextText="Save"
+      nextText={workflowLoading ? "Saving..." : "Save"}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -556,9 +568,9 @@ export default function AddCustomGuardRail() {
           <div className="px-[1.35rem] pb-[1.35rem] space-y-[1.5rem] pt-[1.5rem]">
             {/* Task Section */}
             <div>
-              <Text_14_600_FFFFFF className="mb-[0.75rem]">
+              <Text_14_600_EEEEEE className="mb-[0.75rem]">
                 Task Description *
-              </Text_14_600_FFFFFF>
+              </Text_14_600_EEEEEE>
               <Text_12_400_757575 className="mb-[0.5rem] block">
                 Brief description of what to classify and identify
               </Text_12_400_757575>
@@ -581,7 +593,7 @@ export default function AddCustomGuardRail() {
             <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1rem]">
               <div className="flex justify-between items-center mb-[1rem]">
                 <div>
-                  <Text_14_600_FFFFFF>Definitions *</Text_14_600_FFFFFF>
+                  <Text_14_600_EEEEEE>Definitions *</Text_14_600_EEEEEE>
                   <Text_12_400_757575 className="mt-[0.25rem]">
                     Define key concepts precisely (at least 1 required)
                   </Text_12_400_757575>
@@ -647,7 +659,7 @@ export default function AddCustomGuardRail() {
                 <Panel
                   header={
                     <div>
-                      <Text_14_600_FFFFFF>Interpretation Rules</Text_14_600_FFFFFF>
+                      <Text_14_600_EEEEEE>Interpretation Rules</Text_14_600_EEEEEE>
                       <Text_12_400_757575 className="mt-[0.25rem] block">
                         Optional - How to apply criteria
                       </Text_12_400_757575>
@@ -702,7 +714,7 @@ export default function AddCustomGuardRail() {
                 <Panel
                   header={
                     <div>
-                      <Text_14_600_FFFFFF>Evaluation Approach</Text_14_600_FFFFFF>
+                      <Text_14_600_EEEEEE>Evaluation Approach</Text_14_600_EEEEEE>
                       <Text_12_400_757575 className="mt-[0.25rem] block">
                         Optional - Dual evaluation approach
                       </Text_12_400_757575>
@@ -755,7 +767,7 @@ export default function AddCustomGuardRail() {
 
             {/* Safe Content Section */}
             <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1rem]">
-              <Text_14_600_FFFFFF className="mb-[0.5rem]">Safe Content *</Text_14_600_FFFFFF>
+              <Text_14_600_EEEEEE className="mb-[0.5rem]">Safe Content *</Text_14_600_EEEEEE>
               <Text_12_400_757575 className="mb-[1rem] block">
                 Define what constitutes safe/legitimate content
               </Text_12_400_757575>
@@ -903,7 +915,7 @@ export default function AddCustomGuardRail() {
             <div className="bg-[#ffffff07] border border-[#757575] rounded-[8px] p-[1rem]">
               <div className="flex justify-between items-center mb-[1rem]">
                 <div>
-                  <Text_14_600_FFFFFF>Violations</Text_14_600_FFFFFF>
+                  <Text_14_600_EEEEEE>Violations</Text_14_600_EEEEEE>
                   <Text_12_400_757575 className="mt-[0.25rem]">
                     Define violation categories in increasing severity
                   </Text_12_400_757575>
@@ -1150,7 +1162,7 @@ export default function AddCustomGuardRail() {
                 <Panel
                   header={
                     <div>
-                      <Text_14_600_FFFFFF>Ambiguity Handling</Text_14_600_FFFFFF>
+                      <Text_14_600_EEEEEE>Ambiguity Handling</Text_14_600_EEEEEE>
                       <Text_12_400_757575 className="mt-[0.25rem] block">
                         Optional - How to handle ambiguous cases
                       </Text_12_400_757575>

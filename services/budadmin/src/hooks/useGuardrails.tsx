@@ -135,6 +135,12 @@ interface GuardrailsState {
   getWorkflow: (workflowId?: string) => Promise<void>;
   clearWorkflow: () => void;
 
+  // Custom probe workflow
+  customProbePolicy: any | null;
+  setCustomProbePolicy: (policy: any) => void;
+  createCustomProbeWorkflow: (probeTypeOption: string) => Promise<boolean>;
+  updateCustomProbeWorkflow: (data: Record<string, any>) => Promise<boolean>;
+
   // Probe rules
   probeRules: ProbeRule[];
   rulesLoading: boolean;
@@ -180,6 +186,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   currentWorkflow: null,
   workflowLoading: false,
   workflowError: null,
+  customProbePolicy: null,
 
   // Probe rules state
   probeRules: [],
@@ -475,6 +482,97 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     }
   },
 
+  // Set custom probe policy
+  setCustomProbePolicy: (policy: any) => {
+    set({ customProbePolicy: policy });
+  },
+
+  // Create custom probe workflow (step 1)
+  createCustomProbeWorkflow: async (probeTypeOption: string): Promise<boolean> => {
+    set({ workflowLoading: true, workflowError: null });
+
+    try {
+      const response = await AppRequest.Post(
+        "/guardrails/custom-probe-workflow",
+        {
+          workflow_total_steps: 3,
+          step_number: 1,
+          trigger_workflow: false,
+          probe_type_option: probeTypeOption,
+        },
+      );
+
+      if (response && response.status >= 200 && response.status < 300 && response.data) {
+        set({ currentWorkflow: response.data });
+
+        // Fetch the workflow data after creation
+        await get().getWorkflow(response.data.workflow_id);
+
+        return true;
+      }
+
+      const errorMsg = response?.data?.detail || response?.data?.message || "Failed to create custom probe workflow";
+      errorToast(errorMsg);
+      return false;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+                          error?.response?.data?.message ||
+                          error?.message ||
+                          "Failed to create custom probe workflow";
+      errorToast(errorMessage);
+      set({ workflowError: errorMessage });
+      return false;
+    } finally {
+      set({ workflowLoading: false });
+    }
+  },
+
+  // Update custom probe workflow (steps 2 & 3)
+  updateCustomProbeWorkflow: async (data: Record<string, any>): Promise<boolean> => {
+    const currentWorkflow = get().currentWorkflow;
+    if (!currentWorkflow?.workflow_id) {
+      errorToast("No active workflow found");
+      return false;
+    }
+
+    set({ workflowLoading: true, workflowError: null });
+
+    try {
+      const payload = {
+        workflow_id: currentWorkflow.workflow_id,
+        ...data,
+      };
+
+      const response = await AppRequest.Post(
+        "/guardrails/custom-probe-workflow",
+        payload,
+      );
+
+      if (response && response.status >= 200 && response.status < 300 && response.data) {
+        set({ currentWorkflow: response.data });
+
+        // Fetch the workflow data after update
+        await get().getWorkflow(currentWorkflow.workflow_id);
+
+        return true;
+      }
+
+      const errorMsg = response?.data?.detail || response?.data?.message || "Failed to update custom probe workflow";
+      errorToast(errorMsg);
+      return false;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+                          error?.response?.data?.message ||
+                          error?.message ||
+                          "Failed to update custom probe workflow";
+      errorToast(errorMessage);
+      set({ workflowError: errorMessage });
+      return false;
+    } finally {
+      set({ workflowLoading: false });
+    }
+  },
+
   // Clear workflow
   clearWorkflow: () => {
     set({
@@ -485,6 +583,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       selectedDeployment: null,
       selectedProvider: null,
       isStandaloneDeployment: false,
+      customProbePolicy: null,
     });
   },
 

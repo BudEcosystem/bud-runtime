@@ -5,8 +5,8 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { Input } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { successToast } from "@/components/toast";
-// import { errorToast } from "@/components/toast"; // TODO: Re-enable when validation is enabled
+import { errorToast, successToast } from "@/components/toast";
+import useGuardrails from "src/hooks/useGuardrails";
 import { Text_12_400_757575 } from "@/components/ui/text";
 import CustomSelect from "../components/CustomSelect";
 import GuardTypeSelect from "../components/GuardTypeSelect";
@@ -30,6 +30,7 @@ const inputStyle = { backgroundColor: "transparent", color: "#EEEEEE" };
 
 export default function GuardRailDetails() {
   const { closeDrawer, openDrawerWithStep } = useDrawer();
+  const { updateCustomProbeWorkflow, customProbePolicy, workflowLoading, clearWorkflow } = useGuardrails();
 
   // Editable form state
   const [name, setName] = useState("");
@@ -41,45 +42,50 @@ export default function GuardRailDetails() {
     openDrawerWithStep("add-custom-guardrail");
   };
 
-  const handleFinish = () => {
-    // TODO: Re-enable validation when ready
-    // if (!name.trim()) {
-    //   errorToast("Please enter a guard rail name");
-    //   return;
-    // }
-    // if (!description.trim()) {
-    //   errorToast("Please enter a description");
-    //   return;
-    // }
-    // if (guardTypes.length === 0) {
-    //   errorToast("Please select at least one guard type");
-    //   return;
-    // }
-    // if (!modality) {
-    //   errorToast("Please select a modality");
-    //   return;
-    // }
+  const handleFinish = async () => {
+    if (!name.trim()) {
+      errorToast("Please enter a guard rail name");
+      return;
+    }
+    if (!description.trim()) {
+      errorToast("Please enter a description");
+      return;
+    }
+    if (guardTypes.length === 0) {
+      errorToast("Please select at least one guard type");
+      return;
+    }
+    if (!modality) {
+      errorToast("Please select a modality");
+      return;
+    }
 
-    // Build the guardrail details object
-    const guardrailDetails = {
+    const success = await updateCustomProbeWorkflow({
+      step_number: 3,
+      trigger_workflow: true,
+      probe_type_option: "llm_policy",
+      policy: customProbePolicy,
       name: name.trim(),
       description: description.trim(),
       guard_types: guardTypes,
-      modality: modality,
-    };
+      modality_types: modality ? [modality] : [],
+    });
 
-    console.log("GuardRail Details:", JSON.stringify(guardrailDetails, null, 2));
+    if (!success) return;
+
     successToast("Guardrail created successfully!");
+    clearWorkflow();
     closeDrawer();
   };
 
   return (
     <BudForm
       data={{}}
+      disableNext={workflowLoading}
       onBack={handleBack}
       onNext={handleFinish}
       backText="Back"
-      nextText="Finish"
+      nextText={workflowLoading ? "Creating..." : "Finish"}
     >
       <BudWraperBox>
         <BudDrawerLayout>
