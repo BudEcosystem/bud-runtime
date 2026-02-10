@@ -47,6 +47,7 @@ class PipelineDefinitionCRUD:
         dag_definition: dict[str, Any],
         created_by: str,
         description: str | None = None,
+        icon: str | None = None,
         status: PipelineStatus = PipelineStatus.DRAFT,
         user_id: UUID | None = None,
         system_owned: bool = False,
@@ -58,6 +59,7 @@ class PipelineDefinitionCRUD:
             dag_definition: Complete pipeline DAG definition.
             created_by: User or service that created the pipeline.
             description: Optional pipeline description.
+            icon: Optional icon/emoji for UI representation.
             status: Initial pipeline status (default: draft).
             user_id: UUID of the owning user (None for system/anonymous pipelines).
             system_owned: True if this is a system-owned pipeline visible to all users.
@@ -72,6 +74,7 @@ class PipelineDefinitionCRUD:
         definition = PipelineDefinition(
             name=name,
             description=description,
+            icon=icon,
             dag_definition=dag_definition,
             status=status,
             step_count=step_count,

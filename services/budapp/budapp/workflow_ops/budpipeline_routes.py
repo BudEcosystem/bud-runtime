@@ -171,6 +171,7 @@ async def create_budpipeline(
             name=request_body.get("name"),
             user_id=str(current_user.id),
             system_owned=request_body.get("system_owned", False),
+            icon=request_body.get("icon"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:
@@ -1053,6 +1054,7 @@ async def update_budpipeline(
             dag=request_body.get("dag"),
             name=request_body.get("name"),
             user_id=str(current_user.id),
+            icon=request_body.get("icon"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_200_OK)
     except ClientException as e:
