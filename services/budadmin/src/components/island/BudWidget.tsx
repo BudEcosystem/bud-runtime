@@ -154,6 +154,9 @@ export function BudWidget({
   useEffect(() => {
     console.log("flow", flow);
   }, [flow]);
+  useEffect(() => {
+    console.log("faiedStep", faiedStep);
+  }, [faiedStep]);
 
   const openWidget = async () => {
     let workflow: WorkflowType;

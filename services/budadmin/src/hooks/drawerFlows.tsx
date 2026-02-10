@@ -5372,6 +5372,8 @@ export const flowMapping: {
   "model_benchmark": "model_benchmark",
   "evaluate_model": "run-evaluation",
   "prompt_creation": "add-agent",
+  "custom_probe_creation": "add-guardrail",
+  "guardrail_deployment": "add-guardrail",
 }
 
 export const inProgressSteps = [

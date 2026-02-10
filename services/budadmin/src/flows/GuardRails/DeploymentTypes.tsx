@@ -142,7 +142,7 @@ export default function DeploymentTypes() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3] leading-[1.5]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="px-[1.35rem] pb-[1.35rem] mt-[1.5rem]">
             <div className="space-y-[0.75rem]">
               {deploymentOptions.map((option) => (
                 <div
