@@ -85,12 +85,31 @@ pub struct GatewayConfig {
     pub analytics: AnalyticsConfig,
     #[serde(default)]
     pub blocking: BlockingConfig,
+    #[serde(default)]
+    pub otlp_proxy: OtlpProxyConfig,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct BlockingConfig {
     #[serde(default)]
     pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct OtlpProxyConfig {
+    pub enabled: bool,
+    pub collector_endpoint: String,
+}
+
+impl Default for OtlpProxyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            collector_endpoint: std::env::var("OTEL_EXPORTER_OTLP_HTTP_ENDPOINT")
+                .unwrap_or_else(|_| "http://localhost:4318".to_string()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

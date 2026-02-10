@@ -39,6 +39,9 @@ data:
     [object_storage]
     type = "disabled"
 
+    [gateway.otlp_proxy]
+    enabled = true
+
     [gateway.export.otlp.traces]
     enabled = true
 
