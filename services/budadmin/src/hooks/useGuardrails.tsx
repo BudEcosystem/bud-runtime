@@ -93,9 +93,11 @@ interface GuardrailsState {
     user_id?: string;
     project_id?: string;
     endpoint_id?: string;
-    search?: string;
+    search?: boolean;
+    name?: string;
     page?: number;
-    page_size?: number;
+    limit?: number;
+    append?: boolean;
   }) => Promise<void>;
 
   setSearchTerm: (search: string) => void;
@@ -165,7 +167,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   probesError: null,
   totalProbes: 0,
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 10,
   totalPages: 0,
 
   searchTerm: "",
@@ -196,12 +198,13 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
   // Fetch probes with filtering and pagination
   fetchProbes: async (params) => {
-    set({ probesLoading: true, probesError: null });
+    const isAppend = params?.append === true;
+    set({ probesLoading: !isAppend, probesError: null });
 
     try {
       const queryParams: any = {
         page: params?.page || get().currentPage,
-        page_size: params?.page_size || get().pageSize,
+        limit: params?.limit || get().pageSize,
       };
 
       // Add optional filters
@@ -226,8 +229,12 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (params?.endpoint_id) {
         queryParams.endpoint_id = params.endpoint_id;
       }
+      // search is a boolean flag, name is the search text
       if (params?.search) {
-        queryParams.search = params.search;
+        queryParams.search = true;
+      }
+      if (params?.name) {
+        queryParams.name = params.name;
       }
       const response = await AppRequest.Get("/guardrails/probes", {
         params: queryParams,
@@ -235,8 +242,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
       if (response.data) {
         const data: ProbesResponse = response.data;
+        const newProbes = data.probes || [];
         set({
-          probes: data.probes || [],
+          probes: isAppend ? [...get().probes, ...newProbes] : newProbes,
           totalProbes: data.total_record || 0,
           currentPage: data.page || 1,
           totalPages: data.total_pages || 0,
@@ -248,7 +256,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       set({
         probesError: error?.message || "Failed to fetch probes",
         probesLoading: false,
-        probes: [],
+        ...(isAppend ? {} : { probes: [] }),
       });
     }
   },
@@ -353,7 +361,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
           provider_id: providerId,
           provider_type: providerType,
           step_number: 1,
-          workflow_total_steps: 5, // Not counting the first step
+          workflow_total_steps: 10,
           trigger_workflow: false,
         },
       );

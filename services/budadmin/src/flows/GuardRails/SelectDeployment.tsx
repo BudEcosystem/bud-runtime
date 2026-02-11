@@ -118,7 +118,7 @@ export default function SelectDeployment() {
 
 
   const handleBack = () => {
-    openDrawerWithStep("select-project");
+    openDrawerWithStep("deployment-types");
   };
 
   const handleNext = async () => {
@@ -134,7 +134,7 @@ export default function SelectDeployment() {
 
       // Build the complete payload with all required fields
       const payload: any = {
-        step_number: 5, // Deployment/endpoint selection is step 5
+        step_number: 9,
         endpoint_ids: [selectedDeployment], // Send as array per new requirement
         trigger_workflow: false,
       };

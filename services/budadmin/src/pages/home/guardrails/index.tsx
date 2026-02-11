@@ -433,13 +433,13 @@ export default function GuardRails() {
       try {
         const queryParams: any = {
           page: params?.page || 1,
-          page_size: params?.page_size || pageSize,
-          search: params?.isSearching === true ? true : false, // Add search parameter
+          limit: params?.limit || pageSize,
+          search: params?.isSearching === true ? true : false,
         };
 
         // Add optional filters
         if (params?.searchTerm) {
-          queryParams.query = params.searchTerm; // Use 'query' for the actual search term
+          queryParams.name = params.searchTerm;
         }
         if (params?.provider_type) {
           queryParams.provider_type = params.provider_type;
@@ -499,9 +499,9 @@ export default function GuardRails() {
         // Use local fetch function instead of the hook's fetchProbes
         const params: any = {
           page: page,
-          page_size: pageSize,
-          isSearching: shouldSearch, // Pass the search flag
-          append: append, // For infinite scroll
+          limit: pageSize,
+          isSearching: shouldSearch,
+          append: append,
         };
 
         if (filter.name) {
@@ -622,7 +622,7 @@ export default function GuardRails() {
 
     // Only fetch when user is loaded and has permission
     if (!loadingUser && hasPermission(PermissionEnum.ModelView)) {
-      fetchMainPageProbes({ page: 1, page_size: pageSize, isSearching: false });
+      fetchMainPageProbes({ page: 1, limit: pageSize, isSearching: false });
     }
   }, [loadingUser]);
 

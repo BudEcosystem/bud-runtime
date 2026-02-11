@@ -27,7 +27,6 @@ export default function SelectProject() {
     setSelectedProject: setSelectedProjectInStore,
     updateWorkflow,
     workflowLoading,
-    isStandaloneDeployment,
   } = useGuardrails();
 
   // Fetch projects on component mount and when search changes
@@ -40,7 +39,7 @@ export default function SelectProject() {
   }, [searchTerm]);
 
   const handleBack = () => {
-    openDrawerWithStep("deployment-types");
+    openDrawerWithStep("bud-sentinel-probes");
   };
 
   const handleNext = async () => {
@@ -55,7 +54,7 @@ export default function SelectProject() {
 
       // Build the complete payload
       const payload: any = {
-        step_number: 4, // Project selection is step 4
+        step_number: 3,
         project_id: selectedProject,
         trigger_workflow: false,
       };
@@ -77,24 +76,14 @@ export default function SelectProject() {
         payload.probe_selections = currentWorkflow.probe_selections;
       }
 
-      // Include is_standalone from the store (set in DeploymentTypes step)
-      payload.is_standalone = isStandaloneDeployment;
-
       // Update workflow with complete data
       await updateWorkflow(payload);
 
       // Save selected project to guardrails store
       setSelectedProjectInStore(selectedProjectData);
 
-      // Check if this is a standalone guardrail endpoint (skip deployment selection)
-      // Use the store flag which was set in DeploymentTypes step
-      if (isStandaloneDeployment) {
-        // Skip deployment selection for guardrail-endpoint type
-        openDrawerWithStep("probe-settings");
-      } else {
-        // Normal flow - go to deployment selection
-        openDrawerWithStep("select-deployment");
-      }
+      // Go to credentials selection
+      openDrawerWithStep("guardrail-select-credentials");
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }

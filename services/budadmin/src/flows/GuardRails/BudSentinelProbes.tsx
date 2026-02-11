@@ -5,7 +5,7 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { Input, Checkbox, Spin } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { ChevronRight } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import CustomPopover from "src/flows/components/customPopover";
 import Tags from "src/flows/components/DrawerTags";
@@ -25,6 +25,8 @@ export default function BudSentinelProbes() {
     "all",
   );
   const [hoveredProbe, setHoveredProbe] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const isLoadingMore = useRef(false);
 
   // Use the guardrails hook
   const {
@@ -32,6 +34,7 @@ export default function BudSentinelProbes() {
     probesLoading,
     fetchProbes,
     totalProbes,
+    totalPages,
     fetchProbeById,
     setSelectedProbe: setSelectedProbeInStore,
     setSelectedProbes: setSelectedProbesInStore,
@@ -44,24 +47,59 @@ export default function BudSentinelProbes() {
   // Fetch probes on component mount and when search changes
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      // Build filter payload
+      setPage(1);
+
       const filterPayload: any = {
         page: 1,
-        page_size: 100, // Fetch all probes for now
+        limit: 10,
       };
 
-      // Add search filter if present
       if (searchTerm) {
-        filterPayload.search = searchTerm;
+        filterPayload.search = true;
+        filterPayload.name = searchTerm;
       }
 
-      // The provider_id will be automatically added from selectedProvider in the fetchProbes function
-      // since we updated useGuardrails to use selectedProvider internally
       fetchProbes(filterPayload);
-    }, 300); // Debounce search
+    }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, selectedProvider?.id]);
+
+  // Load more probes for infinite scroll
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore.current || page >= totalPages) return;
+    isLoadingMore.current = true;
+
+    const nextPage = page + 1;
+    const filterPayload: any = {
+      page: nextPage,
+      limit: 10,
+      append: true,
+    };
+
+    if (searchTerm) {
+      filterPayload.search = true;
+      filterPayload.name = searchTerm;
+    }
+
+    await fetchProbes(filterPayload);
+    setPage(nextPage);
+    isLoadingMore.current = false;
+  }, [page, totalPages, searchTerm, fetchProbes]);
+
+  // Scroll handler for infinite scroll
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const target = e.currentTarget;
+      const isNearBottom =
+        target.scrollTop + target.clientHeight >= target.scrollHeight - 100;
+
+      if (isNearBottom && !isLoadingMore.current && page < totalPages) {
+        loadMore();
+      }
+    },
+    [loadMore, page, totalPages],
+  );
 
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
@@ -141,8 +179,8 @@ export default function BudSentinelProbes() {
           // PII Detection selected - go to PII configuration page
           openDrawerWithStep("pii-detection-config");
         } else {
-          // For other selections, skip PII config and go to deployment types
-          openDrawerWithStep("deployment-types");
+          // For other selections, skip PII config and go to project selection
+          openDrawerWithStep("select-project");
         }
       } catch (error) {
         console.error("Failed to update workflow:", error);
@@ -174,18 +212,6 @@ export default function BudSentinelProbes() {
 
   const getFilteredProbes = () => {
     let filtered = probes || [];
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (probe) =>
-          probe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          probe.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          probe.tags?.some((tag) =>
-            tag.name.toLowerCase().includes(searchTerm.toLowerCase()),
-          ),
-      );
-    }
 
     // Apply category filter based on tags
     if (activeFilter !== "all") {
@@ -233,7 +259,7 @@ export default function BudSentinelProbes() {
       nextText="Next"
       disableNext={selectedProbes.length === 0 || workflowLoading}
     >
-      <BudWraperBox>
+      <BudWraperBox onScroll={handleScroll}>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Probes List"
@@ -244,7 +270,7 @@ export default function BudSentinelProbes() {
 
           <div className="pb-[1.35rem]">
             {/* Search Bar */}
-            <div className="mb-[1.5rem] px-[1.35rem]">
+            <div className="mb-[1.5rem] px-[1.35rem] mt-[1.5rem]">
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined className="text-[#757575]" />}
@@ -259,7 +285,7 @@ export default function BudSentinelProbes() {
             </div>
 
             {/* Filter Buttons */}
-            <div className="flex gap-[0.75rem] mb-[2rem] px-[1.35rem]">
+            <div className="flex gap-[0.75rem] mb-[2rem] px-[1.35rem] hidden">
               <Tags
                 name="PII"
                 color={activeFilter === "pii" ? "#D1B854" : "#757575"}
@@ -416,6 +442,12 @@ export default function BudSentinelProbes() {
                     </div>
                   ),
                 )
+              )}
+
+              {!probesLoading && page < totalPages && (
+                <div className="flex justify-center py-[1rem]">
+                  <Spin size="small" />
+                </div>
               )}
 
               {!probesLoading && Object.keys(groupedProbes).length === 0 && (

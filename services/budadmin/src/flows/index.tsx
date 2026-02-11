@@ -148,6 +148,11 @@ import ProbeDeploymentSuccess from "./GuardRails/ProbeDeploymentSuccess";
 import ProbeDetails from "./GuardRails/ProbeDetails";
 import ViewGuardRailDetails from "./GuardRails/ViewGuardRailDetails";
 import UseGuardrail from "./GuardRails/UseGuardrail";
+import GuardrailSelectCredentials from "./GuardRails/GuardrailSelectCredentials";
+import GuardrailOnboardingStatus from "./GuardRails/GuardrailOnboardingStatus";
+import GuardrailHardwareMode from "./GuardRails/GuardrailHardwareMode";
+import GuardrailDeploySpecs from "./GuardRails/GuardrailDeploySpecs";
+import GuardrailSelectCluster from "./GuardRails/GuardrailSelectCluster";
 import AddAgentSelectProject from "./AddAgent";
 import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
 import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
@@ -328,6 +333,11 @@ export const StepComponents = {
   "probe-settings": ProbeSettings,
   "deploying-probe": DeployingProbe,
   "probe-deployment-success": ProbeDeploymentSuccess,
+  "guardrail-select-credentials": GuardrailSelectCredentials,
+  "guardrail-onboarding-status": GuardrailOnboardingStatus,
+  "guardrail-hardware-mode": GuardrailHardwareMode,
+  "guardrail-deploy-specs": GuardrailDeploySpecs,
+  "guardrail-select-cluster": GuardrailSelectCluster,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
   "use-guardrail": UseGuardrail,

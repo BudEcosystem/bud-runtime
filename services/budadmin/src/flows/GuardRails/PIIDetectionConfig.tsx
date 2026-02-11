@@ -223,8 +223,8 @@ export default function PIIDetectionConfig() {
       // Update workflow with selected rules
       await updateWorkflow(updatePayload);
 
-      // Move to deployment types selection
-      openDrawerWithStep("deployment-types");
+      // Move to project selection
+      openDrawerWithStep("select-project");
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }

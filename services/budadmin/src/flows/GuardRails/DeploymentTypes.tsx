@@ -22,31 +22,11 @@ export default function DeploymentTypes() {
     currentWorkflow,
     selectedProvider,
     selectedProbes,
-    selectedProbe,
     setIsStandaloneDeployment
   } = useGuardrails();
 
   const handleBack = () => {
-    // Get the selected probes
-    const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
-
-    // Check if any selected probe is a PII probe (same logic as BudSentinelProbes)
-    const hasPIIProbe = probesArray.some(probe =>
-      probe.name?.toLowerCase().includes("personal identifier") ||
-      probe.name?.toLowerCase().includes("pii") ||
-      probe.tags?.some(
-        (tag: any) =>
-          tag.name.toLowerCase().includes("dlp") ||
-          tag.name.toLowerCase().includes("personal"),
-      )
-    );
-
-    // Navigate back based on whether PII probes were selected
-    if (hasPIIProbe) {
-      openDrawerWithStep("pii-detection-config");
-    } else {
-      openDrawerWithStep("bud-sentinel-probes");
-    }
+    openDrawerWithStep("guardrail-select-cluster");
   };
 
   const handleNext = async () => {
@@ -70,7 +50,7 @@ export default function DeploymentTypes() {
 
       // Build the complete workflow payload
       const payload: any = {
-        step_number: 3, // Deployment type selection is step 3
+        step_number: 8,
         deployment_type: mappedValues.deployment_type,
         is_standalone: mappedValues.is_standalone,
         trigger_workflow: false,
@@ -95,7 +75,7 @@ export default function DeploymentTypes() {
         payload.probe_selections = currentWorkflow.probe_selections;
       } else {
         // Fallback: build from selectedProbes if needed
-        const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
+        const probesArray = selectedProbes?.length > 0 ? selectedProbes : [];
         if (probesArray.length > 0) {
           payload.probe_selections = probesArray.map(probe => ({
             id: probe.id
@@ -106,8 +86,13 @@ export default function DeploymentTypes() {
       // Update workflow with complete data
       await updateWorkflow(payload);
 
-      // Both deployment types go to project selection
-      openDrawerWithStep("select-project");
+      // Standalone: skip endpoint selection, go to probe settings
+      // Not standalone: go to endpoint selection
+      if (mappedValues.is_standalone) {
+        openDrawerWithStep("probe-settings");
+      } else {
+        openDrawerWithStep("select-deployment");
+      }
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }

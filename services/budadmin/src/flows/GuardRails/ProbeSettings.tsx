@@ -32,13 +32,11 @@ export default function ProbeSettings() {
   ];
 
   const handleBack = () => {
-    // Check if this is a standalone guardrail endpoint (deployment selection was skipped)
-    // Use the store flag which was set in DeploymentTypes step
     if (isStandaloneDeployment) {
-      // Go back to project selection (deployment was skipped)
-      openDrawerWithStep("select-project");
+      // Standalone: endpoint selection was skipped, go back to deployment types
+      openDrawerWithStep("deployment-types");
     } else {
-      // Normal flow - go back to deployment selection
+      // Normal flow - go back to endpoint selection
       openDrawerWithStep("select-deployment");
     }
   };
@@ -62,7 +60,7 @@ export default function ProbeSettings() {
 
       // Build the complete payload with all required fields
       const payload: any = {
-        step_number: 6, // Probe settings is the final step 6
+        step_number: 10,
         name: profileName.trim(),
         description: profileDescription.trim() || undefined,
         guard_types: selectedLifecycle,
