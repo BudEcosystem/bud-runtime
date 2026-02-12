@@ -113,9 +113,9 @@ class TelemetryQueryBuilder:
         trace_id_subquery = self._build_trace_id_subquery(request, params)
         target_conditions = self._build_target_span_conditions(request, params)
 
-        # Count query: how many target spans exist for pagination metadata
+        # Count query: count distinct traces for pagination metadata
         count_query = f"""
-            SELECT count()
+            SELECT count(DISTINCT TraceId)
             FROM {_TELEMETRY_TRACE_TABLE}
             WHERE {target_conditions}
         """  # nosec B608
@@ -154,6 +154,11 @@ class TelemetryQueryBuilder:
 
         if request.include_links:
             columns.extend(["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"])
+
+        # Include prompt/project attrs for tree builder target filtering
+        if request.span_names is None and not request.include_all_attributes:
+            columns.append("SpanAttributes['gateway_analytics.prompt_id']")
+            columns.append("SpanAttributes['gateway_analytics.project_id']")
 
         return ", ".join(columns)
 
@@ -359,6 +364,8 @@ class TelemetryQueryBuilder:
         # Scalar operators
         params[param_prefix] = str(condition.value) if condition.value is not None else ""
 
+        _NUMERIC_OPS = {FilterOperator.gt, FilterOperator.gte, FilterOperator.lt, FilterOperator.lte}
+
         op_map = {
             FilterOperator.eq: "=",
             FilterOperator.neq: "!=",
@@ -372,6 +379,12 @@ class TelemetryQueryBuilder:
         sql_op = op_map.get(op)
         if sql_op is None:
             raise ValueError(f"Unsupported filter operator: {op}")
+
+        # SpanAttributes/ResourceAttributes are Map(String, String), so
+        # comparisons like "2782" > "10000" are lexicographic (wrong).
+        # Cast both sides to Float64 for numeric operators.
+        if op in _NUMERIC_OPS:
+            return f"toFloat64OrZero({field_expr}) {sql_op} toFloat64OrZero(%({param_prefix})s)"
 
         return f"{field_expr} {sql_op} %({param_prefix})s"
 
@@ -1767,6 +1780,11 @@ class ObservabilityMetricsService:
         if request.include_links:
             columns.extend(["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"])
 
+        # Internal columns for tree builder target filtering
+        if request.span_names is None and not request.include_all_attributes:
+            columns.append("_internal:prompt_id")
+            columns.append("_internal:project_id")
+
         return columns
 
     def _build_telemetry_span_tree(
@@ -1818,7 +1836,17 @@ class ObservabilityMetricsService:
             if request.span_names is None:
                 # Default: gateway_analytics spans are targets
                 if span_dict["span_name"] == "gateway_analytics":
-                    target_span_ids.append(span_id)
+                    # Verify prompt_id and project_id match to exclude
+                    # gateway_analytics spans from other prompts sharing the trace
+                    if request.include_all_attributes:
+                        attrs = span_dict.get("attributes", {})
+                        prompt_ok = attrs.get("gateway_analytics.prompt_id") == request.prompt_id
+                        project_ok = attrs.get("gateway_analytics.project_id") == request.project_id
+                    else:
+                        prompt_ok = span_dict.get("_prompt_id", "") == request.prompt_id
+                        project_ok = span_dict.get("_project_id", "") == request.project_id
+                    if prompt_ok and project_ok:
+                        target_span_ids.append(span_id)
             else:
                 # Custom: spans matching the requested names
                 if span_dict["span_name"] in request.span_names:
@@ -1905,6 +1933,12 @@ class ObservabilityMetricsService:
             "status_code": row[col_idx["StatusCode"]] if "StatusCode" in col_idx else "",
             "status_message": (row[col_idx["StatusMessage"]] or "") if "StatusMessage" in col_idx else "",
         }
+
+        # Internal filtering columns (not exposed in response attributes)
+        if "_internal:prompt_id" in col_idx:
+            span["_prompt_id"] = row[col_idx["_internal:prompt_id"]] or ""
+        if "_internal:project_id" in col_idx:
+            span["_project_id"] = row[col_idx["_internal:project_id"]] or ""
 
         # Build attributes from select_attributes
         attributes: dict[str, str] = {}

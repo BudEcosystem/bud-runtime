@@ -40,6 +40,14 @@ class TestBuildQueryDefault:
         assert "%(prompt_id)s" in count_query
         assert "%(project_id)s" in count_query
 
+    def test_count_query_uses_distinct_trace_id(self):
+        """Count query counts distinct traces, not individual spans."""
+        builder = TelemetryQueryBuilder()
+        request = _make_request()
+        _, count_query, _ = builder.build_query(request)
+
+        assert "count(DISTINCT TraceId)" in count_query
+
     def test_default_query_has_timestamp_filters(self):
         """Default query includes timestamp range conditions."""
         builder = TelemetryQueryBuilder()
@@ -146,44 +154,44 @@ class TestSpanFilters:
         assert "SpanAttributes['status'] != %(span_f0)s" in count_query
 
     def test_gt_filter(self):
-        """Gt operator produces > comparison."""
+        """Gt operator produces numeric > comparison via toFloat64OrZero."""
         builder = TelemetryQueryBuilder()
         request = _make_request(
             span_filters=[FilterCondition(field="duration_ms", op=FilterOperator.gt, value="5000")]
         )
         _, count_query, params = builder.build_query(request)
 
-        assert "SpanAttributes['duration_ms'] > %(span_f0)s" in count_query
+        assert "toFloat64OrZero(SpanAttributes['duration_ms']) > toFloat64OrZero(%(span_f0)s)" in count_query
 
     def test_gte_filter(self):
-        """Gte operator produces >= comparison."""
+        """Gte operator produces numeric >= comparison via toFloat64OrZero."""
         builder = TelemetryQueryBuilder()
         request = _make_request(
             span_filters=[FilterCondition(field="count", op=FilterOperator.gte, value="10")]
         )
         _, count_query, params = builder.build_query(request)
 
-        assert "SpanAttributes['count'] >= %(span_f0)s" in count_query
+        assert "toFloat64OrZero(SpanAttributes['count']) >= toFloat64OrZero(%(span_f0)s)" in count_query
 
     def test_lt_filter(self):
-        """Lt operator produces < comparison."""
+        """Lt operator produces numeric < comparison via toFloat64OrZero."""
         builder = TelemetryQueryBuilder()
         request = _make_request(
             span_filters=[FilterCondition(field="count", op=FilterOperator.lt, value="10")]
         )
         _, count_query, params = builder.build_query(request)
 
-        assert "SpanAttributes['count'] < %(span_f0)s" in count_query
+        assert "toFloat64OrZero(SpanAttributes['count']) < toFloat64OrZero(%(span_f0)s)" in count_query
 
     def test_lte_filter(self):
-        """Lte operator produces <= comparison."""
+        """Lte operator produces numeric <= comparison via toFloat64OrZero."""
         builder = TelemetryQueryBuilder()
         request = _make_request(
             span_filters=[FilterCondition(field="count", op=FilterOperator.lte, value="10")]
         )
         _, count_query, params = builder.build_query(request)
 
-        assert "SpanAttributes['count'] <= %(span_f0)s" in count_query
+        assert "toFloat64OrZero(SpanAttributes['count']) <= toFloat64OrZero(%(span_f0)s)" in count_query
 
     def test_like_filter(self):
         """Like operator produces LIKE comparison."""
@@ -281,6 +289,37 @@ class TestSelectClause:
         data_query, _, _ = builder.build_query(request)
 
         assert "SpanAttributes['gen_ai.usage.input_tokens']" in data_query
+
+    def test_default_select_includes_internal_prompt_project_columns(self):
+        """Default SELECT includes internal prompt_id and project_id for tree builder filtering."""
+        builder = TelemetryQueryBuilder()
+        request = _make_request()
+        data_query, _, _ = builder.build_query(request)
+
+        assert "SpanAttributes['gateway_analytics.prompt_id']" in data_query
+        assert "SpanAttributes['gateway_analytics.project_id']" in data_query
+
+    def test_internal_columns_omitted_with_include_all_attributes(self):
+        """Internal columns not added when include_all_attributes is True (already available)."""
+        builder = TelemetryQueryBuilder()
+        request = _make_request(include_all_attributes=True)
+        data_query, _, _ = builder.build_query(request)
+
+        # The full SpanAttributes map is included, so internal columns are unnecessary
+        assert "SpanAttributes" in data_query
+        # Should not have the specific internal column extractions
+        select_part = data_query.split("FROM")[0]
+        # Count occurrences - SpanAttributes appears once as the map, not as individual keys
+        assert "gateway_analytics.prompt_id" not in select_part
+
+    def test_internal_columns_omitted_with_span_names(self):
+        """Internal columns not added when span_names is set."""
+        builder = TelemetryQueryBuilder()
+        request = _make_request(span_names=["POST /v1/responses"])
+        data_query, _, _ = builder.build_query(request)
+
+        select_part = data_query.split("FROM")[0]
+        assert "gateway_analytics.prompt_id" not in select_part
 
     def test_include_all_attributes(self):
         """include_all_attributes adds SpanAttributes, ResourceAttributes."""
