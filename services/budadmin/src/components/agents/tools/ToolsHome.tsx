@@ -478,7 +478,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
         ) : (
           <>
             {/* Global Connectors Section */}
-            <GlobalConnectorsSection promptId={promptId} />
+            {/* <GlobalConnectorsSection promptId={promptId} /> */}
 
             {/* Connected Tools Section */}
             {connectedTools.length > 0 && (
