@@ -2940,17 +2940,12 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         self,
         models: list[dict],
         global_cluster_id: UUID | None = None,
-        per_model_configs: list[dict] | None = None,
     ) -> dict:
-        """Validate that selected clusters have capacity for the models.
-
-        Handles both global cluster_id and per-model cluster overrides.
-        Per-model cluster_id takes precedence over global.
+        """Validate that selected cluster has capacity for the models.
 
         Args:
             models: List of model status dicts (must have model_id or model_uri)
-            global_cluster_id: Global cluster_id applied to all models by default
-            per_model_configs: Per-model configs with optional cluster_id overrides
+            global_cluster_id: Cluster_id applied to all models
 
         Returns:
             Dict with:
@@ -2964,163 +2959,70 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         errors: list[str] = []
         warnings: list[str] = []
 
-        # Build per-model config lookup
-        config_by_model_id: dict[str, dict] = {}
-        config_by_model_uri: dict[str, dict] = {}
-        if per_model_configs:
-            for pmc in per_model_configs:
-                if pmc.get("model_id"):
-                    config_by_model_id[str(pmc["model_id"])] = pmc
-                if pmc.get("model_uri"):
-                    config_by_model_uri[pmc["model_uri"]] = pmc
+        if not global_cluster_id:
+            return {
+                "valid": False,
+                "errors": ["No cluster specified for deployment"],
+                "warnings": [],
+                "cluster_assignments": {},
+            }
 
-        # Debug: Log the lookup keys
-        logger.debug(f"validate_cluster_assignment: config_by_model_id keys: {list(config_by_model_id.keys())}")
-        logger.debug(f"validate_cluster_assignment: config_by_model_uri keys: {list(config_by_model_uri.keys())}")
-        logger.debug(f"validate_cluster_assignment: global_cluster_id: {global_cluster_id}")
+        cluster_id_str = str(global_cluster_id)
 
-        # Determine cluster assignment for each model
-        # {cluster_id: [{model_uri, requirements}]}
-        cluster_models: dict[str, list[dict]] = {}
-        model_assignments: dict[str, str] = {}  # model_uri → cluster_id
-        models_without_cluster: list[dict] = []  # Store more info for better error messages
+        # All models go to the same cluster
+        model_assignments: dict[str, str] = {}
+        cluster_models: list[dict] = []
 
         for model in models:
-            model_id = model.get("model_id")
             model_uri = model.get("model_uri", "unknown")
-            model_id_str = str(model_id) if model_id else None
-
-            # Debug: Log model lookup
-            logger.debug(f"validate_cluster_assignment: checking model_id={model_id_str}, model_uri={model_uri}")
-
-            # Determine target cluster (per-model override > global)
-            target_cluster_id = None
-
-            # Check per-model config first
-            if model_id_str and model_id_str in config_by_model_id:
-                target_cluster_id = config_by_model_id[model_id_str].get("cluster_id")
-                logger.debug(f"  Found via model_id, cluster_id={target_cluster_id}")
-            if not target_cluster_id and model_uri in config_by_model_uri:
-                target_cluster_id = config_by_model_uri[model_uri].get("cluster_id")
-                logger.debug(f"  Found via model_uri, cluster_id={target_cluster_id}")
-
-            # Fall back to global
-            if not target_cluster_id:
-                target_cluster_id = global_cluster_id
-                if target_cluster_id:
-                    logger.debug(f"  Using global cluster_id={target_cluster_id}")
-
-            if not target_cluster_id:
-                models_without_cluster.append(
-                    {
-                        "model_id": model_id_str,
-                        "model_uri": model_uri,
-                    }
-                )
-                logger.debug("  No cluster found for model")
-                continue
-
-            cluster_id_str = str(target_cluster_id)
             model_assignments[model_uri] = cluster_id_str
+            # Default requirements (1 CPU) if no simulation data available
+            cluster_models.append({"model_uri": model_uri, "requirements": {"gpu": 0, "cpu": 1, "hpu": 0}})
 
-            # Track model requirements per cluster
-            # Use default requirements (1 CPU) if no simulation data available
-            # In real scenario, this should come from simulation results
-            requirements = {"gpu": 0, "cpu": 1, "hpu": 0}
-
-            if cluster_id_str not in cluster_models:
-                cluster_models[cluster_id_str] = []
-            cluster_models[cluster_id_str].append(
-                {
-                    "model_uri": model_uri,
-                    "requirements": requirements,
-                }
-            )
-
-        # Models without cluster assignment
-        if models_without_cluster:
-            # Build a helpful error message
-            model_details = []
-            for m in models_without_cluster:
-                if m["model_id"]:
-                    model_details.append(f"{m['model_uri']} (id: {m['model_id']})")
-                else:
-                    model_details.append(m["model_uri"])
-
-            # Check if the issue is model_id mismatch
-            if per_model_configs and config_by_model_id:
-                # User provided per-model configs but they didn't match
-                provided_ids = list(config_by_model_id.keys())
-                expected_ids = [m["model_id"] for m in models_without_cluster if m["model_id"]]
-                errors.append(
-                    f"Cluster assignment failed for {len(models_without_cluster)} model(s): {', '.join(model_details)}. "
-                    f"per_model_deployment_configs model_ids {provided_ids} don't match expected model_ids {expected_ids}. "
-                    f"Use model_ids from model_statuses or specify model_uri in per_model_deployment_configs."
-                )
-            else:
-                errors.append(
-                    f"No cluster specified for {len(models_without_cluster)} model(s): {', '.join(model_details)}. "
-                    f"Provide cluster_id globally or in per_model_deployment_configs."
-                )
-
-        # Fetch cluster capacities
+        # Fetch cluster capacity
         cluster_capacities: dict[str, dict] = {}
-        all_cluster_ids = list(cluster_models.keys())
+        try:
+            clusters, _ = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
+                [global_cluster_id]
+            )
+            for cluster in clusters:
+                cluster_capacities[str(cluster.cluster_id)] = {
+                    "name": cluster.name,
+                    "gpu_available": cluster.gpu_available_workers,
+                    "cpu_available": cluster.cpu_available_workers,
+                    "hpu_available": cluster.hpu_available_workers,
+                }
+        except Exception as e:
+            logger.warning(f"Failed to fetch cluster capacities: {e}", exc_info=True)
+            warnings.append("Failed to fetch cluster capacity information")
 
-        if all_cluster_ids:
-            try:
-                clusters, _ = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
-                    [UUID(cid) for cid in all_cluster_ids]
-                )
+        if cluster_id_str not in cluster_capacities:
+            errors.append(f"Cluster {cluster_id_str} not found or unavailable")
+            return {
+                "valid": False,
+                "errors": errors,
+                "warnings": warnings,
+                "cluster_assignments": model_assignments,
+            }
 
-                for cluster in clusters:
-                    cluster_id_str = str(cluster.cluster_id)
-                    cluster_capacities[cluster_id_str] = {
-                        "name": cluster.name,
-                        "gpu_available": cluster.gpu_available_workers,
-                        "cpu_available": cluster.cpu_available_workers,
-                        "hpu_available": cluster.hpu_available_workers,
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to fetch cluster capacities: {e}", exc_info=True)
-                errors.append("Failed to fetch cluster capacity information")
+        # Check total requirements against cluster capacity
+        cap = cluster_capacities[cluster_id_str]
+        total_cpu = sum(m["requirements"]["cpu"] for m in cluster_models)
+        total_gpu = sum(m["requirements"]["gpu"] for m in cluster_models)
+        total_hpu = sum(m["requirements"]["hpu"] for m in cluster_models)
 
-        # Check for missing clusters
-        for cluster_id_str in all_cluster_ids:
-            if cluster_id_str not in cluster_capacities:
-                model_uris = [m["model_uri"] for m in cluster_models[cluster_id_str]]
-                errors.append(
-                    f"Cluster {cluster_id_str} not found or unavailable (assigned to: {', '.join(model_uris)})"
-                )
+        fits = (
+            total_gpu <= cap["gpu_available"]
+            and total_cpu <= cap["cpu_available"]
+            and total_hpu <= cap["hpu_available"]
+        )
 
-        # Validate capacity for each cluster
-        for cluster_id_str, models_list in cluster_models.items():
-            capacity = cluster_capacities.get(cluster_id_str)
-            if not capacity:
-                continue
-
-            cluster_name = capacity["name"]
-
-            # Sum total requirements
-            total_gpu = sum(m["requirements"].get("gpu", 0) for m in models_list)
-            total_cpu = sum(m["requirements"].get("cpu", 0) for m in models_list)
-            total_hpu = sum(m["requirements"].get("hpu", 0) for m in models_list)
-
-            # Check capacity
-            shortfalls = []
-            if total_gpu > capacity["gpu_available"]:
-                shortfalls.append(f"GPU: need {total_gpu}, have {capacity['gpu_available']}")
-            if total_cpu > capacity["cpu_available"]:
-                shortfalls.append(f"CPU: need {total_cpu}, have {capacity['cpu_available']}")
-            if total_hpu > capacity["hpu_available"]:
-                shortfalls.append(f"HPU: need {total_hpu}, have {capacity['hpu_available']}")
-
-            if shortfalls:
-                model_uris = [m["model_uri"] for m in models_list]
-                errors.append(
-                    f"Cluster '{cluster_name}' has insufficient resources for {len(models_list)} model(s) "
-                    f"({', '.join(model_uris)}): {', '.join(shortfalls)}"
-                )
+        if not fits:
+            errors.append(
+                f"Insufficient cluster resources for {len(cluster_models)} model(s). "
+                f"Required: gpu={total_gpu}, cpu={total_cpu}, hpu={total_hpu}. "
+                f"Available: gpu={cap['gpu_available']}, cpu={cap['cpu_available']}, hpu={cap['hpu_available']}."
+            )
 
         return {
             "valid": len(errors) == 0,
