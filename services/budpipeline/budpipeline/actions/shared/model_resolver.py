@@ -69,6 +69,36 @@ async def get_model_info(
         return {}
 
 
+def derive_model_endpoints(model_info: dict[str, Any]) -> str | None:
+    """Derive BudConnect model_endpoints param from budapp supported_endpoints.
+
+    BudConnect needs model_endpoints (e.g. "EMBEDDING", "LLM") to find
+    compatible engines for non-LLM models like classifiers and embedding models.
+    """
+    supported = model_info.get("supported_endpoints")
+    if not supported or not isinstance(supported, dict):
+        return None
+
+    # Collect enabled endpoint types
+    endpoint_types: list[str] = []
+    for key, value in supported.items():
+        if isinstance(value, dict) and value.get("enabled"):
+            endpoint_types.append(key.upper())
+
+    if not endpoint_types:
+        return None
+
+    # Map budapp endpoint names to BudConnect categories
+    budconnect_types: set[str] = set()
+    for ep in endpoint_types:
+        if ep == "CHAT":
+            budconnect_types.add("LLM")
+        elif ep in ("EMBEDDING", "CLASSIFY", "RERANK", "MODERATION"):
+            budconnect_types.add("EMBEDDING")
+
+    return ",".join(sorted(budconnect_types)) if budconnect_types else None
+
+
 def resolve_pretrained_model_uri(model_info: dict[str, Any]) -> str | None:
     """Extract the pretrained model URI from model info.
 

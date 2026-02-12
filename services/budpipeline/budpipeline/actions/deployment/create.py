@@ -31,6 +31,7 @@ from budpipeline.actions.base import (
     register_action,
 )
 from budpipeline.actions.shared.model_resolver import (
+    derive_model_endpoints,
     get_model_info,
     resolve_initiator_user_id,
     resolve_pretrained_model_uri,
@@ -130,11 +131,17 @@ async def _run_simulation(
     if cluster_id:
         simulation_request["cluster_id"] = cluster_id
 
+    # Add model_endpoints for BudConnect engine compatibility lookup
+    model_endpoints = derive_model_endpoints(model_info)
+    if model_endpoints:
+        simulation_request["model_endpoints"] = model_endpoints
+
     logger.info(
         "deployment_create_running_simulation",
         local_path=local_path,
         cluster_id=cluster_id,
         hardware_mode=hardware_mode,
+        model_endpoints=model_endpoints,
     )
 
     try:
