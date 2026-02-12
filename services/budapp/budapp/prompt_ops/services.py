@@ -606,6 +606,7 @@ class PromptService(SessionMixin):
                 response_data["limit"] = request.limit
                 response_data.pop("offset", None)
                 response_data.pop("has_more", None)
+                response_data.pop("query_time_ms", None)
                 response_data["code"] = 200
 
                 return response_data
