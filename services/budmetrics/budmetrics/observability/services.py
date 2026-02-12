@@ -16,6 +16,9 @@ from budmetrics.observability.models import (
     QueryBuilder,
 )
 from budmetrics.observability.schemas import (
+    DEFAULT_SELECT_COLUMNS,
+    MAX_TRACE_LIMIT,
+    QUERYABLE_COLUMNS,
     CacheMetric,
     CountMetric,
     CredentialUsageItem,
@@ -23,6 +26,8 @@ from budmetrics.observability.schemas import (
     CredentialUsageResponse,
     EnhancedInferenceDetailResponse,
     FeedbackItem,
+    FilterCondition,
+    FilterOperator,
     GatewayAnalyticsRequest,
     GatewayAnalyticsResponse,
     GatewayMetadata,
@@ -42,6 +47,9 @@ from budmetrics.observability.schemas import (
     PromptDistributionBucket,
     PromptDistributionRequest,
     PromptDistributionResponse,
+    TelemetryQueryRequest,
+    TelemetryQueryResponse,
+    TelemetrySpanItem,
     TimeMetric,
     TraceDetailResponse,
     TraceEvent,
@@ -50,10 +58,340 @@ from budmetrics.observability.schemas import (
     TraceListResponse,
     TraceResourceType,
     UserUsageItem,
+    validate_attribute_key,
 )
 
 
 logger = logging.get_logger(__name__)
+
+# The table is hardcoded to match existing patterns in services.py
+_TELEMETRY_TRACE_TABLE = "metrics.otel_traces"
+
+
+class TelemetryQueryBuilder:
+    """Build parameterized ClickHouse queries for telemetry trace data.
+
+    Produces two queries:
+    - **count_query**: count of target spans matching all criteria (pagination)
+    - **data_query**: all spans for the paginated trace set (tree building)
+    """
+
+    def build_query(self, request: TelemetryQueryRequest) -> tuple[str, str, dict[str, Any]]:
+        """Build count and data queries from a validated request.
+
+        Args:
+            request: Validated TelemetryQueryRequest.
+
+        Returns:
+            Tuple of (data_query, count_query, params).
+        """
+        params: dict[str, Any] = {
+            "prompt_id": request.prompt_id,
+            "project_id": request.project_id,
+            "from_date": request.from_date,
+        }
+
+        # Default to_date to now if not specified
+        if request.to_date is not None:
+            params["to_date"] = request.to_date
+        else:
+            from datetime import datetime, timezone
+
+            params["to_date"] = datetime.now(timezone.utc)
+
+        if request.version is not None:
+            params["version"] = request.version
+
+        if request.trace_id is not None:
+            params["trace_id"] = request.trace_id
+
+        params["limit"] = min(request.limit, MAX_TRACE_LIMIT)
+        params["offset"] = request.offset
+
+        # Build components
+        select_clause = self._build_select_clause(request)
+        trace_id_subquery = self._build_trace_id_subquery(request, params)
+        target_conditions = self._build_target_span_conditions(request, params)
+
+        # Count query: how many target spans exist for pagination metadata
+        count_query = f"""
+            SELECT count()
+            FROM {_TELEMETRY_TRACE_TABLE}
+            WHERE {target_conditions}
+        """  # nosec B608
+
+        # Data query: all spans for the paginated trace set
+        data_query = f"""
+            SELECT {select_clause}
+            FROM {_TELEMETRY_TRACE_TABLE}
+            WHERE TraceId IN ({trace_id_subquery})
+            ORDER BY Timestamp ASC
+        """  # nosec B608
+
+        return data_query, count_query, params
+
+    # ------------------------------------------------------------------
+    # SELECT clause
+    # ------------------------------------------------------------------
+
+    def _build_select_clause(self, request: TelemetryQueryRequest) -> str:
+        """Build the SELECT column list based on projection options."""
+        columns = list(DEFAULT_SELECT_COLUMNS)
+
+        if request.select_attributes:
+            for key in request.select_attributes:
+                validate_attribute_key(key)
+                columns.append(f"SpanAttributes['{key}']")  # nosec B608
+
+        if request.include_all_attributes:
+            columns.append("SpanAttributes")
+            columns.append("ResourceAttributes")
+        elif request.include_resource_attributes:
+            columns.append("ResourceAttributes")
+
+        if request.include_events:
+            columns.extend(["Events.Timestamp", "Events.Name", "Events.Attributes"])
+
+        if request.include_links:
+            columns.extend(["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"])
+
+        return ", ".join(columns)
+
+    # ------------------------------------------------------------------
+    # Trace ID subquery
+    # ------------------------------------------------------------------
+
+    def _build_trace_id_subquery(self, request: TelemetryQueryRequest, params: dict[str, Any]) -> str:
+        """Build subquery that finds TraceIds via gateway_analytics spans.
+
+        Always filters by project_id, prompt_id, and timestamp range for
+        tenant isolation. Applies span_filters and resource_filters to the
+        gateway_analytics anchor spans.
+        """
+        conditions = [
+            "Timestamp >= %(from_date)s",
+            "Timestamp <= %(to_date)s",
+            "SpanName = 'gateway_analytics'",
+            "SpanAttributes['gateway_analytics.prompt_id'] = %(prompt_id)s",
+            "SpanAttributes['gateway_analytics.project_id'] = %(project_id)s",
+        ]
+
+        if request.version is not None:
+            conditions.append("SpanAttributes['gateway_analytics.prompt_version'] = %(version)s")
+
+        if request.trace_id is not None:
+            conditions.append("TraceId = %(trace_id)s")
+
+        # Apply span_filters to the subquery (filter the anchor spans)
+        if request.span_filters and request.span_names is None:
+            # When no span_names, filters apply to gateway_analytics spans
+            filter_sql = self._build_span_attr_filters(request.span_filters, params)
+            if filter_sql:
+                conditions.append(filter_sql)
+
+        # Apply resource_filters to the subquery only when targeting
+        # gateway_analytics spans (no span_names).  When span_names is set,
+        # the subquery still selects traces via gateway_analytics, but the
+        # resource_filters should only constrain the *target* spans.
+        if request.resource_filters and request.span_names is None:
+            filter_sql = self._build_resource_attr_filters(request.resource_filters, params)
+            if filter_sql:
+                conditions.append(filter_sql)
+
+        order_clause = self._build_order_clause(request)
+        where = " AND ".join(conditions)
+
+        return f"""
+            SELECT DISTINCT TraceId
+            FROM {_TELEMETRY_TRACE_TABLE}
+            WHERE {where}
+            {order_clause}
+            LIMIT %(limit)s OFFSET %(offset)s
+        """  # nosec B608
+
+    # ------------------------------------------------------------------
+    # Target span conditions (for count query)
+    # ------------------------------------------------------------------
+
+    def _build_target_span_conditions(self, request: TelemetryQueryRequest, params: dict[str, Any]) -> str:
+        """Build WHERE conditions for the target spans.
+
+        When ``span_names`` is null, targets are ``gateway_analytics`` spans.
+        When specified, targets are spans matching the given names within
+        the same trace scope.
+        """
+        conditions = [
+            "Timestamp >= %(from_date)s",
+            "Timestamp <= %(to_date)s",
+        ]
+
+        if request.span_names is None:
+            # Default: target gateway_analytics spans
+            conditions.extend(
+                [
+                    "SpanName = 'gateway_analytics'",
+                    "SpanAttributes['gateway_analytics.prompt_id'] = %(prompt_id)s",
+                    "SpanAttributes['gateway_analytics.project_id'] = %(project_id)s",
+                ]
+            )
+
+            if request.version is not None:
+                conditions.append("SpanAttributes['gateway_analytics.prompt_version'] = %(version)s")
+
+            if request.trace_id is not None:
+                conditions.append("TraceId = %(trace_id)s")
+
+            # span_filters apply to gateway_analytics spans
+            if request.span_filters:
+                filter_sql = self._build_span_attr_filters(request.span_filters, params)
+                if filter_sql:
+                    conditions.append(filter_sql)
+        else:
+            # span_names specified: target those specific spans within matching traces
+            trace_id_subquery = self._build_trace_id_subquery(request, params)
+            conditions.append(f"TraceId IN ({trace_id_subquery})")  # nosec B608
+
+            # Build SpanName IN clause
+            span_name_placeholders = []
+            for i, name in enumerate(request.span_names):
+                param_key = f"span_name_{i}"
+                params[param_key] = name
+                span_name_placeholders.append(f"%({param_key})s")
+            conditions.append(f"SpanName IN ({', '.join(span_name_placeholders)})")  # nosec B608
+
+            # span_filters apply to the named spans
+            if request.span_filters:
+                filter_sql = self._build_span_attr_filters(request.span_filters, params)
+                if filter_sql:
+                    conditions.append(filter_sql)
+
+        # resource_filters always apply to target spans
+        if request.resource_filters:
+            filter_sql = self._build_resource_attr_filters(request.resource_filters, params)
+            if filter_sql:
+                conditions.append(filter_sql)
+
+        return " AND ".join(conditions)
+
+    # ------------------------------------------------------------------
+    # Attribute filter builders
+    # ------------------------------------------------------------------
+
+    def _build_span_attr_filters(
+        self,
+        filters: list[FilterCondition],
+        params: dict[str, Any],
+    ) -> str:
+        """Build SQL conditions for SpanAttributes filters."""
+        clauses = []
+        for i, condition in enumerate(filters):
+            clause = self._build_filter_condition(condition, params, i, "span")
+            if clause:
+                clauses.append(clause)
+        return " AND ".join(clauses)
+
+    def _build_resource_attr_filters(
+        self,
+        filters: list[FilterCondition],
+        params: dict[str, Any],
+    ) -> str:
+        """Build SQL conditions for ResourceAttributes filters."""
+        clauses = []
+        for i, condition in enumerate(filters):
+            clause = self._build_filter_condition(condition, params, i, "resource")
+            if clause:
+                clauses.append(clause)
+        return " AND ".join(clauses)
+
+    def _build_filter_condition(
+        self,
+        condition: FilterCondition,
+        params: dict[str, Any],
+        idx: int,
+        attr_type: str,
+    ) -> str:
+        """Translate a single FilterCondition into a parameterized SQL fragment.
+
+        Args:
+            condition: The filter condition.
+            params: Mutable params dict to add values to.
+            idx: Unique index for parameter naming.
+            attr_type: Either "span" or "resource".
+
+        Returns:
+            SQL fragment string.
+        """
+        validate_attribute_key(condition.field)
+
+        if attr_type == "span":
+            field_expr = f"SpanAttributes['{condition.field}']"  # nosec B608
+        else:
+            field_expr = f"ResourceAttributes['{condition.field}']"  # nosec B608
+
+        op = condition.op
+        param_prefix = f"{attr_type}_f{idx}"
+
+        if op == FilterOperator.is_null:
+            return f"{field_expr} = ''"
+        if op == FilterOperator.is_not_null:
+            return f"{field_expr} != ''"
+
+        if op == FilterOperator.in_:
+            if not isinstance(condition.value, list):
+                raise ValueError(f"in_ operator requires a list value, got {type(condition.value)}")
+            placeholders = []
+            for j, val in enumerate(condition.value):
+                pk = f"{param_prefix}_{j}"
+                params[pk] = str(val)
+                placeholders.append(f"%({pk})s")
+            return f"{field_expr} IN ({', '.join(placeholders)})"
+
+        if op == FilterOperator.not_in:
+            if not isinstance(condition.value, list):
+                raise ValueError(f"not_in operator requires a list value, got {type(condition.value)}")
+            placeholders = []
+            for j, val in enumerate(condition.value):
+                pk = f"{param_prefix}_{j}"
+                params[pk] = str(val)
+                placeholders.append(f"%({pk})s")
+            return f"{field_expr} NOT IN ({', '.join(placeholders)})"
+
+        # Scalar operators
+        params[param_prefix] = str(condition.value) if condition.value is not None else ""
+
+        op_map = {
+            FilterOperator.eq: "=",
+            FilterOperator.neq: "!=",
+            FilterOperator.gt: ">",
+            FilterOperator.gte: ">=",
+            FilterOperator.lt: "<",
+            FilterOperator.lte: "<=",
+            FilterOperator.like: "LIKE",
+        }
+
+        sql_op = op_map.get(op)
+        if sql_op is None:
+            raise ValueError(f"Unsupported filter operator: {op}")
+
+        return f"{field_expr} {sql_op} %({param_prefix})s"
+
+    # ------------------------------------------------------------------
+    # ORDER BY
+    # ------------------------------------------------------------------
+
+    def _build_order_clause(self, request: TelemetryQueryRequest) -> str:
+        """Build ORDER BY clause from request order_by specs."""
+        if not request.order_by:
+            return "ORDER BY Timestamp DESC"
+
+        parts = []
+        for spec in request.order_by:
+            ch_col = QUERYABLE_COLUMNS.get(spec.field)
+            if ch_col is None:
+                raise ValueError(f"Invalid order_by field: {spec.field}")
+            parts.append(f"{ch_col} {spec.direction.upper()}")
+
+        return f"ORDER BY {', '.join(parts)}"
 
 
 class ObservabilityMetricsService:
@@ -1332,6 +1670,303 @@ class ObservabilityMetricsService:
             spans=spans,
             total_spans=len(spans),
         )
+
+    # ------------------------------------------------------------------
+    # Telemetry Query API
+    # ------------------------------------------------------------------
+
+    async def query_prompt_telemetry(self, request: TelemetryQueryRequest) -> TelemetryQueryResponse:
+        """Query prompt telemetry data with flexible span selection and tree building.
+
+        Executes a two-query approach:
+        1. Count query for pagination metadata
+        2. Data query for all spans in the matching trace set
+
+        Then builds a nested span tree in Python, pruned to the requested depth.
+
+        Args:
+            request: Validated TelemetryQueryRequest with project_id injected.
+
+        Returns:
+            TelemetryQueryResponse with nested span tree and pagination info.
+        """
+        import time
+
+        await self.initialize()
+
+        start_time = time.monotonic()
+
+        builder = TelemetryQueryBuilder()
+        data_query, count_query, params = builder.build_query(request)
+
+        # Execute count query for pagination
+        try:
+            count_result = await self.clickhouse_client.execute_query(count_query, params)
+            total_count = count_result[0][0] if count_result else 0
+        except Exception as e:
+            if "timeout" in str(e).lower() or "TIMEOUT" in str(e):
+                from budmicroframe.commons.schemas import ErrorResponse
+
+                return ErrorResponse(  # type: ignore[return-value]
+                    message="Query timed out. Try narrowing the time range or adding filters.",
+                    status_code=504,
+                )
+            raise
+
+        # Execute data query for all spans in matching traces
+        try:
+            results = await self.clickhouse_client.execute_query(data_query, params)
+        except Exception as e:
+            if "timeout" in str(e).lower() or "TIMEOUT" in str(e):
+                from budmicroframe.commons.schemas import ErrorResponse
+
+                return ErrorResponse(  # type: ignore[return-value]
+                    message="Query timed out. Try narrowing the time range or adding filters.",
+                    status_code=504,
+                )
+            raise
+
+        # Determine column names from the SELECT clause
+        column_names = self._get_telemetry_column_names(request)
+
+        # Build the span tree
+        data = self._build_telemetry_span_tree(results, column_names, request)
+
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+        return TelemetryQueryResponse(
+            data=data,
+            total_count=total_count,
+            limit=request.limit,
+            offset=request.offset,
+            has_more=(request.offset + request.limit) < total_count,
+            query_time_ms=elapsed_ms,
+        )
+
+    def _get_telemetry_column_names(self, request: TelemetryQueryRequest) -> list[str]:
+        """Build a list of column names matching the SELECT clause order.
+
+        This must match the order produced by TelemetryQueryBuilder._build_select_clause.
+        """
+        columns = list(DEFAULT_SELECT_COLUMNS)
+
+        if request.select_attributes:
+            for key in request.select_attributes:
+                validate_attribute_key(key)
+                columns.append(f"attr:{key}")
+
+        if request.include_all_attributes:
+            columns.append("SpanAttributes")
+            columns.append("ResourceAttributes")
+        elif request.include_resource_attributes:
+            columns.append("ResourceAttributes")
+
+        if request.include_events:
+            columns.extend(["Events.Timestamp", "Events.Name", "Events.Attributes"])
+
+        if request.include_links:
+            columns.extend(["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"])
+
+        return columns
+
+    def _build_telemetry_span_tree(
+        self,
+        flat_rows: list[tuple],
+        column_names: list[str],
+        request: TelemetryQueryRequest,
+    ) -> list[TelemetrySpanItem]:
+        """Build nested span tree from flat ClickHouse rows.
+
+        1. Index all spans by span_id
+        2. Build children_map: parent_span_id -> [child_span_ids]
+        3. Count all descendants per span (memoized, O(n))
+        4. Identify target spans (gateway_analytics or span_names matches)
+        5. For each target span, recursively build nested children up to depth
+
+        Args:
+            flat_rows: Raw row tuples from ClickHouse.
+            column_names: Column names matching row positions.
+            request: The original query request (for depth, span_names).
+
+        Returns:
+            List of TelemetrySpanItem with nested children.
+        """
+        if not flat_rows:
+            return []
+
+        # Map column names to indices
+        col_idx = {name: i for i, name in enumerate(column_names)}
+
+        # Build span_by_id and children_map
+        span_by_id: dict[str, dict[str, Any]] = {}
+        children_map: dict[str, list[str]] = {}
+        target_span_ids: list[str] = []
+
+        for row in flat_rows:
+            span_dict = self._telemetry_row_to_dict(row, col_idx, request)
+            span_id = span_dict["span_id"]
+            span_by_id[span_id] = span_dict
+
+            parent_id = span_dict["parent_span_id"]
+            if parent_id:
+                if parent_id not in children_map:
+                    children_map[parent_id] = []
+                children_map[parent_id].append(span_id)
+
+        # Identify target spans
+        for span_id, span_dict in span_by_id.items():
+            if request.span_names is None:
+                # Default: gateway_analytics spans are targets
+                if span_dict["span_name"] == "gateway_analytics":
+                    target_span_ids.append(span_id)
+            else:
+                # Custom: spans matching the requested names
+                if span_dict["span_name"] in request.span_names:
+                    target_span_ids.append(span_id)
+
+        # Memoized descendant count (O(n) total)
+        descendant_cache: dict[str, int] = {}
+
+        def count_descendants(sid: str) -> int:
+            if sid in descendant_cache:
+                return descendant_cache[sid]
+            children = children_map.get(sid, [])
+            total = len(children)
+            for child_id in children:
+                total += count_descendants(child_id)
+            descendant_cache[sid] = total
+            return total
+
+        # Build nested tree with depth pruning
+        depth = request.depth
+
+        def build_node(sid: str, current_depth: int) -> TelemetrySpanItem:
+            span = span_by_id[sid]
+            child_count = count_descendants(sid)
+
+            children_items: list[TelemetrySpanItem] = []
+            if depth == -1 or current_depth < depth:
+                for child_id in children_map.get(sid, []):
+                    if child_id in span_by_id:
+                        children_items.append(build_node(child_id, current_depth + 1))
+
+            return TelemetrySpanItem(
+                timestamp=span["timestamp"],
+                trace_id=span["trace_id"],
+                span_id=span["span_id"],
+                parent_span_id=span["parent_span_id"],
+                trace_state=span.get("trace_state", ""),
+                span_name=span["span_name"],
+                span_kind=span.get("span_kind", ""),
+                service_name=span.get("service_name", ""),
+                scope_name=span.get("scope_name", ""),
+                scope_version=span.get("scope_version", ""),
+                duration=span.get("duration", 0),
+                status_code=span.get("status_code", ""),
+                status_message=span.get("status_message", ""),
+                child_count=child_count,
+                children=children_items,
+                attributes=span.get("attributes", {}),
+                resource_attributes=span.get("resource_attributes"),
+                events=span.get("events"),
+                links=span.get("links"),
+            )
+
+        return [build_node(sid, 0) for sid in target_span_ids if sid in span_by_id]
+
+    def _telemetry_row_to_dict(
+        self,
+        row: tuple,
+        col_idx: dict[str, int],
+        request: TelemetryQueryRequest,
+    ) -> dict[str, Any]:
+        """Convert a ClickHouse row tuple to a span dict.
+
+        Args:
+            row: Raw row tuple from ClickHouse.
+            col_idx: Map of column name to position index.
+            request: The query request (for projection options).
+
+        Returns:
+            Dict with span fields ready for TelemetrySpanItem construction.
+        """
+        span: dict[str, Any] = {
+            "timestamp": str(row[col_idx["Timestamp"]]) if "Timestamp" in col_idx else "",
+            "trace_id": row[col_idx["TraceId"]] if "TraceId" in col_idx else "",
+            "span_id": row[col_idx["SpanId"]] if "SpanId" in col_idx else "",
+            "parent_span_id": (row[col_idx["ParentSpanId"]] or "") if "ParentSpanId" in col_idx else "",
+            "trace_state": (row[col_idx["TraceState"]] or "") if "TraceState" in col_idx else "",
+            "span_name": row[col_idx["SpanName"]] if "SpanName" in col_idx else "",
+            "span_kind": row[col_idx["SpanKind"]] if "SpanKind" in col_idx else "",
+            "service_name": row[col_idx["ServiceName"]] if "ServiceName" in col_idx else "",
+            "scope_name": (row[col_idx["ScopeName"]] or "") if "ScopeName" in col_idx else "",
+            "scope_version": (row[col_idx["ScopeVersion"]] or "") if "ScopeVersion" in col_idx else "",
+            "duration": row[col_idx["Duration"]] if "Duration" in col_idx else 0,
+            "status_code": row[col_idx["StatusCode"]] if "StatusCode" in col_idx else "",
+            "status_message": (row[col_idx["StatusMessage"]] or "") if "StatusMessage" in col_idx else "",
+        }
+
+        # Build attributes from select_attributes
+        attributes: dict[str, str] = {}
+        if request.select_attributes:
+            for key in request.select_attributes:
+                attr_col = f"attr:{key}"
+                if attr_col in col_idx:
+                    val = row[col_idx[attr_col]]
+                    attributes[key] = str(val) if val else ""
+
+        # If include_all_attributes, merge the full SpanAttributes map
+        if request.include_all_attributes and "SpanAttributes" in col_idx:
+            raw = row[col_idx["SpanAttributes"]]
+            if raw:
+                attributes.update({k: str(v) for k, v in dict(raw).items()})
+
+        span["attributes"] = attributes
+
+        # Resource attributes
+        if (request.include_all_attributes or request.include_resource_attributes) and "ResourceAttributes" in col_idx:
+            raw = row[col_idx["ResourceAttributes"]]
+            span["resource_attributes"] = {k: str(v) for k, v in dict(raw).items()} if raw else {}
+
+        # Events
+        if request.include_events and "Events.Timestamp" in col_idx:
+            events = []
+            ts_col = col_idx["Events.Timestamp"]
+            name_col = col_idx["Events.Name"]
+            attr_col = col_idx["Events.Attributes"]
+            if row[ts_col] and row[name_col]:
+                for i in range(len(row[ts_col])):
+                    events.append(
+                        {
+                            "timestamp": str(row[ts_col][i]),
+                            "name": row[name_col][i],
+                            "attributes": dict(row[attr_col][i]) if row[attr_col] and i < len(row[attr_col]) else {},
+                        }
+                    )
+            span["events"] = events
+
+        # Links
+        if request.include_links and "Links.TraceId" in col_idx:
+            links = []
+            tid_col = col_idx["Links.TraceId"]
+            sid_col = col_idx["Links.SpanId"]
+            state_col = col_idx["Links.TraceState"]
+            lattr_col = col_idx["Links.Attributes"]
+            if row[tid_col] and row[sid_col]:
+                for i in range(len(row[tid_col])):
+                    links.append(
+                        {
+                            "trace_id": row[tid_col][i],
+                            "span_id": row[sid_col][i] if i < len(row[sid_col]) else "",
+                            "trace_state": row[state_col][i] if row[state_col] and i < len(row[state_col]) else "",
+                            "attributes": dict(row[lattr_col][i])
+                            if row[lattr_col] and i < len(row[lattr_col])
+                            else {},
+                        }
+                    )
+            span["links"] = links
+
+        return span
 
     async def _get_inference_from_fact_table(self, inference_id: str) -> Optional[dict]:
         """Try to get inference from InferenceFact table.

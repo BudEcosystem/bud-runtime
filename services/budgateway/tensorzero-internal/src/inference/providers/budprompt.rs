@@ -725,6 +725,26 @@ impl ResponseProvider for BudPromptProvider {
                     streaming_request_builder.bearer_auth(static_key.expose_secret());
             }
 
+            // Inject trace context so the second request shares the same trace as the first
+            if let Some(traceparent) = http_headers.get("traceparent") {
+                if let Ok(value) = traceparent.to_str() {
+                    streaming_request_builder =
+                        streaming_request_builder.header("traceparent", value);
+                }
+            }
+            if let Some(tracestate) = http_headers.get("tracestate") {
+                if let Ok(value) = tracestate.to_str() {
+                    streaming_request_builder =
+                        streaming_request_builder.header("tracestate", value);
+                }
+            }
+            if let Some(baggage_header) = http_headers.get("baggage") {
+                if let Ok(value) = baggage_header.to_str() {
+                    streaming_request_builder =
+                        streaming_request_builder.header("baggage", value);
+                }
+            }
+
             let event_source = streaming_request_builder
                 .json(&request)
                 .eventsource()

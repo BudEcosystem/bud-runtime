@@ -91,6 +91,7 @@ from .schemas import (
     PromptSchemaWorkflowSteps,
     PromptVersionListItem,
     PromptVersionResponse,
+    TelemetryQueryRequest,
     Tool,
     ToolListItem,
 )
@@ -527,6 +528,88 @@ class PromptService(SessionMixin):
                     "total_spans": response_data.get("total_spans", 0),
                     "message": "Trace retrieved successfully",
                 }
+
+    async def query_telemetry(
+        self,
+        request: TelemetryQueryRequest,
+        project_id: str,
+    ) -> dict:
+        """Query prompt telemetry data via budmetrics.
+
+        Validates prompt ownership, injects project context, and
+        forwards the request to budmetrics for query execution.
+
+        Args:
+            request: Validated telemetry query request.
+            project_id: Project ID from API key context.
+
+        Returns:
+            dict: Response data from budmetrics.
+
+        Raises:
+            ClientException: If prompt not found or budmetrics call fails.
+        """
+        # Validate prompt belongs to the project
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={
+                "name": request.prompt_id,
+                "project_id": project_id,
+                "status": PromptStatusEnum.ACTIVE,
+            },
+            missing_ok=True,
+        )
+        if not db_prompt:
+            raise ClientException(
+                message="Prompt not found or does not belong to project",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Resolve default version when client omits version
+        if request.version is None and db_prompt.default_version_id is not None:
+            db_version = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptVersionModel,
+                fields={"id": db_prompt.default_version_id},
+                missing_ok=True,
+            )
+            request_version = str(db_version.version) if db_version else None
+        else:
+            request_version = request.version
+
+        # Build payload with server-injected project_id; convert page → offset for budmetrics
+        payload = request.model_dump(mode="json", exclude={"page"})
+        offset = (request.page - 1) * request.limit
+        payload["offset"] = offset
+        payload["project_id"] = project_id
+        payload["version"] = request_version
+
+        # Forward to budmetrics via Dapr service invocation
+        budmetrics_url = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/"
+            f"{app_settings.bud_metrics_app_id}/method/"
+            f"observability/prompt-telemetry/query"
+        )
+
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.post(budmetrics_url, json=payload) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"budmetrics telemetry query failed: {response_data}")
+                    raise ClientException(
+                        message=response_data.get("message", "Telemetry query failed"),
+                        status_code=response.status,
+                    )
+
+                # Transform response to match budapp pagination convention
+                response_data["total_record"] = response_data.pop("total_count", 0)
+                response_data["page"] = request.page
+                response_data["limit"] = request.limit
+                response_data.pop("offset", None)
+                response_data.pop("has_more", None)
+                response_data.pop("query_time_ms", None)
+                response_data["code"] = 200
+
+                return response_data
 
     async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:
         """Search prompt tags by name."""

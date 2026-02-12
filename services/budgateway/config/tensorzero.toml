@@ -8,6 +8,9 @@ enabled = false
 [gateway.observability]
 enabled = false
 
+[gateway.otlp_proxy]
+enabled = true
+
 [gateway.analytics]
 enabled = true
 # GeoIP database for location data enrichment

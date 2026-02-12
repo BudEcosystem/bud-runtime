@@ -25,6 +25,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
+from budapp.commons.api_key_auth import APIKeyContext, get_api_key_context
 from budapp.commons.constants import PermissionEnum
 from budapp.commons.dependencies import (
     get_current_active_user,
@@ -75,6 +76,8 @@ from .schemas import (
     RegisterConnectorResponse,
     SinglePromptResponse,
     SinglePromptVersionResponse,
+    TelemetryQueryRequest,
+    TelemetryQueryResponse,
     ToolFilter,
     ToolListResponse,
     ToolResponse,
@@ -1774,4 +1777,44 @@ async def get_prompt_trace(
         logger.exception(f"Failed to get trace: {e}")
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to get trace"
+        ).to_http_response()
+
+
+@router.post(
+    "/telemetry/query",
+    responses={
+        status.HTTP_200_OK: {
+            "model": TelemetryQueryResponse,
+            "description": "Telemetry query results",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "model": ErrorResponse,
+            "description": "Invalid API key",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "model": ErrorResponse,
+            "description": "Prompt not found",
+        },
+    },
+    description="Query prompt telemetry data (SDK authentication via API key)",
+    tags=["Telemetry"],
+)
+async def query_telemetry(
+    request_body: TelemetryQueryRequest,
+    api_ctx: Annotated[APIKeyContext, Depends(get_api_key_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Union[TelemetryQueryResponse, ErrorResponse]:
+    try:
+        result = await PromptService(session).query_telemetry(
+            request=request_body,
+            project_id=api_ctx.project_id,
+        )
+        return TelemetryQueryResponse(**result).to_http_response()
+    except ClientException as e:
+        logger.error(f"Failed to query telemetry: {e}")
+        return ErrorResponse(code=e.status_code, message=e.message).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to query telemetry: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR, message="Failed to query telemetry"
         ).to_http_response()

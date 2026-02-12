@@ -686,6 +686,7 @@ mod tests {
                 geoip_db_path: None,
             },
             blocking: BlockingConfig { enabled: false },
+            otlp_proxy: Default::default(),
         };
 
         let config = Box::leak(Box::new(Config {
@@ -747,6 +748,7 @@ mod tests {
                 geoip_db_path: None,
             },
             blocking: BlockingConfig { enabled: false },
+            otlp_proxy: Default::default(),
         };
 
         let config = Box::leak(Box::new(Config {
@@ -777,6 +779,7 @@ mod tests {
                 geoip_db_path: None,
             },
             blocking: BlockingConfig { enabled: false },
+            otlp_proxy: Default::default(),
         };
         let config = Box::leak(Box::new(Config {
             gateway: gateway_config,
@@ -975,6 +978,7 @@ mod tests {
                 geoip_db_path: None,
             },
             blocking: BlockingConfig { enabled: false },
+            otlp_proxy: Default::default(),
         };
         let config = Config {
             gateway: gateway_config,

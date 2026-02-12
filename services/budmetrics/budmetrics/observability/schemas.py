@@ -1,4 +1,5 @@
 import ipaddress
+import re
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -6,7 +7,7 @@ from uuid import UUID
 
 from budmicroframe.commons.schemas import CloudEventBase, ResponseBase
 from fastapi.responses import ORJSONResponse
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def validate_date_range(from_date: Optional[datetime], to_date: Optional[datetime], max_days: int = 90) -> None:
@@ -1234,6 +1235,215 @@ class PromptDistributionResponse(ResponseBase):
     metric: str
     date_range: Dict[str, datetime]
     bucket_definitions: List[Dict[str, Union[float, str]]]
+
+
+# ============================================
+# Telemetry Query Schemas
+# ============================================
+
+
+QUERYABLE_COLUMNS: dict[str, str] = {
+    "timestamp": "Timestamp",
+    "trace_id": "TraceId",
+    "span_id": "SpanId",
+    "parent_span_id": "ParentSpanId",
+    "trace_state": "TraceState",
+    "span_name": "SpanName",
+    "span_kind": "SpanKind",
+    "service_name": "ServiceName",
+    "scope_name": "ScopeName",
+    "scope_version": "ScopeVersion",
+    "duration": "Duration",
+    "status_code": "StatusCode",
+    "status_message": "StatusMessage",
+}
+
+DEFAULT_SELECT_COLUMNS: list[str] = list(QUERYABLE_COLUMNS.values())
+
+# Limits
+MAX_SELECT_ATTRIBUTES = 50
+MAX_SPAN_FILTER_CONDITIONS = 20
+MAX_RESOURCE_FILTER_CONDITIONS = 20
+MAX_TIME_RANGE_DAYS = 90
+MAX_RESULT_ROWS = 10000
+MAX_DEPTH = 10
+MAX_SPAN_NAMES = 20
+MAX_TRACE_LIMIT = 1000
+
+# Attribute key validation pattern — rejects SQL injection characters
+_INVALID_KEY_PATTERN = re.compile(r"['\";]|--|/\*")
+
+
+def validate_attribute_key(key: str) -> str:
+    """Validate an attribute key for safe ClickHouse Map lookup.
+
+    Args:
+        key: The attribute key string to validate.
+
+    Returns:
+        The validated key.
+
+    Raises:
+        ValueError: If key is empty, too long, or contains injection characters.
+    """
+    if not key:
+        raise ValueError("Attribute key must not be empty")
+    if len(key) > 200:
+        raise ValueError(f"Attribute key exceeds 200 characters: {key[:50]}...")
+    if _INVALID_KEY_PATTERN.search(key):
+        raise ValueError(f"Attribute key contains invalid characters: {key!r}")
+    return key
+
+
+class FilterOperator(str, Enum):
+    """Supported filter operators for attribute-level filtering."""
+
+    eq = "eq"
+    neq = "neq"
+    gt = "gt"
+    gte = "gte"
+    lt = "lt"
+    lte = "lte"
+    in_ = "in_"
+    not_in = "not_in"
+    like = "like"
+    is_null = "is_null"
+    is_not_null = "is_not_null"
+
+
+class FilterCondition(BaseModel):
+    """A single filter condition on a span or resource attribute."""
+
+    field: str = Field(..., min_length=1, max_length=200)
+    op: FilterOperator
+    value: Any = None
+
+    @field_validator("field")
+    @classmethod
+    def validate_field(cls, v: str) -> str:
+        """Ensure field name is safe for ClickHouse Map lookup."""
+        return validate_attribute_key(v)
+
+
+class OrderBySpec(BaseModel):
+    """Sort specification for query results."""
+
+    field: str
+    direction: Literal["asc", "desc"] = "desc"
+
+    @field_validator("field")
+    @classmethod
+    def validate_order_field(cls, v: str) -> str:
+        """Ensure order-by field is a known queryable column."""
+        if v not in QUERYABLE_COLUMNS:
+            raise ValueError(f"Invalid order_by field '{v}'. Must be one of: {', '.join(QUERYABLE_COLUMNS.keys())}")
+        return v
+
+
+class TelemetrySpanItem(BaseModel):
+    """A single span in the telemetry query response.
+
+    Supports recursive nesting via the ``children`` field. The ``child_count``
+    represents the total number of descendants (not just direct children),
+    regardless of the ``depth`` parameter used in the query.
+    """
+
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
+
+    timestamp: str
+    trace_id: str
+    span_id: str
+    parent_span_id: str = ""
+    trace_state: str = ""
+    span_name: str
+    span_kind: str = ""
+    service_name: str = ""
+    scope_name: str = ""
+    scope_version: str = ""
+    duration: int = 0
+    status_code: str = ""
+    status_message: str = ""
+    child_count: int = 0
+    children: List["TelemetrySpanItem"] = Field(default_factory=list)
+    attributes: Dict[str, str] = Field(default_factory=dict)
+    resource_attributes: Optional[Dict[str, str]] = None
+    events: Optional[List[Dict[str, Any]]] = None
+    links: Optional[List[Dict[str, Any]]] = None
+
+
+class TelemetryQueryResponse(ResponseBase):
+    """Response for the telemetry query endpoint."""
+
+    object: str = "telemetry_query"
+    data: List[TelemetrySpanItem] = Field(default_factory=list)
+    total_count: int = 0
+    limit: int = 50
+    offset: int = 0
+    has_more: bool = False
+    query_time_ms: int = 0
+
+
+class TelemetryQueryRequest(BaseModel):
+    """Request payload for POST /observability/prompt-telemetry/query.
+
+    Required fields: ``prompt_id`` and ``from_date``.
+    The ``project_id`` is injected server-side by budapp from the API key context
+    and must never be supplied by the client.
+    """
+
+    # === Required context ===
+    prompt_id: str = Field(..., min_length=1)
+    from_date: datetime
+
+    # === Optional scoping ===
+    version: Optional[str] = None
+    to_date: Optional[datetime] = None
+    trace_id: Optional[str] = None
+
+    # === Span selection ===
+    span_names: Optional[List[str]] = Field(None, max_length=MAX_SPAN_NAMES)
+    depth: int = Field(0, ge=-1, le=MAX_DEPTH)
+
+    # === Attribute projection ===
+    select_attributes: Optional[List[str]] = Field(None, max_length=MAX_SELECT_ATTRIBUTES)
+    include_all_attributes: bool = False
+    include_resource_attributes: bool = False
+    include_events: bool = False
+    include_links: bool = False
+
+    # === Span attribute filters ===
+    span_filters: Optional[List[FilterCondition]] = Field(None, max_length=MAX_SPAN_FILTER_CONDITIONS)
+
+    # === Resource attribute filters ===
+    resource_filters: Optional[List[FilterCondition]] = Field(None, max_length=MAX_RESOURCE_FILTER_CONDITIONS)
+
+    # === Pagination ===
+    order_by: Optional[List[OrderBySpec]] = None
+    limit: int = Field(50, ge=1, le=MAX_RESULT_ROWS)
+    offset: int = Field(0, ge=0, le=MAX_RESULT_ROWS)
+
+    # === Server-injected (never client-supplied) ===
+    project_id: Optional[str] = Field(None)
+
+    @field_validator("select_attributes")
+    @classmethod
+    def validate_select_attributes(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate each attribute key in select_attributes for safe Map lookup."""
+        if v is not None:
+            for key in v:
+                validate_attribute_key(key)
+        return v
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "TelemetryQueryRequest":
+        """Ensure from_date/to_date span at most MAX_TIME_RANGE_DAYS."""
+        if self.to_date is not None and self.from_date:
+            if self.to_date < self.from_date:
+                raise ValueError("to_date must be after from_date")
+            date_diff = self.to_date - self.from_date
+            if date_diff > timedelta(days=MAX_TIME_RANGE_DAYS):
+                raise ValueError(f"Time range cannot exceed {MAX_TIME_RANGE_DAYS} days")
+        return self
 
 
 # ============================================
