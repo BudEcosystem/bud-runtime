@@ -499,12 +499,16 @@ class DaprService(DaprClient):
                     if isinstance(detail, dict):
                         # Handle structured error: {"detail": {"error": "...", "errors": [...]}}
                         # and {"detail": {"message": "..."}}
-                        error_message = detail.get("message") or detail.get("error") or str(detail)
-                        # Append validation errors list if present
+                        base_message = detail.get("message") or detail.get("error")
                         errors = detail.get("errors")
+
+                        error_parts = []
+                        if base_message:
+                            error_parts.append(base_message)
                         if errors:
-                            error_details = "; ".join(map(str, errors))
-                            error_message = f"{error_message}: {error_details}"
+                            error_parts.append("; ".join(map(str, errors)))
+
+                        error_message = ": ".join(error_parts) or str(detail)
                     elif detail is not None:
                         error_message = str(detail)
                     else:
