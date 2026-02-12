@@ -11,6 +11,7 @@ import {
   Text_13_400_B3B3B3,
 } from "@/components/ui/text";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
+import { useLoader } from "src/context/appContext";
 
 import {
   useGlobalConnectors,
@@ -192,6 +193,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
     fetchRegistry,
     configureConnector,
   } = useGlobalConnectors();
+  const { isLoading: globalLoading } = useLoader();
 
   // ---- Local state --------------------------------------------------------
   const searchTerm = externalSearchTerm ?? "";
@@ -206,6 +208,25 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
   const [credentialForm, setCredentialForm] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ---- Responsive drawer width (matches BudDrawer pattern) ----------------
+  const [drawerWidth, setDrawerWidth] = useState(400);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      const screenWidth = window.innerWidth;
+      if (screenWidth > 2560) setDrawerWidth(screenWidth * 0.35);
+      else if (screenWidth > 1920) setDrawerWidth(screenWidth * 0.4322);
+      else if (screenWidth > 1280) setDrawerWidth(screenWidth * 0.433);
+      else if (screenWidth > 1024) setDrawerWidth(450);
+      else setDrawerWidth(400);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ---- Computed values (needed before effects) ----------------------------
   const hasMore = registryConnectors.length < registryTotal;
@@ -554,7 +575,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
   return (
     <div className="pb-[60px] pt-[.5rem] relative">
       {/* Registry connector grid */}
-      {isLoading ? (
+      {isLoading && !globalLoading ? (
         <div className="flex justify-center items-center py-20">
           <Spin size="default" />
         </div>
@@ -683,7 +704,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
       <Drawer
         title={null}
         placement="right"
-        width={480}
+        width={drawerWidth}
         open={drawerOpen}
         onClose={closeDrawer}
         closable={false}
