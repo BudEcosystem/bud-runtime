@@ -897,14 +897,9 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         # If models need deployment, trigger deployment first and defer profile creation
         if models_requiring_deployment:
             cluster_id = data.get("cluster_id")
-            per_model_configs = data.get("per_model_deployment_configs", [])
 
-            # Check if we have cluster assignment (global or per-model)
-            has_global_cluster = cluster_id is not None
-            has_per_model_clusters = per_model_configs and any(pmc.get("cluster_id") for pmc in per_model_configs)
-
-            if not has_global_cluster and not has_per_model_clusters:
-                logger.warning("Models require deployment but no cluster_id specified (global or per-model)")
+            if not cluster_id:
+                logger.warning("Models require deployment but no cluster_id specified")
                 execution_status_data = {
                     "workflow_execution_status": {
                         "status": "error",
@@ -922,11 +917,10 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
             logger.info(f"Triggering model deployment for {len(models_requiring_deployment)} models")
 
-            # Build models for deployment with merged deploy configs
-            models_for_deployment = self.build_models_with_deploy_configs(
+            # Build models for deployment with deploy config
+            models_for_deployment = self.build_models_for_deployment(
                 model_statuses=models_requiring_deployment,
-                default_config=data.get("deploy_config"),
-                per_model_configs=data.get("per_model_deployment_configs"),
+                deploy_config=data.get("deploy_config"),
             )
 
             try:
@@ -937,7 +931,8 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     user_id=current_user_id,
                     callback_topics=data.get("callback_topics"),
                     hardware_mode=data.get("hardware_mode", "dedicated"),
-                    simulation_events=data.get("simulation_events"),  # Pass simulator_ids from earlier simulation
+                    deploy_config=data.get("deploy_config"),
+                    budaiscaler_specification=data.get("budaiscaler_specification"),
                 )
 
                 # Build deployment_events structure from trigger_deployment results
