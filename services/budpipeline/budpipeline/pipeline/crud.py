@@ -328,6 +328,8 @@ class PipelineExecutionCRUD:
         pipeline_definition: dict[str, Any],
         initiator: str,
         pipeline_id: UUID | None = None,
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
     ) -> PipelineExecution:
         """Create a new pipeline execution.
 
@@ -335,6 +337,8 @@ class PipelineExecutionCRUD:
             pipeline_definition: Complete pipeline DAG definition (snapshot).
             initiator: User or service that initiated execution.
             pipeline_id: Optional reference to parent pipeline definition.
+            subscriber_ids: Optional user ID(s) for Novu notification delivery.
+            payload_type: Optional custom payload.type for event routing.
 
         Returns:
             Created PipelineExecution instance.
@@ -345,6 +349,8 @@ class PipelineExecutionCRUD:
             initiator=initiator,
             status=ExecutionStatus.PENDING,
             progress_percentage=Decimal("0.00"),
+            subscriber_ids=subscriber_ids,
+            payload_type=payload_type,
         )
         self.session.add(execution)
         await self.session.flush()

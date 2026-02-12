@@ -66,6 +66,12 @@ class ExecutionCreateRequest(BaseModel):
         None, description="User ID initiating the execution (for service-to-service auth)"
     )
     initiator: str = Field(default="api", description="Initiator identifier")
+    subscriber_ids: str | None = Field(
+        None, description="User ID(s) for Novu notifications (enables dual-publish to budnotify)"
+    )
+    payload_type: str | None = Field(
+        None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
+    )
 
 
 class ExecutionResponse(BaseModel):
@@ -133,6 +139,12 @@ class PipelineExecutionCreate(BaseModel):
         None, description="Dapr pub/sub topics for event notifications (validated per FR-022)"
     )
     metadata: dict[str, Any] | None = Field(None, description="Additional execution metadata")
+    subscriber_ids: str | None = Field(
+        None, description="User ID(s) for Novu notifications (enables dual-publish to budnotify)"
+    )
+    payload_type: str | None = Field(
+        None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
+    )
 
 
 class PipelineExecutionUpdate(BaseModel):
@@ -396,4 +408,10 @@ class EphemeralExecutionRequest(BaseModel):
     initiator: str = Field(default="api", description="Initiator identifier")
     callback_topics: list[str] | None = Field(
         None, description="Optional callback topics for real-time progress updates"
+    )
+    subscriber_ids: str | None = Field(
+        None, description="User ID(s) for Novu notifications (enables dual-publish to budnotify)"
+    )
+    payload_type: str | None = Field(
+        None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
     )

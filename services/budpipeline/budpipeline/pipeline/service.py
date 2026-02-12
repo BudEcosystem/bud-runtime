@@ -637,6 +637,8 @@ class PipelineService:
         params: dict[str, Any],
         callback_topics: list[str] | None = None,
         initiator: str = "api",
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
     ) -> dict[str, Any]:
         """Execute a pipeline from database.
 
@@ -649,6 +651,8 @@ class PipelineService:
             params: Input parameters.
             callback_topics: Optional list of callback topics for real-time updates.
             initiator: User or service that initiated execution.
+            subscriber_ids: Optional user ID(s) for Novu notification delivery.
+            payload_type: Optional custom payload.type for event routing.
 
         Returns:
             Execution result dict.
@@ -678,6 +682,8 @@ class PipelineService:
             callback_topics=callback_topics,
             initiator=initiator,
             pipeline_id=pipeline_uuid,
+            subscriber_ids=subscriber_ids,
+            payload_type=payload_type,
         )
 
     async def _execute_pipeline_impl(
@@ -687,6 +693,8 @@ class PipelineService:
         callback_topics: list[str] | None = None,
         initiator: str = "api",
         pipeline_id: UUID | None = None,
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
     ) -> dict[str, Any]:
         """Internal implementation for pipeline execution.
 
@@ -698,6 +706,8 @@ class PipelineService:
             callback_topics: Optional list of callback topics for real-time updates.
             initiator: User or service that initiated execution.
             pipeline_id: Optional pipeline definition ID for linking.
+            subscriber_ids: Optional user ID(s) for Novu notification delivery.
+            payload_type: Optional custom payload.type for event routing.
 
         Returns:
             Execution result dict.
@@ -727,6 +737,8 @@ class PipelineService:
                 initiator=initiator,
                 callback_topics=callback_topics,
                 pipeline_id=pipeline_id,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
             )
             # Use the DB-generated UUID if available
             execution_id = str(db_execution_id)
