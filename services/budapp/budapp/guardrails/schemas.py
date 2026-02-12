@@ -33,7 +33,7 @@ from budapp.commons.constants import (
 )
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.endpoint_ops.schemas import ProviderConfig, ProxyModelPricing
-from budapp.model_ops.schemas import Provider
+from budapp.model_ops.schemas import BudAIScalerSpecification, DeploymentTemplateCreate, Provider
 
 
 class ModelDeploymentStatus(str, Enum):
@@ -681,8 +681,8 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     # Model deployment fields
     cluster_id: UUID4 | None = None
     hardware_mode: Literal["dedicated", "shared"] | None = None
-    deploy_config: dict | None = None  # Default config applied to all models
-    per_model_deployment_configs: list[dict] | None = None  # Per-model configs: [{model_id/model_uri, deploy_config}]
+    deploy_config: DeploymentTemplateCreate | None = None
+    budaiscaler_specification: BudAIScalerSpecification | None = None
     callback_topics: list[str] | None = None
 
     @model_validator(mode="after")
@@ -737,8 +737,8 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     severity_threshold: float | None = None
     # Model deployment fields
     hardware_mode: Literal["dedicated", "shared"] | None = None
-    deploy_config: dict | None = None  # Default config for all models
-    per_model_deployment_configs: list[dict] | None = None  # Per-model configs
+    deploy_config: dict | None = None  # Serialized DeploymentTemplateCreate
+    budaiscaler_specification: dict | None = None  # Serialized BudAIScalerSpecification
     cluster_id: UUID4 | None = None  # Global cluster_id for deployment
     # Model status fields (populated when derive_model_statuses=True)
     model_statuses: list[dict] | None = None
