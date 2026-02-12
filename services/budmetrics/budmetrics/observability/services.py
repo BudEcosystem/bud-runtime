@@ -1395,7 +1395,6 @@ class ObservabilityMetricsService:
             FROM metrics.otel_traces
             WHERE Timestamp >= %(from_date)s
               AND Timestamp <= %(to_date)s
-              AND ParentSpanId = ''
               AND SpanName = 'gateway_analytics'
               AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
               AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
@@ -1479,7 +1478,6 @@ class ObservabilityMetricsService:
             FROM metrics.otel_traces
             WHERE Timestamp >= %(from_date)s
               AND Timestamp <= %(to_date)s
-              AND ParentSpanId = ''
               AND SpanName = 'gateway_analytics'
               AND SpanAttributes['{resource_attr_key}'] = %(resource_id)s
               AND SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
@@ -1502,7 +1500,6 @@ class ObservabilityMetricsService:
             ) as counts ON t.TraceId = counts.TraceId
             WHERE t.Timestamp >= %(from_date)s
               AND t.Timestamp <= %(to_date)s
-              AND t.ParentSpanId = ''
               AND t.SpanName = 'gateway_analytics'
               AND t.SpanAttributes['{resource_attr_key}'] = %(resource_id)s
               AND t.SpanAttributes['gateway_analytics.project_id'] = %(project_id)s
