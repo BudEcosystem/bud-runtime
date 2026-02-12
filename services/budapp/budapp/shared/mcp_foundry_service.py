@@ -694,6 +694,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         transport: str = "SSE",
         visibility: str = "public",
         auth_config: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Create a gateway in MCP Foundry.
 
@@ -703,6 +704,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             transport: Transport type (SSE, stdio) - default SSE
             visibility: Gateway visibility (public, private) - default public
             auth_config: Optional authentication configuration (OAuth, Headers, etc.)
+            tags: Optional list of tags to attach to the gateway
 
         Returns:
             Dict[str, Any]: Gateway creation response with gateway_id
@@ -718,6 +720,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 transport=transport,
                 visibility=visibility,
                 has_auth_config=auth_config is not None,
+                tags=tags,
             )
 
             # Prepare request payload
@@ -727,6 +730,10 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 "transport": transport,
                 "visibility": visibility,
             }
+
+            # Add tags if provided
+            if tags:
+                payload["tags"] = tags
 
             # Merge auth_config if provided
             if auth_config:
@@ -902,6 +909,107 @@ class MCPFoundryService(metaclass=SingletonMeta):
         except Exception as e:
             # Wrap unexpected exceptions
             error_msg = f"Unexpected error updating virtual server {server_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def list_gateways(
+        self,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """List all gateways from MCP Foundry.
+
+        Args:
+            offset: Number of items to skip
+            limit: Maximum number of items to return
+
+        Returns:
+            Tuple of (list of gateways, total count)
+
+        Raises:
+            MCPFoundryException: If the API call fails
+        """
+        try:
+            logger.debug(
+                "Fetching gateways from MCP Foundry",
+                offset=offset,
+                limit=limit,
+            )
+
+            params = {
+                "offset": offset,
+                "limit": limit,
+            }
+
+            response = await self._make_request(
+                method="GET",
+                endpoint="/gateways",
+                params=params,
+            )
+
+            if isinstance(response, dict):
+                gateways = response.get("gateways", response.get("data", response.get("items", [])))
+                total = response.get("total", len(gateways))
+            else:
+                gateways = response if isinstance(response, list) else []
+                total = len(gateways)
+
+            logger.debug(
+                "Successfully fetched gateways from MCP Foundry",
+                returned_count=len(gateways),
+                total_count=total,
+            )
+
+            return gateways, total
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error listing gateways: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def update_gateway(
+        self,
+        gateway_id: str,
+        update_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Update a gateway in MCP Foundry.
+
+        Args:
+            gateway_id: The gateway ID to update
+            update_data: Dictionary of fields to update
+
+        Returns:
+            Dict[str, Any]: Updated gateway data
+
+        Raises:
+            MCPFoundryException: If the API call fails
+        """
+        try:
+            logger.debug(
+                "Updating gateway in MCP Foundry",
+                gateway_id=gateway_id,
+                update_fields=list(update_data.keys()),
+            )
+
+            response = await self._make_request(
+                method="PUT",
+                endpoint=f"/gateways/{gateway_id}",
+                json_data=update_data,
+            )
+
+            logger.debug(
+                "Successfully updated gateway in MCP Foundry",
+                gateway_id=gateway_id,
+            )
+
+            return response
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error updating gateway {gateway_id}: {str(e)}"
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 

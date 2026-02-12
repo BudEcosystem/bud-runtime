@@ -6,6 +6,7 @@ const OAUTH_DRAWER_KEY = 'oauth_should_open_drawer';
 const OAUTH_PROCESSED_KEY = 'oauth_callback_processed';
 const OAUTH_PROMPT_ID_KEY = 'oauth_original_prompt_id'; // Dedicated key for prompt ID preservation
 const OAUTH_SESSION_DATA_KEY = 'oauth_session_data'; // Dedicated key for session data preservation
+const GLOBAL_OAUTH_STATE_KEY = 'global_oauth_connector_state'; // Global connector OAuth state
 
 // Variable interface for schema persistence
 interface OAuthAgentVariable {
@@ -103,7 +104,35 @@ export const useOAuthCallback = (onOAuthCallback?: (state: OAuthState) => void) 
 
     console.log('OAuth callback detected in page');
 
-    // Get saved state from localStorage
+    // Check if this is a global connector OAuth callback
+    const globalState = getGlobalOAuthState();
+    if (globalState?.oauthType === 'global') {
+      console.log('Global connector OAuth callback detected');
+      hasProcessed.current = true;
+      sessionStorage.setItem(OAUTH_PROCESSED_KEY, 'true');
+
+      // Import dynamically to avoid circular deps
+      import('@/services/globalConnectorService').then(({ GlobalConnectorService }) => {
+        GlobalConnectorService.handleOAuthCallback({ code: code!, state: state! }).then((res) => {
+          console.log('Global OAuth callback result:', res?.data);
+          clearGlobalOAuthState();
+
+          // Clean URL params
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+
+          setTimeout(() => {
+            sessionStorage.removeItem(OAUTH_PROCESSED_KEY);
+          }, 5000);
+        }).catch((err) => {
+          console.error('Global OAuth callback failed:', err);
+          clearGlobalOAuthState();
+        });
+      });
+      return;
+    }
+
+    // Get saved state from localStorage (per-prompt connector flow)
     const savedStateStr = localStorage.getItem(OAUTH_STATE_KEY);
 
     if (savedStateStr) {
@@ -248,5 +277,47 @@ export const getOAuthSessionData = (): OAuthSessionData | null => {
   } catch (error) {
     console.error('Failed to get OAuth session data:', error);
     return null;
+  }
+};
+
+// ─── Global Connector OAuth Helpers ──────────────────────────────────────────
+
+export interface GlobalOAuthState {
+  gatewayId: string;
+  gatewayName: string;
+  oauthType: 'global';
+  timestamp: number;
+}
+
+/** Get global OAuth state from localStorage (if any). */
+export const getGlobalOAuthState = (): GlobalOAuthState | null => {
+  try {
+    const saved = localStorage.getItem(GLOBAL_OAUTH_STATE_KEY);
+    if (!saved) return null;
+
+    const state: GlobalOAuthState = JSON.parse(saved);
+    // Check 10-minute expiry
+    if (Date.now() - state.timestamp > 10 * 60 * 1000) {
+      localStorage.removeItem(GLOBAL_OAUTH_STATE_KEY);
+      return null;
+    }
+    return state;
+  } catch {
+    return null;
+  }
+};
+
+/** Check if current OAuth callback is for a global connector. */
+export const isGlobalOAuthCallback = (): boolean => {
+  const state = getGlobalOAuthState();
+  return state?.oauthType === 'global';
+};
+
+/** Clear global OAuth state. */
+export const clearGlobalOAuthState = (): void => {
+  try {
+    localStorage.removeItem(GLOBAL_OAUTH_STATE_KEY);
+  } catch {
+    // ignore
   }
 };
