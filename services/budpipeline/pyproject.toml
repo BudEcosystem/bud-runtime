@@ -86,6 +86,9 @@ deployment_delete = "budpipeline.actions.deployment.delete:DeploymentDeleteActio
 deployment_scale = "budpipeline.actions.deployment.scale:DeploymentScaleAction"
 deployment_ratelimit = "budpipeline.actions.deployment.ratelimit:DeploymentRateLimitAction"
 
+# Simulation Actions
+simulation_run = "budpipeline.actions.simulation.run:SimulationRunAction"
+
 # Integration Actions
 http_request = "budpipeline.actions.integration.http_request:HttpRequestAction"
 notification = "budpipeline.actions.integration.notification:NotificationAction"
