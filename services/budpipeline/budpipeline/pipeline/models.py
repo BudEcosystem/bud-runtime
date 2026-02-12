@@ -102,6 +102,11 @@ class PipelineDefinition(Base):
         nullable=True,
         comment="Optional pipeline description",
     )
+    icon: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Optional icon/emoji for UI representation",
+    )
 
     # DAG definition
     dag_definition: Mapped[dict[str, Any]] = mapped_column(

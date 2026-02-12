@@ -73,6 +73,7 @@ class BudPipelineService(SessionMixin):
         name: Optional[str] = None,
         user_id: Optional[str] = None,
         system_owned: bool = False,
+        icon: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a new pipeline in budpipeline service.
 
@@ -81,6 +82,7 @@ class BudPipelineService(SessionMixin):
             name: Optional pipeline name override
             user_id: The ID of the user creating the pipeline
             system_owned: True if this is a system-owned pipeline visible to all users
+            icon: Optional icon/emoji for UI representation
 
         Returns:
             Created pipeline data including ID
@@ -89,16 +91,20 @@ class BudPipelineService(SessionMixin):
             ClientException: If creation fails
         """
         try:
+            data: Dict[str, Any] = {
+                "dag": dag,
+                "name": name,
+                "user_id": user_id,
+                "system_owned": system_owned,
+            }
+            if icon is not None:
+                data["icon"] = icon
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
                 method_path="pipelines",
                 method="POST",
-                data={
-                    "dag": dag,
-                    "name": name,
-                    "user_id": user_id,
-                    "system_owned": system_owned,
-                },
+                data=data,
             )
             return result
         except ClientException:
@@ -212,6 +218,7 @@ class BudPipelineService(SessionMixin):
         dag: Optional[Dict[str, Any]] = None,
         name: Optional[str] = None,
         user_id: Optional[str] = None,
+        icon: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update a pipeline's DAG definition.
 
@@ -220,6 +227,7 @@ class BudPipelineService(SessionMixin):
             dag: New DAG definition
             name: Optional new name
             user_id: User ID for permission check (optional)
+            icon: Optional icon/emoji for UI representation
 
         Returns:
             Updated pipeline data
@@ -228,11 +236,13 @@ class BudPipelineService(SessionMixin):
             ClientException: If update fails
         """
         try:
-            data = {}
+            data: Dict[str, Any] = {}
             if dag is not None:
                 data["dag"] = dag
             if name is not None:
                 data["name"] = name
+            if icon is not None:
+                data["icon"] = icon
 
             headers = {}
             if user_id:

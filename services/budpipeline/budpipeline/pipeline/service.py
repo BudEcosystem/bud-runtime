@@ -249,6 +249,7 @@ class PipelineService:
         name_override: str | None = None,
         created_by: str = "api",
         description: str | None = None,
+        icon: str | None = None,
         user_id: UUID | None = None,
         system_owned: bool = False,
     ) -> dict[str, Any]:
@@ -260,6 +261,7 @@ class PipelineService:
             name_override: Optional name override.
             created_by: User or service creating the pipeline.
             description: Optional pipeline description.
+            icon: Optional icon/emoji for UI representation.
             user_id: UUID of the owning user (None for system/anonymous pipelines).
             system_owned: True if this is a system-owned pipeline visible to all users.
 
@@ -302,6 +304,7 @@ class PipelineService:
             dag_definition=dag_dict,
             created_by=created_by,
             description=description,
+            icon=icon,
             status=status,
             user_id=user_id,
             system_owned=system_owned,
@@ -321,6 +324,7 @@ class PipelineService:
             "dag": definition.dag_definition,
             "created_by": definition.created_by,
             "description": definition.description,
+            "icon": definition.icon,
             "user_id": str(definition.user_id) if definition.user_id else None,
             "system_owned": definition.system_owned,
         }
@@ -366,6 +370,7 @@ class PipelineService:
             "dag": definition.dag_definition,
             "created_by": definition.created_by,
             "description": definition.description,
+            "icon": definition.icon,
             "execution_count": execution_count,
             "user_id": str(definition.user_id) if definition.user_id else None,
             "system_owned": definition.system_owned,
@@ -419,6 +424,7 @@ class PipelineService:
             "dag": definition.dag_definition,
             "created_by": definition.created_by,
             "description": definition.description,
+            "icon": definition.icon,
             "execution_count": execution_count,
             "user_id": str(definition.user_id) if definition.user_id else None,
             "system_owned": definition.system_owned,
@@ -488,6 +494,7 @@ class PipelineService:
                 "dag": d.dag_definition,
                 "created_by": d.created_by,
                 "description": d.description,
+                "icon": d.icon,
                 "user_id": str(d.user_id) if d.user_id else None,
                 "system_owned": d.system_owned,
                 "execution_count": execution_stats.get(d.id, {}).get("execution_count", 0),
@@ -503,6 +510,7 @@ class PipelineService:
         dag_dict: dict[str, Any],
         name_override: str | None = None,
         expected_version: int | None = None,
+        icon: str | None = None,
     ) -> dict[str, Any]:
         """Update an existing pipeline in database.
 
@@ -561,12 +569,18 @@ class PipelineService:
 
         status = PipelineStatus.DRAFT if is_draft else PipelineStatus.ACTIVE
 
+        update_kwargs: dict[str, Any] = {
+            "name": name,
+            "dag_definition": dag_dict,
+            "status": status,
+        }
+        if icon is not None:
+            update_kwargs["icon"] = icon
+
         definition = await crud.update_with_version(
             definition_id=definition_id,
             expected_version=version,
-            name=name,
-            dag_definition=dag_dict,
-            status=status,
+            **update_kwargs,
         )
         await session.commit()
 
@@ -583,6 +597,7 @@ class PipelineService:
             "dag": definition.dag_definition,
             "created_by": definition.created_by,
             "description": definition.description,
+            "icon": definition.icon,
             "user_id": str(definition.user_id) if definition.user_id else None,
             "system_owned": definition.system_owned,
         }
