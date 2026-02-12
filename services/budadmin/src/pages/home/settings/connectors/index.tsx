@@ -209,13 +209,23 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ---- Responsive drawer width (matches BudDrawer pattern) ----------------
-  const drawerWidth = useMemo(() => {
-    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1440;
-    if (screenWidth > 2560) return screenWidth * 0.35;
-    if (screenWidth > 1920) return screenWidth * 0.4322;
-    if (screenWidth > 1280) return screenWidth * 0.433;
-    if (screenWidth > 1024) return 450;
-    return 400;
+  const [drawerWidth, setDrawerWidth] = useState(400);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      const screenWidth = window.innerWidth;
+      if (screenWidth > 2560) setDrawerWidth(screenWidth * 0.35);
+      else if (screenWidth > 1920) setDrawerWidth(screenWidth * 0.4322);
+      else if (screenWidth > 1280) setDrawerWidth(screenWidth * 0.433);
+      else if (screenWidth > 1024) setDrawerWidth(450);
+      else setDrawerWidth(400);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // ---- Computed values (needed before effects) ----------------------------
