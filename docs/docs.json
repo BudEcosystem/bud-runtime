@@ -66,7 +66,24 @@
             "group": "Models",
             "icon": "brain",
             "pages": [
-              "models/models"
+              "models/introduction",
+              "models/quickstart",
+              "models/model-concepts",
+              "models/creating-first-model",
+              {
+                "group": "Guides",
+                "pages": [
+                  "models/guides/model-security-and-verification",
+                  "models/guides/benchmarking-and-evaluations"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "models/reference/model-operations-reference"
+                ]
+              },
+              "models/troubleshooting"
             ]
           },
           {
