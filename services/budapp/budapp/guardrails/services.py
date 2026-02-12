@@ -2429,18 +2429,23 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                             endpoint_values.append(endpoint_type)
                     model_endpoints = ",".join(endpoint_values) if endpoint_values else None
 
+                # Extract SLO target values: min for ttft/e2e_latency, max for throughput
+                ttft = deploy_config.get("ttft")
+                per_session_tps = deploy_config.get("per_session_tokens_per_sec")
+                e2e_latency = deploy_config.get("e2e_latency")
+
                 response = await DaprService.invoke_service(
                     app_id=app_settings.bud_simulator_app_id,
                     method_path="simulator/run",
                     method="POST",
                     data={
                         "pretrained_model_uri": pretrained_model_uri,
-                        "input_tokens": deploy_config.get("input_tokens", 1024),
-                        "output_tokens": deploy_config.get("output_tokens", 128),
-                        "concurrency": deploy_config.get("concurrency", 10),
-                        "target_ttft": deploy_config.get("target_ttft", 0),
-                        "target_throughput_per_user": deploy_config.get("target_throughput_per_user", 0),
-                        "target_e2e_latency": deploy_config.get("target_e2e_latency", 0),
+                        "input_tokens": deploy_config.get("avg_context_length", 4096),
+                        "output_tokens": deploy_config.get("avg_sequence_length", 512),
+                        "concurrency": deploy_config.get("concurrent_requests", 1),
+                        "target_ttft": ttft[0] if ttft else 0,
+                        "target_throughput_per_user": per_session_tps[1] if per_session_tps else 0,
+                        "target_e2e_latency": e2e_latency[0] if e2e_latency else 0,
                         "notification_metadata": notification_metadata.model_dump(),
                         "source_topic": app_settings.source_topic,
                         "hardware_mode": hardware_mode,
