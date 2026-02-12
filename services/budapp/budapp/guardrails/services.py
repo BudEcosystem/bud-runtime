@@ -769,7 +769,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 "cluster_id",
                 "hardware_mode",
                 "deploy_config",
-                "per_model_deployment_configs",
+                "budaiscaler_specification",
                 "model_statuses",
                 # Simulation results (contains simulator_id for each model)
                 "simulation_events",
@@ -1712,85 +1712,6 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             progress["steps"] = steps
 
         return progress
-
-    def build_models_with_deploy_configs(
-        self,
-        model_statuses: list[dict],
-        default_config: dict | None = None,
-        per_model_configs: list[dict] | None = None,
-    ) -> list[dict]:
-        """Build unique models list with merged deploy configurations.
-
-        Models are deduplicated by model_uri. Merges default deploy_config with per-model overrides.
-
-        Args:
-            model_statuses: List of model status dicts from derive_model_statuses
-            default_config: Default deploy config applied to all models
-            per_model_configs: Per-model overrides, keyed by model_id or model_uri:
-                [{model_id: "...", deploy_config: {...}}] or
-                [{model_uri: "...", deploy_config: {...}}]
-
-        Returns:
-            List of unique model dicts with deploy_config for each model
-        """
-        # Build lookup for per-model configs (by model_id or model_uri)
-        # Each entry can have: deploy_config, cluster_id
-        config_by_model_id: dict[str, dict] = {}
-        config_by_model_uri: dict[str, dict] = {}
-
-        if per_model_configs:
-            for pmc in per_model_configs:
-                # Store the full per-model config (deploy_config + cluster_id)
-                pmc_data = {
-                    "deploy_config": pmc.get("deploy_config", {}),
-                    "cluster_id": pmc.get("cluster_id"),
-                }
-                if pmc.get("model_id"):
-                    config_by_model_id[str(pmc["model_id"])] = pmc_data
-                if pmc.get("model_uri"):
-                    config_by_model_uri[pmc["model_uri"]] = pmc_data
-
-        # Deduplicate by model_uri
-        seen_model_uris: set[str] = set()
-        models = []
-
-        for model_status in model_statuses:
-            model_uri = model_status.get("model_uri")
-            if not model_uri or model_uri in seen_model_uris:
-                continue
-            seen_model_uris.add(model_uri)
-
-            model_id = str(model_status.get("model_id", "")) if model_status.get("model_id") else ""
-
-            # Start with default config
-            merged_config = dict(default_config) if default_config else {}
-            per_model_cluster_id = None
-
-            # Override with per-model config (model_id takes precedence over model_uri)
-            if model_uri in config_by_model_uri:
-                pmc_data = config_by_model_uri[model_uri]
-                merged_config.update(pmc_data.get("deploy_config", {}))
-                per_model_cluster_id = pmc_data.get("cluster_id")
-            if model_id and model_id in config_by_model_id:
-                pmc_data = config_by_model_id[model_id]
-                merged_config.update(pmc_data.get("deploy_config", {}))
-                # model_id lookup takes precedence for cluster_id too
-                if pmc_data.get("cluster_id"):
-                    per_model_cluster_id = pmc_data["cluster_id"]
-
-            models.append(
-                {
-                    "model_id": model_id or None,
-                    "model_uri": model_uri,
-                    "local_path": model_status.get("local_path"),  # For budsim simulation
-                    "supported_endpoints": model_status.get("supported_endpoints"),  # For budsim engine selection
-                    "model_provider_type": model_status.get("model_provider_type"),
-                    "deploy_config": merged_config,
-                    "cluster_id": per_model_cluster_id,  # Per-model cluster override
-                }
-            )
-
-        return models
 
     def build_models_for_deployment(
         self,
