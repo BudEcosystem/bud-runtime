@@ -281,14 +281,23 @@ class ConnectorService:
                 continue
             configured.append((gw, connector_id))
 
-        # 3. Batch-fetch registry connectors for enrichment
+        # 3. Single registry call → build lookup map (replaces N sequential get_connector_by_id calls)
         unique_ids = {cid for _, cid in configured}
         registry_map: Dict[str, Optional[Dict[str, Any]]] = {}
-        for cid in unique_ids:
+        if unique_ids:
             try:
-                registry_map[cid] = await mcp_foundry_service.get_connector_by_id(cid)
+                all_connectors, _ = await mcp_foundry_service.list_connectors(
+                    show_registered_only=False, show_available_only=True, offset=0, limit=500
+                )
+                for c in all_connectors:
+                    cid = c.get("id")
+                    if cid in unique_ids:
+                        registry_map[cid] = c
             except Exception:
-                registry_map[cid] = None
+                logger.warning("Failed to fetch registry connectors for enrichment")
+            # Ensure all IDs have an entry (None for missing)
+            for cid in unique_ids:
+                registry_map.setdefault(cid, None)
 
         # 4. Fetch tool counts and OAuth status in parallel
         async def _tool_count(gw_id: str) -> Tuple[str, int]:
@@ -300,8 +309,12 @@ class ConnectorService:
 
         async def _oauth_connected(gw_id: str) -> Tuple[str, bool]:
             try:
-                status = await mcp_foundry_service.get_oauth_status(gw_id)
-                return gw_id, bool(status.get("oauth_enabled") or status.get("connected") or status.get("authorized"))
+                oauth_status = await mcp_foundry_service.get_oauth_status(gw_id)
+                return gw_id, bool(
+                    oauth_status.get("oauth_enabled")
+                    or oauth_status.get("connected")
+                    or oauth_status.get("authorized")
+                )
             except Exception:
                 return gw_id, False
 
@@ -326,7 +339,7 @@ class ConnectorService:
                     "name": gw.get("name", registry.get("name", connector_id)),
                     "enabled": gw.get("enabled", True),
                     "tags": gw.get("tags", []),
-                    "icon": registry.get("icon"),
+                    "icon": registry.get("logo_url"),
                     "description": registry.get("description"),
                     "category": registry.get("category"),
                     "auth_type": registry.get("auth_type"),
