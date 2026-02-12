@@ -437,7 +437,6 @@ const Connections = () => {
 
   // Delete confirmation (bottom-right notification pattern)
   const { contextHolder, openConfirm } = useConfirmAction();
-  const [confirmLoading, setConfirmLoading] = useState(false);
 
   // Fetch configured connectors on mount
   useEffect(() => {
@@ -497,21 +496,19 @@ const Connections = () => {
       cancelText: "Cancel",
       cancelAction: () => {},
       okText: "Delete",
-      loading: confirmLoading,
+      loading: false,
       key: "delete-connector",
       type: "warning",
       okAction: async () => {
-        setConfirmLoading(true);
         const success = await deleteGateway(connector.gateway_id);
         if (success) {
           fetchConfigured({ include_disabled: true });
         } else {
           errorToast("Failed to delete connector");
         }
-        setConfirmLoading(false);
       },
     });
-  }, [openConfirm, confirmLoading, deleteGateway, fetchConfigured]);
+  }, [openConfirm, deleteGateway, fetchConfigured]);
 
   // Table columns
   const columns = useMemo<ColumnsType<ConfiguredConnector>>(

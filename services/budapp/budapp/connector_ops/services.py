@@ -157,7 +157,10 @@ class ConnectorService:
     async def get_registry_connector(self, connector_id: str) -> Dict[str, Any]:
         """Get a single connector from the registry."""
         connector = await mcp_foundry_service.get_connector_by_id(connector_id)
-        # Map logo_url to icon for frontend consistency
+        # Enrich with credential_schema and normalize logo_url → icon
+        auth_type_str = connector.get("auth_type", "Open")
+        auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
+        connector["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
         if "logo_url" in connector:
             connector["icon"] = connector.pop("logo_url")
         return connector
