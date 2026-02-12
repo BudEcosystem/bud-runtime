@@ -319,6 +319,7 @@ class BudPipelineService(SessionMixin):
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
+        payload_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Start a pipeline execution.
 
@@ -327,6 +328,7 @@ class BudPipelineService(SessionMixin):
             params: Input parameters for the execution
             callback_topics: Optional list of callback topics for real-time updates
             user_id: User ID initiating the execution
+            payload_type: Optional custom payload.type for event routing
 
         Returns:
             Execution details including execution_id
@@ -344,6 +346,9 @@ class BudPipelineService(SessionMixin):
             if user_id:
                 data["user_id"] = user_id
                 data["initiator"] = user_id
+                data["subscriber_ids"] = user_id  # Auto-set for Novu delivery
+            if payload_type:
+                data["payload_type"] = payload_type
 
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
@@ -405,6 +410,7 @@ class BudPipelineService(SessionMixin):
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
+        payload_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Deprecated: Use execute_pipeline() instead."""
         return await self.execute_pipeline(
@@ -412,6 +418,7 @@ class BudPipelineService(SessionMixin):
             params=params,
             callback_topics=callback_topics,
             user_id=user_id,
+            payload_type=payload_type,
         )
 
     async def run_ephemeral_execution(
@@ -420,6 +427,7 @@ class BudPipelineService(SessionMixin):
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
+        payload_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute a pipeline inline without saving the pipeline definition.
 
@@ -432,6 +440,7 @@ class BudPipelineService(SessionMixin):
             params: Input parameters for the execution
             callback_topics: Optional list of callback topics for real-time updates
             user_id: User ID initiating the execution
+            payload_type: Optional custom payload.type for event routing
 
         Returns:
             Execution details including execution_id
@@ -449,6 +458,9 @@ class BudPipelineService(SessionMixin):
             if user_id:
                 data["user_id"] = user_id
                 data["initiator"] = user_id
+                data["subscriber_ids"] = user_id  # Auto-set for Novu delivery
+            if payload_type:
+                data["payload_type"] = payload_type
 
             logger.debug(
                 "Sending ephemeral execution request",
@@ -463,20 +475,38 @@ class BudPipelineService(SessionMixin):
                 data=data,
             )
 
-            # Check if the response is an error response
-            if isinstance(result, dict) and ("error" in result or "errors" in result):
-                error_msg = result.get("error", "Unknown error")
-                errors = result.get("errors", [])
-                logger.error(
-                    "Ephemeral execution failed with validation errors",
-                    error=error_msg,
-                    errors=errors,
-                    pipeline_name=pipeline_definition.get("name"),
-                )
-                raise ClientException(
-                    f"Pipeline validation failed: {error_msg}. Errors: {errors}",
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
+            # Check for error response from budpipeline
+            if isinstance(result, dict):
+                # Handle ErrorResponse format: {"object": "error", "code": N, "message": "..."}
+                if result.get("object") == "error" and "message" in result:
+                    error_msg = result["message"]
+                    try:
+                        error_code = int(result.get("code", 500))
+                    except (ValueError, TypeError):
+                        error_code = 500
+                    raise ClientException(
+                        error_msg,
+                        status_code=error_code,
+                    )
+                # Handle HTTPException format: {"detail": ...}
+                if "detail" in result:
+                    detail = result["detail"]
+                    if isinstance(detail, dict) and "error" in detail:
+                        error_msg = detail.get("error", "Ephemeral execution failed")
+                        errors = detail.get("errors", [])
+                        if errors:
+                            error_details = ", ".join(map(str, errors))
+                            error_msg = f"{error_msg}: {error_details}"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                    else:
+                        error_msg = str(detail) if isinstance(detail, str) else "Ephemeral execution failed"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
 
             return result
         except ClientException:
