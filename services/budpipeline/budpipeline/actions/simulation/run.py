@@ -45,6 +45,26 @@ logger = structlog.get_logger(__name__)
 DEFAULT_MAX_WAIT_SECONDS = 1800  # 30 minutes
 
 
+class BudSimEvents:
+    """Constants for BudSim event names and statuses."""
+
+    # Event names (payload.event)
+    RESULTS = "results"
+    VALIDATION = "validation"
+    HARDWARE_SELECTION = "hardware_selection"
+    ENGINE_CONFIGURATION = "engine_configuration"
+    PERFORMANCE_ESTIMATION = "performance_estimation"
+    RANKING = "ranking"
+
+    # Event statuses (payload.content.status)
+    COMPLETED = "COMPLETED"
+    STARTED = "STARTED"
+    FAILED = "FAILED"
+
+    # Event types (top-level type field)
+    WORKFLOW_METADATA = "workflow_metadata"
+
+
 class SimulationRunExecutor(BaseActionExecutor):
     """Executor for running BudSim performance simulations."""
 
@@ -248,7 +268,7 @@ class SimulationRunExecutor(BaseActionExecutor):
         payload = context.event_data.get("payload") or {}
         event_name = payload.get("event", "")
         content = payload.get("content") or {}
-        status_str = content.get("status", "")
+        status_str = content.get("status", "").upper()
 
         logger.info(
             "simulation_run_event_received",
@@ -259,17 +279,17 @@ class SimulationRunExecutor(BaseActionExecutor):
         )
 
         # Skip metadata events (no actionable payload)
-        if event_type == "workflow_metadata":
+        if event_type == BudSimEvents.WORKFLOW_METADATA:
             return EventResult(action=EventAction.IGNORE)
 
         # Completion event: event_name="results" with status COMPLETED
-        if event_name == "results" and status_str in ("completed", "COMPLETED"):
+        if event_name == BudSimEvents.RESULTS and status_str == BudSimEvents.COMPLETED:
             result = content.get("result") or {}
             recommendations = result.get("recommendations", [])
             return self._build_completion_result(context, recommendations)
 
         # Failure event: any event with FAILED status
-        if status_str in ("failed", "FAILED"):
+        if status_str == BudSimEvents.FAILED:
             error_msg = (
                 content.get("message", "") or content.get("error", "") or "Simulation failed"
             )
@@ -287,16 +307,19 @@ class SimulationRunExecutor(BaseActionExecutor):
 
         # Progress events: update progress based on activity phase
         progress_map = {
-            "validation": 10.0,
-            "hardware_selection": 25.0,
-            "engine_configuration": 50.0,
-            "performance_estimation": 75.0,
-            "ranking": 90.0,
+            BudSimEvents.VALIDATION: 10.0,
+            BudSimEvents.HARDWARE_SELECTION: 25.0,
+            BudSimEvents.ENGINE_CONFIGURATION: 50.0,
+            BudSimEvents.PERFORMANCE_ESTIMATION: 75.0,
+            BudSimEvents.RANKING: 90.0,
         }
-        if event_name in progress_map and status_str in ("STARTED", "COMPLETED"):
+        if event_name in progress_map and status_str in (
+            BudSimEvents.STARTED,
+            BudSimEvents.COMPLETED,
+        ):
             progress = progress_map[event_name]
             # Bump progress slightly higher on COMPLETED vs STARTED
-            if status_str == "COMPLETED":
+            if status_str == BudSimEvents.COMPLETED:
                 progress = min(progress + 5.0, 95.0)
             return EventResult(
                 action=EventAction.UPDATE_PROGRESS,
@@ -330,12 +353,14 @@ class SimulationRunExecutor(BaseActionExecutor):
             )
 
         top_rec = recommendations[0]
+        # ClusterMetrics nests performance data under "metrics" key
+        sim_metrics = top_rec.get("metrics") or {}
         metrics = {
-            "ttft": top_rec.get("ttft"),
-            "throughput_per_user": top_rec.get("throughput_per_user"),
-            "e2e_latency": top_rec.get("e2e_latency"),
-            "error_rate": top_rec.get("error_rate"),
-            "cost_per_million_tokens": top_rec.get("cost_per_million_tokens"),
+            "ttft": sim_metrics.get("ttft"),
+            "throughput_per_user": sim_metrics.get("throughput_per_user"),
+            "e2e_latency": sim_metrics.get("e2e_latency"),
+            "error_rate": sim_metrics.get("error_rate"),
+            "cost_per_million_tokens": sim_metrics.get("cost_per_million_tokens"),
         }
 
         logger.info(

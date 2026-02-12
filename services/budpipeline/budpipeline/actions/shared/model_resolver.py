@@ -6,6 +6,7 @@ from budapp. Used by deployment_create and simulation_run actions.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import structlog
@@ -15,17 +16,20 @@ from budpipeline.commons.config import settings
 
 logger = structlog.get_logger(__name__)
 
+# UUID pattern for validating model_id to prevent path traversal
+_UUID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
+
 
 def resolve_initiator_user_id(context: ActionContext) -> str | None:
     """Resolve the initiator user ID for downstream service calls.
 
-    Checks params, workflow_params, and settings in order of priority.
+    Uses only trusted sources (workflow_params set by the system, or
+    the configured system_user_id). Does NOT read from context.params
+    to prevent user impersonation via action parameters.
     """
-    return (
-        context.params.get("user_id")
-        or context.workflow_params.get("user_id")
-        or settings.system_user_id
-    )
+    return context.workflow_params.get("user_id") or settings.system_user_id
 
 
 async def get_model_info(
@@ -35,12 +39,16 @@ async def get_model_info(
 
     Args:
         context: Action execution context with service invocation capability.
-        model_id: The model ID to look up.
+        model_id: The model ID to look up (must be a valid UUID).
         user_id: The user ID for authorization.
 
     Returns:
         Model info dict, or empty dict on failure.
     """
+    if not _UUID_PATTERN.match(model_id):
+        logger.warning("get_model_info_invalid_id", model_id=model_id)
+        return {}
+
     try:
         response = await context.invoke_service(
             app_id=settings.budapp_app_id,
