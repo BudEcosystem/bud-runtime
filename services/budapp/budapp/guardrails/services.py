@@ -159,15 +159,9 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         trigger_workflow = request.trigger_workflow
         callback_topics = request.callback_topics
         hardware_mode = request.hardware_mode
-        deploy_config = request.deploy_config
-        per_model_deployment_configs = request.per_model_deployment_configs
+        deploy_config = request.deploy_config  # DeploymentTemplateCreate | None
+        budaiscaler_specification = request.budaiscaler_specification
         cluster_id = request.cluster_id  # Global cluster_id
-
-        # Debug: Log per_model_deployment_configs to trace data flow
-        if per_model_deployment_configs:
-            logger.info(f"Received per_model_deployment_configs: {per_model_deployment_configs}")
-            for idx, pmc in enumerate(per_model_deployment_configs):
-                logger.info(f"  pmc[{idx}] keys: {pmc.keys()}, has cluster_id: {'cluster_id' in pmc}")
 
         current_step_number = step_number
 
@@ -317,18 +311,12 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             guard_types=guard_types,
             severity_threshold=severity_threshold,
             hardware_mode=hardware_mode,
-            deploy_config=deploy_config,
-            per_model_deployment_configs=per_model_deployment_configs,
+            deploy_config=deploy_config.model_dump(exclude_none=True) if deploy_config else None,
+            budaiscaler_specification=budaiscaler_specification.model_dump(exclude_none=True)
+            if budaiscaler_specification
+            else None,
             cluster_id=cluster_id,
         ).model_dump(exclude_none=True, exclude_unset=True, mode="json")
-
-        # Debug: Log workflow_step_data after model_dump
-        if "per_model_deployment_configs" in workflow_step_data:
-            logger.info(
-                f"After model_dump, per_model_deployment_configs: {workflow_step_data['per_model_deployment_configs']}"
-            )
-            for idx, pmc in enumerate(workflow_step_data["per_model_deployment_configs"]):
-                logger.info(f"  stored pmc[{idx}] keys: {pmc.keys()}, has cluster_id: {'cluster_id' in pmc}")
 
         # Get workflow steps first to check for existing data
         db_workflow_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
@@ -519,35 +507,22 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     default_deploy_config = step_data["deploy_config"]
                     break
 
-        # Validate global deploy_config doesn't contain endpoint_name
-        # endpoint_name must be unique per model, so it should only be in per_model_deployment_configs
-        if default_deploy_config and default_deploy_config.get("endpoint_name"):
-            raise ClientException(
-                "endpoint_name cannot be specified in global deploy_config. "
-                "Use per_model_deployment_configs to specify unique endpoint names per model."
-            )
-
-        # Get per_model_deployment_configs from request or workflow data
-        per_model_configs = per_model_deployment_configs
-        if not per_model_configs:
+        budaiscaler_spec = (
+            budaiscaler_specification.model_dump(exclude_none=True) if budaiscaler_specification else None
+        )
+        if not budaiscaler_spec:
             for db_step in db_workflow_steps:
                 step_data = db_step.data or {}
-                if step_data.get("per_model_deployment_configs"):
-                    per_model_configs = step_data["per_model_deployment_configs"]
+                if step_data.get("budaiscaler_specification"):
+                    budaiscaler_spec = step_data["budaiscaler_specification"]
                     break
 
-        # Validate cluster assignment if any cluster_id is specified
-        # cluster_id can be at global level or per-model level (per-model overrides global)
-        has_global_cluster = cluster_id is not None
-        has_per_model_clusters = per_model_configs and any(pmc.get("cluster_id") for pmc in per_model_configs)
-
-        if (has_global_cluster or has_per_model_clusters) and model_statuses_data:
+        if cluster_id and model_statuses_data:
             models_requiring_deployment = [m for m in model_statuses_data if m.get("requires_deployment")]
             if models_requiring_deployment:
                 validation_result = await self.validate_cluster_assignment(
                     models=models_requiring_deployment,
                     global_cluster_id=cluster_id,
-                    per_model_configs=per_model_configs,
                 )
                 # Store validation result in workflow step
                 workflow_step_data["cluster_validation"] = validation_result
