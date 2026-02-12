@@ -2238,188 +2238,124 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         user_id: UUID | None = None,
         callback_topics: list[str] | None = None,
         hardware_mode: str = "dedicated",
-        simulation_events: dict | None = None,
+        deploy_config: dict | None = None,
+        budaiscaler_specification: dict | None = None,
     ) -> dict:
-        """Trigger model deployments by calling ModelService.deploy_model_by_step directly.
+        """Trigger model deployments via BudPipeline deployment_create action.
 
-        Calls ModelService directly (no HTTP overhead), passing simulator_id from
-        simulation_events to skip redundant simulation.
+        Creates a DAG with sequential deployment_create steps for each model.
+        The pipeline action handles simulation internally using the provided cluster_id.
 
         Args:
-            models: List of model info dicts with keys: model_id, model_name, deploy_config, cluster_id (optional)
-            cluster_id: Global target cluster for deployment (can be None if per-model cluster_ids provided)
+            models: List of model dicts with keys: model_id, model_name, model_uri, deploy_config
+            cluster_id: Target cluster for deployment
             project_id: Project ID for the deployments
             user_id: User ID initiating the operation
             callback_topics: Optional callback topics for real-time updates
             hardware_mode: Hardware allocation mode ("dedicated" or "shared")
-            simulation_events: Optional simulation results containing simulator_id (workflow_id) for each model
+            deploy_config: Serialized DeploymentTemplateCreate dict
+            budaiscaler_specification: Optional autoscaling configuration
 
         Returns:
-            Dict with workflow_ids and deployment info for tracking
+            Dict with execution_id and deployment info for tracking
         """
-        import asyncio
         import re
 
         if not models:
             return {"execution_id": None, "message": "No models to deploy"}
 
-        # Build lookup map from model_id to simulator_id (workflow_id) from simulation_events
-        # simulation_events.results contains [{model_id, model_uri, workflow_id, status}]
-        simulator_id_map: dict[str, str] = {}
-        if simulation_events:
-            for sim_result in simulation_events.get("results", []):
-                model_id = sim_result.get("model_id")
-                workflow_id = sim_result.get("workflow_id")  # This is the simulator_id
-                if model_id and workflow_id:
-                    simulator_id_map[str(model_id)] = str(workflow_id)
-            if simulator_id_map:
-                logger.info(f"Using simulator_ids from simulation_events for {len(simulator_id_map)} models")
-
-        # Build deployment requests for each model
-        deployment_requests = []
+        # Build DAG steps - one deployment_create step per model, sequential execution
+        steps = []
+        results = []
         for i, model in enumerate(models):
-            deploy_config = model.get("deploy_config", {})
+            step_id = f"deploy_{i}"
             model_name = model.get("model_name", f"model_{i}")
+            model_deploy_config = model.get("deploy_config", {})
 
-            # Generate unique endpoint name if not provided
-            endpoint_name = deploy_config.get("endpoint_name")
-            if not endpoint_name:
-                sanitized_name = re.sub(r"[^a-zA-Z0-9]", "-", model_name).lower().strip("-")
-                sanitized_name = sanitized_name[:60]
-                short_uuid = str(uuid4())[:8]
-                endpoint_name = f"{sanitized_name}-guardrail-{short_uuid}"
+            # Generate unique endpoint name
+            sanitized_name = re.sub(r"[^a-zA-Z0-9]", "-", model_name).lower().strip("-")
+            sanitized_name = sanitized_name[:60]
+            short_uuid = str(uuid4())[:8]
+            endpoint_name = f"{sanitized_name}-guardrail-{short_uuid}"
 
-            # Use per-model cluster_id if available, otherwise fall back to global
-            model_cluster_id = model.get("cluster_id") or cluster_id
-            if not model_cluster_id:
-                raise ValueError(f"No cluster_id specified for model {model_name} (model_id={model.get('model_id')})")
-
-            # Build deploy request payload matching ModelDeployStepRequest schema
-            # NOTE: input_tokens/output_tokens defaults MUST match trigger_simulation defaults (1024/128)
-            # to ensure simulation and deployment use consistent values
-            request_data = {
-                "workflow_total_steps": 1,
-                "step_number": 1,
-                "trigger_workflow": True,
+            step_params = {
                 "model_id": str(model["model_id"]),
                 "project_id": str(project_id),
-                "cluster_id": str(model_cluster_id),
                 "endpoint_name": endpoint_name,
+                "cluster_id": str(cluster_id),
                 "hardware_mode": hardware_mode,
-                "deploy_config": {
-                    "concurrent_requests": deploy_config.get("concurrency", 10),
-                    "avg_sequence_length": deploy_config.get("output_tokens", 128),
-                    "avg_context_length": deploy_config.get("input_tokens", 1024),
-                },
+                "concurrent_requests": model_deploy_config.get("concurrent_requests", 1),
+                "avg_sequence_length": model_deploy_config.get("avg_sequence_length", 512),
+                "avg_context_length": model_deploy_config.get("avg_context_length", 4096),
             }
 
-            # Add callback_topic if provided
-            if callback_topics:
-                request_data["callback_topic"] = callback_topics[0]
+            # Add SLO targets if present in deploy_config
+            if model_deploy_config.get("ttft"):
+                step_params["ttft"] = model_deploy_config["ttft"]
+            if model_deploy_config.get("per_session_tokens_per_sec"):
+                step_params["per_session_tokens_per_sec"] = model_deploy_config["per_session_tokens_per_sec"]
+            if model_deploy_config.get("e2e_latency"):
+                step_params["e2e_latency"] = model_deploy_config["e2e_latency"]
 
-            # Add simulator_id if available from simulation_events (allows budapp to skip redundant simulation)
-            model_id_str = str(model["model_id"])
-            if model_id_str in simulator_id_map:
-                request_data["simulator_id"] = simulator_id_map[model_id_str]
-                logger.debug(f"Using simulator_id {simulator_id_map[model_id_str]} for model {model_id_str}")
+            # Add budaiscaler_specification if provided
+            if budaiscaler_specification:
+                step_params["budaiscaler_specification"] = budaiscaler_specification
 
-            deployment_requests.append(
+            # Sequential: each step depends on the previous one
+            depends_on = [f"deploy_{i - 1}"] if i > 0 else []
+
+            steps.append(
+                {
+                    "id": step_id,
+                    "name": f"Deploy {model_name}",
+                    "action": "deployment_create",
+                    "params": step_params,
+                    "depends_on": depends_on,
+                }
+            )
+
+            results.append(
                 {
                     "model_id": str(model["model_id"]),
                     "model_name": model_name,
                     "endpoint_name": endpoint_name,
-                    "cluster_id": str(model_cluster_id),
-                    "request_data": request_data,
+                    "cluster_id": str(cluster_id),
+                    "status": "running",
+                    "error": None,
+                    "workflow_id": None,
                 }
             )
 
-        logger.info(f"Triggering direct deployment for {len(models)} models to cluster {cluster_id}")
+        # Build the DAG definition
+        dag = {
+            "name": "guardrail-model-deployment",
+            "description": f"Deploy {len(models)} models for guardrail",
+            "steps": steps,
+            "outputs": {},
+            "parameters": [],
+        }
 
-        # Import ModelService and schema for direct service call (avoid HTTP overhead)
-        from budapp.model_ops.schemas import DeploymentTemplateCreate
-        from budapp.model_ops.services import ModelService
+        logger.info(f"Triggering deployment pipeline for {len(models)} models to cluster {cluster_id}")
 
-        async def deploy_single_model(deployment_req: dict) -> dict:
-            """Deploy a single model by calling ModelService directly."""
-            try:
-                req_data = deployment_req["request_data"]
-                deploy_config_dict = req_data.get("deploy_config", {})
+        # Execute via BudPipeline
+        pipeline_service = BudPipelineService(self.session)
+        result = await pipeline_service.run_ephemeral_execution(
+            pipeline_definition=dag,
+            params={"user_id": str(user_id)} if user_id else {},
+            callback_topics=callback_topics,
+            user_id=str(user_id) if user_id else None,
+        )
 
-                # Convert deploy_config dict to DeploymentTemplateCreate schema
-                deploy_config = DeploymentTemplateCreate(
-                    concurrent_requests=deploy_config_dict.get("concurrent_requests", 10),
-                    avg_sequence_length=deploy_config_dict.get("avg_sequence_length", 128),
-                    avg_context_length=deploy_config_dict.get("avg_context_length", 1024),
-                    per_session_tokens_per_sec=deploy_config_dict.get("per_session_tokens_per_sec"),
-                    ttft=deploy_config_dict.get("ttft"),
-                    e2e_latency=deploy_config_dict.get("e2e_latency"),
-                )
-
-                # Extract simulator_id
-                simulator_id_str = req_data.get("simulator_id")
-                simulator_id = UUID(simulator_id_str) if simulator_id_str else None
-                logger.info(f"Deploying model {req_data['model_id']} with simulator_id={simulator_id_str}")
-
-                # Call ModelService.deploy_model_by_step directly
-                model_service = ModelService(self.session)
-                db_workflow = await model_service.deploy_model_by_step(
-                    current_user_id=user_id,
-                    step_number=req_data.get("step_number", 1),
-                    workflow_id=None,  # Create new workflow
-                    workflow_total_steps=req_data.get("workflow_total_steps", 1),
-                    model_id=UUID(req_data["model_id"]),
-                    project_id=UUID(req_data["project_id"]),
-                    cluster_id=UUID(req_data["cluster_id"]) if req_data.get("cluster_id") else None,
-                    endpoint_name=req_data["endpoint_name"],
-                    deploy_config=deploy_config,
-                    trigger_workflow=req_data.get("trigger_workflow", True),
-                    hardware_mode=req_data.get("hardware_mode", "dedicated"),
-                    simulator_id=simulator_id,
-                    callback_topic=req_data.get("callback_topic"),
-                )
-
-                workflow_id = db_workflow.id if db_workflow else None
-                logger.info(f"Deployment started for model {deployment_req['model_id']}: workflow_id={workflow_id}")
-                return {
-                    "model_id": deployment_req["model_id"],
-                    "model_name": deployment_req["model_name"],
-                    "endpoint_name": deployment_req["endpoint_name"],
-                    "cluster_id": deployment_req["cluster_id"],
-                    "status": "running",
-                    "error": None,
-                    "workflow_id": str(workflow_id) if workflow_id else None,
-                }
-            except Exception as e:
-                logger.exception(f"Failed to deploy model {deployment_req['model_id']}: {e}")
-                return {
-                    "model_id": deployment_req["model_id"],
-                    "model_name": deployment_req["model_name"],
-                    "endpoint_name": deployment_req["endpoint_name"],
-                    "cluster_id": deployment_req["cluster_id"],
-                    "status": "failed",
-                    "error": str(e),
-                    "workflow_id": None,
-                }
-
-        # Run all deployments in parallel
-        results = await asyncio.gather(*[deploy_single_model(req) for req in deployment_requests])
-
-        # Build response
-        successful = sum(1 for r in results if r["status"] == "running")
-        failed = sum(1 for r in results if r["status"] == "failed")
-
-        # Use first workflow_id as execution_id for tracking (for compatibility)
-        execution_id = next((r["workflow_id"] for r in results if r["workflow_id"]), None)
-
-        logger.info(f"Deployment triggered: {successful} running, {failed} failed")
+        execution_id = result.get("execution_id")
+        logger.info(f"Deployment pipeline started: execution_id={execution_id}")
 
         return {
             "execution_id": execution_id,
             "results": results,
-            "step_mapping": {r["model_id"]: f"deploy_{i}" for i, r in enumerate(results)},
+            "step_mapping": {str(model["model_id"]): f"deploy_{i}" for i, model in enumerate(models)},
             "total_models": len(models),
-            "successful": successful,
-            "failed": failed,
+            "successful": len(models),
+            "failed": 0,
             "cluster_id": str(cluster_id) if cluster_id else None,
         }
 
