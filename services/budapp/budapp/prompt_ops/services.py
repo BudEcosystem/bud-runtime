@@ -91,6 +91,7 @@ from .schemas import (
     PromptSchemaWorkflowSteps,
     PromptVersionListItem,
     PromptVersionResponse,
+    TelemetryQueryRequest,
     Tool,
     ToolListItem,
 )
@@ -527,6 +528,64 @@ class PromptService(SessionMixin):
                     "total_spans": response_data.get("total_spans", 0),
                     "message": "Trace retrieved successfully",
                 }
+
+    async def query_telemetry(
+        self,
+        request: TelemetryQueryRequest,
+        project_id: str,
+    ) -> dict:
+        """Query prompt telemetry data via budmetrics.
+
+        Validates prompt ownership, injects project context, and
+        forwards the request to budmetrics for query execution.
+
+        Args:
+            request: Validated telemetry query request.
+            project_id: Project ID from API key context.
+
+        Returns:
+            dict: Response data from budmetrics.
+
+        Raises:
+            ClientException: If prompt not found or budmetrics call fails.
+        """
+        # Validate prompt belongs to the project
+        db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
+            PromptModel,
+            fields={
+                "name": request.prompt_id,
+                "project_id": project_id,
+                "status": PromptStatusEnum.ACTIVE,
+            },
+            missing_ok=True,
+        )
+        if not db_prompt:
+            raise ClientException(
+                message="Prompt not found or does not belong to project",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Build payload with server-injected project_id
+        payload = request.model_dump(mode="json")
+        payload["project_id"] = project_id
+
+        # Forward to budmetrics via Dapr service invocation
+        budmetrics_url = (
+            f"{app_settings.dapr_base_url}/v1.0/invoke/"
+            f"{app_settings.bud_metrics_app_id}/method/"
+            f"observability/prompt-telemetry/query"
+        )
+
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.post(budmetrics_url, json=payload) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    logger.error(f"budmetrics telemetry query failed: {response_data}")
+                    raise ClientException(
+                        message=response_data.get("message", "Telemetry query failed"),
+                        status_code=response.status,
+                    )
+                return response_data
 
     async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:
         """Search prompt tags by name."""
