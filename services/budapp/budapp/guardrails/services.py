@@ -680,10 +680,9 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             models_requiring_deployment = [m for m in model_statuses_data if m.get("requires_deployment")]
 
             # Build models with merged deploy configs
-            models_for_simulation = self.build_models_with_deploy_configs(
+            models_for_simulation = self.build_models_for_deployment(
                 model_statuses=models_requiring_deployment,
-                default_config=default_deploy_config,
-                per_model_configs=per_model_configs,
+                deploy_config=default_deploy_config,
             )
 
             try:
@@ -1788,6 +1787,44 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     "model_provider_type": model_status.get("model_provider_type"),
                     "deploy_config": merged_config,
                     "cluster_id": per_model_cluster_id,  # Per-model cluster override
+                }
+            )
+
+        return models
+
+    def build_models_for_deployment(
+        self,
+        model_statuses: list[dict],
+        deploy_config: dict | None = None,
+    ) -> list[dict]:
+        """Build unique models list with deploy configuration.
+
+        Models are deduplicated by model_uri. All models share the same deploy_config.
+
+        Args:
+            model_statuses: List of model status dicts from derive_model_statuses
+            deploy_config: Deploy config applied to all models (serialized DeploymentTemplateCreate)
+
+        Returns:
+            List of unique model dicts for deployment
+        """
+        seen_model_uris: set[str] = set()
+        models = []
+
+        for model_status in model_statuses:
+            model_uri = model_status.get("model_uri")
+            if not model_uri or model_uri in seen_model_uris:
+                continue
+            seen_model_uris.add(model_uri)
+
+            model_id = str(model_status.get("model_id", "")) if model_status.get("model_id") else ""
+
+            models.append(
+                {
+                    "model_id": model_id or None,
+                    "model_uri": model_uri,
+                    "model_name": model_uri.split("/")[-1] if "/" in model_uri else model_uri,
+                    "deploy_config": dict(deploy_config) if deploy_config else {},
                 }
             )
 
