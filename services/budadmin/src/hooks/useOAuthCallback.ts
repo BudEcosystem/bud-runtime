@@ -297,12 +297,14 @@ export const getGlobalOAuthState = (): GlobalOAuthState | null => {
 
     const state: GlobalOAuthState = JSON.parse(saved);
     // Check 10-minute expiry
-    if (Date.now() - state.timestamp > 10 * 60 * 1000) {
+    const OAUTH_STATE_EXPIRY_MS = 10 * 60 * 1000;
+    if (Date.now() - state.timestamp > OAUTH_STATE_EXPIRY_MS) {
       localStorage.removeItem(GLOBAL_OAUTH_STATE_KEY);
       return null;
     }
     return state;
-  } catch {
+  } catch (error) {
+    console.error("Failed to parse global OAuth state:", error);
     return null;
   }
 };

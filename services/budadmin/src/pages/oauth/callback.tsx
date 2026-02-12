@@ -33,7 +33,7 @@ export default function OAuthCallbackPage() {
           setStatus("success");
           // Auto-redirect to connections page after a short delay
           setTimeout(() => {
-            router.replace("/settings/connections");
+            router.replace("/connectors");
           }, 2000);
         } else {
           setStatus("error");

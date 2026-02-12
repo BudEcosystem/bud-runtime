@@ -44,23 +44,33 @@ export const GlobalConnectorsSection: React.FC<GlobalConnectorsSectionProps> = (
   useEffect(() => {
     if (!availableGateways.length) return;
 
+    let isMounted = true;
+
     const fetchStatuses = async () => {
       const statuses: Record<string, GatewayWithStatus> = {};
       for (const gw of availableGateways) {
         try {
           const status = await getOAuthStatus(gw.id);
+          if (!isMounted) return;
           statuses[gw.id] = {
             ...gw,
             isAuthorized: status?.oauth_enabled === true,
           };
         } catch {
+          if (!isMounted) return;
           statuses[gw.id] = { ...gw, isAuthorized: false };
         }
       }
-      setGatewayStatuses(statuses);
+      if (isMounted) {
+        setGatewayStatuses(statuses);
+      }
     };
 
     fetchStatuses();
+
+    return () => {
+      isMounted = false;
+    };
   }, [availableGateways, getOAuthStatus]);
 
   const handleConnect = useCallback(async (gateway: Gateway) => {
@@ -96,12 +106,21 @@ export const GlobalConnectorsSection: React.FC<GlobalConnectorsSectionProps> = (
         const updated = { ...prev, [gatewayId]: { ...current, toolsExpanded: true, toolsLoading: true } };
 
         // Fetch tools async
-        listToolsForGateway(gatewayId).then((tools) => {
-          setGatewayStatuses((p) => ({
-            ...p,
-            [gatewayId]: { ...p[gatewayId], tools, toolsLoading: false },
-          }));
-        });
+        listToolsForGateway(gatewayId)
+          .then((tools) => {
+            setGatewayStatuses((p) => ({
+              ...p,
+              [gatewayId]: { ...p[gatewayId], tools, toolsLoading: false },
+            }));
+          })
+          .catch((err) => {
+            console.error("Failed to list tools for gateway:", err);
+            errorToast("Failed to load tools for this connector.");
+            setGatewayStatuses((p) => ({
+              ...p,
+              [gatewayId]: { ...p[gatewayId], tools: [], toolsLoading: false },
+            }));
+          });
 
         return updated;
       }

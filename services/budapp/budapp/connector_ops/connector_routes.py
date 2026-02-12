@@ -490,7 +490,17 @@ async def public_oauth_callback(
 
     OAuth providers redirect here after user authorization. The endpoint proxies
     the code and state to MCP Foundry for token exchange.
+
+    Security note: CSRF protection is delegated to MCP Foundry which validates
+    the state parameter against the value it generated during initiate_oauth.
+    The state is cryptographically signed by MCP Foundry and bound to the
+    gateway + user session that initiated the flow.
     """
+    if not code or not state:
+        return ErrorResponse(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Missing required OAuth parameters (code, state)",
+        ).to_http_response()
     try:
         result = await ConnectorService().handle_oauth_callback(code=code, state=state)
         return {

@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { GlobalConnectorService } from "@/services/globalConnectorService";
 import { errorToast, successToast } from "@/components/toast";
 
+const TAG_PREFIX_CLIENT = "client:";
+
 export interface Gateway {
   id: string;
   name: string;
@@ -248,8 +250,8 @@ export const useGlobalConnectors = create<GlobalConnectorsState>((set) => ({
         set((state) => ({
           configuredConnectors: state.configuredConnectors.map((c) => {
             if (c.gateway_id !== gatewayId) return c;
-            const nonClientTags = c.tags.filter((t) => !t.startsWith("client:"));
-            return { ...c, tags: [...nonClientTags, ...clients.map((cl) => `client:${cl}`)] };
+            const nonClientTags = c.tags.filter((t) => !t.startsWith(TAG_PREFIX_CLIENT));
+            return { ...c, tags: [...nonClientTags, ...clients.map((cl) => `${TAG_PREFIX_CLIENT}${cl}`)] };
           }),
         }));
         return true;
@@ -269,7 +271,7 @@ export const useGlobalConnectors = create<GlobalConnectorsState>((set) => ({
       const data = res?.data;
       if (data?.success) {
         set({
-          availableGateways: data.gateways || [],
+          availableGateways: data.connectors || [],
           availableTotal: data.total_record || 0,
         });
       }
@@ -305,6 +307,7 @@ export const useGlobalConnectors = create<GlobalConnectorsState>((set) => ({
       const res = await GlobalConnectorService.getOAuthStatus(gatewayId);
       return res?.data;
     } catch (e) {
+      console.error(`Failed to get OAuth status for gateway ${gatewayId}:`, e);
       return null;
     }
   },

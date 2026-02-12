@@ -30,6 +30,18 @@ from ..shared.mcp_foundry_service import mcp_foundry_service
 
 logger = logging.get_logger(__name__)
 
+# ─── Tag constants ──────────────────────────────────────────────────────────
+TAG_PREFIX_CONNECTOR_ID = "connector-id"
+TAG_PREFIX_CLIENT = "client"
+TAG_PREFIX_SOURCE = "source"
+TAG_SOURCE_BUDAPP = "source:budapp"
+TAG_CLIENT_DASHBOARD = "client:dashboard"
+TAG_CLIENT_CHAT = "client:chat"
+DEFAULT_CLIENT_TAGS = [TAG_CLIENT_DASHBOARD, TAG_CLIENT_CHAT]
+
+# ─── OAuth constants ────────────────────────────────────────────────────────
+OAUTH_REFRESH_THRESHOLD_SECONDS = 300
+
 
 def _detect_transport_from_url(url: str) -> str:
     """Detect transport type from connector URL."""
@@ -74,7 +86,7 @@ def _transform_credentials_to_mcp_format(
             "token_management": {
                 "store_tokens": True,
                 "auto_refresh": True,
-                "refresh_threshold_seconds": 300,
+                "refresh_threshold_seconds": OAUTH_REFRESH_THRESHOLD_SECONDS,
             },
         }
         if credentials.scopes:
@@ -190,10 +202,9 @@ class ConnectorService:
         transport = _detect_transport_from_url(connector_url)
 
         tags = [
-            f"connector-id:{connector_id}",
-            "source:budapp",
-            "client:dashboard",
-            "client:chat",
+            f"{TAG_PREFIX_CONNECTOR_ID}:{connector_id}",
+            TAG_SOURCE_BUDAPP,
+            *DEFAULT_CLIENT_TAGS,
         ]
 
         gateway_response = await mcp_foundry_service.create_gateway(
@@ -250,6 +261,20 @@ class ConnectorService:
     async def list_tools(self, gateway_id: str, offset: int = 0, limit: int = 100) -> Tuple[List[Dict[str, Any]], int]:
         """List tools scoped to a specific gateway via get_gateway_by_id."""
         gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+
+        # Validate gateway is enabled and accessible to dashboard clients
+        if not gateway.get("enabled", True):
+            raise ClientException(
+                message="Gateway is disabled",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        tags = gateway.get("tags", [])
+        if tags and TAG_CLIENT_DASHBOARD not in tags:
+            raise ClientException(
+                message="Gateway is not accessible to the dashboard client",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         tools = gateway.get("tools", [])
         total = len(tools)
         paginated = tools[offset : offset + limit]
@@ -272,12 +297,12 @@ class ConnectorService:
         configured: List[Tuple[Dict[str, Any], str]] = []
         for gw in gateways:
             tags = gw.get("tags", [])
-            connector_id = _extract_tag_value(tags, "connector-id")
+            connector_id = _extract_tag_value(tags, TAG_PREFIX_CONNECTOR_ID)
             if not connector_id:
                 continue
             if not include_disabled and not gw.get("enabled", True):
                 continue
-            if client and f"client:{client}" not in tags:
+            if client and f"{TAG_PREFIX_CLIENT}:{client}" not in tags:
                 continue
             configured.append((gw, connector_id))
 
@@ -362,8 +387,8 @@ class ConnectorService:
         gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
         current_tags = gateway.get("tags", [])
         # Remove existing client:* tags, add new ones
-        new_tags = [t for t in current_tags if not t.startswith("client:")]
-        new_tags.extend(f"client:{c}" for c in clients)
+        new_tags = [t for t in current_tags if not t.startswith(f"{TAG_PREFIX_CLIENT}:")]
+        new_tags.extend(f"{TAG_PREFIX_CLIENT}:{c}" for c in clients)
         return await mcp_foundry_service.update_gateway(gateway_id, {"tags": new_tags})
 
     async def tag_existing_gateway(self, gateway_id: str, connector_id: str) -> Dict[str, Any]:
@@ -373,10 +398,9 @@ class ConnectorService:
         new_tags = list(
             set(current_tags)
             | {
-                f"connector-id:{connector_id}",
-                "source:budapp",
-                "client:dashboard",
-                "client:chat",
+                f"{TAG_PREFIX_CONNECTOR_ID}:{connector_id}",
+                TAG_SOURCE_BUDAPP,
+                *DEFAULT_CLIENT_TAGS,
             }
         )
         return await mcp_foundry_service.update_gateway(gateway_id, {"tags": new_tags})

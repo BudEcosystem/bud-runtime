@@ -345,8 +345,8 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
                 (p: any) => p?.key?.trim() || p?.value?.trim(),
               );
             }
-          } catch {
-            /* skip malformed JSON */
+          } catch (e) {
+            console.error(`Failed to parse key-value-array for field '${key}':`, value, e);
           }
         }
       } else if (key === "passthrough_headers" || key === "scopes") {

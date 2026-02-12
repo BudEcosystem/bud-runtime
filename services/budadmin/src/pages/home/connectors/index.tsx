@@ -9,6 +9,8 @@ import Connections from "../settings/connections";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import { useGlobalConnectors } from "@/stores/useGlobalConnectors";
 
+const SEARCH_DEBOUNCE_MS = 350;
+
 export default function ConnectorsPage() {
   const [activeTab, setActiveTab] = useState("1");
   const [searchTerm, setSearchTerm] = useState("");
@@ -21,7 +23,7 @@ export default function ConnectorsPage() {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       searchTimerRef.current = setTimeout(() => {
         fetchRegistry({ name: value, page: 1, limit: 20 });
-      }, 350);
+      }, SEARCH_DEBOUNCE_MS);
     },
     [fetchRegistry],
   );

@@ -19,6 +19,11 @@ import ProjectTags from "src/flows/components/ProjectTags";
 
 const GLOBAL_OAUTH_STATE_KEY = "global_oauth_connector_state";
 
+// Tag prefixes used for filtering display tags
+const TAG_PREFIX_CLIENT = "client:";
+const TAG_PREFIX_CONNECTOR_ID = "connector-id:";
+const TAG_PREFIX_SOURCE = "source:";
+
 // ---------------------------------------------------------------------------
 // Inline Icons
 // ---------------------------------------------------------------------------
@@ -134,13 +139,13 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
   // Parse active client tags from connector tags
   const activeClients = new Set(
     connector.tags
-      .filter((t) => t.startsWith("client:"))
-      .map((t) => t.slice(7))
+      .filter((t) => t.startsWith(TAG_PREFIX_CLIENT))
+      .map((t) => t.slice(TAG_PREFIX_CLIENT.length))
   );
 
   // Extract non-client tags for display (e.g. category, source tags)
   const registryTags = connector.tags.filter(
-    (t) => !t.startsWith("client:") && !t.startsWith("connector-id:") && !t.startsWith("source:")
+    (t) => !t.startsWith(TAG_PREFIX_CLIENT) && !t.startsWith(TAG_PREFIX_CONNECTOR_ID) && !t.startsWith(TAG_PREFIX_SOURCE)
   );
 
   const handleClientToggle = async (clientKey: string, enabled: boolean) => {
