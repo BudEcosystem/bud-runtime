@@ -144,16 +144,26 @@ class ConnectorService:
             offset=offset,
             limit=limit,
         )
-        # Enrich each connector with credential_schema based on auth_type
+        # Enrich each connector with credential_schema and normalize logo_url → icon
         for c in connectors:
             auth_type_str = c.get("auth_type", "Open")
             auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
             c["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+            # Map logo_url to icon for frontend consistency
+            if "logo_url" in c:
+                c["icon"] = c.pop("logo_url")
         return connectors, total
 
     async def get_registry_connector(self, connector_id: str) -> Dict[str, Any]:
         """Get a single connector from the registry."""
-        return await mcp_foundry_service.get_connector_by_id(connector_id)
+        connector = await mcp_foundry_service.get_connector_by_id(connector_id)
+        # Enrich with credential_schema and normalize logo_url → icon
+        auth_type_str = connector.get("auth_type", "Open")
+        auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
+        connector["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+        if "logo_url" in connector:
+            connector["icon"] = connector.pop("logo_url")
+        return connector
 
     # ─── Admin: Gateway CRUD ─────────────────────────────────────────────
 

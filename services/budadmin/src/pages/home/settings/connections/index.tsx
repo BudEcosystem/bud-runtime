@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Spin, Empty, Switch, Table, ConfigProvider, Drawer, Tooltip, Button, Modal, Space } from "antd";
+import { Spin, Empty, Switch, Table, ConfigProvider, Drawer, Tooltip, Button, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
-  Text_14_600_EEEEEE,
   Text_14_400_757575,
   Text_12_400_EEEEEE,
   Text_12_400_B3B3B3,
@@ -11,6 +10,7 @@ import {
 } from "@/components/ui/text";
 import { SecondaryButton } from "@/components/ui/bud/form/Buttons";
 import { errorToast } from "@/components/toast";
+import { useConfirmAction } from "@/hooks/useConfirmAction";
 import {
   useGlobalConnectors,
   type ConfiguredConnector,
@@ -124,6 +124,23 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
   const [toolsLoading, setToolsLoading] = useState(false);
   const [clientUpdating, setClientUpdating] = useState<string | null>(null);
 
+  // Responsive drawer width (matches BudDrawer pattern)
+  const [drawerWidth, setDrawerWidth] = useState(400);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      const sw = window.innerWidth;
+      if (sw > 2560) setDrawerWidth(sw * 0.35);
+      else if (sw > 1920) setDrawerWidth(sw * 0.4322);
+      else if (sw > 1280) setDrawerWidth(sw * 0.433);
+      else if (sw > 1024) setDrawerWidth(450);
+      else setDrawerWidth(400);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   useEffect(() => {
     if (open && connector) {
       setToolsLoading(true);
@@ -169,7 +186,7 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
     <Drawer
       title={null}
       placement="right"
-      width={480}
+      width={drawerWidth}
       open={open}
       onClose={onClose}
       closable={false}
@@ -418,10 +435,8 @@ const Connections = () => {
     [configuredConnectors, detailGatewayId]
   );
 
-  // Delete modal
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingConnector, setDeletingConnector] = useState<ConfiguredConnector | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Delete confirmation (bottom-right notification pattern)
+  const { contextHolder, openConfirm } = useConfirmAction();
 
   // Fetch configured connectors on mount
   useEffect(() => {
@@ -474,21 +489,26 @@ const Connections = () => {
   const handleRequestDelete = useCallback((connector: ConfiguredConnector) => {
     setDetailOpen(false);
     setDetailGatewayId(null);
-    setDeletingConnector(connector);
-    setDeleteModalOpen(true);
-  }, []);
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deletingConnector) return;
-    setIsDeleting(true);
-    const success = await deleteGateway(deletingConnector.gateway_id);
-    setIsDeleting(false);
-    if (success) {
-      setDeleteModalOpen(false);
-      setDeletingConnector(null);
-      fetchConfigured({ include_disabled: true });
-    }
-  }, [deletingConnector, deleteGateway, fetchConfigured]);
+    openConfirm({
+      message: `You're about to delete the ${connector.name} connector`,
+      description:
+        "Once you delete the connector, it will not be recovered. All associated tools and user connections will be removed. Are you sure?",
+      cancelText: "Cancel",
+      cancelAction: () => {},
+      okText: "Delete",
+      loading: false,
+      key: "delete-connector",
+      type: "warning",
+      okAction: async () => {
+        const success = await deleteGateway(connector.gateway_id);
+        if (success) {
+          fetchConfigured({ include_disabled: true });
+        } else {
+          errorToast("Failed to delete connector");
+        }
+      },
+    });
+  }, [openConfirm, deleteGateway, fetchConfigured]);
 
   // Table columns
   const columns = useMemo<ColumnsType<ConfiguredConnector>>(
@@ -581,8 +601,7 @@ const Connections = () => {
                 className="!p-1 text-[#757575] hover:!text-[#E82E2E]"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDeletingConnector(record);
-                  setDeleteModalOpen(true);
+                  handleRequestDelete(record);
                 }}
               >
                 <TrashIcon />
@@ -592,7 +611,7 @@ const Connections = () => {
         ),
       },
     ],
-    [connectingId, togglingId, handleConnect, handleToggle, handleDetail]
+    [connectingId, togglingId, handleConnect, handleToggle, handleDetail, handleRequestDelete]
   );
 
   // Empty state
@@ -637,47 +656,13 @@ const Connections = () => {
         onDelete={handleRequestDelete}
       />
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        open={deleteModalOpen}
-        onCancel={() => { setDeleteModalOpen(false); setDeletingConnector(null); }}
-        footer={null}
-        closable={false}
-        centered
-        width={400}
-        styles={{
-          content: { background: "#141414", border: "1px solid #1F1F1F", borderRadius: "12px", padding: "24px" },
-          mask: { background: "rgba(0, 0, 0, 0.6)" },
-        }}
-        rootClassName="connections-delete-modal"
-      >
-        <div>
-          <Text_14_600_EEEEEE className="mb-2">Delete Connector</Text_14_600_EEEEEE>
-          <Text_14_400_757575 className="mb-5">
-            Are you sure you want to delete{" "}
-            <span className="text-[#EEEEEE] font-medium">{deletingConnector?.name}</span>?
-            This action cannot be undone. All associated tools and user connections will be removed.
-          </Text_14_400_757575>
-          <div className="flex justify-end gap-3">
-            <SecondaryButton onClick={() => { setDeleteModalOpen(false); setDeletingConnector(null); }} text="Cancel" />
-            <Button
-              onClick={handleDeleteConfirm}
-              loading={isDeleting}
-              disabled={isDeleting}
-              className="flex justify-center items-center !border-[.5px] font-normal h-[1.75rem] min-w-[4rem] rounded-[0.3rem]"
-              style={{ borderColor: "#E82E2E", background: "#1A0A0A", color: "#E82E2E", fontSize: "0.75rem", paddingLeft: "0.7rem", paddingRight: "0.7rem" }}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Confirm action notification (bottom-right) */}
+      {contextHolder}
 
       {/* Scoped styles */}
       <style jsx global>{`
         .connections-detail-drawer .ant-drawer-content { background: transparent !important; }
         .connections-detail-drawer .ant-drawer-body { background: transparent !important; }
-        .connections-delete-modal .ant-modal-content { background: #141414 !important; border: 1px solid #1f1f1f !important; }
       `}</style>
     </div>
   );
