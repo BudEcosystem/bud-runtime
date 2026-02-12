@@ -23,6 +23,16 @@ from budpipeline.subscriptions.service import subscription_service
 
 logger = get_logger(__name__)
 
+
+class _DecimalEncoder(json.JSONEncoder):
+    """JSON encoder that handles Decimal objects."""
+
+    def default(self, o: Any) -> Any:
+        if isinstance(o, Decimal):
+            return float(o)
+        return super().default(o)
+
+
 # Default payload type when none is specified
 _DEFAULT_PAYLOAD_TYPE = "pipeline_execution"
 
@@ -353,7 +363,7 @@ class EventPublisher:
                 await client.publish_event(
                     pubsub_name=self.pubsub_name,
                     topic_name=topic,
-                    data=json.dumps(payload),
+                    data=json.dumps(payload, cls=_DecimalEncoder),
                     data_content_type="application/json",
                 )
 

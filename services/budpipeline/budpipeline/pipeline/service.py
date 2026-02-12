@@ -779,6 +779,8 @@ class PipelineService:
                     expected_version=db_version,
                     status=DBExecutionStatus.RUNNING,
                     start_time_value=started_at,
+                    subscriber_ids=subscriber_ids,
+                    payload_type=payload_type,
                 )
                 if success:
                     logger.info(f"Updated execution {execution_id} to RUNNING with start_time")
@@ -867,6 +869,8 @@ class PipelineService:
                                 step_id=step.id,
                                 step_name=step.name,
                                 sequence_number=seq_num,
+                                subscriber_ids=subscriber_ids,
+                                payload_type=payload_type,
                             )
                             if success:
                                 step_db_info[step.id] = (db_uuid, new_version, seq_num)
@@ -902,6 +906,8 @@ class PipelineService:
                                         step_id=step.id,
                                         step_name=step.name,
                                         sequence_number=seq_num,
+                                        subscriber_ids=subscriber_ids,
+                                        payload_type=payload_type,
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to persist step SKIPPED status: {e}")
@@ -1066,6 +1072,8 @@ class PipelineService:
                                         step_id=step.id,
                                         step_name=step.name,
                                         sequence_number=seq_num,
+                                        subscriber_ids=subscriber_ids,
+                                        payload_type=payload_type,
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to persist step COMPLETED status: {e}")
@@ -1129,6 +1137,8 @@ class PipelineService:
                                         step_id=step.id,
                                         step_name=step.name,
                                         sequence_number=seq_num,
+                                        subscriber_ids=subscriber_ids,
+                                        payload_type=payload_type,
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to persist step FAILED status: {e}")
@@ -1196,6 +1206,8 @@ class PipelineService:
                         progress_percentage=Decimal("100.00"),
                         end_time_value=datetime.now(timezone.utc),
                         final_outputs=execution_data.get("outputs"),
+                        subscriber_ids=subscriber_ids,
+                        payload_type=payload_type,
                     )
                     if success:
                         db_version = new_version
@@ -1236,6 +1248,8 @@ class PipelineService:
                                 step_id=step_id,
                                 step_name=step_state.get("name", step_id),
                                 sequence_number=seq_num,
+                                subscriber_ids=subscriber_ids,
+                                payload_type=payload_type,
                             )
                         except Exception as persist_step_err:
                             logger.warning(
@@ -1255,6 +1269,8 @@ class PipelineService:
                     status=DBExecutionStatus.FAILED,
                     end_time_value=datetime.now(timezone.utc),
                     error_info={"error": str(e)},
+                    subscriber_ids=subscriber_ids,
+                    payload_type=payload_type,
                 )
                 logger.info(f"Persisted failure to database: {execution_id}")
             except Exception as persist_err:

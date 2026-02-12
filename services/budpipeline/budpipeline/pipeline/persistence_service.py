@@ -241,6 +241,8 @@ class PersistenceService:
         final_outputs: dict[str, Any] | None = None,
         error_info: dict[str, Any] | None = None,
         correlation_id: str | None = None,
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
     ) -> tuple[bool, int]:
         """Update execution status with optimistic locking.
 
@@ -256,6 +258,8 @@ class PersistenceService:
             final_outputs: Final outputs (will be sanitized).
             error_info: Error details.
             correlation_id: Optional correlation ID for event tracing.
+            subscriber_ids: Optional user ID(s) for Novu notification delivery.
+            payload_type: Optional custom payload.type for event routing.
 
         Returns:
             Tuple of (success, new_version).
@@ -299,6 +303,8 @@ class PersistenceService:
                         final_outputs=final_outputs,
                         error_info=error_info,
                         correlation_id=correlation_id,
+                        subscriber_ids=subscriber_ids,
+                        payload_type=payload_type,
                     )
 
                     return True, execution.version
@@ -330,6 +336,8 @@ class PersistenceService:
         final_outputs: dict[str, Any] | None = None,
         error_info: dict[str, Any] | None = None,
         correlation_id: str | None = None,
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
     ) -> None:
         """Publish execution status events to callback topics.
 
@@ -342,6 +350,8 @@ class PersistenceService:
                     success=True,
                     final_outputs=final_outputs,
                     correlation_id=correlation_id,
+                    subscriber_ids=subscriber_ids,
+                    payload_type=payload_type,
                 )
             elif status == ExecutionStatus.FAILED:
                 message = error_info.get("message") if error_info else None
@@ -350,12 +360,16 @@ class PersistenceService:
                     success=False,
                     final_message=message,
                     correlation_id=correlation_id,
+                    subscriber_ids=subscriber_ids,
+                    payload_type=payload_type,
                 )
             elif status == ExecutionStatus.RUNNING and progress_percentage is not None:
                 await event_publisher.publish_workflow_progress(
                     execution_id=execution_id,
                     progress_percentage=progress_percentage,
                     correlation_id=correlation_id,
+                    subscriber_ids=subscriber_ids,
+                    payload_type=payload_type,
                 )
         except Exception as e:
             # Non-blocking - log and continue (FR-014)
@@ -382,6 +396,8 @@ class PersistenceService:
         step_name: str | None = None,
         sequence_number: int | None = None,
         correlation_id: str | None = None,
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
     ) -> tuple[bool, int]:
         """Update step execution status with optimistic locking.
 
@@ -402,6 +418,8 @@ class PersistenceService:
             step_name: Step name for event publishing.
             sequence_number: Step sequence number for event publishing.
             correlation_id: Optional correlation ID for event tracing.
+            subscriber_ids: Optional user ID(s) for Novu notification delivery.
+            payload_type: Optional custom payload.type for event routing.
 
         Returns:
             Tuple of (success, new_version).
@@ -433,9 +451,6 @@ class PersistenceService:
 
                     # Publish step events to callback topics (T048)
                     if execution_id and step_id and step_name:
-                        # Look up execution notification config
-                        exec_crud = PipelineExecutionCRUD(session)
-                        execution = await exec_crud.get_by_id(execution_id)
                         await self._publish_step_event(
                             execution_id=execution_id,
                             step_id=step_id,
@@ -445,8 +460,8 @@ class PersistenceService:
                             sequence_number=sequence_number or 0,
                             error_message=error_message,
                             correlation_id=correlation_id,
-                            subscriber_ids=execution.subscriber_ids if execution else None,
-                            payload_type=execution.payload_type if execution else None,
+                            subscriber_ids=subscriber_ids,
+                            payload_type=payload_type,
                         )
 
                     return True, step.version
