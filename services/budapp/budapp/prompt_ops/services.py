@@ -565,9 +565,23 @@ class PromptService(SessionMixin):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # Build payload with server-injected project_id
-        payload = request.model_dump(mode="json")
+        # Resolve default version when client omits version
+        if request.version is None and db_prompt.default_version_id is not None:
+            db_version = await PromptDataManager(self.session).retrieve_by_fields(
+                PromptVersionModel,
+                fields={"id": db_prompt.default_version_id},
+                missing_ok=True,
+            )
+            request_version = str(db_version.version) if db_version else None
+        else:
+            request_version = request.version
+
+        # Build payload with server-injected project_id; convert page → offset for budmetrics
+        payload = request.model_dump(mode="json", exclude={"page"})
+        offset = (request.page - 1) * request.limit
+        payload["offset"] = offset
         payload["project_id"] = project_id
+        payload["version"] = request_version
 
         # Forward to budmetrics via Dapr service invocation
         budmetrics_url = (
@@ -585,6 +599,15 @@ class PromptService(SessionMixin):
                         message=response_data.get("message", "Telemetry query failed"),
                         status_code=response.status,
                     )
+
+                # Transform response to match budapp pagination convention
+                response_data["total_record"] = response_data.pop("total_count", 0)
+                response_data["page"] = request.page
+                response_data["limit"] = request.limit
+                response_data.pop("offset", None)
+                response_data.pop("has_more", None)
+                response_data["code"] = 200
+
                 return response_data
 
     async def search_prompt_tags(self, search_term: str, offset: int = 0, limit: int = 10) -> Tuple[List[Dict], int]:

@@ -1102,17 +1102,12 @@ class TelemetryQueryRequest(BaseModel):
     span_filters: Optional[List[FilterCondition]] = Field(None, max_length=20)
     resource_filters: Optional[List[FilterCondition]] = Field(None, max_length=20)
     order_by: Optional[List[OrderBySpec]] = None
-    limit: int = Field(50, ge=1, le=10000)
-    offset: int = Field(0, ge=0, le=10000)
+    page: int = Field(1, ge=1)
+    limit: int = Field(10, ge=0)
 
 
-class TelemetryQueryResponse(SuccessResponse):
+class TelemetryQueryResponse(PaginatedSuccessResponse):
     """Response schema for telemetry query results."""
 
     object: str = "telemetry_query"
     data: List[TelemetrySpanItem] = Field(default_factory=list)
-    total_count: int = 0
-    limit: int = 50
-    offset: int = 0
-    has_more: bool = False
-    query_time_ms: int = 0

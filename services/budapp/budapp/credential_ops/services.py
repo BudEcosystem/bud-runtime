@@ -669,14 +669,16 @@ class CredentialService(SessionMixin):
         try:
             hashed_key = CredentialModel.set_hashed_key(api_key)
 
-            is_valid = await self.is_credential_valid(hashed_key)
-            if not is_valid:
-                return None
-
             db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
                 CredentialModel, {"hashed_key": hashed_key}, missing_ok=True
             )
             if not db_credential:
+                return None
+
+            # Check expiry — DB stores naive-UTC datetimes
+            now_naive_utc = datetime.now(UTC).replace(tzinfo=None)
+            if db_credential.expiry and db_credential.expiry < now_naive_utc:
+                logger.warning(f"API key credential {db_credential.id} is expired")
                 return None
 
             return {
