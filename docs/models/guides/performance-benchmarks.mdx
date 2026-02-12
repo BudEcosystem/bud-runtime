@@ -1,17 +1,13 @@
 ---
 title: "Performance Benchmarks"
-description: "Run guided benchmark experiments on your own infrastructure with the updated Bud workflow"
+description: "Run benchmark experiments on your infrastructure to compare model speed, throughput, and runtime efficiency"
 ---
 
-Bud AI Foundry now provides an expanded benchmark workflow with additional controls and a guided sequence, so you can run experiments faster with less setup.
+Use the Models benchmarking workflow to measure runtime performance before promoting a model to production.
 
-You can benchmark model performance directly on your own clusters and compare results across runs.
+Bud AI Foundry supports guided benchmark creation, benchmark history filtering, and side-by-side comparison of runs executed on your own clusters.
 
-## What is new
-
-- Guided benchmark creation flow with step-by-step inputs.
-- Support for both dataset-based and configuration-based evaluations.
-- Benchmark history views with filters for model and status.
+## Benchmark workflow
 
 ```mermaid
 graph LR
@@ -21,6 +17,13 @@ graph LR
     D --> E[Run Benchmark]
     E --> F[Analyze History and Results]
 ```
+
+## What to measure
+
+- **Latency**: response time characteristics for target traffic patterns.
+- **Throughput**: sustained request handling capacity.
+- **Duration**: total benchmark completion time.
+- **Consistency**: result stability across reruns and environments.
 
 ## Demo walkthrough
 
@@ -34,19 +37,30 @@ graph LR
 6. Run benchmark and monitor status.
 7. Review throughput, latency/TPOT, duration, and completion state.
 
-## Why it matters
+## Recommended process
 
-- Makes capacity planning more data-driven.
-- Helps identify best-fit model/cluster combinations.
-- Reduces trial-and-error when preparing production rollouts.
+1. Start with 2-3 candidate models for the same workload.
+2. Run the same setup (dataset/config, hardware profile, concurrency) for fair comparison.
+3. Track benchmark history by model and status to identify regressions.
+4. Re-run critical scenarios after model, adapter, or infrastructure changes.
+5. Promote only configurations that satisfy performance SLOs.
 
 ## Best practices
 
-- Keep benchmark runs comparable by standardizing inputs.
-- Use tags to group experiments by use case or release.
-- Re-run critical scenarios after model or cluster changes.
+- Use descriptive benchmark names for easy audits.
+- Tag runs by project, release, or use case for fast filtering.
+- Separate exploratory runs from release-gating runs.
+- Capture benchmark context (cluster type, runtime settings, request profile) with each run.
+
+## Escalation checklist
+
+<Check>Latency and throughput meet service objectives.</Check>
+<Check>Duration is acceptable for recurring validation cycles.</Check>
+<Check>No regression versus the previous approved benchmark baseline.</Check>
+<Check>Approval owner signs off promotion based on benchmark evidence.</Check>
 
 ## Related docs
 
-- [Benchmarking and Evaluations](/models/guides/benchmarking-and-evaluations)
+- [Evaluations](/models/guides/evaluations)
 - [Creating Your First Model](/models/creating-first-model)
+- [Troubleshooting](/models/troubleshooting)

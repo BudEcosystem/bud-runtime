@@ -74,7 +74,7 @@
                 "group": "Guides",
                 "pages": [
                   "models/guides/model-security-and-verification",
-                  "models/guides/benchmarking-and-evaluations",
+                  "models/guides/evaluations",
                   "models/guides/automated-model-license-analysis",
                   "models/guides/performance-benchmarks",
                   "models/guides/tool-calling-and-reasoning-parser",
