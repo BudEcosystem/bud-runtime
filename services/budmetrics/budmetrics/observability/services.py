@@ -76,9 +76,7 @@ class TelemetryQueryBuilder:
     - **data_query**: all spans for the paginated trace set (tree building)
     """
 
-    def build_query(
-        self, request: TelemetryQueryRequest
-    ) -> tuple[str, str, dict[str, Any]]:
+    def build_query(self, request: TelemetryQueryRequest) -> tuple[str, str, dict[str, Any]]:
         """Build count and data queries from a validated request.
 
         Args:
@@ -155,9 +153,7 @@ class TelemetryQueryBuilder:
             columns.extend(["Events.Timestamp", "Events.Name", "Events.Attributes"])
 
         if request.include_links:
-            columns.extend(
-                ["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"]
-            )
+            columns.extend(["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"])
 
         return ", ".join(columns)
 
@@ -165,9 +161,7 @@ class TelemetryQueryBuilder:
     # Trace ID subquery
     # ------------------------------------------------------------------
 
-    def _build_trace_id_subquery(
-        self, request: TelemetryQueryRequest, params: dict[str, Any]
-    ) -> str:
+    def _build_trace_id_subquery(self, request: TelemetryQueryRequest, params: dict[str, Any]) -> str:
         """Build subquery that finds TraceIds via gateway_analytics spans.
 
         Always filters by project_id, prompt_id, and timestamp range for
@@ -183,9 +177,7 @@ class TelemetryQueryBuilder:
         ]
 
         if request.version is not None:
-            conditions.append(
-                "SpanAttributes['gateway_analytics.prompt_version'] = %(version)s"
-            )
+            conditions.append("SpanAttributes['gateway_analytics.prompt_version'] = %(version)s")
 
         if request.trace_id is not None:
             conditions.append("TraceId = %(trace_id)s")
@@ -202,9 +194,7 @@ class TelemetryQueryBuilder:
         # the subquery still selects traces via gateway_analytics, but the
         # resource_filters should only constrain the *target* spans.
         if request.resource_filters and request.span_names is None:
-            filter_sql = self._build_resource_attr_filters(
-                request.resource_filters, params
-            )
+            filter_sql = self._build_resource_attr_filters(request.resource_filters, params)
             if filter_sql:
                 conditions.append(filter_sql)
 
@@ -223,9 +213,7 @@ class TelemetryQueryBuilder:
     # Target span conditions (for count query)
     # ------------------------------------------------------------------
 
-    def _build_target_span_conditions(
-        self, request: TelemetryQueryRequest, params: dict[str, Any]
-    ) -> str:
+    def _build_target_span_conditions(self, request: TelemetryQueryRequest, params: dict[str, Any]) -> str:
         """Build WHERE conditions for the target spans.
 
         When ``span_names`` is null, targets are ``gateway_analytics`` spans.
@@ -239,25 +227,23 @@ class TelemetryQueryBuilder:
 
         if request.span_names is None:
             # Default: target gateway_analytics spans
-            conditions.extend([
-                "SpanName = 'gateway_analytics'",
-                "SpanAttributes['gateway_analytics.prompt_id'] = %(prompt_id)s",
-                "SpanAttributes['gateway_analytics.project_id'] = %(project_id)s",
-            ])
+            conditions.extend(
+                [
+                    "SpanName = 'gateway_analytics'",
+                    "SpanAttributes['gateway_analytics.prompt_id'] = %(prompt_id)s",
+                    "SpanAttributes['gateway_analytics.project_id'] = %(project_id)s",
+                ]
+            )
 
             if request.version is not None:
-                conditions.append(
-                    "SpanAttributes['gateway_analytics.prompt_version'] = %(version)s"
-                )
+                conditions.append("SpanAttributes['gateway_analytics.prompt_version'] = %(version)s")
 
             if request.trace_id is not None:
                 conditions.append("TraceId = %(trace_id)s")
 
             # span_filters apply to gateway_analytics spans
             if request.span_filters:
-                filter_sql = self._build_span_attr_filters(
-                    request.span_filters, params
-                )
+                filter_sql = self._build_span_attr_filters(request.span_filters, params)
                 if filter_sql:
                     conditions.append(filter_sql)
         else:
@@ -271,23 +257,17 @@ class TelemetryQueryBuilder:
                 param_key = f"span_name_{i}"
                 params[param_key] = name
                 span_name_placeholders.append(f"%({param_key})s")
-            conditions.append(
-                f"SpanName IN ({', '.join(span_name_placeholders)})"
-            )  # nosec B608
+            conditions.append(f"SpanName IN ({', '.join(span_name_placeholders)})")  # nosec B608
 
             # span_filters apply to the named spans
             if request.span_filters:
-                filter_sql = self._build_span_attr_filters(
-                    request.span_filters, params
-                )
+                filter_sql = self._build_span_attr_filters(request.span_filters, params)
                 if filter_sql:
                     conditions.append(filter_sql)
 
         # resource_filters always apply to target spans
         if request.resource_filters:
-            filter_sql = self._build_resource_attr_filters(
-                request.resource_filters, params
-            )
+            filter_sql = self._build_resource_attr_filters(request.resource_filters, params)
             if filter_sql:
                 conditions.append(filter_sql)
 
@@ -1695,9 +1675,7 @@ class ObservabilityMetricsService:
     # Telemetry Query API
     # ------------------------------------------------------------------
 
-    async def query_prompt_telemetry(
-        self, request: TelemetryQueryRequest
-    ) -> TelemetryQueryResponse:
+    async def query_prompt_telemetry(self, request: TelemetryQueryRequest) -> TelemetryQueryResponse:
         """Query prompt telemetry data with flexible span selection and tree building.
 
         Executes a two-query approach:
@@ -1723,9 +1701,7 @@ class ObservabilityMetricsService:
 
         # Execute count query for pagination
         try:
-            count_result = await self.clickhouse_client.execute_query(
-                count_query, params
-            )
+            count_result = await self.clickhouse_client.execute_query(count_query, params)
             total_count = count_result[0][0] if count_result else 0
         except Exception as e:
             if "timeout" in str(e).lower() or "TIMEOUT" in str(e):
@@ -1754,9 +1730,7 @@ class ObservabilityMetricsService:
         column_names = self._get_telemetry_column_names(request)
 
         # Build the span tree
-        data = self._build_telemetry_span_tree(
-            results, column_names, request
-        )
+        data = self._build_telemetry_span_tree(results, column_names, request)
 
         elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -1769,9 +1743,7 @@ class ObservabilityMetricsService:
             query_time_ms=elapsed_ms,
         )
 
-    def _get_telemetry_column_names(
-        self, request: TelemetryQueryRequest
-    ) -> list[str]:
+    def _get_telemetry_column_names(self, request: TelemetryQueryRequest) -> list[str]:
         """Build a list of column names matching the SELECT clause order.
 
         This must match the order produced by TelemetryQueryBuilder._build_select_clause.
@@ -1793,9 +1765,7 @@ class ObservabilityMetricsService:
             columns.extend(["Events.Timestamp", "Events.Name", "Events.Attributes"])
 
         if request.include_links:
-            columns.extend(
-                ["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"]
-            )
+            columns.extend(["Links.TraceId", "Links.SpanId", "Links.TraceState", "Links.Attributes"])
 
         return columns
 
@@ -1902,11 +1872,7 @@ class ObservabilityMetricsService:
                 links=span.get("links"),
             )
 
-        return [
-            build_node(sid, 0)
-            for sid in target_span_ids
-            if sid in span_by_id
-        ]
+        return [build_node(sid, 0) for sid in target_span_ids if sid in span_by_id]
 
     def _telemetry_row_to_dict(
         self,
@@ -1970,11 +1936,13 @@ class ObservabilityMetricsService:
             attr_col = col_idx["Events.Attributes"]
             if row[ts_col] and row[name_col]:
                 for i in range(len(row[ts_col])):
-                    events.append({
-                        "timestamp": str(row[ts_col][i]),
-                        "name": row[name_col][i],
-                        "attributes": dict(row[attr_col][i]) if row[attr_col] and i < len(row[attr_col]) else {},
-                    })
+                    events.append(
+                        {
+                            "timestamp": str(row[ts_col][i]),
+                            "name": row[name_col][i],
+                            "attributes": dict(row[attr_col][i]) if row[attr_col] and i < len(row[attr_col]) else {},
+                        }
+                    )
             span["events"] = events
 
         # Links
@@ -1986,12 +1954,16 @@ class ObservabilityMetricsService:
             lattr_col = col_idx["Links.Attributes"]
             if row[tid_col] and row[sid_col]:
                 for i in range(len(row[tid_col])):
-                    links.append({
-                        "trace_id": row[tid_col][i],
-                        "span_id": row[sid_col][i] if i < len(row[sid_col]) else "",
-                        "trace_state": row[state_col][i] if row[state_col] and i < len(row[state_col]) else "",
-                        "attributes": dict(row[lattr_col][i]) if row[lattr_col] and i < len(row[lattr_col]) else {},
-                    })
+                    links.append(
+                        {
+                            "trace_id": row[tid_col][i],
+                            "span_id": row[sid_col][i] if i < len(row[sid_col]) else "",
+                            "trace_state": row[state_col][i] if row[state_col] and i < len(row[state_col]) else "",
+                            "attributes": dict(row[lattr_col][i])
+                            if row[lattr_col] and i < len(row[lattr_col])
+                            else {},
+                        }
+                    )
             span["links"] = links
 
         return span

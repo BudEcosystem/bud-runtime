@@ -1336,9 +1336,7 @@ class OrderBySpec(BaseModel):
     def validate_order_field(cls, v: str) -> str:
         """Ensure order-by field is a known queryable column."""
         if v not in QUERYABLE_COLUMNS:
-            raise ValueError(
-                f"Invalid order_by field '{v}'. Must be one of: {', '.join(QUERYABLE_COLUMNS.keys())}"
-            )
+            raise ValueError(f"Invalid order_by field '{v}'. Must be one of: {', '.join(QUERYABLE_COLUMNS.keys())}")
         return v
 
 
@@ -1414,14 +1412,10 @@ class TelemetryQueryRequest(BaseModel):
     include_links: bool = False
 
     # === Span attribute filters ===
-    span_filters: Optional[List[FilterCondition]] = Field(
-        None, max_length=MAX_SPAN_FILTER_CONDITIONS
-    )
+    span_filters: Optional[List[FilterCondition]] = Field(None, max_length=MAX_SPAN_FILTER_CONDITIONS)
 
     # === Resource attribute filters ===
-    resource_filters: Optional[List[FilterCondition]] = Field(
-        None, max_length=MAX_RESOURCE_FILTER_CONDITIONS
-    )
+    resource_filters: Optional[List[FilterCondition]] = Field(None, max_length=MAX_RESOURCE_FILTER_CONDITIONS)
 
     # === Pagination ===
     order_by: Optional[List[OrderBySpec]] = None
@@ -1448,9 +1442,7 @@ class TelemetryQueryRequest(BaseModel):
                 raise ValueError("to_date must be after from_date")
             date_diff = self.to_date - self.from_date
             if date_diff > timedelta(days=MAX_TIME_RANGE_DAYS):
-                raise ValueError(
-                    f"Time range cannot exceed {MAX_TIME_RANGE_DAYS} days"
-                )
+                raise ValueError(f"Time range cannot exceed {MAX_TIME_RANGE_DAYS} days")
         return self
 
 
