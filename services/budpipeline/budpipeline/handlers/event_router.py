@@ -8,6 +8,7 @@ and routes the event to the action executor's on_event() method.
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -15,8 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Use new action architecture
 from budpipeline.actions.base import EventAction, EventContext, EventResult, action_registry
-from budpipeline.pipeline.crud import StepExecutionCRUD
-from budpipeline.pipeline.models import StepExecution, StepStatus
+from budpipeline.pipeline.crud import PipelineExecutionCRUD, StepExecutionCRUD
+from budpipeline.pipeline.models import ExecutionStatus, StepExecution, StepStatus
+from budpipeline.progress.publisher import event_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,101 @@ def extract_workflow_id(event_data: dict[str, Any]) -> str | None:
         return str(workflow_id)
 
     return None
+
+
+async def _publish_step_event(
+    execution_id: UUID,
+    step_id: str,
+    step_name: str,
+    status: StepStatus,
+    sequence_number: int = 0,
+    progress_percentage: Decimal = Decimal("0.00"),
+    error_message: str | None = None,
+    subscriber_ids: str | None = None,
+    payload_type: str | None = None,
+    notification_workflow_id: str | None = None,
+) -> None:
+    """Non-blocking step event publish. Mirrors persistence_service._publish_step_event."""
+    try:
+        if status == StepStatus.RUNNING:
+            await event_publisher.publish_step_started(
+                execution_id=execution_id,
+                step_id=step_id,
+                step_name=step_name,
+                sequence_number=sequence_number,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
+        elif status == StepStatus.COMPLETED:
+            await event_publisher.publish_step_completed(
+                execution_id=execution_id,
+                step_id=step_id,
+                step_name=step_name,
+                progress_percentage=progress_percentage,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
+        elif status in (StepStatus.FAILED, StepStatus.TIMEOUT):
+            await event_publisher.publish_step_failed(
+                execution_id=execution_id,
+                step_id=step_id,
+                step_name=step_name,
+                error_message=error_message or "Step failed",
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
+    except Exception as e:
+        logger.warning(
+            f"Failed to publish step event for step {step_id}: {e}",
+        )
+
+
+async def _publish_execution_event(
+    execution_id: UUID,
+    status: ExecutionStatus,
+    progress_percentage: Decimal | None = None,
+    final_outputs: dict[str, Any] | None = None,
+    error_info: dict[str, Any] | None = None,
+    subscriber_ids: str | None = None,
+    payload_type: str | None = None,
+    notification_workflow_id: str | None = None,
+) -> None:
+    """Non-blocking execution event publish. Mirrors persistence_service._publish_execution_event."""
+    try:
+        if status == ExecutionStatus.COMPLETED:
+            await event_publisher.publish_workflow_completed(
+                execution_id=execution_id,
+                success=True,
+                final_outputs=final_outputs,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
+        elif status == ExecutionStatus.FAILED:
+            message = error_info.get("message") if error_info else None
+            await event_publisher.publish_workflow_completed(
+                execution_id=execution_id,
+                success=False,
+                final_message=message,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
+        elif status == ExecutionStatus.RUNNING and progress_percentage is not None:
+            await event_publisher.publish_workflow_progress(
+                execution_id=execution_id,
+                progress_percentage=progress_percentage,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
+    except Exception as e:
+        logger.warning(
+            f"Failed to publish execution event for execution {execution_id}: {e}",
+        )
 
 
 async def route_event(
@@ -215,6 +312,20 @@ async def route_event(
             f"outputs={list(final_outputs.keys())}"
         )
 
+        # Publish step completion event
+        execution_crud = PipelineExecutionCRUD(session)
+        execution = await execution_crud.get_by_id(step.execution_id)
+        await _publish_step_event(
+            execution_id=step.execution_id,
+            step_id=step.step_id,
+            step_name=step.step_name or step.step_id,
+            status=final_status,
+            error_message=result.error,
+            subscriber_ids=execution.subscriber_ids if execution else None,
+            payload_type=execution.payload_type if execution else None,
+            notification_workflow_id=execution.notification_workflow_id if execution else None,
+        )
+
         return EventRouteResult(
             routed=True,
             step_execution_id=step.id,
@@ -226,8 +337,6 @@ async def route_event(
     elif result.action == EventAction.UPDATE_PROGRESS:
         # Update progress but keep waiting for more events
         if result.progress is not None:
-            from decimal import Decimal
-
             await step_crud.update_with_version(
                 step_uuid=step.id,
                 expected_version=step.version,
@@ -309,6 +418,20 @@ async def process_timeout(
             status=final_status,
             outputs=outputs,
             error_message=error_message,
+        )
+
+        # Publish step completion/timeout event
+        execution_crud = PipelineExecutionCRUD(session)
+        execution = await execution_crud.get_by_id(step.execution_id)
+        await _publish_step_event(
+            execution_id=step.execution_id,
+            step_id=step.step_id,
+            step_name=step.step_name or step.step_id,
+            status=final_status,
+            error_message=error_message,
+            subscriber_ids=execution.subscriber_ids if execution else None,
+            payload_type=execution.payload_type if execution else None,
+            notification_workflow_id=execution.notification_workflow_id if execution else None,
         )
 
         return EventRouteResult(
@@ -421,9 +544,6 @@ async def trigger_pipeline_continuation(
     )
 
     # Update execution status based on step completion
-    from budpipeline.pipeline.crud import PipelineExecutionCRUD
-    from budpipeline.pipeline.models import ExecutionStatus
-
     execution_crud = PipelineExecutionCRUD(session)
     execution = await execution_crud.get_by_id(execution_id)
 
@@ -431,15 +551,19 @@ async def trigger_pipeline_continuation(
         logger.warning(f"Execution {execution_id} not found for continuation")
         return
 
+    # Extract notification metadata
+    subscriber_ids = execution.subscriber_ids
+    payload_type = execution.payload_type
+    notification_workflow_id = execution.notification_workflow_id
+
     # Check if execution is done
     all_done = pending_count == 0 and running_count == 0
 
     if all_done:
-        from decimal import Decimal
-
         if failed_count > 0:
             # Execution failed
             final_status = ExecutionStatus.FAILED
+            error_info = {"failed_steps": failed_count, "total_steps": total_steps}
             logger.info(
                 f"Execution {execution_id} FAILED: {failed_count} steps failed out of {total_steps}"
             )
@@ -448,7 +572,15 @@ async def trigger_pipeline_continuation(
                 expected_version=execution.version,
                 status=final_status,
                 end_time=datetime.now(timezone.utc),
-                error_info={"failed_steps": failed_count, "total_steps": total_steps},
+                error_info=error_info,
+            )
+            await _publish_execution_event(
+                execution_id=execution_id,
+                status=final_status,
+                error_info=error_info,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
             )
         else:
             # Execution completed successfully
@@ -471,16 +603,30 @@ async def trigger_pipeline_continuation(
                 end_time=datetime.now(timezone.utc),
                 final_outputs=final_outputs,
             )
+            await _publish_execution_event(
+                execution_id=execution_id,
+                status=final_status,
+                final_outputs=final_outputs,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
     else:
         # Still running - update progress percentage
-        from decimal import Decimal
-
         if total_steps > 0:
-            progress = Decimal(str((completed_count / total_steps) * 100))
+            progress = Decimal(str((completed_count / total_steps) * 100)).quantize(Decimal("0.01"))
             await execution_crud.update_with_version(
                 execution_id=execution_id,
                 expected_version=execution.version,
-                progress_percentage=progress.quantize(Decimal("0.01")),
+                progress_percentage=progress,
+            )
+            await _publish_execution_event(
+                execution_id=execution_id,
+                status=ExecutionStatus.RUNNING,
+                progress_percentage=progress,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
             )
 
         # Trigger execution of pending steps that have their dependencies met
@@ -513,11 +659,6 @@ async def _check_and_finalize_execution(
         execution_id: The execution to check.
         all_steps: All step executions for this execution.
     """
-    from decimal import Decimal
-
-    from budpipeline.pipeline.crud import PipelineExecutionCRUD
-    from budpipeline.pipeline.models import ExecutionStatus
-
     # Refresh step statuses from database
     step_crud = StepExecutionCRUD(session)
     fresh_steps = await step_crud.get_by_execution_id(execution_id)
@@ -582,9 +723,15 @@ async def _check_and_finalize_execution(
         logger.debug(f"Execution {execution_id} already finalized with status {execution.status}")
         return
 
+    # Extract notification metadata
+    subscriber_ids = execution.subscriber_ids
+    payload_type = execution.payload_type
+    notification_workflow_id = execution.notification_workflow_id
+
     if failed_count > 0:
         # Execution failed
         final_status = ExecutionStatus.FAILED
+        error_info = {"failed_steps": failed_count, "total_steps": total_steps}
         logger.info(
             f"Execution {execution_id} FAILED: {failed_count} steps failed out of {total_steps}"
         )
@@ -593,7 +740,15 @@ async def _check_and_finalize_execution(
             expected_version=execution.version,
             status=final_status,
             end_time=datetime.now(timezone.utc),
-            error_info={"failed_steps": failed_count, "total_steps": total_steps},
+            error_info=error_info,
+        )
+        await _publish_execution_event(
+            execution_id=execution_id,
+            status=final_status,
+            error_info=error_info,
+            subscriber_ids=subscriber_ids,
+            payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
     else:
         # Execution completed successfully
@@ -613,6 +768,14 @@ async def _check_and_finalize_execution(
             progress_percentage=Decimal("100.00"),
             end_time=datetime.now(timezone.utc),
             final_outputs=final_outputs,
+        )
+        await _publish_execution_event(
+            execution_id=execution_id,
+            status=final_status,
+            final_outputs=final_outputs,
+            subscriber_ids=subscriber_ids,
+            payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
 
@@ -653,7 +816,6 @@ async def _continue_pipeline_execution(
     """
     from budpipeline.actions.base import ActionContext, action_registry
     from budpipeline.commons.config import settings
-    from budpipeline.pipeline.crud import PipelineExecutionCRUD
 
     # Build set of completed step IDs and collect their outputs
     completed_step_ids: set[str] = set()
@@ -665,12 +827,17 @@ async def _continue_pipeline_execution(
             if s.outputs:
                 step_outputs[s.step_id] = s.outputs
 
-    # Get execution to retrieve DAG and params
+    # Get execution to retrieve DAG, params, and notification metadata
     execution_crud = PipelineExecutionCRUD(session)
     execution = await execution_crud.get_by_id(execution_id)
     if not execution:
         logger.warning(f"Execution {execution_id} not found for continuation")
         return
+
+    # Extract notification metadata
+    subscriber_ids = execution.subscriber_ids
+    payload_type = execution.payload_type
+    notification_workflow_id = execution.notification_workflow_id
 
     # Get DAG from pipeline_definition (which contains the 'dag' field with steps)
     pipeline_def = execution.pipeline_definition or {}
@@ -751,6 +918,18 @@ async def _continue_pipeline_execution(
             )
             # Use the version from the updated step for subsequent operations
             current_version = updated_step.version
+
+            # Publish step started event
+            await _publish_step_event(
+                execution_id=execution_id,
+                step_id=step_id,
+                step_name=fresh_step.step_name or step_id,
+                status=StepStatus.RUNNING,
+                sequence_number=fresh_step.sequence_number or 0,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
         except Exception as e:
             logger.warning(f"Failed to mark step {step_id} as RUNNING: {e}")
             continue
@@ -792,6 +971,16 @@ async def _continue_pipeline_execution(
                 status=StepStatus.FAILED,
                 outputs={},
                 error_message=str(e),
+            )
+            await _publish_step_event(
+                execution_id=execution_id,
+                step_id=step_id,
+                step_name=fresh_step.step_name or step_id,
+                status=StepStatus.FAILED,
+                error_message=str(e),
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
             )
             await _commit_and_finalize_on_failure(session, step_crud, execution_id)
             continue
@@ -835,6 +1024,15 @@ async def _continue_pipeline_execution(
                     error_message=None,
                 )
                 logger.info(f"Step {step_id} completed synchronously")
+                await _publish_step_event(
+                    execution_id=execution_id,
+                    step_id=step_id,
+                    step_name=fresh_step.step_name or step_id,
+                    status=StepStatus.COMPLETED,
+                    subscriber_ids=subscriber_ids,
+                    payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
+                )
 
                 # Commit the completion before continuing
                 await session.commit()
@@ -857,4 +1055,14 @@ async def _continue_pipeline_execution(
                 error_message=result.error,
             )
             logger.warning(f"Step {step_id} failed: {result.error}")
+            await _publish_step_event(
+                execution_id=execution_id,
+                step_id=step_id,
+                step_name=fresh_step.step_name or step_id,
+                status=StepStatus.FAILED,
+                error_message=result.error,
+                subscriber_ids=subscriber_ids,
+                payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
+            )
             await _commit_and_finalize_on_failure(session, step_crud, execution_id)
