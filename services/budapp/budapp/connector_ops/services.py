@@ -17,6 +17,7 @@
 """Service layer for global connector operations — thin proxy to MCP Foundry."""
 
 import asyncio
+import re
 from contextlib import suppress
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
@@ -26,7 +27,7 @@ from fastapi import status
 from ..commons import logging
 from ..commons.config import app_settings
 from ..commons.constants import CONNECTOR_AUTH_CREDENTIALS_MAP, MCP_AUTH_TYPE_MAPPING, ConnectorAuthTypeEnum
-from ..commons.exceptions import ClientException
+from ..commons.exceptions import ClientException, MCPFoundryException
 from ..prompt_ops.schemas import HeadersCredentials, OAuthCredentials, OpenCredentials
 from ..shared.mcp_foundry_service import mcp_foundry_service
 from ..shared.redis_service import RedisService
@@ -342,16 +343,18 @@ class ConnectorService:
         result = await mcp_foundry_service.handle_oauth_callback(code, state)
 
         gateway_id = result.get("gateway_id")
-        if gateway_id:
+        if gateway_id and re.fullmatch(r"[0-9a-fA-F\-]{1,64}", gateway_id):
             try:
                 await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
                 logger.info("Auto-fetched tools after OAuth", gateway_id=gateway_id)
-            except Exception as fetch_err:
+            except (MCPFoundryException, Exception) as fetch_err:
                 logger.warning(
                     "Failed to auto-fetch tools after OAuth",
                     gateway_id=gateway_id,
                     error=str(fetch_err),
                 )
+        elif gateway_id:
+            logger.warning("Skipping auto-fetch: invalid gateway_id format", gateway_id=gateway_id)
 
         return result
 
