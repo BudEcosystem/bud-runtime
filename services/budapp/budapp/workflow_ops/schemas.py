@@ -144,6 +144,9 @@ class RetrieveWorkflowStepData(BaseModel):
     simulation_events: dict | None = None
     # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
     deployment_events: dict | None = None
+    # CommonStatus-compatible guardrail events
+    guardrail_onboarding_events: dict | None = None
+    guardrail_deployment_events: dict | None = None
     # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
     pending_profile_data: dict | None = None
 

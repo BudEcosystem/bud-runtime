@@ -415,6 +415,96 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await PromptWorkflowService(self.session).create_prompt_schema_from_notification_event(payload)
 
+    async def update_guardrail_onboarding_events(self, payload: NotificationPayload) -> None:
+        """Update the guardrail model onboarding events for a workflow step."""
+        event_name = BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value
+        try:
+            await self._update_workflow_step_events(event_name, payload)
+            await self._update_workflow_progress(event_name, payload)
+        except Exception:
+            logger.error("Failed to update guardrail onboarding workflow step events")
+
+        if payload.content.status == "FAILED":
+            await self._update_guardrail_workflow_status(payload, "failed", "Model onboarding failed")
+
+    async def update_guardrail_deployment_events(self, payload: NotificationPayload) -> None:
+        """Update the guardrail deployment events for a workflow step."""
+        event_name = BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value
+        try:
+            await self._update_workflow_step_events(event_name, payload)
+            await self._update_workflow_progress(event_name, payload)
+        except Exception:
+            logger.error("Failed to update guardrail deployment workflow step events")
+
+        if payload.event == "results":
+            await self._handle_guardrail_deployment_results(payload)
+
+        if payload.content.status == "FAILED":
+            await self._update_guardrail_workflow_status(payload, "failed", "Model deployment failed")
+
+    async def _update_guardrail_workflow_status(self, payload: NotificationPayload, status: str, reason: str) -> None:
+        """Update the guardrail workflow status on failure."""
+        try:
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": payload.workflow_id}
+            )
+            if db_workflow:
+                from budapp.commons.constants import WorkflowStatusEnum
+
+                self.session.refresh(db_workflow)
+                await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow, {"status": WorkflowStatusEnum.FAILED, "reason": reason}
+                )
+        except Exception:
+            logger.error(f"Failed to update guardrail workflow status for {payload.workflow_id}")
+
+    async def _handle_guardrail_deployment_results(self, payload: NotificationPayload) -> None:
+        """Handle guardrail deployment completion by finalizing profile creation."""
+        try:
+            from budapp.guardrails.services import GuardrailDeploymentWorkflowService
+
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": payload.workflow_id}
+            )
+            if not db_workflow:
+                logger.warning(f"No workflow found for guardrail deployment results: {payload.workflow_id}")
+                return
+
+            # Get pending profile data from workflow steps
+            db_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": payload.workflow_id}
+            )
+            pending_profile_data = None
+            for step in db_steps:
+                step_data = step.data or {}
+                if step_data.get("pending_profile_data"):
+                    pending_profile_data = step_data["pending_profile_data"]
+                    break
+
+            if not pending_profile_data:
+                logger.warning(f"No pending profile data found for workflow {payload.workflow_id}")
+                return
+
+            latest_step = db_steps[-1] if db_steps else None
+            if not latest_step:
+                return
+
+            guardrail_profile_id = pending_profile_data.get("guardrail_profile_id")
+            user_id_str = pending_profile_data.get("user_id")
+
+            from uuid import UUID
+
+            await GuardrailDeploymentWorkflowService(self.session)._finalize_guardrail_profile_creation(
+                data=pending_profile_data,
+                workflow_id=payload.workflow_id,
+                current_user_id=UUID(user_id_str) if user_id_str else None,
+                db_workflow=db_workflow,
+                db_latest_workflow_step=latest_step,
+                guardrail_profile_id=UUID(guardrail_profile_id) if guardrail_profile_id else None,
+            )
+        except Exception:
+            logger.exception(f"Failed to finalize guardrail profile after deployment for {payload.workflow_id}")
+
     async def update_eta_events(self, payload: NotificationPayload) -> None:
         """Update ETA value for workflow progress and step."""
         if not payload.workflow_id:
@@ -657,6 +747,8 @@ class SubscriberHandler:
             PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
             PayloadType.EVALUATE_MODEL: self._handle_evaluate_model,
             PayloadType.PERFORM_PROMPT_SCHEMA: self._handle_perform_prompt_schema,
+            PayloadType.GUARDRAIL_MODEL_ONBOARDING: self._handle_guardrail_model_onboarding,
+            PayloadType.GUARDRAIL_DEPLOYMENT: self._handle_guardrail_deployment,
         }
 
         handler = handlers.get(payload.type)
@@ -810,6 +902,22 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated prompt schema event in workflow step",
+        ).to_http_response()
+
+    async def _handle_guardrail_model_onboarding(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the guardrail model onboarding event."""
+        await NotificationService(self.session).update_guardrail_onboarding_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated guardrail onboarding event",
+        ).to_http_response()
+
+    async def _handle_guardrail_deployment(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the guardrail deployment event."""
+        await NotificationService(self.session).update_guardrail_deployment_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated guardrail deployment event",
         ).to_http_response()
 
 

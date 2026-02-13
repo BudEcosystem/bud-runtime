@@ -664,6 +664,8 @@ class PayloadType(str, Enum):
     DELETE_ADAPTER = "delete_adapter"
     EVALUATE_MODEL = "evaluate_model"
     PERFORM_PROMPT_SCHEMA = "perform_prompt_schema"
+    GUARDRAIL_MODEL_ONBOARDING = "guardrail_model_onboarding"
+    GUARDRAIL_DEPLOYMENT = "guardrail_deployment"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -691,6 +693,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
+    GUARDRAIL_ONBOARDING_EVENTS = "guardrail_onboarding_events"
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
     TOOL_CREATION_EVENTS = "tool_creation_events"
@@ -716,6 +719,8 @@ PAYLOAD_TO_WORKFLOW_STEP_EVENT: dict[PayloadType, BudServeWorkflowStepEventName]
     PayloadType.ADD_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS,
     PayloadType.DELETE_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS,
     PayloadType.EVALUATE_MODEL: BudServeWorkflowStepEventName.EVALUATION_EVENTS,
+    PayloadType.GUARDRAIL_MODEL_ONBOARDING: BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS,
+    PayloadType.GUARDRAIL_DEPLOYMENT: BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS,
 }
 
 

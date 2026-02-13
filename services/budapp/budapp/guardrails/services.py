@@ -30,12 +30,14 @@ from budapp.commons import logging
 from budapp.commons.config import app_settings
 from budapp.commons.constants import (
     APP_ICONS,
+    BudServeWorkflowStepEventName,
     EndpointStatusEnum,
     GuardrailDeploymentStatusEnum,
     GuardrailProviderTypeEnum,
     GuardrailStatusEnum,
     ModelEndpointEnum,
     NotificationTypeEnum,
+    PayloadType,
     ProjectStatusEnum,
     ProviderCapabilityEnum,
     ProxyProviderEnum,
@@ -471,6 +473,32 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                         "status": "running",
                         "results": onboarding_result,
                     }
+
+                    # Build CommonStatus-compatible events from DAG steps
+                    onboarding_steps = [
+                        {"id": s["id"], "title": s["title"], "description": s["description"], "payload": {}}
+                        for s in onboarding_result.get("dag_steps", [])
+                    ]
+                    onboarding_steps.append(
+                        {"id": "results", "title": "Results", "description": "Final results", "payload": {}}
+                    )
+                    onboarding_events_data = {
+                        "object": "workflow_metadata",
+                        "status": "PENDING",
+                        "workflow_id": execution_id,
+                        "workflow_name": "guardrail-model-onboarding",
+                        "progress_type": BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value,
+                        "steps": onboarding_steps,
+                    }
+                    workflow_step_data[BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value] = (
+                        onboarding_events_data
+                    )
+
+                    # Update workflow progress for CommonStatus polling
+                    self.session.refresh(db_workflow)
+                    await WorkflowDataManager(self.session).update_by_fields(
+                        db_workflow, {"progress": onboarding_events_data}
+                    )
                 else:
                     workflow_step_data["onboarding_events"] = {
                         "status": "failed",
@@ -517,7 +545,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     budaiscaler_spec = step_data["budaiscaler_specification"]
                     break
 
-        if cluster_id and model_statuses_data:
+        if cluster_id and model_statuses_data and sim_hardware_mode != "shared":
             models_requiring_deployment = [m for m in model_statuses_data if m.get("requires_deployment")]
             if models_requiring_deployment:
                 validation_result = await self.validate_cluster_assignment(
@@ -552,14 +580,38 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             running_sims = [r for r in existing_sim_results if r.get("status") == "running"]
             if running_sims:
                 logger.info(f"Refreshing status for {len(running_sims)} running simulations")
-                refreshed_events = await self.refresh_simulation_status(existing_sim_events)
+                refreshed_events, recommended_clusters = await self.refresh_simulation_status(
+                    existing_sim_events, deploy_config=default_deploy_config
+                )
                 workflow_step_data["simulation_events"] = refreshed_events
                 existing_sim_results = refreshed_events.get("results", [])
+
+                # Store recommended_clusters at the top level
+                if recommended_clusters:
+                    workflow_step_data["recommended_clusters"] = recommended_clusters
 
                 # Update the workflow step with refreshed simulation status
                 await WorkflowStepDataManager(self.session).update_by_fields(
                     db_workflow_step, {"data": workflow_step_data}
                 )
+            elif not workflow_step_data.get("recommended_clusters"):
+                # All sims complete but recommended_clusters not yet computed — recompute
+                successful_results = [r for r in existing_sim_results if r.get("status") == "success"]
+                if successful_results:
+                    resource_summary = await self._compute_cluster_resource_summary(
+                        existing_sim_results, deploy_config=default_deploy_config
+                    )
+                    existing_sim_events["deployable"] = resource_summary["deployable"]
+                    existing_sim_events["warnings"] = resource_summary["warnings"]
+                    # Clean up old keys
+                    existing_sim_events.pop("cluster_summary", None)
+                    existing_sim_events.pop("recommended_clusters", None)
+                    workflow_step_data["simulation_events"] = existing_sim_events
+                    workflow_step_data["recommended_clusters"] = resource_summary["recommended_clusters"]
+
+                    await WorkflowStepDataManager(self.session).update_by_fields(
+                        db_workflow_step, {"data": workflow_step_data}
+                    )
 
         # Get deployment_events from current step or previous steps
         existing_deploy_events = workflow_step_data.get("deployment_events", {})
@@ -775,6 +827,9 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 "simulation_events",
                 # Deployment tracking (to prevent duplicate triggers)
                 "deployment_events",
+                # CommonStatus-compatible events for notification-driven progress
+                BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value,
+                BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value,
             ]
 
             # from workflow steps extract necessary information
@@ -1000,6 +1055,23 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 end_step_number = db_latest_workflow_step.step_number + 1
                 db_workflow_step = await self._create_or_update_next_workflow_step(workflow_id, end_step_number, {})
 
+                # Build CommonStatus-compatible deployment events from DAG steps
+                deploy_steps = [
+                    {"id": s["id"], "title": s["title"], "description": s["description"], "payload": {}}
+                    for s in deployment_result.get("dag_steps", [])
+                ]
+                deploy_steps.append(
+                    {"id": "results", "title": "Results", "description": "Final results", "payload": {}}
+                )
+                deployment_events_data = {
+                    "object": "workflow_metadata",
+                    "status": "PENDING",
+                    "workflow_id": deployment_result.get("execution_id"),
+                    "workflow_name": "guardrail-model-deployment",
+                    "progress_type": BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value,
+                    "steps": deploy_steps,
+                }
+
                 execution_status_data = {
                     "workflow_execution_status": {
                         "status": "running",
@@ -1008,6 +1080,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     "deployment_events": deployment_events,
                     "pending_profile_data": pending_profile_data,
                     "profile_id": None,
+                    BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value: deployment_events_data,
                 }
 
                 await WorkflowStepDataManager(self.session).update_by_fields(
@@ -1015,7 +1088,11 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 )
                 await WorkflowDataManager(self.session).update_by_fields(
                     db_workflow,
-                    {"current_step": end_step_number, "status": WorkflowStatusEnum.IN_PROGRESS},
+                    {
+                        "progress": deployment_events_data,
+                        "current_step": end_step_number,
+                        "status": WorkflowStatusEnum.IN_PROGRESS,
+                    },
                 )
                 logger.info(f"Model deployment pipeline started: {deployment_result.get('execution_id')}")
                 return
@@ -1740,14 +1817,22 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
             model_id = str(model_status.get("model_id", "")) if model_status.get("model_id") else ""
 
-            models.append(
-                {
-                    "model_id": model_id or None,
-                    "model_uri": model_uri,
-                    "model_name": model_uri.split("/")[-1] if "/" in model_uri else model_uri,
-                    "deploy_config": dict(deploy_config) if deploy_config else {},
-                }
-            )
+            model_dict = {
+                "model_id": model_id or None,
+                "model_uri": model_uri,
+                "model_name": model_uri.split("/")[-1] if "/" in model_uri else model_uri,
+                "deploy_config": dict(deploy_config) if deploy_config else {},
+            }
+
+            # Pass through local_path and supported_endpoints from model status
+            # local_path: cached model path so budsim doesn't need HF credentials for gated models
+            # supported_endpoints: for budsim engine selection
+            if model_status.get("local_path"):
+                model_dict["local_path"] = model_status["local_path"]
+            if model_status.get("supported_endpoints"):
+                model_dict["supported_endpoints"] = model_status["supported_endpoints"]
+
+            models.append(model_dict)
 
         return models
 
@@ -2055,6 +2140,14 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
     # Pipeline Integration for Cross-Service Calls
     # =========================================================================
 
+    @staticmethod
+    def _sanitize_step_id(prefix: str, name: str) -> str:
+        """Create a sanitized step ID from a prefix and model name."""
+        import re
+
+        sanitized = re.sub(r"[^a-zA-Z0-9]", "-", name).lower().strip("-")[:60]
+        return f"{prefix}-{sanitized}"
+
     async def trigger_model_onboarding(
         self,
         models: list[dict],
@@ -2085,8 +2178,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         # Build DAG steps - one model_add step per model
         steps = []
-        for i, model in enumerate(models):
-            step_id = f"onboard_{i}"
+        for model in models:
             model_uri = model["model_uri"]
             uri_parts = model_uri.split("/")
 
@@ -2094,6 +2186,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             # Format: "author/model-name" -> author="author", name="model-name"
             model_name = uri_parts[-1] if uri_parts else model_uri
             model_author = uri_parts[0] if len(uri_parts) > 1 else None
+            step_id = self._sanitize_step_id("onboard", model_name)
 
             # Default guardrail tag + any tags from the rule
             tags = [{"name": "guardrail", "color": "#6366f1"}]
@@ -2133,13 +2226,19 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         logger.info(f"Triggering model onboarding pipeline for {len(models)} models")
 
+        # Ensure source_topic is in callback_topics for notification routing
+        effective_callback_topics = list(callback_topics or [])
+        if app_settings.source_topic and app_settings.source_topic not in effective_callback_topics:
+            effective_callback_topics.append(app_settings.source_topic)
+
         # Execute via BudPipeline
         pipeline_service = BudPipelineService(self.session)
         result = await pipeline_service.run_ephemeral_execution(
             pipeline_definition=dag,
             params={"user_id": str(user_id)} if user_id else {},
-            callback_topics=callback_topics,
+            callback_topics=effective_callback_topics or None,
             user_id=str(user_id) if user_id else None,
+            payload_type=PayloadType.GUARDRAIL_MODEL_ONBOARDING.value,
         )
 
         execution_id = result.get("execution_id")
@@ -2147,7 +2246,15 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         return {
             "execution_id": execution_id,
-            "step_mapping": {model["rule_id"]: f"onboard_{i}" for i, model in enumerate(models)},
+            "step_mapping": {model["rule_id"]: step["id"] for model, step in zip(models, steps, strict=False)},
+            "dag_steps": [
+                {
+                    "id": s["id"],
+                    "title": s["name"],
+                    "description": f"{s['action']} for {s['params'].get('model_uri', '')}",
+                }
+                for s in steps
+            ],
             "total_models": len(models),
         }
 
@@ -2182,15 +2289,30 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         """
         import re
 
+        from sqlalchemy import select
+
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.models import Model
+
         if not models:
             return {"execution_id": None, "message": "No models to deploy"}
+
+        # Sort models by model_size descending (larger models deploy first)
+        # so the biggest resource consumer is scheduled before smaller ones
+        model_ids = [m["model_id"] for m in models if m.get("model_id")]
+        if model_ids:
+            stmt = select(Model.id, Model.model_size).where(Model.id.in_(model_ids))
+            rows = ModelDataManager(self.session).execute_all(stmt)
+            size_map = {str(row.id): row.model_size or 0 for row in rows}
+            models = sorted(models, key=lambda m: size_map.get(str(m.get("model_id")), 0), reverse=True)
 
         # Build DAG steps - one deployment_create step per model, sequential execution
         steps = []
         results = []
+        prev_step_id = None
         for i, model in enumerate(models):
-            step_id = f"deploy_{i}"
             model_name = model.get("model_name", f"model_{i}")
+            step_id = self._sanitize_step_id("deploy", model_name)
             model_deploy_config = model.get("deploy_config", {})
 
             # Generate unique endpoint name
@@ -2223,7 +2345,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                 step_params["budaiscaler_specification"] = budaiscaler_specification
 
             # Sequential: each step depends on the previous one
-            depends_on = [f"deploy_{i - 1}"] if i > 0 else []
+            depends_on = [prev_step_id] if prev_step_id else []
 
             steps.append(
                 {
@@ -2246,6 +2368,7 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     "workflow_id": None,
                 }
             )
+            prev_step_id = step_id
 
         # Build the DAG definition
         dag = {
@@ -2258,13 +2381,19 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
 
         logger.info(f"Triggering deployment pipeline for {len(models)} models to cluster {cluster_id}")
 
+        # Ensure source_topic is in callback_topics for notification routing
+        effective_callback_topics = list(callback_topics or [])
+        if app_settings.source_topic and app_settings.source_topic not in effective_callback_topics:
+            effective_callback_topics.append(app_settings.source_topic)
+
         # Execute via BudPipeline
         pipeline_service = BudPipelineService(self.session)
         result = await pipeline_service.run_ephemeral_execution(
             pipeline_definition=dag,
             params={"user_id": str(user_id)} if user_id else {},
-            callback_topics=callback_topics,
+            callback_topics=effective_callback_topics or None,
             user_id=str(user_id) if user_id else None,
+            payload_type=PayloadType.GUARDRAIL_DEPLOYMENT.value,
         )
 
         execution_id = result.get("execution_id")
@@ -2273,7 +2402,15 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
         return {
             "execution_id": execution_id,
             "results": results,
-            "step_mapping": {str(model["model_id"]): f"deploy_{i}" for i, model in enumerate(models)},
+            "step_mapping": {str(model["model_id"]): step["id"] for model, step in zip(models, steps, strict=False)},
+            "dag_steps": [
+                {
+                    "id": s["id"],
+                    "title": s["name"],
+                    "description": f"{s['action']} for {s['params'].get('model_id', '')}",
+                }
+                for s in steps
+            ],
             "total_models": len(models),
             "successful": len(models),
             "failed": 0,
@@ -2411,11 +2548,13 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
     async def refresh_simulation_status(
         self,
         simulation_events: dict,
+        deploy_config: dict | None = None,
     ) -> dict:
         """Refresh simulation status by checking budsim recommendations for each running simulation.
 
         Args:
             simulation_events: Current simulation_events dict with results
+            deploy_config: Serialized DeploymentTemplateCreate for benchmark label computation
 
         Returns:
             Updated simulation_events with refreshed statuses
@@ -2491,47 +2630,62 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
             "running": running_count,
         }
 
-        # If all simulations complete, compute resource summary (top-level only)
+        # If all simulations complete, compute common cluster recommendations
+        recommended_clusters = None
         if running_count == 0 and successful_count > 0:
-            resource_summary = await self._compute_cluster_resource_summary(updated_results)
+            resource_summary = await self._compute_cluster_resource_summary(
+                updated_results, deploy_config=deploy_config
+            )
             result["deployable"] = resource_summary["deployable"]
             result["warnings"] = resource_summary["warnings"]
-            result["cluster_summary"] = resource_summary["cluster_summary"]
+            recommended_clusters = resource_summary["recommended_clusters"]
 
-        return result
+        return result, recommended_clusters
 
     async def _compute_cluster_resource_summary(
         self,
         results: list[dict],
+        deploy_config: dict | None = None,
     ) -> dict:
-        """Compute cluster resource summary for simulation results.
+        """Compute common cluster recommendations across all models.
 
-        Uses assignment algorithm to find if a valid model→cluster distribution exists
-        where each model is assigned to exactly one cluster without exceeding capacity.
+        Finds clusters recommended for ALL models, picks the largest model's
+        recommendation as representative (worst-case benchmarks), and returns
+        RecommendedCluster objects matching the model deployment workflow structure.
 
         Args:
             results: List of simulation results with recommendations
+            deploy_config: Serialized DeploymentTemplateCreate for benchmark label computation
 
         Returns:
-            Dict with deployable flag, warnings list, and cluster_summary
+            Dict with deployable flag, warnings list, and recommended_clusters
         """
         from budapp.cluster_ops.crud import ClusterDataManager
+        from budapp.cluster_ops.schemas import RecommendedCluster, RecommendedClusterData
+        from budapp.commons.async_utils import get_range_label
+        from budapp.model_ops.crud import ModelDataManager
+        from budapp.model_ops.models import Model
+        from budapp.model_ops.schemas import DeploymentTemplateCreate
 
         warnings: list[str] = []
-        cluster_summary: dict[str, dict] = {}
-        cluster_capacities: dict[str, dict] = {}  # Cache cluster lookups
 
-        # Build model options: {model_uri: [{cluster_id, requirements}, ...]}
-        model_options: dict[str, list[dict]] = {}
-        all_cluster_ids: set[str] = set()
+        # Build per-model cluster sets and per-(model, cluster) recommendation map
+        model_cluster_sets: dict[str, set[str]] = {}
+        # {(model_id, cluster_id): recommendation_dict}
+        model_cluster_recs: dict[tuple[str, str], dict] = {}
+        model_ids: set[str] = set()
 
         for result in results:
             if result.get("status") != "success" or not result.get("recommendations"):
                 continue
 
             model_uri = result.get("model_uri", "unknown")
-            if model_uri not in model_options:
-                model_options[model_uri] = []
+            model_id = result.get("model_id", "")
+            if model_id:
+                model_ids.add(str(model_id))
+
+            if model_uri not in model_cluster_sets:
+                model_cluster_sets[model_uri] = set()
 
             for rec in result.get("recommendations", []):
                 cluster_id = rec.get("cluster_id")
@@ -2539,176 +2693,205 @@ class GuardrailDeploymentWorkflowService(SessionMixin):
                     continue
 
                 cluster_id_str = str(cluster_id)
-                all_cluster_ids.add(cluster_id_str)
+                model_cluster_sets[model_uri].add(cluster_id_str)
+                model_cluster_recs[(str(model_id), cluster_id_str)] = rec
 
-                devices_by_type = self._extract_device_requirements(rec)
-                model_options[model_uri].append(
-                    {
-                        "cluster_id": cluster_id_str,
-                        "requirements": devices_by_type,
-                    }
-                )
-
-        if not model_options:
-            return {"deployable": False, "warnings": ["No models with recommendations"], "cluster_summary": {}}
-
-        # Fetch cluster capacities
-        if all_cluster_ids:
-            try:
-                clusters, _ = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
-                    [UUID(cid) for cid in all_cluster_ids]
-                )
-
-                for cluster in clusters:
-                    cluster_id_str = str(cluster.cluster_id)
-                    cluster_capacities[cluster_id_str] = {
-                        "name": cluster.name,
-                        "gpu_available": cluster.gpu_available_workers,
-                        "cpu_available": cluster.cpu_available_workers,
-                        "hpu_available": cluster.hpu_available_workers,
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to fetch cluster capacities: {e}", exc_info=True)
-                warnings.append("Failed to fetch cluster capacity information")
-
-        # Check for models with no valid cluster options
-        for model_uri, options in model_options.items():
-            valid_options = [opt for opt in options if opt["cluster_id"] in cluster_capacities]
-            if not valid_options:
-                warnings.append(f"Model '{model_uri}' has no available cluster options")
-
-        # Try to find valid assignment using greedy algorithm
-        # Sort models by number of options (ascending) - fewer options = higher priority
-        sorted_models = sorted(model_options.items(), key=lambda x: len(x[1]))
-
-        # Track remaining capacity per cluster
-        remaining_capacity: dict[str, dict] = {}
-        for cluster_id, cap in cluster_capacities.items():
-            remaining_capacity[cluster_id] = {
-                "gpu": cap["gpu_available"],
-                "cpu": cap["cpu_available"],
-                "hpu": cap["hpu_available"],
+        if not model_cluster_sets:
+            return {
+                "deployable": False,
+                "warnings": ["No models with recommendations"],
+                "recommended_clusters": [],
             }
 
-        # Try greedy assignment
-        assignment: dict[str, str] = {}  # model_uri → cluster_id
-        unassigned_models: list[str] = []
+        # Find clusters common to ALL models
+        common_cluster_ids = set.intersection(*model_cluster_sets.values())
 
-        for model_uri, options in sorted_models:
-            assigned = False
-            for opt in options:
-                cluster_id = opt["cluster_id"]
-                if cluster_id not in remaining_capacity:
-                    continue
+        if not common_cluster_ids:
+            model_uris = list(model_cluster_sets.keys())
+            warnings.append(f"No common cluster found across all {len(model_uris)} model(s): {', '.join(model_uris)}")
+            return {
+                "deployable": False,
+                "warnings": warnings,
+                "recommended_clusters": [],
+            }
 
-                req = opt["requirements"]
-                cap = remaining_capacity[cluster_id]
+        # Find the largest model by model_size from DB
+        largest_model_id = None
+        if model_ids:
+            try:
+                from sqlalchemy import select as sa_select
 
-                # Check if this cluster can fit this model
-                if req["gpu"] <= cap["gpu"] and req["cpu"] <= cap["cpu"] and req["hpu"] <= cap["hpu"]:
-                    # Assign model to this cluster
-                    assignment[model_uri] = cluster_id
-                    # Deduct capacity
-                    cap["gpu"] -= req["gpu"]
-                    cap["cpu"] -= req["cpu"]
-                    cap["hpu"] -= req["hpu"]
-                    assigned = True
-                    break
+                stmt = sa_select(Model).where(Model.id.in_([UUID(mid) for mid in model_ids]))
+                db_models = ModelDataManager(self.session).scalars_all(stmt)
+                if db_models:
+                    # Pick the model with the largest model_size
+                    db_models_with_size = [m for m in db_models if m.model_size]
+                    if db_models_with_size:
+                        largest_model = max(db_models_with_size, key=lambda m: m.model_size)
+                        largest_model_id = str(largest_model.id)
+                    else:
+                        # No model_size info, fall back to first model
+                        largest_model_id = str(db_models[0].id)
+            except Exception as e:
+                logger.warning(f"Failed to look up model sizes: {e}", exc_info=True)
 
-            if not assigned:
-                unassigned_models.append(model_uri)
+        # Fall back to first model_id if DB lookup failed
+        if not largest_model_id and model_ids:
+            largest_model_id = next(iter(model_ids))
 
-        # Build cluster summary
-        for cluster_id in all_cluster_ids:
-            cap = cluster_capacities.get(cluster_id)
-            if not cap:
+        # Fetch DB cluster details
+        cluster_db_map: dict[str, object] = {}
+        try:
+            clusters, _ = await ClusterDataManager(self.session).get_available_clusters_by_cluster_ids(
+                [UUID(cid) for cid in common_cluster_ids]
+            )
+            for cluster in clusters:
+                cluster_db_map[str(cluster.cluster_id)] = cluster
+        except Exception as e:
+            logger.warning(f"Failed to fetch cluster details: {e}", exc_info=True)
+            warnings.append("Failed to fetch cluster details")
+
+        # Parse deploy_config for label computation
+        parsed_deploy_config = None
+        if deploy_config:
+            try:
+                if isinstance(deploy_config, DeploymentTemplateCreate):
+                    parsed_deploy_config = deploy_config
+                elif isinstance(deploy_config, dict):
+                    parsed_deploy_config = DeploymentTemplateCreate(**deploy_config)
+            except Exception as e:
+                logger.warning(f"Failed to parse deploy_config for label computation: {e}", exc_info=True)
+
+        # Build RecommendedCluster objects for each common cluster
+        recommended_clusters: list[dict] = []
+
+        for cluster_id_str in common_cluster_ids:
+            # Pick the largest model's recommendation for this cluster
+            rec = model_cluster_recs.get((largest_model_id, cluster_id_str))
+            if not rec:
+                # Fall back to any model's recommendation for this cluster
+                for mid in model_ids:
+                    rec = model_cluster_recs.get((str(mid), cluster_id_str))
+                    if rec:
+                        break
+            if not rec:
                 continue
 
-            assigned_models = [m for m, c in assignment.items() if c == cluster_id]
-            total_req = {"gpu": 0, "cpu": 0, "hpu": 0}
+            db_cluster = cluster_db_map.get(cluster_id_str)
+            if not db_cluster:
+                continue
 
-            for model_uri in assigned_models:
-                for opt in model_options.get(model_uri, []):
-                    if opt["cluster_id"] == cluster_id:
-                        for dev_type in ["gpu", "cpu", "hpu"]:
-                            total_req[dev_type] += opt["requirements"].get(dev_type, 0)
-                        break
+            metrics = rec.get("metrics", {})
 
-            cluster_summary[cluster_id] = {
-                "cluster_name": cap["name"],
-                "assigned_models": assigned_models,
-                "total_required": total_req,
-                "available": {
-                    "gpu": cap["gpu_available"],
-                    "cpu": cap["cpu_available"],
-                    "hpu": cap["hpu_available"],
-                },
-            }
+            # Build benchmarks with label/value pairs
+            total_replicas = metrics.get("replica", 1)
 
-        # Determine deployability
-        all_deployable = len(unassigned_models) == 0 and len(model_options) > 0
+            concurrency_data = {"label": None, "value": metrics.get("concurrency", 0)}
+            if parsed_deploy_config:
+                concurrency_data["label"] = await get_range_label(
+                    metrics.get("concurrency", 0), parsed_deploy_config.concurrent_requests
+                )
 
-        if unassigned_models:
-            warnings.append(
-                f"Insufficient cluster resources for {len(unassigned_models)} model(s): {', '.join(unassigned_models)}"
+            ttft_data = None
+            per_session_tokens_per_sec_data = None
+            over_all_throughput_data = None
+            e2e_latency_data = None
+
+            ttft_value = metrics.get("ttft")
+            if ttft_value is not None:
+                ttft_data = {"label": None, "value": ttft_value}
+                if parsed_deploy_config and parsed_deploy_config.ttft is not None:
+                    ttft_data["label"] = await get_range_label(
+                        ttft_value, parsed_deploy_config.ttft, higher_is_better=False
+                    )
+
+            throughput_value = metrics.get("throughput_per_user")
+            if throughput_value is not None:
+                per_session_tokens_per_sec_data = {"label": None, "value": throughput_value}
+                if parsed_deploy_config and parsed_deploy_config.per_session_tokens_per_sec is not None:
+                    per_session_tokens_per_sec_data["label"] = await get_range_label(
+                        throughput_value, parsed_deploy_config.per_session_tokens_per_sec
+                    )
+
+                over_all_throughput = metrics.get("concurrency", 0) * throughput_value
+                over_all_throughput_data = {
+                    "label": per_session_tokens_per_sec_data["label"],
+                    "value": over_all_throughput,
+                }
+
+            e2e_latency_value = metrics.get("e2e_latency")
+            if e2e_latency_value is not None:
+                e2e_latency_data = {"label": None, "value": e2e_latency_value}
+                if parsed_deploy_config and parsed_deploy_config.e2e_latency is not None:
+                    e2e_latency_data["label"] = await get_range_label(
+                        e2e_latency_value, parsed_deploy_config.e2e_latency, higher_is_better=False
+                    )
+
+            # Resource details
+            resource_details = []
+            if db_cluster.cpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "CPU",
+                        "available": db_cluster.cpu_available_workers,
+                        "total": db_cluster.cpu_total_workers,
+                    }
+                )
+            if db_cluster.gpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "GPU",
+                        "available": db_cluster.gpu_available_workers,
+                        "total": db_cluster.gpu_total_workers,
+                    }
+                )
+            if db_cluster.hpu_count > 0:
+                resource_details.append(
+                    {
+                        "type": "HPU",
+                        "available": db_cluster.hpu_available_workers,
+                        "total": db_cluster.hpu_total_workers,
+                    }
+                )
+
+            total_resources = sum(item["total"] for item in resource_details)
+            resources_used = total_resources - sum(item["available"] for item in resource_details)
+
+            device_types = metrics.get("device_types", [])
+
+            recommended_cluster = RecommendedCluster(
+                id=db_cluster.id,
+                cluster_id=db_cluster.cluster_id,
+                name=db_cluster.name,
+                cost_per_token=metrics.get("cost_per_million_tokens", 0),
+                total_resources=total_resources,
+                resources_used=resources_used,
+                resource_details=resource_details,
+                required_devices=device_types,
+                benchmarks=RecommendedClusterData(
+                    replicas=total_replicas,
+                    ttft=ttft_data,
+                    per_session_tokens_per_sec=per_session_tokens_per_sec_data,
+                    e2e_latency=e2e_latency_data,
+                    over_all_throughput=over_all_throughput_data,
+                    concurrency=concurrency_data,
+                ),
+                tool_calling_parser_type=rec.get("tool_calling_parser_type"),
+                reasoning_parser_type=rec.get("reasoning_parser_type"),
+                chat_template=rec.get("chat_template"),
+                supports_lora=rec.get("supports_lora"),
+                supports_pipeline_parallelism=rec.get("supports_pipeline_parallelism"),
             )
+            recommended_clusters.append(recommended_cluster.model_dump(mode="json"))
+
+        # Sort by cost (cheapest first)
+        recommended_clusters.sort(key=lambda r: r.get("cost_per_token", float("inf")))
 
         return {
-            "deployable": all_deployable,
+            "deployable": len(recommended_clusters) > 0,
             "warnings": warnings,
-            "cluster_summary": cluster_summary,
-            "suggested_assignment": assignment if all_deployable else None,
+            "recommended_clusters": recommended_clusters,
         }
-
-    def _extract_device_requirements(self, recommendation: dict) -> dict:
-        """Extract device requirements from a recommendation.
-
-        Handles both budsim structures:
-        1. New: metrics.device_types[].device_type, metrics.device_types[].num_replicas
-        2. Legacy: config.node_groups[].type, config.node_groups[].replicas, tp_size, pp_size
-
-        Args:
-            recommendation: A single recommendation dict
-
-        Returns:
-            Dict with gpu, cpu, hpu counts
-        """
-        devices_by_type = {"gpu": 0, "cpu": 0, "hpu": 0}
-
-        metrics = recommendation.get("metrics", {})
-        device_types = metrics.get("device_types", [])
-
-        if device_types:
-            # New structure from budsim recommendations
-            for dt in device_types:
-                device_type = dt.get("device_type", "cuda").lower()
-                num_replicas = dt.get("num_replicas", 1)
-
-                if device_type in ("cuda", "gpu"):
-                    devices_by_type["gpu"] += num_replicas
-                elif device_type in ("hpu",):
-                    devices_by_type["hpu"] += num_replicas
-                else:  # cpu, cpu_high
-                    devices_by_type["cpu"] += num_replicas
-        else:
-            # Legacy structure with config.node_groups
-            config = recommendation.get("config", {})
-            node_groups = config.get("node_groups", [])
-            for ng in node_groups:
-                device_type = ng.get("type", "cuda").lower()
-                replicas = ng.get("replicas", 1)
-                tp_size = ng.get("tp_size", 1)
-                pp_size = ng.get("pp_size", 1)
-                devices_needed = replicas * tp_size * pp_size
-
-                if device_type in ("cuda", "gpu"):
-                    devices_by_type["gpu"] += devices_needed
-                elif device_type in ("hpu",):
-                    devices_by_type["hpu"] += devices_needed
-                else:  # cpu, cpu_high
-                    devices_by_type["cpu"] += devices_needed
-
-        return devices_by_type
 
     async def refresh_deployment_status(
         self,

@@ -750,7 +750,8 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     credential_required: bool | None = None
     # Cluster selection fields
     selected_cluster_id: UUID4 | None = None
-    cluster_recommendations: list[dict] | None = None
+    # Common cluster recommendations across all models (RecommendedCluster dicts)
+    recommended_clusters: list[dict] | None = None
     # Onboarding events: {execution_id, status, results}
     onboarding_events: dict | None = None
     # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}

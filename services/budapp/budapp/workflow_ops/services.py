@@ -686,6 +686,9 @@ class WorkflowService(SessionMixin):
                 "deployment_events",
                 # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
                 "pending_profile_data",
+                # CommonStatus-compatible events for notification-driven progress
+                BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value,
+                BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value,
             ],
             "prompt_creation": [
                 "model_id",
