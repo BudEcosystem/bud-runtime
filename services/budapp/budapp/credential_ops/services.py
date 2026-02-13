@@ -656,6 +656,41 @@ class CredentialService(SessionMixin):
         hashed_key = CredentialModel.set_hashed_key(api_key)
         return await self.is_credential_valid(hashed_key, client_ip)
 
+    async def validate_api_key_and_get_context(self, api_key: str) -> Optional[Dict]:
+        """Validate an API key and return its associated context.
+
+        Args:
+            api_key: The plain API key to validate.
+
+        Returns:
+            Dict with api_key_project_id, api_key_id, user_id on success.
+            None if the key is invalid or not found.
+        """
+        try:
+            hashed_key = CredentialModel.set_hashed_key(api_key)
+
+            db_credential = await CredentialDataManager(self.session).retrieve_by_fields(
+                CredentialModel, {"hashed_key": hashed_key}, missing_ok=True
+            )
+            if not db_credential:
+                return None
+
+            # Check expiry — DB stores naive-UTC datetimes
+            now_naive_utc = datetime.now(UTC).replace(tzinfo=None)
+            if db_credential.expiry and db_credential.expiry < now_naive_utc:
+                logger.warning(f"API key credential {db_credential.id} is expired")
+                return None
+
+            return {
+                "api_key_project_id": str(db_credential.project_id),
+                "api_key_id": str(db_credential.id),
+                "user_id": str(db_credential.user_id) if db_credential.user_id else None,
+            }
+
+        except Exception as e:
+            logger.error(f"Error validating API key context: {e}")
+            return None
+
     async def is_credential_valid(self, hashed_key: str, client_ip: Optional[str] = None) -> bool:
         """Validate a credential including expiry and IP whitelist checks.
 

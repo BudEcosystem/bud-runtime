@@ -19,6 +19,7 @@ class PipelineCreateRequest(BaseModel):
 
     dag: dict[str, Any] = Field(..., description="The DAG definition")
     name: str | None = Field(None, description="Optional pipeline name override")
+    icon: str | None = Field(None, description="Optional icon/emoji for UI representation")
     user_id: str | None = Field(
         None, description="User ID for pipeline ownership (set by service from auth context)"
     )
@@ -43,6 +44,7 @@ class PipelineResponse(BaseModel):
     user_id: str | None = None
     system_owned: bool = False
     description: str | None = None
+    icon: str | None = None
     dag: dict[str, Any] | None = None
     execution_count: int = 0
     last_execution_at: datetime | None = None
@@ -64,6 +66,12 @@ class ExecutionCreateRequest(BaseModel):
         None, description="User ID initiating the execution (for service-to-service auth)"
     )
     initiator: str = Field(default="api", description="Initiator identifier")
+    subscriber_ids: str | None = Field(
+        None, description="User ID(s) for Novu notifications (enables dual-publish to budnotify)"
+    )
+    payload_type: str | None = Field(
+        None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
+    )
 
 
 class ExecutionResponse(BaseModel):
@@ -131,6 +139,12 @@ class PipelineExecutionCreate(BaseModel):
         None, description="Dapr pub/sub topics for event notifications (validated per FR-022)"
     )
     metadata: dict[str, Any] | None = Field(None, description="Additional execution metadata")
+    subscriber_ids: str | None = Field(
+        None, description="User ID(s) for Novu notifications (enables dual-publish to budnotify)"
+    )
+    payload_type: str | None = Field(
+        None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
+    )
 
 
 class PipelineExecutionUpdate(BaseModel):
@@ -351,6 +365,7 @@ class PipelineDefinitionResponse(BaseModel):
     version: int = Field(..., description="Optimistic locking version")
     name: str = Field(..., description="Human-readable pipeline name")
     description: str | None = Field(None, description="Optional pipeline description")
+    icon: str | None = Field(None, description="Optional icon/emoji for UI representation")
     status: PipelineStatus = Field(..., description="Current pipeline status")
     step_count: int = Field(..., description="Number of steps in the pipeline DAG")
     dag: dict[str, Any] = Field(..., alias="dag_definition", description="Pipeline DAG definition")
@@ -393,4 +408,10 @@ class EphemeralExecutionRequest(BaseModel):
     initiator: str = Field(default="api", description="Initiator identifier")
     callback_topics: list[str] | None = Field(
         None, description="Optional callback topics for real-time progress updates"
+    )
+    subscriber_ids: str | None = Field(
+        None, description="User ID(s) for Novu notifications (enables dual-publish to budnotify)"
+    )
+    payload_type: str | None = Field(
+        None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
     )

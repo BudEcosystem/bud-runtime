@@ -38,6 +38,7 @@ CATEGORY_ICONS = {
     "Cluster": "server",
     "Deployment": "rocket",
     "Integration": "plug",
+    "Simulation": "beaker",
 }
 
 
@@ -147,6 +148,16 @@ def _get_category_icon(category: str) -> str:
     return CATEGORY_ICONS.get(category, "box")
 
 
+def _is_param_visible(show_when, params: dict) -> bool:
+    """Check if a param's show_when condition is met given current params."""
+    target_value = params.get(show_when.param)
+    if show_when.equals is not None:
+        return target_value == show_when.equals
+    if show_when.not_equals is not None:
+        return target_value != show_when.not_equals
+    return True
+
+
 @router.get("", response_model=ActionListResponse)
 async def list_actions() -> ActionListResponse:
     """List all registered actions.
@@ -238,6 +249,9 @@ async def validate_params(request: ValidateRequest) -> ValidateResponse:
     # Check required parameters
     for param in meta.params:
         if param.required and param.name not in request.params:
+            # Skip required check if show_when condition is not met
+            if param.show_when and not _is_param_visible(param.show_when, request.params):
+                continue
             errors.append(f"Missing required parameter: {param.name}")
             continue
 

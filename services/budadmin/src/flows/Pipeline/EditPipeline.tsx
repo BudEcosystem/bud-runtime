@@ -28,6 +28,7 @@ export default function EditPipeline() {
     <BudForm
       data={{
         name: pipeline.name || "",
+        icon: pipeline.icon || "🔄",
         description: pipeline.dag?.description || "",
       }}
       drawerLoading={isSaving}
@@ -50,7 +51,7 @@ export default function EditPipeline() {
             description: values.description,
           };
 
-          const result = await updateWorkflow(pipeline.id, updatedDag);
+          const result = await updateWorkflow(pipeline.id, updatedDag, values.icon);
           if (result) {
             successToast("Pipeline updated successfully");
             closeDrawer();

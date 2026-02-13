@@ -433,3 +433,39 @@ pub async fn require_api_key(
 
     Ok(next.run(request).await)
 }
+
+/// Lightweight auth middleware for OTLP telemetry proxy.
+/// Validates Bearer token but does NOT consume the request body.
+pub async fn require_api_key_telemetry(
+    State(auth): State<Auth>,
+    request: Request,
+    next: Next,
+) -> Result<Response, Response> {
+    let key = request
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| {
+            let s = s.trim();
+            s.strip_prefix("Bearer ").unwrap_or(s).to_string()
+        });
+
+    let key = match key {
+        Some(k) => k,
+        None => {
+            return Err(auth_error_response(
+                StatusCode::UNAUTHORIZED,
+                "Missing authorization header",
+            ))
+        }
+    };
+
+    if auth.validate_api_key(&key).is_err() {
+        return Err(auth_error_response(
+            StatusCode::UNAUTHORIZED,
+            "Invalid API key",
+        ));
+    }
+
+    Ok(next.run(request).await)
+}

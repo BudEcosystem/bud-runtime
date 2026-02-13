@@ -31,6 +31,8 @@ from budmetrics.observability.schemas import (
     ObservabilityMetricsResponse,
     PromptDistributionRequest,
     PromptDistributionResponse,
+    TelemetryQueryRequest,
+    TelemetryQueryResponse,
     TimeSeriesRequest,
     TimeSeriesResponse,
     TraceDetailResponse,
@@ -832,5 +834,34 @@ async def get_trace(
     except Exception as e:
         logger.error(f"Error getting trace: {e}")
         response = ErrorResponse(message=f"Error getting trace: {str(e)}")
+
+    return response.to_http_response()
+
+
+@observability_router.post("/prompt-telemetry/query", tags=["Traces"])
+async def query_prompt_telemetry(
+    request: TelemetryQueryRequest,
+) -> Response:
+    """Query prompt telemetry data with flexible span selection.
+
+    Supports depth-controlled tree traversal, attribute projection,
+    and dual-filter types (span + resource attributes).
+
+    Args:
+        request: The telemetry query request payload.
+
+    Returns:
+        HTTP response with nested span tree and pagination info.
+    """
+    response: Union[TelemetryQueryResponse, ErrorResponse]
+
+    try:
+        response = await service.query_prompt_telemetry(request=request)
+    except ValidationError as e:
+        logger.error(f"Validation error in telemetry query: {e}")
+        response = ErrorResponse(message=f"Invalid query parameters: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error querying prompt telemetry: {e}")
+        response = ErrorResponse(message=f"Error querying prompt telemetry: {str(e)}")
 
     return response.to_http_response()
