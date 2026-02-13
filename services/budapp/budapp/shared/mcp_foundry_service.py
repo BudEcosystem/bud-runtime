@@ -1358,6 +1358,102 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
+    async def get_oauth_token_status(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+        """Check if a user has an active OAuth token for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to check token status for
+            user_id: The user ID (email) to check
+
+        Returns:
+            Dict containing token status (connected, gateway_id, user_id,
+            token_type, expires_at, is_expired, scopes, created_at, updated_at)
+
+        Raises:
+            MCPFoundryException: If the request fails
+        """
+        try:
+            logger.debug(f"Checking OAuth token status for gateway {gateway_id}, user {user_id}")
+
+            response = await self._make_request(
+                method="GET",
+                endpoint=f"/oauth/api/tokens/{gateway_id}",
+                headers={"X-User-ID": user_id},
+            )
+
+            logger.debug(f"Successfully retrieved OAuth token status for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error checking OAuth token status for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def revoke_oauth_token(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+        """Revoke the current user's OAuth token for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to revoke token for
+            user_id: The user ID (email) whose token to revoke
+
+        Returns:
+            Dict containing revocation result (success, gateway_id, message)
+
+        Raises:
+            MCPFoundryException: If the request fails
+        """
+        try:
+            logger.debug(f"Revoking OAuth token for gateway {gateway_id}, user {user_id}")
+
+            response = await self._make_request(
+                method="DELETE",
+                endpoint=f"/oauth/api/tokens/{gateway_id}",
+                headers={"X-User-ID": user_id},
+            )
+
+            logger.debug(f"Successfully revoked OAuth token for gateway {gateway_id}")
+            return response
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error revoking OAuth token for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
+    async def admin_revoke_oauth_token(self, gateway_id: str, user_email: str) -> Dict[str, Any]:
+        """Admin: Revoke another user's OAuth token for a gateway.
+
+        Args:
+            gateway_id: The gateway ID to revoke token for
+            user_email: The email of the user whose token to revoke
+
+        Returns:
+            Dict containing revocation result (success, gateway_id, message)
+
+        Raises:
+            MCPFoundryException: If the request fails
+        """
+        try:
+            logger.debug(f"Admin revoking OAuth token for gateway {gateway_id}, user {user_email}")
+
+            response = await self._make_request(
+                method="DELETE",
+                endpoint=f"/oauth/api/tokens/{gateway_id}/{user_email}",
+            )
+
+            logger.debug(f"Successfully admin-revoked OAuth token for gateway {gateway_id}, user {user_email}")
+            return response
+
+        except MCPFoundryException:
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error admin-revoking OAuth token for gateway {gateway_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise MCPFoundryException(error_msg, status_code=500)
+
     async def _make_multipart_request(
         self,
         method: str,

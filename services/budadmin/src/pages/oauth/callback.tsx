@@ -1,13 +1,39 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { tempApiBaseUrl } from "@/components/environment";
+import { getOAuthReturnUrl, clearOAuthReturnUrl } from "@/hooks/useOAuthCallback";
 
 type Status = "loading" | "success" | "error";
+
+/** Build a redirect URL with OAuth status query params. Returns null if URL is malformed or uses an unsafe scheme. */
+function buildReturnRedirect(
+  returnUrl: string,
+  oauthStatus: "success" | "error",
+  extra: Record<string, string> = {}
+): string | null {
+  try {
+    const url = new URL(returnUrl);
+    // Only allow http/https schemes — block javascript:, data:, etc.
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      console.error("Unsafe return URL scheme:", url.protocol);
+      return null;
+    }
+    url.searchParams.set("oauth_status", oauthStatus);
+    for (const [k, v] of Object.entries(extra)) {
+      if (v) url.searchParams.set(k, v);
+    }
+    return url.toString();
+  } catch {
+    console.error("Invalid return URL:", returnUrl);
+    return null;
+  }
+}
 
 export default function OAuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [hasReturnRedirect, setHasReturnRedirect] = useState(false);
 
   useEffect(() => {
     // Wait for router.query to be populated (Next.js hydration)
@@ -26,24 +52,80 @@ export default function OAuthCallbackPage() {
 
     const params = new URLSearchParams({ code: codeStr, state: stateStr });
 
+    /** Handle error-case redirect (shared by API error and network error paths). */
+    const handleErrorRedirect = (message: string) => {
+      const returnUrl = getOAuthReturnUrl();
+      clearOAuthReturnUrl();
+      if (returnUrl) {
+        const redirect = buildReturnRedirect(returnUrl, "error", {
+          error: message,
+        });
+        if (redirect) {
+          setHasReturnRedirect(true);
+          setTimeout(() => {
+            window.location.href = redirect;
+          }, 3000);
+        }
+      }
+    };
+
     fetch(`${tempApiBaseUrl}/connectors/oauth/public-callback?${params}`)
       .then(async (res) => {
         const data = await res.json();
         if (res.ok && data.success) {
           setStatus("success");
-          // Auto-redirect to connections page after a short delay
-          setTimeout(() => {
-            router.replace("/connectors");
-          }, 2000);
+
+          // Determine return URL: server response takes priority, then localStorage fallback
+          const returnUrl = data.return_url || getOAuthReturnUrl();
+          clearOAuthReturnUrl();
+
+          if (returnUrl) {
+            const gatewayId = data.gateway_id || "";
+            const redirect = buildReturnRedirect(returnUrl, "success", {
+              gateway_id: gatewayId,
+            });
+            if (redirect) {
+              setTimeout(() => {
+                window.location.href = redirect;
+              }, 1500);
+            } else {
+              setTimeout(() => {
+                router.replace("/connectors");
+              }, 2000);
+            }
+          } else {
+            // Default: redirect to connectors page
+            setTimeout(() => {
+              router.replace("/connectors");
+            }, 2000);
+          }
         } else {
+          const msg = data.message || "OAuth callback failed.";
           setStatus("error");
-          setErrorMessage(data.message || "OAuth callback failed.");
+          setErrorMessage(msg);
+
+          // Server may include return_url even on error responses
+          if (data.return_url) {
+            const redirect = buildReturnRedirect(data.return_url, "error", {
+              error: msg,
+            });
+            if (redirect) {
+              clearOAuthReturnUrl();
+              setHasReturnRedirect(true);
+              setTimeout(() => {
+                window.location.href = redirect;
+              }, 3000);
+              return;
+            }
+          }
+          handleErrorRedirect(msg);
         }
       })
       .catch((err) => {
         console.error("OAuth callback request failed:", err);
         setStatus("error");
         setErrorMessage("Network error — could not reach the server.");
+        handleErrorRedirect("Network error");
       });
   }, [router.isReady, router.query]);
 
@@ -180,21 +262,27 @@ export default function OAuthCallbackPage() {
             >
               {errorMessage}
             </p>
-            <a
-              href="/settings/connections"
-              style={{
-                display: "inline-block",
-                padding: "0.5rem 1.25rem",
-                borderRadius: "0.375rem",
-                background: "#965CDE",
-                color: "#fff",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                textDecoration: "none",
-              }}
-            >
-              Back to Connections
-            </a>
+            {hasReturnRedirect ? (
+              <p style={{ fontSize: "0.875rem", color: "#757575", margin: 0 }}>
+                Redirecting you back...
+              </p>
+            ) : (
+              <a
+                href="/connectors"
+                style={{
+                  display: "inline-block",
+                  padding: "0.5rem 1.25rem",
+                  borderRadius: "0.375rem",
+                  background: "#965CDE",
+                  color: "#fff",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                }}
+              >
+                Back to Connections
+              </a>
+            )}
           </>
         )}
       </div>

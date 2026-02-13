@@ -17,15 +17,19 @@
 """Service layer for global connector operations — thin proxy to MCP Foundry."""
 
 import asyncio
+from contextlib import suppress
 from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 from fastapi import status
 
 from ..commons import logging
+from ..commons.config import app_settings
 from ..commons.constants import CONNECTOR_AUTH_CREDENTIALS_MAP, MCP_AUTH_TYPE_MAPPING, ConnectorAuthTypeEnum
 from ..commons.exceptions import ClientException
 from ..prompt_ops.schemas import HeadersCredentials, OAuthCredentials, OpenCredentials
 from ..shared.mcp_foundry_service import mcp_foundry_service
+from ..shared.redis_service import RedisService
 
 
 logger = logging.get_logger(__name__)
@@ -41,6 +45,78 @@ DEFAULT_CLIENT_TAGS = [TAG_CLIENT_DASHBOARD, TAG_CLIENT_CHAT]
 
 # ─── OAuth constants ────────────────────────────────────────────────────────
 OAUTH_REFRESH_THRESHOLD_SECONDS = 300
+
+# ─── OAuth return_url helpers ───────────────────────────────────────────────
+_RETURN_URL_TTL_SECONDS = 600  # 10 minutes
+_RETURN_URL_REDIS_PREFIX = "oauth_return_url:"
+
+_redis_service = RedisService()
+
+
+def validate_return_url(url: str) -> str:
+    """Validate a return URL against the allowed domains list.
+
+    Enforces HTTP(S) scheme for all domains; HTTPS required for non-localhost.
+
+    Raises:
+        ClientException: If the URL is invalid or the domain is not allowed.
+    """
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise ClientException(
+            message="Invalid return_url: missing scheme or host",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Only allow http and https schemes (blocks javascript:, data:, etc.)
+    if parsed.scheme not in ("http", "https"):
+        raise ClientException(
+            message="return_url must use HTTP or HTTPS scheme",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    hostname = parsed.hostname or ""
+    allowed_raw = app_settings.oauth_return_url_allowed_domains
+    allowed_domains = {d.strip().lower() for d in allowed_raw.split(",") if d.strip()}
+
+    if hostname.lower() not in allowed_domains:
+        raise ClientException(
+            message=f"return_url domain '{hostname}' is not in the allowed list",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    localhost_hosts = {"localhost", "127.0.0.1"}
+    if hostname.lower() not in localhost_hosts and parsed.scheme != "https":
+        raise ClientException(
+            message="return_url must use HTTPS for non-localhost domains",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return url
+
+
+async def store_return_url(state: str, url: str) -> None:
+    """Store a return URL in Redis keyed by OAuth state with TTL."""
+    key = f"{_RETURN_URL_REDIS_PREFIX}{state}"
+    with suppress(Exception):
+        await _redis_service.set(key, url, ex=_RETURN_URL_TTL_SECONDS)
+
+
+async def pop_return_url(state: str) -> Optional[str]:
+    """Retrieve and remove the return URL for a given OAuth state from Redis.
+
+    Returns None if not found or expired.
+    """
+    key = f"{_RETURN_URL_REDIS_PREFIX}{state}"
+    try:
+        value = await _redis_service.get(key)
+        if value:
+            with suppress(Exception):
+                await _redis_service.delete(key)
+            return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+    except Exception:
+        pass
+    return None
 
 
 def _detect_transport_from_url(url: str) -> str:
@@ -267,6 +343,18 @@ class ConnectorService:
     async def fetch_tools(self, gateway_id: str) -> Dict[str, Any]:
         """Fetch tools after OAuth completion."""
         return await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+
+    async def get_oauth_token_status(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+        """Check if a user has an active OAuth token for a gateway."""
+        return await mcp_foundry_service.get_oauth_token_status(gateway_id, user_id)
+
+    async def revoke_oauth_token(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+        """Revoke the current user's OAuth token for a gateway."""
+        return await mcp_foundry_service.revoke_oauth_token(gateway_id, user_id)
+
+    async def admin_revoke_oauth_token(self, gateway_id: str, user_email: str) -> Dict[str, Any]:
+        """Admin: Revoke another user's OAuth token for a gateway."""
+        return await mcp_foundry_service.admin_revoke_oauth_token(gateway_id, user_email)
 
     async def list_tools(self, gateway_id: str, offset: int = 0, limit: int = 100) -> Tuple[List[Dict[str, Any]], int]:
         """List tools scoped to a specific gateway via get_gateway_by_id."""
