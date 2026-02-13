@@ -1,0 +1,94 @@
+{{- if .Values.microservices.mcpgateway.sso.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-mcpgateway-keycloak-init-script
+data:
+  keycloak-init.sh: |-
+    #!/bin/sh
+    set -e
+
+    KEYCLOAK_BASE_URL="{{ .Values.microservices.mcpgateway.sso.keycloakBaseUrl | default (printf "http://%s-keycloak" .Release.Name) }}"
+    REALM="{{ .Values.microservices.mcpgateway.sso.realm }}"
+    CLIENT_ID="{{ .Values.microservices.mcpgateway.sso.clientId }}"
+    ADMIN_USER="{{ .Values.keycloak.auth.adminUser }}"
+    ADMIN_PASSWORD="{{ .Values.keycloak.auth.adminPassword }}"
+
+    echo "Waiting for Keycloak at ${KEYCLOAK_BASE_URL} ..."
+    ATTEMPTS=0
+    MAX_ATTEMPTS=60
+    until curl -sf "${KEYCLOAK_BASE_URL}/realms/master" > /dev/null 2>&1; do
+      ATTEMPTS=$((ATTEMPTS + 1))
+      if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
+        echo "ERROR: Keycloak not ready after $((MAX_ATTEMPTS * 5))s"
+        exit 1
+      fi
+      echo "  attempt ${ATTEMPTS}/${MAX_ATTEMPTS} - retrying in 5s..."
+      sleep 5
+    done
+    echo "Keycloak is ready."
+
+    echo "Obtaining admin token..."
+    TOKEN_RESPONSE=$(curl -sf -X POST \
+      "${KEYCLOAK_BASE_URL}/realms/master/protocol/openid-connect/token" \
+      --data-urlencode "grant_type=password" \
+      --data-urlencode "client_id=admin-cli" \
+      --data-urlencode "username=${ADMIN_USER}" \
+      --data-urlencode "password=${ADMIN_PASSWORD}")
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+    if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+      echo "ERROR: Failed to obtain admin token"
+      echo "$TOKEN_RESPONSE"
+      exit 1
+    fi
+    echo "Admin token obtained."
+
+    echo "Checking if client '${CLIENT_ID}' exists in realm '${REALM}'..."
+    EXISTING=$(curl -sf -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}")
+    CLIENT_COUNT=$(echo "$EXISTING" | jq 'length')
+
+    if [ "$CLIENT_COUNT" -gt "0" ]; then
+      echo "Client '${CLIENT_ID}' already exists."
+      CLIENT_UUID=$(echo "$EXISTING" | jq -r '.[0].id')
+    else
+      echo "Creating client '${CLIENT_ID}'..."
+      CREATE_RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+        -H "Content-Type: application/json" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients" \
+        -d "{
+          \"clientId\": \"${CLIENT_ID}\",
+          \"enabled\": true,
+          \"publicClient\": false,
+          \"serviceAccountsEnabled\": true,
+          \"directAccessGrantsEnabled\": true,
+          \"protocol\": \"openid-connect\"
+        }")
+      HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
+      if [ "$HTTP_CODE" != "201" ]; then
+        echo "ERROR: Failed to create client (HTTP ${HTTP_CODE})"
+        echo "$CREATE_RESPONSE"
+        exit 1
+      fi
+      echo "Client '${CLIENT_ID}' created."
+
+      # Re-fetch to get UUID
+      EXISTING=$(curl -sf -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}")
+      CLIENT_UUID=$(echo "$EXISTING" | jq -r '.[0].id')
+    fi
+
+    echo "Retrieving client secret for UUID=${CLIENT_UUID}..."
+    SECRET_RESPONSE=$(curl -sf -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/client-secret")
+    CLIENT_SECRET=$(echo "$SECRET_RESPONSE" | jq -r '.value')
+    if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "null" ]; then
+      echo "ERROR: Failed to retrieve client secret"
+      echo "$SECRET_RESPONSE"
+      exit 1
+    fi
+
+    echo "export SSO_KEYCLOAK_CLIENT_SECRET='${CLIENT_SECRET}'" > /shared/sso-env
+    echo "SSO env file written to /shared/sso-env"
+{{- end }}
