@@ -196,7 +196,7 @@ class ModelAddExecutor(BaseActionExecutor):
         # Check for model extraction completion events
         # budapp sends type="workflow_completed" for model workflows
         if event_type == "workflow_completed":
-            result_data = context.event_data.get("result", {})
+            result_data = context.event_data.get("result") or {}
             status = context.event_data.get("status", "UNKNOWN")
 
             if status == "COMPLETED":
@@ -246,7 +246,7 @@ class ModelAddExecutor(BaseActionExecutor):
         # Check for direct model_extraction events from budcluster
         if event_type == "model_extraction" and event_name == "results":
             if status_str == "COMPLETED":
-                result = content.get("result", {})
+                result = content.get("result") or {}
                 model_id = result.get("model_id")
                 model_name = result.get("model_name", "")
 
@@ -316,7 +316,7 @@ class ModelAddExecutor(BaseActionExecutor):
 
                 # Handle COMPLETED status only for final completion events
                 if is_completion_event and status_str == "COMPLETED":
-                    result = content.get("result", {})
+                    result = content.get("result") or {}
                     model_id = result.get("model_id")
                     model_name = result.get("model_name", "") or context.step_outputs.get(
                         "model_name", ""

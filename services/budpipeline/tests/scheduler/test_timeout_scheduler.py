@@ -48,12 +48,27 @@ class TestProcessTimeoutWaitUntil:
             timeout_at=datetime.now(timezone.utc),
         )
 
-        mock_crud_instance = AsyncMock()
-        mock_crud_instance.complete_step_from_event = AsyncMock()
+        mock_step_crud = AsyncMock()
+        mock_step_crud.complete_step_from_event = AsyncMock()
 
-        with patch(
-            "budpipeline.handlers.event_router.StepExecutionCRUD",
-            return_value=mock_crud_instance,
+        mock_exec_crud = AsyncMock()
+        mock_exec_crud.get_by_id = AsyncMock(
+            return_value=MagicMock(
+                subscriber_ids=None,
+                payload_type=None,
+                notification_workflow_id=None,
+            )
+        )
+
+        with (
+            patch(
+                "budpipeline.handlers.event_router.StepExecutionCRUD",
+                return_value=mock_step_crud,
+            ),
+            patch(
+                "budpipeline.handlers.event_router.PipelineExecutionCRUD",
+                return_value=mock_exec_crud,
+            ),
         ):
             result = await process_timeout(session, step)
 
@@ -64,8 +79,8 @@ class TestProcessTimeoutWaitUntil:
         assert result.action_taken == EventAction.COMPLETE
 
         # Verify the CRUD was called with correct status
-        mock_crud_instance.complete_step_from_event.assert_called_once()
-        call_kwargs = mock_crud_instance.complete_step_from_event.call_args[1]
+        mock_step_crud.complete_step_from_event.assert_called_once()
+        call_kwargs = mock_step_crud.complete_step_from_event.call_args[1]
         assert call_kwargs["status"] == StepStatus.COMPLETED
         assert call_kwargs["error_message"] is None
         assert call_kwargs["outputs"]["waited"] is True
@@ -80,12 +95,27 @@ class TestProcessTimeoutWaitUntil:
             external_workflow_id=f"model_add:{uuid4()}",
         )
 
-        mock_crud_instance = AsyncMock()
-        mock_crud_instance.complete_step_from_event = AsyncMock()
+        mock_step_crud = AsyncMock()
+        mock_step_crud.complete_step_from_event = AsyncMock()
 
-        with patch(
-            "budpipeline.handlers.event_router.StepExecutionCRUD",
-            return_value=mock_crud_instance,
+        mock_exec_crud = AsyncMock()
+        mock_exec_crud.get_by_id = AsyncMock(
+            return_value=MagicMock(
+                subscriber_ids=None,
+                payload_type=None,
+                notification_workflow_id=None,
+            )
+        )
+
+        with (
+            patch(
+                "budpipeline.handlers.event_router.StepExecutionCRUD",
+                return_value=mock_step_crud,
+            ),
+            patch(
+                "budpipeline.handlers.event_router.PipelineExecutionCRUD",
+                return_value=mock_exec_crud,
+            ),
         ):
             result = await process_timeout(session, step)
 
@@ -96,8 +126,8 @@ class TestProcessTimeoutWaitUntil:
         assert result.action_taken == EventAction.COMPLETE
 
         # Verify the CRUD was called with TIMEOUT status
-        mock_crud_instance.complete_step_from_event.assert_called_once()
-        call_kwargs = mock_crud_instance.complete_step_from_event.call_args[1]
+        mock_step_crud.complete_step_from_event.assert_called_once()
+        call_kwargs = mock_step_crud.complete_step_from_event.call_args[1]
         assert call_kwargs["status"] == StepStatus.TIMEOUT
         assert call_kwargs["error_message"] is not None
         assert "timed out" in call_kwargs["error_message"]
@@ -118,17 +148,32 @@ class TestProcessTimeoutWaitUntil:
             timeout_at=scheduled_time,
         )
 
-        mock_crud_instance = AsyncMock()
-        mock_crud_instance.complete_step_from_event = AsyncMock()
+        mock_step_crud = AsyncMock()
+        mock_step_crud.complete_step_from_event = AsyncMock()
 
-        with patch(
-            "budpipeline.handlers.event_router.StepExecutionCRUD",
-            return_value=mock_crud_instance,
+        mock_exec_crud = AsyncMock()
+        mock_exec_crud.get_by_id = AsyncMock(
+            return_value=MagicMock(
+                subscriber_ids=None,
+                payload_type=None,
+                notification_workflow_id=None,
+            )
+        )
+
+        with (
+            patch(
+                "budpipeline.handlers.event_router.StepExecutionCRUD",
+                return_value=mock_step_crud,
+            ),
+            patch(
+                "budpipeline.handlers.event_router.PipelineExecutionCRUD",
+                return_value=mock_exec_crud,
+            ),
         ):
             await process_timeout(session, step)
 
         # Verify outputs contain both scheduled and actual wake times
-        call_kwargs = mock_crud_instance.complete_step_from_event.call_args[1]
+        call_kwargs = mock_step_crud.complete_step_from_event.call_args[1]
         outputs = call_kwargs["outputs"]
         assert outputs["scheduled_wake_time"] == scheduled_time.isoformat()
         assert outputs["actual_wake_time"] is not None
@@ -140,14 +185,12 @@ class TestProcessTimeoutWaitUntil:
         session = AsyncMock()
         step = make_step_execution(handler_type="wait_until")
 
-        mock_crud_instance = AsyncMock()
-        mock_crud_instance.complete_step_from_event = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        mock_step_crud = AsyncMock()
+        mock_step_crud.complete_step_from_event = AsyncMock(side_effect=Exception("Database error"))
 
         with patch(
             "budpipeline.handlers.event_router.StepExecutionCRUD",
-            return_value=mock_crud_instance,
+            return_value=mock_step_crud,
         ):
             result = await process_timeout(session, step)
 
