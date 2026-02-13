@@ -330,6 +330,7 @@ class PipelineExecutionCRUD:
         pipeline_id: UUID | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> PipelineExecution:
         """Create a new pipeline execution.
 
@@ -339,6 +340,7 @@ class PipelineExecutionCRUD:
             pipeline_id: Optional reference to parent pipeline definition.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Created PipelineExecution instance.
@@ -351,6 +353,7 @@ class PipelineExecutionCRUD:
             progress_percentage=Decimal("0.00"),
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
         self.session.add(execution)
         await self.session.flush()

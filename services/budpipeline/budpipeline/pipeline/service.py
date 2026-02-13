@@ -639,6 +639,7 @@ class PipelineService:
         initiator: str = "api",
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> dict[str, Any]:
         """Execute a pipeline from database.
 
@@ -653,6 +654,7 @@ class PipelineService:
             initiator: User or service that initiated execution.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Execution result dict.
@@ -684,6 +686,7 @@ class PipelineService:
             pipeline_id=pipeline_uuid,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def _execute_pipeline_impl(
@@ -695,6 +698,7 @@ class PipelineService:
         pipeline_id: UUID | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> dict[str, Any]:
         """Internal implementation for pipeline execution.
 
@@ -708,6 +712,7 @@ class PipelineService:
             pipeline_id: Optional pipeline definition ID for linking.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Execution result dict.
@@ -739,6 +744,7 @@ class PipelineService:
                 pipeline_id=pipeline_id,
                 subscriber_ids=subscriber_ids,
                 payload_type=payload_type,
+                notification_workflow_id=notification_workflow_id,
             )
             # Use the DB-generated UUID if available
             execution_id = str(db_execution_id)
@@ -781,6 +787,7 @@ class PipelineService:
                     start_time_value=started_at,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
                 if success:
                     logger.info(f"Updated execution {execution_id} to RUNNING with start_time")
@@ -871,6 +878,7 @@ class PipelineService:
                                 sequence_number=seq_num,
                                 subscriber_ids=subscriber_ids,
                                 payload_type=payload_type,
+                                notification_workflow_id=notification_workflow_id,
                             )
                             if success:
                                 step_db_info[step.id] = (db_uuid, new_version, seq_num)
@@ -908,6 +916,7 @@ class PipelineService:
                                         sequence_number=seq_num,
                                         subscriber_ids=subscriber_ids,
                                         payload_type=payload_type,
+                                        notification_workflow_id=notification_workflow_id,
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to persist step SKIPPED status: {e}")
@@ -1074,6 +1083,7 @@ class PipelineService:
                                         sequence_number=seq_num,
                                         subscriber_ids=subscriber_ids,
                                         payload_type=payload_type,
+                                        notification_workflow_id=notification_workflow_id,
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to persist step COMPLETED status: {e}")
@@ -1139,6 +1149,7 @@ class PipelineService:
                                         sequence_number=seq_num,
                                         subscriber_ids=subscriber_ids,
                                         payload_type=payload_type,
+                                        notification_workflow_id=notification_workflow_id,
                                     )
                                 except Exception as e:
                                     logger.warning(f"Failed to persist step FAILED status: {e}")
@@ -1208,6 +1219,7 @@ class PipelineService:
                         final_outputs=execution_data.get("outputs"),
                         subscriber_ids=subscriber_ids,
                         payload_type=payload_type,
+                        notification_workflow_id=notification_workflow_id,
                     )
                     if success:
                         db_version = new_version
@@ -1250,6 +1262,7 @@ class PipelineService:
                                 sequence_number=seq_num,
                                 subscriber_ids=subscriber_ids,
                                 payload_type=payload_type,
+                                notification_workflow_id=notification_workflow_id,
                             )
                         except Exception as persist_step_err:
                             logger.warning(
@@ -1271,6 +1284,7 @@ class PipelineService:
                     error_info={"error": str(e)},
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
                 logger.info(f"Persisted failure to database: {execution_id}")
             except Exception as persist_err:

@@ -59,6 +59,7 @@ class PersistenceService:
         pipeline_id: UUID | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> tuple[UUID, int]:
         """Create a new pipeline execution in database.
 
@@ -69,6 +70,7 @@ class PersistenceService:
             pipeline_id: Optional reference to parent pipeline definition.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Tuple of (execution_id, version).
@@ -87,6 +89,7 @@ class PersistenceService:
                     pipeline_id=pipeline_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
 
                 # Create subscriptions if callback topics provided
@@ -243,6 +246,7 @@ class PersistenceService:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> tuple[bool, int]:
         """Update execution status with optimistic locking.
 
@@ -260,6 +264,7 @@ class PersistenceService:
             correlation_id: Optional correlation ID for event tracing.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Tuple of (success, new_version).
@@ -305,6 +310,7 @@ class PersistenceService:
                         correlation_id=correlation_id,
                         subscriber_ids=subscriber_ids,
                         payload_type=payload_type,
+                        notification_workflow_id=notification_workflow_id,
                     )
 
                     return True, execution.version
@@ -338,6 +344,7 @@ class PersistenceService:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> None:
         """Publish execution status events to callback topics.
 
@@ -352,6 +359,7 @@ class PersistenceService:
                     correlation_id=correlation_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
             elif status == ExecutionStatus.FAILED:
                 message = error_info.get("message") if error_info else None
@@ -362,6 +370,7 @@ class PersistenceService:
                     correlation_id=correlation_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
             elif status == ExecutionStatus.RUNNING and progress_percentage is not None:
                 await event_publisher.publish_workflow_progress(
@@ -370,6 +379,7 @@ class PersistenceService:
                     correlation_id=correlation_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
         except Exception as e:
             # Non-blocking - log and continue (FR-014)
@@ -398,6 +408,7 @@ class PersistenceService:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> tuple[bool, int]:
         """Update step execution status with optimistic locking.
 
@@ -420,6 +431,7 @@ class PersistenceService:
             correlation_id: Optional correlation ID for event tracing.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Tuple of (success, new_version).
@@ -462,6 +474,7 @@ class PersistenceService:
                             correlation_id=correlation_id,
                             subscriber_ids=subscriber_ids,
                             payload_type=payload_type,
+                            notification_workflow_id=notification_workflow_id,
                         )
 
                     return True, step.version
@@ -567,6 +580,7 @@ class PersistenceService:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> None:
         """Publish step status events to callback topics.
 
@@ -582,6 +596,7 @@ class PersistenceService:
                     correlation_id=correlation_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
             elif status == StepStatus.COMPLETED:
                 await event_publisher.publish_step_completed(
@@ -592,6 +607,7 @@ class PersistenceService:
                     correlation_id=correlation_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
             elif status == StepStatus.FAILED:
                 await event_publisher.publish_step_failed(
@@ -602,6 +618,7 @@ class PersistenceService:
                     correlation_id=correlation_id,
                     subscriber_ids=subscriber_ids,
                     payload_type=payload_type,
+                    notification_workflow_id=notification_workflow_id,
                 )
         except Exception as e:
             # Non-blocking - log and continue (FR-014)
