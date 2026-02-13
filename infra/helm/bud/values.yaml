@@ -239,6 +239,14 @@ microservices:
     enabled: true
     image: budstudio/mcpgateway:latest
     env: {}
+    sso:
+      enabled: true
+      initImage: "alpine:3.19"
+      realm: "bud-keycloak"
+      clientId: "mcp-gateway"
+      externalJwtValidation: "true"
+      autoCreateUsers: "true"
+      # keycloakBaseUrl: override if external Keycloak (defaults to internal http://{release}-keycloak/)
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration
