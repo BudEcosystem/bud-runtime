@@ -141,6 +141,7 @@ class PromptService(SessionMixin):
 
             prompt_item = PromptListItem(
                 id=prompt.id,
+                project_id=prompt.project_id,
                 name=prompt.name,
                 description=prompt.description,
                 tags=prompt.tags,
@@ -311,18 +312,6 @@ class PromptService(SessionMixin):
         db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
             PromptModel, fields={"id": prompt_id, "status": PromptStatusEnum.ACTIVE}
         )
-
-        # Validate name uniqueness if name is provided
-        if "name" in data:
-            duplicate_prompt = await PromptDataManager(self.session).retrieve_by_fields(
-                PromptModel,
-                fields={"name": data["name"]},
-                exclude_fields={"id": prompt_id, "status": PromptStatusEnum.DELETED},
-                missing_ok=True,
-                case_sensitive=False,
-            )
-            if duplicate_prompt:
-                raise ClientException(message="Prompt name already exists", status_code=status.HTTP_400_BAD_REQUEST)
 
         # Validate default_version_id if provided
         if "default_version_id" in data and data["default_version_id"]:
