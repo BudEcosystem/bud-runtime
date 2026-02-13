@@ -31,6 +31,7 @@ from budapp.commons.constants import (
     ProxyProviderEnum,
     ScannerTypeEnum,
 )
+from budapp.commons.helpers import validate_icon
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.endpoint_ops.schemas import ProviderConfig, ProxyModelPricing
 from budapp.model_ops.schemas import BudAIScalerSpecification, DeploymentTemplateCreate, Provider
@@ -249,6 +250,14 @@ class GuardrailRuleCreate(BaseModel):
     model_config_json: Optional[dict] = None
     model_id: Optional[UUID4] = None
 
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
+
 
 class GuardrailRuleUpdate(BaseModel):
     """Schema for updating a guardrail rule."""
@@ -299,6 +308,14 @@ class GuardrailProbeCreate(BaseModel):
     description: Optional[str] = None
     icon: Optional[str] = None
     tags: Optional[list[Tag]] = None
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
 
 
 class GuardrailProbeUpdate(BaseModel):
