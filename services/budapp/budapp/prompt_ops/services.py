@@ -140,6 +140,7 @@ class PromptService(SessionMixin):
 
             prompt_item = PromptListItem(
                 id=prompt.id,
+                project_id=prompt.project_id,
                 name=prompt.name,
                 description=prompt.description,
                 tags=prompt.tags,
