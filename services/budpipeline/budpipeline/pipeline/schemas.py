@@ -72,6 +72,11 @@ class ExecutionCreateRequest(BaseModel):
     payload_type: str | None = Field(
         None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
     )
+    notification_workflow_id: str | None = Field(
+        None,
+        max_length=255,
+        description="Override payload.workflow_id in notifications (defaults to execution_id)",
+    )
 
 
 class ExecutionResponse(BaseModel):
@@ -144,6 +149,11 @@ class PipelineExecutionCreate(BaseModel):
     )
     payload_type: str | None = Field(
         None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
+    )
+    notification_workflow_id: str | None = Field(
+        None,
+        max_length=255,
+        description="Override payload.workflow_id in notifications (defaults to execution_id)",
     )
 
 
@@ -414,4 +424,9 @@ class EphemeralExecutionRequest(BaseModel):
     )
     payload_type: str | None = Field(
         None, description="Custom payload.type for event routing (defaults to pipeline_execution)"
+    )
+    notification_workflow_id: str | None = Field(
+        None,
+        max_length=255,
+        description="Override payload.workflow_id in notifications (defaults to execution_id)",
     )

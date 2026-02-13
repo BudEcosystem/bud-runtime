@@ -320,6 +320,7 @@ class BudPipelineService(SessionMixin):
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
         payload_type: Optional[str] = None,
+        notification_workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Start a pipeline execution.
 
@@ -329,6 +330,7 @@ class BudPipelineService(SessionMixin):
             callback_topics: Optional list of callback topics for real-time updates
             user_id: User ID initiating the execution
             payload_type: Optional custom payload.type for event routing
+            notification_workflow_id: Optional override for payload.workflow_id in notifications
 
         Returns:
             Execution details including execution_id
@@ -349,6 +351,8 @@ class BudPipelineService(SessionMixin):
                 data["subscriber_ids"] = user_id  # Auto-set for Novu delivery
             if payload_type:
                 data["payload_type"] = payload_type
+            if notification_workflow_id:
+                data["notification_workflow_id"] = notification_workflow_id
 
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
@@ -411,6 +415,7 @@ class BudPipelineService(SessionMixin):
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
         payload_type: Optional[str] = None,
+        notification_workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Deprecated: Use execute_pipeline() instead."""
         return await self.execute_pipeline(
@@ -419,6 +424,7 @@ class BudPipelineService(SessionMixin):
             callback_topics=callback_topics,
             user_id=user_id,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def run_ephemeral_execution(
@@ -428,6 +434,7 @@ class BudPipelineService(SessionMixin):
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
         payload_type: Optional[str] = None,
+        notification_workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute a pipeline inline without saving the pipeline definition.
 
@@ -441,6 +448,7 @@ class BudPipelineService(SessionMixin):
             callback_topics: Optional list of callback topics for real-time updates
             user_id: User ID initiating the execution
             payload_type: Optional custom payload.type for event routing
+            notification_workflow_id: Optional override for payload.workflow_id in notifications
 
         Returns:
             Execution details including execution_id
@@ -461,6 +469,8 @@ class BudPipelineService(SessionMixin):
                 data["subscriber_ids"] = user_id  # Auto-set for Novu delivery
             if payload_type:
                 data["payload_type"] = payload_type
+            if notification_workflow_id:
+                data["notification_workflow_id"] = notification_workflow_id
 
             logger.debug(
                 "Sending ephemeral execution request",

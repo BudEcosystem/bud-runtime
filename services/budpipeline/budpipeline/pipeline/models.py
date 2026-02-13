@@ -299,6 +299,11 @@ class PipelineExecution(Base):
         nullable=True,
         comment="Custom payload.type for budadmin routing (defaults to pipeline_execution)",
     )
+    notification_workflow_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Override payload.workflow_id in notifications (defaults to execution_id)",
+    )
 
     # Audit timestamps
     created_at: Mapped[datetime] = mapped_column(
