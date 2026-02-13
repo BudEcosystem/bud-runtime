@@ -74,6 +74,7 @@ class ExecutionCreateRequest(BaseModel):
     )
     notification_workflow_id: str | None = Field(
         None,
+        max_length=255,
         description="Override payload.workflow_id in notifications (defaults to execution_id)",
     )
 
@@ -151,6 +152,7 @@ class PipelineExecutionCreate(BaseModel):
     )
     notification_workflow_id: str | None = Field(
         None,
+        max_length=255,
         description="Override payload.workflow_id in notifications (defaults to execution_id)",
     )
 
@@ -425,5 +427,6 @@ class EphemeralExecutionRequest(BaseModel):
     )
     notification_workflow_id: str | None = Field(
         None,
+        max_length=255,
         description="Override payload.workflow_id in notifications (defaults to execution_id)",
     )
