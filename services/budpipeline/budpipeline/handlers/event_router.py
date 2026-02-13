@@ -799,21 +799,30 @@ async def _continue_pipeline_execution(
         if result.success:
             if result.awaiting_event and result.external_workflow_id:
                 # Step is awaiting an event - persist and wait
+                # NOTE: Use step_crud (same session) instead of persistence_service
+                # (which creates its own session) to avoid optimistic lock conflicts.
+                # The RUNNING status update above was flushed but not committed,
+                # so a new session would not see the updated version.
                 from datetime import timedelta
 
                 timeout_secs = result.timeout_seconds or settings.default_async_step_timeout
                 timeout_at = datetime.now(timezone.utc) + timedelta(seconds=timeout_secs)
 
-                from budpipeline.pipeline.persistence_service import persistence_service
-
-                await persistence_service.mark_step_awaiting_event(
+                awaiting_step = await step_crud.mark_step_awaiting_event(
                     step_uuid=fresh_step.id,
                     expected_version=current_version,
                     external_workflow_id=result.external_workflow_id,
                     handler_type=action_type,
                     timeout_at=timeout_at,
-                    outputs=result.outputs,
                 )
+                # Also persist partial outputs from the handler
+                if result.outputs:
+                    from budpipeline.commons.sanitization import sanitize_outputs
+
+                    awaiting_step.outputs = sanitize_outputs(result.outputs)
+                    await session.flush()
+
+                await session.commit()
                 logger.info(f"Step {step_id} now awaiting event from {result.external_workflow_id}")
                 # Don't continue to dependent steps - wait for event
             else:
