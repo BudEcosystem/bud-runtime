@@ -7,6 +7,7 @@ const OAUTH_PROCESSED_KEY = 'oauth_callback_processed';
 const OAUTH_PROMPT_ID_KEY = 'oauth_original_prompt_id'; // Dedicated key for prompt ID preservation
 const OAUTH_SESSION_DATA_KEY = 'oauth_session_data'; // Dedicated key for session data preservation
 const GLOBAL_OAUTH_STATE_KEY = 'global_oauth_connector_state'; // Global connector OAuth state
+const OAUTH_RETURN_URL_KEY = 'oauth_return_url'; // Return URL for cross-app OAuth redirect
 
 // Variable interface for schema persistence
 interface OAuthAgentVariable {
@@ -205,6 +206,7 @@ export const clearOAuthState = (): void => {
     localStorage.removeItem(OAUTH_DRAWER_KEY);
     localStorage.removeItem(OAUTH_PROMPT_ID_KEY);
     localStorage.removeItem(OAUTH_SESSION_DATA_KEY);
+    localStorage.removeItem(OAUTH_RETURN_URL_KEY);
     sessionStorage.removeItem(OAUTH_PROCESSED_KEY);
   } catch (error) {
     console.error('Failed to clear OAuth state:', error);
@@ -319,6 +321,37 @@ export const isGlobalOAuthCallback = (): boolean => {
 export const clearGlobalOAuthState = (): void => {
   try {
     localStorage.removeItem(GLOBAL_OAUTH_STATE_KEY);
+    localStorage.removeItem(OAUTH_RETURN_URL_KEY);
+  } catch {
+    // ignore
+  }
+};
+
+// ─── OAuth Return URL Helpers ────────────────────────────────────────────────
+
+/** Save a return URL to localStorage before OAuth redirect (client-side fallback). */
+export const saveOAuthReturnUrl = (url: string): void => {
+  try {
+    localStorage.setItem(OAUTH_RETURN_URL_KEY, url);
+  } catch (error) {
+    console.error('Failed to save OAuth return URL:', error);
+  }
+};
+
+/** Get the stored return URL from localStorage. */
+export const getOAuthReturnUrl = (): string | null => {
+  try {
+    return localStorage.getItem(OAUTH_RETURN_URL_KEY);
+  } catch (error) {
+    console.error('Failed to get OAuth return URL:', error);
+    return null;
+  }
+};
+
+/** Clear the stored return URL from localStorage. */
+export const clearOAuthReturnUrl = (): void => {
+  try {
+    localStorage.removeItem(OAUTH_RETURN_URL_KEY);
   } catch {
     // ignore
   }

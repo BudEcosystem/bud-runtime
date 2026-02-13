@@ -161,10 +161,13 @@ export class GlobalConnectorService {
   // ═══ User: OAuth ══════════════════════════════════════════════════════════
 
   /** Start OAuth flow for a gateway */
-  static async initiateOAuth(gatewayId: string) {
+  static async initiateOAuth(gatewayId: string, returnUrl?: string) {
+    const params: Record<string, string> = {};
+    if (returnUrl) params.return_url = returnUrl;
     return await AppRequest.Post(
       `${tempApiBaseUrl}/connectors/${gatewayId}/oauth/initiate`,
-      {}
+      {},
+      { params }
     );
   }
 

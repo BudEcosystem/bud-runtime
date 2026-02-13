@@ -16,7 +16,7 @@
 
 """API routes for global connector operations — thin proxy to MCP Foundry."""
 
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -30,7 +30,7 @@ from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
 from .schemas import ClientsRequest, ConfigureConnectorRequest, OAuthCallbackRequest, TagExistingRequest, ToggleRequest
-from .services import ConnectorService
+from .services import ConnectorService, pop_return_url, store_return_url, validate_return_url
 
 
 logger = logging.get_logger(__name__)
@@ -503,11 +503,15 @@ async def public_oauth_callback(
         ).to_http_response()
     try:
         result = await ConnectorService().handle_oauth_callback(code=code, state=state)
-        return {
+        return_url = pop_return_url(state)
+        response = {
             "success": True,
             "message": "OAuth callback handled successfully",
             **result,
         }
+        if return_url:
+            response["return_url"] = return_url
+        return response
     except (ClientException, MCPFoundryException) as e:
         logger.exception(f"Failed to handle public OAuth callback: {e}")
         return ErrorResponse(
@@ -581,10 +585,19 @@ async def initiate_oauth(
     gateway_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Session = Depends(get_session),
+    return_url: Optional[str] = Query(None, description="URL to redirect to after OAuth completes"),
 ) -> Dict[str, Any]:
     """User: Start OAuth flow for a gateway."""
     try:
+        # Validate return_url early (before calling MCP Foundry) to fail fast
+        validated_return_url = validate_return_url(return_url) if return_url else None
+
         result = await ConnectorService().initiate_oauth(gateway_id)
+        if validated_return_url:
+            oauth_state = result.get("state", "")
+            if oauth_state:
+                store_return_url(oauth_state, validated_return_url)
+            result["return_url"] = validated_return_url
         return {
             "success": True,
             "message": "OAuth flow initiated",
@@ -747,4 +760,114 @@ async def get_oauth_status(
         return ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to get OAuth status",
+        ).to_http_response()
+
+
+@connector_router.get(
+    "/{gateway_id}/oauth/token-status",
+    responses={
+        status.HTTP_200_OK: {"description": "Token status retrieved"},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+    },
+    description="Check if current user has an active OAuth token for a gateway",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def get_oauth_token_status(
+    gateway_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """User: Check if current user has an active OAuth token for a gateway."""
+    try:
+        result = await ConnectorService().get_oauth_token_status(gateway_id, current_user.email)
+        return {
+            "success": True,
+            "message": "Token status retrieved",
+            **result,
+        }
+    except (ClientException, MCPFoundryException) as e:
+        logger.exception(f"Failed to get token status for gateway {gateway_id}: {e}")
+        return ErrorResponse(
+            code=getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            message=str(e),
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to get token status for gateway {gateway_id}: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to get token status",
+        ).to_http_response()
+
+
+@connector_router.delete(
+    "/{gateway_id}/oauth/token",
+    responses={
+        status.HTTP_200_OK: {"description": "Token revoked successfully"},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+    },
+    description="Revoke current user's OAuth token for a gateway",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
+async def revoke_oauth_token(
+    gateway_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """User: Revoke current user's OAuth token for a gateway."""
+    try:
+        result = await ConnectorService().revoke_oauth_token(gateway_id, current_user.email)
+        return {
+            "success": True,
+            "message": "Token revoked successfully",
+            **result,
+        }
+    except (ClientException, MCPFoundryException) as e:
+        logger.exception(f"Failed to revoke token for gateway {gateway_id}: {e}")
+        return ErrorResponse(
+            code=getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            message=str(e),
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to revoke token for gateway {gateway_id}: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to revoke token",
+        ).to_http_response()
+
+
+@connector_router.delete(
+    "/{gateway_id}/oauth/token/{user_email}",
+    responses={
+        status.HTTP_200_OK: {"description": "Token revoked successfully"},
+        status.HTTP_403_FORBIDDEN: {"model": ErrorResponse},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+    },
+    description="Admin: Revoke another user's OAuth token for a gateway",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def admin_revoke_oauth_token(
+    gateway_id: str,
+    user_email: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """Admin: Revoke another user's OAuth token for a gateway."""
+    try:
+        result = await ConnectorService().admin_revoke_oauth_token(gateway_id, user_email)
+        return {
+            "success": True,
+            "message": f"Token revoked successfully for user {user_email}",
+            **result,
+        }
+    except (ClientException, MCPFoundryException) as e:
+        logger.exception(f"Failed to admin-revoke token for gateway {gateway_id}, user {user_email}: {e}")
+        return ErrorResponse(
+            code=getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            message=str(e),
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to admin-revoke token for gateway {gateway_id}, user {user_email}: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to revoke token",
         ).to_http_response()
