@@ -683,7 +683,6 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     hardware_mode: Literal["dedicated", "shared"] | None = None
     deploy_config: DeploymentTemplateCreate | None = None
     budaiscaler_specification: BudAIScalerSpecification | None = None
-    callback_topics: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":
@@ -694,24 +693,13 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
         if self.workflow_id is not None and self.workflow_total_steps is not None:
             raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
 
-        # Check if at least one of the required fields is provided
-        required_fields = [
-            "provider_type",
-            "provider_id",
-            "name",
-            "project_id",
-            "endpoint_ids",
-            "is_standalone",
-            "credential_id",
-            "probe_selections",
-            "guard_types",
-            "severity_threshold",
-        ]
-        if not any(getattr(self, field) for field in required_fields):
-            input_data = self.model_dump(exclude_unset=True)
-            if "guardrail_profile_id" in input_data:
-                return self
-            raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
+        # When continuing a workflow, ensure at least one step-specific field was sent.
+        # Uses exclude_unset to detect actually-sent fields (handles falsy values like False/0).
+        meta_fields = {"workflow_id", "step_number", "workflow_total_steps"}
+        input_data = self.model_dump(exclude_unset=True)
+        step_fields = set(input_data.keys()) - meta_fields
+        if self.workflow_id is not None and not step_fields:
+            raise ValueError("At least one step-specific field is required when workflow_id is provided")
 
         if self.endpoint_ids and self.is_standalone:
             raise ValueError("endpoint_ids and is_standalone can't be used together, choose either one.")

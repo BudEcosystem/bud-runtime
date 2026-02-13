@@ -138,15 +138,13 @@ class RetrieveWorkflowStepData(BaseModel):
     skip_to_step: int | None = None
     credential_required: bool | None = None
 
-    # Onboarding events: {execution_id, status, results}
-    onboarding_events: dict | None = None
-    # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
-    simulation_events: dict | None = None
-    # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
-    deployment_events: dict | None = None
     # CommonStatus-compatible guardrail events
     guardrail_onboarding_events: dict | None = None
+    guardrail_simulation_events: dict | None = None
     guardrail_deployment_events: dict | None = None
+    # Simulation pipeline tracking
+    simulation_step_mapping: dict | None = None
+    simulation_models: dict | None = None
     # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
     pending_profile_data: dict | None = None
 

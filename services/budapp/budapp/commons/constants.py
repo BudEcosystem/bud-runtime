@@ -666,6 +666,7 @@ class PayloadType(str, Enum):
     PERFORM_PROMPT_SCHEMA = "perform_prompt_schema"
     GUARDRAIL_MODEL_ONBOARDING = "guardrail_model_onboarding"
     GUARDRAIL_DEPLOYMENT = "guardrail_deployment"
+    GUARDRAIL_SIMULATION = "guardrail_simulation"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -695,6 +696,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     EVALUATION_EVENTS = "evaluation_events"
     GUARDRAIL_ONBOARDING_EVENTS = "guardrail_onboarding_events"
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
+    GUARDRAIL_SIMULATION_EVENTS = "guardrail_simulation_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
     TOOL_CREATION_EVENTS = "tool_creation_events"
 
@@ -721,6 +723,7 @@ PAYLOAD_TO_WORKFLOW_STEP_EVENT: dict[PayloadType, BudServeWorkflowStepEventName]
     PayloadType.EVALUATE_MODEL: BudServeWorkflowStepEventName.EVALUATION_EVENTS,
     PayloadType.GUARDRAIL_MODEL_ONBOARDING: BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS,
     PayloadType.GUARDRAIL_DEPLOYMENT: BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS,
+    PayloadType.GUARDRAIL_SIMULATION: BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS,
 }
 
 
