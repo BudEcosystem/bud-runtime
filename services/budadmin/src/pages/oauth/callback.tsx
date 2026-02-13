@@ -5,7 +5,7 @@ import { getOAuthReturnUrl, clearOAuthReturnUrl } from "@/hooks/useOAuthCallback
 
 type Status = "loading" | "success" | "error";
 
-/** Build a redirect URL with OAuth status query params. Returns null if URL is malformed. */
+/** Build a redirect URL with OAuth status query params. Returns null if URL is malformed or uses an unsafe scheme. */
 function buildReturnRedirect(
   returnUrl: string,
   oauthStatus: "success" | "error",
@@ -13,6 +13,11 @@ function buildReturnRedirect(
 ): string | null {
   try {
     const url = new URL(returnUrl);
+    // Only allow http/https schemes — block javascript:, data:, etc.
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      console.error("Unsafe return URL scheme:", url.protocol);
+      return null;
+    }
     url.searchParams.set("oauth_status", oauthStatus);
     for (const [k, v] of Object.entries(extra)) {
       if (v) url.searchParams.set(k, v);
@@ -47,6 +52,23 @@ export default function OAuthCallbackPage() {
 
     const params = new URLSearchParams({ code: codeStr, state: stateStr });
 
+    /** Handle error-case redirect (shared by API error and network error paths). */
+    const handleErrorRedirect = (message: string) => {
+      const returnUrl = getOAuthReturnUrl();
+      clearOAuthReturnUrl();
+      if (returnUrl) {
+        const redirect = buildReturnRedirect(returnUrl, "error", {
+          error: message,
+        });
+        if (redirect) {
+          setHasReturnRedirect(true);
+          setTimeout(() => {
+            window.location.href = redirect;
+          }, 3000);
+        }
+      }
+    };
+
     fetch(`${tempApiBaseUrl}/connectors/oauth/public-callback?${params}`)
       .then(async (res) => {
         const data = await res.json();
@@ -78,43 +100,32 @@ export default function OAuthCallbackPage() {
             }, 2000);
           }
         } else {
+          const msg = data.message || "OAuth callback failed.";
           setStatus("error");
-          setErrorMessage(data.message || "OAuth callback failed.");
+          setErrorMessage(msg);
 
-          // On error, try to redirect back with error status
-          const returnUrl = getOAuthReturnUrl();
-          clearOAuthReturnUrl();
-          if (returnUrl) {
-            const redirect = buildReturnRedirect(returnUrl, "error", {
-              error: data.message || "OAuth callback failed",
+          // Server may include return_url even on error responses
+          if (data.return_url) {
+            const redirect = buildReturnRedirect(data.return_url, "error", {
+              error: msg,
             });
             if (redirect) {
+              clearOAuthReturnUrl();
               setHasReturnRedirect(true);
               setTimeout(() => {
                 window.location.href = redirect;
               }, 3000);
+              return;
             }
           }
+          handleErrorRedirect(msg);
         }
       })
       .catch((err) => {
         console.error("OAuth callback request failed:", err);
         setStatus("error");
         setErrorMessage("Network error — could not reach the server.");
-
-        const returnUrl = getOAuthReturnUrl();
-        clearOAuthReturnUrl();
-        if (returnUrl) {
-          const redirect = buildReturnRedirect(returnUrl, "error", {
-            error: "Network error",
-          });
-          if (redirect) {
-            setHasReturnRedirect(true);
-            setTimeout(() => {
-              window.location.href = redirect;
-            }, 3000);
-          }
-        }
+        handleErrorRedirect("Network error");
       });
   }, [router.isReady, router.query]);
 

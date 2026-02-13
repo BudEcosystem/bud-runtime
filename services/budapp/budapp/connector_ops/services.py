@@ -17,7 +17,7 @@
 """Service layer for global connector operations — thin proxy to MCP Foundry."""
 
 import asyncio
-import time
+from contextlib import suppress
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -29,6 +29,7 @@ from ..commons.constants import CONNECTOR_AUTH_CREDENTIALS_MAP, MCP_AUTH_TYPE_MA
 from ..commons.exceptions import ClientException
 from ..prompt_ops.schemas import HeadersCredentials, OAuthCredentials, OpenCredentials
 from ..shared.mcp_foundry_service import mcp_foundry_service
+from ..shared.redis_service import RedisService
 
 
 logger = logging.get_logger(__name__)
@@ -45,15 +46,17 @@ DEFAULT_CLIENT_TAGS = [TAG_CLIENT_DASHBOARD, TAG_CLIENT_CHAT]
 # ─── OAuth constants ────────────────────────────────────────────────────────
 OAUTH_REFRESH_THRESHOLD_SECONDS = 300
 
-# ─── OAuth return_url cache (state → (url, expiry_timestamp)) ───────────────
+# ─── OAuth return_url helpers ───────────────────────────────────────────────
 _RETURN_URL_TTL_SECONDS = 600  # 10 minutes
-_return_url_cache: Dict[str, Tuple[str, float]] = {}
+_RETURN_URL_REDIS_PREFIX = "oauth_return_url:"
+
+_redis_service = RedisService()
 
 
 def validate_return_url(url: str) -> str:
     """Validate a return URL against the allowed domains list.
 
-    Enforces HTTPS for all domains except localhost/127.0.0.1.
+    Enforces HTTP(S) scheme for all domains; HTTPS required for non-localhost.
 
     Raises:
         ClientException: If the URL is invalid or the domain is not allowed.
@@ -62,6 +65,13 @@ def validate_return_url(url: str) -> str:
     if not parsed.scheme or not parsed.netloc:
         raise ClientException(
             message="Invalid return_url: missing scheme or host",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Only allow http and https schemes (blocks javascript:, data:, etc.)
+    if parsed.scheme not in ("http", "https"):
+        raise ClientException(
+            message="return_url must use HTTP or HTTPS scheme",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -85,32 +95,28 @@ def validate_return_url(url: str) -> str:
     return url
 
 
-def store_return_url(state: str, url: str) -> None:
-    """Store a return URL keyed by OAuth state with TTL.
-
-    Lazily cleans up expired entries to prevent unbounded growth.
-    """
-    now = time.monotonic()
-    # Lazy cleanup: remove expired entries
-    expired = [k for k, (_, exp) in _return_url_cache.items() if exp <= now]
-    for k in expired:
-        _return_url_cache.pop(k, None)
-
-    _return_url_cache[state] = (url, now + _RETURN_URL_TTL_SECONDS)
+async def store_return_url(state: str, url: str) -> None:
+    """Store a return URL in Redis keyed by OAuth state with TTL."""
+    key = f"{_RETURN_URL_REDIS_PREFIX}{state}"
+    with suppress(Exception):
+        await _redis_service.set(key, url, ex=_RETURN_URL_TTL_SECONDS)
 
 
-def pop_return_url(state: str) -> Optional[str]:
-    """Retrieve and remove the return URL for a given OAuth state.
+async def pop_return_url(state: str) -> Optional[str]:
+    """Retrieve and remove the return URL for a given OAuth state from Redis.
 
     Returns None if not found or expired.
     """
-    entry = _return_url_cache.pop(state, None)
-    if entry is None:
-        return None
-    url, expiry = entry
-    if time.monotonic() > expiry:
-        return None
-    return url
+    key = f"{_RETURN_URL_REDIS_PREFIX}{state}"
+    try:
+        value = await _redis_service.get(key)
+        if value:
+            with suppress(Exception):
+                await _redis_service.delete(key)
+            return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+    except Exception:
+        pass
+    return None
 
 
 def _detect_transport_from_url(url: str) -> str:

@@ -3,24 +3,39 @@
 These tests target the standalone utility functions (validate_return_url,
 store_return_url, pop_return_url) which don't require database or Dapr.
 We import them lazily to avoid triggering the full application import chain
-during collection.
+during collection.  Redis is mocked so no running Redis instance is needed.
 """
 
-import time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import status
 
 
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    """Clear the return URL cache before and after each test."""
-    from budapp.connector_ops.services import _return_url_cache
+# ─── Redis mock fixtures ────────────────────────────────────────────────────
 
-    _return_url_cache.clear()
-    yield
-    _return_url_cache.clear()
+
+@pytest.fixture(autouse=True)
+def _mock_redis():
+    """Mock RedisService to use an in-memory dict instead of real Redis."""
+    store: dict[str, bytes] = {}
+
+    async def fake_set(name, value, ex=None, **kwargs):
+        store[str(name)] = value.encode("utf-8") if isinstance(value, str) else value
+
+    async def fake_get(name):
+        return store.get(str(name))
+
+    async def fake_delete(*names):
+        for name in names:
+            store.pop(str(name), None)
+
+    with patch("budapp.connector_ops.services._redis_service") as mock_svc:
+        mock_svc.set = AsyncMock(side_effect=fake_set)
+        mock_svc.get = AsyncMock(side_effect=fake_get)
+        mock_svc.delete = AsyncMock(side_effect=fake_delete)
+        mock_svc._store = store  # expose for tests that need direct access
+        yield mock_svc
 
 
 # ─── validate_return_url ─────────────────────────────────────────────────────
@@ -73,6 +88,31 @@ class TestValidateReturnUrl:
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "HTTPS" in str(exc_info.value.message)
 
+    def test_rejects_javascript_scheme(self):
+        from budapp.commons.exceptions import ClientException
+        from budapp.connector_ops.services import validate_return_url
+
+        with pytest.raises(ClientException) as exc_info:
+            validate_return_url("javascript://localhost/%0aalert(1)")
+        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+        assert "HTTP or HTTPS" in str(exc_info.value.message)
+
+    def test_rejects_data_scheme(self):
+        from budapp.commons.exceptions import ClientException
+        from budapp.connector_ops.services import validate_return_url
+
+        with pytest.raises(ClientException) as exc_info:
+            validate_return_url("data://localhost/text/html,<script>alert(1)</script>")
+        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_rejects_ftp_scheme(self):
+        from budapp.commons.exceptions import ClientException
+        from budapp.connector_ops.services import validate_return_url
+
+        with pytest.raises(ClientException) as exc_info:
+            validate_return_url("ftp://admin.dev.bud.studio/file")
+        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
     def test_custom_allowed_domains(self):
         from budapp.connector_ops.services import validate_return_url
 
@@ -111,57 +151,60 @@ class TestValidateReturnUrl:
 
 
 class TestReturnUrlCache:
-    """Tests for store_return_url and pop_return_url."""
+    """Tests for store_return_url and pop_return_url (Redis-backed)."""
 
-    def test_store_and_pop(self):
+    @pytest.mark.asyncio
+    async def test_store_and_pop(self):
         from budapp.connector_ops.services import pop_return_url, store_return_url
 
-        store_return_url("state-abc", "https://example.com/cb")
-        result = pop_return_url("state-abc")
+        await store_return_url("state-abc", "https://example.com/cb")
+        result = await pop_return_url("state-abc")
         assert result == "https://example.com/cb"
 
-    def test_pop_removes_entry(self):
+    @pytest.mark.asyncio
+    async def test_pop_removes_entry(self):
         from budapp.connector_ops.services import pop_return_url, store_return_url
 
-        store_return_url("state-abc", "https://example.com/cb")
-        pop_return_url("state-abc")
-        assert pop_return_url("state-abc") is None
+        await store_return_url("state-abc", "https://example.com/cb")
+        await pop_return_url("state-abc")
+        assert await pop_return_url("state-abc") is None
 
-    def test_pop_nonexistent_state(self):
+    @pytest.mark.asyncio
+    async def test_pop_nonexistent_state(self):
         from budapp.connector_ops.services import pop_return_url
 
-        assert pop_return_url("no-such-state") is None
+        assert await pop_return_url("no-such-state") is None
 
-    def test_expired_entry_returns_none(self):
-        from budapp.connector_ops.services import _return_url_cache, pop_return_url, store_return_url
-
-        store_return_url("state-exp", "https://example.com/cb")
-        # Manually set expiry to the past
-        url, _ = _return_url_cache["state-exp"]
-        _return_url_cache["state-exp"] = (url, time.monotonic() - 1)
-        assert pop_return_url("state-exp") is None
-
-    def test_lazy_cleanup_of_expired_entries(self):
-        from budapp.connector_ops.services import _return_url_cache, store_return_url
-
-        # Store an entry that's already expired
-        _return_url_cache["old"] = ("https://old.com", time.monotonic() - 1)
-        # Storing a new entry should clean up the expired one
-        store_return_url("new", "https://new.com")
-        assert "old" not in _return_url_cache
-        assert "new" in _return_url_cache
-
-    def test_multiple_states(self):
+    @pytest.mark.asyncio
+    async def test_multiple_states(self):
         from budapp.connector_ops.services import pop_return_url, store_return_url
 
-        store_return_url("s1", "https://one.com")
-        store_return_url("s2", "https://two.com")
-        assert pop_return_url("s1") == "https://one.com"
-        assert pop_return_url("s2") == "https://two.com"
+        await store_return_url("s1", "https://one.com")
+        await store_return_url("s2", "https://two.com")
+        assert await pop_return_url("s1") == "https://one.com"
+        assert await pop_return_url("s2") == "https://two.com"
 
-    def test_overwrite_same_state(self):
+    @pytest.mark.asyncio
+    async def test_overwrite_same_state(self):
         from budapp.connector_ops.services import pop_return_url, store_return_url
 
-        store_return_url("s1", "https://first.com")
-        store_return_url("s1", "https://second.com")
-        assert pop_return_url("s1") == "https://second.com"
+        await store_return_url("s1", "https://first.com")
+        await store_return_url("s1", "https://second.com")
+        assert await pop_return_url("s1") == "https://second.com"
+
+    @pytest.mark.asyncio
+    async def test_redis_set_called_with_ttl(self, _mock_redis):
+        from budapp.connector_ops.services import store_return_url
+
+        await store_return_url("state-ttl", "https://example.com/cb")
+        _mock_redis.set.assert_called_once()
+        call_kwargs = _mock_redis.set.call_args
+        assert call_kwargs[1].get("ex") == 600 or call_kwargs[0][2] == 600
+
+    @pytest.mark.asyncio
+    async def test_pop_deletes_from_redis(self, _mock_redis):
+        from budapp.connector_ops.services import pop_return_url, store_return_url
+
+        await store_return_url("state-del", "https://example.com/cb")
+        await pop_return_url("state-del")
+        _mock_redis.delete.assert_called_once()

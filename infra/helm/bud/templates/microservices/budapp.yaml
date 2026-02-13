@@ -114,7 +114,7 @@ spec:
           - name: ENTRYPOINT_MCPGATEWAY_PASSWORD
             value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_PASSWORD }}
           - name: OAUTH_RETURN_URL_ALLOWED_DOMAINS
-            value: "{{ include "bud.ingress.hosts.budadmin" . }},{{ printf "chat.%s" .Values.global.ingress.hosts.root }},localhost,127.0.0.1"
+            value: "{{ include "bud.ingress.hosts.budadmin" . }},{{ include "bud.ingress.hosts.onyx" . }},localhost,127.0.0.1"
 {{- if (default .Values.microservices.budsentinel.enabled false) }}
           - name: BUD_SENTINEL_BASE_URL
             value: {{ .Release.Name }}-budsentinel:50051

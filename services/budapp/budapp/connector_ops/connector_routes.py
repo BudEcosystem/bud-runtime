@@ -16,9 +16,11 @@
 
 """API routes for global connector operations — thin proxy to MCP Foundry."""
 
+import json
 from typing import Annotated, Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
@@ -501,9 +503,10 @@ async def public_oauth_callback(
             code=status.HTTP_400_BAD_REQUEST,
             message="Missing required OAuth parameters (code, state)",
         ).to_http_response()
+    # Pop return_url before try/except so it's available for both success and error paths
+    return_url = await pop_return_url(state)
     try:
         result = await ConnectorService().handle_oauth_callback(code=code, state=state)
-        return_url = pop_return_url(state)
         response = {
             "success": True,
             "message": "OAuth callback handled successfully",
@@ -514,16 +517,28 @@ async def public_oauth_callback(
         return response
     except (ClientException, MCPFoundryException) as e:
         logger.exception(f"Failed to handle public OAuth callback: {e}")
-        return ErrorResponse(
+        error_resp = ErrorResponse(
             code=getattr(e, "status_code", status.HTTP_400_BAD_REQUEST),
             message=str(e),
-        ).to_http_response()
+        )
+        json_response = error_resp.to_http_response()
+        if return_url:
+            content = json.loads(json_response.body.decode())
+            content["return_url"] = return_url
+            json_response = JSONResponse(content=content, status_code=json_response.status_code)
+        return json_response
     except Exception as e:
         logger.exception(f"Failed to handle public OAuth callback: {e}")
-        return ErrorResponse(
+        error_resp = ErrorResponse(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to handle OAuth callback",
-        ).to_http_response()
+        )
+        json_response = error_resp.to_http_response()
+        if return_url:
+            content = json.loads(json_response.body.decode())
+            content["return_url"] = return_url
+            json_response = JSONResponse(content=content, status_code=json_response.status_code)
+        return json_response
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -596,7 +611,7 @@ async def initiate_oauth(
         if validated_return_url:
             oauth_state = result.get("state", "")
             if oauth_state:
-                store_return_url(oauth_state, validated_return_url)
+                await store_return_url(oauth_state, validated_return_url)
             result["return_url"] = validated_return_url
         return {
             "success": True,
