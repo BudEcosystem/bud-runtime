@@ -8,11 +8,10 @@ data:
     #!/bin/sh
     set -e
 
-    KEYCLOAK_BASE_URL="{{ .Values.microservices.mcpgateway.sso.keycloakBaseUrl | default (printf "http://%s-keycloak" .Release.Name) }}"
-    REALM="{{ .Values.microservices.mcpgateway.sso.realm }}"
-    CLIENT_ID="{{ .Values.microservices.mcpgateway.sso.clientId }}"
-    ADMIN_USER="{{ .Values.keycloak.auth.adminUser }}"
-    ADMIN_PASSWORD="{{ .Values.keycloak.auth.adminPassword }}"
+    # All configuration is read from environment variables injected by the
+    # pod spec (see deployment.yaml initContainers). No Helm values are
+    # baked into this script, which avoids both credential leakage through
+    # ConfigMaps and shell-injection risks from untrusted values.
 
     echo "Waiting for Keycloak at ${KEYCLOAK_BASE_URL} ..."
     ATTEMPTS=0
@@ -33,8 +32,8 @@ data:
       "${KEYCLOAK_BASE_URL}/realms/master/protocol/openid-connect/token" \
       --data-urlencode "grant_type=password" \
       --data-urlencode "client_id=admin-cli" \
-      --data-urlencode "username=${ADMIN_USER}" \
-      --data-urlencode "password=${ADMIN_PASSWORD}")
+      --data-urlencode "username=${KEYCLOAK_ADMIN_USER}" \
+      --data-urlencode "password=${KEYCLOAK_ADMIN_PASSWORD}")
     ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
     if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
       echo "ERROR: Failed to obtain admin token"
@@ -43,45 +42,49 @@ data:
     fi
     echo "Admin token obtained."
 
-    echo "Checking if client '${CLIENT_ID}' exists in realm '${REALM}'..."
+    echo "Checking if client '${KC_CLIENT_ID}' exists in realm '${KC_REALM}'..."
     EXISTING=$(curl -sf -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-      "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}")
+      "${KEYCLOAK_BASE_URL}/admin/realms/${KC_REALM}/clients?clientId=${KC_CLIENT_ID}")
     CLIENT_COUNT=$(echo "$EXISTING" | jq 'length')
 
     if [ "$CLIENT_COUNT" -gt "0" ]; then
-      echo "Client '${CLIENT_ID}' already exists."
+      echo "Client '${KC_CLIENT_ID}' already exists."
       CLIENT_UUID=$(echo "$EXISTING" | jq -r '.[0].id')
     else
-      echo "Creating client '${CLIENT_ID}'..."
-      CREATE_RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST \
+      echo "Creating client '${KC_CLIENT_ID}'..."
+      CREATE_RESPONSE=$(curl -si -X POST \
         -H "Authorization: Bearer ${ACCESS_TOKEN}" \
         -H "Content-Type: application/json" \
-        "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients" \
+        "${KEYCLOAK_BASE_URL}/admin/realms/${KC_REALM}/clients" \
         -d "{
-          \"clientId\": \"${CLIENT_ID}\",
+          \"clientId\": \"${KC_CLIENT_ID}\",
           \"enabled\": true,
           \"publicClient\": false,
           \"serviceAccountsEnabled\": true,
           \"directAccessGrantsEnabled\": true,
           \"protocol\": \"openid-connect\"
         }")
-      HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
+
+      HTTP_CODE=$(echo "$CREATE_RESPONSE" | head -1 | awk '{print $2}')
       if [ "$HTTP_CODE" != "201" ]; then
         echo "ERROR: Failed to create client (HTTP ${HTTP_CODE})"
+        echo "$CREATE_RESPONSE" | awk 'BEGIN {p=0} /^[[:space:]]*$/ {p=1; next} p'
+        exit 1
+      fi
+
+      # Extract UUID from the Location header returned by Keycloak
+      CLIENT_UUID=$(echo "$CREATE_RESPONSE" | grep -i '^Location:' | awk -F/ '{print $NF}' | tr -d '\r')
+      if [ -z "$CLIENT_UUID" ]; then
+        echo "ERROR: Failed to get client UUID from Location header"
         echo "$CREATE_RESPONSE"
         exit 1
       fi
-      echo "Client '${CLIENT_ID}' created."
-
-      # Re-fetch to get UUID
-      EXISTING=$(curl -sf -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-        "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}")
-      CLIENT_UUID=$(echo "$EXISTING" | jq -r '.[0].id')
+      echo "Client '${KC_CLIENT_ID}' created with UUID ${CLIENT_UUID}."
     fi
 
     echo "Retrieving client secret for UUID=${CLIENT_UUID}..."
     SECRET_RESPONSE=$(curl -sf -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-      "${KEYCLOAK_BASE_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/client-secret")
+      "${KEYCLOAK_BASE_URL}/admin/realms/${KC_REALM}/clients/${CLIENT_UUID}/client-secret")
     CLIENT_SECRET=$(echo "$SECRET_RESPONSE" | jq -r '.value')
     if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "null" ]; then
       echo "ERROR: Failed to retrieve client secret"
