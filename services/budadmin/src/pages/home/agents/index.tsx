@@ -55,6 +55,10 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
   const needsSeeMore = item.description && item.description.length > 100;
 
   const handleCardClick = () => {
+    if (!item.project_id) {
+      errorToast("Cannot open agent details: Project ID is missing.");
+      return;
+    }
     router.push(`/agents/${item.project_id}/agentDetails/${item.id}?name=${encodeURIComponent(item.name)}`);
   };
 
