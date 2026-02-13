@@ -419,23 +419,9 @@ class CreatePromptWorkflowSteps(BaseModel):
 class EditPromptRequest(BaseModel):
     """Edit prompt request schema."""
 
-    name: str | None = Field(
-        None,
-        min_length=1,
-        max_length=255,
-        description="Name of the prompt, must be non-empty and at most 255 characters.",
-    )
     description: str | None = Field(None, description="Description of the prompt.")
     tags: list[Tag] | None = Field(None, description="Tags associated with the prompt.")
     default_version_id: UUID4 | None = Field(None, description="Default version ID for the prompt.")
-
-    @field_validator("name", mode="before")
-    @classmethod
-    def validate_name(cls, value: str | None) -> str | None:
-        """Ensure the name is not empty or only whitespace."""
-        if value is not None and not value.strip():
-            raise ValueError("Prompt name cannot be empty or only whitespace.")
-        return value
 
 
 class PromptVersionResponse(BaseModel):
