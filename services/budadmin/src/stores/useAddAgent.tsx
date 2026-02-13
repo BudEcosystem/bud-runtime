@@ -237,7 +237,7 @@ export const useAddAgent = create<{
       const response: any = await AppRequest.Post(
         `${tempApiBaseUrl}/prompts/prompt-workflow`,
         {
-          workflow_total_steps: 6,
+          workflow_total_steps: 5,
           step_number: 1,
           project_id: projectId,
         },

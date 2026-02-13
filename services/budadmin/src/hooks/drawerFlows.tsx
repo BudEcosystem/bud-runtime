@@ -4793,7 +4793,7 @@ const addGuardrail: DrawerFlowType = {
 const addAgent: DrawerFlowType = {
   title: "Add Agent",
   description: "Create a new agent",
-  totalSteps: 6,
+  totalSteps: 5,
   steps: [
     {
       navigation: () => ["Select Project", "Add Agent"],
@@ -4808,10 +4808,6 @@ const addAgent: DrawerFlowType = {
         {
           status: FormProgressStatus.notCompleted,
           title: "Select Type",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Select Model",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -4844,43 +4840,6 @@ const addAgent: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Select Model",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Configuration",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Review",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Select Model", "Add Agent"],
-      id: "add-agent-select-model",
-      step: 3,
-      component: StepComponents["add-agent-select-model"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Project",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Type",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Select Model",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
           title: "Configuration",
         },
         {
@@ -4897,7 +4856,7 @@ const addAgent: DrawerFlowType = {
     {
       navigation: () => ["Configuration", "Add Agent"],
       id: "add-agent-configuration",
-      step: 4,
+      step: 3,
       component: StepComponents["add-agent-configuration"],
       progress: [
         {
@@ -4909,10 +4868,6 @@ const addAgent: DrawerFlowType = {
           title: "Select Type",
         },
         {
-          status: FormProgressStatus.completed,
-          title: "Select Model",
-        },
-        {
           status: FormProgressStatus.inProgress,
           title: "Configuration",
         },
@@ -4920,13 +4875,17 @@ const addAgent: DrawerFlowType = {
           status: FormProgressStatus.notCompleted,
           title: "Review",
         },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
       ],
       confirmClose: true,
     },
     {
       navigation: () => ["Review", "Add Agent"],
       id: "add-agent-deployment-warning",
-      step: 5,
+      step: 4,
       component: StepComponents["add-agent-deployment-warning"],
       progress: [
         {
@@ -4936,10 +4895,6 @@ const addAgent: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Select Type",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Model",
         },
         {
           status: FormProgressStatus.completed,
@@ -4959,7 +4914,7 @@ const addAgent: DrawerFlowType = {
     {
       navigation: () => ["Success", "Add Agent"],
       id: "add-agent-success",
-      step: 6,
+      step: 5,
       component: StepComponents["add-agent-success"],
       progress: [
         {
@@ -4969,10 +4924,6 @@ const addAgent: DrawerFlowType = {
         {
           status: FormProgressStatus.completed,
           title: "Select Type",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Model",
         },
         {
           status: FormProgressStatus.completed,

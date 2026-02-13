@@ -73,6 +73,7 @@ class BudPipelineService(SessionMixin):
         name: Optional[str] = None,
         user_id: Optional[str] = None,
         system_owned: bool = False,
+        icon: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a new pipeline in budpipeline service.
 
@@ -81,6 +82,7 @@ class BudPipelineService(SessionMixin):
             name: Optional pipeline name override
             user_id: The ID of the user creating the pipeline
             system_owned: True if this is a system-owned pipeline visible to all users
+            icon: Optional icon/emoji for UI representation
 
         Returns:
             Created pipeline data including ID
@@ -89,16 +91,20 @@ class BudPipelineService(SessionMixin):
             ClientException: If creation fails
         """
         try:
+            data: Dict[str, Any] = {
+                "dag": dag,
+                "name": name,
+                "user_id": user_id,
+                "system_owned": system_owned,
+            }
+            if icon is not None:
+                data["icon"] = icon
+
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
                 method_path="pipelines",
                 method="POST",
-                data={
-                    "dag": dag,
-                    "name": name,
-                    "user_id": user_id,
-                    "system_owned": system_owned,
-                },
+                data=data,
             )
             return result
         except ClientException:
@@ -212,6 +218,7 @@ class BudPipelineService(SessionMixin):
         dag: Optional[Dict[str, Any]] = None,
         name: Optional[str] = None,
         user_id: Optional[str] = None,
+        icon: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update a pipeline's DAG definition.
 
@@ -220,6 +227,7 @@ class BudPipelineService(SessionMixin):
             dag: New DAG definition
             name: Optional new name
             user_id: User ID for permission check (optional)
+            icon: Optional icon/emoji for UI representation
 
         Returns:
             Updated pipeline data
@@ -228,11 +236,13 @@ class BudPipelineService(SessionMixin):
             ClientException: If update fails
         """
         try:
-            data = {}
+            data: Dict[str, Any] = {}
             if dag is not None:
                 data["dag"] = dag
             if name is not None:
                 data["name"] = name
+            if icon is not None:
+                data["icon"] = icon
 
             headers = {}
             if user_id:
@@ -309,6 +319,8 @@ class BudPipelineService(SessionMixin):
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
+        payload_type: Optional[str] = None,
+        notification_workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Start a pipeline execution.
 
@@ -317,6 +329,8 @@ class BudPipelineService(SessionMixin):
             params: Input parameters for the execution
             callback_topics: Optional list of callback topics for real-time updates
             user_id: User ID initiating the execution
+            payload_type: Optional custom payload.type for event routing
+            notification_workflow_id: Optional override for payload.workflow_id in notifications
 
         Returns:
             Execution details including execution_id
@@ -334,6 +348,11 @@ class BudPipelineService(SessionMixin):
             if user_id:
                 data["user_id"] = user_id
                 data["initiator"] = user_id
+                data["subscriber_ids"] = user_id  # Auto-set for Novu delivery
+            if payload_type:
+                data["payload_type"] = payload_type
+            if notification_workflow_id:
+                data["notification_workflow_id"] = notification_workflow_id
 
             result = await DaprService.invoke_service(
                 app_id=BUDPIPELINE_APP_ID,
@@ -395,6 +414,8 @@ class BudPipelineService(SessionMixin):
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
+        payload_type: Optional[str] = None,
+        notification_workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Deprecated: Use execute_pipeline() instead."""
         return await self.execute_pipeline(
@@ -402,6 +423,8 @@ class BudPipelineService(SessionMixin):
             params=params,
             callback_topics=callback_topics,
             user_id=user_id,
+            payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def run_ephemeral_execution(
@@ -410,6 +433,8 @@ class BudPipelineService(SessionMixin):
         params: Optional[Dict[str, Any]] = None,
         callback_topics: Optional[List[str]] = None,
         user_id: Optional[str] = None,
+        payload_type: Optional[str] = None,
+        notification_workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute a pipeline inline without saving the pipeline definition.
 
@@ -422,6 +447,8 @@ class BudPipelineService(SessionMixin):
             params: Input parameters for the execution
             callback_topics: Optional list of callback topics for real-time updates
             user_id: User ID initiating the execution
+            payload_type: Optional custom payload.type for event routing
+            notification_workflow_id: Optional override for payload.workflow_id in notifications
 
         Returns:
             Execution details including execution_id
@@ -439,6 +466,11 @@ class BudPipelineService(SessionMixin):
             if user_id:
                 data["user_id"] = user_id
                 data["initiator"] = user_id
+                data["subscriber_ids"] = user_id  # Auto-set for Novu delivery
+            if payload_type:
+                data["payload_type"] = payload_type
+            if notification_workflow_id:
+                data["notification_workflow_id"] = notification_workflow_id
 
             logger.debug(
                 "Sending ephemeral execution request",
@@ -453,20 +485,38 @@ class BudPipelineService(SessionMixin):
                 data=data,
             )
 
-            # Check if the response is an error response
-            if isinstance(result, dict) and ("error" in result or "errors" in result):
-                error_msg = result.get("error", "Unknown error")
-                errors = result.get("errors", [])
-                logger.error(
-                    "Ephemeral execution failed with validation errors",
-                    error=error_msg,
-                    errors=errors,
-                    pipeline_name=pipeline_definition.get("name"),
-                )
-                raise ClientException(
-                    f"Pipeline validation failed: {error_msg}. Errors: {errors}",
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
+            # Check for error response from budpipeline
+            if isinstance(result, dict):
+                # Handle ErrorResponse format: {"object": "error", "code": N, "message": "..."}
+                if result.get("object") == "error" and "message" in result:
+                    error_msg = result["message"]
+                    try:
+                        error_code = int(result.get("code", 500))
+                    except (ValueError, TypeError):
+                        error_code = 500
+                    raise ClientException(
+                        error_msg,
+                        status_code=error_code,
+                    )
+                # Handle HTTPException format: {"detail": ...}
+                if "detail" in result:
+                    detail = result["detail"]
+                    if isinstance(detail, dict) and "error" in detail:
+                        error_msg = detail.get("error", "Ephemeral execution failed")
+                        errors = detail.get("errors", [])
+                        if errors:
+                            error_details = ", ".join(map(str, errors))
+                            error_msg = f"{error_msg}: {error_details}"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                    else:
+                        error_msg = str(detail) if isinstance(detail, str) else "Ephemeral execution failed"
+                        raise ClientException(
+                            error_msg,
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
 
             return result
         except ClientException:

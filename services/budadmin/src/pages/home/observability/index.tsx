@@ -686,3 +686,6 @@ const ObservabilityPage: React.FC = () => {
 };
 
 export default ObservabilityPage;
+
+// Skip static generation — this page requires client-side rendering
+export const getServerSideProps = () => ({ props: {} });

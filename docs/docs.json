@@ -42,14 +42,52 @@
             "group": "Projects",
             "icon": "folder-tree",
             "pages": [
-              "projects/projects"
+              "projects/introduction",
+              "projects/quickstart",
+              "projects/project-concepts",
+              "projects/creating-first-project",
+              {
+                "group": "Guides",
+                "pages": [
+                  "projects/guides/managing-project-members",
+                  "projects/guides/deployment-settings-and-autoscaling"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "projects/reference/project-tabs-reference"
+                ]
+              },
+              "projects/troubleshooting"
             ]
           },
           {
             "group": "Models",
             "icon": "brain",
             "pages": [
-              "models/models"
+              "models/introduction",
+              "models/quickstart",
+              "models/model-concepts",
+              "models/creating-first-model",
+              {
+                "group": "Guides",
+                "pages": [
+                  "models/guides/model-security-and-verification",
+                  "models/guides/evaluations",
+                  "models/guides/automated-model-license-analysis",
+                  "models/guides/performance-benchmarks",
+                  "models/guides/tool-calling-and-reasoning-parser",
+                  "models/guides/how-to-add-adapters-to-your-deployed-models"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "models/reference/model-operations-reference"
+                ]
+              },
+              "models/troubleshooting"
             ]
           },
           {

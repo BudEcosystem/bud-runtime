@@ -21,6 +21,8 @@ pub struct ApiKeyMetadata {
     pub model_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<i64>,
 }
 
 // Auth metadata from Redis __metadata__ field
@@ -331,6 +333,15 @@ pub async fn require_api_key(
             }
         }
 
+        // Add prompt version number for analytics (resolved from default version in Redis)
+        if let Some(version) = metadata.version {
+            if let Ok(header_value) = version.to_string().parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-version", header_value);
+            }
+        }
+
         // Add auth metadata headers if available
         if let Some(auth_meta) = auth.get_auth_metadata(&key) {
             if let Some(api_key_id) = auth_meta.api_key_id {
@@ -429,6 +440,42 @@ pub async fn require_api_key(
                 }
             }
         }
+    }
+
+    Ok(next.run(request).await)
+}
+
+/// Lightweight auth middleware for OTLP telemetry proxy.
+/// Validates Bearer token but does NOT consume the request body.
+pub async fn require_api_key_telemetry(
+    State(auth): State<Auth>,
+    request: Request,
+    next: Next,
+) -> Result<Response, Response> {
+    let key = request
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| {
+            let s = s.trim();
+            s.strip_prefix("Bearer ").unwrap_or(s).to_string()
+        });
+
+    let key = match key {
+        Some(k) => k,
+        None => {
+            return Err(auth_error_response(
+                StatusCode::UNAUTHORIZED,
+                "Missing authorization header",
+            ))
+        }
+    };
+
+    if auth.validate_api_key(&key).is_err() {
+        return Err(auth_error_response(
+            StatusCode::UNAUTHORIZED,
+            "Invalid API key",
+        ));
     }
 
     Ok(next.run(request).await)

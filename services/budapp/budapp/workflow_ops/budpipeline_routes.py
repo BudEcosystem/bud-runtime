@@ -123,6 +123,8 @@ async def run_ephemeral_execution(
             params=request_body.get("params", {}),
             callback_topics=request_body.get("callback_topics"),
             user_id=str(current_user.id),
+            payload_type=request_body.get("payload_type"),
+            notification_workflow_id=request_body.get("notification_workflow_id"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:
@@ -171,6 +173,7 @@ async def create_budpipeline(
             name=request_body.get("name"),
             user_id=str(current_user.id),
             system_owned=request_body.get("system_owned", False),
+            icon=request_body.get("icon"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:
@@ -1053,6 +1056,7 @@ async def update_budpipeline(
             dag=request_body.get("dag"),
             name=request_body.get("name"),
             user_id=str(current_user.id),
+            icon=request_body.get("icon"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_200_OK)
     except ClientException as e:
@@ -1153,6 +1157,8 @@ async def execute_budpipeline(
             params=request_body.get("params", {}),
             callback_topics=request_body.get("callback_topics"),
             user_id=str(current_user.id),
+            payload_type=request_body.get("payload_type"),
+            notification_workflow_id=request_body.get("notification_workflow_id"),
         )
         return JSONResponse(content=result, status_code=status.HTTP_201_CREATED)
     except ClientException as e:

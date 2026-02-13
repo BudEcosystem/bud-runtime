@@ -47,6 +47,7 @@ class PipelineDefinitionCRUD:
         dag_definition: dict[str, Any],
         created_by: str,
         description: str | None = None,
+        icon: str | None = None,
         status: PipelineStatus = PipelineStatus.DRAFT,
         user_id: UUID | None = None,
         system_owned: bool = False,
@@ -58,6 +59,7 @@ class PipelineDefinitionCRUD:
             dag_definition: Complete pipeline DAG definition.
             created_by: User or service that created the pipeline.
             description: Optional pipeline description.
+            icon: Optional icon/emoji for UI representation.
             status: Initial pipeline status (default: draft).
             user_id: UUID of the owning user (None for system/anonymous pipelines).
             system_owned: True if this is a system-owned pipeline visible to all users.
@@ -72,6 +74,7 @@ class PipelineDefinitionCRUD:
         definition = PipelineDefinition(
             name=name,
             description=description,
+            icon=icon,
             dag_definition=dag_definition,
             status=status,
             step_count=step_count,
@@ -325,6 +328,9 @@ class PipelineExecutionCRUD:
         pipeline_definition: dict[str, Any],
         initiator: str,
         pipeline_id: UUID | None = None,
+        subscriber_ids: str | None = None,
+        payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> PipelineExecution:
         """Create a new pipeline execution.
 
@@ -332,6 +338,9 @@ class PipelineExecutionCRUD:
             pipeline_definition: Complete pipeline DAG definition (snapshot).
             initiator: User or service that initiated execution.
             pipeline_id: Optional reference to parent pipeline definition.
+            subscriber_ids: Optional user ID(s) for Novu notification delivery.
+            payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id in notifications.
 
         Returns:
             Created PipelineExecution instance.
@@ -342,6 +351,9 @@ class PipelineExecutionCRUD:
             initiator=initiator,
             status=ExecutionStatus.PENDING,
             progress_percentage=Decimal("0.00"),
+            subscriber_ids=subscriber_ids,
+            payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
         self.session.add(execution)
         await self.session.flush()

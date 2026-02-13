@@ -368,6 +368,7 @@ class ModelDetailResponse(BaseModel):
     source: str
     provider_type: ModelProviderTypeEnum
     uri: str
+    local_path: str | None = None
     paper_published: list[PaperPublishedModel] | None = None
     model_licenses: ModelLicensesModel | None = None
     provider: Provider | None = None
@@ -677,6 +678,7 @@ class ModelResponse(BaseModel):
     modality: List[ModalityEnum]
     source: str
     uri: str
+    local_path: str | None = None
     created_user: UserInfo | None = None
     model_size: int | None = None
     tasks: list[Task] | None = None
