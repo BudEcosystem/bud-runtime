@@ -148,6 +148,7 @@ class EventPublisher:
         step_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish event to all active callback topics for an execution.
 
@@ -163,6 +164,7 @@ class EventPublisher:
             step_id: Optional step ID for step-level events.
             subscriber_ids: Optional user ID(s) for Novu notification delivery.
             payload_type: Optional custom payload.type for event routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics event was queued for publishing.
@@ -176,6 +178,7 @@ class EventPublisher:
             step_id=step_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
         published_topics: list[str] = []
@@ -233,6 +236,7 @@ class EventPublisher:
         step_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> dict[str, Any]:
         """Build event payload in NotificationPayload format.
 
@@ -326,7 +330,7 @@ class EventPublisher:
                 "category": "internal",
                 "type": payload_type or _DEFAULT_PAYLOAD_TYPE,
                 "event": event_key,
-                "workflow_id": str(execution_id),
+                "workflow_id": notification_workflow_id or str(execution_id),
                 "source": "budpipeline",
                 "content": content,
             },
@@ -482,6 +486,7 @@ class EventPublisher:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish workflow progress event.
 
@@ -493,6 +498,7 @@ class EventPublisher:
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics published to.
@@ -510,6 +516,7 @@ class EventPublisher:
             correlation_id=correlation_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def publish_step_started(
@@ -521,6 +528,7 @@ class EventPublisher:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish step started event.
 
@@ -532,6 +540,7 @@ class EventPublisher:
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics published to.
@@ -551,6 +560,7 @@ class EventPublisher:
             step_id=step_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def publish_step_completed(
@@ -563,6 +573,7 @@ class EventPublisher:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish step completed event.
 
@@ -575,6 +586,7 @@ class EventPublisher:
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics published to.
@@ -595,6 +607,7 @@ class EventPublisher:
             step_id=step_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def publish_step_failed(
@@ -606,6 +619,7 @@ class EventPublisher:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish step failed event.
 
@@ -617,6 +631,7 @@ class EventPublisher:
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics published to.
@@ -636,6 +651,7 @@ class EventPublisher:
             step_id=step_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def publish_workflow_completed(
@@ -647,6 +663,7 @@ class EventPublisher:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish workflow completed event.
 
@@ -658,6 +675,7 @@ class EventPublisher:
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics published to.
@@ -678,6 +696,7 @@ class EventPublisher:
             correlation_id=correlation_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     async def publish_eta_update(
@@ -688,6 +707,7 @@ class EventPublisher:
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
+        notification_workflow_id: str | None = None,
     ) -> list[str]:
         """Publish ETA update event.
 
@@ -698,6 +718,7 @@ class EventPublisher:
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
+            notification_workflow_id: Optional override for payload.workflow_id.
 
         Returns:
             List of topics published to.
@@ -715,6 +736,7 @@ class EventPublisher:
             correlation_id=correlation_id,
             subscriber_ids=subscriber_ids,
             payload_type=payload_type,
+            notification_workflow_id=notification_workflow_id,
         )
 
     @property

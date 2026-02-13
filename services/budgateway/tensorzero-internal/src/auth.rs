@@ -21,6 +21,8 @@ pub struct ApiKeyMetadata {
     pub model_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<i64>,
 }
 
 // Auth metadata from Redis __metadata__ field
@@ -328,6 +330,15 @@ pub async fn require_api_key(
                 request
                     .headers_mut()
                     .insert("x-tensorzero-prompt-version-id", header_value);
+            }
+        }
+
+        // Add prompt version number for analytics (resolved from default version in Redis)
+        if let Some(version) = metadata.version {
+            if let Ok(header_value) = version.to_string().parse() {
+                request
+                    .headers_mut()
+                    .insert("x-tensorzero-prompt-version", header_value);
             }
         }
 

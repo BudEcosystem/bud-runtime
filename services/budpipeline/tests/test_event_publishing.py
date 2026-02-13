@@ -139,6 +139,36 @@ class TestEventTypes:
         assert "75.0%" in payload["payload"]["content"]["message"]
 
     @pytest.mark.asyncio
+    async def test_workflow_progress_with_notification_workflow_id(
+        self, event_publisher, execution_id
+    ):
+        """Test that notification_workflow_id overrides payload.workflow_id in convenience methods."""
+        custom_wf_id = "external-wf-999"
+
+        with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
+            mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
+
+            published_payloads = []
+
+            async def capture_payload(topic, execution_id, event_type, payload):
+                published_payloads.append(payload)
+                return True
+
+            with patch.object(
+                event_publisher, "_publish_single_topic", side_effect=capture_payload
+            ):
+                await event_publisher.publish_workflow_progress(
+                    execution_id=execution_id,
+                    progress_percentage=Decimal("50.00"),
+                    notification_workflow_id=custom_wf_id,
+                )
+
+                await asyncio.sleep(0.1)
+
+        assert len(published_payloads) == 1
+        assert published_payloads[0]["payload"]["workflow_id"] == custom_wf_id
+
+    @pytest.mark.asyncio
     async def test_step_started_event(self, event_publisher, execution_id):
         """Test step started event structure (NotificationPayload format)."""
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
@@ -564,6 +594,47 @@ class TestEventPayloadStructure:
         )
 
         assert payload["subscriber_ids"] == "user-123"
+
+    def test_build_event_payload_notification_workflow_id_override(
+        self, event_publisher, execution_id
+    ):
+        """Test that notification_workflow_id overrides payload.workflow_id."""
+        custom_workflow_id = "external-workflow-abc-123"
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            notification_workflow_id=custom_workflow_id,
+        )
+
+        assert payload["payload"]["workflow_id"] == custom_workflow_id
+        assert payload["payload"]["workflow_id"] != str(execution_id)
+
+    def test_build_event_payload_notification_workflow_id_default(
+        self, event_publisher, execution_id
+    ):
+        """Test that payload.workflow_id defaults to execution_id when notification_workflow_id is None."""
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            notification_workflow_id=None,
+        )
+
+        assert payload["payload"]["workflow_id"] == str(execution_id)
+
+    def test_build_event_payload_notification_workflow_id_empty_string_uses_execution_id(
+        self, event_publisher, execution_id
+    ):
+        """Test that empty string notification_workflow_id falls back to execution_id."""
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            notification_workflow_id="",
+        )
+
+        assert payload["payload"]["workflow_id"] == str(execution_id)
 
     def test_build_event_payload_status_mapping(self, event_publisher, execution_id):
         """Test that event types map to correct content.status."""
