@@ -237,6 +237,7 @@ class GuardrailRuleCreate(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    icon: Optional[str] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -270,6 +271,7 @@ class GuardrailRuleResponse(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    icon: Optional[str] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -295,6 +297,7 @@ class GuardrailProbeCreate(BaseModel):
     provider_type: GuardrailProviderTypeEnum
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    icon: Optional[str] = None
     tags: Optional[list[Tag]] = None
 
 
@@ -316,6 +319,7 @@ class GuardrailProbeResponse(BaseModel):
     name: str
     uri: Optional[str] = None
     description: Optional[str] = None
+    icon: Optional[str] = None
     tags: Optional[list[Tag]] = None
     probe_type: ProbeTypeEnum = ProbeTypeEnum.PROVIDER
     provider_type: GuardrailProviderTypeEnum
@@ -380,6 +384,7 @@ class GuardrailCustomProbeResponse(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
+    icon: str | None = None
     probe_type: ProbeTypeEnum
     scanner_type: ScannerTypeEnum | None = None
     model_id: UUID4 | None = None
@@ -406,6 +411,7 @@ class GuardrailCustomProbeResponse(BaseModel):
                 "id": data.id,
                 "name": data.name,
                 "description": data.description,
+                "icon": data.icon,
                 "probe_type": data.probe_type,
                 "scanner_type": getattr(rule, "scanner_type", None),
                 "model_id": getattr(rule, "model_id", None),
