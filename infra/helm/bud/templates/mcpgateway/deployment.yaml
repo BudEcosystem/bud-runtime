@@ -34,10 +34,43 @@ spec:
       affinity:
         {{- $affinity | nindent 8 }}
       {{- end }}
+      {{- if .Values.microservices.mcpgateway.sso.enabled }}
+      initContainers:
+        - name: keycloak-init
+          image: {{ .Values.microservices.mcpgateway.sso.initImage | default "alpine:3.19" }}
+          command: ["/bin/sh", "-c", "apk add --no-cache curl jq && sh /scripts/keycloak-init.sh"]
+          env:
+            - name: KEYCLOAK_BASE_URL
+              value: {{ .Values.microservices.mcpgateway.sso.keycloakBaseUrl | default (printf "http://%s-keycloak" .Release.Name) | quote }}
+            - name: KC_REALM
+              value: {{ .Values.microservices.mcpgateway.sso.realm | quote }}
+            - name: KC_CLIENT_ID
+              value: {{ .Values.microservices.mcpgateway.sso.clientId | quote }}
+            - name: KEYCLOAK_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-mcpgateway-keycloak-init
+                  key: admin-user
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-mcpgateway-keycloak-init
+                  key: admin-password
+          volumeMounts:
+            - name: keycloak-init-script
+              mountPath: /scripts
+              readOnly: true
+            - name: sso-shared
+              mountPath: /shared
+      {{- end }}
       containers:
         - name: mcpgateway
           image: {{ .Values.microservices.mcpgateway.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
+          {{- if .Values.microservices.mcpgateway.sso.enabled }}
+          command: ["/bin/sh", "-c"]
+          args: [". /shared/sso-env && exec ./run-gunicorn.sh"]
+          {{- end }}
           ports:
             - containerPort: 4444
           env:
@@ -65,10 +98,32 @@ spec:
               value: "redis://default:{{ .Values.valkey.auth.password}}@{{ .Release.Name }}-valkey-primary:6379/9"
             - name: DATABASE_URL
               value: "postgresql://{{ .Values.externalServices.postgresql.databases.mcpgateway.username }}:{{ .Values.externalServices.postgresql.databases.mcpgateway.password }}@{{ $.Release.Name }}-postgresql:5432/{{ .Values.externalServices.postgresql.databases.mcpgateway.name }}"
+          {{- if .Values.microservices.mcpgateway.sso.enabled }}
+            - name: SSO_ENABLED
+              value: "true"
+            - name: SSO_KEYCLOAK_ENABLED
+              value: "true"
+            - name: SSO_KEYCLOAK_BASE_URL
+              value: {{ .Values.microservices.mcpgateway.sso.keycloakBaseUrl | default (printf "http://%s-keycloak" .Release.Name) | quote }}
+            - name: SSO_KEYCLOAK_REALM
+              value: {{ .Values.microservices.mcpgateway.sso.realm | quote }}
+            - name: SSO_KEYCLOAK_CLIENT_ID
+              value: {{ .Values.microservices.mcpgateway.sso.clientId | quote }}
+            - name: EXTERNAL_JWT_VALIDATION_ENABLED
+              value: {{ .Values.microservices.mcpgateway.sso.externalJwtValidation | toString | quote }}
+            - name: SSO_AUTO_CREATE_USERS
+              value: {{ .Values.microservices.mcpgateway.sso.autoCreateUsers | toString | quote }}
+          {{- end }}
           {{ $root := . }}
           {{- range $key, $value := .Values.microservices.mcpgateway.env }}
             - name: {{ $key }}
               value: {{ tpl $value $root | quote }}
+          {{- end }}
+          {{- if .Values.microservices.mcpgateway.sso.enabled }}
+          volumeMounts:
+            - name: sso-shared
+              mountPath: /shared
+              readOnly: true
           {{- end }}
           resources:
             limits:
@@ -77,3 +132,11 @@ spec:
             requests:
               cpu: 1000m
               memory: 2048Mi
+      {{- if .Values.microservices.mcpgateway.sso.enabled }}
+      volumes:
+        - name: keycloak-init-script
+          configMap:
+            name: {{ .Release.Name }}-mcpgateway-keycloak-init-script
+        - name: sso-shared
+          emptyDir: {}
+      {{- end }}
