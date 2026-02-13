@@ -333,8 +333,27 @@ class ConnectorService:
         return await mcp_foundry_service.initiate_oauth(gateway_id)
 
     async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
-        """Handle OAuth callback."""
-        return await mcp_foundry_service.handle_oauth_callback(code, state)
+        """Handle OAuth callback and auto-fetch tools from the MCP server.
+
+        After the token exchange succeeds, we trigger tool discovery so that
+        the tool list is populated immediately rather than staying empty until
+        a manual fetch-tools call.
+        """
+        result = await mcp_foundry_service.handle_oauth_callback(code, state)
+
+        gateway_id = result.get("gateway_id")
+        if gateway_id:
+            try:
+                await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+                logger.info("Auto-fetched tools after OAuth", gateway_id=gateway_id)
+            except Exception as fetch_err:
+                logger.warning(
+                    "Failed to auto-fetch tools after OAuth",
+                    gateway_id=gateway_id,
+                    error=str(fetch_err),
+                )
+
+        return result
 
     async def get_oauth_status(self, gateway_id: str) -> Dict[str, Any]:
         """Get OAuth status for a gateway."""
