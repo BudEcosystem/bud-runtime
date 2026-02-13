@@ -75,6 +75,8 @@ spec:
             value: "{{ .Values.microservices.budnotify.daprid }}"
           - name: BUDMETRICS_APP_ID
             value: "{{ .Values.microservices.budmetrics.daprid }}"
+          - name: NOTIFY_SERVICE_TOPIC
+            value: "{{ .Values.microservices.budnotify.pubsubTopic }}"
           # PostgreSQL configuration (002-pipeline-event-persistence)
           - name: PSQL_HOST
             value: {{ include "bud.externalServices.postgresql.host" . }}

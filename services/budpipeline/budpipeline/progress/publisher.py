@@ -15,7 +15,7 @@ from collections import deque
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from budpipeline.commons.config import settings
 from budpipeline.commons.observability import get_logger, record_event_published
@@ -242,7 +242,7 @@ class EventPublisher:
 
         Produces the format understood by budnotify (Novu) and budadmin's CommonStatus.tsx:
         {
-            "notification_type": "EVENT",
+            "notification_type": "event",
             "name": "bud-notification",
             "subscriber_ids": "user-uuid-or-null",
             "payload": {
@@ -323,7 +323,7 @@ class EventPublisher:
                 content["result"] = result_data
 
         payload: dict[str, Any] = {
-            "notification_type": "EVENT",
+            "notification_type": "event",
             "name": "bud-notification",
             "subscriber_ids": subscriber_ids,
             "payload": {
@@ -350,6 +350,10 @@ class EventPublisher:
     ) -> bool:
         """Publish event to a single topic.
 
+        Follows budmicroframe's DaprService.publish_to_topic() pattern:
+        enriches data with source/source_topic, sets CloudEvent metadata
+        via publish_metadata, and uses application/cloudevents+json content type.
+
         Args:
             topic: Target topic.
             execution_id: Execution UUID.
@@ -363,12 +367,30 @@ class EventPublisher:
             # Import Dapr client here to avoid circular imports
             from dapr.aio.clients import DaprClient
 
+            # Copy payload to avoid mutating the shared dict across topics
+            data = payload.copy()
+
+            # Enrich data matching budmicroframe's DaprService.publish_to_topic() pattern
+            data["source"] = settings.name
+            data["source_topic"] = topic
+            if data.get("type") is None:
+                data["type"] = event_type
+
+            # CloudEvent metadata for Dapr (budmicroframe pattern)
+            event_id = str(uuid4())
+            publish_metadata = {
+                "cloudevent.id": event_id,
+                "cloudevent.source": settings.name,
+                "cloudevent.type": event_type,
+            }
+
             async with DaprClient() as client:
                 await client.publish_event(
                     pubsub_name=self.pubsub_name,
                     topic_name=topic,
-                    data=json.dumps(payload, cls=_DecimalEncoder),
-                    data_content_type="application/json",
+                    data=json.dumps(data, cls=_DecimalEncoder),
+                    data_content_type="application/cloudevents+json",
+                    publish_metadata=publish_metadata,
                 )
 
             record_event_published(event_type)
