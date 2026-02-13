@@ -55,8 +55,7 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
   const needsSeeMore = item.description && item.description.length > 100;
 
   const handleCardClick = () => {
-    // Navigate to agent detail page
-    // router.push(`/home/agentDetails/${item.id}`);
+    router.push(`/agents/${item.project_id}/agentDetails/${item.id}?name=${encodeURIComponent(item.name)}`);
   };
 
   return (

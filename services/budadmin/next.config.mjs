@@ -97,7 +97,7 @@ export default {
         source: '/clusters/:clustersId/deployments/:deploymentId/:scoreType',
         destination:
           '/_commonPages/PromptList',
-          // '/home/clusters/[clustersId]/PromptList',
+        // '/home/clusters/[clustersId]/PromptList',
       },
       {
         source: '/clusters/:clustersId/perfomanceBenchmarks',
@@ -168,6 +168,11 @@ export default {
       {
         source: '/agents',
         destination: '/home/agents',
+      },
+      {
+        source: '/agents/:projectId/agentDetails/:id',
+        // destination: '/home/projectId/deployments/[deploymentId]',
+        destination: '/home/agentDetails/[id]',
       },
 
       // DAG Pipelines
