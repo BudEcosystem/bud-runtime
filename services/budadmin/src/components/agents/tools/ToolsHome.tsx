@@ -338,6 +338,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
 
   const getToolIcon = (tool: typeof connectors[0]) => {
     if (tool.icon) {
+      if (tool.icon.startsWith('http://') || tool.icon.startsWith('https://')) {
+        return <img src={tool.icon} alt={tool.name} className="w-5 h-5 object-contain" />;
+      }
       return tool.icon;
     }
     // Fallback to first letter

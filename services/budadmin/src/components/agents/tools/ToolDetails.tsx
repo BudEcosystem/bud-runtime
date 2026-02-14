@@ -64,6 +64,9 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
 
   const getToolIcon = () => {
     if (toolData?.icon) {
+      if (toolData.icon.startsWith('http://') || toolData.icon.startsWith('https://')) {
+        return <img src={toolData.icon} alt={toolData.name || toolName} className="w-4 h-4 object-contain" />;
+      }
       return toolData.icon;
     }
     const name = toolData?.name || toolName || '';

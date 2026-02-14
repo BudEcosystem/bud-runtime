@@ -966,6 +966,9 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
 
   const getToolIcon = () => {
     if (connector.icon) {
+      if (connector.icon.startsWith('http://') || connector.icon.startsWith('https://')) {
+        return <img src={connector.icon} alt={connector.name} className="w-4 h-4 object-contain" />;
+      }
       return connector.icon;
     }
     return connector.name.charAt(0).toUpperCase();
