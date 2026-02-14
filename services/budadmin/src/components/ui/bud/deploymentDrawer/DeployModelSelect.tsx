@@ -4,7 +4,7 @@ import { Text_12_300_EEEEEE, Text_12_600_EEEEEE } from "../../text";
 import { ModelListCard } from "./ModelListCard";
 import { Tag } from "../dataEntry/TagsInput";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Checkbox } from "antd";
+import { Checkbox, Spin } from "antd";
 
 function DeployModelSelect({
   multiSelect,
@@ -22,7 +22,8 @@ function DeployModelSelect({
   hideSelect,
   emptyComponent = <Text_12_300_EEEEEE className="pl-5">
     To add new models for the provider, click the &quot;+Cloud Model&quot; button
-  </Text_12_300_EEEEEE>
+  </Text_12_300_EEEEEE>,
+  isLoadingMore,
 }: {
   multiSelect?: boolean;
   multiSelectedModels?: Model[];
@@ -38,6 +39,7 @@ function DeployModelSelect({
   children: React.ReactNode;
   hideSelect?: boolean;
   emptyComponent?: React.ReactNode;
+  isLoadingMore?: boolean;
 }) {
   const [selectAllModels, setSelectAllModels] = useState<boolean>(false);
 
@@ -123,6 +125,11 @@ function DeployModelSelect({
                 )}
               </div>
             ))}
+            {isLoadingMore && (
+              <div className="flex justify-center items-center py-4">
+                <Spin size="small" />
+              </div>
+            )}
           </>
         ) : (
           <div className="flex justify-center items-center min-h-[4rem]">
