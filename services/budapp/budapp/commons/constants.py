@@ -608,7 +608,6 @@ class WorkflowTypeEnum(StrEnum):
     GUARDRAIL_DEPLOYMENT = auto()
     PROMPT_CREATION = auto()
     PROMPT_SCHEMA_CREATION = auto()
-    TOOL_CREATION = auto()
     CUSTOM_PROBE_CREATION = auto()
 
 
@@ -698,7 +697,6 @@ class BudServeWorkflowStepEventName(str, Enum):
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
     GUARDRAIL_SIMULATION_EVENTS = "guardrail_simulation_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
-    TOOL_CREATION_EVENTS = "tool_creation_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -3107,7 +3105,6 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
     WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
     WorkflowTypeEnum.MODEL_BENCHMARK: "Successfully cancelled benchmark.",
-    WorkflowTypeEnum.TOOL_CREATION: "Successfully cancelled tool creation.",
 }
 
 

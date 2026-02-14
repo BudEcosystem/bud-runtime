@@ -64,7 +64,6 @@ from .playground_ops import playground_routes
 from .project_ops import project_routes
 from .prompt_ops import prompt_routes
 from .router_ops import router_routes
-from .tool_ops import tool_routes
 from .user_ops import user_routes
 from .workflow_ops import budpipeline_routes, workflow_routes
 
@@ -359,10 +358,6 @@ internal_router.include_router(router_routes.router_router)
 internal_router.include_router(eval_routes.router)
 internal_router.include_router(billing_router)
 internal_router.include_router(guardrail_routes.router)
-# Register workflow and virtual server routes BEFORE tool_router to avoid /{tool_id} matching them
-internal_router.include_router(tool_routes.tool_workflow_router)
-internal_router.include_router(tool_routes.virtual_server_router)
-internal_router.include_router(tool_routes.tool_router)
 
 app.include_router(internal_router)
 

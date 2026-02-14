@@ -5008,26 +5008,6 @@ const editPipeline: DrawerFlowType = {
   ],
 };
 
-const viewTool: DrawerFlowType = {
-  title: "View Tool",
-  description: "View tool details",
-  totalSteps: 1,
-  steps: [
-    {
-      navigation: () => ["Tools", "View Tool"],
-      id: "view-tool-details",
-      step: 1,
-      component: StepComponents["view-tool-details"],
-      progress: [
-        {
-          status: FormProgressStatus.inProgress,
-          title: "View Tool",
-        },
-      ],
-      confirmClose: false,
-    },
-  ],
-};
 
 const pipelineExecutionDetails: DrawerFlowType = {
   title: "Execution Details",
@@ -5050,184 +5030,7 @@ const pipelineExecutionDetails: DrawerFlowType = {
   ],
 };
 
-const viewVirtualServer: DrawerFlowType = {
-  title: "Virtual Server",
-  description: "View virtual server details",
-  totalSteps: 1,
-  steps: [
-    {
-      navigation: () => ["Tools", "Virtual Server"],
-      id: "view-virtual-server-details",
-      step: 1,
-      component: StepComponents["view-virtual-server-details"],
-      progress: [
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Virtual Server",
-        },
-      ],
-      confirmClose: false,
-    },
-  ],
-};
 
-const addTool: DrawerFlowType = {
-  title: "Add Tool",
-  description: "Add a new tool",
-  totalSteps: 5,
-  steps: [
-    {
-      navigation: () => ["Tools", "Add Tool"],
-      id: "select-tool-source",
-      step: 1,
-      component: StepComponents["select-tool-source"],
-      progress: [
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Select Source",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Configure",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Create",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Tools", "Add Tool", "Bud Catalogue"],
-      id: "bud-tools-catalogue",
-      step: 2,
-      component: StepComponents["bud-tools-catalogue"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Source",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Select Tools",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Tools", "Add Tool", "OpenAPI Specification"],
-      id: "openapi-specification",
-      step: 2,
-      component: StepComponents["openapi-specification"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Source",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Configure",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Create",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Tools", "Add Tool", "Creating Tool"],
-      id: "creating-tool-status",
-      step: 3,
-      component: StepComponents["creating-tool-status"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Source",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Configure",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Creating",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
-        },
-      ],
-      confirmClose: false,
-    },
-    {
-      navigation: () => ["Tools", "Add Tool", "Success"],
-      id: "tool-creation-success",
-      step: 4,
-      component: StepComponents["tool-creation-success"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Source",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Configure",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Create",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Success",
-        },
-      ],
-      confirmClose: false,
-    },
-    {
-      navigation: () => ["Tools", "Add Tool", "Virtual Server"],
-      id: "create-virtual-server",
-      step: 5,
-      component: StepComponents["create-virtual-server"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Select Source",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Configure",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Create",
-        },
-        {
-          status: FormProgressStatus.completed,
-          title: "Success",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Virtual Server",
-        },
-      ],
-      confirmClose: false,
-    },
-  ],
-};
 
 const pipelineCreateSchedule: DrawerFlowType = {
   title: "Create Schedule",
@@ -5250,26 +5053,6 @@ const pipelineCreateSchedule: DrawerFlowType = {
   ],
 };
 
-const toolDetailsExpanded: DrawerFlowType = {
-  title: "Tool Details",
-  description: "View tool details and sub-tools",
-  totalSteps: 1,
-  steps: [
-    {
-      navigation: () => ["Tools", "Tool Details"],
-      id: "tool-details-expanded",
-      step: 1,
-      component: StepComponents["tool-details-expanded"],
-      progress: [
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Tool Details",
-        },
-      ],
-      confirmClose: false,
-    },
-  ],
-};
 
 const flows = {
   "new-project": newProject,
@@ -5347,11 +5130,6 @@ const flows = {
   "edit-pipeline": editPipeline,
   "pipeline-execution-details": pipelineExecutionDetails,
   "pipeline-create-schedule": pipelineCreateSchedule,
-  // tools
-  "view-tool": viewTool,
-  "view-virtual-server": viewVirtualServer,
-  "add-tool": addTool,
-  "tool-details-expanded": toolDetailsExpanded,
 };
 
 export const flowMapping: {
