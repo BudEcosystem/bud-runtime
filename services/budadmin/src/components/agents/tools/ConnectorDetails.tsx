@@ -14,6 +14,7 @@ import { AgentSession, useAgentStore } from '@/stores/useAgentStore';
 import { useAddAgent } from '@/stores/useAddAgent';
 import { OAuthState, OAuthSessionData, clearOAuthState, saveOAuthPromptId, getOAuthPromptId, saveOAuthSessionData } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl } from '@/utils/urlUtils';
+import { renderToolIcon } from '@/utils/iconUtils';
 import { saveAgentMetadata } from '@/services/workflowMetadataService';
 import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
@@ -965,13 +966,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
   };
 
   const getToolIcon = () => {
-    if (connector.icon) {
-      if (connector.icon.startsWith('http://') || connector.icon.startsWith('https://')) {
-        return <img src={connector.icon} alt={connector.name} className="w-4 h-4 object-contain" />;
-      }
-      return connector.icon;
-    }
-    return connector.name.charAt(0).toUpperCase();
+    return renderToolIcon(connector.icon, connector.name, "w-4 h-4 object-contain");
   };
 
   const isStepOneValid = () => {
