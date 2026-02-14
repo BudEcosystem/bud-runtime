@@ -102,6 +102,11 @@ class PipelineDefinition(Base):
         nullable=True,
         comment="Optional pipeline description",
     )
+    icon: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Optional icon/emoji for UI representation",
+    )
 
     # DAG definition
     dag_definition: Mapped[dict[str, Any]] = mapped_column(
@@ -281,6 +286,23 @@ class PipelineExecution(Base):
         JSONB,
         nullable=True,
         comment="Error details if failed (error_type, message, stack_trace)",
+    )
+
+    # Notification fields
+    subscriber_ids: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="User ID(s) for Novu delivery (enables dual-publish to budnotify)",
+    )
+    payload_type: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Custom payload.type for budadmin routing (defaults to pipeline_execution)",
+    )
+    notification_workflow_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Override payload.workflow_id in notifications (defaults to execution_id)",
     )
 
     # Audit timestamps

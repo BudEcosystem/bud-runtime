@@ -60,6 +60,11 @@ class AppConfig(BaseAppConfig):
 
     # Pub/Sub
     pubsub_name: str = Field(default="pubsub", alias="PUBSUB_NAME")
+    notify_service_topic: str | None = Field(
+        default=None,
+        alias="NOTIFY_SERVICE_TOPIC",
+        description="Dapr pub/sub topic for budnotify (enables Novu dual-publish)",
+    )
 
     # Service Discovery (Dapr App IDs)
     budapp_app_id: str = Field(default="budapp", alias="BUDAPP_APP_ID")

@@ -14,8 +14,10 @@ microservices:
     buddoc:
         enabled: false
         image: dittops/buddoc:nightly
+    budadmin:
+        image: budstudio/budadmin:nightly
     budapp:
-        image: dittops/budapp:nightly
+        image: lostnull/budfoundry-app:development
     budgateway:
         image: budstudio/budgateway:nightly
     budsim:
@@ -23,7 +25,7 @@ microservices:
         env:
             SKIP_MASTER_NODE_FOR_CPU: "false"
     budcluster:
-        image: dittops/budcluster:nightly
+        image: budstudio/budcluster:nightly
         env:
             # Update OTel endpoint for ditto environment
             OTEL_COLLECTOR_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
@@ -36,7 +38,7 @@ microservices:
     budmetrics:
         image: dittops/budmetrics:nightly
     budprompt:
-        enabled:false
+        enabled: false
     budplayground:
         enabled: false
     budcustomer:

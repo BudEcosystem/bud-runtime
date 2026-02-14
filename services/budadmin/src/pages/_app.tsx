@@ -184,7 +184,8 @@ function App({ Component, pageProps }: { Component: any; pageProps: any }) {
       "/reset-password",
       "/auth/reset-password",
       "/register",
-      "/auth/register"
+      "/auth/register",
+      "/oauth/callback"
     ];
 
     if (publicPaths.some(path => router.pathname === path)) {
@@ -230,7 +231,8 @@ function App({ Component, pageProps }: { Component: any; pageProps: any }) {
       "/reset-password",
       "/auth/reset-password",
       "/register",
-      "/auth/register"
+      "/auth/register",
+      "/oauth/callback"
     ];
 
     const isPublicPath = publicPaths.some(path => router.pathname === path);

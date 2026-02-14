@@ -36,6 +36,9 @@ const ICON_MAP: Record<string, string> = {
   'bell': 'ph:bell-bold',
   'link': 'ph:link-bold',
 
+  // Simulation
+  'beaker': 'ph:flask-bold',
+
   // Control Flow
   'note': 'ph:note-bold',
   'timer': 'ph:timer-bold',

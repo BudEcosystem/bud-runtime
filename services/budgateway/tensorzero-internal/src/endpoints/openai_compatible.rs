@@ -7592,7 +7592,12 @@ pub async fn response_create_handler(
 
     // Capture prompt info for analytics headers (before params is moved into async block)
     let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());
-    let prompt_version = params.prompt.as_ref().and_then(|p| p.version.clone());
+    let prompt_version = params.prompt.as_ref().and_then(|p| p.version.clone())
+        .or_else(|| {
+            headers.get("x-tensorzero-prompt-version")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        });
     // Capture project_id from incoming headers for analytics
     let project_id = headers
         .get("x-tensorzero-project-id")

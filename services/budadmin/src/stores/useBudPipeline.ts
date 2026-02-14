@@ -72,6 +72,7 @@ export type BudPipelineItem = {
   updated_at?: string;
   step_count: number;
   dag: DAGDefinition;
+  icon?: string;
   warnings?: string[];
   execution_count?: number;
   last_execution_at?: string;
@@ -645,8 +646,8 @@ type BudPipelineStore = {
   getWorkflow: (id: string) => Promise<void>;
   getExecutions: (workflowId?: string, page?: number, pageSize?: number) => Promise<void>;
   getExecution: (executionId: string) => Promise<void>;
-  createWorkflow: (dag: DAGDefinition) => Promise<BudPipelineItem | null>;
-  updateWorkflow: (id: string, dag: DAGDefinition) => Promise<BudPipelineItem | null>;
+  createWorkflow: (dag: DAGDefinition, icon?: string) => Promise<BudPipelineItem | null>;
+  updateWorkflow: (id: string, dag: DAGDefinition, icon?: string) => Promise<BudPipelineItem | null>;
   executeWorkflow: (workflowId: string, params: Record<string, any>) => Promise<PipelineExecution | null>;
   deleteWorkflow: (id: string) => Promise<boolean>;
   validatePipeline: (dag: DAGDefinition) => Promise<ValidationResult>;
@@ -852,7 +853,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
   },
 
   // Create workflow
-  createWorkflow: async (dag: DAGDefinition) => {
+  createWorkflow: async (dag: DAGDefinition, icon?: string) => {
     set({ isLoading: true, error: null });
 
     if (USE_MOCK_DATA) {
@@ -865,6 +866,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
         created_at: new Date().toISOString(),
         step_count: dag.steps.length,
         dag,
+        icon,
         execution_count: 0,
       };
       set((state) => ({
@@ -878,6 +880,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       const response = await AppRequest.Post(BUDPIPELINE_API, {
         dag,
         name: dag.name,
+        icon,
       });
       const newWorkflow = response.data;
       set((state) => ({
@@ -896,7 +899,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
   },
 
   // Update workflow
-  updateWorkflow: async (id: string, dag: DAGDefinition) => {
+  updateWorkflow: async (id: string, dag: DAGDefinition, icon?: string) => {
     set({ isLoading: true, error: null });
 
     if (USE_MOCK_DATA) {
@@ -910,6 +913,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
         updated_at: new Date().toISOString(),
         step_count: dag.steps.length,
         dag,
+        icon,
         execution_count: get().workflows.find((w) => w.id === id)?.execution_count || 0,
       };
       set((state) => ({
@@ -924,6 +928,7 @@ export const useBudPipeline = create<BudPipelineStore>((set, get) => ({
       const response = await AppRequest.Put(`${BUDPIPELINE_API}/${id}`, {
         dag,
         name: dag.name,
+        icon,
       });
       const updatedWorkflow = response.data;
       set((state) => ({

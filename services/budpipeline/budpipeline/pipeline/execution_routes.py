@@ -349,6 +349,9 @@ async def create_execution(
             params=execution_params,
             callback_topics=request.callback_topics,
             initiator=request.initiator or "api",
+            subscriber_ids=request.subscriber_ids,
+            payload_type=request.payload_type,
+            notification_workflow_id=request.notification_workflow_id,
         )
 
         return ExecutionResponse(
@@ -434,6 +437,9 @@ async def run_ephemeral_execution(
             callback_topics=request.callback_topics,
             initiator=request.initiator,
             pipeline_id=None,  # None marks this as an ephemeral execution
+            subscriber_ids=request.subscriber_ids,
+            payload_type=request.payload_type,
+            notification_workflow_id=request.notification_workflow_id,
         )
 
         return ExecutionResponse(

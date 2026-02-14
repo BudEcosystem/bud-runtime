@@ -205,6 +205,7 @@ microservices:
     image: budstudio/budgateway:0.6.0
     env:
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4317"
+      OTEL_EXPORTER_OTLP_HTTP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration for budgateway
@@ -238,6 +239,14 @@ microservices:
     enabled: true
     image: budstudio/mcpgateway:latest
     env: {}
+    sso:
+      enabled: true
+      initImage: "alpine:3.19"
+      realm: "bud-keycloak"
+      clientId: "mcp-gateway"
+      externalJwtValidation: "true"
+      autoCreateUsers: "true"
+      # keycloakBaseUrl: override if external Keycloak (defaults to internal http://{release}-keycloak/)
     nodeSelector: {}
     affinity: {}
     # Autoscaling configuration

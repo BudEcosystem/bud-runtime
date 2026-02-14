@@ -48,7 +48,7 @@ export default function NewPipeline() {
             outputs: {},
           };
 
-          const result = await createWorkflow(dag);
+          const result = await createWorkflow(dag, values.icon);
           if (result) {
             successToast("Pipeline draft created");
             closeDrawer();

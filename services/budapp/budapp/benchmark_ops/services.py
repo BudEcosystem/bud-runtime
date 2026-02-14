@@ -301,14 +301,22 @@ class BenchmarkService(SessionMixin):
                         required_data[key] = db_workflow_step.data[key]
 
             # Check if all required keys are present
-            required_keys = keys_of_interest
+            required_keys = [
+                "name",
+                "tags",
+                "description",
+                "eval_with",
+                "model_id",
+                "cluster_id",
+                "nodes",
+                "concurrent_requests",
+            ]
             if required_data.get("eval_with", "") == "dataset":
-                required_keys.remove("max_input_tokens")
-                required_keys.remove("max_output_tokens")
+                required_keys.append("datasets")
             elif required_data.get("eval_with", "") == "configuration":
-                required_keys.remove("datasets")
-            if required_data.get("provider_type", "") in ["hugging_face", "url", "disk"]:
-                required_keys.remove("credential_id")
+                required_keys.extend(["max_input_tokens", "max_output_tokens"])
+            if required_data.get("provider_type", "") not in ["hugging_face", "url", "disk", ""]:
+                required_keys.append("credential_id")
 
             missing_keys = [key for key in required_keys if key not in required_data]
             if missing_keys:

@@ -195,12 +195,18 @@ class WorkflowService(SessionMixin):
             # Deployment config fields
             hardware_mode = required_data.get("hardware_mode")
             deploy_config = required_data.get("deploy_config")
-            # Onboarding events: {execution_id, status, results}
-            onboarding_events = required_data.get("onboarding_events")
-            # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
-            simulation_events = required_data.get("simulation_events")
-            # Deployment events: {execution_id, results: [{model_id, cluster_id, status, endpoint_id}], total, successful, failed, running}
-            deployment_events = required_data.get("deployment_events")
+            # CommonStatus-compatible events
+            guardrail_onboarding_events = required_data.get(
+                BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value
+            )
+            guardrail_simulation_events = required_data.get(
+                BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS.value
+            )
+            guardrail_deployment_events = required_data.get(
+                BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value
+            )
+            simulation_step_mapping = required_data.get("simulation_step_mapping")
+            simulation_models = required_data.get("simulation_models")
             # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
             pending_profile_data = required_data.get("pending_profile_data")
             # Deployment results
@@ -360,7 +366,7 @@ class WorkflowService(SessionMixin):
                 await GuardrailsDeploymentDataManager(self.session).retrieve_by_fields(
                     GuardrailProfile, {"id": UUID(required_data["guardrail_profile_id"])}, missing_ok=True
                 )
-                if "guardrail_profile_id" in required_data
+                if required_data.get("guardrail_profile_id")
                 else None
             )
 
@@ -466,12 +472,12 @@ class WorkflowService(SessionMixin):
                 per_model_deployment_configs=per_model_deployment_configs if per_model_deployment_configs else None,
                 models_to_deploy=models_to_deploy if models_to_deploy else None,
                 models_to_reuse=models_to_reuse if models_to_reuse else None,
-                # Onboarding events: {execution_id, status, results}
-                onboarding_events=onboarding_events if onboarding_events else None,
-                # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
-                simulation_events=simulation_events if simulation_events else None,
-                # Deployment events: {execution_id, results: [{model_id, cluster_id, status, endpoint_id}], total, successful, failed, running}
-                deployment_events=deployment_events if deployment_events else None,
+                # CommonStatus-compatible events
+                guardrail_onboarding_events=guardrail_onboarding_events if guardrail_onboarding_events else None,
+                guardrail_simulation_events=guardrail_simulation_events if guardrail_simulation_events else None,
+                guardrail_deployment_events=guardrail_deployment_events if guardrail_deployment_events else None,
+                simulation_step_mapping=simulation_step_mapping if simulation_step_mapping else None,
+                simulation_models=simulation_models if simulation_models else None,
                 # Pending profile data: stored when deployment is in progress
                 pending_profile_data=pending_profile_data if pending_profile_data else None,
                 # Deployment results
@@ -678,14 +684,15 @@ class WorkflowService(SessionMixin):
                 "recommended_clusters",
                 "models_to_deploy",
                 "models_to_reuse",
-                # Onboarding events: {execution_id, status, results}
-                "onboarding_events",
-                # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}
-                "simulation_events",
-                # Deployment events: {execution_id, results: [{model_id, model_uri, cluster_id, status, endpoint_id}], total, successful, failed, running}
-                "deployment_events",
                 # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
                 "pending_profile_data",
+                # Simulation pipeline tracking
+                BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS.value,
+                "simulation_step_mapping",
+                "simulation_models",
+                # CommonStatus-compatible events for notification-driven progress
+                BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value,
+                BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value,
             ],
             "prompt_creation": [
                 "model_id",

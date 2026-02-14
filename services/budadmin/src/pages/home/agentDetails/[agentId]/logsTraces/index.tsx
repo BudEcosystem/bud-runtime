@@ -123,3 +123,6 @@ const LogsTracesTab: React.FC<LogsTracesTabProps> = ({ agentData }) => {
 };
 
 export default LogsTracesTab;
+
+// Skip static generation — this page requires client-side rendering
+export const getServerSideProps = () => ({ props: {} });

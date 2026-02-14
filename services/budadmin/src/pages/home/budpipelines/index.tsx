@@ -61,7 +61,7 @@ const WorkflowCard = ({
         {/* Header with icon */}
         <div className="pr-0 flex justify-between items-start gap-3">
           <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center text-xl">
-            🔄
+            {workflow.icon || "🔄"}
           </div>
           <ConfigProvider
             theme={{

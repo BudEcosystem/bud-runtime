@@ -30,43 +30,16 @@ from budpipeline.actions.base import (
     ValidationRules,
     register_action,
 )
+from budpipeline.actions.shared.model_resolver import (
+    derive_model_endpoints,
+    get_model_info,
+    resolve_initiator_user_id,
+    resolve_pretrained_model_uri,
+)
 from budpipeline.commons.config import settings
 from budpipeline.commons.constants import CALLBACK_TOPIC
 
 logger = structlog.get_logger(__name__)
-
-
-def _resolve_initiator_user_id(context: ActionContext) -> str | None:
-    """Resolve the initiator user ID for downstream service calls."""
-    return (
-        context.params.get("user_id")
-        or context.workflow_params.get("user_id")
-        or settings.system_user_id
-    )
-
-
-async def _get_model_info(
-    context: ActionContext, model_id: str, user_id: str | None
-) -> dict[str, Any]:
-    """Get model info from budapp to determine provider type and local path."""
-    try:
-        response = await context.invoke_service(
-            app_id=settings.budapp_app_id,
-            method_path=f"models/{model_id}",
-            http_method="GET",
-            params={"user_id": user_id} if user_id else None,
-            timeout_seconds=30,
-        )
-        # Response structure: {"object": "model.get", "model": {...}, ...}
-        # Extract the nested model data
-        return response.get("model", response.get("data", response))
-    except Exception as e:
-        logger.warning(
-            "deployment_create_get_model_failed",
-            model_id=model_id,
-            error=str(e),
-        )
-        return {}
 
 
 async def _run_simulation(
@@ -90,10 +63,7 @@ async def _run_simulation(
         return None, None, None
 
     # Get the local model path (needed for simulation)
-    # Try multiple fields in order of preference
-    local_path = (
-        model_info.get("local_path") or model_info.get("uri") or model_info.get("huggingface_url")
-    )
+    local_path = resolve_pretrained_model_uri(model_info)
 
     # Log available model info fields for debugging
     logger.info(
@@ -161,11 +131,17 @@ async def _run_simulation(
     if cluster_id:
         simulation_request["cluster_id"] = cluster_id
 
+    # Add model_endpoints for BudConnect engine compatibility lookup
+    model_endpoints = derive_model_endpoints(model_info)
+    if model_endpoints:
+        simulation_request["model_endpoints"] = model_endpoints
+
     logger.info(
         "deployment_create_running_simulation",
         local_path=local_path,
         cluster_id=cluster_id,
         hardware_mode=hardware_mode,
+        model_endpoints=model_endpoints,
     )
 
     try:
@@ -321,7 +297,7 @@ class DeploymentCreateExecutor(BaseActionExecutor):
         )
 
         try:
-            initiator_user_id = _resolve_initiator_user_id(context)
+            initiator_user_id = resolve_initiator_user_id(context)
 
             # Build deploy_config
             deploy_config: dict = {
@@ -347,7 +323,7 @@ class DeploymentCreateExecutor(BaseActionExecutor):
                 )
 
                 # Get model info first (need local_path for simulation)
-                model_info = await _get_model_info(context, model_id, initiator_user_id)
+                model_info = await get_model_info(context, model_id, initiator_user_id)
 
                 if model_info:
                     # Run simulation - returns (recommendation, simulator_id, error_message)

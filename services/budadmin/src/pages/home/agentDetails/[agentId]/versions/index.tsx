@@ -10,7 +10,7 @@ import {
   Text_12_400_EEEEEE,
 } from "@/components/ui/text";
 import { formatDate } from "src/utils/formatDate";
-import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
+import { BorderlessButton, PrimaryButton, SecondaryButton } from "@/components/ui/bud/form/Buttons";
 import { usePrompts, IPromptVersion } from "src/hooks/usePrompts";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { AppRequest } from "src/pages/api/requests";
@@ -166,7 +166,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
             const endpoint = endpointResponse.data.endpoints[0];
             selectedDeployment = {
               id: endpoint.id,
-              name: endpoint.model.name,
+              name: endpoint.name,
               model: {
                 icon: endpoint.model.icon || endpoint.model.uri,
                 provider: endpoint.model.provider
@@ -251,7 +251,6 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
 
       // Load prompt data into agent store for edit version mode
       loadPromptForEditVersion(promptId, versionMetadata, sessionData);
-
       // Open the agent drawer
       openAgentDrawer();
     } catch (error) {
@@ -361,7 +360,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
         {!versionData.is_default_version && (
-          <PrimaryButton
+          <BorderlessButton
             className="px-[.1rem]"
             onClick={() => handleSetDefaultVersion(versionData)}
             disabled={settingDefaultVersionId === versionData.id}
@@ -369,9 +368,9 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
             <div className="flex justify-center items-center gap-1">
               Set as Default
             </div>
-          </PrimaryButton>
+          </BorderlessButton>
         )}
-        <PrimaryButton
+        <BorderlessButton
           className="px-[.1rem]"
           onClick={() => handleEditVersion(versionData)}
         >
@@ -381,7 +380,7 @@ const VersionsTab: React.FC<VersionsTabProps> = ({ agentData }) => {
             </svg>
             Edit
           </div>
-        </PrimaryButton>
+        </BorderlessButton>
         {/* {showDeploy && (
           <PrimaryButton
             className="px-[.1rem]"
