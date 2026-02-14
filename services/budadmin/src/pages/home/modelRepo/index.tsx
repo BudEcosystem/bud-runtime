@@ -400,14 +400,14 @@ export default function ModelRepo() {
     }
   }, [filterReset]);
 
-  // Initial load
+  // Initial load - wait for permissions to be ready before fetching data
   useEffect(() => {
-    if (isMounted && hasPermission(PermissionEnum.ModelView)) {
+    if (isMounted && !loadingUser && hasPermission(PermissionEnum.ModelView)) {
       getTasks();
       getAuthors();
       load(filter, 1, false);
     }
-  }, [isMounted]);
+  }, [isMounted, loadingUser]);
 
   // Search with debounce
   useEffect(() => {
