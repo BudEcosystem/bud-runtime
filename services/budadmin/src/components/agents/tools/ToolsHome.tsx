@@ -9,6 +9,7 @@ import { ConnectorDetails } from './ConnectorDetails';
 import { GlobalConnectorsSection } from './GlobalConnectorsSection';
 import { getOAuthState, isOAuthCallback, clearOAuthState, getOAuthPromptId } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl, getConnectorFromUrlByPosition } from '@/utils/urlUtils';
+import { renderToolIcon } from '@/utils/iconUtils';
 
 const EMPTY_CONNECTOR_LIST: Connector[] = [];
 const EMPTY_CONNECTED_TOOL_LIST: Connector[] = [];
@@ -337,11 +338,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
   };
 
   const getToolIcon = (tool: typeof connectors[0]) => {
-    if (tool.icon) {
-      return tool.icon;
-    }
-    // Fallback to first letter
-    return tool.name.charAt(0).toUpperCase();
+    return renderToolIcon(tool.icon, tool.name);
   };
 
   const handleConnectorClick = (connector: Connector, isConnected: boolean = false) => {
