@@ -46,6 +46,7 @@ from .cluster_ops.workflows import ClusterRecommendedSchedulerWorkflows
 from .commons import logging
 from .commons.config import app_settings, secrets_settings
 from .commons.exceptions import ClientException
+from .connector_ops import connector_routes
 from .core import common_routes, meta_routes, notify_routes
 from .credential_ops import credential_routes
 from .dataset_ops import dataset_routes
@@ -337,6 +338,7 @@ internal_router.include_router(oauth_internal_proxy.internal_oauth_router)
 internal_router.include_router(benchmark_routes.benchmark_router)
 internal_router.include_router(cluster_routes.cluster_router)
 internal_router.include_router(cluster_settings_router)
+internal_router.include_router(connector_routes.connector_router)
 internal_router.include_router(common_routes.common_router)
 internal_router.include_router(credential_routes.credential_router)
 internal_router.include_router(credential_routes.proprietary_credential_router)

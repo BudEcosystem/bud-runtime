@@ -31,9 +31,10 @@ from budapp.commons.constants import (
     ProxyProviderEnum,
     ScannerTypeEnum,
 )
+from budapp.commons.helpers import validate_icon
 from budapp.commons.schemas import PaginatedSuccessResponse, SuccessResponse, Tag
 from budapp.endpoint_ops.schemas import ProviderConfig, ProxyModelPricing
-from budapp.model_ops.schemas import Provider
+from budapp.model_ops.schemas import BudAIScalerSpecification, DeploymentTemplateCreate, Provider
 
 
 class ModelDeploymentStatus(str, Enum):
@@ -237,6 +238,7 @@ class GuardrailRuleCreate(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    icon: Optional[str] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -247,6 +249,14 @@ class GuardrailRuleCreate(BaseModel):
     is_gated: Optional[bool] = False
     model_config_json: Optional[dict] = None
     model_id: Optional[UUID4] = None
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
 
 
 class GuardrailRuleUpdate(BaseModel):
@@ -270,6 +280,7 @@ class GuardrailRuleResponse(BaseModel):
     probe_id: UUID4
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    icon: Optional[str] = None
     modality_types: Optional[list[str]] = None
     guard_types: Optional[list[str]] = None
     examples: Optional[list[str]] = None
@@ -295,7 +306,16 @@ class GuardrailProbeCreate(BaseModel):
     provider_type: GuardrailProviderTypeEnum
     status: GuardrailStatusEnum
     description: Optional[str] = None
+    icon: Optional[str] = None
     tags: Optional[list[Tag]] = None
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def icon_validate(cls, value: str | None) -> str | None:
+        """Validate the icon."""
+        if value is not None and not validate_icon(value):
+            raise ValueError("invalid icon")
+        return value
 
 
 class GuardrailProbeUpdate(BaseModel):
@@ -316,6 +336,7 @@ class GuardrailProbeResponse(BaseModel):
     name: str
     uri: Optional[str] = None
     description: Optional[str] = None
+    icon: Optional[str] = None
     tags: Optional[list[Tag]] = None
     probe_type: ProbeTypeEnum = ProbeTypeEnum.PROVIDER
     provider_type: GuardrailProviderTypeEnum
@@ -380,6 +401,7 @@ class GuardrailCustomProbeResponse(BaseModel):
     id: UUID4
     name: str
     description: str | None = None
+    icon: str | None = None
     probe_type: ProbeTypeEnum
     scanner_type: ScannerTypeEnum | None = None
     model_id: UUID4 | None = None
@@ -406,6 +428,7 @@ class GuardrailCustomProbeResponse(BaseModel):
                 "id": data.id,
                 "name": data.name,
                 "description": data.description,
+                "icon": data.icon,
                 "probe_type": data.probe_type,
                 "scanner_type": getattr(rule, "scanner_type", None),
                 "model_id": getattr(rule, "model_id", None),
@@ -681,9 +704,8 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
     # Model deployment fields
     cluster_id: UUID4 | None = None
     hardware_mode: Literal["dedicated", "shared"] | None = None
-    deploy_config: dict | None = None  # Default config applied to all models
-    per_model_deployment_configs: list[dict] | None = None  # Per-model configs: [{model_id/model_uri, deploy_config}]
-    callback_topics: list[str] | None = None
+    deploy_config: DeploymentTemplateCreate | None = None
+    budaiscaler_specification: BudAIScalerSpecification | None = None
 
     @model_validator(mode="after")
     def validate_fields(self) -> "GuardrailDeploymentWorkflowRequest":
@@ -694,24 +716,13 @@ class GuardrailDeploymentWorkflowRequest(BaseModel):
         if self.workflow_id is not None and self.workflow_total_steps is not None:
             raise ValueError("workflow_total_steps and workflow_id cannot be provided together")
 
-        # Check if at least one of the required fields is provided
-        required_fields = [
-            "provider_type",
-            "provider_id",
-            "name",
-            "project_id",
-            "endpoint_ids",
-            "is_standalone",
-            "credential_id",
-            "probe_selections",
-            "guard_types",
-            "severity_threshold",
-        ]
-        if not any(getattr(self, field) for field in required_fields):
-            input_data = self.model_dump(exclude_unset=True)
-            if "guardrail_profile_id" in input_data:
-                return self
-            raise ValueError(f"At least one of {', '.join(required_fields)} is required when workflow_id is provided")
+        # When continuing a workflow, ensure at least one step-specific field was sent.
+        # Uses exclude_unset to detect actually-sent fields (handles falsy values like False/0).
+        meta_fields = {"workflow_id", "step_number", "workflow_total_steps"}
+        input_data = self.model_dump(exclude_unset=True)
+        step_fields = set(input_data.keys()) - meta_fields
+        if self.workflow_id is not None and not step_fields:
+            raise ValueError("At least one step-specific field is required when workflow_id is provided")
 
         if self.endpoint_ids and self.is_standalone:
             raise ValueError("endpoint_ids and is_standalone can't be used together, choose either one.")
@@ -737,8 +748,8 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     severity_threshold: float | None = None
     # Model deployment fields
     hardware_mode: Literal["dedicated", "shared"] | None = None
-    deploy_config: dict | None = None  # Default config for all models
-    per_model_deployment_configs: list[dict] | None = None  # Per-model configs
+    deploy_config: dict | None = None  # Serialized DeploymentTemplateCreate
+    budaiscaler_specification: dict | None = None  # Serialized BudAIScalerSpecification
     cluster_id: UUID4 | None = None  # Global cluster_id for deployment
     # Model status fields (populated when derive_model_statuses=True)
     model_statuses: list[dict] | None = None
@@ -750,7 +761,8 @@ class GuardrailDeploymentWorkflowSteps(BaseModel):
     credential_required: bool | None = None
     # Cluster selection fields
     selected_cluster_id: UUID4 | None = None
-    cluster_recommendations: list[dict] | None = None
+    # Common cluster recommendations across all models (RecommendedCluster dicts)
+    recommended_clusters: list[dict] | None = None
     # Onboarding events: {execution_id, status, results}
     onboarding_events: dict | None = None
     # Simulation events: {results: [{model_id, model_uri, workflow_id, status}], total_models, successful, failed}

@@ -18,6 +18,7 @@
 
 import re
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
@@ -57,6 +58,7 @@ class PromptListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID4
+    project_id: UUID4
     name: str
     description: str | None
     tags: list[dict] | None
@@ -419,23 +421,9 @@ class CreatePromptWorkflowSteps(BaseModel):
 class EditPromptRequest(BaseModel):
     """Edit prompt request schema."""
 
-    name: str | None = Field(
-        None,
-        min_length=1,
-        max_length=255,
-        description="Name of the prompt, must be non-empty and at most 255 characters.",
-    )
     description: str | None = Field(None, description="Description of the prompt.")
     tags: list[Tag] | None = Field(None, description="Tags associated with the prompt.")
     default_version_id: UUID4 | None = Field(None, description="Default version ID for the prompt.")
-
-    @field_validator("name", mode="before")
-    @classmethod
-    def validate_name(cls, value: str | None) -> str | None:
-        """Ensure the name is not empty or only whitespace."""
-        if value is not None and not value.strip():
-            raise ValueError("Prompt name cannot be empty or only whitespace.")
-        return value
 
 
 class PromptVersionResponse(BaseModel):
@@ -1018,3 +1006,95 @@ class TraceDetailResponse(SuccessResponse):
     trace_id: str
     spans: List[TraceItem] = []
     total_spans: int = 0
+
+
+# ============================================
+# Telemetry Query Schemas
+# ============================================
+
+
+class FilterOperator(str, Enum):
+    """Supported filter operators for telemetry queries."""
+
+    eq = "eq"
+    neq = "neq"
+    gt = "gt"
+    gte = "gte"
+    lt = "lt"
+    lte = "lte"
+    in_ = "in_"
+    not_in = "not_in"
+    like = "like"
+    is_null = "is_null"
+    is_not_null = "is_not_null"
+
+
+class FilterCondition(BaseModel):
+    """A single filter condition for telemetry queries."""
+
+    field: str = Field(..., min_length=1, max_length=200)
+    op: FilterOperator
+    value: Any = None
+
+
+class OrderBySpec(BaseModel):
+    """Sort specification for telemetry queries."""
+
+    field: str
+    direction: Literal["asc", "desc"] = "desc"
+
+
+class TelemetrySpanItem(BaseModel):
+    """Schema for a telemetry span item."""
+
+    timestamp: str
+    trace_id: str
+    span_id: str
+    parent_span_id: str = ""
+    trace_state: str = ""
+    span_name: str
+    span_kind: str = ""
+    service_name: str = ""
+    scope_name: str = ""
+    scope_version: str = ""
+    duration: int = 0
+    status_code: str = ""
+    status_message: str = ""
+    child_count: int = 0
+    children: List["TelemetrySpanItem"] = Field(default_factory=list)
+    attributes: Dict[str, str] = Field(default_factory=dict)
+    resource_attributes: Optional[Dict[str, str]] = None
+    events: Optional[List[Dict[str, Any]]] = None
+    links: Optional[List[Dict[str, Any]]] = None
+
+
+class TelemetryQueryRequest(BaseModel):
+    """Request schema for querying prompt telemetry data.
+
+    The project_id is excluded — it is injected server-side from API key context.
+    """
+
+    prompt_id: str = Field(..., min_length=1)
+    from_date: datetime
+    version: Optional[str] = None
+    to_date: Optional[datetime] = None
+    trace_id: Optional[str] = None
+    span_names: Optional[List[str]] = Field(None, max_length=20)
+    depth: int = Field(0, ge=-1, le=10)
+    select_attributes: Optional[List[str]] = Field(None, max_length=50)
+    include_all_attributes: bool = False
+    include_resource_attributes: bool = False
+    include_events: bool = False
+    include_links: bool = False
+    span_filters: Optional[List[FilterCondition]] = Field(None, max_length=20)
+    resource_filters: Optional[List[FilterCondition]] = Field(None, max_length=20)
+    order_by: Optional[List[OrderBySpec]] = None
+    page: int = Field(1, ge=1)
+    limit: int = Field(10, ge=0)
+
+
+class TelemetryQueryResponse(PaginatedSuccessResponse):
+    """Response schema for telemetry query results."""
+
+    object: str = "telemetry_query"
+    data: List[TelemetrySpanItem] = Field(default_factory=list)

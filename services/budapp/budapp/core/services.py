@@ -415,6 +415,210 @@ class NotificationService(SessionMixin):
         if payload.event == "results":
             await PromptWorkflowService(self.session).create_prompt_schema_from_notification_event(payload)
 
+    async def update_guardrail_onboarding_events(self, payload: NotificationPayload) -> None:
+        """Update the guardrail model onboarding events for a workflow step."""
+        event_name = BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS.value
+        try:
+            await self._update_workflow_step_events(event_name, payload)
+            await self._update_workflow_progress(event_name, payload)
+        except Exception:
+            logger.error("Failed to update guardrail onboarding workflow step events")
+
+        if payload.content.status == "FAILED":
+            await self._update_guardrail_workflow_status(payload, "failed", "Model onboarding failed")
+
+    async def update_guardrail_deployment_events(self, payload: NotificationPayload) -> None:
+        """Update the guardrail deployment events for a workflow step."""
+        event_name = BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value
+        try:
+            await self._update_workflow_step_events(event_name, payload)
+            await self._update_workflow_progress(event_name, payload)
+        except Exception:
+            logger.error("Failed to update guardrail deployment workflow step events")
+
+        if payload.event == "results":
+            await self._handle_guardrail_deployment_results(payload)
+
+        if payload.content.status == "FAILED":
+            await self._update_guardrail_workflow_status(payload, "failed", "Model deployment failed")
+
+    async def update_guardrail_simulation_events(self, payload: NotificationPayload) -> None:
+        """Update the guardrail simulation events for a workflow step."""
+        event_name = BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS.value
+        try:
+            await self._update_workflow_step_events(event_name, payload)
+            await self._update_workflow_progress(event_name, payload)
+        except Exception:
+            logger.error("Failed to update guardrail simulation workflow step events")
+
+        if payload.event == "results":
+            await self._handle_guardrail_simulation_results(payload)
+
+        if payload.content.status == "FAILED":
+            await self._update_guardrail_workflow_status(payload, "failed", "Simulation failed")
+
+    async def _handle_guardrail_simulation_results(self, payload: NotificationPayload) -> None:
+        """Handle guardrail simulation completion by computing recommended_clusters.
+
+        Extracts per-model simulation results directly from the payload's
+        content.result.outputs (keyed by step_id), maps them back to model_ids
+        via simulation_step_mapping, then computes common cluster recommendations.
+        """
+        try:
+            from budapp.guardrails.services import GuardrailDeploymentWorkflowService
+
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": payload.workflow_id}
+            )
+            if not db_workflow:
+                logger.warning(f"No workflow found for guardrail simulation results: {payload.workflow_id}")
+                return
+
+            # Get all workflow steps to extract simulation metadata
+            db_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": payload.workflow_id}
+            )
+
+            step_mapping = {}
+            simulation_models = {}
+            deploy_config = None
+            target_step = None
+
+            for step in db_steps:
+                step_data = step.data or {}
+                if step_data.get("simulation_step_mapping"):
+                    step_mapping = step_data["simulation_step_mapping"]
+                if step_data.get("simulation_models"):
+                    simulation_models = step_data["simulation_models"]
+                if step_data.get("deploy_config") and not deploy_config:
+                    deploy_config = step_data["deploy_config"]
+                sim_events = step_data.get(BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS.value)
+                if sim_events:
+                    target_step = step
+
+            if not step_mapping:
+                logger.warning(f"Missing step_mapping for simulation results: {payload.workflow_id}")
+                return
+
+            # Extract results directly from the payload (outputs keyed by step_id)
+            result_data = payload.content.result if payload.content.result else {}
+            outputs = result_data.get("outputs", {})
+
+            if not outputs:
+                logger.warning(f"No outputs in simulation results payload for workflow {payload.workflow_id}")
+                return
+
+            # Build reverse mapping: step_id -> model_id
+            reverse_mapping = {step_id: model_id for model_id, step_id in step_mapping.items()}
+
+            # Extract per-model recommendations from payload outputs
+            sim_results = []
+            for step_id, step_output in outputs.items():
+                model_id = reverse_mapping.get(step_id)
+                if not model_id:
+                    continue
+
+                model_info = simulation_models.get(model_id, {})
+                result_entry = {
+                    "model_id": model_id,
+                    "model_uri": model_info.get("model_uri", ""),
+                    "status": "success" if step_output.get("success") else "failed",
+                }
+
+                recommendations = step_output.get("recommendations", [])
+                if recommendations:
+                    result_entry["recommendations"] = recommendations
+
+                sim_results.append(result_entry)
+
+            # Compute recommended_clusters from aggregated simulation results
+            successful_results = [r for r in sim_results if r.get("status") == "success" and r.get("recommendations")]
+            if successful_results:
+                resource_summary = await GuardrailDeploymentWorkflowService(
+                    self.session
+                )._compute_cluster_resource_summary(sim_results, deploy_config=deploy_config)
+
+                # Store recommended_clusters in workflow step data
+                if target_step:
+                    data = target_step.data or {}
+                    data["recommended_clusters"] = resource_summary["recommended_clusters"]
+                    self.session.refresh(target_step)
+                    await WorkflowStepDataManager(self.session).update_by_fields(target_step, {"data": data})
+
+                logger.info(
+                    f"Computed recommended_clusters for workflow {payload.workflow_id}: "
+                    f"{len(resource_summary.get('recommended_clusters', []))} clusters"
+                )
+            else:
+                logger.warning(
+                    f"No successful simulation results with recommendations for workflow {payload.workflow_id}"
+                )
+        except Exception:
+            logger.exception(f"Failed to handle guardrail simulation results for {payload.workflow_id}")
+
+    async def _update_guardrail_workflow_status(self, payload: NotificationPayload, status: str, reason: str) -> None:
+        """Update the guardrail workflow status on failure."""
+        try:
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": payload.workflow_id}
+            )
+            if db_workflow:
+                from budapp.commons.constants import WorkflowStatusEnum
+
+                self.session.refresh(db_workflow)
+                await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow, {"status": WorkflowStatusEnum.FAILED, "reason": reason}
+                )
+        except Exception:
+            logger.error(f"Failed to update guardrail workflow status for {payload.workflow_id}")
+
+    async def _handle_guardrail_deployment_results(self, payload: NotificationPayload) -> None:
+        """Handle guardrail deployment completion by finalizing profile creation."""
+        try:
+            from budapp.guardrails.services import GuardrailDeploymentWorkflowService
+
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": payload.workflow_id}
+            )
+            if not db_workflow:
+                logger.warning(f"No workflow found for guardrail deployment results: {payload.workflow_id}")
+                return
+
+            # Get pending profile data from workflow steps
+            db_steps = await WorkflowStepDataManager(self.session).get_all_workflow_steps(
+                {"workflow_id": payload.workflow_id}
+            )
+            pending_profile_data = None
+            for step in db_steps:
+                step_data = step.data or {}
+                if step_data.get("pending_profile_data"):
+                    pending_profile_data = step_data["pending_profile_data"]
+                    break
+
+            if not pending_profile_data:
+                logger.warning(f"No pending profile data found for workflow {payload.workflow_id}")
+                return
+
+            latest_step = db_steps[-1] if db_steps else None
+            if not latest_step:
+                return
+
+            guardrail_profile_id = pending_profile_data.get("guardrail_profile_id")
+            user_id_str = pending_profile_data.get("user_id")
+
+            from uuid import UUID
+
+            await GuardrailDeploymentWorkflowService(self.session)._finalize_guardrail_profile_creation(
+                data=pending_profile_data,
+                workflow_id=payload.workflow_id,
+                current_user_id=UUID(user_id_str) if user_id_str else None,
+                db_workflow=db_workflow,
+                db_latest_workflow_step=latest_step,
+                guardrail_profile_id=UUID(guardrail_profile_id) if guardrail_profile_id else None,
+            )
+        except Exception:
+            logger.exception(f"Failed to finalize guardrail profile after deployment for {payload.workflow_id}")
+
     async def update_eta_events(self, payload: NotificationPayload) -> None:
         """Update ETA value for workflow progress and step."""
         if not payload.workflow_id:
@@ -657,6 +861,9 @@ class SubscriberHandler:
             PayloadType.DELETE_ADAPTER: self._handle_delete_adapter,
             PayloadType.EVALUATE_MODEL: self._handle_evaluate_model,
             PayloadType.PERFORM_PROMPT_SCHEMA: self._handle_perform_prompt_schema,
+            PayloadType.GUARDRAIL_MODEL_ONBOARDING: self._handle_guardrail_model_onboarding,
+            PayloadType.GUARDRAIL_DEPLOYMENT: self._handle_guardrail_deployment,
+            PayloadType.GUARDRAIL_SIMULATION: self._handle_guardrail_simulation,
         }
 
         handler = handlers.get(payload.type)
@@ -810,6 +1017,30 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated prompt schema event in workflow step",
+        ).to_http_response()
+
+    async def _handle_guardrail_model_onboarding(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the guardrail model onboarding event."""
+        await NotificationService(self.session).update_guardrail_onboarding_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated guardrail onboarding event",
+        ).to_http_response()
+
+    async def _handle_guardrail_deployment(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the guardrail deployment event."""
+        await NotificationService(self.session).update_guardrail_deployment_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated guardrail deployment event",
+        ).to_http_response()
+
+    async def _handle_guardrail_simulation(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the guardrail simulation event."""
+        await NotificationService(self.session).update_guardrail_simulation_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated guardrail simulation event",
         ).to_http_response()
 
 

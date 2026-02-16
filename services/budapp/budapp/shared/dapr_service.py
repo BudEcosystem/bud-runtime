@@ -495,15 +495,26 @@ class DaprService(DaprClient):
                 # Extract error message from response
                 error_message = "Service invocation failed"
                 if isinstance(response_data, dict):
-                    # Handle various error response formats
-                    error_message = (
-                        response_data.get("detail", {}).get("message")
-                        if isinstance(response_data.get("detail"), dict)
-                        else response_data.get("detail")
-                        or response_data.get("message")
-                        or response_data.get("error")
-                        or str(response_data)
-                    )
+                    detail = response_data.get("detail")
+                    if isinstance(detail, dict):
+                        # Handle structured error: {"detail": {"error": "...", "errors": [...]}}
+                        # and {"detail": {"message": "..."}}
+                        base_message = detail.get("message") or detail.get("error")
+                        errors = detail.get("errors")
+
+                        error_parts = []
+                        if base_message:
+                            error_parts.append(base_message)
+                        if errors:
+                            error_parts.append("; ".join(map(str, errors)))
+
+                        error_message = ": ".join(error_parts) or str(detail)
+                    elif detail is not None:
+                        error_message = str(detail)
+                    else:
+                        error_message = (
+                            response_data.get("message") or response_data.get("error") or str(response_data)
+                        )
                 elif isinstance(response_data, (str, bytes)):
                     error_message = response_data.decode() if isinstance(response_data, bytes) else response_data
 

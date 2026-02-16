@@ -6,8 +6,10 @@ import { useConnectors, Connector } from '@/stores/useConnectors';
 import { useAgentStore } from '@/stores/useAgentStore';
 import { Text_14_400_757575, Text_14_400_EEEEEE } from '@/components/ui/text';
 import { ConnectorDetails } from './ConnectorDetails';
+import { GlobalConnectorsSection } from './GlobalConnectorsSection';
 import { getOAuthState, isOAuthCallback, clearOAuthState, getOAuthPromptId } from '@/hooks/useOAuthCallback';
 import { updateConnectorInUrl, getConnectorFromUrlByPosition } from '@/utils/urlUtils';
+import { renderToolIcon } from '@/utils/iconUtils';
 
 const EMPTY_CONNECTOR_LIST: Connector[] = [];
 const EMPTY_CONNECTED_TOOL_LIST: Connector[] = [];
@@ -336,11 +338,7 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
   };
 
   const getToolIcon = (tool: typeof connectors[0]) => {
-    if (tool.icon) {
-      return tool.icon;
-    }
-    // Fallback to first letter
-    return tool.name.charAt(0).toUpperCase();
+    return renderToolIcon(tool.icon, tool.name);
   };
 
   const handleConnectorClick = (connector: Connector, isConnected: boolean = false) => {
@@ -476,6 +474,9 @@ export const ToolsHome: React.FC<ToolsHomeProps> = ({ promptId: propPromptId, wo
           </div>
         ) : (
           <>
+            {/* Global Connectors Section */}
+            {/* <GlobalConnectorsSection promptId={promptId} /> */}
+
             {/* Connected Tools Section */}
             {connectedTools.length > 0 && (
               <div className="border-b border-[#1F1F1F]">

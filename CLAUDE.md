@@ -235,6 +235,13 @@ PRs must include:
 - Each service has its own CLAUDE.md with service-specific guidance
 - Security is high priority: never store keys as plain text
 
+### Auto-Learning (budmem)
+
+When the user corrects you or expresses a preference, offer to save it via `/budmem add`. Watch for these patterns:
+- `remember:` or `important:` — save immediately
+- Corrections like "no, use X", "actually, I meant..." — offer to save
+- Preferences like "don't use X", "prefer X", "always X", "never X" — offer to save
+
 ### Planning & Research
 
 When planning any non-trivial task, conduct extensive web-based research before implementation:

@@ -192,6 +192,10 @@ export default {
         source: '/tools',
         destination: '/home/tools',
       },
+      {
+        source: '/connectors',
+        destination: '/home/connectors',
+      },
     ];
   },
   env: {

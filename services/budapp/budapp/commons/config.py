@@ -242,6 +242,12 @@ class AppConfig(BaseAppConfig):
     mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
     mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
 
+    # OAuth return URL allowed domains (comma-separated)
+    oauth_return_url_allowed_domains: str = Field(
+        default="admin.dev.bud.studio,localhost,127.0.0.1",
+        alias="OAUTH_RETURN_URL_ALLOWED_DOMAINS",
+    )
+
     @computed_field
     def static_dir(self) -> str:
         """Get the static directory."""

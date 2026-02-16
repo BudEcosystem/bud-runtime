@@ -20,7 +20,7 @@ use tensorzero_internal::analytics_middleware::{
     analytics_middleware, attach_analytics_batcher_middleware, attach_clickhouse_middleware,
     attach_geoip_middleware, attach_ua_parser_middleware,
 };
-use tensorzero_internal::auth::require_api_key;
+use tensorzero_internal::auth::{require_api_key, require_api_key_telemetry};
 use tensorzero_internal::blocking_middleware::{attach_blocking_manager, blocking_middleware};
 use tensorzero_internal::clickhouse::ClickHouseConnectionInfo;
 use tensorzero_internal::config_parser::Config;
@@ -370,6 +370,35 @@ async fn main() {
     // This extracts incoming traceparent headers for distributed tracing
     let openai_routes = openai_routes.apply_otel_http_trace_layer();
 
+    // OTLP telemetry proxy routes (conditionally enabled)
+    let otlp_routes = if app_state.config.gateway.otlp_proxy.enabled {
+        tracing::info!("OTLP proxy routes enabled");
+        let routes = Router::new()
+            .route(
+                "/v1/traces",
+                post(endpoints::otlp_proxy::otlp_proxy_handler),
+            )
+            .route(
+                "/v1/metrics",
+                post(endpoints::otlp_proxy::otlp_proxy_handler),
+            )
+            .route(
+                "/v1/logs",
+                post(endpoints::otlp_proxy::otlp_proxy_handler),
+            )
+            .layer(DefaultBodyLimit::max(5 * 1024 * 1024)); // 5 MB limit
+
+        let routes = match &app_state.authentication_info {
+            AuthenticationInfo::Enabled(auth) => routes.layer(
+                axum::middleware::from_fn_with_state(auth.clone(), require_api_key_telemetry),
+            ),
+            AuthenticationInfo::Disabled => routes,
+        };
+        Some(routes)
+    } else {
+        None
+    };
+
     // Routes that don't require authentication
     let public_routes = Router::new()
         .route("/inference", post(endpoints::inference::inference_handler))
@@ -435,7 +464,10 @@ async fn main() {
         );
 
     let mut router = Router::new()
-        .merge(openai_routes)
+        .merge(openai_routes);
+    // NOTE: OTLP routes are merged AFTER analytics/blocking middleware layers (below)
+    // so they bypass analytics_middleware, blocking_middleware, TraceLayer, and the 100MB body limit.
+    router = router
         .merge(public_routes)
         .fallback(endpoints::fallback::handle_404)
         .layer(axum::middleware::from_fn(add_version_header))
@@ -502,6 +534,14 @@ async fn main() {
             Arc::new(app_state.clickhouse_connection_info.clone()),
             attach_clickhouse_middleware,
         ));
+    }
+
+    // Merge OTLP proxy routes AFTER analytics/blocking middleware layers.
+    // In Axum, .layer() only wraps routes already in the router, so OTLP routes
+    // bypass: analytics_middleware (no gateway_analytics spans), blocking_middleware,
+    // TraceLayer (no recursive tracing), and the 100MB DefaultBodyLimit (OTLP has its own 5MB limit).
+    if let Some(otlp) = otlp_routes {
+        router = router.merge(otlp);
     }
 
     let router = router.with_state(app_state);

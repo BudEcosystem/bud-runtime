@@ -9,7 +9,6 @@ Tests for T043 (002-pipeline-event-persistence):
 """
 
 import asyncio
-from datetime import datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -105,14 +104,16 @@ class TestEventTypes:
 
     @pytest.mark.asyncio
     async def test_workflow_progress_event(self, event_publisher, execution_id):
-        """Test workflow progress event structure."""
+        """Test workflow progress event structure (NotificationPayload format)."""
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
             published_payloads = []
+            captured_event_types = []
 
             async def capture_payload(topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
+                captured_event_types.append(event_type)
                 return True
 
             with patch.object(
@@ -130,14 +131,20 @@ class TestEventTypes:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["type"] == EventType.WORKFLOW_PROGRESS
-        assert payload["data"]["progress_percentage"] == 75.0
-        assert payload["data"]["eta_seconds"] == 120
-        assert payload["data"]["current_step"] == "Processing data"
+        assert captured_event_types[0] == EventType.WORKFLOW_PROGRESS
+        assert payload["notification_type"] == "event"
+        assert payload["payload"]["type"] == "pipeline_execution"
+        assert payload["payload"]["event"] == "progress"
+        assert payload["payload"]["content"]["status"] == "RUNNING"
+        assert "75.0%" in payload["payload"]["content"]["message"]
 
     @pytest.mark.asyncio
-    async def test_step_started_event(self, event_publisher, execution_id):
-        """Test step started event structure."""
+    async def test_workflow_progress_with_notification_workflow_id(
+        self, event_publisher, execution_id
+    ):
+        """Test that notification_workflow_id overrides payload.workflow_id in convenience methods."""
+        custom_wf_id = "external-wf-999"
+
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
@@ -145,6 +152,34 @@ class TestEventTypes:
 
             async def capture_payload(topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
+                return True
+
+            with patch.object(
+                event_publisher, "_publish_single_topic", side_effect=capture_payload
+            ):
+                await event_publisher.publish_workflow_progress(
+                    execution_id=execution_id,
+                    progress_percentage=Decimal("50.00"),
+                    notification_workflow_id=custom_wf_id,
+                )
+
+                await asyncio.sleep(0.1)
+
+        assert len(published_payloads) == 1
+        assert published_payloads[0]["payload"]["workflow_id"] == custom_wf_id
+
+    @pytest.mark.asyncio
+    async def test_step_started_event(self, event_publisher, execution_id):
+        """Test step started event structure (NotificationPayload format)."""
+        with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
+            mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
+
+            published_payloads = []
+            captured_event_types = []
+
+            async def capture_payload(topic, execution_id, event_type, payload):
+                published_payloads.append(payload)
+                captured_event_types.append(event_type)
                 return True
 
             with patch.object(
@@ -161,21 +196,24 @@ class TestEventTypes:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["type"] == EventType.STEP_STARTED
-        assert payload["step_id"] == "step1"
-        assert payload["data"]["step_name"] == "First Step"
-        assert payload["data"]["sequence_number"] == 1
+        assert captured_event_types[0] == EventType.STEP_STARTED
+        assert payload["payload"]["event"] == "step1"
+        assert payload["payload"]["content"]["title"] == "First Step"
+        assert payload["payload"]["content"]["status"] == "STARTED"
+        assert payload["payload"]["content"]["result"]["sequence_number"] == 1
 
     @pytest.mark.asyncio
     async def test_step_completed_event(self, event_publisher, execution_id):
-        """Test step completed event structure."""
+        """Test step completed event structure (NotificationPayload format)."""
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
             published_payloads = []
+            captured_event_types = []
 
             async def capture_payload(topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
+                captured_event_types.append(event_type)
                 return True
 
             with patch.object(
@@ -193,19 +231,22 @@ class TestEventTypes:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["type"] == EventType.STEP_COMPLETED
-        assert payload["data"]["duration_seconds"] == 30
+        assert captured_event_types[0] == EventType.STEP_COMPLETED
+        assert payload["payload"]["content"]["status"] == "COMPLETED"
+        assert payload["payload"]["content"]["result"]["duration_seconds"] == 30
 
     @pytest.mark.asyncio
     async def test_step_failed_event(self, event_publisher, execution_id):
-        """Test step failed event structure."""
+        """Test step failed event structure (NotificationPayload format)."""
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
             published_payloads = []
+            captured_event_types = []
 
             async def capture_payload(topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
+                captured_event_types.append(event_type)
                 return True
 
             with patch.object(
@@ -222,19 +263,22 @@ class TestEventTypes:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["type"] == EventType.STEP_FAILED
-        assert payload["data"]["error_message"] == "Connection timeout"
+        assert captured_event_types[0] == EventType.STEP_FAILED
+        assert payload["payload"]["content"]["status"] == "FAILED"
+        assert payload["payload"]["content"]["message"] == "Connection timeout"
 
     @pytest.mark.asyncio
     async def test_workflow_completed_success_event(self, event_publisher, execution_id):
-        """Test workflow completed (success) event structure."""
+        """Test workflow completed (success) event structure (NotificationPayload format)."""
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
             published_payloads = []
+            captured_event_types = []
 
             async def capture_payload(topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
+                captured_event_types.append(event_type)
                 return True
 
             with patch.object(
@@ -251,19 +295,23 @@ class TestEventTypes:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["type"] == EventType.WORKFLOW_COMPLETED
-        assert payload["data"]["success"] is True
+        assert captured_event_types[0] == EventType.WORKFLOW_COMPLETED
+        assert payload["payload"]["event"] == "results"
+        assert payload["payload"]["content"]["status"] == "COMPLETED"
+        assert payload["payload"]["content"]["result"]["success"] is True
 
     @pytest.mark.asyncio
     async def test_workflow_completed_failure_event(self, event_publisher, execution_id):
-        """Test workflow completed (failure) event structure."""
+        """Test workflow completed (failure) event structure (NotificationPayload format)."""
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
             mock_sub_service.get_active_topics = AsyncMock(return_value=["topic1"])
 
             published_payloads = []
+            captured_event_types = []
 
             async def capture_payload(topic, execution_id, event_type, payload):
                 published_payloads.append(payload)
+                captured_event_types.append(event_type)
                 return True
 
             with patch.object(
@@ -279,8 +327,10 @@ class TestEventTypes:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["type"] == EventType.WORKFLOW_FAILED
-        assert payload["data"]["success"] is False
+        assert captured_event_types[0] == EventType.WORKFLOW_FAILED
+        assert payload["payload"]["event"] == "results"
+        assert payload["payload"]["content"]["status"] == "FAILED"
+        assert payload["payload"]["content"]["result"]["success"] is False
 
 
 class TestCorrelationIds:
@@ -340,11 +390,11 @@ class TestCorrelationIds:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["execution_id"] == str(execution_id)
+        assert payload["payload"]["workflow_id"] == str(execution_id)
 
     @pytest.mark.asyncio
     async def test_step_id_included_for_step_events(self, event_publisher, execution_id):
-        """Test that step ID is included for step-level events."""
+        """Test that step ID is used as payload.event for step-level events."""
         step_id = "step1"
 
         with patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service:
@@ -370,7 +420,7 @@ class TestCorrelationIds:
 
         assert len(published_payloads) == 1
         payload = published_payloads[0]
-        assert payload["step_id"] == step_id
+        assert payload["payload"]["event"] == step_id
 
 
 class TestRetryQueue:
@@ -488,42 +538,196 @@ class TestRetryQueue:
 
 
 class TestEventPayloadStructure:
-    """Tests for event payload structure."""
+    """Tests for NotificationPayload event structure."""
 
     def test_build_event_payload_required_fields(self, event_publisher, execution_id):
-        """Test that required fields are always present."""
+        """Test that required NotificationPayload fields are always present."""
         payload = event_publisher._build_event_payload(
             event_type=EventType.WORKFLOW_PROGRESS,
             execution_id=execution_id,
-            data={"test": "data"},
+            data={"progress_percentage": 50.0},
         )
 
-        assert "type" in payload
-        assert "execution_id" in payload
-        assert "timestamp" in payload
-        assert "data" in payload
+        assert payload["notification_type"] == "event"
+        assert payload["name"] == "bud-notification"
+        assert "payload" in payload
+        assert payload["payload"]["category"] == "internal"
+        assert payload["payload"]["type"] == "pipeline_execution"
+        assert payload["payload"]["workflow_id"] == str(execution_id)
+        assert payload["payload"]["source"] == "budpipeline"
+        assert "content" in payload["payload"]
+        assert "title" in payload["payload"]["content"]
+        assert "message" in payload["payload"]["content"]
+        assert "status" in payload["payload"]["content"]
 
     def test_build_event_payload_optional_fields(self, event_publisher, execution_id):
         """Test optional fields are included when provided."""
         payload = event_publisher._build_event_payload(
             event_type=EventType.STEP_COMPLETED,
             execution_id=execution_id,
-            data={"test": "data"},
+            data={"step_name": "My Step", "progress_percentage": 50.0},
             correlation_id="corr-123",
             step_id="step1",
         )
 
         assert payload["correlation_id"] == "corr-123"
-        assert payload["step_id"] == "step1"
+        assert payload["payload"]["event"] == "step1"
 
-    def test_build_event_payload_timestamp_format(self, event_publisher, execution_id):
-        """Test that timestamp is in ISO format."""
+    def test_build_event_payload_custom_payload_type(self, event_publisher, execution_id):
+        """Test that custom payload_type overrides default."""
         payload = event_publisher._build_event_payload(
             event_type=EventType.WORKFLOW_PROGRESS,
             execution_id=execution_id,
             data={},
+            payload_type="model_benchmark",
         )
 
-        # Should be parseable as ISO format
-        timestamp = payload["timestamp"]
-        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        assert payload["payload"]["type"] == "model_benchmark"
+
+    def test_build_event_payload_subscriber_ids(self, event_publisher, execution_id):
+        """Test that subscriber_ids is included in payload."""
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            subscriber_ids="user-123",
+        )
+
+        assert payload["subscriber_ids"] == "user-123"
+
+    def test_build_event_payload_notification_workflow_id_override(
+        self, event_publisher, execution_id
+    ):
+        """Test that notification_workflow_id overrides payload.workflow_id."""
+        custom_workflow_id = "external-workflow-abc-123"
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            notification_workflow_id=custom_workflow_id,
+        )
+
+        assert payload["payload"]["workflow_id"] == custom_workflow_id
+        assert payload["payload"]["workflow_id"] != str(execution_id)
+
+    def test_build_event_payload_notification_workflow_id_default(
+        self, event_publisher, execution_id
+    ):
+        """Test that payload.workflow_id defaults to execution_id when notification_workflow_id is None."""
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            notification_workflow_id=None,
+        )
+
+        assert payload["payload"]["workflow_id"] == str(execution_id)
+
+    def test_build_event_payload_notification_workflow_id_empty_string_uses_execution_id(
+        self, event_publisher, execution_id
+    ):
+        """Test that empty string notification_workflow_id falls back to execution_id."""
+        payload = event_publisher._build_event_payload(
+            event_type=EventType.WORKFLOW_PROGRESS,
+            execution_id=execution_id,
+            data={},
+            notification_workflow_id="",
+        )
+
+        assert payload["payload"]["workflow_id"] == str(execution_id)
+
+    def test_build_event_payload_status_mapping(self, event_publisher, execution_id):
+        """Test that event types map to correct content.status."""
+        test_cases = [
+            (EventType.STEP_STARTED, "STARTED"),
+            (EventType.STEP_COMPLETED, "COMPLETED"),
+            (EventType.STEP_FAILED, "FAILED"),
+            (EventType.WORKFLOW_PROGRESS, "RUNNING"),
+            (EventType.WORKFLOW_COMPLETED, "COMPLETED"),
+            (EventType.WORKFLOW_FAILED, "FAILED"),
+            (EventType.ETA_UPDATE, "RUNNING"),
+        ]
+
+        for event_type, expected_status in test_cases:
+            payload = event_publisher._build_event_payload(
+                event_type=event_type,
+                execution_id=execution_id,
+                data={},
+            )
+            assert payload["payload"]["content"]["status"] == expected_status, (
+                f"Event {event_type} should map to status {expected_status}"
+            )
+
+
+class TestDualPublish:
+    """Tests for dual-publish to budnotify when subscriber_ids is set."""
+
+    @pytest.mark.asyncio
+    async def test_dual_publish_with_subscriber_ids(self, event_publisher, execution_id):
+        """Test that events are published to both budnotify and callback topics."""
+        with (
+            patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service,
+            patch("budpipeline.progress.publisher.settings") as mock_settings,
+        ):
+            mock_sub_service.get_active_topics = AsyncMock(return_value=["callback-topic"])
+            mock_settings.notify_service_topic = "budnotify-topic"
+            mock_settings.dapr_pubsub_name = "pubsub"
+
+            published_topics = []
+
+            async def capture_topic(topic, execution_id, event_type, payload):
+                published_topics.append(topic)
+                return True
+
+            with patch.object(event_publisher, "_publish_single_topic", side_effect=capture_topic):
+                topics = await event_publisher.publish_to_topics(
+                    execution_id=execution_id,
+                    event_type=EventType.WORKFLOW_PROGRESS,
+                    data={"progress_percentage": 50.0},
+                    subscriber_ids="user-123",
+                )
+
+                await asyncio.sleep(0.1)
+
+        # Should include both budnotify topic and callback topic
+        assert "budnotify-topic" in topics
+        assert "callback-topic" in topics
+
+    @pytest.mark.asyncio
+    async def test_no_dual_publish_without_subscriber_ids(self, event_publisher, execution_id):
+        """Test that without subscriber_ids, only callback topics are used."""
+        with (
+            patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service,
+            patch("budpipeline.progress.publisher.settings") as mock_settings,
+        ):
+            mock_sub_service.get_active_topics = AsyncMock(return_value=["callback-topic"])
+            mock_settings.notify_service_topic = "budnotify-topic"
+
+            topics = await event_publisher.publish_to_topics(
+                execution_id=execution_id,
+                event_type=EventType.WORKFLOW_PROGRESS,
+                data={"progress_percentage": 50.0},
+            )
+
+        # Only callback topics, no budnotify
+        assert topics == ["callback-topic"]
+
+    @pytest.mark.asyncio
+    async def test_no_dual_publish_without_notify_topic(self, event_publisher, execution_id):
+        """Test that without notify_service_topic config, no dual-publish occurs."""
+        with (
+            patch("budpipeline.progress.publisher.subscription_service") as mock_sub_service,
+            patch("budpipeline.progress.publisher.settings") as mock_settings,
+        ):
+            mock_sub_service.get_active_topics = AsyncMock(return_value=["callback-topic"])
+            mock_settings.notify_service_topic = None
+
+            topics = await event_publisher.publish_to_topics(
+                execution_id=execution_id,
+                event_type=EventType.WORKFLOW_PROGRESS,
+                data={"progress_percentage": 50.0},
+                subscriber_ids="user-123",
+            )
+
+        # Only callback topics even with subscriber_ids
+        assert topics == ["callback-topic"]
