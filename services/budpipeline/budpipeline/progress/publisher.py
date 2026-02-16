@@ -350,10 +350,10 @@ class EventPublisher:
     ) -> bool:
         """Publish event to a single topic.
 
-        Constructs a full CloudEvent envelope and publishes with
-        application/cloudevents+json content type. This prevents Dapr from
-        injecting its own id/datacontenttype fields, which budnotify's
-        CloudEventBase(extra="forbid") would reject with 422.
+        Sends flat payload data with CloudEvent attributes passed via
+        publish_metadata, matching the budmicroframe publish_to_topic
+        pattern. This avoids injecting extra fields (id, datacontenttype)
+        into the JSON body that downstream subscribers would reject.
 
         Args:
             topic: Target topic.
@@ -370,30 +370,25 @@ class EventPublisher:
 
             # Copy payload to avoid mutating the shared dict across topics
             event_payload = payload.copy()
-            correlation_id = event_payload.pop("correlation_id", None)
+            event_payload["source"] = settings.name
+            event_payload["source_topic"] = topic
 
-            # Construct a full CloudEvent envelope so Dapr does not inject
-            # its own id/datacontenttype fields (which budnotify rejects).
-            # Extension attributes (source_topic, correlation_id) go at the
-            # envelope level, not inside data.
-            cloud_event: dict[str, Any] = {
-                "specversion": "1.0",
-                "id": str(uuid4()),
-                "source": settings.name,
-                "type": event_type,
-                "datacontenttype": "application/json",
-                "source_topic": topic,
-                "data": event_payload,
+            # Pass CloudEvent attributes via publish_metadata so Dapr
+            # does not inject them into the JSON body.
+            event_id = str(uuid4())
+            publish_metadata = {
+                "cloudevent.id": event_id,
+                "cloudevent.source": settings.name,
+                "cloudevent.type": event_type,
             }
-            if correlation_id:
-                cloud_event["correlation_id"] = correlation_id
 
             async with DaprClient() as client:
                 await client.publish_event(
                     pubsub_name=self.pubsub_name,
                     topic_name=topic,
-                    data=json.dumps(cloud_event, cls=_DecimalEncoder),
+                    data=json.dumps(event_payload, cls=_DecimalEncoder),
                     data_content_type="application/cloudevents+json",
+                    publish_metadata=publish_metadata,
                 )
 
             record_event_published(event_type)
