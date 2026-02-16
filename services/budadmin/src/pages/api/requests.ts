@@ -47,6 +47,10 @@ axiosInstance.defaults.paramsSerializer = {
   serialize: serializeParams,
 };
 
+let lastNoInternetToast = 0;
+let lastSlowNetworkToast = 0;
+const NETWORK_TOAST_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
 let Token = null;
 export let isRefreshing = false;
 export let refreshSubscribers: ((token: string) => void)[] = [];
@@ -70,13 +74,17 @@ if (typeof window !== "undefined") {
 
 axiosInstance.interceptors.request.use(
   async (config) => {
-    // ✅ Check Internet Connection
+    // ✅ Check Internet Connection (toast throttled to once per 5 minutes)
     if (typeof window !== "undefined" && !navigator.onLine) {
-      errorToast("No internet connection");
+      const now = Date.now();
+      if (now - lastNoInternetToast >= NETWORK_TOAST_INTERVAL) {
+        lastNoInternetToast = now;
+        errorToast("No internet connection");
+      }
       return Promise.reject(new Error("No internet connection"));
     }
 
-    // ✅ Optional: Network quality check
+    // ✅ Optional: Network quality check (toast throttled to once per 5 minutes)
     const connection =
       (navigator as any).connection ||
       (navigator as any)["mozConnection"] ||
@@ -88,8 +96,11 @@ axiosInstance.interceptors.request.use(
         ["2g", "slow-2g"].includes(effectiveType) || downlink < 0.5;
 
       if (slowConnection) {
-        errorToast("Network is too slow or throttled");
-        return Promise.reject(new Error("Poor network connection"));
+        const now = Date.now();
+        if (now - lastSlowNetworkToast >= NETWORK_TOAST_INTERVAL) {
+          lastSlowNetworkToast = now;
+          errorToast("Network is too slow or throttled");
+        }
       }
     }
 
