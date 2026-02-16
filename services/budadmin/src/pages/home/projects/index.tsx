@@ -81,13 +81,13 @@ const Projects = () => {
     }
   }, [getGlobalProjects, hasPermission, hideLoader, showLoader, setPageSize]);
 
-  // Initial load
+  // Initial load - wait for permissions to be ready before fetching data
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && !loadingUser) {
       setCurrentPage(1);
       load(1, pageSize);
     }
-  }, [isMounted, load, pageSize]);
+  }, [isMounted, loadingUser, load, pageSize]);
 
   // Search with debounce
   useEffect(() => {

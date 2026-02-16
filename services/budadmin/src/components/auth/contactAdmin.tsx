@@ -165,9 +165,11 @@ const ContactAdmin = ({ onSubmit }: ContactAdminKeyProps) => {
           }}
         >
           <Text_12_400_EEEEEE className="text-[#EC7575]">
-            {authError.includes("Cannot read properties")
-              ? "Something went wrong, please try again later."
-              : authError}
+            {typeof window !== "undefined" && !navigator.onLine
+              ? "No internet connection"
+              : authError.includes("Cannot read properties")
+                ? "Something went wrong, please try again later."
+                : authError}
           </Text_12_400_EEEEEE>
         </motion.div>
       )}
