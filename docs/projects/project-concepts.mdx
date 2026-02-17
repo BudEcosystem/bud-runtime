@@ -20,7 +20,6 @@ flowchart TB
     TABS --> GUA[Guardrails]
 ```
 
-
 ## Core Concepts
 
 ### 1. Project Metadata
@@ -57,18 +56,32 @@ Deployment settings can be tuned with SLO-aligned autoscaling signals (for examp
 
 ## How Projects Relate to Other Modules
 
-| Module | Relationship to Projects |
-|--------|---------------------------|
-| **Models** | Models are selected and deployed into project-scoped endpoints |
-| **Deployments** | Deployments are managed and governed within projects |
-| **Routes** | Routing policies are configured from project context |
-| **Observability** | Monitoring is filtered by project for faster diagnostics |
-| **User Management** | Access is granted to project resources via RBAC |
+| Module              | Relationship to Projects                                       |
+| ------------------- | -------------------------------------------------------------- |
+| **Models**          | Models are selected and deployed into project-scoped endpoints |
+| **Deployments**     | Deployments are managed and governed within projects           |
+| **Routes**          | Routing policies are configured from project context           |
+| **Observability**   | Monitoring is filtered by project for faster diagnostics       |
+| **User Management** | Access is granted to project resources via RBAC                |
 
 ## Best Practices
 
-<Check>Use one project per product, tenant, or major workload boundary.</Check>
-<Check>Keep project tags consistent for reporting and governance.</Check>
-<Check>Grant manage permissions to a minimal set of operators.</Check>
-<Check>Review analytics and observability before scaling or route changes.</Check>
-<Check>Enable guardrails early in lifecycle, not only after incidents.</Check>
+<Check>
+  Use one project per product, tenant, or major workload boundary.
+</Check>
+
+ <Check>
+  Keep project tags consistent for reporting and governance.
+</Check>
+
+ <Check>
+  Grant manage permissions to a minimal set of operators.
+</Check>
+
+ <Check>
+  Review analytics and observability before scaling or route changes.
+</Check>
+
+ <Check>
+  Enable guardrails early in lifecycle, not only after incidents.
+</Check>
