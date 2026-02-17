@@ -15,6 +15,7 @@ import { AppRequest } from "src/pages/api/requests";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useObservabilitySocket } from "@/hooks/useObservabilitySocket";
 import ProjectTags from "src/flows/components/ProjectTags";
+import { usePromptMetrics } from "src/hooks/usePromptMetrics";
 
 // API Response Types
 interface SpanEvent {
@@ -1059,10 +1060,16 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const [logsData, setLogsData] = useState<LogEntry[]>([]);
   const [isAllExpanded, setIsAllExpanded] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [totalRecord, setTotalRecord] = useState(0);
+
+  // Time-series API hook for chart data
+  const { fetchPromptTimeSeries, PROMPT_METRICS: METRICS } = usePromptMetrics();
 
   // Live chart data - stores traces with timestamps for aggregation
   const liveChartTracesRef = useRef<{ timestamp: number; status?: string; duration?: number }[]>([]);
   const chartUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Time-series API data points for merging with live traces
+  const timeSeriesDataRef = useRef<{ timestamp: number; value: number }[]>([]);
 
 
   // Live streaming state
@@ -1282,6 +1289,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       if (response.data?.items && response.data.items.length > 0) {
         const spans: TraceSpan[] = response.data.items;
         const total = response.data.total_record || 0;
+        setTotalRecord(total);
 
         // Find earliest timestamp for offset calculation
         const timestamps = spans.map((s: TraceSpan) => new Date(s.timestamp).getTime());
@@ -1744,8 +1752,16 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       const errorDuration = errorTraces.reduce((sum, t) => sum + (t.duration || 0), 0);
       const totalDuration = successDuration + errorDuration;
 
+      // In live mode, also add historical counts from time-series API
+      let apiCount = 0;
+      if (isLive && timeSeriesDataRef.current.length > 0) {
+        apiCount = timeSeriesDataRef.current
+          .filter(d => d.timestamp >= bucketStart && d.timestamp < bucketEnd)
+          .reduce((sum, d) => sum + d.value, 0);
+      }
+
       successData.push({
-        value: successTraces.length,
+        value: successTraces.length + apiCount,
         bucketStart,
         bucketEnd,
         totalDuration,
@@ -1782,6 +1798,99 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       ],
     });
   }, [timeRange, isLive, logsData]);
+
+  // Fetch chart data from time-series API
+  // Stores data in ref for live mode merging; updates chart directly in non-live mode
+  const fetchChartData = useCallback(async () => {
+    if (!promptId) return;
+
+    const { from_date, to_date } = getTimeRangeDates(timeRange, customDateRange);
+
+    const response = await fetchPromptTimeSeries(
+      from_date,
+      to_date,
+      [METRICS.requests],
+      { prompt_id: [promptId] },
+      { dataSource: "prompt", fillGaps: true }
+    );
+
+    if (response && response.groups && response.groups.length > 0) {
+      const aggregatedData: Map<string, number> = new Map();
+
+      response.groups.forEach((group) => {
+        group.data_points.forEach((point) => {
+          const timestamp = point.timestamp;
+          const value = point.values[METRICS.requests] || 0;
+          const existing = aggregatedData.get(timestamp) || 0;
+          aggregatedData.set(timestamp, existing + value);
+        });
+      });
+
+      const sortedEntries = Array.from(aggregatedData.entries()).sort(
+        (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
+      );
+
+      // Always store in ref for live mode merging
+      timeSeriesDataRef.current = sortedEntries.map(([timestamp, value]) => ({
+        timestamp: new Date(timestamp).getTime(),
+        value,
+      }));
+
+      // Only update chart directly in non-live mode
+      // In live mode, updateChartData handles chart rendering with merged data
+      if (!isLive && chartInstanceRef.current) {
+        const labels = sortedEntries.map(([timestamp]) => {
+          const date = new Date(timestamp);
+          const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+          if (hoursDiff <= 24) {
+            return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+          } else if (hoursDiff <= 24 * 7) {
+            return (
+              date.toLocaleDateString("en-US", { weekday: "short" }) +
+              " " +
+              date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+            );
+          } else {
+            return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          }
+        });
+
+        const successData: ExtendedBucketData[] = sortedEntries.map(([timestamp, value], index) => {
+          const currentTime = new Date(timestamp).getTime();
+          const nextTime =
+            index < sortedEntries.length - 1
+              ? new Date(sortedEntries[index + 1][0]).getTime()
+              : currentTime + 3600000;
+          return {
+            value,
+            bucketStart: currentTime,
+            bucketEnd: nextTime,
+            totalDuration: 0,
+          };
+        });
+
+        const labelInterval = Math.max(1, Math.ceil(labels.length / 8));
+
+        chartInstanceRef.current.setOption({
+          xAxis: {
+            data: labels,
+            axisLabel: {
+              interval: (index: number) => index % labelInterval === 0,
+            },
+          },
+          series: [{ data: [] }, { data: successData }],
+        });
+      }
+    } else {
+      timeSeriesDataRef.current = [];
+      if (!isLive && chartInstanceRef.current) {
+        chartInstanceRef.current.setOption({
+          xAxis: { data: [] },
+          series: [{ data: [] }, { data: [] }],
+        });
+      }
+    }
+  }, [promptId, timeRange, customDateRange, isLive, fetchPromptTimeSeries, METRICS]);
 
   // Initialize echarts with stacked bar configuration
   useEffect(() => {
@@ -1986,18 +2095,19 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     };
   }, []);
 
-  // Set up chart update interval for real-time scrolling
+  // Set up chart update: always fetch time-series data, plus live interval when live
   useEffect(() => {
     // Clear existing interval
     if (chartUpdateIntervalRef.current) {
       clearInterval(chartUpdateIntervalRef.current);
     }
 
-    // Always update chart immediately when dependencies change
-    updateChartData();
+    // Always fetch time-series API data (populates ref for live merging, updates chart in non-live)
+    fetchChartData();
 
-    // In live mode, set up interval for continuous time scrolling
     if (isLive) {
+      // In live mode, also run interval to merge API data + live traces
+      updateChartData();
       chartUpdateIntervalRef.current = setInterval(() => {
         updateChartData();
       }, CHART_CONFIG.updateInterval);
@@ -2009,7 +2119,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         chartUpdateIntervalRef.current = null;
       }
     };
-  }, [isLive, timeRange, updateChartData]);
+  }, [isLive, timeRange, customDateRange, updateChartData, fetchChartData]);
 
   // Get time range label for display
   const getTimeRangeLabel = () => {
@@ -2093,7 +2203,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           <Text_12_400_B3B3B3>
             {isLoading
               ? "Loading traces..."
-              : `Showing ${logsData.length} records from the last ${getTimeRangeLabel()}`}
+              : `Showing ${totalRecord} records from the last ${getTimeRangeLabel()}`}
           </Text_12_400_B3B3B3>
           <div className="flex items-center gap-4">
             {/* Expand/Collapse button - only show in traces view */}
