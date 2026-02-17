@@ -57,7 +57,7 @@ export default function ViewModel() {
     // }
 
     closeExpandedStep();
-    if (key == "5") {
+    if (key == "3") {
       setToAdapter(true);
     } else {
       setToAdapter(false);
@@ -74,18 +74,18 @@ export default function ViewModel() {
         label: "General",
         children: <General data={selectedModel} />,
       },
+      // {
+      //   key: "2",
+      //   label: "Evaluations",
+      //   children: <Evaluations model={selectedModel} />,
+      // },
       {
         key: "2",
-        label: "Evaluations",
-        children: <Evaluations model={selectedModel} />,
-      },
-      {
-        key: "4",
         label: "Advanced",
         children: <Advanced data={selectedModel} />,
       },
       {
-        key: "5",
+        key: "3",
         label: "Adapters",
         children: (
           <General
