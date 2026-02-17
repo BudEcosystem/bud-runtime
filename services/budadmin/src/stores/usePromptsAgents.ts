@@ -206,9 +206,9 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
         set({
           prompts: finalPrompts,
           filteredPrompts: finalFiltered,
-          totalCount: response.data.total || finalPrompts.length,
+          totalCount: response.data.total_record || response.data.total || finalPrompts.length,
           currentPage: response.data.page || 1,
-          totalPages: response.data.total_pages || Math.ceil((response.data.total || finalPrompts.length) / state.pageSize),
+          totalPages: response.data.total_pages || Math.ceil((response.data.total_record || response.data.total || finalPrompts.length) / state.pageSize),
           categories,
           authors,
           isLoading: false,
