@@ -440,10 +440,10 @@ export const useModels = create<{
           scan_result: response.data.scan_result,
         },
       });
-      set({ loading: true });
+      set({ loading: false });
       return response.data;
     } catch (error) {
-      set({ loading: true });
+      set({ loading: false });
       console.error("Error creating model:", error);
     }
   },
@@ -490,7 +490,8 @@ export const useModels = create<{
   },
   filters: {},
   refresh: () => {
-    get().getGlobalModels(get().filters);
+    const { filters } = get();
+    get().getGlobalModels({ ...filters, page: 1 });
   },
   deleteModel: async (modelId: string) => {
     try {

@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import { ConfigProvider, Image, Popover, Select, Slider, Tag } from "antd";
+import { ConfigProvider, Image, Popover, Select, Slider, Spin, Tag } from "antd";
 import { useCallback, useEffect, useState, useRef } from "react";
 import React from "react";
 import DashBoardLayout from "../layout";
@@ -305,6 +305,7 @@ export default function ModelRepo() {
   // Add refs to prevent multiple API calls
   const isLoadingMore = useRef(false);
   const lastScrollTop = useRef(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(
     async (filter, page?: number, isInfiniteScroll: boolean = false) => {
@@ -316,6 +317,7 @@ export default function ModelRepo() {
 
         if (isInfiniteScroll) {
           isLoadingMore.current = true;
+          setLoadingMore(true);
         }
 
         const targetPage = page !== undefined ? page : currentPage;
@@ -324,31 +326,36 @@ export default function ModelRepo() {
           showLoader();
         }
 
-        await getGlobalModels({
-          page: targetPage,
-          limit: pageSize,
-          name: filter.name,
-          tag: filter.name,
-          // description: filter.name,
-          modality: filter.modality?.length > 0 ? filter.modality : undefined,
-          tasks: filter.tasks?.length > 0 ? filter.tasks : undefined,
-          author: filter.author?.length > 0 ? filter.author : undefined,
-          model_size_min: isFinite(filter.model_size_min)
-            ? filter.model_size_min
-            : undefined,
-          model_size_max: isFinite(filter.model_size_max)
-            ? filter.model_size_max
-            : undefined,
-          // table_source: filter.table_source,
-          table_source: "model",
-        });
+        try {
+          await getGlobalModels({
+            page: targetPage,
+            limit: pageSize,
+            name: filter.name,
+            tag: filter.name,
+            // description: filter.name,
+            modality: filter.modality?.length > 0 ? filter.modality : undefined,
+            tasks: filter.tasks?.length > 0 ? filter.tasks : undefined,
+            author: filter.author?.length > 0 ? filter.author : undefined,
+            model_size_min: isFinite(filter.model_size_min)
+              ? filter.model_size_min
+              : undefined,
+            model_size_max: isFinite(filter.model_size_max)
+              ? filter.model_size_max
+              : undefined,
+            // table_source: filter.table_source,
+            table_source: "model",
+          });
+        } catch (error) {
+          console.error("Failed to load models:", error);
+        } finally {
+          if (!isInfiniteScroll) {
+            hideLoader();
+          }
 
-        if (!isInfiniteScroll) {
-          hideLoader();
-        }
-
-        if (isInfiniteScroll) {
-          isLoadingMore.current = false;
+          if (isInfiniteScroll) {
+            isLoadingMore.current = false;
+            setLoadingMore(false);
+          }
         }
       }
     },
@@ -832,13 +839,18 @@ export default function ModelRepo() {
                 }}
               />
               {models?.length > 0 ? (
-                <div className="grid gap-[1.1rem] grid-cols-3  1680px:mt-[1.75rem] pb-[1.1rem]">
-                  <>
+                <>
+                  <div className="grid gap-[1.1rem] grid-cols-3  1680px:mt-[1.75rem] pb-[1.1rem]">
                     {models.map((item, index) => (
                       <ModelCard key={index} {...item} />
                     ))}
-                  </>
-                </div>
+                  </div>
+                  {loadingMore && (
+                    <div className="flex justify-center items-center py-[1.5rem]">
+                      <Spin size="small" />
+                    </div>
+                  )}
+                </>
               ) : (
                 <div>
                   <>

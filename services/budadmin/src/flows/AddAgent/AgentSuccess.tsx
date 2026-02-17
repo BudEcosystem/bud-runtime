@@ -13,6 +13,7 @@ import { ModelFlowInfoCard } from "@/components/ui/bud/deploymentDrawer/DeployMo
 import { useAddAgent } from "@/stores/useAddAgent";
 import { usePrompts } from "src/hooks/usePrompts";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { usePromptsAgents } from "@/stores/usePromptsAgents";
 import CustomDropDown from "../components/CustomDropDown";
 import CustomPopover from "../components/customPopover";
 import { ChevronDown } from "lucide-react";
@@ -66,6 +67,7 @@ export default function AgentSuccess() {
   const { closeDrawer } = useDrawer();
   const { getPrompts } = usePrompts();
   const { resetSessionState } = useAgentStore();
+  const { refreshPrompts } = usePromptsAgents();
 
   // Get data from the Add Agent store
   const {
@@ -128,6 +130,8 @@ export default function AgentSuccess() {
         project_id: projectId,
       }, projectId);
     }
+    // Refresh the global agents listing
+    refreshPrompts();
     // Close the drawer
     closeDrawer();
   };
