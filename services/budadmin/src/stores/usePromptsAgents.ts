@@ -132,7 +132,12 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
   // Fetch prompts from API
   fetchPrompts: async (params?: PromptsListParams) => {
     const state = get();
-    set({ isLoading: true });
+    const page = params?.page || state.currentPage;
+    const isAppend = page > 1;
+
+    if (!isAppend) {
+      set({ isLoading: true });
+    }
 
     try {
       // Determine the search query - use params.name if provided, otherwise use state.searchQuery
@@ -140,7 +145,7 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
       const hasSearchQuery = searchQuery && searchQuery.trim().length > 0;
 
       const queryParams: PromptsListParams = {
-        page: params?.page || state.currentPage,
+        page: page,
         limit: params?.limit || state.pageSize,
         search: hasSearchQuery ? true : undefined,
         name: hasSearchQuery ? searchQuery : undefined,
@@ -162,10 +167,10 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
       });
 
       if (response.data) {
-        const prompts = response.data.prompts || [];
+        const newPrompts = response.data.prompts || [];
 
         // Apply client-side filters for additional filtering (category, author, tags, rating)
-        let filtered = [...prompts];
+        let filtered = [...newPrompts];
 
         if (state.selectedCategory) {
           filtered = filtered.filter(p => p.category === state.selectedCategory);
@@ -189,17 +194,21 @@ export const usePromptsAgents = create<PromptsAgentsStore>((set, get) => ({
           filtered = filtered.filter(p => (p.rating || 0) <= state.ratingMax!);
         }
 
+        // Append or replace based on page
+        const finalPrompts = isAppend ? [...state.prompts, ...newPrompts] : newPrompts;
+        const finalFiltered = isAppend ? [...state.filteredPrompts, ...filtered] : filtered;
+
         // Extract unique categories, authors, and tags for filters
-        const categories = Array.from(new Set(prompts.map(p => p.category).filter(Boolean))) as string[];
-        const authors = Array.from(new Set(prompts.map(p => p.author).filter(Boolean))) as string[];
-        const allTags = Array.from(new Set(prompts.flatMap(p => (p.tags || []).map(t => t.name))));
+        const categories = Array.from(new Set(finalPrompts.map(p => p.category).filter(Boolean))) as string[];
+        const authors = Array.from(new Set(finalPrompts.map(p => p.author).filter(Boolean))) as string[];
+        const allTags = Array.from(new Set(finalPrompts.flatMap(p => (p.tags || []).map(t => t.name))));
 
         set({
-          prompts: prompts,
-          filteredPrompts: filtered,
-          totalCount: response.data.total || prompts.length,
+          prompts: finalPrompts,
+          filteredPrompts: finalFiltered,
+          totalCount: response.data.total || finalPrompts.length,
           currentPage: response.data.page || 1,
-          totalPages: response.data.total_pages || Math.ceil((response.data.total || prompts.length) / state.pageSize),
+          totalPages: response.data.total_pages || Math.ceil((response.data.total || finalPrompts.length) / state.pageSize),
           categories,
           authors,
           isLoading: false,
