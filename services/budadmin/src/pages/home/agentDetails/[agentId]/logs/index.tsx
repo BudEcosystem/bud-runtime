@@ -818,6 +818,21 @@ const formatDuration = (seconds: number): string => {
   return `${seconds.toFixed(2)}s`;
 };
 
+const formatChartLabel = (timestamp: string | number): string => {
+  const date = new Date(timestamp);
+  const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+  if (hoursDiff <= 24) {
+    return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+  } else if (hoursDiff <= 24 * 7) {
+    return (
+      date.toLocaleDateString("en-US", { weekday: "short" }) +
+      " " +
+      date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+    );
+  }
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
 // Helper function to detect exception/error status from a span
 const detectSpanException = (span: TraceSpan): { hasException: boolean; errorType?: string } => {
   const attrs = span.span_attributes || {};
@@ -1839,21 +1854,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       // Only update chart directly in non-live mode
       // In live mode, updateChartData handles chart rendering with merged data
       if (!isLive && chartInstanceRef.current) {
-        const labels = sortedEntries.map(([timestamp]) => {
-          const date = new Date(timestamp);
-          const hoursDiff = (Date.now() - date.getTime()) / (1000 * 60 * 60);
-          if (hoursDiff <= 24) {
-            return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
-          } else if (hoursDiff <= 24 * 7) {
-            return (
-              date.toLocaleDateString("en-US", { weekday: "short" }) +
-              " " +
-              date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
-            );
-          } else {
-            return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          }
-        });
+        const labels = sortedEntries.map(([timestamp]) => formatChartLabel(timestamp));
 
         const successData: ExtendedBucketData[] = sortedEntries.map(([timestamp, value], index) => {
           const currentTime = new Date(timestamp).getTime();
