@@ -1393,7 +1393,7 @@ function AgentBoxInner({
               {isEditVersionMode && editVersionData ? `V${editVersionData.versionNumber}` : `V${index + 1}`}
             </span>
           </div>
-          {isHovering && (
+          {isHovering && !isEditVersionMode && (
             <PrimaryButton
               onClick={handleSaveClick}
               disabled={!session?.selectedDeployment?.name || isSavingChanges}
@@ -1408,7 +1408,7 @@ function AgentBoxInner({
                   : 'text-[#479d5f] group-hover:text-[#EEEEEE]'
               }`}
             >
-              {isAddVersionMode ? "Save Version" : isEditVersionMode ? "Save Changes" : "Save"}
+              {isAddVersionMode ? "Save Version" : "Save"}
             </PrimaryButton>
           )}
         </div>
