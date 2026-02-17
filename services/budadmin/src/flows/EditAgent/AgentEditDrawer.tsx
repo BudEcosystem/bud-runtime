@@ -175,6 +175,7 @@ export default function AgentEditDrawer() {
                 formItemClassnames="mb-[1rem]"
                 infoText="Enter a unique name for your agent"
                 InputClasses="py-[.5rem]"
+                disabled={true}
               />
             </div>
 
