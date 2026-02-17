@@ -324,31 +324,35 @@ export default function ModelRepo() {
           showLoader();
         }
 
-        await getGlobalModels({
-          page: targetPage,
-          limit: pageSize,
-          name: filter.name,
-          tag: filter.name,
-          // description: filter.name,
-          modality: filter.modality?.length > 0 ? filter.modality : undefined,
-          tasks: filter.tasks?.length > 0 ? filter.tasks : undefined,
-          author: filter.author?.length > 0 ? filter.author : undefined,
-          model_size_min: isFinite(filter.model_size_min)
-            ? filter.model_size_min
-            : undefined,
-          model_size_max: isFinite(filter.model_size_max)
-            ? filter.model_size_max
-            : undefined,
-          // table_source: filter.table_source,
-          table_source: "model",
-        });
+        try {
+          await getGlobalModels({
+            page: targetPage,
+            limit: pageSize,
+            name: filter.name,
+            tag: filter.name,
+            // description: filter.name,
+            modality: filter.modality?.length > 0 ? filter.modality : undefined,
+            tasks: filter.tasks?.length > 0 ? filter.tasks : undefined,
+            author: filter.author?.length > 0 ? filter.author : undefined,
+            model_size_min: isFinite(filter.model_size_min)
+              ? filter.model_size_min
+              : undefined,
+            model_size_max: isFinite(filter.model_size_max)
+              ? filter.model_size_max
+              : undefined,
+            // table_source: filter.table_source,
+            table_source: "model",
+          });
+        } catch (error) {
+          console.error("Failed to load models:", error);
+        } finally {
+          if (!isInfiniteScroll) {
+            hideLoader();
+          }
 
-        if (!isInfiniteScroll) {
-          hideLoader();
-        }
-
-        if (isInfiniteScroll) {
-          isLoadingMore.current = false;
+          if (isInfiniteScroll) {
+            isLoadingMore.current = false;
+          }
         }
       }
     },
