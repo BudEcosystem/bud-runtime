@@ -102,6 +102,8 @@ interface LogsTabProps {
 }
 
 // Chart configuration for real-time scrolling
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 const CHART_CONFIG = {
   bucketCount: 30, // Number of bars in the chart
   updateInterval: 500, // Chart update interval in ms (faster for smoother scrolling)
@@ -147,7 +149,7 @@ const generateTimeBuckets = (timeWindowMs: number, bucketCount: number): TimeBuc
         minute: '2-digit',
         second: '2-digit',
       });
-    } else if (timeWindowMs <= 3600000) {
+    } else if (timeWindowMs <= ONE_HOUR_MS) {
       // <= 1 hour: show minutes:seconds
       label = date.toLocaleTimeString('en-US', {
         hour12: false,
@@ -1746,7 +1748,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       // Format label based on time window
       const date = new Date(bucketEnd);
       let label: string;
-      if (timeWindowMs <= 3600000) {
+      if (timeWindowMs <= ONE_HOUR_MS) {
         // <= 1 hour: show MM:SS
         label = date.toLocaleTimeString('en-US', { hour12: false, minute: '2-digit', second: '2-digit' });
       } else if (timeWindowMs <= 86400000) {
@@ -1861,7 +1863,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           const nextTime =
             index < sortedEntries.length - 1
               ? new Date(sortedEntries[index + 1][0]).getTime()
-              : currentTime + 3600000;
+              : currentTime + ONE_HOUR_MS;
           return {
             value,
             bucketStart: currentTime,
