@@ -23,12 +23,20 @@ graph LR
 
 ## Step-by-step guide
 
-1. Open your deployment and navigate to **Adapters**.
-2. Start **Add Adapter** flow.
-3. Select adapter model and enter adapter details.
+1. Open **Models** and add your adapter model to the model catalog first.
+1. Go to **Projects** and select the project that contains your deployed base model.
+1. Open **Deployments** and then open the target deployment detail page.
+1. In deployment details, open the **Adapters** tab.
+1. Click **Add Adapter**.
+1. In **Select Adapter Model**, choose the adapter model that you already added in **Models**.
+3. Enter adapter deployment details (for example, adapter deployment name) and continue.
 4. Deploy adapter and monitor status until completion.
 5. Validate adapter behavior with use-case specific prompts.
 6. Use adapter-level metrics and logs for ongoing optimization.
+
+![Image](/images/image-20.png)
+
+**Important:** The **Add Adapter** flow in deployment details only lists adapter-compatible models from the catalog. If your adapter model is not visible, first add/publish it from the **Models** page.
 
 ## Why this matters
 
