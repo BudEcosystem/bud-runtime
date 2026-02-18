@@ -414,6 +414,8 @@ class EndpointDataManager(DataManagerUtils):
 
         # Generate statements according to search or filters
         if search:
+            # Pop name for separate AND filtering (not OR'd with other conditions)
+            endpoint_name = filters.pop("name", None)
             if explicit_filters["model_name"]:
                 # For search, query using like operator
                 model_name_condition = Model.name.ilike(f"%{explicit_filters['model_name']}%")
@@ -457,6 +459,10 @@ class EndpointDataManager(DataManagerUtils):
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
             )
+            if endpoint_name:
+                name_condition = func.lower(EndpointModel.name).like(f"%{endpoint_name.lower()}%")
+                stmt = stmt.filter(name_condition)
+                count_stmt = count_stmt.filter(name_condition)
         else:
             if explicit_filters["model_name"]:
                 model_name_condition = Model.name == explicit_filters["model_name"]
