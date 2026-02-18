@@ -10,7 +10,7 @@ In the Models experience, evaluation signals complement performance benchmarks s
 ## Evaluation workflow
 
 ```mermaid
-graph TD
+graph LR
     A[Candidate Models] --> B[Run Evaluations]
     B --> C[Quality Signals]
     C --> D[Promotion Review]
@@ -41,10 +41,22 @@ graph TD
 
 ## Escalation checklist
 
-<Check>Quality threshold passed on target dataset.</Check>
-<Check>Evaluation rerun confirms stable quality.</Check>
-<Check>Security and verification checks are green.</Check>
-<Check>Approval owner signs off promotion.</Check>
+<Check>
+  Quality threshold passed on target dataset.
+</Check>
+
+ <Check>
+  Evaluation rerun confirms stable quality.
+</Check>
+
+ <Check>
+  Security and verification checks are green.
+</Check>
+
+ <Check>
+  Approval owner signs off promotion.
+</Check>
+
 
 ## Related docs
 

@@ -14,7 +14,7 @@ This quickstart walks through adding a model, validating readiness, and confirmi
 5. Confirm model visibility in the repository.
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[Open Models] --> B[Click + Model]
     B --> C[Choose Modality and Source]
     C --> D[Fill Metadata and Connectivity]
@@ -40,13 +40,15 @@ flowchart TD
 
 ## Step 2: Start onboarding
 
-1. Click **+ Model**.
+1. Click **\+ Model**.
 2. Select the target **modality**.
 3. Select a source type:
    - **Cloud**
    - **Hugging Face**
    - **URL**
    - **Disk**
+
+![Image](/images/image-15.png)
 
 ## Step 3: Configure model details
 
@@ -58,7 +60,7 @@ Provide required fields for the selected source:
 - modality and endpoint-related metadata.
 
 <Tip>
-Use clear naming and tags so teams can find the model quickly in filtered views.
+  Use clear naming and tags so teams can find the model quickly in filtered views.
 </Tip>
 
 ## Step 4: Submit and monitor status
@@ -75,9 +77,17 @@ Use clear naming and tags so teams can find the model quickly in filtered views.
 
 ## Success criteria
 
-<Check>The model appears in the repository list.</Check>
-<Check>Metadata (name, tags, source) is correct.</Check>
-<Check>Verification/security indicators are visible.</Check>
+<Check>
+  The model appears in the repository list.
+</Check>
+
+<Check>
+  Metadata (name, tags, source) is correct.
+</Check>
+
+<Check>
+  Verification/security indicators are visible.
+</Check>
 
 ## Next steps
 

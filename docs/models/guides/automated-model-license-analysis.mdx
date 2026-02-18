@@ -10,15 +10,17 @@ Bud AI Foundry includes a built-in license analysis experience so your team can 
 ## What this feature solves
 
 - Reduces manual license interpretation work.
-- Gives teams a repeatable review step before onboarding or deployment.
+- Gives teams a repeatable review step before deployment.
 - Surfaces license details and FAQs in one place for faster decisions.
+
+![Image](/images/image-17.png)
 
 ## How it works in Bud
 
 The model details flow supports viewing license details and FAQs, including license files/URLs and structured Q&A content.
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[Select Candidate Models] --> B[Open Model License Details]
     B --> C[Review License Summary]
     C --> D[Check License FAQ and File]
@@ -36,7 +38,7 @@ flowchart TD
 5. Continue onboarding/deployment only for approved candidates.
 
 <Tip>
-Treat license review as a required quality gate, alongside performance and security checks.
+  Treat license review as a required quality gate, alongside performance and security checks.
 </Tip>
 
 ## Practical examples
