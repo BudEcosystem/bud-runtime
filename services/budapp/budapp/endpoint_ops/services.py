@@ -2461,6 +2461,7 @@ class EndpointService(SessionMixin):
         "hyperbolic": ProxyProviderEnum.HYPERBOLIC,
         "mistral": ProxyProviderEnum.MISTRAL,
         "together": ProxyProviderEnum.TOGETHER,
+        "together_ai": ProxyProviderEnum.TOGETHER,
         "xai": ProxyProviderEnum.XAI,
         "vllm": ProxyProviderEnum.VLLM,
     }
