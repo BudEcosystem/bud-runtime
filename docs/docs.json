@@ -94,7 +94,23 @@
             "group": "Deployments",
             "icon": "rocket",
             "pages": [
-              "deployments/deployments"
+              "deployments/introduction",
+              "deployments/quickstart",
+              "deployments/deployment-concepts",
+              "deployments/creating-first-deployment",
+              {
+                "group": "Guides",
+                "pages": [
+                  "deployments/guides/deployment-lifecycle-management"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "deployments/reference/deployment-actions-reference"
+                ]
+              },
+              "deployments/troubleshooting"
             ]
           },
           {
