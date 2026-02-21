@@ -3,6 +3,7 @@
 import { Box, Flex } from "@radix-ui/themes";
 import { PlusIcon, Share1Icon } from "@radix-ui/react-icons";
 import { useEffect, useState, useRef, useCallback } from "react";
+import { Spin } from "antd";
 import React from "react";
 import DashBoardLayout from "../layout";
 import {
@@ -47,6 +48,7 @@ const Projects = () => {
   // Add refs to prevent multiple API calls
   const isLoadingMore = useRef(false);
   const lastScrollTop = useRef(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const goToDetails = (item) => {
     router.push(`/projects/${item.project.id}`);
@@ -61,6 +63,7 @@ const Projects = () => {
 
       if (isInfiniteScroll) {
         isLoadingMore.current = true;
+        setLoadingMore(true);
       }
 
       setPageSize(size);
@@ -69,25 +72,30 @@ const Projects = () => {
         showLoader();
       }
 
-      await getGlobalProjects(page, size, searchTerm);
+      try {
+        await getGlobalProjects(page, size, searchTerm);
+      } catch (error) {
+        console.error("Failed to load projects:", error);
+      } finally {
+        if (!isInfiniteScroll) {
+          hideLoader();
+        }
 
-      if (!isInfiniteScroll) {
-        hideLoader();
-      }
-
-      if (isInfiniteScroll) {
-        isLoadingMore.current = false;
+        if (isInfiniteScroll) {
+          isLoadingMore.current = false;
+          setLoadingMore(false);
+        }
       }
     }
   }, [getGlobalProjects, hasPermission, hideLoader, showLoader, setPageSize]);
 
-  // Initial load
+  // Initial load - wait for permissions to be ready before fetching data
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && !loadingUser) {
       setCurrentPage(1);
       load(1, pageSize);
     }
-  }, [isMounted, load, pageSize]);
+  }, [isMounted, loadingUser, load, pageSize]);
 
   // Search with debounce
   useEffect(() => {
@@ -184,9 +192,10 @@ const Projects = () => {
                 textMessage={`No projects found for the search term ${searchTerm}`}
               />
             )}
-            <div className="grid gap-[1.1rem] grid-cols-3 mt-[2.95rem] 1680px:mt-[1.75rem] pb-[1.1rem]">
+            <div className="mt-[2.95rem] 1680px:mt-[1.75rem] pb-[1.1rem]">
               {globalProjects?.length > 0 ? (
                 <>
+                  <div className="grid gap-[1.1rem] grid-cols-3">
                   {globalProjects?.map((item: any, index) => (
                     <Flex
                       direction="column"
@@ -280,6 +289,12 @@ const Projects = () => {
                       </Flex>
                     </Flex>
                   ))}
+                  </div>
+                  {loadingMore && (
+                    <div className="flex justify-center items-center py-[1.5rem]">
+                      <Spin size="small" />
+                    </div>
+                  )}
                 </>
               ) : (
                 !searchTerm && (

@@ -6,6 +6,7 @@ import { Text_12_400_EEEEEE, Text_14_400_EEEEEE, Text_10_400_757575, Text_10_400
 import { AppRequest } from 'src/pages/api/requests';
 import { tempApiBaseUrl } from '@/components/environment';
 import { errorToast } from '@/components/toast';
+import { renderToolIcon } from '@/utils/iconUtils';
 import ProjectTags from 'src/flows/components/ProjectTags';
 
 interface ToolDetailsProps {
@@ -63,11 +64,7 @@ export const ToolDetails: React.FC<ToolDetailsProps> = ({
   }, [toolId]);
 
   const getToolIcon = () => {
-    if (toolData?.icon) {
-      return toolData.icon;
-    }
-    const name = toolData?.name || toolName || '';
-    return name.charAt(0).toUpperCase();
+    return renderToolIcon(toolData?.icon, toolData?.name || toolName || '', "w-4 h-4 object-contain");
   };
 
   const formatParamName = (paramName: string) => {

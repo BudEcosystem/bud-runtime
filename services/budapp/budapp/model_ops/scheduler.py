@@ -203,11 +203,6 @@ class CloudModelSyncScheduler:
             await EndpointDataManager(session).mark_as_deprecated(deprecated_model_ids)
             logger.debug("Marked endpoints as deprecated")
 
-        # Soft delete deprecated models
-        with Session(engine) as session:
-            await ModelDataManager(session).soft_delete_deprecated_models(deprecated_model_ids)
-            logger.debug("Soft deleted deprecated models from model zoo")
-
         # Remove deprecated cloud models
         with Session(engine) as session:
             await CloudModelDataManager(session).remove_non_supported_cloud_models(cloud_model_uris)

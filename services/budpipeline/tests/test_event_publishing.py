@@ -132,7 +132,7 @@ class TestEventTypes:
         assert len(published_payloads) == 1
         payload = published_payloads[0]
         assert captured_event_types[0] == EventType.WORKFLOW_PROGRESS
-        assert payload["notification_type"] == "EVENT"
+        assert payload["notification_type"] == "event"
         assert payload["payload"]["type"] == "pipeline_execution"
         assert payload["payload"]["event"] == "progress"
         assert payload["payload"]["content"]["status"] == "RUNNING"
@@ -548,7 +548,7 @@ class TestEventPayloadStructure:
             data={"progress_percentage": 50.0},
         )
 
-        assert payload["notification_type"] == "EVENT"
+        assert payload["notification_type"] == "event"
         assert payload["name"] == "bud-notification"
         assert "payload" in payload
         assert payload["payload"]["category"] == "internal"

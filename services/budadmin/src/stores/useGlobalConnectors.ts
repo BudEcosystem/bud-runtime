@@ -109,7 +109,7 @@ export const useGlobalConnectors = create<GlobalConnectorsState>((set) => ({
   availableLoading: false,
 
   fetchRegistry: async (params, append = false) => {
-    set({ registryLoading: !append });
+    set({ registryLoading: true });
     try {
       const res = await GlobalConnectorService.listRegistry(params);
       const data = res?.data;

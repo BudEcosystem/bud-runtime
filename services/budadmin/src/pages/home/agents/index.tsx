@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import React from "react";
 import { useRouter } from "next/router";
 import DashBoardLayout from "../layout";
@@ -29,7 +29,7 @@ import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import NoDataFount from "@/components/ui/noDataFount";
 import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
-import { ConfigProvider, Popover, Select, Slider, Tag, Dropdown, type MenuProps } from "antd";
+import { ConfigProvider, Popover, Select, Slider, Spin, Tag, Dropdown, type MenuProps } from "antd";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { usePromptsAgents, type PromptAgent } from "@/stores/usePromptsAgents";
 import { IconOnlyRender } from "src/flows/components/BudIconRender";
@@ -55,8 +55,11 @@ function PromptAgentCard({ item, index }: { item: PromptAgent; index: number }) 
   const needsSeeMore = item.description && item.description.length > 100;
 
   const handleCardClick = () => {
-    // Navigate to agent detail page
-    // router.push(`/home/agentDetails/${item.id}`);
+    if (!item.project_id) {
+      errorToast("Cannot open agent details: Project ID is missing.");
+      return;
+    }
+    router.push(`/agents/${item.project_id}/agentDetails/${item.id}?name=${encodeURIComponent(item.name)}`);
   };
 
   return (
@@ -272,6 +275,8 @@ export default function PromptsAgents() {
   const {
     filteredPrompts,
     isLoading,
+    totalCount,
+    totalPages,
     searchQuery,
     selectedType,
     selectedCategory,
@@ -295,6 +300,9 @@ export default function PromptsAgents() {
 
   // State
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const isLoadingMoreRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
   const [tempFilter, setTempFilter] = useState<any>(defaultFilter);
   const [filter, setFilter] = useState<any>(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -318,6 +326,46 @@ export default function PromptsAgents() {
     [setSearchQuery, setSelectedType, setSelectedCategory, setSelectedAuthor, setSelectedTags, setRatingRange, applyFilters]
   );
 
+  const loadMoreAgents = useCallback(async (page: number) => {
+    if (isLoadingMoreRef.current) return;
+    isLoadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      await fetchPrompts({ page });
+    } catch (error) {
+      console.error("Failed to load more agents:", error);
+    } finally {
+      isLoadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [fetchPrompts]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+
+    if (scrollTop <= lastScrollTopRef.current) {
+      lastScrollTopRef.current = scrollTop;
+      return;
+    }
+    lastScrollTopRef.current = scrollTop;
+
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+
+    if (
+      isNearBottom &&
+      !isLoadingMoreRef.current &&
+      filteredPrompts?.length < totalCount &&
+      currentPage < totalPages
+    ) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      loadMoreAgents(nextPage);
+    }
+  };
+
   const handleOpenChange = (open: boolean) => {
     setFilterOpen(open);
     setTempFilter(filter);
@@ -327,6 +375,8 @@ export default function PromptsAgents() {
     setFilterOpen(false);
     setFilter(tempFilter);
     setCurrentPage(1);
+    isLoadingMoreRef.current = false;
+    lastScrollTopRef.current = 0;
     await load(tempFilter);
     setFilterReset(false);
   };
@@ -334,6 +384,8 @@ export default function PromptsAgents() {
   const resetFilter = async () => {
     setTempFilter(defaultFilter);
     setCurrentPage(1);
+    isLoadingMoreRef.current = false;
+    lastScrollTopRef.current = 0;
     setFilterReset(true);
     await storeResetFilters();
   };
@@ -355,6 +407,8 @@ export default function PromptsAgents() {
   }, [filterReset]);
 
   useEffect(() => {
+    isLoadingMoreRef.current = false;
+    lastScrollTopRef.current = 0;
     const timer = setTimeout(() => {
       if (filter.name !== undefined) {
         setSearchQuery(filter.name);
@@ -1067,6 +1121,7 @@ export default function PromptsAgents() {
             <div
               className="boardMainContainer listingContainer scroll-smooth pt-[2.95rem] relative"
               id="prompts-agents-list"
+              onScroll={handleScroll}
             >
               <SelectedFilters
                 filters={tempFilter}
@@ -1079,11 +1134,18 @@ export default function PromptsAgents() {
                   <div className="text-[#B3B3B3]">Loading prompts and agents...</div>
                 </div>
               ) : filteredPrompts?.length > 0 ? (
-                <div className="grid gap-[1.1rem] grid-cols-3 1680px:mt-[1.75rem] pb-[1.1rem]">
-                  {filteredPrompts.map((item, index) => (
-                    <PromptAgentCard key={item.id} item={item} index={index} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid gap-[1.1rem] grid-cols-3 1680px:mt-[1.75rem] pb-[1.1rem]">
+                    {filteredPrompts.map((item, index) => (
+                      <PromptAgentCard key={item.id} item={item} index={index} />
+                    ))}
+                  </div>
+                  {loadingMore && (
+                    <div className="flex justify-center items-center py-[1.5rem]">
+                      <Spin size="small" />
+                    </div>
+                  )}
+                </>
               ) : (
                 <div>
                   {Object.keys(filter).filter(

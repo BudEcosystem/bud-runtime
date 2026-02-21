@@ -608,7 +608,6 @@ class WorkflowTypeEnum(StrEnum):
     GUARDRAIL_DEPLOYMENT = auto()
     PROMPT_CREATION = auto()
     PROMPT_SCHEMA_CREATION = auto()
-    TOOL_CREATION = auto()
     CUSTOM_PROBE_CREATION = auto()
 
 
@@ -664,6 +663,9 @@ class PayloadType(str, Enum):
     DELETE_ADAPTER = "delete_adapter"
     EVALUATE_MODEL = "evaluate_model"
     PERFORM_PROMPT_SCHEMA = "perform_prompt_schema"
+    GUARDRAIL_MODEL_ONBOARDING = "guardrail_model_onboarding"
+    GUARDRAIL_DEPLOYMENT = "guardrail_deployment"
+    GUARDRAIL_SIMULATION = "guardrail_simulation"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -691,9 +693,10 @@ class BudServeWorkflowStepEventName(str, Enum):
     ADAPTER_DEPLOYMENT_EVENTS = "adapter_deployment_events"
     ADAPTER_DELETE_EVENTS = "adapter_delete_events"
     EVALUATION_EVENTS = "evaluation_events"
+    GUARDRAIL_ONBOARDING_EVENTS = "guardrail_onboarding_events"
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
+    GUARDRAIL_SIMULATION_EVENTS = "guardrail_simulation_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
-    TOOL_CREATION_EVENTS = "tool_creation_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -716,6 +719,9 @@ PAYLOAD_TO_WORKFLOW_STEP_EVENT: dict[PayloadType, BudServeWorkflowStepEventName]
     PayloadType.ADD_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DEPLOYMENT_EVENTS,
     PayloadType.DELETE_ADAPTER: BudServeWorkflowStepEventName.ADAPTER_DELETE_EVENTS,
     PayloadType.EVALUATE_MODEL: BudServeWorkflowStepEventName.EVALUATION_EVENTS,
+    PayloadType.GUARDRAIL_MODEL_ONBOARDING: BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS,
+    PayloadType.GUARDRAIL_DEPLOYMENT: BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS,
+    PayloadType.GUARDRAIL_SIMULATION: BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS,
 }
 
 
@@ -3099,7 +3105,6 @@ WORKFLOW_DELETE_MESSAGES = {
     WorkflowTypeEnum.ADD_WORKER_TO_ENDPOINT: "Successfully cancelled worker to deployment.",
     WorkflowTypeEnum.GUARDRAIL_DEPLOYMENT: "Successfully cancelled guardrail deployment.",
     WorkflowTypeEnum.MODEL_BENCHMARK: "Successfully cancelled benchmark.",
-    WorkflowTypeEnum.TOOL_CREATION: "Successfully cancelled tool creation.",
 }
 
 

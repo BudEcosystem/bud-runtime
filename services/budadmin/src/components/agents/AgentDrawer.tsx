@@ -60,6 +60,12 @@ const AgentDrawer: React.FC = () => {
     // Remove prompt parameter from URL
     removePromptFromUrl();
 
+    // If in edit version mode, trigger refresh of versions list
+    // (individual saves already persisted changes to the backend)
+    if (isEditVersionMode) {
+      window.dispatchEvent(new CustomEvent('versionCreated'));
+    }
+
     // Check if we're in a workflow
     if (workflowContext.isInWorkflow) {
       // Close the agent drawer

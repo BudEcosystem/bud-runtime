@@ -7,6 +7,17 @@ Use the Models benchmarking workflow to measure runtime performance before promo
 
 Bud AI Foundry supports guided benchmark creation, benchmark history filtering, and side-by-side comparison of runs executed on your own clusters.
 
+<img
+  src="/images/image-19.png"
+  alt="Image"
+  className="hidden dark:block"
+/>
+<img
+  src="/images/performance-benchmark.png"
+  alt="Image"
+  className="dark:hidden"
+/>
+
 ## Benchmark workflow
 
 ```mermaid
@@ -37,6 +48,8 @@ graph LR
 6. Run benchmark and monitor status.
 7. Review throughput, latency/TPOT, duration, and completion state.
 
+![Image](/images/image-19.png)
+
 ## Recommended process
 
 1. Start with 2-3 candidate models for the same workload.
@@ -54,10 +67,21 @@ graph LR
 
 ## Escalation checklist
 
-<Check>Latency and throughput meet service objectives.</Check>
-<Check>Duration is acceptable for recurring validation cycles.</Check>
-<Check>No regression versus the previous approved benchmark baseline.</Check>
-<Check>Approval owner signs off promotion based on benchmark evidence.</Check>
+<Check>
+  Latency and throughput meet service objectives.
+</Check>
+
+<Check>
+  Duration is acceptable for recurring validation cycles.
+</Check>
+
+<Check>
+  No regression versus the previous approved benchmark baseline.
+</Check>
+
+<Check>
+  Approval owner signs off promotion based on benchmark evidence.
+</Check>
 
 ## Related docs
 
