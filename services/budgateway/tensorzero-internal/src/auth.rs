@@ -289,6 +289,14 @@ pub async fn require_api_key(
                         .insert("x-tensorzero-prompt-id", header_value);
                 }
             }
+            // Also set endpoint_id for inference_cost lookup and baggage propagation
+            if let Some(ref endpoint_id) = metadata.endpoint_id {
+                if let Ok(header_value) = endpoint_id.parse() {
+                    request
+                        .headers_mut()
+                        .insert("x-tensorzero-endpoint-id", header_value);
+                }
+            }
         } else {
             // For model-based requests, add the model name header
             if let Ok(header_value) = lookup_key.parse() {
