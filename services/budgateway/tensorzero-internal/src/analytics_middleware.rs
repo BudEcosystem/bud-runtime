@@ -29,6 +29,12 @@ use crate::geoip::GeoIpService;
 #[derive(Clone)]
 pub struct ParentSpanContext(pub opentelemetry::Context);
 
+/// Wrapper for storing the gateway_analytics span handle in request extensions.
+/// Handlers can extract this to record attributes directly on the gateway_analytics span,
+/// which is necessary for streaming responses where header-based propagation doesn't work.
+#[derive(Clone)]
+pub struct GatewayAnalyticsSpan(pub tracing::Span);
+
 /// Middleware for collecting analytics data about gateway requests
 pub async fn analytics_middleware(
     headers: HeaderMap,
@@ -96,6 +102,8 @@ pub async fn analytics_middleware(
         gen_ai.usage.input_tokens = tracing::field::Empty,
         gen_ai.usage.output_tokens = tracing::field::Empty,
         gen_ai.usage.total_tokens = tracing::field::Empty,
+        // Inference cost (for /v1/responses)
+        gen_ai.inference_cost = tracing::field::Empty,
         // OpenTelemetry error status
         otel.status_code = tracing::field::Empty,
         otel.status_description = tracing::field::Empty,
@@ -200,6 +208,11 @@ pub async fn analytics_middleware(
     let ga_span_ctx = tracing::Span::current().context();
     request.extensions_mut().insert(ParentSpanContext(ga_span_ctx));
 
+    // Store gateway_analytics span handle for handlers to record attributes directly.
+    // This is needed for streaming responses where header-based propagation doesn't work
+    // because headers are set before the stream body is consumed.
+    request.extensions_mut().insert(GatewayAnalyticsSpan(tracing::Span::current()));
+
     // Get ClickHouse connection before processing request
     let clickhouse_opt = request
         .extensions()
@@ -298,6 +311,16 @@ pub async fn analytics_middleware(
                     let span = tracing::Span::current();
                     span.record("gen_ai.usage.total_tokens", tokens);
                     tracing::debug!("Captured total_tokens {} for analytics", tokens);
+                }
+            }
+        }
+        // Extract inference cost from response headers if present (for /v1/responses)
+        if let Some(cost_header) = response.headers().get("x-tensorzero-inference-cost") {
+            if let Ok(cost_str) = cost_header.to_str() {
+                if let Ok(cost) = cost_str.parse::<f64>() {
+                    let span = tracing::Span::current();
+                    span.record("gen_ai.inference_cost", cost);
+                    tracing::debug!("Captured inference_cost {} for analytics", cost);
                 }
             }
         }

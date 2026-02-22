@@ -7607,9 +7607,15 @@ pub async fn response_create_handler(
         model_credential_store,
         ..
     }): AppState,
+    ga_span_ext: Option<Extension<crate::analytics_middleware::GatewayAnalyticsSpan>>,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
 ) -> Result<Response<Body>, Error> {
+    // Extract gateway_analytics span handle for direct attribute recording in streaming closures.
+    // This bypasses the header-based mechanism which doesn't work for streaming (headers are set
+    // before the stream body is consumed and usage/cost data becomes available).
+    let ga_span_handle = ga_span_ext.map(|Extension(s)| s.0);
+
     // Capture request arrival time for observability
     let request_arrival_time = chrono::Utc::now();
 
@@ -7648,6 +7654,11 @@ pub async fn response_create_handler(
     let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
         std::sync::Arc::new(std::sync::Mutex::new(None));
     let captured_usage_clone = captured_usage.clone();
+
+    // Capture inference cost for analytics (will be populated inside async block)
+    let captured_inference_cost: std::sync::Arc<std::sync::Mutex<Option<f64>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_inference_cost_clone = captured_inference_cost.clone();
 
     // Capture model latency for analytics (will be populated inside async block)
     // This is used to calculate gateway_processing_ms = total_duration_ms - model_latency_ms
@@ -7812,6 +7823,9 @@ pub async fn response_create_handler(
                     *guard = Some(provider_latency_ms);
                 }
 
+                // Clone gateway_analytics span handle for use in stream closure
+                let ga_span_for_stream = ga_span_handle.clone();
+
                 // Wrap stream to capture events and record observability after completion
                 let sse_stream = async_stream::stream! {
                     use futures::StreamExt;
@@ -7883,6 +7897,27 @@ pub async fn response_create_handler(
                                     ) {
                                         let span = tracing::Span::current();
                                         span.record("gen_ai.inference_cost", ic);
+                                        if let Ok(mut guard) = captured_inference_cost_clone.lock() {
+                                            *guard = Some(ic);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Record usage/cost directly on gateway_analytics span for streaming.
+                            // Header-based propagation doesn't work for streaming because headers
+                            // are set before the stream body is consumed.
+                            if let Some(ref ga_span) = ga_span_for_stream {
+                                if let Some(ref usage) = response.usage {
+                                    ga_span.record("gen_ai.usage.input_tokens", usage.input_tokens as i64);
+                                    if let Some(output) = usage.output_tokens {
+                                        ga_span.record("gen_ai.usage.output_tokens", output as i64);
+                                    }
+                                    ga_span.record("gen_ai.usage.total_tokens", usage.total_tokens as i64);
+                                }
+                                if let Ok(guard) = captured_inference_cost_clone.lock() {
+                                    if let Some(cost) = *guard {
+                                        ga_span.record("gen_ai.inference_cost", cost);
                                     }
                                 }
                             }
@@ -7950,6 +7985,9 @@ pub async fn response_create_handler(
                         ) {
                             let span = tracing::Span::current();
                             span.record("gen_ai.inference_cost", ic);
+                            if let Ok(mut guard) = captured_inference_cost_clone.lock() {
+                                *guard = Some(ic);
+                            }
                         }
                     }
                 }
@@ -8024,6 +8062,10 @@ pub async fn response_create_handler(
 
             // Clone inference_cost_pricing for use inside async_stream block
             let inference_cost_for_stream = inference_cost_pricing.clone();
+            let captured_inference_cost_for_stream = captured_inference_cost_clone.clone();
+
+            // Clone gateway_analytics span handle for use in stream closure
+            let ga_span_for_stream = ga_span_handle.clone();
 
             // Wrap stream to capture events and record observability after completion
             let sse_stream = async_stream::stream! {
@@ -8097,6 +8139,27 @@ pub async fn response_create_handler(
                                 ) {
                                     let span = tracing::Span::current();
                                     span.record("gen_ai.inference_cost", ic);
+                                    if let Ok(mut guard) = captured_inference_cost_for_stream.lock() {
+                                        *guard = Some(ic);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Record usage/cost directly on gateway_analytics span for streaming.
+                        // Header-based propagation doesn't work for streaming because headers
+                        // are set before the stream body is consumed.
+                        if let Some(ref ga_span) = ga_span_for_stream {
+                            if let Some(ref usage) = response.usage {
+                                ga_span.record("gen_ai.usage.input_tokens", usage.input_tokens as i64);
+                                if let Some(output) = usage.output_tokens {
+                                    ga_span.record("gen_ai.usage.output_tokens", output as i64);
+                                }
+                                ga_span.record("gen_ai.usage.total_tokens", usage.total_tokens as i64);
+                            }
+                            if let Ok(guard) = captured_inference_cost_for_stream.lock() {
+                                if let Some(cost) = *guard {
+                                    ga_span.record("gen_ai.inference_cost", cost);
                                 }
                             }
                         }
@@ -8171,6 +8234,9 @@ pub async fn response_create_handler(
                     ) {
                         let span = tracing::Span::current();
                         span.record("gen_ai.inference_cost", ic);
+                        if let Ok(mut guard) = captured_inference_cost_clone.lock() {
+                            *guard = Some(ic);
+                        }
                     }
                 }
             }
@@ -8290,6 +8356,16 @@ pub async fn response_create_handler(
                     response
                         .headers_mut()
                         .insert("x-tensorzero-total-tokens", value);
+                }
+            }
+        }
+        // Add inference cost header for analytics
+        if let Ok(guard) = captured_inference_cost.lock() {
+            if let Some(cost) = *guard {
+                if let Ok(value) = axum::http::HeaderValue::from_str(&cost.to_string()) {
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-inference-cost", value);
                 }
             }
         }
