@@ -907,7 +907,7 @@ class GatewayBlockingRuleStats(BaseModel):
 class AggregatedMetricsRequest(BaseModel):
     """Request schema for aggregated metrics with server-side calculations."""
 
-    from_date: datetime
+    from_date: Optional[datetime] = None
     to_date: Optional[datetime] = None
     group_by: Optional[list[Literal["model", "project", "endpoint", "user", "user_project"]]] = None
     filters: Optional[Dict[str, Any]] = None  # e.g., {"project_id": ["uuid1", "uuid2"], "model_id": "uuid"}
@@ -931,6 +931,9 @@ class AggregatedMetricsRequest(BaseModel):
             "throughput_avg",
             "error_rate",
             "unique_users",
+            "p95_inference_cost",
+            "max_inference_cost",
+            "min_inference_cost",
         ]
     ]
     data_source: Literal["inference", "prompt"] = "inference"
@@ -939,8 +942,19 @@ class AggregatedMetricsRequest(BaseModel):
     @classmethod
     def validate_to_date(cls, v: Optional[datetime], info) -> Optional[datetime]:
         """Validate that to_date is after from_date and within reasonable range."""
-        validate_date_range(info.data.get("from_date"), v)
+        from_date = info.data.get("from_date")
+        if from_date and v:
+            validate_date_range(from_date, v)
         return v
+
+    @model_validator(mode="after")
+    def set_default_from_date(self):
+        if self.from_date is None:
+            from budmetrics.commons.config import app_settings
+
+            to_date = self.to_date or datetime.now()
+            self.from_date = to_date - timedelta(days=app_settings.clickhouse_ttl_inference_fact)
+        return self
 
 
 class AggregatedMetricValue(BaseModel):
