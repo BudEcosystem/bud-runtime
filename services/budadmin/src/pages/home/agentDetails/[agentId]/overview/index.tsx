@@ -1738,6 +1738,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
     min: string;
   } | null>(null);
   const [costMetricsLoading, setCostMetricsLoading] = useState(false);
+  const [costMetricsError, setCostMetricsError] = useState<string | null>(null);
   const { getPromptById } = usePrompts();
   const { openDrawer } = useDrawer();
   const { hasPermission } = useUser();
@@ -1792,10 +1793,11 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
     return `$${value.toFixed(2)}`;
   };
 
-  const fetchCostMetrics = async () => {
+  const fetchCostMetrics = useCallback(async () => {
     if (!promptId || typeof promptId !== "string") return;
 
     setCostMetricsLoading(true);
+    setCostMetricsError(null);
     try {
       const response = await AppRequest.Post(
         `${tempApiBaseUrl}/metrics/aggregated`,
@@ -1820,15 +1822,15 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
       }
     } catch (error) {
       console.error("Error fetching cost metrics:", error);
+      setCostMetricsError("Failed to load cost metrics.");
     } finally {
       setCostMetricsLoading(false);
     }
-  };
+  }, [promptId]);
 
   useEffect(() => {
     fetchCostMetrics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptId]);
+  }, [fetchCostMetrics]);
 
   if (loading) {
     return (
@@ -1929,6 +1931,8 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
             </div>
             {costMetricsLoading ? (
               <Spin size="small" />
+            ) : costMetricsError ? (
+              <Text_12_400_B3B3B3>{costMetricsError}</Text_12_400_B3B3B3>
             ) : (
               <Text_40_400_EEEEEE>{costMetrics?.p95 ?? "--"}</Text_40_400_EEEEEE>
             )}
@@ -1942,6 +1946,8 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
             </div>
             {costMetricsLoading ? (
               <Spin size="small" />
+            ) : costMetricsError ? (
+              <Text_12_400_B3B3B3>{costMetricsError}</Text_12_400_B3B3B3>
             ) : (
               <Text_40_400_EEEEEE>{costMetrics?.max ?? "--"}</Text_40_400_EEEEEE>
             )}
@@ -1955,6 +1961,8 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
             </div>
             {costMetricsLoading ? (
               <Spin size="small" />
+            ) : costMetricsError ? (
+              <Text_12_400_B3B3B3>{costMetricsError}</Text_12_400_B3B3B3>
             ) : (
               <Text_40_400_EEEEEE>{costMetrics?.min ?? "--"}</Text_40_400_EEEEEE>
             )}
