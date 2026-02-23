@@ -3239,10 +3239,12 @@ class EndpointService(SessionMixin):
                     if resp.status != 200:
                         return None
                     data = await resp.json()
-            for cluster in data.get("clusters", []):
+            for cluster in data.get("items", []):
                 if cluster.get("cluster_id") == cluster_id:
-                    cost_per_token = cluster.get("cost_per_token", 0)
-                    if cost_per_token:
+                    metrics = cluster.get("metrics", {})
+                    cost_per_million = metrics.get("cost_per_million_tokens", 0)
+                    if cost_per_million:
+                        cost_per_token = cost_per_million / 1_000_000
                         half_cost = cost_per_token / 2
                         return {
                             "input_cost_per_token": half_cost,
