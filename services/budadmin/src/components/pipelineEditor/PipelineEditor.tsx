@@ -8,7 +8,7 @@
  * connection validation, and undo/redo support.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -32,7 +32,7 @@ import {
   type NodePaletteConfig,
 } from '@/components/flowEditor';
 import { PipelineToolbar } from './components/PipelineToolbar';
-import { ActionConfigPanel } from './components/ActionConfigPanel';
+import { ActionConfigPanel, type ActionConfigPanelRef } from './components/ActionConfigPanel';
 
 import type { DAGDefinition, PipelineStep } from '@/stores/useBudPipeline';
 import { pipelineNodeTypes, SPECIAL_NODE_TYPES, UNDELETABLE_NODE_TYPES } from './config/pipelineNodeTypes';
@@ -48,6 +48,16 @@ import type { StepNodeData } from './nodes/StepNode';
 export interface SelectOption {
   label: string;
   value: string;
+}
+
+export type FlushResult = {
+  stepId: string;
+  updates: { name?: string; params?: Record<string, unknown>; condition?: string };
+} | null | false;
+
+export interface PipelineEditorRef {
+  /** Flushes unsaved action config panel changes. Returns updates if flushed, null if nothing to flush, false if validation failed. */
+  flushUnsavedActionChanges: () => Promise<FlushResult>;
 }
 
 export interface PipelineEditorProps {
@@ -196,7 +206,7 @@ const helpTextStyles: React.CSSProperties = {
 // Inner Editor (needs ReactFlowProvider)
 // ============================================================================
 
-function PipelineEditorInner({
+const PipelineEditorInner = forwardRef<PipelineEditorRef, PipelineEditorProps>(function PipelineEditorInner({
   dag,
   onNodeClick,
   onAddStep,
@@ -206,7 +216,7 @@ function PipelineEditorInner({
   readonly = false,
   dataSources,
   loadingDataSources,
-}: PipelineEditorProps) {
+}: PipelineEditorProps, ref) {
   // Conversion utilities
   const { createInitialState, flowToDag, createStepNode } = usePipelineConversion();
 
@@ -221,6 +231,7 @@ function PipelineEditorInner({
   const [actionSearch, setActionSearch] = useState('');
   const [searchExpanded, setSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const actionConfigPanelRef = useRef<ActionConfigPanelRef>(null);
 
   // Get selected node data
   const selectedNode = useMemo(() => {
@@ -488,6 +499,25 @@ function PipelineEditorInner({
     }
   }, [nodes, edges, dag, flowToDag, onSave]);
 
+  // Expose flush method so parent can auto-save unsaved action changes
+  useImperativeHandle(ref, () => ({
+    flushUnsavedActionChanges: async () => {
+      if (!configPanelOpen || !selectedStepData) return null;
+      if (!actionConfigPanelRef.current) return null;
+
+      const result = await actionConfigPanelRef.current.flush();
+      if (!result) return false; // validation failed
+
+      // Propagate updates through the normal callback chain
+      handleStepUpdate(result);
+
+      return {
+        stepId: selectedStepData.stepId || '',
+        updates: result,
+      };
+    },
+  }), [configPanelOpen, selectedStepData, handleStepUpdate]);
+
   return (
     <div style={containerStyles}>
       {/* Canvas Area */}
@@ -536,6 +566,7 @@ function PipelineEditorInner({
         {/* Config Panel (shown when step node is selected in edit mode) */}
         {!readonly && configPanelOpen && selectedStepData && (
           <ActionConfigPanel
+            ref={actionConfigPanelRef}
             key={`config-${selectedStepData.stepId}`}
             stepId={selectedStepData.stepId || ''}
             stepName={selectedStepData.name || ''}
@@ -618,18 +649,18 @@ function PipelineEditorInner({
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // Main Component (with Provider)
 // ============================================================================
 
-export function PipelineEditor(props: PipelineEditorProps) {
+export const PipelineEditor = forwardRef<PipelineEditorRef, PipelineEditorProps>(function PipelineEditor(props, ref) {
   return (
     <ReactFlowProvider>
-      <PipelineEditorInner {...props} />
+      <PipelineEditorInner {...props} ref={ref} />
     </ReactFlowProvider>
   );
-}
+});
 
 export default PipelineEditor;
