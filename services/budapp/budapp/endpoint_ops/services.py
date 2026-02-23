@@ -2624,6 +2624,34 @@ class EndpointService(SessionMixin):
             logger.error(f"Failed to update pricing in proxy cache: {e}")
             # Don't raise - cache update failure shouldn't block the operation
 
+    async def update_inference_cost_in_proxy_cache(self, endpoint_id: UUID, cost_data: dict) -> None:
+        """Update inference_cost in the model_table cache without touching other fields.
+
+        Args:
+            endpoint_id: The endpoint ID to update inference cost for.
+            cost_data: The inference cost dict (from Endpoint.inference_cost JSONB).
+        """
+        try:
+            redis_service = RedisService()
+            cache_key = f"model_table:{endpoint_id}"
+            cached_data = await redis_service.get(cache_key)
+
+            if cached_data:
+                model_data = json.loads(cached_data)
+                if str(endpoint_id) in model_data:
+                    inference_cost_pricing = self._convert_inference_cost_to_pricing(cost_data)
+                    if inference_cost_pricing:
+                        model_data[str(endpoint_id)]["inference_cost"] = inference_cost_pricing.model_dump()
+                    else:
+                        model_data[str(endpoint_id)].pop("inference_cost", None)
+                    await redis_service.set(cache_key, json.dumps(model_data))
+                    logger.debug(f"Updated inference_cost in model_table for endpoint {endpoint_id}")
+            else:
+                logger.warning(f"No model_table entry found for endpoint {endpoint_id}, skipping cache update")
+
+        except Exception as e:
+            logger.error(f"Failed to update inference_cost in proxy cache for endpoint {endpoint_id}: {e}")
+
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
         """Delete model from proxy cache for a project."""
         redis_service = RedisService()

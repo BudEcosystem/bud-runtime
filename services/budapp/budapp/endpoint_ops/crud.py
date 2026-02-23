@@ -684,6 +684,27 @@ class EndpointDataManager(DataManagerUtils):
 
         return self.execute_scalar(stmt)
 
+    async def get_active_endpoints_by_cloud_model_uris(self, uris: set[str]) -> list[EndpointModel]:
+        """Get active endpoints linked to cloud models with the given URIs.
+
+        Args:
+            uris: Set of cloud model URIs to match against.
+
+        Returns:
+            list[EndpointModel]: Active endpoints whose model URI is in the given set.
+        """
+        active_statuses = (EndpointStatusEnum.RUNNING, EndpointStatusEnum.PENDING, EndpointStatusEnum.DEPLOYING)
+        stmt = (
+            select(EndpointModel)
+            .join(Model, EndpointModel.model_id == Model.id)
+            .where(
+                Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                Model.uri.in_(uris),
+                EndpointModel.status.in_(active_statuses),
+            )
+        )
+        return self.scalars_all(stmt)
+
 
 class PublicationHistoryDataManager(DataManagerUtils):
     """Data manager for the PublicationHistory model."""
