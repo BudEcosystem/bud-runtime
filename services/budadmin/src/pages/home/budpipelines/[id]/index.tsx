@@ -105,6 +105,10 @@ const WorkflowDetail = () => {
       label: p.name,
       value: p.id,
     })),
+    providerTypeMap: providers.reduce((map: Record<string, string>, p) => {
+      map[p.id] = p.type;
+      return map;
+    }, {}),
     credentials: proprietaryCredentials.map((c) => ({
       label: `${c.name} (${c.type})`,
       value: c.id,
