@@ -1665,6 +1665,55 @@ fn extract_provider_status_code(
         .unwrap_or_else(|| fallback_error.status_code())
 }
 
+/// Detailed provider error info extracted from nested error wrappers
+struct ProviderErrorInfo {
+    message: String,
+    provider_name: String,
+    raw_request: Option<String>,
+    raw_response: Option<String>,
+}
+
+/// Extract detailed provider error info from nested errors for observability.
+/// Walks through AllVariantsFailed → ModelProvidersExhausted → ModelChainExhausted → InferenceClient
+/// to find the innermost provider error details.
+fn extract_provider_error_details(errors: &HashMap<String, Error>) -> Option<ProviderErrorInfo> {
+    for error in errors.values() {
+        match error.get_details() {
+            ErrorDetails::InferenceClient {
+                message,
+                provider_type,
+                raw_request,
+                raw_response,
+                ..
+            } => {
+                return Some(ProviderErrorInfo {
+                    message: message.clone(),
+                    provider_name: provider_type.clone(),
+                    raw_request: raw_request.clone(),
+                    raw_response: raw_response.clone(),
+                });
+            }
+            ErrorDetails::ModelProvidersExhausted { provider_errors } => {
+                if let Some(info) = extract_provider_error_details(provider_errors) {
+                    return Some(info);
+                }
+            }
+            ErrorDetails::ModelChainExhausted { model_errors } => {
+                if let Some(info) = extract_provider_error_details(model_errors) {
+                    return Some(info);
+                }
+            }
+            ErrorDetails::AllVariantsFailed { errors: inner } => {
+                if let Some(info) = extract_provider_error_details(inner) {
+                    return Some(info);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 /// Send failure event to Kafka for observability when an inference fails
 async fn send_failure_event(
     kafka_connection_info: &KafkaConnectionInfo,
@@ -1687,7 +1736,24 @@ async fn send_failure_event(
 
     // Extract error details
     let error_details = error.get_details();
-    let error_message = error.to_string();
+
+    // Extract detailed provider error message from nested errors when available
+    let error_message = match error_details {
+        ErrorDetails::AllVariantsFailed { errors } => extract_provider_error_details(errors)
+            .map(|info| info.message.clone())
+            .unwrap_or_else(|| error.to_string()),
+        ErrorDetails::ModelProvidersExhausted { provider_errors } => {
+            extract_provider_error_details(provider_errors)
+                .map(|info| info.message.clone())
+                .unwrap_or_else(|| error.to_string())
+        }
+        ErrorDetails::ModelChainExhausted { model_errors } => {
+            extract_provider_error_details(model_errors)
+                .map(|info| info.message.clone())
+                .unwrap_or_else(|| error.to_string())
+        }
+        _ => error.to_string(),
+    };
 
     // Extract the actual provider status code from nested errors
     // When errors are wrapped (e.g., AllVariantsFailed wrapping InferenceClient),
@@ -1846,9 +1912,40 @@ fn extract_failure_model_inference(
     gateway_response: Option<&serde_json::Value>,
     observability_metadata: Option<&ObservabilityMetadata>,
 ) -> crate::inference::types::ModelInferenceDatabaseInsert {
-    let error_message = error.to_string();
     let serialized_input = serialize_or_log(&resolved_input.messages);
     let gateway_response_str = gateway_response.and_then(|v| serde_json::to_string(v).ok());
+
+    // Try to extract detailed provider error from nested error wrappers
+    let provider_info = match error.get_details() {
+        ErrorDetails::AllVariantsFailed { errors } => extract_provider_error_details(errors),
+        ErrorDetails::ModelProvidersExhausted { provider_errors } => {
+            extract_provider_error_details(provider_errors)
+        }
+        ErrorDetails::ModelChainExhausted { model_errors } => {
+            extract_provider_error_details(model_errors)
+        }
+        _ => None,
+    };
+
+    let (error_message, raw_request_str, raw_response_str, provider_name) =
+        if let Some(ref info) = provider_info {
+            (
+                info.message.clone(),
+                info.raw_request.clone().unwrap_or_default(),
+                // Prefer actual provider raw_response; fall back to error message
+                info.raw_response
+                    .clone()
+                    .unwrap_or_else(|| info.message.clone()),
+                info.provider_name.clone(),
+            )
+        } else {
+            (
+                error.to_string(),
+                String::new(),
+                error.to_string(),
+                "unknown".to_string(),
+            )
+        };
 
     // Determine model_id for model_name field
     let model_id = if let Some(obs_metadata) = observability_metadata {
@@ -1860,8 +1957,8 @@ fn extract_failure_model_inference(
     crate::inference::types::ModelInferenceDatabaseInsert {
         id: uuid::Uuid::now_v7(),
         inference_id,
-        raw_request: "".to_string(),        // Empty - failed before provider
-        raw_response: error_message.clone(), // Error message
+        raw_request: raw_request_str,
+        raw_response: raw_response_str,
         system: resolved_input
             .system
             .as_ref()
@@ -1869,14 +1966,14 @@ fn extract_failure_model_inference(
             .map(|s| s.to_string()),
         input_messages: serialized_input,
         output: format!("Error: {}", error_message),
-        input_tokens: None,          // None - no provider response
-        output_tokens: None,         // None - no provider response
+        input_tokens: None,
+        output_tokens: None,
         response_time_ms: Some(start_time.elapsed().as_millis() as u32),
         model_name: model_id,
-        model_provider_name: "unknown".to_string(), // Provider not reached
-        ttft_ms: None,              // None - no streaming
+        model_provider_name: provider_name,
+        ttft_ms: None,
         cached: false,
-        finish_reason: None,        // None - no completion
+        finish_reason: None,
         gateway_request,
         gateway_response: gateway_response_str,
         endpoint_type: "chat".to_string(),
