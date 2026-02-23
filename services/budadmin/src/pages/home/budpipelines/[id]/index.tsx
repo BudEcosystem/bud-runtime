@@ -683,9 +683,11 @@ const WorkflowDetail = () => {
                       // Calculate the correct run number based on pagination
                       const totalCount = executionsPagination?.total_count || 0;
                       const offset = (executionsPage - 1) * executionsPageSize;
+                      const runNumber = totalCount - offset - index;
+                      if (runNumber <= 0) return <Text_11_400_808080>—</Text_11_400_808080>;
                       return (
                         <Text_11_400_808080>
-                          #{totalCount - offset - index}
+                          #{runNumber}
                         </Text_11_400_808080>
                       );
                     },
