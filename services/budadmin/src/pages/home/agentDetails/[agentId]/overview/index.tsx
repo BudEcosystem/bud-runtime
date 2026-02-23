@@ -1754,10 +1754,11 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
         setError(null);
         const data = await getPromptById(promptId, projectId as string);
         setAgentData(data);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching agent details:", error);
-        const errorMessage = error?.response?.data?.detail ||
-          error?.message ||
+        const axiosError = error as { response?: { data?: { detail?: string } }; message?: string };
+        const errorMessage = axiosError?.response?.data?.detail ||
+          axiosError?.message ||
           "Failed to load agent details. Please try again.";
         setError(errorMessage);
 
