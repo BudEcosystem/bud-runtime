@@ -828,289 +828,291 @@ export default function PromptsAgents() {
                     setFilter({ ...filter, name: value });
                   }}
                 />
-                <ConfigProvider
-                  theme={{
-                    token: {
-                      sizePopupArrow: 0,
-                    },
-                  }}
-                  getPopupContainer={(trigger) => (trigger.parentNode as HTMLElement) || document.body}
-                >
-                  <Popover
-                    open={filterOpen}
-                    onOpenChange={handleOpenChange}
-                    placement="bottomRight"
-                    content={
-                      <div className="bg-[#111113] shadow-none border border-[#1F1F1F] rounded-[6px] width-348">
-                        <div className="p-[1.5rem] flex items-start justify-start flex-col">
-                          <div className="text-[#FFFFFF] text-[0.875rem] font-400">
-                            Filter
-                          </div>
-                          <div className="text-[0.75rem] font-400 text-[#757575]">
-                            Apply filters to find prompts and agents
-                          </div>
-                        </div>
-                        <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
-                        <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
-                          {/* Type Filter */}
-                          <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
-                            <div className="w-full">
-                              <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                Type
-                              </Text_12_300_EEEEEE>
+                <div className="hidden">
+                  <ConfigProvider
+                    theme={{
+                      token: {
+                        sizePopupArrow: 0,
+                      },
+                    }}
+                    getPopupContainer={(trigger) => (trigger.parentNode as HTMLElement) || document.body}
+                  >
+                    <Popover
+                      open={filterOpen}
+                      onOpenChange={handleOpenChange}
+                      placement="bottomRight"
+                      content={
+                        <div className="bg-[#111113] shadow-none border border-[#1F1F1F] rounded-[6px] width-348">
+                          <div className="p-[1.5rem] flex items-start justify-start flex-col">
+                            <div className="text-[#FFFFFF] text-[0.875rem] font-400">
+                              Filter
                             </div>
-                            <div className="custom-select-two w-full rounded-[6px] relative">
-                              <ConfigProvider
-                                theme={{
-                                  token: {
-                                    colorTextPlaceholder: "#808080",
-                                    boxShadowSecondary: "none",
-                                  },
-                                }}
-                              >
-                                <Select
-                                  variant="borderless"
-                                  placeholder="Select Type"
-                                  style={{
-                                    backgroundColor: "transparent",
-                                    color: "#EEEEEE",
-                                    border: "0.5px solid #757575",
-                                    width: "100%",
-                                  }}
-                                  value={tempFilter.type}
-                                  size="large"
-                                  className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={[
-                                    { label: "Prompt", value: "simple_prompt" },
-                                    { label: "Agent", value: "agent" },
-                                  ]}
-                                  onChange={(value) => {
-                                    setTempFilter({
-                                      ...tempFilter,
-                                      type: value,
-                                    });
-                                  }}
-                                />
-                              </ConfigProvider>
+                            <div className="text-[0.75rem] font-400 text-[#757575]">
+                              Apply filters to find prompts and agents
                             </div>
                           </div>
-
-                          {/* Category Filter */}
-                          <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
-                            <div className="w-full">
-                              <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                Category
-                              </Text_12_300_EEEEEE>
-                            </div>
-                            <div className="custom-select-two w-full rounded-[6px] relative">
-                              <ConfigProvider
-                                theme={{
-                                  token: {
-                                    colorTextPlaceholder: "#808080",
-                                    boxShadowSecondary: "none",
-                                  },
-                                }}
-                              >
-                                <Select
-                                  variant="borderless"
-                                  placeholder="Select Category"
-                                  style={{
-                                    backgroundColor: "transparent",
-                                    color: "#EEEEEE",
-                                    border: "0.5px solid #757575",
-                                    width: "100%",
-                                  }}
-                                  value={tempFilter.category}
-                                  size="large"
-                                  className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={categories.map(cat => ({
-                                    label: cat,
-                                    value: cat,
-                                  }))}
-                                  onChange={(value) => {
-                                    setTempFilter({
-                                      ...tempFilter,
-                                      category: value,
-                                    });
-                                  }}
-                                />
-                              </ConfigProvider>
-                            </div>
-                          </div>
-
-                          {/* Author Filter */}
-                          <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
-                            <div className="w-full">
-                              <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                Author
-                              </Text_12_300_EEEEEE>
-                            </div>
-                            <div className="custom-select-two w-full rounded-[6px] relative">
-                              <ConfigProvider
-                                theme={{
-                                  token: {
-                                    colorTextPlaceholder: "#808080",
-                                    boxShadowSecondary: "none",
-                                  },
-                                }}
-                              >
-                                <Select
-                                  variant="borderless"
-                                  placeholder="Select Author"
-                                  style={{
-                                    backgroundColor: "transparent",
-                                    color: "#EEEEEE",
-                                    border: "0.5px solid #757575",
-                                    width: "100%",
-                                  }}
-                                  value={tempFilter.author}
-                                  size="large"
-                                  className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={authors.map(author => ({
-                                    label: author,
-                                    value: author,
-                                  }))}
-                                  onChange={(value) => {
-                                    setTempFilter({
-                                      ...tempFilter,
-                                      author: value,
-                                    });
-                                  }}
-                                />
-                              </ConfigProvider>
-                            </div>
-                          </div>
-
-                          {/* Tags Filter */}
-                          <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
-                            <div className="w-full">
-                              <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
-                                Tags
-                              </Text_12_300_EEEEEE>
-                            </div>
-                            <div className="custom-select-two w-full rounded-[6px] relative">
-                              <ConfigProvider
-                                theme={{
-                                  token: {
-                                    colorTextPlaceholder: "#808080",
-                                    boxShadowSecondary: "none",
-                                  },
-                                }}
-                              >
-                                <Select
-                                  placeholder="Select Tags"
-                                  style={{
-                                    backgroundColor: "transparent",
-                                    color: "#EEEEEE",
-                                    border: "0.5px solid #757575",
-                                    width: "100%",
-                                  }}
-                                  value={tempFilter.tags}
-                                  size="large"
-                                  mode="multiple"
-                                  className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
-                                  options={allTags.map(tag => ({
-                                    label: tag,
-                                    value: tag,
-                                  }))}
-                                  onChange={(value) => {
-                                    setTempFilter({
-                                      ...tempFilter,
-                                      tags: value,
-                                    });
-                                  }}
-                                  tagRender={(props) => {
-                                    const { label } = props;
-                                    return (
-                                      <Tags name={label as string} color="#D1B854" />
-                                    );
-                                  }}
-                                />
-                              </ConfigProvider>
-                            </div>
-                          </div>
-
-                          {/* Rating Range */}
-                          <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
-                            <div className="w-full">
-                              <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1 text-nowrap">
-                                Rating
-                              </Text_12_300_EEEEEE>
-                              <div className="flex items-center justify-center">
-                                <div className="text-[#757575] text-[.75rem] h-[4px] mr-1 leading-8">
-                                  0
-                                </div>
-                                <Slider
-                                  className="budSlider mt-[3.2rem] w-full"
-                                  min={0}
-                                  max={5}
-                                  step={0.1}
-                                  range
-                                  value={[
-                                    tempFilter.rating_min || 0,
-                                    tempFilter.rating_max || 5,
-                                  ]}
-                                  onChange={(value) => {
-                                    setTempFilter({
-                                      ...tempFilter,
-                                      rating_min: value[0],
-                                      rating_max: value[1],
-                                    });
-                                  }}
-                                  tooltip={{
-                                    open: true,
-                                    getPopupContainer: (trigger) =>
-                                      (trigger.parentNode as HTMLElement) ||
-                                      document.body,
-                                  }}
-                                  styles={{
-                                    track: {
-                                      backgroundColor: "#965CDE",
-                                    },
-                                    rail: {
-                                      backgroundColor: "#212225",
-                                      height: 4,
+                          <div className="height-1 bg-[#1F1F1F] mb-[1.5rem] w-full"></div>
+                          <div className="w-full flex flex-col gap-size-20 px-[1.5rem] pb-[1.5rem]">
+                            {/* Type Filter */}
+                            <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
+                              <div className="w-full">
+                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+                                  Type
+                                </Text_12_300_EEEEEE>
+                              </div>
+                              <div className="custom-select-two w-full rounded-[6px] relative">
+                                <ConfigProvider
+                                  theme={{
+                                    token: {
+                                      colorTextPlaceholder: "#808080",
+                                      boxShadowSecondary: "none",
                                     },
                                   }}
-                                />
-                                <div className="text-[#757575] text-[.75rem] h-[4px] ml-1 leading-8">
-                                  5
+                                >
+                                  <Select
+                                    variant="borderless"
+                                    placeholder="Select Type"
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      color: "#EEEEEE",
+                                      border: "0.5px solid #757575",
+                                      width: "100%",
+                                    }}
+                                    value={tempFilter.type}
+                                    size="large"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={[
+                                      { label: "Prompt", value: "simple_prompt" },
+                                      { label: "Agent", value: "agent" },
+                                    ]}
+                                    onChange={(value) => {
+                                      setTempFilter({
+                                        ...tempFilter,
+                                        type: value,
+                                      });
+                                    }}
+                                  />
+                                </ConfigProvider>
+                              </div>
+                            </div>
+
+                            {/* Category Filter */}
+                            <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
+                              <div className="w-full">
+                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+                                  Category
+                                </Text_12_300_EEEEEE>
+                              </div>
+                              <div className="custom-select-two w-full rounded-[6px] relative">
+                                <ConfigProvider
+                                  theme={{
+                                    token: {
+                                      colorTextPlaceholder: "#808080",
+                                      boxShadowSecondary: "none",
+                                    },
+                                  }}
+                                >
+                                  <Select
+                                    variant="borderless"
+                                    placeholder="Select Category"
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      color: "#EEEEEE",
+                                      border: "0.5px solid #757575",
+                                      width: "100%",
+                                    }}
+                                    value={tempFilter.category}
+                                    size="large"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={categories.map(cat => ({
+                                      label: cat,
+                                      value: cat,
+                                    }))}
+                                    onChange={(value) => {
+                                      setTempFilter({
+                                        ...tempFilter,
+                                        category: value,
+                                      });
+                                    }}
+                                  />
+                                </ConfigProvider>
+                              </div>
+                            </div>
+
+                            {/* Author Filter */}
+                            <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
+                              <div className="w-full">
+                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+                                  Author
+                                </Text_12_300_EEEEEE>
+                              </div>
+                              <div className="custom-select-two w-full rounded-[6px] relative">
+                                <ConfigProvider
+                                  theme={{
+                                    token: {
+                                      colorTextPlaceholder: "#808080",
+                                      boxShadowSecondary: "none",
+                                    },
+                                  }}
+                                >
+                                  <Select
+                                    variant="borderless"
+                                    placeholder="Select Author"
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      color: "#EEEEEE",
+                                      border: "0.5px solid #757575",
+                                      width: "100%",
+                                    }}
+                                    value={tempFilter.author}
+                                    size="large"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={authors.map(author => ({
+                                      label: author,
+                                      value: author,
+                                    }))}
+                                    onChange={(value) => {
+                                      setTempFilter({
+                                        ...tempFilter,
+                                        author: value,
+                                      });
+                                    }}
+                                  />
+                                </ConfigProvider>
+                              </div>
+                            </div>
+
+                            {/* Tags Filter */}
+                            <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
+                              <div className="w-full">
+                                <Text_12_300_EEEEEE className="absolute bg-[#101010] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap">
+                                  Tags
+                                </Text_12_300_EEEEEE>
+                              </div>
+                              <div className="custom-select-two w-full rounded-[6px] relative">
+                                <ConfigProvider
+                                  theme={{
+                                    token: {
+                                      colorTextPlaceholder: "#808080",
+                                      boxShadowSecondary: "none",
+                                    },
+                                  }}
+                                >
+                                  <Select
+                                    placeholder="Select Tags"
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      color: "#EEEEEE",
+                                      border: "0.5px solid #757575",
+                                      width: "100%",
+                                    }}
+                                    value={tempFilter.tags}
+                                    size="large"
+                                    mode="multiple"
+                                    className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.6rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
+                                    options={allTags.map(tag => ({
+                                      label: tag,
+                                      value: tag,
+                                    }))}
+                                    onChange={(value) => {
+                                      setTempFilter({
+                                        ...tempFilter,
+                                        tags: value,
+                                      });
+                                    }}
+                                    tagRender={(props) => {
+                                      const { label } = props;
+                                      return (
+                                        <Tags name={label as string} color="#D1B854" />
+                                      );
+                                    }}
+                                  />
+                                </ConfigProvider>
+                              </div>
+                            </div>
+
+                            {/* Rating Range */}
+                            <div className="rounded-[6px] relative !bg-[transparent] !w-[100%] mb-[0]">
+                              <div className="w-full">
+                                <Text_12_300_EEEEEE className="absolute px-1.4 tracking-[.035rem] flex items-center gap-1 text-nowrap">
+                                  Rating
+                                </Text_12_300_EEEEEE>
+                                <div className="flex items-center justify-center">
+                                  <div className="text-[#757575] text-[.75rem] h-[4px] mr-1 leading-8">
+                                    0
+                                  </div>
+                                  <Slider
+                                    className="budSlider mt-[3.2rem] w-full"
+                                    min={0}
+                                    max={5}
+                                    step={0.1}
+                                    range
+                                    value={[
+                                      tempFilter.rating_min || 0,
+                                      tempFilter.rating_max || 5,
+                                    ]}
+                                    onChange={(value) => {
+                                      setTempFilter({
+                                        ...tempFilter,
+                                        rating_min: value[0],
+                                        rating_max: value[1],
+                                      });
+                                    }}
+                                    tooltip={{
+                                      open: true,
+                                      getPopupContainer: (trigger) =>
+                                        (trigger.parentNode as HTMLElement) ||
+                                        document.body,
+                                    }}
+                                    styles={{
+                                      track: {
+                                        backgroundColor: "#965CDE",
+                                      },
+                                      rail: {
+                                        backgroundColor: "#212225",
+                                        height: 4,
+                                      },
+                                    }}
+                                  />
+                                  <div className="text-[#757575] text-[.75rem] h-[4px] ml-1 leading-8">
+                                    5
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center justify-between">
-                            <SecondaryButton
-                              type="button"
-                              onClick={resetFilter}
-                              classNames="!px-[.8rem] tracking-[.02rem] mr-[.5rem]"
-                            >
-                              Reset
-                            </SecondaryButton>
-                            <PrimaryButton
-                              type="submit"
-                              onClick={applyFilter}
-                              classNames="!px-[.8rem] tracking-[.02rem]"
-                            >
-                              Apply
-                            </PrimaryButton>
+                            <div className="flex items-center justify-between">
+                              <SecondaryButton
+                                type="button"
+                                onClick={resetFilter}
+                                classNames="!px-[.8rem] tracking-[.02rem] mr-[.5rem]"
+                              >
+                                Reset
+                              </SecondaryButton>
+                              <PrimaryButton
+                                type="submit"
+                                onClick={applyFilter}
+                                classNames="!px-[.8rem] tracking-[.02rem]"
+                              >
+                                Apply
+                              </PrimaryButton>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    }
-                    trigger={["click"]}
-                  >
-                    <label
-                      className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
+                      }
+                      trigger={["click"]}
                     >
-                      <MixerHorizontalIcon
-                        style={{ width: "0.875rem", height: "0.875rem" }}
-                        className="text-[#B3B3B3] group-hover:text-[#FFFFFF]"
-                      />
-                    </label>
-                  </Popover>
-                </ConfigProvider>
+                      <label
+                        className="group h-[1.7rem] text-[#EEEEEE] mx-2 flex items-center cursor-pointer text-xs font-normal leading-3 rounded-[6px] shadow-none bg-transparent"
+                      >
+                        <MixerHorizontalIcon
+                          style={{ width: "0.875rem", height: "0.875rem" }}
+                          className="text-[#B3B3B3] group-hover:text-[#FFFFFF]"
+                        />
+                      </label>
+                    </Popover>
+                  </ConfigProvider>
+                </div>
               </div>
             }
           />
