@@ -13,7 +13,7 @@ import {
   Text_40_400_EEEEEE,
 } from "@/components/ui/text";
 import Tags from "src/flows/components/DrawerTags";
-import { usePrompts } from "src/hooks/usePrompts";
+import { usePrompts, IPrompt } from "src/hooks/usePrompts";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
 import { usePromptMetrics } from "src/hooks/usePromptMetrics";
@@ -1729,7 +1729,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
   // Support both 'id' (from rewrite rule) and 'agentId' (from folder name)
   const { id, agentId, projectId } = router.query;
   const promptId = id || agentId;
-  const [agentData, setAgentData] = useState<any>(null);
+  const [agentData, setAgentData] = useState<IPrompt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [costMetrics, setCostMetrics] = useState<{
@@ -1767,6 +1767,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
           setAgentData({
             id: promptId,
             name: "Agent Name (Dev Fallback)",
+            prompt_type: "chat",
             description: "LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.",
             tags: [
               { name: "tag 1", color: "#965CDE" },
