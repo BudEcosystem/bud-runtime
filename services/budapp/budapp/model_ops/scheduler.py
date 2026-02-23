@@ -229,16 +229,15 @@ class CloudModelSyncScheduler:
         if not synced_uris:
             return
 
+        checked = 0
+        updated = 0
         with Session(engine) as session:
             endpoints = await EndpointDataManager(session).get_active_endpoints_by_cloud_model_uris(synced_uris)
 
-        checked = 0
-        updated = 0
-        for endpoint in endpoints:
-            checked += 1
-            try:
-                with Session(engine) as session:
-                    endpoint_svc = EndpointService(session)
+            endpoint_svc = EndpointService(session)
+            for endpoint in endpoints:
+                checked += 1
+                try:
                     new_cost = await endpoint_svc.get_inference_cost(endpoint.id)
                     if new_cost is None:
                         continue
@@ -248,14 +247,13 @@ class CloudModelSyncScheduler:
                         continue
 
                     # Update Endpoint.inference_cost in PostgreSQL
-                    merged_endpoint = session.merge(endpoint)
-                    await EndpointDataManager(session).update_by_fields(merged_endpoint, {"inference_cost": new_cost})
+                    await EndpointDataManager(session).update_by_fields(endpoint, {"inference_cost": new_cost})
 
                     # Update Redis cache
                     await endpoint_svc.update_inference_cost_in_proxy_cache(endpoint.id, new_cost)
                     updated += 1
-            except Exception:
-                logger.exception("Failed to refresh inference cost for endpoint %s", endpoint.id)
+                except Exception:
+                    logger.exception("Failed to refresh inference cost for endpoint %s", endpoint.id)
 
         logger.debug(
             "Inference cost refresh complete: checked %d endpoints, updated %d",
