@@ -8,6 +8,7 @@ and receives completion event via on_event().
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import httpx
 import structlog
@@ -65,6 +66,12 @@ async def _fetch_cluster_info(
         Tuple of (budapp_cluster_id, bud_cluster_id, nodes_list, error_message)
         error_message is None on success, contains details on failure
     """
+    # Validate cluster_id is a valid UUID to prevent path injection
+    try:
+        UUID(cluster_id)
+    except (ValueError, AttributeError):
+        return None, None, [], f"Invalid cluster_id format: '{cluster_id}' is not a valid UUID"
+
     try:
         # Step 1: Fetch cluster details from budapp to get bud_cluster_id
         # The cluster_id might be either the budapp UUID or the budcluster UUID.
@@ -83,7 +90,7 @@ async def _fetch_cluster_info(
             cluster_data = cluster_response.get("cluster", cluster_response)
             budapp_cluster_id = cluster_data.get("id") or cluster_id
             bud_cluster_id = cluster_data.get("cluster_id")
-        except Exception:
+        except Exception:  # noqa: BLE001 - broad catch intentional for fallback strategy
             # Lookup by budapp id failed - the cluster_id might be a budcluster UUID.
             # Try listing clusters to find the one matching this cluster_id field.
             logger.info(
@@ -583,6 +590,7 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
                 "replicas": replicas,
                 "num_prompts": context.params.get("num_prompts", 10),
                 "user_confirmation": True,
+                "run_as_simulation": False,
                 "callback_topic": CALLBACK_TOPIC,
             }
 
