@@ -576,6 +576,10 @@ class PipelineService:
         }
         if icon is not None:
             update_kwargs["icon"] = icon
+        # Sync description from DAG to the dedicated column
+        dag_description = dag_dict.get("description")
+        if dag_description is not None:
+            update_kwargs["description"] = dag_description
 
         definition = await crud.update_with_version(
             definition_id=definition_id,
@@ -585,6 +589,8 @@ class PipelineService:
         await session.commit()
 
         logger.info(f"Updated pipeline in database: {definition.id} ({name})")
+
+        execution_count = await crud.get_execution_count(definition_id)
 
         return {
             "id": str(definition.id),
@@ -598,6 +604,7 @@ class PipelineService:
             "created_by": definition.created_by,
             "description": definition.description,
             "icon": definition.icon,
+            "execution_count": execution_count,
             "user_id": str(definition.user_id) if definition.user_id else None,
             "system_owned": definition.system_owned,
         }
