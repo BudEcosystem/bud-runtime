@@ -2919,8 +2919,13 @@ class ObservabilityMetricsService:
 
         # Metrics that require raw data for percentile calculations
         raw_data_metrics = {
-            "p95_latency", "p99_latency", "ttft_p95", "ttft_p99",
-            "p95_inference_cost", "max_inference_cost", "min_inference_cost",
+            "p95_latency",
+            "p99_latency",
+            "ttft_p95",
+            "ttft_p99",
+            "p95_inference_cost",
+            "max_inference_cost",
+            "min_inference_cost",
         }
         # Dimensions that require InferenceFact (not available in rollup tables)
         raw_data_dimensions = {"user"}
@@ -3133,7 +3138,9 @@ class ObservabilityMetricsService:
             elif metric == "max_inference_cost":
                 select_fields.append("max(ifact.inference_cost) as max_inference_cost")
             elif metric == "min_inference_cost":
-                select_fields.append("minIf(ifact.inference_cost, ifact.inference_cost IS NOT NULL) as min_inference_cost")
+                select_fields.append(
+                    "minIf(ifact.inference_cost, ifact.inference_cost IS NOT NULL) as min_inference_cost"
+                )
 
         # Build WHERE clause
         where_conditions = [

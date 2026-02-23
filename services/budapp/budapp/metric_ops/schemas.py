@@ -564,7 +564,9 @@ class BlockingRuleSyncRequest(BaseModel):
 class AggregatedMetricsRequest(BaseModel):
     """Request schema for aggregated metrics with server-side calculations."""
 
-    from_date: Optional[datetime] = Field(None, description="Start date for the analysis (defaults to full retention window)")
+    from_date: Optional[datetime] = Field(
+        None, description="Start date for the analysis (defaults to full retention window)"
+    )
     to_date: Optional[datetime] = Field(None, description="End date for the analysis")
     group_by: Optional[List[Literal["model", "project", "endpoint", "user", "user_project"]]] = Field(
         None, description="Dimensions to group by"

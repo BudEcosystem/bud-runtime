@@ -949,6 +949,7 @@ class AggregatedMetricsRequest(BaseModel):
 
     @model_validator(mode="after")
     def set_default_from_date(self):
+        """Set from_date to retention window start if not provided."""
         if self.from_date is None:
             from budmetrics.commons.config import app_settings
 
