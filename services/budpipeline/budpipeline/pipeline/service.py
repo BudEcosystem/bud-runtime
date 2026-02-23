@@ -590,7 +590,7 @@ class PipelineService:
 
         logger.info(f"Updated pipeline in database: {definition.id} ({name})")
 
-        execution_count = await crud.get_execution_count(definition_id)
+        execution_stats = await crud.get_execution_stats(definition_id)
 
         return {
             "id": str(definition.id),
@@ -604,7 +604,8 @@ class PipelineService:
             "created_by": definition.created_by,
             "description": definition.description,
             "icon": definition.icon,
-            "execution_count": execution_count,
+            "execution_count": execution_stats["execution_count"],
+            "last_execution_at": execution_stats["last_execution_at"],
             "user_id": str(definition.user_id) if definition.user_id else None,
             "system_owned": definition.system_owned,
         }
