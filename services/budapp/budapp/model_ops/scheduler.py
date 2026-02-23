@@ -29,6 +29,7 @@ from ..commons.config import app_settings
 from ..commons.constants import ModelEndpointEnum
 from ..commons.database import engine
 from ..endpoint_ops.crud import EndpointDataManager
+from ..endpoint_ops.services import EndpointService
 from ..model_ops.crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
 from ..model_ops.models import CloudModel as CloudModelModel
 from ..model_ops.models import Provider as ProviderModel
@@ -214,6 +215,53 @@ class CloudModelSyncScheduler:
                 await CloudModelDataManager(session).upsert_one(CloudModelModel, cloud_model.model_dump(), ["uri"])
                 logger.debug("Upserted cloud model: %s", cloud_model)
         logger.debug("Upserted %s cloud models", len(cloud_model_data))
+
+        # Refresh inference costs on active endpoints affected by the sync
+        await self._refresh_endpoint_inference_costs(cloud_model_data)
+
+    async def _refresh_endpoint_inference_costs(self, cloud_model_data: List[CloudModelCreate]) -> None:
+        """Refresh Endpoint.inference_cost and Redis cache for endpoints linked to synced CloudModels.
+
+        Args:
+            cloud_model_data: The list of CloudModelCreate objects that were just upserted.
+        """
+        synced_uris = {cm.uri for cm in cloud_model_data}
+        if not synced_uris:
+            return
+
+        with Session(engine) as session:
+            endpoints = await EndpointDataManager(session).get_active_endpoints_by_cloud_model_uris(synced_uris)
+
+        checked = 0
+        updated = 0
+        for endpoint in endpoints:
+            checked += 1
+            try:
+                with Session(engine) as session:
+                    endpoint_svc = EndpointService(session)
+                    new_cost = await endpoint_svc.get_inference_cost(endpoint.id)
+                    if new_cost is None:
+                        continue
+
+                    # Skip if unchanged
+                    if endpoint.inference_cost == new_cost:
+                        continue
+
+                    # Update Endpoint.inference_cost in PostgreSQL
+                    merged_endpoint = session.merge(endpoint)
+                    await EndpointDataManager(session).update_by_fields(merged_endpoint, {"inference_cost": new_cost})
+
+                    # Update Redis cache
+                    await endpoint_svc.update_inference_cost_in_proxy_cache(endpoint.id, new_cost)
+                    updated += 1
+            except Exception:
+                logger.exception("Failed to refresh inference cost for endpoint %s", endpoint.id)
+
+        logger.debug(
+            "Inference cost refresh complete: checked %d endpoints, updated %d",
+            checked,
+            updated,
+        )
 
 
 if __name__ == "__main__":
