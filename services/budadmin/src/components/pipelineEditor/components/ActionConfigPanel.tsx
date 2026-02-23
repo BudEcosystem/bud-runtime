@@ -558,31 +558,43 @@ export function ActionConfigPanel({
       return;
     }
 
+    // Clear stale cloud_model_id when provider changes
+    if (localParams.cloud_model_id) {
+      handleParamChange('cloud_model_id', '');
+    }
+
+    let cancelled = false;
     setLoadingCloudModels(true);
     AppRequest.Get(`${tempApiBaseUrl}/models/`, {
       params: {
         table_source: 'cloud_model',
         source: providerType,
         page: 1,
-        limit: 200,
+        limit: 1000,
         order_by: '-created_at',
       },
     })
       .then((response: any) => {
+        if (cancelled) return;
         const models = response?.data?.models || [];
-        const options: SelectOption[] = models.map((item: any) => ({
-          label: item?.model?.name || item?.name || 'Unknown',
-          value: item?.model?.id || item?.id || '',
-        }));
+        const options: SelectOption[] = models
+          .map((item: any) => ({
+            label: item?.model?.name || item?.name || 'Unknown',
+            value: item?.model?.id || item?.id,
+          }))
+          .filter((opt: { value: unknown }): opt is SelectOption => Boolean(opt.value));
         setCloudModelOptions(options);
       })
       .catch((err: any) => {
-        console.warn('Failed to fetch cloud models:', err);
+        if (cancelled) return;
+        errorToast('Failed to fetch cloud models. Please try again.');
         setCloudModelOptions([]);
       })
       .finally(() => {
-        setLoadingCloudModels(false);
+        if (!cancelled) setLoadingCloudModels(false);
       });
+
+    return () => { cancelled = true; };
   }, [localParams.provider_id, dataSources.providerTypeMap, action]);
 
   // Check if a string is an emoji
