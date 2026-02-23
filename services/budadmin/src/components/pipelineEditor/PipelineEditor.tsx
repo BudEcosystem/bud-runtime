@@ -73,6 +73,7 @@ export interface PipelineEditorProps {
     projects?: SelectOption[];
     endpoints?: SelectOption[];
     providers?: SelectOption[];
+    providerTypeMap?: Record<string, string>;
   };
   /** Loading states for data sources */
   loadingDataSources?: Set<string>;

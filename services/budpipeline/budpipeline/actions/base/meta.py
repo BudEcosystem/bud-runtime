@@ -29,6 +29,7 @@ class ParamType(str, Enum):
     ENDPOINT_REF = "endpoint_ref"  # Endpoint reference
     PROVIDER_REF = "provider_ref"  # Cloud provider reference
     CREDENTIAL_REF = "credential_ref"  # API credential reference (for cloud models)
+    CLOUD_MODEL_REF = "cloud_model_ref"  # Pre-seeded cloud model reference (filtered by provider)
 
 
 class ExecutionMode(str, Enum):

@@ -32,6 +32,8 @@ export type ParamType =
   | 'project_ref'
   | 'endpoint_ref'
   | 'provider_ref'
+  | 'credential_ref'
+  | 'cloud_model_ref'
   | 'branches';
 
 export interface SelectOption {
