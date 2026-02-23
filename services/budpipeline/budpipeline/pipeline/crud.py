@@ -283,6 +283,28 @@ class PipelineDefinitionCRUD:
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
+    async def get_execution_stats(self, definition_id: UUID) -> dict[str, Any]:
+        """Get execution count and last execution time for a pipeline.
+
+        Args:
+            definition_id: Pipeline definition UUID.
+
+        Returns:
+            Dict with execution_count and last_execution_at.
+        """
+        stmt = select(
+            func.count(PipelineExecution.id).label("execution_count"),
+            func.max(PipelineExecution.created_at).label("last_execution_at"),
+        ).where(PipelineExecution.pipeline_id == definition_id)
+        result = await self.session.execute(stmt)
+        row = result.one()
+        return {
+            "execution_count": row.execution_count,
+            "last_execution_at": row.last_execution_at.isoformat()
+            if row.last_execution_at
+            else None,
+        }
+
     async def exists_by_name_for_user(
         self,
         name: str,
