@@ -4061,6 +4061,16 @@ class ModelService(SessionMixin):
 
         logger.info(f"Successfully created endpoint {db_endpoint.id} for cloud model {model_id}")
 
+        # Fetch inference cost for cloud model and save to endpoint JSONB column
+        # Import here to avoid circular import
+        from ..endpoint_ops.services import EndpointService
+
+        endpoint_service = EndpointService(self.session)
+        inference_cost = await endpoint_service.get_inference_cost(db_endpoint.id)
+        if inference_cost:
+            await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"inference_cost": inference_cost})
+            logger.debug(f"Saved inference_cost for cloud endpoint {db_endpoint.id}")
+
         # Fetch credential details if credential_id is provided
         encrypted_credential_data = None
         if credential_id:
@@ -4078,10 +4088,6 @@ class ModelService(SessionMixin):
         model_type = db_model.source.lower() if db_model.source else "openai"
 
         # Add model to proxy cache
-        # Import here to avoid circular import
-        from ..endpoint_ops.services import EndpointService
-
-        endpoint_service = EndpointService(self.session)
         await endpoint_service.add_model_to_proxy_cache(
             endpoint_id=db_endpoint.id,
             model_name=namespace,

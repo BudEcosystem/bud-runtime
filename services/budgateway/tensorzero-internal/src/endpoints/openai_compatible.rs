@@ -393,6 +393,7 @@ pub(crate) fn serialize_without_nulls<T: Serialize>(
         model_inference_details.endpoint_id = tracing::field::Empty,
         model_inference_details.model_id = tracing::field::Empty,
         model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.inference_cost = tracing::field::Empty,
         model_inference_details.response_analysis = tracing::field::Empty,
         model_inference_details.is_success = tracing::field::Empty,
         model_inference_details.request_arrival_time = tracing::field::Empty,
@@ -538,24 +539,26 @@ pub async fn inference_handler(
     // Capture the current span for streaming observability
     params.observability_span = Some(tracing::Span::current());
 
-    // Get the guardrail profile if model has one configured
-    let (guardrail_profile_id, model_pricing) = if let Some(model_name) = &resolved_model_name {
-        let models = config.models.read().await;
-        match models.get(model_name).await {
-            Ok(Some(model)) => {
-                let profile = model.guardrail_profile.clone();
-                let pricing = model.pricing.clone();
-                drop(models);
-                (profile, pricing)
+    // Get the guardrail profile and pricing if model has one configured
+    let (guardrail_profile_id, model_pricing, inference_cost_pricing) =
+        if let Some(model_name) = &resolved_model_name {
+            let models = config.models.read().await;
+            match models.get(model_name).await {
+                Ok(Some(model)) => {
+                    let profile = model.guardrail_profile.clone();
+                    let pricing = model.pricing.clone();
+                    let inference_cost = model.inference_cost.clone();
+                    drop(models);
+                    (profile, pricing, inference_cost)
+                }
+                _ => {
+                    drop(models);
+                    (None, None, None)
+                }
             }
-            _ => {
-                drop(models);
-                (None, None)
-            }
-        }
-    } else {
-        (None, None)
-    };
+        } else {
+            (None, None, None)
+        };
 
     // Create guardrail execution context to track all guardrail operations
     let mut guardrail_context = crate::guardrail::GuardrailExecutionContext::new();
@@ -969,6 +972,17 @@ pub async fn inference_handler(
                     obs_metadata.api_key_project_id.as_deref(),
                     None, // no error for success
                 );
+
+                // Record actual inference cost (separate from admin billing cost)
+                let inference_cost_pricing = write_info
+                    .as_ref()
+                    .and_then(|wi| wi.inference_cost_pricing.as_ref());
+                let inference_cost =
+                    super::observability::calculate_cost(usage, inference_cost_pricing);
+                if let Some(ic) = inference_cost {
+                    let span = tracing::Span::current();
+                    span.record("model_inference_details.inference_cost", ic);
+                }
             }
 
             // Extract model latency from the result (using the first model inference result) before moving result
@@ -1454,6 +1468,7 @@ pub async fn inference_handler(
                     headers_for_tracking,
                     observability_metadata.clone(),
                     model_pricing.clone(),
+                    inference_cost_pricing.clone(),
                     Some(request_arrival_time),
                     Some(observability_span),
                 );
@@ -2836,6 +2851,7 @@ struct OpenAICompatibleStreamProcessor {
     // Observability fields for recording inference details after stream completes
     observability_metadata: Option<super::inference::ObservabilityMetadata>,
     model_pricing: Option<crate::model::ModelPricing>,
+    inference_cost_pricing: Option<crate::model::ModelPricing>,
     request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
     // Captured span from handler to ensure Span::current() works correctly in streaming
     observability_span: Option<tracing::Span>,
@@ -2855,6 +2871,7 @@ impl OpenAICompatibleStreamProcessor {
             headers: None,
             observability_metadata: None,
             model_pricing: None,
+            inference_cost_pricing: None,
             request_arrival_time: None,
             observability_span: None,
         }
@@ -2868,6 +2885,7 @@ impl OpenAICompatibleStreamProcessor {
         headers: HeaderMap,
         observability_metadata: Option<super::inference::ObservabilityMetadata>,
         model_pricing: Option<crate::model::ModelPricing>,
+        inference_cost_pricing: Option<crate::model::ModelPricing>,
         request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
         observability_span: Option<tracing::Span>,
     ) -> Self {
@@ -2879,6 +2897,7 @@ impl OpenAICompatibleStreamProcessor {
             headers: Some(headers),
             observability_metadata,
             model_pricing,
+            inference_cost_pricing,
             request_arrival_time,
             observability_span,
         }
@@ -3049,6 +3068,16 @@ impl OpenAICompatibleStreamProcessor {
                         obs_metadata.api_key_project_id.as_deref(),
                         None, // no error for success
                     );
+
+                    // Record actual inference cost (separate from admin billing cost)
+                    let inference_cost = super::observability::calculate_cost(
+                        &usage,
+                        self.inference_cost_pricing.as_ref(),
+                    );
+                    if let Some(ic) = inference_cost {
+                        let span = tracing::Span::current();
+                        span.record("model_inference_details.inference_cost", ic);
+                    }
                 }
             }
         }
@@ -3074,6 +3103,7 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
     headers: HeaderMap,
     observability_metadata: Option<super::inference::ObservabilityMetadata>,
     model_pricing: Option<crate::model::ModelPricing>,
+    inference_cost_pricing: Option<crate::model::ModelPricing>,
     request_arrival_time: Option<chrono::DateTime<chrono::Utc>>,
     observability_span: Option<tracing::Span>,
 ) -> impl Stream<Item = Result<Event, Error>> {
@@ -3085,6 +3115,7 @@ fn prepare_serialized_openai_compatible_events_with_usage_tracking(
         headers,
         observability_metadata,
         model_pricing,
+        inference_cost_pricing,
         request_arrival_time,
         observability_span,
     )
@@ -3366,6 +3397,7 @@ struct OpenAICompatibleCompletionLogProbs {
         model_inference_details.endpoint_id = tracing::field::Empty,
         model_inference_details.model_id = tracing::field::Empty,
         model_inference_details.cost = tracing::field::Empty,
+        model_inference_details.inference_cost = tracing::field::Empty,
         model_inference_details.is_success = tracing::field::Empty,
         model_inference_details.api_key_id = tracing::field::Empty,
         model_inference_details.user_id = tracing::field::Empty,
@@ -7550,6 +7582,9 @@ fn try_reconstruct_response_from_events(events: &[ResponseStreamEvent]) -> Optio
         // Inference ID (for ClickHouse InferenceFact table)
         gen_ai.inference_id = tracing::field::Empty,
 
+        // Inference cost (for ClickHouse inference_cost column)
+        gen_ai.inference_cost = tracing::field::Empty,
+
         // Timing fields (for ClickHouse InferenceFact table)
         gen_ai.request_arrival_time = tracing::field::Empty,
         gen_ai.request_forward_time = tracing::field::Empty,
@@ -7572,9 +7607,15 @@ pub async fn response_create_handler(
         model_credential_store,
         ..
     }): AppState,
+    ga_span_ext: Option<Extension<crate::analytics_middleware::GatewayAnalyticsSpan>>,
     headers: HeaderMap,
     StructuredJson(params): StructuredJson<OpenAIResponseCreateParams>,
 ) -> Result<Response<Body>, Error> {
+    // Extract gateway_analytics span handle for direct attribute recording in streaming closures.
+    // This bypasses the header-based mechanism which doesn't work for streaming (headers are set
+    // before the stream body is consumed and usage/cost data becomes available).
+    let ga_span_handle = ga_span_ext.map(|Extension(s)| s.0);
+
     // Capture request arrival time for observability
     let request_arrival_time = chrono::Utc::now();
 
@@ -7613,6 +7654,11 @@ pub async fn response_create_handler(
     let captured_usage: std::sync::Arc<std::sync::Mutex<Option<(i32, Option<i32>, i32)>>> =
         std::sync::Arc::new(std::sync::Mutex::new(None));
     let captured_usage_clone = captured_usage.clone();
+
+    // Capture inference cost for analytics (will be populated inside async block)
+    let captured_inference_cost: std::sync::Arc<std::sync::Mutex<Option<f64>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_inference_cost_clone = captured_inference_cost.clone();
 
     // Capture model latency for analytics (will be populated inside async block)
     // This is used to calculate gateway_processing_ms = total_duration_ms - model_latency_ms
@@ -7681,6 +7727,37 @@ pub async fn response_create_handler(
         cache_options: &cache_options,
     };
 
+    // Resolve inference_cost pricing for this response:
+    // - Standard models: use model.inference_cost directly (from proxy cache)
+    // - BudPrompt models: look up deployment model via x-tensorzero-endpoint-id header
+    let inference_cost_pricing: Option<crate::model::ModelPricing> = {
+        // First try direct inference_cost on the model itself (standard models)
+        if model.inference_cost.is_some() {
+            model.inference_cost.clone()
+        } else {
+            // BudPrompt path: use x-tensorzero-endpoint-id header from auth middleware
+            let endpoint_id = headers
+                .get("x-tensorzero-endpoint-id")
+                .and_then(|v| v.to_str().ok());
+
+            if let Some(eid) = endpoint_id {
+                let dep_models = config.models.read().await;
+                match dep_models.get(&std::sync::Arc::from(eid)).await {
+                    Ok(Some(dep_model)) => dep_model.inference_cost.clone(),
+                    _ => {
+                        tracing::debug!(
+                            "Deployment model '{}' not found in model table for inference cost lookup",
+                            eid
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        }
+    };
+
     // Capture the gateway request for logging purposes (without null values)
     let gateway_request = serialize_without_nulls(&params).ok();
 
@@ -7746,6 +7823,9 @@ pub async fn response_create_handler(
                     *guard = Some(provider_latency_ms);
                 }
 
+                // Clone gateway_analytics span handle for use in stream closure
+                let ga_span_for_stream = ga_span_handle.clone();
+
                 // Wrap stream to capture events and record observability after completion
                 let sse_stream = async_stream::stream! {
                     use futures::StreamExt;
@@ -7804,6 +7884,44 @@ pub async fn response_create_handler(
                             );
                             super::observability::record_response_result(&response);
 
+                            // Record actual inference cost
+                            if let Some(ref ic_pricing) = inference_cost_pricing {
+                                if let Some(ref usage) = response.usage {
+                                    let inference_usage = crate::inference::types::Usage {
+                                        input_tokens: usage.input_tokens as u32,
+                                        output_tokens: usage.output_tokens.unwrap_or(0) as u32,
+                                    };
+                                    if let Some(ic) = super::observability::calculate_cost(
+                                        &inference_usage,
+                                        Some(ic_pricing),
+                                    ) {
+                                        let span = tracing::Span::current();
+                                        span.record("gen_ai.inference_cost", ic);
+                                        if let Ok(mut guard) = captured_inference_cost_clone.lock() {
+                                            *guard = Some(ic);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Record usage/cost directly on gateway_analytics span for streaming.
+                            // Header-based propagation doesn't work for streaming because headers
+                            // are set before the stream body is consumed.
+                            if let Some(ref ga_span) = ga_span_for_stream {
+                                if let Some(ref usage) = response.usage {
+                                    ga_span.record("gen_ai.usage.input_tokens", usage.input_tokens as i64);
+                                    if let Some(output) = usage.output_tokens {
+                                        ga_span.record("gen_ai.usage.output_tokens", output as i64);
+                                    }
+                                    ga_span.record("gen_ai.usage.total_tokens", usage.total_tokens as i64);
+                                }
+                                if let Ok(guard) = captured_inference_cost_clone.lock() {
+                                    if let Some(cost) = *guard {
+                                        ga_span.record("gen_ai.inference_cost", cost);
+                                    }
+                                }
+                            }
+
                             // Record timing and request/response fields for streaming
                             // (Follows same pattern as chat completions in inference.rs)
                             let request_forward_time = chrono::Utc::now();
@@ -7853,6 +7971,26 @@ pub async fn response_create_handler(
 
                 // Record response fields for observability
                 super::observability::record_response_result(&result.response);
+
+                // Record actual inference cost
+                if let Some(ref ic_pricing) = inference_cost_pricing {
+                    if let Some(ref usage) = result.response.usage {
+                        let inference_usage = crate::inference::types::Usage {
+                            input_tokens: usage.input_tokens as u32,
+                            output_tokens: usage.output_tokens.unwrap_or(0) as u32,
+                        };
+                        if let Some(ic) = super::observability::calculate_cost(
+                            &inference_usage,
+                            Some(ic_pricing),
+                        ) {
+                            let span = tracing::Span::current();
+                            span.record("gen_ai.inference_cost", ic);
+                            if let Ok(mut guard) = captured_inference_cost_clone.lock() {
+                                *guard = Some(ic);
+                            }
+                        }
+                    }
+                }
 
                 // Record provider latency as span attribute for ClickHouse materialized view
                 // This is the gateway-calculated latency: time from request to provider until response received
@@ -7922,6 +8060,13 @@ pub async fn response_create_handler(
                 *guard = Some(provider_latency_ms);
             }
 
+            // Clone inference_cost_pricing for use inside async_stream block
+            let inference_cost_for_stream = inference_cost_pricing.clone();
+            let captured_inference_cost_for_stream = captured_inference_cost_clone.clone();
+
+            // Clone gateway_analytics span handle for use in stream closure
+            let ga_span_for_stream = ga_span_handle.clone();
+
             // Wrap stream to capture events and record observability after completion
             let sse_stream = async_stream::stream! {
                 use futures::StreamExt;
@@ -7981,6 +8126,44 @@ pub async fn response_create_handler(
                         );
                         super::observability::record_response_result(&response);
 
+                        // Record actual inference cost
+                        if let Some(ref ic_pricing) = inference_cost_for_stream {
+                            if let Some(ref usage) = response.usage {
+                                let inference_usage = crate::inference::types::Usage {
+                                    input_tokens: usage.input_tokens as u32,
+                                    output_tokens: usage.output_tokens.unwrap_or(0) as u32,
+                                };
+                                if let Some(ic) = super::observability::calculate_cost(
+                                    &inference_usage,
+                                    Some(ic_pricing),
+                                ) {
+                                    let span = tracing::Span::current();
+                                    span.record("gen_ai.inference_cost", ic);
+                                    if let Ok(mut guard) = captured_inference_cost_for_stream.lock() {
+                                        *guard = Some(ic);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Record usage/cost directly on gateway_analytics span for streaming.
+                        // Header-based propagation doesn't work for streaming because headers
+                        // are set before the stream body is consumed.
+                        if let Some(ref ga_span) = ga_span_for_stream {
+                            if let Some(ref usage) = response.usage {
+                                ga_span.record("gen_ai.usage.input_tokens", usage.input_tokens as i64);
+                                if let Some(output) = usage.output_tokens {
+                                    ga_span.record("gen_ai.usage.output_tokens", output as i64);
+                                }
+                                ga_span.record("gen_ai.usage.total_tokens", usage.total_tokens as i64);
+                            }
+                            if let Ok(guard) = captured_inference_cost_for_stream.lock() {
+                                if let Some(cost) = *guard {
+                                    ga_span.record("gen_ai.inference_cost", cost);
+                                }
+                            }
+                        }
+
                         // Record timing and request/response fields for streaming
                         // (Follows same pattern as chat completions in inference.rs)
                         let request_forward_time = chrono::Utc::now();
@@ -8037,6 +8220,26 @@ pub async fn response_create_handler(
 
             // Record response fields for observability
             super::observability::record_response_result(&result.response);
+
+            // Record actual inference cost
+            if let Some(ref ic_pricing) = inference_cost_pricing {
+                if let Some(ref usage) = result.response.usage {
+                    let inference_usage = crate::inference::types::Usage {
+                        input_tokens: usage.input_tokens as u32,
+                        output_tokens: usage.output_tokens.unwrap_or(0) as u32,
+                    };
+                    if let Some(ic) = super::observability::calculate_cost(
+                        &inference_usage,
+                        Some(ic_pricing),
+                    ) {
+                        let span = tracing::Span::current();
+                        span.record("gen_ai.inference_cost", ic);
+                        if let Ok(mut guard) = captured_inference_cost_clone.lock() {
+                            *guard = Some(ic);
+                        }
+                    }
+                }
+            }
 
             // Record provider latency as span attribute for ClickHouse materialized view
             // This is the gateway-calculated latency: time from request to provider until response received
@@ -8153,6 +8356,16 @@ pub async fn response_create_handler(
                     response
                         .headers_mut()
                         .insert("x-tensorzero-total-tokens", value);
+                }
+            }
+        }
+        // Add inference cost header for analytics
+        if let Ok(guard) = captured_inference_cost.lock() {
+            if let Some(cost) = *guard {
+                if let Ok(value) = axum::http::HeaderValue::from_str(&cost.to_string()) {
+                    response
+                        .headers_mut()
+                        .insert("x-tensorzero-inference-cost", value);
                 }
             }
         }

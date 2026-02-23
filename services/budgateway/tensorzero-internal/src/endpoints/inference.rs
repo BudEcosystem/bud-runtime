@@ -390,6 +390,7 @@ pub struct WriteInfo {
     pub observability_metadata: Option<ObservabilityMetadata>,
     pub gateway_request: Option<String>,
     pub model_pricing: Option<crate::model::ModelPricing>,
+    pub inference_cost_pricing: Option<crate::model::ModelPricing>,
 }
 
 impl std::fmt::Debug for InferenceOutput {
@@ -755,16 +756,18 @@ pub async fn inference(
                     extra_headers,
                 };
 
-                // Get model pricing from the result
-                let model_pricing =
+                // Get model pricing and inference cost from the result
+                let (model_pricing, inference_cost_pricing) =
                     if let Some(first_result) = result.model_inference_results().first() {
                         // Look up the model config to get pricing
                         match models.get(&first_result.model_name).await {
-                            Ok(Some(model)) => model.pricing.clone(),
-                            _ => None,
+                            Ok(Some(model)) => {
+                                (model.pricing.clone(), model.inference_cost.clone())
+                            }
+                            _ => (None, None),
                         }
                     } else {
-                        None
+                        (None, None)
                     };
 
                 Some(WriteInfo {
@@ -773,6 +776,7 @@ pub async fn inference(
                     observability_metadata: params.observability_metadata.clone(),
                     gateway_request: params.gateway_request.clone(),
                     model_pricing,
+                    inference_cost_pricing,
                 })
             } else {
                 None

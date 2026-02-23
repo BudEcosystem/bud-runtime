@@ -491,6 +491,7 @@ impl<'c> Config<'c> {
                             retry_config: None,
                             rate_limits: None, // Embedding models don't have rate limits in this conversion
                             pricing: None, // Legacy embedding models don't have pricing information
+                            inference_cost: None, // Legacy embedding models don't have inference cost
                             guardrail_profile: None, // Legacy embedding models don't have guardrail profiles
                         };
                         (name, model_config)
