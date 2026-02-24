@@ -335,10 +335,13 @@ export const useChatStore = create<ChatStore>()(
         }
       },
 
-      // Clear prompt sessions (IDs starting with 'prompt_') - used when switching to default mode
+      // Clear prompt sessions - used when switching to default mode
+      // Detects prompt sessions by isPromptSession flag OR legacy 'prompt_' prefix
       clearPromptSessions: () => {
         set((state) => {
-          const clearedState = clearSessionsByPredicate(state, (chat) => !chat.id.startsWith('prompt_'));
+          const isPrompt = (chat: Session) =>
+            chat.isPromptSession === true || chat.id.startsWith('prompt_');
+          const clearedState = clearSessionsByPredicate(state, (chat) => !isPrompt(chat));
           return {
             ...clearedState,
             promptIds: [], // Also clear promptIds
@@ -347,20 +350,28 @@ export const useChatStore = create<ChatStore>()(
         saveToStorage(get());
       },
 
-      // Clear default sessions (UUIDs) - used when switching to prompt mode
+      // Clear default sessions (non-prompt) - used when switching to prompt mode
       clearDefaultSessions: () => {
-        set((state) => clearSessionsByPredicate(state, (chat) => chat.id.startsWith('prompt_')));
+        set((state) => {
+          const isPrompt = (chat: Session) =>
+            chat.isPromptSession === true || chat.id.startsWith('prompt_');
+          return clearSessionsByPredicate(state, (chat) => isPrompt(chat));
+        });
         saveToStorage(get());
       },
 
       // Check if there are any prompt sessions
       hasPromptSessions: () => {
-        return get().activeChatList.some((chat) => chat.id.startsWith('prompt_'));
+        return get().activeChatList.some(
+          (chat) => chat.isPromptSession === true || chat.id.startsWith('prompt_')
+        );
       },
 
       // Check if there are any default sessions
       hasDefaultSessions: () => {
-        return get().activeChatList.some((chat) => !chat.id.startsWith('prompt_'));
+        return get().activeChatList.some(
+          (chat) => chat.isPromptSession !== true && !chat.id.startsWith('prompt_')
+        );
       },
 
       messages: {},  // Start empty, will be loaded by initializeStore
