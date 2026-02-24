@@ -322,6 +322,7 @@ getEndpointClusterDetails: async (endpointId: string, projectId?) => {
       return response;
     } catch (error) {
       console.error("Error deleting deployment:", error);
+      throw error;
     }
   },
   updateEndPoint: async (endpointId: string, data: any) => {
