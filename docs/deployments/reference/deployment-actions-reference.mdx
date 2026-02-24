@@ -12,8 +12,8 @@ This page summarizes the most common deployment actions available from project d
 ```mermaid
 flowchart TD
     A[Deploy Model] --> B[Endpoint Active]
-    B --> C[Use this model: Copy Code Snippets]
-    B --> D[Update Settings]
+    B --> C[Update Settings]
+    C --> D[Use this model: Copy Code Snippets]
     D --> E{Customer portal exposure needed?}
     E -->|Yes| F[Publish with Pricing]
     E -->|No| G[Keep Internal]
@@ -24,22 +24,22 @@ flowchart TD
 
 ## Core Actions
 
-| Action | Where | Purpose |
-|--------|-------|---------|
-| **Deploy Model** | Deployments list | Create a new endpoint from selected model + cluster |
-| **Use this model** | List row or General tab | Copy cURL, Python, and JavaScript snippets for immediate endpoint use |
-| **Publish** | Deployments list row | Publish model to the **Customer Dashboard portal** with pricing metadata |
-| **Publish Details** | Published endpoint row | Review or adjust publication pricing metadata |
-| **Unpublish** | Published endpoint row | Remove model from customer portal while keeping deployment active |
-| **Delete** | Deployments list row | Remove endpoint after dependency checks |
+| Action              | Where                   | Purpose                                                                  |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------ |
+| **Deploy Model**    | Deployments list        | Create a new endpoint from selected model + cluster                      |
+| **Use this model**  | List row or General tab | Copy cURL, Python, and JavaScript snippets for immediate endpoint use    |
+| **Publish**         | Deployments list row    | Publish model to the **Customer Dashboard portal** with pricing metadata |
+| **Publish Details** | Published endpoint row  | Review or adjust publication pricing metadata                            |
+| **Unpublish**       | Published endpoint row  | Remove model from customer portal while keeping deployment active        |
+| **Delete**          | Deployments list row    | Remove endpoint after dependency checks                                  |
 
 ## Detail-Page Actions
 
-| Tab | Action | Use Case |
-|-----|--------|----------|
-| **Workers** | Add Worker | Increase local serving capacity |
-| **Settings** | Save policy changes | Apply rate limits, retries, and fallback rules |
-| **Model Evaluations** | Run Another Evaluation / Export | Validate quality and share result artifacts |
+| Tab                   | Action                          | Use Case                                       |
+| --------------------- | ------------------------------- | ---------------------------------------------- |
+| **Workers**           | Add Worker                      | Increase local serving capacity                |
+| **Settings**          | Save policy changes             | Apply rate limits, retries, and fallback rules |
+| **Model Evaluations** | Run Another Evaluation / Export | Validate quality and share result artifacts    |
 
 ## Operational Notes
 
