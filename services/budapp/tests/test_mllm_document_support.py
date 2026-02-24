@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -17,23 +18,19 @@ from budapp.endpoint_ops.schemas import BudDocConfig, ProxyModelConfig
 
 def test_document_endpoint_exists():
     """Test that DOCUMENT endpoint is defined in ModelEndpointEnum."""
-    assert hasattr(ModelEndpointEnum, 'DOCUMENT')
+    assert hasattr(ModelEndpointEnum, "DOCUMENT")
     assert ModelEndpointEnum.DOCUMENT.value == "/v1/documents"
 
 
 def test_buddoc_provider_exists():
     """Test that BUDDOC provider is defined in ProxyProviderEnum."""
-    assert hasattr(ProxyProviderEnum, 'BUDDOC')
+    assert hasattr(ProxyProviderEnum, "BUDDOC")
     assert ProxyProviderEnum.BUDDOC.value == "buddoc"
 
 
 def test_buddoc_config_creation():
     """Test that BudDocConfig can be created properly."""
-    config = BudDocConfig(
-        type="buddoc",
-        api_base="http://test-api/v1.0/invoke/buddoc/method",
-        model_name="test-model"
-    )
+    config = BudDocConfig(type="buddoc", api_base="http://test-api/v1.0/invoke/buddoc/method", model_name="test-model")
 
     assert config.type == "buddoc"
     assert config.api_base == "http://test-api/v1.0/invoke/buddoc/method"
@@ -46,7 +43,7 @@ def test_buddoc_config_with_api_key_location():
         type="buddoc",
         api_base="http://test-api/v1.0/invoke/buddoc/method",
         model_name="test-model",
-        api_key_location="dynamic::authorization"
+        api_key_location="dynamic::authorization",
     )
 
     assert config.type == "buddoc"
@@ -78,22 +75,20 @@ async def test_proxy_cache_includes_buddoc_for_document_endpoint():
     endpoint_id = uuid4()
 
     # Mock Redis service
-    with patch('budapp.endpoint_ops.services.RedisService') as mock_redis_class:
+    with patch("budapp.endpoint_ops.services.RedisService") as mock_redis_class:
         mock_redis = mock_redis_class.return_value
         mock_redis.set = AsyncMock()
 
         # Mock pricing lookup
-        with patch.object(service, 'get_current_pricing', return_value=None):
+        with patch.object(service, "get_current_pricing", return_value=None):
             # Call with DOCUMENT endpoint in supported_endpoints
             await service.add_model_to_proxy_cache(
                 endpoint_id=endpoint_id,
                 model_name="test-mllm-model",
                 model_type="vllm",
                 api_base="http://test-api",
-                supported_endpoints=[
-                    ModelEndpointEnum.CHAT.value,
-                    ModelEndpointEnum.DOCUMENT.value
-                ],
+                supported_endpoints=[ModelEndpointEnum.CHAT.value, ModelEndpointEnum.DOCUMENT.value],
+                include_inference_cost=False,
             )
 
         # Verify Redis was called
@@ -135,12 +130,12 @@ async def test_non_mllm_model_no_buddoc():
     endpoint_id = uuid4()
 
     # Mock Redis service
-    with patch('budapp.endpoint_ops.services.RedisService') as mock_redis_class:
+    with patch("budapp.endpoint_ops.services.RedisService") as mock_redis_class:
         mock_redis = mock_redis_class.return_value
         mock_redis.set = AsyncMock()
 
         # Mock pricing lookup
-        with patch.object(service, 'get_current_pricing', return_value=None):
+        with patch.object(service, "get_current_pricing", return_value=None):
             # Call with only CHAT endpoint (no DOCUMENT)
             await service.add_model_to_proxy_cache(
                 endpoint_id=endpoint_id,
@@ -148,6 +143,7 @@ async def test_non_mllm_model_no_buddoc():
                 model_type="vllm",
                 api_base="http://test-api",
                 supported_endpoints=[ModelEndpointEnum.CHAT.value],
+                include_inference_cost=False,
             )
 
         # Check the stored configuration

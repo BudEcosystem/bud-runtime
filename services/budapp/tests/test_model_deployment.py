@@ -103,6 +103,7 @@ async def test_create_endpoint_directly_for_cloud_model():
         # Configure endpoint service and credential service mocks
         mock_endpoint_service_instance = MagicMock()
         mock_endpoint_service_instance.add_model_to_proxy_cache = AsyncMock()
+        mock_endpoint_service_instance.get_inference_cost = AsyncMock(return_value=None)
         mock_endpoint_service.return_value = mock_endpoint_service_instance
         mock_credential_service_instance = MagicMock()
         mock_credential_service_instance.update_proxy_cache = AsyncMock()

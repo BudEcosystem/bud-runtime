@@ -986,6 +986,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let json_model_config = ModelConfig {
@@ -1004,6 +1005,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let tool_provider_config = ProviderConfig::Dummy(DummyProvider {
@@ -1026,6 +1028,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let error_model_config = ModelConfig {
@@ -1044,6 +1047,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         // Test case 1: invalid message (String passed when template required)
@@ -1235,6 +1239,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let models = HashMap::from([("good".into(), text_model_config)])
@@ -1819,6 +1824,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let error_model_config = ModelConfig {
@@ -1837,6 +1843,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         // Test case 1: Model inference fails because of model issues

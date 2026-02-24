@@ -3435,6 +3435,14 @@ svg.ant-progress-circle {
       min-height: 1.5rem !important;
       line-height: 100% !important;
 
+      .ant-pagination-item-ellipsis {
+        color: rgba(255, 255, 255, 0.45) !important;
+      }
+
+      .ant-pagination-item-link-icon {
+        color: #965cde !important;
+      }
+
       a {
         width: 1.5rem !important;
         max-width: 1.5rem !important;
@@ -3544,7 +3552,7 @@ svg.ant-progress-circle {
     padding-bottom: .2rem !important;
 
     .ant-select-selection-item {
-      line-height: 100% !important;
+      line-height: 1.25rem !important;
       font-size: .75rem !important;
     }
   }

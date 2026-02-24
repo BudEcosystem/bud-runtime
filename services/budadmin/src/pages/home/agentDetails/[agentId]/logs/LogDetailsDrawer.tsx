@@ -674,7 +674,7 @@ export default function LogDetailsDrawer() {
   const metadataTags = useMemo(() => {
     if (!currentSpanData) return [];
 
-    const tags: { label: string; value: string }[] = [];
+    const tags: { label: string; value: string; fullValue?: string }[] = [];
 
     if (currentSpanData.title) {
       tags.push({ label: "span_name", value: currentSpanData.title });
@@ -689,10 +689,10 @@ export default function LogDetailsDrawer() {
       tags.push({ label: "kind", value: currentSpanData.rawData.span_kind });
     }
     if (currentSpanData.traceId) {
-      tags.push({ label: "trace_id", value: `...${currentSpanData.traceId.slice(-6)}` });
+      tags.push({ label: "trace_id", value: `...${currentSpanData.traceId.slice(-6)}`, fullValue: currentSpanData.traceId });
     }
     if (currentSpanData.spanId) {
-      tags.push({ label: "span_id", value: `...${currentSpanData.spanId.slice(-6)}` });
+      tags.push({ label: "span_id", value: `...${currentSpanData.spanId.slice(-6)}`, fullValue: currentSpanData.spanId });
     }
 
     return tags;
@@ -764,7 +764,7 @@ export default function LogDetailsDrawer() {
               {metadataTags.map((tag, index) => (
                 <Tags
                   key={index}
-                  copyText={`${tag.label}: ${tag.value}`}
+                  copyText={`${tag.label}: ${tag.fullValue ?? tag.value}`}
                   onTagClick={() => {}}
                   showTooltip
                   tooltipText="Copy"

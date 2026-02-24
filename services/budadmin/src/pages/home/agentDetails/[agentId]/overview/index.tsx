@@ -9,9 +9,11 @@ import {
   Text_12_600_EEEEEE,
   Text_20_400_FFFFFF,
   Text_26_600_FFFFFF,
+  Text_15_600_EEEEEE,
+  Text_40_400_EEEEEE,
 } from "@/components/ui/text";
 import Tags from "src/flows/components/DrawerTags";
-import { usePrompts } from "src/hooks/usePrompts";
+import { usePrompts, IPrompt } from "src/hooks/usePrompts";
 import ProjectTags from "src/flows/components/ProjectTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
 import { usePromptMetrics } from "src/hooks/usePromptMetrics";
@@ -46,7 +48,7 @@ interface ExtendedBucketData {
   timestamp: string;
 }
 
-interface OverviewTabProps {}
+interface OverviewTabProps { }
 const capitalize = (str: string) => str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase();
 
 // Calls Chart Component using ECharts
@@ -596,7 +598,7 @@ const TokenUsageChart: React.FC<TokenUsageChartProps> = ({ promptId }) => {
           // Handle both number values and potential nested objects
           const value = typeof rawValue === "number" ? rawValue
             : typeof rawValue === "object" && rawValue !== null ? (rawValue as any).value ?? (rawValue as any).count ?? 0
-            : Number(rawValue) || 0;
+              : Number(rawValue) || 0;
           const existing = aggregatedData.get(timestamp) || 0;
           aggregatedData.set(timestamp, existing + value);
         });
@@ -1727,16 +1729,23 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
   // Support both 'id' (from rewrite rule) and 'agentId' (from folder name)
   const { id, agentId, projectId } = router.query;
   const promptId = id || agentId;
-  const [agentData, setAgentData] = useState<any>(null);
+  const [agentData, setAgentData] = useState<IPrompt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [costMetrics, setCostMetrics] = useState<{
+    p95: string;
+    max: string;
+    min: string;
+  } | null>(null);
+  const [costMetricsLoading, setCostMetricsLoading] = useState(false);
+  const [costMetricsError, setCostMetricsError] = useState<string | null>(null);
   const { getPromptById } = usePrompts();
   const { openDrawer } = useDrawer();
   const { hasPermission } = useUser();
 
   // Check if we're in development mode
   const isDevelopmentMode = process.env.NEXT_PUBLIC_VERCEL_ENV === "development" ||
-                           process.env.NODE_ENV === "development";
+    process.env.NODE_ENV === "development";
 
   const fetchAgentDetails = async () => {
     if (promptId && typeof promptId === "string") {
@@ -1745,11 +1754,12 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
         setError(null);
         const data = await getPromptById(promptId, projectId as string);
         setAgentData(data);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching agent details:", error);
-        const errorMessage = error?.response?.data?.detail ||
-                            error?.message ||
-                            "Failed to load agent details. Please try again.";
+        const axiosError = error as { response?: { data?: { detail?: string } }; message?: string };
+        const errorMessage = axiosError?.response?.data?.detail ||
+          axiosError?.message ||
+          "Failed to load agent details. Please try again.";
         setError(errorMessage);
 
         // Only set fallback data in development mode
@@ -1758,6 +1768,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
           setAgentData({
             id: promptId,
             name: "Agent Name (Dev Fallback)",
+            prompt_type: "chat",
             description: "LiveMathBench can capture LLM capabilities in complex reasoning tasks, including challenging latest question sets from various mathematical competitions.",
             tags: [
               { name: "tag 1", color: "#965CDE" },
@@ -1779,6 +1790,49 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
     fetchAgentDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptId, projectId]);
+
+  const formatCostValue = (value: number): string => {
+    return `$${value.toFixed(2)}`;
+  };
+
+  const fetchCostMetrics = useCallback(async () => {
+    if (!promptId || typeof promptId !== "string") return;
+
+    setCostMetricsLoading(true);
+    setCostMetricsError(null);
+    try {
+      const response = await AppRequest.Post(
+        `${tempApiBaseUrl}/metrics/aggregated`,
+        {
+          data_source: "prompt",
+          filters: { prompt_id: promptId },
+          metrics: [
+            "p95_inference_cost",
+            "max_inference_cost",
+            "min_inference_cost",
+          ],
+        },
+      );
+
+      if (response?.data?.summary) {
+        const summary = response.data.summary;
+        setCostMetrics({
+          p95: formatCostValue(summary.p95_inference_cost?.value ?? 0),
+          max: formatCostValue(summary.max_inference_cost?.value ?? 0),
+          min: formatCostValue(summary.min_inference_cost?.value ?? 0),
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching cost metrics:", error);
+      setCostMetricsError("Failed to load cost metrics.");
+    } finally {
+      setCostMetricsLoading(false);
+    }
+  }, [promptId]);
+
+  useEffect(() => {
+    fetchCostMetrics();
+  }, [fetchCostMetrics]);
 
   if (loading) {
     return (
@@ -1842,7 +1896,7 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
           <Text_26_600_FFFFFF className="text-[#EEE]">
             {agentData?.name}
           </Text_26_600_FFFFFF>
-          <ProjectTags color={endpointStatusMapping[capitalize(agentData?.status)]} name={capitalize(agentData?.status)}/>
+          <ProjectTags color={endpointStatusMapping[capitalize(agentData?.status)]} name={capitalize(agentData?.status)} />
           <div className="ml-auto">
             <PrimaryButton
               permission={hasPermission(PermissionEnum.ModelManage)}
@@ -1870,23 +1924,50 @@ const OverviewTab: React.FC<OverviewTabProps> = () => {
       </div>
 
       {/* Cost Metrics */}
-      <Row gutter={[16, 16]} className="mb-6 hidden">
+      <Row gutter={[16, 16]} className="mb-6 ">
         <Col span={8}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <Text_12_400_B3B3B3 className="mb-2">P 95 Cost / Request</Text_12_400_B3B3B3>
-            <Text_20_400_FFFFFF>2.4k USD</Text_20_400_FFFFFF>
+          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 flex flex-col justify-between h-full items-start min-h-[11.375rem]">
+            <div className="relative w-fit">
+              <Text_15_600_EEEEEE className="leading-[1.5rem]">P 95 Cost / Request</Text_15_600_EEEEEE>
+              <div className="absolute h-[3px] w-[1.625rem] bg-[#965CDE]"></div>
+            </div>
+            {costMetricsLoading ? (
+              <Spin size="small" />
+            ) : costMetricsError ? (
+              <Text_12_400_B3B3B3>{costMetricsError}</Text_12_400_B3B3B3>
+            ) : (
+              <Text_40_400_EEEEEE>{costMetrics?.p95 ?? "--"}</Text_40_400_EEEEEE>
+            )}
           </div>
         </Col>
         <Col span={8}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <Text_12_400_B3B3B3 className="mb-2">Max Cost / Request</Text_12_400_B3B3B3>
-            <Text_20_400_FFFFFF>2.4k USD</Text_20_400_FFFFFF>
+          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 flex flex-col justify-between h-full items-start min-h-[11.375rem]">
+            <div className="relative w-fit">
+              <Text_15_600_EEEEEE className="leading-[1.5rem]">Max Cost / Request</Text_15_600_EEEEEE>
+              <div className="absolute h-[3px] w-[1.625rem] bg-[#965CDE]"></div>
+            </div>
+            {costMetricsLoading ? (
+              <Spin size="small" />
+            ) : costMetricsError ? (
+              <Text_12_400_B3B3B3>{costMetricsError}</Text_12_400_B3B3B3>
+            ) : (
+              <Text_40_400_EEEEEE>{costMetrics?.max ?? "--"}</Text_40_400_EEEEEE>
+            )}
           </div>
         </Col>
         <Col span={8}>
-          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6">
-            <Text_12_400_B3B3B3 className="mb-2">Max Cost / Request</Text_12_400_B3B3B3>
-            <Text_20_400_FFFFFF>2.4k USD</Text_20_400_FFFFFF>
+          <div className="bg-[#101010] border border-[#1F1F1F] rounded-lg p-6 flex flex-col justify-between h-full items-start min-h-[11.375rem]">
+            <div className="relative w-fit">
+              <Text_15_600_EEEEEE className="leading-[1.5rem]">Min Cost / Request</Text_15_600_EEEEEE>
+              <div className="absolute h-[3px] w-[1.625rem] bg-[#965CDE]"></div>
+            </div>
+            {costMetricsLoading ? (
+              <Spin size="small" />
+            ) : costMetricsError ? (
+              <Text_12_400_B3B3B3>{costMetricsError}</Text_12_400_B3B3B3>
+            ) : (
+              <Text_40_400_EEEEEE>{costMetrics?.min ?? "--"}</Text_40_400_EEEEEE>
+            )}
           </div>
         </Col>
       </Row>

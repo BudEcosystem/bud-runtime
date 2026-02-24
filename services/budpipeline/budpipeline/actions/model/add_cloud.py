@@ -224,11 +224,11 @@ META = ActionMeta(
         ),
         ParamDefinition(
             name="cloud_model_id",
-            label="Pre-seeded Model ID",
-            type=ParamType.STRING,
-            description="ID of a pre-seeded cloud model (optional - leave empty for custom)",
+            label="Pre-seeded Model",
+            type=ParamType.CLOUD_MODEL_REF,
+            description="Select a pre-seeded cloud model from the provider's catalog (optional)",
             required=False,
-            placeholder="Leave empty to add custom model",
+            placeholder="Select a cloud model...",
         ),
         ParamDefinition(
             name="model_name",

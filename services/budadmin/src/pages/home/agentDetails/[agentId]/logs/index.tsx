@@ -572,11 +572,10 @@ const FlatLogRow = ({
 }) => {
   return (
     <div
-      className={`w-full flex-auto relative transition-colors border-b border-[rgba(255,255,255,0.08)] ${
-        isSelected
+      className={`w-full flex-auto relative transition-colors border-b border-[rgba(255,255,255,0.08)] ${isSelected
           ? "bg-[#1a1a1a] border-l-2 border-l-[#965CDE]"
           : "hover:bg-[rgba(255,255,255,0.03)] border-l-2 border-l-transparent"
-      }`}
+        }`}
     >
       <div
         className="flex items-center justify-between py-1 cursor-pointer"
@@ -1923,7 +1922,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         textStyle: { color: "#fafafa", fontSize: 12 },
         confine: true, // Keep tooltip within chart bounds
         extraCssText: 'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);',
-        formatter: function(params: any) {
+        formatter: function (params: any) {
           // Extract data from the series (Error is first, Success is second)
           const errorParam = params[0];
           const successParam = params[1];
@@ -1943,7 +1942,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           const formatDateTime = (timestamp: number) => {
             const date = new Date(timestamp);
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
-                   date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
           };
 
           // Format duration
@@ -1999,20 +1998,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
                 ` : ''}
               </div>
               ` : ''}
-              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #27272a; font-size: 11px;">
-                <div style="display: flex; align-items: center; gap: 8px; color: #71717a; margin-bottom: 4px;">
-                  <span style="color: #965CDE;">&#8857;</span>
-                  <span><strong style="color: #a1a1aa;">Double click:</strong> Jump to time</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; color: #71717a; margin-bottom: 4px;">
-                  <span style="color: #965CDE;">&#8644;</span>
-                  <span><strong style="color: #a1a1aa;">Drag area:</strong> Change active range</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; color: #71717a;">
-                  <span style="color: #965CDE;">&#9711;</span>
-                  <span><strong style="color: #a1a1aa;">Scroll:</strong> Zoom in/out active range</span>
-                </div>
-              </div>
+
             </div>
           `;
         },
@@ -2098,6 +2084,21 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     };
   }, []);
 
+  // <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #27272a; font-size: 11px;">
+  //               <div style="display: flex; align-items: center; gap: 8px; color: #71717a; margin-bottom: 4px;">
+  //                 <span style="color: #965CDE;">&#8857;</span>
+  //                 <span><strong style="color: #a1a1aa;">Double click:</strong> Jump to time</span>
+  //               </div>
+  //               <div style="display: flex; align-items: center; gap: 8px; color: #71717a; margin-bottom: 4px;">
+  //                 <span style="color: #965CDE;">&#8644;</span>
+  //                 <span><strong style="color: #a1a1aa;">Drag area:</strong> Change active range</span>
+  //               </div>
+  //               <div style="display: flex; align-items: center; gap: 8px; color: #71717a;">
+  //                 <span style="color: #965CDE;">&#9711;</span>
+  //                 <span><strong style="color: #a1a1aa;">Scroll:</strong> Zoom in/out active range</span>
+  //               </div>
+  //             </div>
+
   // Set up chart update: always fetch time-series data, plus live interval when live
   useEffect(() => {
     // Clear existing interval
@@ -2160,11 +2161,10 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           />
           <div className="flex items-center border border-[#3a3a3a] rounded-md overflow-hidden max-h-[1.6rem]">
             <button
-              className={`p-[.4rem] border-r border-[#3a3a3a] transition-colors ${
-                viewMode === 'traces'
+              className={`p-[.4rem] border-r border-[#3a3a3a] transition-colors ${viewMode === 'traces'
                   ? "bg-[#2a2a2a] text-white"
                   : "bg-[#1a1a1a] text-[#B3B3B3] hover:text-white hover:bg-[#2a2a2a]"
-              }`}
+                }`}
               title="Traces view"
               onClick={() => setViewMode('traces')}
             >
@@ -2178,11 +2178,10 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
               </svg>
             </button>
             <button
-              className={`p-[.4rem] transition-colors ${
-                viewMode === 'flatten'
+              className={`p-[.4rem] transition-colors ${viewMode === 'flatten'
                   ? "bg-[#2a2a2a] text-white"
                   : "bg-[#1a1a1a] text-[#B3B3B3] hover:text-white hover:bg-[#2a2a2a]"
-              }`}
+                }`}
               title="Flatten view"
               onClick={() => setViewMode('flatten')}
             >

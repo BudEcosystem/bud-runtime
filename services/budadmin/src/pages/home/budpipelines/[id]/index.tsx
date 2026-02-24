@@ -105,6 +105,10 @@ const WorkflowDetail = () => {
       label: p.name,
       value: p.id,
     })),
+    providerTypeMap: providers.reduce((map: Record<string, string>, p) => {
+      map[p.id] = p.type;
+      return map;
+    }, {}),
     credentials: proprietaryCredentials.map((c) => ({
       label: `${c.name} (${c.type})`,
       value: c.id,
@@ -680,12 +684,17 @@ const WorkflowDetail = () => {
                     title: "Run #",
                     key: "run_number",
                     render: (_: unknown, __: any, index: number) => {
-                      // Calculate the correct run number based on pagination
+                      // Use server-side pagination metadata to keep run numbers
+                      // in sync with the displayed data during page transitions
                       const totalCount = executionsPagination?.total_count || 0;
-                      const offset = (executionsPage - 1) * executionsPageSize;
+                      const page = executionsPagination?.page || executionsPage;
+                      const pageSize = executionsPagination?.page_size || executionsPageSize;
+                      const offset = (page - 1) * pageSize;
+                      const runNumber = totalCount - offset - index;
+                      if (runNumber <= 0) return <Text_11_400_808080>—</Text_11_400_808080>;
                       return (
                         <Text_11_400_808080>
-                          #{totalCount - offset - index}
+                          #{runNumber}
                         </Text_11_400_808080>
                       );
                     },

@@ -8,6 +8,7 @@ and receives completion event via on_event().
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 import httpx
 import structlog
@@ -48,41 +49,105 @@ async def _fetch_cluster_info(
     context: ActionContext,
     cluster_id: str,
     user_id: str | None = None,
-) -> tuple[str | None, list[dict[str, Any]]]:
+) -> tuple[str | None, str | None, list[dict[str, Any]], str | None]:
     """Fetch cluster information including bud_cluster_id and nodes.
+
+    The cluster_id param may be either a budapp UUID (cluster.id) or a
+    budcluster UUID (cluster.cluster_id). The pipeline editor stores the
+    budcluster UUID for CLUSTER_REF params. This function tries the budapp
+    lookup first, then falls back to treating the value as a bud_cluster_id.
 
     Args:
         context: Action context for service invocation
-        cluster_id: The cluster ID (budapp cluster id)
+        cluster_id: The cluster ID (budapp id or budcluster cluster_id)
         user_id: User ID for authorization
 
     Returns:
-        Tuple of (bud_cluster_id, nodes_list)
+        Tuple of (budapp_cluster_id, bud_cluster_id, nodes_list, error_message)
+        error_message is None on success, contains details on failure
     """
+    # Validate cluster_id is a valid UUID to prevent path injection
+    try:
+        UUID(cluster_id)
+    except (ValueError, AttributeError):
+        return None, None, [], f"Invalid cluster_id format: '{cluster_id}' is not a valid UUID"
+
     try:
         # Step 1: Fetch cluster details from budapp to get bud_cluster_id
-        cluster_response = await context.invoke_service(
-            app_id=settings.budapp_app_id,
-            method_path=f"clusters/{cluster_id}",
-            http_method="GET",
-            params={"user_id": user_id} if user_id else None,
-            timeout_seconds=30,
-        )
+        # The cluster_id might be either the budapp UUID or the budcluster UUID.
+        # Try budapp lookup first (GET /clusters/{id}).
+        budapp_cluster_id = None
+        bud_cluster_id = None
 
-        # Extract bud_cluster_id from cluster response
-        cluster_data = cluster_response.get("cluster", cluster_response)
-        bud_cluster_id = cluster_data.get("cluster_id")
+        try:
+            cluster_response = await context.invoke_service(
+                app_id=settings.budapp_app_id,
+                method_path=f"clusters/{cluster_id}",
+                http_method="GET",
+                params={"user_id": user_id} if user_id else None,
+                timeout_seconds=30,
+            )
+            cluster_data = cluster_response.get("cluster", cluster_response)
+            budapp_cluster_id = cluster_data.get("id") or cluster_id
+            bud_cluster_id = cluster_data.get("cluster_id")
+        except Exception:  # noqa: BLE001 - broad catch intentional for fallback strategy
+            # Lookup by budapp id failed - the cluster_id might be a budcluster UUID.
+            # Try listing clusters to find the one matching this cluster_id field.
+            logger.info(
+                "cluster_lookup_by_id_failed_trying_as_bud_cluster_id",
+                cluster_id=cluster_id,
+            )
+            try:
+                params = {"limit": 100}
+                if user_id:
+                    params["user_id"] = user_id
+                clusters_response = await context.invoke_service(
+                    app_id=settings.budapp_app_id,
+                    method_path="clusters/clusters",
+                    http_method="GET",
+                    params=params,
+                    timeout_seconds=30,
+                )
+                # Search through clusters to find one with matching cluster_id
+                clusters_list = clusters_response.get("clusters", [])
+                for c in clusters_list:
+                    if c.get("cluster_id") == cluster_id:
+                        budapp_cluster_id = c.get("id")
+                        bud_cluster_id = cluster_id
+                        logger.info(
+                            "cluster_found_by_bud_cluster_id",
+                            input_cluster_id=cluster_id,
+                            budapp_cluster_id=budapp_cluster_id,
+                            bud_cluster_id=bud_cluster_id,
+                        )
+                        break
+                if not bud_cluster_id:
+                    return (
+                        None,
+                        None,
+                        [],
+                        f"Cluster not found: no cluster with id or cluster_id "
+                        f"matching '{cluster_id}'",
+                    )
+            except Exception as e2:
+                return (
+                    None,
+                    None,
+                    [],
+                    f"Failed to fetch cluster info for cluster {cluster_id}: {e2}",
+                )
 
         if not bud_cluster_id:
             logger.warning(
                 "cluster_info_no_bud_cluster_id",
                 cluster_id=cluster_id,
             )
-            return None, []
+            return None, None, [], f"Cluster {cluster_id} has no associated bud_cluster_id"
 
         logger.info(
             "cluster_info_fetched",
             cluster_id=cluster_id,
+            budapp_cluster_id=budapp_cluster_id,
             bud_cluster_id=bud_cluster_id,
         )
 
@@ -116,7 +181,7 @@ async def _fetch_cluster_info(
             cluster_id=cluster_id,
             node_count=len(nodes_list),
         )
-        return str(bud_cluster_id), nodes_list
+        return str(budapp_cluster_id), str(bud_cluster_id), nodes_list, None
 
     except Exception as e:
         logger.error(
@@ -124,7 +189,7 @@ async def _fetch_cluster_info(
             cluster_id=cluster_id,
             error=str(e),
         )
-        return None, []
+        return None, None, [], f"Failed to fetch cluster info for cluster {cluster_id}: {e}"
 
 
 async def _get_node_configurations(
@@ -309,16 +374,17 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
 
         try:
             # Step 0: Fetch cluster information (bud_cluster_id and nodes)
-            bud_cluster_id, nodes = await _fetch_cluster_info(
+            budapp_cluster_id, bud_cluster_id, nodes, fetch_error = await _fetch_cluster_info(
                 context, cluster_id, user_id=initiator_user_id
             )
 
             if not bud_cluster_id:
-                error_msg = f"Could not fetch cluster info for cluster {cluster_id}"
+                error_msg = fetch_error or f"Could not fetch cluster info for cluster {cluster_id}"
                 logger.error(
                     "model_benchmark_no_cluster_info",
                     step_id=context.step_id,
                     cluster_id=cluster_id,
+                    error=error_msg,
                 )
                 return ActionResult(
                     success=False,
@@ -383,11 +449,12 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
             hardware_mode = context.params.get("hardware_mode", "dedicated")
 
             # Fetch available device configurations from budsim
+            # Use budapp_cluster_id since node-configurations endpoint expects budapp UUID
             try:
                 config_response = await _get_node_configurations(
                     context=context,
                     model_id=model_id,
-                    cluster_id=cluster_id,
+                    cluster_id=budapp_cluster_id or cluster_id,
                     hostnames=hostnames,
                     hardware_mode=hardware_mode,
                     input_tokens=max_input_tokens,
@@ -500,12 +567,13 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
                     )
 
             # Step 2: Call budapp to start the benchmark workflow
+            # Use budapp_cluster_id for cluster_id (budapp run-workflow expects budapp UUID)
             request_data = {
                 "workflow_total_steps": 1,
                 "step_number": 1,
                 "trigger_workflow": True,
                 "model_id": model_id,
-                "cluster_id": cluster_id,
+                "cluster_id": budapp_cluster_id or cluster_id,
                 "bud_cluster_id": bud_cluster_id,
                 "nodes": nodes,
                 "name": benchmark_name,
@@ -522,7 +590,7 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
                 "replicas": replicas,
                 "num_prompts": context.params.get("num_prompts", 10),
                 "user_confirmation": True,
-                "run_as_simulation": context.params.get("run_as_simulation", False),
+                "run_as_simulation": False,
                 "callback_topic": CALLBACK_TOPIC,
             }
 
@@ -807,6 +875,12 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
             errors.append("model_id is required for benchmarking")
         if not params.get("cluster_id"):
             errors.append("cluster_id is required for benchmarking")
+        benchmark_name = params.get("benchmark_name", "")
+        if benchmark_name and len(benchmark_name) > 50:
+            errors.append(
+                f"benchmark_name must be at most 50 characters (got {len(benchmark_name)}). "
+                "This limit ensures the Kubernetes namespace stays within the 63-character limit."
+            )
         return errors
 
 
@@ -841,8 +915,9 @@ META = ActionMeta(
             name="benchmark_name",
             label="Benchmark Name",
             type=ParamType.STRING,
-            description="Name for this benchmark run",
+            description="Name for this benchmark run (max 50 characters due to Kubernetes namespace limits)",
             default="auto-benchmark",
+            validation=ValidationRules(max_length=50),
         ),
         ParamDefinition(
             name="concurrent_requests",
@@ -922,13 +997,6 @@ META = ActionMeta(
             description="Number of model replicas",
             required=False,
             validation=ValidationRules(min=1, max=32),
-        ),
-        ParamDefinition(
-            name="run_as_simulation",
-            label="Run as Simulation",
-            type=ParamType.BOOLEAN,
-            description="Run benchmark as simulation (no actual deployment)",
-            default=False,
         ),
         ParamDefinition(
             name="max_wait_seconds",

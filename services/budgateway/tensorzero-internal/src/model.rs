@@ -108,6 +108,7 @@ pub struct ModelConfig {
     pub retry_config: Option<RetryConfig>, // Optional model-level retry configuration
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
     pub pricing: Option<ModelPricing>, // Optional pricing information
+    pub inference_cost: Option<ModelPricing>, // Optional actual inference cost (from provider pricing)
     pub guardrail_profile: Option<Arc<str>>, // Optional guardrail profile ID for wrapped inference
 }
 
@@ -124,6 +125,8 @@ pub(crate) struct UninitializedModelConfig {
     pub rate_limits: Option<crate::rate_limit::RateLimitConfig>, // rate limiting configuration
     #[serde(default)]
     pub pricing: Option<ModelPricing>, // Optional pricing information
+    #[serde(default)]
+    pub inference_cost: Option<ModelPricing>, // Optional actual inference cost (from provider pricing)
     pub guardrail_profile: Option<Arc<str>>, // Optional guardrail profile ID for wrapped inference
 }
 
@@ -840,6 +843,7 @@ impl UninitializedModelConfig {
             retry_config: self.retry_config,
             rate_limits: self.rate_limits,
             pricing: self.pricing,
+            inference_cost: self.inference_cost,
             guardrail_profile: self.guardrail_profile,
         })
     }
@@ -3933,6 +3937,7 @@ impl ShorthandModelConfig for ModelConfig {
             retry_config: None,      // Shorthand models don't have retry config
             rate_limits: None,       // Shorthand models don't have rate limits
             pricing: None,           // Shorthand models don't have pricing
+            inference_cost: None,    // Shorthand models don't have inference cost
             guardrail_profile: None, // Shorthand models don't have guardrail profiles
         })
     }
@@ -4048,6 +4053,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
@@ -4120,6 +4126,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let response = model_config
@@ -4221,6 +4228,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
 
@@ -4292,6 +4300,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let (
@@ -4367,6 +4376,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let response = model_config
@@ -4470,6 +4480,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let (
@@ -4553,6 +4564,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
@@ -4665,6 +4677,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let tool_config = ToolCallConfig {
@@ -4793,6 +4806,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
         let model_table: ModelTable = HashMap::from([("claude".into(), anthropic_model_config)])
@@ -4906,6 +4920,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
 
@@ -4935,6 +4950,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
 
@@ -4977,6 +4993,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                inference_cost: None,
                 guardrail_profile: None,
             },
         );
@@ -4990,6 +5007,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                inference_cost: None,
                 guardrail_profile: None,
             },
         );
@@ -5003,6 +5021,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                inference_cost: None,
                 guardrail_profile: None,
             },
         );
@@ -5057,6 +5076,7 @@ mod tests {
                         retry_config: None,
                         rate_limits: None,
                         pricing: None,
+                        inference_cost: None,
                         guardrail_profile: None,
                     },
                 );
@@ -5103,6 +5123,7 @@ mod tests {
             retry_config: None,
             rate_limits: None,
             pricing: None,
+            inference_cost: None,
             guardrail_profile: None,
         };
 
