@@ -11,17 +11,13 @@ From a single project tab, teams can deploy workloads, monitor status, control r
 
 ## Why Deployments Matter
 
-**Immediate endpoint usability after deploy**
-Once a model is deployed and active, the endpoint is available. Use **Use this model** to copy cURL, Python, or JavaScript snippets for integration.
+**Immediate endpoint usability after deploy** Once a model is deployed and active, the endpoint is available. Use **Use this model** to copy cURL, Python, or JavaScript snippets for integration.
 
-**Separate publish workflow for customer portal**
-**Publish** is used to expose models in the **Customer Dashboard portal** with pricing metadata for customer consumption.
+**Separate publish workflow for customer portal** **Publish** is used to expose models in the **Customer Dashboard portal** with pricing metadata for customer consumption.
 
-**Built-in reliability controls**
-Configure retries, fallback chains, and rate limiting directly from deployment settings.
+**Built-in reliability controls** Configure retries, fallback chains, and rate limiting directly from deployment settings.
 
-**Production visibility**
-Track endpoint health and review runtime details through deployment-level tabs.
+**Production visibility** Track endpoint health and review runtime details through deployment-level tabs.
 
 ## Deployment Lifecycle
 
@@ -30,21 +26,21 @@ flowchart LR
     A[Select Model] --> B[Choose Cluster & Runtime Targets]
     B --> C[Create Deployment]
     C --> D[Endpoint Becomes Usable]
-    D --> E[Use this model: Copy Code Snippets]
-    D --> F[Configure Reliability Settings]
-    F --> G[Publish to Customer Dashboard Portal]
+    D --> E[Configure Reliability Settings]
+    E --> F[Use this model: Copy Code Snippets]
+    E --> G[Publish to Customer Dashboard Portal]
     G --> H[Monitor and Iterate]
 ```
 
 ## Core Areas in Deployments
 
-| Area | What you can do |
-|------|------------------|
-| **Deployment List** | Search, filter, deploy, publish, and manage project endpoints |
-| **General Tab** | Review model/cluster metadata and deployment status |
-| **Workers Tab** | Inspect and scale workers for local deployments |
-| **Settings Tab** | Set rate limits, retries, and fallback behavior |
-| **Model Evaluations Tab** | Review quality checks before wider rollout |
+| Area                      | What you can do                                               |
+| ------------------------- | ------------------------------------------------------------- |
+| **Deployment List**       | Search, filter, deploy, publish, and manage project endpoints |
+| **General Tab**           | Review model/cluster metadata and deployment status           |
+| **Workers Tab**           | Inspect and scale workers for local deployments               |
+| **Settings Tab**          | Set rate limits, retries, and fallback behavior               |
+| **Model Evaluations Tab** | Review quality checks before wider rollout                    |
 
 ## Typical Workflow
 
@@ -57,15 +53,13 @@ flowchart LR
 ## Getting Started
 
 <CardGroup cols={3}>
-  <Card title="Quick Start" icon="play" href="/deployments/quickstart">
+  <Card icon="play" href="/deployments/quickstart" title="Quick Start">
     Launch your first deployment in minutes
   </Card>
-
-  <Card title="Deployment Concepts" icon="book" href="/deployments/deployment-concepts">
+  <Card icon="book" href="/deployments/deployment-concepts" title="Deployment Concepts">
     Understand endpoint usage, publish behavior, and lifecycle states
   </Card>
-
-  <Card title="Step-by-Step Tutorial" icon="graduation-cap" href="/deployments/creating-first-deployment">
+  <Card icon="graduation-cap" href="/deployments/creating-first-deployment" title="Step-by-Step Tutorial">
     Build and publish a first deployment with best practices
   </Card>
 </CardGroup>
