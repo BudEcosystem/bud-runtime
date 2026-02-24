@@ -508,15 +508,12 @@ const PipelineEditorInner = forwardRef<PipelineEditorRef, PipelineEditorProps>(f
       const result = await actionConfigPanelRef.current.flush();
       if (!result) return false; // validation failed
 
-      // Propagate updates through the normal callback chain
-      handleStepUpdate(result);
-
       return {
         stepId: selectedStepData.stepId || '',
         updates: result,
       };
     },
-  }), [configPanelOpen, selectedStepData, handleStepUpdate]);
+  }), [configPanelOpen, selectedStepData]);
 
   return (
     <div style={containerStyles}>
