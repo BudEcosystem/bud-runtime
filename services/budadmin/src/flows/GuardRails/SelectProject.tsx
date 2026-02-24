@@ -13,7 +13,6 @@ import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 
 export default function SelectProject() {
-  console.log("Rendering SelectProject component");
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -26,7 +25,7 @@ export default function SelectProject() {
   const {
     setSelectedProject: setSelectedProjectInStore,
     updateWorkflow,
-    workflowLoading,
+    workflowLoading
   } = useGuardrails();
 
   // Fetch projects on component mount and when search changes
@@ -49,34 +48,13 @@ export default function SelectProject() {
     }
 
     try {
-      // Get current state BEFORE async operations
-      const { currentWorkflow, selectedProvider } = useGuardrails.getState();
-
-      // Build the complete payload
+      // Backend accumulates data across steps, so only send step-specific fields
       const payload: any = {
         step_number: 3,
         project_id: selectedProject,
-        trigger_workflow: false,
       };
 
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      }
-
-      // Include provider data from previous steps
-      if (selectedProvider?.provider_type) {
-        payload.provider_type = selectedProvider.provider_type;
-      }
-      if (selectedProvider?.id) {
-        payload.provider_id = selectedProvider.id;
-      }
-
-      // Include probe selections from previous steps
-      if (currentWorkflow?.probe_selections) {
-        payload.probe_selections = currentWorkflow.probe_selections;
-      }
-
-      // Update workflow with complete data
+      // Update workflow with step-specific data
       await updateWorkflow(payload);
 
       // Save selected project to guardrails store

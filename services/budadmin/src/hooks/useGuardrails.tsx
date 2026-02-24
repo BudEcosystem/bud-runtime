@@ -362,7 +362,6 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
           provider_type: providerType,
           step_number: 1,
           workflow_total_steps: 10,
-          trigger_workflow: false,
         },
       );
 
@@ -461,6 +460,8 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   },
 
   // Get workflow
+  // The GET /workflows/{id} response has: { workflow_id, status, workflow_steps: { name, endpoint_ids, ... } }
+  // We flatten workflow_steps into the root so components can access fields directly
   getWorkflow: async (workflowId?: string) => {
     const id = workflowId || get().currentWorkflow?.workflow_id;
     if (!id) {
@@ -475,8 +476,11 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       );
 
       if (response.data) {
+        const { workflow_steps, ...rest } = response.data;
+        // Flatten workflow_steps into root so fields like endpoint_ids, name, probe_selections
+        // are accessible at currentWorkflow.endpoint_ids instead of currentWorkflow.workflow_steps.endpoint_ids
         set({
-          currentWorkflow: response.data,
+          currentWorkflow: { ...rest, ...(workflow_steps || {}), workflow_steps },
         });
       }
     } catch (error: any) {

@@ -46,7 +46,10 @@ export default function CommonStatus({
     | 'performance_benchmark'
     | 'deploy_quantization'
     | 'add_adapter'
-    | 'evaluate_model',
+    | 'evaluate_model'
+    | 'guardrail_model_onboarding'
+    | 'guardrail_simulation'
+    | 'guardrail_deployment',
     events_field_id:
     'bud_simulator_events'
     | 'budserve_cluster_events'
@@ -61,13 +64,18 @@ export default function CommonStatus({
     | 'quantization_deployment_events'
     | 'adapter_deployment_events'
     | 'evaluation_workflow_events'
-    | 'evaluation_events',
+    | 'evaluation_events'
+    | 'guardrail_onboarding_events'
+    | 'guardrail_simulation_events'
+    | 'guardrail_deployment_events',
     onCompleted: () => void,
     onFailed: () => void,
 }) {
     const [loading, setLoading] = useState(false);
     const [steps, setSteps] = useState([]);
     const [eta, setEta] = useState("");
+    // Sub-workflow ID extracted from the events data (may differ from parent workflowId)
+    const [eventsWorkflowId, setEventsWorkflowId] = useState<string | null>(null);
     const { socket } = useSocket();
 
     let timeout: any;
@@ -79,18 +87,25 @@ export default function CommonStatus({
         }
     }, [failedEvents]);
 
+    // Events that use the main budapp API (relative URL via AppRequest)
+    const useMainApi = events_field_id === 'budserve_cluster_events'
+        || events_field_id === "bud_simulator_events"
+        || events_field_id === 'guardrail_onboarding_events'
+        || events_field_id === 'guardrail_simulation_events'
+        || events_field_id === 'guardrail_deployment_events';
+
     const getWorkflow = async () => {
         if (loading) return;
         setSteps([]);
         setLoading(true);
         // bud_simulator_events, budserve_cluster_events
         let url = `${tempApiBaseUrl}/workflows/${workflowId}`;
-        if (events_field_id === 'budserve_cluster_events' || events_field_id === "bud_simulator_events") {
+        if (useMainApi) {
             url = `/workflows/${workflowId}`;
         }
         const response: any = await AppRequest.Get(success_payload_type == 'performance_benchmark' ? `${tempApiBaseUrl}/workflows/${workflowId}` : url);
         let data: WorkflowType;
-        if (events_field_id === 'budserve_cluster_events' || events_field_id === "bud_simulator_events") {
+        if (useMainApi) {
             data = response?.data;
         } else {
             data = response.data;
@@ -98,10 +113,15 @@ export default function CommonStatus({
         if (success_payload_type == 'performance_benchmark') {
             data = response?.data
         }
-        const newSteps = data?.workflow_steps[events_field_id]?.steps;
+        const eventsData = data?.workflow_steps[events_field_id];
+        const newSteps = eventsData?.steps;
         setSteps(newSteps);
-        if (data?.workflow_steps[events_field_id]?.eta) {
-            calculateEta(data?.workflow_steps[events_field_id]?.eta, setEta);
+        // Extract sub-workflow ID from the events data (may differ from parent workflowId)
+        if (eventsData?.workflow_id) {
+            setEventsWorkflowId(eventsData.workflow_id);
+        }
+        if (eventsData?.eta) {
+            calculateEta(eventsData.eta, setEta);
         }
         console.log('response', response)
         setLoading(false);
@@ -120,8 +140,13 @@ export default function CommonStatus({
             if (!data) {
                 return;
             }
-            if (data?.message && data?.message?.payload && data?.message?.payload?.workflow_id !== workflowId) {
-                return;
+            if (data?.message && data?.message?.payload) {
+                const notifWorkflowId = data.message.payload.workflow_id;
+                // If the notification has no workflow_id, let it through (some flows don't include it in real-time)
+                // Otherwise, accept notifications matching either the parent workflow ID or the sub-workflow ID
+                if (notifWorkflowId && notifWorkflowId !== workflowId && notifWorkflowId !== eventsWorkflowId) {
+                    return;
+                }
             }
         } catch (error) {
             return
@@ -153,7 +178,7 @@ export default function CommonStatus({
             onFailed();
         }
         console.log(`data.message`, data.message)
-    }, [steps, workflowId]);
+    }, [steps, workflowId, eventsWorkflowId]);
 
     useEffect(() => {
         if (socket) {
@@ -168,7 +193,7 @@ export default function CommonStatus({
                 clearTimeout(timeout);
             }
         };
-    }, [socket]);
+    }, [socket, handleNotification]);
 
     return <BudDrawerLayout>
         <div className="flex flex-col	justify-start items-center w-full">

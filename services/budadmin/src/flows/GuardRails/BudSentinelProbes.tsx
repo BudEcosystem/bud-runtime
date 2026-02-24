@@ -142,7 +142,6 @@ export default function BudSentinelProbes() {
           probe_selections: selectedProbes.map(probeId => ({
             id: probeId,
           })),
-          trigger_workflow: false,
         };
 
         // Include workflow_id if available
@@ -150,10 +149,6 @@ export default function BudSentinelProbes() {
           payload.workflow_id = currentWorkflow.workflow_id;
         }
 
-        // Include provider data from previous step
-        if (selectedProvider?.id) {
-          payload.provider_id = selectedProvider.id;
-        }
         if (selectedProvider?.provider_type) {
           payload.provider_type = selectedProvider.provider_type;
         }

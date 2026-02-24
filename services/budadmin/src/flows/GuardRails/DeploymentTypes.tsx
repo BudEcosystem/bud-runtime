@@ -19,9 +19,6 @@ export default function DeploymentTypes() {
   const {
     updateWorkflow,
     workflowLoading,
-    currentWorkflow,
-    selectedProvider,
-    selectedProbes,
     setIsStandaloneDeployment
   } = useGuardrails();
 
@@ -48,42 +45,14 @@ export default function DeploymentTypes() {
       // Store the standalone flag in the store (persists across workflow updates)
       setIsStandaloneDeployment(mappedValues.is_standalone);
 
-      // Build the complete workflow payload
+      // Backend accumulates data across steps, so only send step-specific fields
       const payload: any = {
-        step_number: 8,
+        step_number: 5,
         deployment_type: mappedValues.deployment_type,
         is_standalone: mappedValues.is_standalone,
-        trigger_workflow: false,
       };
 
-      // Include workflow_id if available
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      }
-
-      // Include provider data from previous steps
-      if (selectedProvider?.id) {
-        payload.provider_id = selectedProvider.id;
-      }
-      if (selectedProvider?.provider_type) {
-        payload.provider_type = selectedProvider.provider_type;
-      }
-
-      // Include probe selections from previous steps
-      if (currentWorkflow?.probe_selections) {
-        // Use existing probe_selections from workflow (which should have rules)
-        payload.probe_selections = currentWorkflow.probe_selections;
-      } else {
-        // Fallback: build from selectedProbes if needed
-        const probesArray = selectedProbes?.length > 0 ? selectedProbes : [];
-        if (probesArray.length > 0) {
-          payload.probe_selections = probesArray.map(probe => ({
-            id: probe.id
-          }));
-        }
-      }
-
-      // Update workflow with complete data
+      // Update workflow with step-specific data
       await updateWorkflow(payload);
 
       // Standalone: skip endpoint selection, go to probe settings

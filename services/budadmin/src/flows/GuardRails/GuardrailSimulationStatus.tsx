@@ -7,7 +7,7 @@ import useGuardrails from "src/hooks/useGuardrails";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import CommonStatus from "src/flows/components/CommonStatus";
 
-export default function GuardrailOnboardingStatus() {
+export default function GuardrailSimulationStatus() {
   const [showAlert, setShowAlert] = React.useState(false);
   const { closeDrawer, openDrawerWithStep } = useDrawer();
   const { currentWorkflow } = useGuardrails();
@@ -30,9 +30,9 @@ export default function GuardrailOnboardingStatus() {
           <BudDrawerLayout>
             <BudStepAlert
               type="warning"
-              title="You're about to stop the onboarding process"
-              description="If the onboarding process is stopped, the guardrail models will not be added to the repository."
-              cancelText="Continue Onboarding"
+              title="You're about to stop the simulation"
+              description="If the simulation is stopped, you will need to restart the deployment specifications step."
+              cancelText="Continue Simulation"
               confirmText="Cancel Anyways"
               confirmAction={() => {
                 closeDrawer();
@@ -47,30 +47,30 @@ export default function GuardrailOnboardingStatus() {
           <BudDrawerLayout>
             <BudStepAlert
               type="failed"
-              title="Model Onboarding Failed!"
-              description="We were not able to onboard the guardrail models. Please try again."
+              title="Simulation Failed!"
+              description="The simulation process failed. Please try again."
               confirmText="Go Back"
               confirmAction={() => {
-                openDrawerWithStep("guardrail-select-credentials");
+                openDrawerWithStep("guardrail-deploy-specs");
               }}
             />
           </BudDrawerLayout>
         )}
         <CommonStatus
           workflowId={currentWorkflow?.workflow_id}
-          events_field_id="guardrail_onboarding_events"
+          events_field_id="guardrail_simulation_events"
           onCompleted={() => {
-            openDrawerWithStep("deployment-types");
+            openDrawerWithStep("guardrail-select-cluster");
           }}
           onFailed={() => {
             setIsFailed(true);
           }}
-          success_payload_type="guardrail_model_onboarding"
-          title="Onboarding Guardrail Models"
+          success_payload_type="guardrail_simulation"
+          title="Running Simulation"
           description={
             <>
-              In process of verification, downloading and onboarding the
-              guardrail models required for the selected probes.
+              Running performance simulation to determine optimal cluster
+              configuration for your guardrail models.
             </>
           }
           extraInfo="This may take some time..."

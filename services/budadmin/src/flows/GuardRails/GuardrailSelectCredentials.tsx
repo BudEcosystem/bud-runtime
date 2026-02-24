@@ -16,13 +16,10 @@ export default function GuardrailSelectCredentials() {
     selectedProvider,
   } = useGuardrails();
 
-  // Get the provider type for credentials from workflow response
-  // After step 3, the backend derives model info from probe_selections + project_id
+  // Get the credential provider type from workflow model info (not the guardrail provider_type which is "bud")
   const providerType =
     currentWorkflow?.models?.[0]?.source ||
     currentWorkflow?.model_source ||
-    currentWorkflow?.provider_type ||
-    selectedProvider?.provider_type ||
     "huggingface";
 
   const handleBack = () => {
@@ -33,30 +30,11 @@ export default function GuardrailSelectCredentials() {
     if (!selectedCredentials?.id) return;
 
     try {
+      // Backend accumulates data across steps, so only send step-specific fields
       const payload: any = {
         step_number: 4,
         credential_id: selectedCredentials.id,
-        trigger_workflow: false,
       };
-
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      }
-
-      if (selectedProvider?.id) {
-        payload.provider_id = selectedProvider.id;
-      }
-      if (selectedProvider?.provider_type) {
-        payload.provider_type = selectedProvider.provider_type;
-      }
-
-      if (currentWorkflow?.probe_selections) {
-        payload.probe_selections = currentWorkflow.probe_selections;
-      }
-
-      if (currentWorkflow?.project_id) {
-        payload.project_id = currentWorkflow.project_id;
-      }
 
       const success = await updateWorkflow(payload);
       if (success) {
