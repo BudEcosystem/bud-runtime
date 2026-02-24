@@ -27,19 +27,19 @@ description: "Create a deployment, use its endpoint, and optionally publish to c
 
 ![Image](/images/image-24.png)
 
-## Step 4: Use the Endpoint
-
-1. Return to the deployment row (or open General tab actions).
-2. Click **Use this model**.
-3. Copy cURL, Python, or JavaScript snippets.
-4. Run a test call in your app or API client.
-
-## Step 5: Configure Reliability
+## Step 4: Configure Reliability
 
 1. Open **Settings**.
 2. Enable and configure rate limiting strategy.
 3. Add retries and fallback deployment chain if needed.
 4. Save your settings.
+
+## Step 5: Use the Endpoint
+
+1. Return to the deployment row (or open General tab actions).
+2. Click **Use this model**.
+3. Copy cURL, Python, or JavaScript snippets.
+4. Run a test call in your app or API client.
 
 ## Step 6: Publish for Customer Dashboard (Optional)
 
@@ -54,8 +54,8 @@ description: "Create a deployment, use its endpoint, and optionally publish to c
 flowchart TD
     A[Open Project] --> B[Deploy Model]
     B --> C[Check General/Workers]
-    C --> D[Use this model: Copy Snippet]
-    D --> E[Configure Settings]
+    C --> D[Configure Settings]
+    D --> E[Use this model: Copy Snippet]
     E --> F{Need customer portal listing?}
     F -->|Yes| G[Publish with Pricing]
     F -->|No| H[Keep Internal Endpoint Usage]
