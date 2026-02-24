@@ -1,11 +1,17 @@
 ---
 title: "Deployment Concepts"
-description: "Understand deployment types, tabs, and lifecycle controls"
+description: "Understand endpoint usage, publishing, tabs, and lifecycle controls"
 ---
 
 ## What is a Deployment?
 
 A deployment is a managed runtime endpoint that binds a selected model to infrastructure, execution settings, and access controls. It is the unit used for serving inference traffic in Bud AI Foundry projects.
+
+## Deploy vs Use vs Publish
+
+- **Deploy**: Creates an endpoint and makes it available for inference once active.
+- **Use this model**: Gives ready-to-copy cURL, Python, and JavaScript snippets to call that endpoint.
+- **Publish**: Lists the model in the **Customer Dashboard portal** for customer-facing consumption and pricing governance.
 
 ## Deployment Building Blocks
 
@@ -14,8 +20,9 @@ flowchart LR
     A[Model Source] --> D[Deployment]
     B[Cluster Target] --> D
     C[Runtime Config] --> D
-    D --> E[Endpoint URL]
-    D --> F[Policies and Limits]
+    D --> E[Active Endpoint]
+    E --> F[Use this model Snippets]
+    E --> G[Optional Publish to Customer Portal]
 ```
 
 ## Deployment Types
@@ -46,9 +53,10 @@ Tracks evaluation runs and results linked to a deployment.
 stateDiagram-v2
     [*] --> Creating
     Creating --> Active
-    Active --> Published
-    Published --> Unpublished
-    Unpublished --> Published
+    Active --> UsableByAPIClients
+    UsableByAPIClients --> PublishedToCustomerPortal
+    PublishedToCustomerPortal --> Unpublished
+    Unpublished --> PublishedToCustomerPortal
     Active --> Failed
     Failed --> Active
     Active --> Deleted
@@ -64,4 +72,4 @@ stateDiagram-v2
 
 ## Permission Model
 
-Deployment actions are permission-aware. View-only users can inspect metadata while manage permissions are required for create, edit, publish, and delete actions.
+Deployment actions are permission-aware. View-only users can inspect metadata, while manage permissions are required for create, edit, publish, and delete actions.

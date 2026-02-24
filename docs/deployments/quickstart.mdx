@@ -1,6 +1,6 @@
 ---
 title: "Quick Start"
-description: "Create, validate, and publish your first deployment"
+description: "Create a deployment, use its endpoint, and optionally publish to customer portal"
 ---
 
 ## Step 1: Open Project Deployments
@@ -23,29 +23,38 @@ description: "Create, validate, and publish your first deployment"
 2. Review the **General** tab for status and metadata.
 3. If this is a local deployment, check **Workers** for node health.
 
-## Step 4: Configure Reliability
+## Step 4: Use the Endpoint
+
+1. Return to the deployment row (or open General tab actions).
+2. Click **Use this model**.
+3. Copy cURL, Python, or JavaScript snippets.
+4. Run a test call in your app or API client.
+
+## Step 5: Configure Reliability
 
 1. Open **Settings**.
 2. Enable and configure rate limiting strategy.
 3. Add retries and fallback deployment chain if needed.
 4. Save your settings.
 
-## Step 5: Publish for Consumption
+## Step 6: Publish for Customer Dashboard (Optional)
 
 1. Return to the Deployments list.
 2. Click **Publish** for the target deployment.
 3. Set pricing details and confirm publication.
-4. Use **Use this model** to copy integration snippets.
+4. Verify the model appears in the **Customer Dashboard portal** catalog.
 
 ## Quick Start Flow
 
 ```mermaid
 flowchart TD
     A[Open Project] --> B[Deploy Model]
-    B --> C[Check General Status]
-    C --> D[Configure Settings]
-    D --> E[Publish Endpoint]
-    E --> F[Share Integration Snippets]
+    B --> C[Check General/Workers]
+    C --> D[Use this model: Copy Snippet]
+    D --> E[Configure Settings]
+    E --> F{Need customer portal listing?}
+    F -->|Yes| G[Publish with Pricing]
+    F -->|No| H[Keep Internal Endpoint Usage]
 ```
 
 ## Next Steps
@@ -56,6 +65,6 @@ flowchart TD
   </Card>
 
   <Card title="Troubleshooting" icon="screwdriver-wrench" href="/deployments/troubleshooting">
-    Resolve common deployment and publication issues
+    Resolve common deployment, endpoint usage, and publish issues
   </Card>
 </CardGroup>
