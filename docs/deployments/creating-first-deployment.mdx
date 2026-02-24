@@ -38,24 +38,28 @@ In this walkthrough, you will create a deployment, validate runtime health, use 
 3. Confirm **General** tab status is healthy.
 4. If local, verify **Workers** activity.
 
-## Step 5: Use This Model for Integration
-
-1. Click **Use this model** from the deployment row or detail page.
-2. Copy cURL/Python/JavaScript snippet.
-3. Run a test request from your application or API client.
-
-## Step 6: Harden Reliability Settings
+## Step 5: Harden Reliability Settings
 
 1. Open **Settings**.
 2. Configure rate limiting strategy and quotas.
 3. Add retry and fallback logic.
 4. Save changes.
 
+## Step 6: Use This Model for Integration
+
+1. Click **Use this model** from the deployment row or detail page.
+2. Copy cURL/Python/JavaScript snippet.
+3. Run a test request from your application or API client.
+
+![Image](/images/image-25.png)
+
 ## Step 7: Publish for Customer Dashboard (Optional)
 
 1. Return to Deployments table.
 2. Click **Publish** and provide pricing metadata.
 3. Confirm the model is available in the **Customer Dashboard portal**.
+
+![Image](/images/image-26.png)
 
 ## End-to-End Flow
 
@@ -64,8 +68,8 @@ flowchart TD
     A[Open Project Deployments] --> B[Deploy Model]
     B --> C[Set Runtime Targets]
     C --> D[Validate General/Workers]
-    D --> E[Use this model: Copy Snippet]
-    E --> F[Configure Settings]
+    D --> E[Configure Settings]
+    E --> F[Use this model: Copy Snippet]
     F --> G{Need customer portal listing?}
     G -->|Yes| H[Publish with Pricing]
     G -->|No| I[Continue Internal API Usage]
