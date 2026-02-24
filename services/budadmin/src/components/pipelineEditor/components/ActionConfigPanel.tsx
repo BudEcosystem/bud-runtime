@@ -7,7 +7,7 @@
  * Renders form fields based on the action's parameter schema.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { Slider, ConfigProvider } from 'antd';
 import { AppRequest } from 'src/pages/api/requests';
@@ -265,6 +265,11 @@ function BranchEditor({ branches, onChange, availableSteps }: BranchEditorProps)
 // Types
 // ============================================================================
 
+export interface ActionConfigPanelRef {
+  /** Validates and returns the current local state if valid, or null if validation fails */
+  flush: () => Promise<{ name: string; params: Record<string, unknown>; condition?: string } | null>;
+}
+
 export interface ActionConfigPanelProps {
   /** The selected step data */
   stepId: string;
@@ -483,7 +488,7 @@ const dangerButtonStyles: React.CSSProperties = {
 // Component
 // ============================================================================
 
-export function ActionConfigPanel({
+export const ActionConfigPanel = forwardRef<ActionConfigPanelRef, ActionConfigPanelProps>(function ActionConfigPanel({
   stepId,
   stepName,
   action,
@@ -495,7 +500,7 @@ export function ActionConfigPanel({
   dataSources = {},
   loadingDataSources = new Set(),
   availableSteps = [],
-}: ActionConfigPanelProps) {
+}: ActionConfigPanelProps, ref) {
   // Get default params for this action and merge with provided params
   const defaultParams = useMemo(() => getDefaultParams(action), [action]);
   const mergedParams = useMemo(() => ({ ...defaultParams, ...params }), [defaultParams, params]);
@@ -722,6 +727,36 @@ export function ActionConfigPanel({
     });
     onClose();
   }, [action, localParams, localName, localCondition, onUpdate, onClose, showValidationErrors]);
+
+  // Expose flush method for parent to auto-save unsaved changes
+  useImperativeHandle(ref, () => ({
+    flush: async () => {
+      const validation = validateParams(action, localParams);
+      if (!validation.valid) {
+        showValidationErrors(validation.errors);
+        return null;
+      }
+
+      try {
+        const response = await AppRequest.Post('/budpipeline/actions/validate', {
+          action_type: action,
+          params: localParams,
+        });
+        if (response?.data && !response.data.valid) {
+          showValidationErrors(response.data.errors || ['Validation failed']);
+          return null;
+        }
+      } catch (err) {
+        console.warn('Backend validation failed, using local validation only:', err);
+      }
+
+      return {
+        name: localName,
+        params: localParams,
+        condition: localCondition || undefined,
+      };
+    },
+  }), [action, localParams, localName, localCondition, showValidationErrors]);
 
   // Get options for ref types
   const getRefOptions = useCallback(
@@ -1195,6 +1230,6 @@ export function ActionConfigPanel({
       </div>
     </div>
   );
-}
+});
 
 export default ActionConfigPanel;
