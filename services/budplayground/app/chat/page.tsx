@@ -89,6 +89,7 @@ export default function ChatPage() {
             modified_at: new Date().toISOString(),
             total_tokens: 0,
             active: true,
+            isPromptSession: true,
           };
 
           if (selectedModel) {
@@ -153,6 +154,10 @@ export default function ChatPage() {
         setPromptIds(idsArray);
       }
       console.log('Extracted promptIds from URL:', idsArray);
+    } else {
+      // No promptIds in URL - clear any stale prompt state from previous session
+      setPromptIds([]);
+      setPromptIdsFromUrl([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
