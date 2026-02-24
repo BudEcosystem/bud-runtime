@@ -1,0 +1,58 @@
+---
+title: "Deployment Lifecycle Management"
+description: "Operate deployments from launch to retirement with predictable controls"
+---
+
+## Overview
+
+Lifecycle management helps teams keep deployments stable, auditable, and cost-aware as they evolve from testing to production.
+
+## Recommended Lifecycle Stages
+
+```mermaid
+flowchart LR
+    A[Create] --> B[Validate]
+    B --> C[Use this model for API Integration]
+    C --> D[Configure Policies]
+    D --> E{Need Customer Dashboard listing?}
+    E -->|Yes| F[Publish with Pricing]
+    E -->|No| G[Operate Internally]
+    F --> H[Monitor and Iterate]
+    G --> H
+    H --> I[Retire]
+```
+
+## Launch Stage
+
+- Select model source and cluster intentionally.
+- Use naming that encodes environment or business domain.
+- Validate endpoint readiness immediately after creation.
+
+## Integration Stage
+
+- Use **Use this model** to copy official snippets.
+- Validate endpoint behavior with real prompts before wider rollout.
+
+## Policy Stage
+
+- Add rate limits aligned to expected traffic.
+- Configure retries and fallback routes for resiliency.
+- Re-check permission boundaries for sensitive projects.
+
+## Publish Stage (Optional)
+
+- Publish only when the model should appear in the **Customer Dashboard portal**.
+- Attach pricing metadata for downstream customer consumption.
+- Document portal-facing SLAs and usage expectations.
+
+## Operate Stage
+
+- Track status, performance, and error trends.
+- Scale workers for local deployments when demand rises.
+- Re-run evaluations after meaningful model or policy changes.
+
+## Retire Stage
+
+- Unpublish before deletion when external users consume the endpoint.
+- Confirm route dependencies are removed.
+- Delete only after migration to replacement endpoints is complete.
