@@ -24,7 +24,8 @@ export type ParamType =
   | 'project_ref'
   | 'endpoint_ref'
   | 'provider_ref'
-  | 'credential_ref';
+  | 'credential_ref'
+  | 'cloud_model_ref';
 
 export interface SelectOption {
   value: string;

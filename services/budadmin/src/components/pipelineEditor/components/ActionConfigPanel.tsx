@@ -7,10 +7,11 @@
  * Renders form fields based on the action's parameter schema.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { Slider, ConfigProvider } from 'antd';
 import { AppRequest } from 'src/pages/api/requests';
+import { tempApiBaseUrl } from '@/components/environment';
 import { errorToast } from '@/components/toast';
 import {
   getActionMeta,
@@ -264,6 +265,11 @@ function BranchEditor({ branches, onChange, availableSteps }: BranchEditorProps)
 // Types
 // ============================================================================
 
+export interface ActionConfigPanelRef {
+  /** Validates and returns the current local state if valid, or null if validation fails */
+  flush: () => Promise<{ name: string; params: Record<string, unknown>; condition?: string } | null>;
+}
+
 export interface ActionConfigPanelProps {
   /** The selected step data */
   stepId: string;
@@ -289,6 +295,7 @@ export interface ActionConfigPanelProps {
     endpoints?: SelectOption[];
     providers?: SelectOption[];
     credentials?: SelectOption[];
+    providerTypeMap?: Record<string, string>;
   };
   /** Whether data sources are loading */
   loadingDataSources?: Set<string>;
@@ -481,7 +488,7 @@ const dangerButtonStyles: React.CSSProperties = {
 // Component
 // ============================================================================
 
-export function ActionConfigPanel({
+export const ActionConfigPanel = forwardRef<ActionConfigPanelRef, ActionConfigPanelProps>(function ActionConfigPanel({
   stepId,
   stepName,
   action,
@@ -493,7 +500,7 @@ export function ActionConfigPanel({
   dataSources = {},
   loadingDataSources = new Set(),
   availableSteps = [],
-}: ActionConfigPanelProps) {
+}: ActionConfigPanelProps, ref) {
   // Get default params for this action and merge with provided params
   const defaultParams = useMemo(() => getDefaultParams(action), [action]);
   const mergedParams = useMemo(() => ({ ...defaultParams, ...params }), [defaultParams, params]);
@@ -514,6 +521,10 @@ export function ActionConfigPanel({
     return templateFields;
   });
 
+  // Cloud model options for cloud_model_ref fields
+  const [cloudModelOptions, setCloudModelOptions] = useState<SelectOption[]>([]);
+  const [loadingCloudModels, setLoadingCloudModels] = useState(false);
+
   // Sync local state when props change (e.g., when selecting a different node)
   useEffect(() => {
     const newMergedParams = { ...getDefaultParams(action), ...params };
@@ -533,6 +544,63 @@ export function ActionConfigPanel({
   // Get action metadata
   const actionMeta = getActionMeta(action);
   const paramDefs = getActionParams(action);
+
+  // Fetch cloud models when provider_id changes (for cloud_model_ref params)
+  useEffect(() => {
+    const hasCloudModelRef = paramDefs.some((p) => p.type === 'cloud_model_ref');
+    if (!hasCloudModelRef) return;
+
+    const providerId = localParams.provider_id as string;
+    if (!providerId || providerId.includes('{{')) {
+      setCloudModelOptions([]);
+      return;
+    }
+
+    // Look up provider type from the providerTypeMap
+    const providerType = dataSources.providerTypeMap?.[providerId];
+    if (!providerType) {
+      setCloudModelOptions([]);
+      return;
+    }
+
+    // Clear stale cloud_model_id when provider changes
+    if (localParams.cloud_model_id) {
+      handleParamChange('cloud_model_id', '');
+    }
+
+    let cancelled = false;
+    setLoadingCloudModels(true);
+    AppRequest.Get(`${tempApiBaseUrl}/models/`, {
+      params: {
+        table_source: 'cloud_model',
+        source: providerType,
+        page: 1,
+        limit: 1000,
+        order_by: '-created_at',
+      },
+    })
+      .then((response: any) => {
+        if (cancelled) return;
+        const models = response?.data?.models || [];
+        const options: SelectOption[] = models
+          .map((item: any) => ({
+            label: item?.model?.name || item?.name || 'Unknown',
+            value: item?.model?.id || item?.id,
+          }))
+          .filter((opt: { value: unknown }): opt is SelectOption => Boolean(opt.value));
+        setCloudModelOptions(options);
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        errorToast('Failed to fetch cloud models. Please try again.');
+        setCloudModelOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCloudModels(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [localParams.provider_id, dataSources.providerTypeMap, action]);
 
   // Check if a string is an emoji
   const isEmoji = (str: string): boolean => {
@@ -659,6 +727,36 @@ export function ActionConfigPanel({
     });
     onClose();
   }, [action, localParams, localName, localCondition, onUpdate, onClose, showValidationErrors]);
+
+  // Expose flush method for parent to auto-save unsaved changes
+  useImperativeHandle(ref, () => ({
+    flush: async () => {
+      const validation = validateParams(action, localParams);
+      if (!validation.valid) {
+        showValidationErrors(validation.errors);
+        return null;
+      }
+
+      try {
+        const response = await AppRequest.Post('/budpipeline/actions/validate', {
+          action_type: action,
+          params: localParams,
+        });
+        if (response?.data && !response.data.valid) {
+          showValidationErrors(response.data.errors || ['Validation failed']);
+          return null;
+        }
+      } catch (err) {
+        console.warn('Backend validation failed, using local validation only:', err);
+      }
+
+      return {
+        name: localName,
+        params: localParams,
+        condition: localCondition || undefined,
+      };
+    },
+  }), [action, localParams, localName, localCondition, showValidationErrors]);
 
   // Get options for ref types
   const getRefOptions = useCallback(
@@ -849,6 +947,34 @@ export function ActionConfigPanel({
             </div>
           )}
 
+          {/* Cloud Model Ref (dynamic dropdown based on selected provider) */}
+          {param.type === 'cloud_model_ref' && (
+            <div>
+              {!localParams.provider_id || (typeof localParams.provider_id === 'string' && localParams.provider_id.includes('{{')) ? (
+                <div style={{ ...helpTextStyles, padding: '8px 12px', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #333' }}>
+                  Select a provider first to see available models
+                </div>
+              ) : (
+                <select
+                  id={fieldId}
+                  value={String(value)}
+                  style={selectStyles}
+                  disabled={loadingCloudModels}
+                  onChange={(e) => handleParamChange(param.name, e.target.value)}
+                >
+                  <option value="">
+                    {loadingCloudModels ? 'Loading models...' : `Select ${param.label}...`}
+                  </option>
+                  {cloudModelOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Template (Jinja2) */}
           {param.type === 'template' && (
             <textarea
@@ -995,7 +1121,7 @@ export function ActionConfigPanel({
         </div>
       );
     },
-    [localParams, isParamVisible, handleParamChange, getRefOptions, isLoadingRef, availableSteps, isTemplateMode, toggleTemplateMode]
+    [localParams, isParamVisible, handleParamChange, getRefOptions, isLoadingRef, availableSteps, isTemplateMode, toggleTemplateMode, cloudModelOptions, loadingCloudModels]
   );
 
   return (
@@ -1104,6 +1230,6 @@ export function ActionConfigPanel({
       </div>
     </div>
   );
-}
+});
 
 export default ActionConfigPanel;

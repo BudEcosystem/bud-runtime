@@ -37,6 +37,7 @@ class TestParamType:
             "endpoint_ref",
             "provider_ref",
             "credential_ref",
+            "cloud_model_ref",
         ]
         actual_types = [pt.value for pt in ParamType]
         assert sorted(actual_types) == sorted(expected_types)

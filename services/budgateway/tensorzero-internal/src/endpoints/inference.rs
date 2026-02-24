@@ -1648,21 +1648,77 @@ pub async fn write_inference(
     futures::future::join_all(futures).await;
 }
 
-/// Extract provider status code from nested error HashMap
-/// When errors are wrapped (e.g., AllVariantsFailed wrapping InferenceClient),
-/// we want the provider's status code (400) not the wrapper's (502)
+/// Extract provider status code from nested error HashMap.
+/// Recursively walks AllVariantsFailed → ModelProvidersExhausted → ModelChainExhausted → InferenceClient
+/// to find the provider's status code (e.g. 400) instead of the wrapper's (e.g. 502).
 fn extract_provider_status_code(
     errors: &HashMap<String, Error>,
     fallback_error: &Error,
 ) -> StatusCode {
     errors
         .values()
-        .next()
-        .and_then(|e| match e.get_details() {
+        .find_map(|e| match e.get_details() {
             ErrorDetails::InferenceClient { status_code, .. } => *status_code,
+            ErrorDetails::ModelProvidersExhausted { provider_errors } => {
+                let fallback = e.status_code();
+                let code = extract_provider_status_code(provider_errors, e);
+                if code != fallback { Some(code) } else { None }
+            }
+            ErrorDetails::ModelChainExhausted { model_errors } => {
+                let fallback = e.status_code();
+                let code = extract_provider_status_code(model_errors, e);
+                if code != fallback { Some(code) } else { None }
+            }
+            ErrorDetails::AllVariantsFailed { errors: inner } => {
+                let fallback = e.status_code();
+                let code = extract_provider_status_code(inner, e);
+                if code != fallback { Some(code) } else { None }
+            }
             _ => None,
         })
         .unwrap_or_else(|| fallback_error.status_code())
+}
+
+/// Detailed provider error info extracted from nested error wrappers.
+/// `provider_name` is the routing key (HashMap key) when available,
+/// falling back to `provider_type` from the InferenceClient error.
+struct ProviderErrorInfo {
+    message: String,
+    provider_name: String,
+    raw_request: Option<String>,
+}
+
+/// Extract detailed provider error info from nested errors for observability.
+/// Walks through AllVariantsFailed → ModelProvidersExhausted → ModelChainExhausted → InferenceClient
+/// to find the innermost provider error details. Uses the HashMap key as the
+/// provider routing name so it aligns with success-path records.
+fn extract_provider_error_details(errors: &HashMap<String, Error>) -> Option<ProviderErrorInfo> {
+    errors.iter().find_map(|(key, error)| match error.get_details() {
+        ErrorDetails::InferenceClient {
+            message,
+            provider_type,
+            raw_request,
+            ..
+        } => Some(ProviderErrorInfo {
+            message: message.clone(),
+            // Use the HashMap key as the routing provider name; it comes from
+            // ModelProvidersExhausted.provider_errors which is keyed by the
+            // configured provider name. Fall back to provider_type if the key
+            // looks like a variant/model identifier rather than a provider name.
+            provider_name: key.clone(),
+            raw_request: raw_request.clone(),
+        }),
+        ErrorDetails::ModelProvidersExhausted { provider_errors } => {
+            extract_provider_error_details(provider_errors)
+        }
+        ErrorDetails::ModelChainExhausted { model_errors } => {
+            extract_provider_error_details(model_errors)
+        }
+        ErrorDetails::AllVariantsFailed { errors: inner } => {
+            extract_provider_error_details(inner)
+        }
+        _ => None,
+    })
 }
 
 /// Send failure event to Kafka for observability when an inference fails
@@ -1687,7 +1743,17 @@ async fn send_failure_event(
 
     // Extract error details
     let error_details = error.get_details();
-    let error_message = error.to_string();
+
+    // Extract detailed provider error message from nested errors when available
+    let error_message = match error_details {
+        ErrorDetails::AllVariantsFailed { errors } => Some(errors),
+        ErrorDetails::ModelProvidersExhausted { provider_errors } => Some(provider_errors),
+        ErrorDetails::ModelChainExhausted { model_errors } => Some(model_errors),
+        _ => None,
+    }
+    .and_then(extract_provider_error_details)
+    .map(|info| info.message)
+    .unwrap_or_else(|| error.to_string());
 
     // Extract the actual provider status code from nested errors
     // When errors are wrapped (e.g., AllVariantsFailed wrapping InferenceClient),
@@ -1846,9 +1912,36 @@ fn extract_failure_model_inference(
     gateway_response: Option<&serde_json::Value>,
     observability_metadata: Option<&ObservabilityMetadata>,
 ) -> crate::inference::types::ModelInferenceDatabaseInsert {
-    let error_message = error.to_string();
     let serialized_input = serialize_or_log(&resolved_input.messages);
     let gateway_response_str = gateway_response.and_then(|v| serde_json::to_string(v).ok());
+
+    // Try to extract detailed provider error from nested error wrappers
+    let provider_info = match error.get_details() {
+        ErrorDetails::AllVariantsFailed { errors } => Some(errors),
+        ErrorDetails::ModelProvidersExhausted { provider_errors } => Some(provider_errors),
+        ErrorDetails::ModelChainExhausted { model_errors } => Some(model_errors),
+        _ => None,
+    }
+    .and_then(extract_provider_error_details);
+
+    let (error_message, raw_request_str, raw_response_str, provider_name) =
+        if let Some(ref info) = provider_info {
+            (
+                info.message.clone(),
+                info.raw_request.clone().unwrap_or_default(),
+                // Store the parsed error message (not the full raw HTTP response body)
+                // to avoid persisting potentially sensitive data that providers may echo back.
+                info.message.clone(),
+                info.provider_name.clone(),
+            )
+        } else {
+            (
+                error.to_string(),
+                String::new(),
+                error.to_string(),
+                "unknown".to_string(),
+            )
+        };
 
     // Determine model_id for model_name field
     let model_id = if let Some(obs_metadata) = observability_metadata {
@@ -1860,8 +1953,8 @@ fn extract_failure_model_inference(
     crate::inference::types::ModelInferenceDatabaseInsert {
         id: uuid::Uuid::now_v7(),
         inference_id,
-        raw_request: "".to_string(),        // Empty - failed before provider
-        raw_response: error_message.clone(), // Error message
+        raw_request: raw_request_str,
+        raw_response: raw_response_str,
         system: resolved_input
             .system
             .as_ref()
@@ -1869,14 +1962,14 @@ fn extract_failure_model_inference(
             .map(|s| s.to_string()),
         input_messages: serialized_input,
         output: format!("Error: {}", error_message),
-        input_tokens: None,          // None - no provider response
-        output_tokens: None,         // None - no provider response
+        input_tokens: None,
+        output_tokens: None,
         response_time_ms: Some(start_time.elapsed().as_millis() as u32),
         model_name: model_id,
-        model_provider_name: "unknown".to_string(), // Provider not reached
-        ttft_ms: None,              // None - no streaming
+        model_provider_name: provider_name,
+        ttft_ms: None,
         cached: false,
-        finish_reason: None,        // None - no completion
+        finish_reason: None,
         gateway_request,
         gateway_response: gateway_response_str,
         endpoint_type: "chat".to_string(),

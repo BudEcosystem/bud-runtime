@@ -13,9 +13,13 @@ Lifecycle management helps teams keep deployments stable, auditable, and cost-aw
 flowchart LR
     A[Create] --> B[Validate]
     B --> C[Configure Policies]
-    C --> D[Publish]
-    D --> E[Monitor]
-    E --> F[Iterate or Retire]
+    C --> D[Use this model for API Integration]
+    D --> E{Need Customer Dashboard listing?}
+    E -->|Yes| F[Publish with Pricing]
+    E -->|No| G[Operate Internally]
+    F --> H[Monitor and Iterate]
+    G --> H
+    H --> I[Retire]
 ```
 
 ## Launch Stage
@@ -24,17 +28,28 @@ flowchart LR
 - Use naming that encodes environment or business domain.
 - Validate endpoint readiness immediately after creation.
 
+## Integration Stage
+
+- Use **Use this model** to copy official snippets.
+- Validate endpoint behavior with real prompts before wider rollout.
+
 ## Policy Stage
 
 - Add rate limits aligned to expected traffic.
 - Configure retries and fallback routes for resiliency.
 - Re-check permission boundaries for sensitive projects.
 
-## Publish Stage
+![Image](/images/image-27.png)
 
-- Publish only after health and quality checks.
-- Attach pricing metadata for downstream consumers.
-- Document endpoint usage expectations for consuming teams.
+## Publish Stage (Optional)
+
+- Publish only when the model should appear in the **Customer Dashboard portal**.
+- Attach pricing metadata for downstream customer consumption.
+- Document portal-facing SLAs and usage expectations.
+
+<Frame>
+  ![Image](/images/image-28.png)
+</Frame>
 
 ## Operate Stage
 

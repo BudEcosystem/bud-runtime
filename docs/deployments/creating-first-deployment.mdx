@@ -1,11 +1,11 @@
 ---
 title: "Creating Your First Deployment"
-description: "Step-by-step tutorial to launch and publish a deployment"
+description: "Step-by-step tutorial to deploy, use endpoint snippets, and optionally publish"
 ---
 
 ## What You'll Build
 
-In this walkthrough, you will create a deployment, validate runtime health, add reliability settings, and publish it for consumers.
+In this walkthrough, you will create a deployment, validate runtime health, use endpoint snippets, add reliability settings, and optionally publish it to the Customer Dashboard portal.
 
 ## Prerequisites
 
@@ -45,11 +45,21 @@ In this walkthrough, you will create a deployment, validate runtime health, add 
 3. Add retry and fallback logic.
 4. Save changes.
 
-## Step 6: Publish and Share
+## Step 6: Use This Model for Integration
+
+1. Click **Use this model** from the deployment row or detail page.
+2. Copy cURL/Python/JavaScript snippet.
+3. Run a test request from your application or API client.
+
+![Image](/images/image-25.png)
+
+## Step 7: Publish for Customer Dashboard (Optional)
 
 1. Return to Deployments table.
 2. Click **Publish** and provide pricing metadata.
-3. Use **Use this model** to copy cURL/Python/JavaScript integration snippets.
+3. Confirm the model is available in the **Customer Dashboard portal**.
+
+![Image](/images/image-26.png)
 
 ## End-to-End Flow
 
@@ -59,13 +69,15 @@ flowchart TD
     B --> C[Set Runtime Targets]
     C --> D[Validate General/Workers]
     D --> E[Configure Settings]
-    E --> F[Publish Deployment]
-    F --> G[Distribute Integration Snippets]
+    E --> F[Use this model: Copy Snippet]
+    F --> G{Need customer portal listing?}
+    G -->|Yes| H[Publish with Pricing]
+    G -->|No| I[Continue Internal API Usage]
 ```
 
 ## Best Practices
 
 - Use clear, environment-aware naming conventions for deployments.
-- Validate deployment status before publishing.
-- Start with conservative limits and tune based on observed traffic.
-- Use evaluations and observability signals before increasing production exposure.
+- Validate deployment status before sharing snippets or publishing.
+- Keep **Use this model** for direct API integration workflows.
+- Use **Publish** only when the deployment should appear in the customer-facing portal.

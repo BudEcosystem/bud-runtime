@@ -6,7 +6,7 @@
 
 // Main Editor (React Flow based)
 export { PipelineEditor } from './PipelineEditor';
-export type { PipelineEditorProps, SelectOption } from './PipelineEditor';
+export type { PipelineEditorProps, PipelineEditorRef, SelectOption } from './PipelineEditor';
 
 // Viewer Components
 export { DAGViewer } from './DAGViewer';

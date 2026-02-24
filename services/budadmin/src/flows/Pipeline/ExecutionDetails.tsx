@@ -7,12 +7,12 @@ import {
   Text_11_400_808080,
   Text_20_400_FFFFFF,
 } from "@/components/ui/text";
-import { Empty, Tag } from "antd";
+import { Empty, Tag, Tooltip } from "antd";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useBudPipeline } from "src/stores/useBudPipeline";
 import { useEffect, useMemo } from "react";
-import { differenceInMinutes } from "date-fns";
-import { SpecificationTableItem } from "../components/SpecificationTableItem";
+import { format, formatDistanceToNow } from "date-fns";
+
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 
 const PipelineExecutionDetails = () => {
@@ -28,19 +28,18 @@ const PipelineExecutionDetails = () => {
     }
   }, [executionId, getExecution]);
 
-  const formatMinutesAgo = (value?: string) => {
+  const formatTimestamp = (value?: string) => {
     if (!value) return "—";
-    const minutes = Math.max(0, differenceInMinutes(new Date(), new Date(value)));
-    return minutes === 1 ? "1 min ago" : `${minutes} min ago`;
+    return format(new Date(value), "MMM d, yyyy, h:mm:ss a");
   };
 
   const startedLabel = useMemo(
-    () => formatMinutesAgo(selectedExecution?.started_at),
+    () => formatTimestamp(selectedExecution?.started_at),
     [selectedExecution?.started_at]
   );
 
   const completedLabel = useMemo(
-    () => formatMinutesAgo(selectedExecution?.completed_at),
+    () => formatTimestamp(selectedExecution?.completed_at),
     [selectedExecution?.completed_at]
   );
 
@@ -61,13 +60,18 @@ const PipelineExecutionDetails = () => {
     return totalMinutes === 1 ? "1 min" : `${totalMinutes} min`;
   }, [selectedExecution?.started_at, selectedExecution?.completed_at]);
 
-  const executionSpecs = useMemo(
-    () => [
-      { name: "Started", value: startedLabel },
-      { name: "Completed", value: completedLabel },
-      { name: "Duration", value: durationLabel },
-    ],
-    [startedLabel, completedLabel, durationLabel]
+  const startedTooltip = useMemo(
+    () => selectedExecution?.started_at
+      ? formatDistanceToNow(new Date(selectedExecution.started_at), { addSuffix: true })
+      : "",
+    [selectedExecution?.started_at]
+  );
+
+  const completedTooltip = useMemo(
+    () => selectedExecution?.completed_at
+      ? formatDistanceToNow(new Date(selectedExecution.completed_at), { addSuffix: true })
+      : "",
+    [selectedExecution?.completed_at]
   );
 
   return (
@@ -99,10 +103,23 @@ const PipelineExecutionDetails = () => {
                     {selectedExecution.status}
                   </Tag>
                 </div>
-                <div className="mt-[1.1rem] flex flex-row flex-wrap gap-y-[1.15rem] mb-[1.1rem]">
-                  {executionSpecs.map((item, index) => (
-                    <SpecificationTableItem key={index} item={{ ...item, full: false }} valueWidth={80} />
-                  ))}
+                <div className="mt-[1.1rem] grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 mb-[1.1rem]">
+                  <Text_11_400_808080>Started</Text_11_400_808080>
+                  <Tooltip title={startedTooltip}>
+                    <div className="text-[12px] text-[#EEEEEE] truncate">
+                      {startedLabel}
+                    </div>
+                  </Tooltip>
+                  <Text_11_400_808080>Completed</Text_11_400_808080>
+                  <Tooltip title={completedTooltip}>
+                    <div className="text-[12px] text-[#EEEEEE] truncate">
+                      {completedLabel}
+                    </div>
+                  </Tooltip>
+                  <Text_11_400_808080>Duration</Text_11_400_808080>
+                  <div className="text-[12px] text-[#EEEEEE]">
+                    {durationLabel}
+                  </div>
                 </div>
               </DrawerCard>
             </BudDrawerLayout>
