@@ -12,7 +12,7 @@ import {
   RightOutlined,
   DownOutlined,
 } from "@ant-design/icons";
-import { formatDistanceToNow, differenceInSeconds } from "date-fns";
+import { format, formatDistanceToNow, differenceInSeconds } from "date-fns";
 
 const statusConfig: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
   pending: {
@@ -100,9 +100,9 @@ const StepTimelineItem: React.FC<StepTimelineItemProps> = ({
               <span className="text-gray-500 text-xs">{duration}s</span>
             )} */}
             {step.started_at && (
-              <Tooltip title={new Date(step.started_at).toLocaleString()}>
+              <Tooltip title={formatDistanceToNow(new Date(step.started_at), { addSuffix: true })}>
                 <span className="text-gray-600 text-[10px]">
-                  {formatDistanceToNow(new Date(step.started_at), { addSuffix: true })}
+                  {format(new Date(step.started_at), "MMM d, yyyy, h:mm:ss a")}
                 </span>
               </Tooltip>
             )}

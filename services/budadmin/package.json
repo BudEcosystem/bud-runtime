@@ -35,6 +35,7 @@
     "antd": "^5.21.1",
     "antd-style": "^3.7.1",
     "axios": "^1.12.0",
+    "bignumber.js": "^9.3.1",
     "bytebuffer": "^5.0.1",
     "chroma-js": "^3.1.1",
     "class-variance-authority": "^0.7.0",

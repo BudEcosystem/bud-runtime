@@ -29,10 +29,10 @@ import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useConfirmAction } from "src/hooks/useConfirmAction";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
-import { Button, Tag, Empty, Table, notification } from "antd";
+import { Button, Tag, Empty, Table, Tooltip, notification } from "antd";
 import { successToast, errorToast } from "@/components/toast";
 import { PipelineEditor, PipelineTriggersPanel, type PipelineEditorRef } from "@/components/pipelineEditor";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
 
 const WorkflowDetail = () => {
@@ -758,11 +758,14 @@ const WorkflowDetail = () => {
                     title: "Started",
                     dataIndex: "started_at",
                     key: "started_at",
+                    width: 180,
                     render: (value: string) => (
                       <Text_11_400_808080>
-                        {value
-                          ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                          : "—"}
+                        {value ? (
+                          <Tooltip title={`${format(new Date(value), "MMM d, yyyy, h:mm:ss a")} (${formatDistanceToNow(new Date(value), { addSuffix: true })})`}>
+                            <span className="whitespace-nowrap">{format(new Date(value), "MMM d, yyyy, h:mm:ss a")}</span>
+                          </Tooltip>
+                        ) : "—"}
                       </Text_11_400_808080>
                     ),
                   },
@@ -770,11 +773,14 @@ const WorkflowDetail = () => {
                     title: "Completed",
                     dataIndex: "completed_at",
                     key: "completed_at",
+                    width: 180,
                     render: (value: string) => (
                       <Text_11_400_808080>
-                        {value
-                          ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                          : "—"}
+                        {value ? (
+                          <Tooltip title={`${format(new Date(value), "MMM d, yyyy, h:mm:ss a")} (${formatDistanceToNow(new Date(value), { addSuffix: true })})`}>
+                            <span className="whitespace-nowrap">{format(new Date(value), "MMM d, yyyy, h:mm:ss a")}</span>
+                          </Tooltip>
+                        ) : "—"}
                       </Text_11_400_808080>
                     ),
                   },
