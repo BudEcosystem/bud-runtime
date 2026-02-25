@@ -25,6 +25,7 @@ from uuid import UUID
 
 import jwt
 from fastapi import status
+from sqlalchemy.exc import IntegrityError
 
 from budapp.shared.redis_service import RedisService
 
@@ -627,18 +628,26 @@ class PlaygroundService(SessionMixin):
                         f"JIT provisioning successful for user {db_user.email} "
                         f"(auth_id: {auth_id}) via access token flow"
                     )
-                except Exception as e:
-                    # Could be a race condition — another request may have created the user
-                    logger.warning(f"JIT provisioning error for auth_id {auth_id}: {e}. Re-checking DB...")
+                except IntegrityError:
+                    # Race condition — another request already created this user
+                    logger.warning(f"JIT provisioning race condition for auth_id {auth_id}. Re-checking DB...")
                     db_user = await UserDataManager(self.session).retrieve_by_fields(
                         UserModel, {"auth_id": auth_id}, missing_ok=True
                     )
                     if not db_user:
-                        logger.error(f"JIT provisioning failed and user still not found: {auth_id}")
+                        logger.error(
+                            f"JIT provisioning failed after race condition and user still not found: {auth_id}"
+                        )
                         raise ClientException(
                             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             message="Failed to provision user account. Please try again or contact support.",
                         )
+                except Exception as e:
+                    logger.error(f"Unexpected error during JIT provisioning for auth_id {auth_id}: {e}", exc_info=True)
+                    raise ClientException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        message="Failed to provision user account. Please try again or contact support.",
+                    )
 
             # Set the access token for permission checks
             db_user.raw_token = access_token

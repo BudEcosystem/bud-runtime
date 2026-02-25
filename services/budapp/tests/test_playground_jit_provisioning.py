@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from budapp.commons.constants import UserRoleEnum, UserStatusEnum, UserTypeEnum
@@ -235,7 +236,7 @@ class TestPlaygroundJITProvisioning:
             # Simulate race condition — IntegrityError from concurrent insert
             auth_instance = MockAuthService.return_value
             auth_instance._create_user_from_keycloak = AsyncMock(
-                side_effect=Exception("duplicate key value violates unique constraint")
+                side_effect=IntegrityError("duplicate key value violates unique constraint", "params", "orig")
             )
 
             with contextlib.suppress(Exception):
@@ -245,10 +246,10 @@ class TestPlaygroundJITProvisioning:
             assert udm_instance.retrieve_by_fields.call_count == 4
 
     @pytest.mark.asyncio
-    async def test_jit_fails_completely_returns_500(
+    async def test_jit_non_race_error_returns_500(
         self, playground_service, test_tenant, test_tenant_client, keycloak_user_dict
     ):
-        """When JIT fails and re-check also finds no user, should return 500."""
+        """When JIT fails with a non-IntegrityError, should return 500 immediately without re-querying DB."""
         with (
             patch("budapp.playground_ops.services.UserDataManager") as MockUDM,
             patch("budapp.playground_ops.services.KeycloakManager") as MockKM,
@@ -258,8 +259,9 @@ class TestPlaygroundJITProvisioning:
             mock_settings.default_realm_name = "bud-keycloak"
 
             udm_instance = MockUDM.return_value
-            # All lookups return None — user never created
-            udm_instance.retrieve_by_fields = AsyncMock(side_effect=[test_tenant, test_tenant_client, None, None])
+            # Only 3 calls: tenant, tenant_client, None (user not found)
+            # No 4th call — non-race errors don't trigger DB re-query
+            udm_instance.retrieve_by_fields = AsyncMock(side_effect=[test_tenant, test_tenant_client, None])
 
             km_instance = MockKM.return_value
             km_instance.validate_token = AsyncMock(return_value={"sub": "3dd53c4e-7b00-445b-8be1-c8ae3a8540de"})
@@ -267,6 +269,40 @@ class TestPlaygroundJITProvisioning:
 
             auth_instance = MockAuthService.return_value
             auth_instance._create_user_from_keycloak = AsyncMock(side_effect=Exception("database connection lost"))
+
+            with pytest.raises(ClientException) as exc_info:
+                await playground_service.initialize_session_with_access_token(access_token="valid-access-token")
+
+            assert exc_info.value.status_code == 500
+            assert "Failed to provision" in exc_info.value.message
+            # Verify no re-query was attempted (only 3 calls, not 4)
+            assert udm_instance.retrieve_by_fields.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_jit_race_condition_requery_fails_returns_500(
+        self, playground_service, test_tenant, test_tenant_client, keycloak_user_dict
+    ):
+        """When IntegrityError race condition occurs but re-query also finds no user, should return 500."""
+        with (
+            patch("budapp.playground_ops.services.UserDataManager") as MockUDM,
+            patch("budapp.playground_ops.services.KeycloakManager") as MockKM,
+            patch("budapp.playground_ops.services.AuthService") as MockAuthService,
+            patch("budapp.playground_ops.services.app_settings") as mock_settings,
+        ):
+            mock_settings.default_realm_name = "bud-keycloak"
+
+            udm_instance = MockUDM.return_value
+            # 4 calls: tenant, tenant_client, None (not found), None (re-query also fails)
+            udm_instance.retrieve_by_fields = AsyncMock(side_effect=[test_tenant, test_tenant_client, None, None])
+
+            km_instance = MockKM.return_value
+            km_instance.validate_token = AsyncMock(return_value={"sub": "3dd53c4e-7b00-445b-8be1-c8ae3a8540de"})
+            km_instance.get_keycloak_user_by_id = Mock(return_value=keycloak_user_dict)
+
+            auth_instance = MockAuthService.return_value
+            auth_instance._create_user_from_keycloak = AsyncMock(
+                side_effect=IntegrityError("duplicate key", "params", "orig")
+            )
 
             with pytest.raises(ClientException) as exc_info:
                 await playground_service.initialize_session_with_access_token(access_token="valid-access-token")
@@ -314,8 +350,23 @@ class TestKeycloakGetUserById:
 
             assert result is None
 
-    def test_returns_none_on_generic_exception(self):
-        """Should return None and log error on unexpected exceptions."""
+    def test_raises_on_non_404_keycloak_error(self):
+        """Should re-raise KeycloakGetError for non-404 errors (5xx, 403, etc.)."""
+        from keycloak.exceptions import KeycloakGetError
+
+        from budapp.commons.keycloak import KeycloakManager
+
+        with patch.object(KeycloakManager, "get_realm_admin") as mock_get_admin:
+            mock_admin = Mock()
+            mock_admin.get_user.side_effect = KeycloakGetError(error_message="Forbidden", response_code=403)
+            mock_get_admin.return_value = mock_admin
+
+            km = KeycloakManager.__new__(KeycloakManager)
+            with pytest.raises(KeycloakGetError):
+                km.get_keycloak_user_by_id("test-uuid", "bud-keycloak")
+
+    def test_raises_on_generic_exception(self):
+        """Should re-raise unexpected exceptions."""
         from budapp.commons.keycloak import KeycloakManager
 
         with patch.object(KeycloakManager, "get_realm_admin") as mock_get_admin:
@@ -324,6 +375,5 @@ class TestKeycloakGetUserById:
             mock_get_admin.return_value = mock_admin
 
             km = KeycloakManager.__new__(KeycloakManager)
-            result = km.get_keycloak_user_by_id("test-uuid", "bud-keycloak")
-
-            assert result is None
+            with pytest.raises(ConnectionError):
+                km.get_keycloak_user_by_id("test-uuid", "bud-keycloak")

@@ -362,12 +362,16 @@ class KeycloakManager:
             realm_admin = self.get_realm_admin(realm_name)
             user = realm_admin.get_user(user_id)
             return user
-        except KeycloakGetError:
-            logger.warning(f"User {user_id} not found in Keycloak realm {realm_name}")
-            return None
+        except KeycloakGetError as e:
+            if e.response_code == 404:
+                logger.warning(f"User {user_id} not found in Keycloak realm {realm_name}")
+                return None
+            # Non-404 errors (5xx, 403, etc.) indicate infrastructure/auth issues — re-raise
+            logger.error(f"Keycloak error fetching user {user_id} (HTTP {e.response_code}): {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Error fetching Keycloak user by ID {user_id}: {str(e)}")
-            return None
+            raise
 
     def get_user_realm_roles(self, user_id: str, realm_name: str) -> Optional[list[str]]:
         """Get realm roles assigned to a user in Keycloak.
