@@ -416,8 +416,8 @@ export default function GuardRails() {
         };
 
         // Add optional filters
-        if (params?.searchTerm) {
-          queryParams.name = params.searchTerm;
+        if (params?.name) {
+          queryParams.name = params.name;
         }
         if (params?.provider_type) {
           queryParams.provider_type = params.provider_type;
@@ -483,7 +483,7 @@ export default function GuardRails() {
         };
 
         if (filter.name) {
-          params.searchTerm = filter.name; // Use searchTerm for the actual search string
+          params.name = filter.name;
         }
 
         if (filter.provider?.length > 0) {
