@@ -37,6 +37,7 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import { PlusOutlined } from "@ant-design/icons";
 import GeneralTags from "src/flows/components/GeneralTags";
 import { formatDate } from "@/utils/formatDate";
+import IconRender from "src/flows/components/BudIconRender";
 
 // Interface for GuardRail/Probe data structure
 interface GuardRail {
@@ -79,35 +80,6 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
     return () => window.removeEventListener("resize", checkOverflow);
   }, [item.description]);
 
-  const getTypeIcon = (item: any) => {
-    // Use uri or type to determine icon
-    const typeIdentifier = item.uri || item.type || '';
-    switch (typeIdentifier.toLowerCase()) {
-      case 'pii':
-      case 'personal_identifier_information':
-        return '🔒';
-      case 'secrets':
-      case 'credentials':
-        return '🔐';
-      case 'regex':
-        return '📝';
-      case 'toxicity':
-        return '⚠️';
-      case 'bias':
-        return '⚖️';
-      case 'jailbreak':
-        return '🚫';
-      case 'custom':
-        return '⚙️';
-      case 'profanity':
-        return '🤬';
-      case 'semantic':
-        return '🧠';
-      default:
-        return '🛡️';
-    }
-  };
-
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active':
@@ -132,8 +104,12 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
       <div className="flex flex-col justify-start pr-[1.5em] pl-[1.5em] pt-[1.6em] h-full">
         <div className="flex items-start justify-between mb-[1.25rem]">
           <div className="flex flex-col justify-start gap-[1rem]">
-            <div className="w-[2.4rem] h-[2.4rem] bg-[#1F1F1F] rounded flex items-center justify-center text-[1.75rem]">
-              {getTypeIcon(item)}
+            <div className="w-[2.40125rem] h-[2.40125rem] bg-[#1F1F1F] rounded-[5px] flex items-center justify-center">
+              <IconRender
+                icon={item?.icon || "🛡️"}
+                size={26}
+                imageSize={24}
+              />
             </div>
             <div className="flex-1">
               <Text_11_400_808080>

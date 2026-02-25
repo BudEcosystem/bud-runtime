@@ -16,6 +16,7 @@ import {
   Text_14_400_EEEEEE,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
+import IconRender from "src/flows/components/BudIconRender";
 
 export default function BudSentinelProbes() {
   const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
@@ -100,22 +101,6 @@ export default function BudSentinelProbes() {
     },
     [loadMore, page, totalPages],
   );
-
-  const getCategoryIcon = (category: string) => {
-    switch (category.toLowerCase()) {
-      case "pii":
-      case "personal identifier information":
-      case "data loss prevention (dlp)":
-        return "🔒";
-      case "bias":
-        return "⚖️";
-      case "content":
-      case "secrets & credentials":
-        return "🛡️";
-      default:
-        return "📋";
-    }
-  };
 
   const handleBack = () => {
     openDrawerWithStep("select-provider");
@@ -356,14 +341,12 @@ export default function BudSentinelProbes() {
                               }`}
                             >
                               {/* Icon Section */}
-                              <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
-                                <span className="text-[1.5rem]">
-                                  {getCategoryIcon(
-                                    probe.name ||
-                                      probe.tags?.[0]?.name ||
-                                      category,
-                                  )}
-                                </span>
+                              <div className="bg-[#1F1F1F] rounded-[5px] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
+                                <IconRender
+                                  icon={probe?.icon || "🛡️"}
+                                  size={30}
+                                  imageSize={26}
+                                />
                               </div>
 
                               {/* Content Section */}

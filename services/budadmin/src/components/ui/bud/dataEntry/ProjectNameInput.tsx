@@ -25,10 +25,10 @@ export function NameIconDisplay({
   return (
     <div className="drawerNameInput flex flex-row items-center justify-between">
       <Button
-        className="text-2xl items-center flex jutify-center  rounded-[0.25rem] h-[2.1875] w-[2.1875]  bg-[#1F1F1F] p-1 mr-[0.5rem]"
+        className="text-2xl items-center flex justify-center  rounded-[0.25rem] h-[2.1875rem] w-[2.1875rem]  bg-[#1F1F1F] p-1 mr-[0.5rem]"
         type="link"
       >
-        {icon}
+        <div>{icon}</div>
       </Button>
       <div className="w-full" >
         <div
