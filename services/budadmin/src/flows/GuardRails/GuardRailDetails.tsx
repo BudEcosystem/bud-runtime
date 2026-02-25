@@ -5,7 +5,7 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { Input } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { errorToast, successToast } from "@/components/toast";
+import { errorToast } from "@/components/toast";
 import useGuardrails from "src/hooks/useGuardrails";
 import { Text_12_400_757575 } from "@/components/ui/text";
 import CustomSelect from "../components/CustomSelect";
@@ -29,8 +29,8 @@ const inputClassName = "bg-transparent text-[#EEEEEE] border-[#757575] hover:bor
 const inputStyle = { backgroundColor: "transparent", color: "#EEEEEE" };
 
 export default function GuardRailDetails() {
-  const { closeDrawer, openDrawerWithStep } = useDrawer();
-  const { updateCustomProbeWorkflow, customProbePolicy, workflowLoading, clearWorkflow } = useGuardrails();
+  const { openDrawerWithStep } = useDrawer();
+  const { updateCustomProbeWorkflow, customProbePolicy, workflowLoading } = useGuardrails();
 
   // Editable form state
   const [name, setName] = useState("");
@@ -72,10 +72,7 @@ export default function GuardRailDetails() {
     });
 
     if (!success) return;
-
-    successToast("Guardrail created successfully!");
-    clearWorkflow();
-    closeDrawer();
+    openDrawerWithStep("custom-probe-success");
   };
 
   return (

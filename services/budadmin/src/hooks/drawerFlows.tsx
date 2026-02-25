@@ -4522,16 +4522,36 @@ const addGuardrailDeployment: DrawerFlowType = {
       component: StepComponents["bud-sentinel-probes"],
       progress: [
         {
-          status: FormProgressStatus.completed,
-          title: "Select Provider",
-        },
-        {
           status: FormProgressStatus.inProgress,
-          title: "Select Probes",
+          title: "Select Probes List",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Project",
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select deployment Types",
+        },
+         {
+          status: FormProgressStatus.notCompleted,
+          title: "Select probe Settings",
+        },
+         {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+         {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+         {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4544,16 +4564,36 @@ const addGuardrailDeployment: DrawerFlowType = {
       component: StepComponents["pii-detection-config"],
       progress: [
         {
-          status: FormProgressStatus.completed,
-          title: "Select Probes",
-        },
-        {
           status: FormProgressStatus.inProgress,
-          title: "Configure Rules",
+          title: "Select Probes List",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Project",
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4567,7 +4607,7 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Probes",
+          title: "Select Probes List",
         },
         {
           status: FormProgressStatus.inProgress,
@@ -4575,7 +4615,27 @@ const addGuardrailDeployment: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Deploy Type",
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4589,15 +4649,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
           title: "Select Project",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Credentials",
+          title: "Select or Add Credentials",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Deploy Type",
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4611,15 +4691,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Credentials",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Onboarding",
+          title: "Select or Add Credentials",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Deploy Type",
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4633,15 +4733,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
           title: "Select Project",
         },
         {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
           status: FormProgressStatus.inProgress,
-          title: "Deploy Type",
+          title: "Select deployment Types",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Settings",
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4655,15 +4775,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Deploy Type",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Endpoints",
+          title: "Select deployment Types",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Settings",
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4677,15 +4817,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Deploy Type",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Settings",
+          title: "Select probe Settings",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Deploy",
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4699,15 +4859,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Settings",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select probe Settings",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Hardware",
+          title: "Select hardware Resource",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Specifications",
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4721,15 +4901,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Hardware",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select hardware Resource",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Specifications",
+          title: "Set Deployment Specifications",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Cluster",
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4743,15 +4943,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Specifications",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select hardware Resource",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Simulation",
+          title: "Set Deployment Specifications",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Cluster",
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4765,15 +4985,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Simulation",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Set Deployment Specifications",
         },
         {
           status: FormProgressStatus.inProgress,
           title: "Select Cluster",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Deploy",
         },
       ],
       confirmClose: true,
@@ -4787,15 +5027,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Cluster",
+          title: "Select Probes List",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Set Deployment Specifications",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Deploying",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Success",
+          title: "Select Cluster",
         },
       ],
       confirmClose: true,
@@ -4809,11 +5069,35 @@ const addGuardrailDeployment: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Deploying",
+          title: "Select Probes List",
         },
         {
-          status: FormProgressStatus.inProgress,
-          title: "Success",
+          status: FormProgressStatus.completed,
+          title: "Select Project",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select or Add Credentials",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select deployment Types",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select probe Settings",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select hardware Resource",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Set Deployment Specifications",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Cluster",
         },
       ],
       confirmClose: false,
@@ -4839,11 +5123,11 @@ const addCustomProbe: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Select Type",
+          title: "Define a custom guardrail policy",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Configure",
+          title: "Guard Rail details",
         },
       ],
       confirmClose: true,
@@ -4860,11 +5144,11 @@ const addCustomProbe: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Configure Rules",
+          title: "Define a custom guardrail policy",
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Details",
+          title: "Guard Rail details",
         },
       ],
       confirmClose: true,
@@ -4927,14 +5211,35 @@ const addCustomProbe: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Define a custom guardrail policy",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Configure",
+          title: "Guard Rail details",
         },
       ],
       confirmClose: true,
+    },
+    {
+      navigation: () => ["Guardrails", "Success"],
+      id: "custom-probe-success",
+      step: 4,
+      component: StepComponents["custom-probe-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Probe Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Define a custom guardrail policy",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Guard Rail details",
+        },
+      ],
+      confirmClose: false,
     },
   ],
 };

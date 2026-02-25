@@ -137,6 +137,7 @@ import AddCustomGuardRail from "./GuardRails/AddCustomGuardRail";
 import UploadDataset from "./GuardRails/UploadDataset";
 import TrainingProbe from "./GuardRails/TrainingProbe";
 import GuardRailDetails from "./GuardRails/GuardRailDetails";
+import CustomProbeSuccess from "./GuardRails/CustomProbeSuccess";
 import BudSentinelProbes from "./GuardRails/BudSentinelProbes";
 import PIIDetectionConfig from "./GuardRails/PIIDetectionConfig";
 import DeploymentTypes from "./GuardRails/DeploymentTypes";
@@ -319,6 +320,7 @@ export const StepComponents = {
   "upload-dataset": UploadDataset,
   "training-probe": TrainingProbe,
   "guardrail-details": GuardRailDetails,
+  "custom-probe-success": CustomProbeSuccess,
   "bud-sentinel-probes": BudSentinelProbes,
   "pii-detection-config": PIIDetectionConfig,
   "deployment-types": DeploymentTypes,

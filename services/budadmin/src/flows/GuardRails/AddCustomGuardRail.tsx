@@ -17,7 +17,7 @@ import {
 } from "@ant-design/icons";
 import React, { useState, useCallback } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { errorToast, successToast } from "@/components/toast";
+import { errorToast } from "@/components/toast";
 import useGuardrails from "src/hooks/useGuardrails";
 import {
   Text_12_400_757575,
@@ -276,7 +276,6 @@ export default function AddCustomGuardRail() {
 
     if (!success) return;
 
-    successToast("Custom guardrail configuration saved");
     openDrawerWithStep("guardrail-details");
   };
 
