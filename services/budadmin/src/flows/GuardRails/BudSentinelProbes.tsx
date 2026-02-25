@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/text";
 import IconRender from "src/flows/components/BudIconRender";
 
+const PROBES_PAGE_LIMIT = 10;
+
 export default function BudSentinelProbes() {
   const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,7 +54,7 @@ export default function BudSentinelProbes() {
 
       const filterPayload: any = {
         page: 1,
-        limit: 10,
+        limit: PROBES_PAGE_LIMIT,
       };
 
       if (searchTerm) {
@@ -74,7 +76,7 @@ export default function BudSentinelProbes() {
     const nextPage = page + 1;
     const filterPayload: any = {
       page: nextPage,
-      limit: 10,
+      limit: PROBES_PAGE_LIMIT,
       append: true,
     };
 
