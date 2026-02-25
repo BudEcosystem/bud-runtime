@@ -326,6 +326,17 @@ class SimulationRunExecutor(BaseActionExecutor):
                 progress=progress,
             )
 
+        # Forward explicit ETA events from budsim
+        if event_name == "eta":
+            eta_result = EventResult.eta_from_content(content)
+            if eta_result is not None:
+                logger.info(
+                    "simulation_run_eta_forwarded",
+                    step_execution_id=context.step_execution_id,
+                    eta_minutes=eta_result.eta_minutes,
+                )
+                return eta_result
+
         # Unknown event - ignore
         logger.debug(
             "simulation_run_event_ignored",

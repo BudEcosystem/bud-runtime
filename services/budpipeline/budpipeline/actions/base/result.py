@@ -79,10 +79,33 @@ class EventResult:
     outputs: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     progress: float | None = None  # 0.0 to 100.0
+    eta_minutes: int | None = None  # Estimated time remaining in minutes
 
     def __post_init__(self) -> None:
         """Validate result state."""
         if self.action == EventAction.COMPLETE and self.status is None:
             raise ValueError("COMPLETE action requires status")
-        if self.action == EventAction.UPDATE_PROGRESS and self.progress is None:
-            raise ValueError("UPDATE_PROGRESS action requires progress")
+        if (
+            self.action == EventAction.UPDATE_PROGRESS
+            and self.progress is None
+            and self.eta_minutes is None
+        ):
+            raise ValueError("UPDATE_PROGRESS action requires progress or eta_minutes")
+
+    @staticmethod
+    def eta_from_content(content: dict[str, Any]) -> EventResult | None:
+        """Parse ETA from upstream service event content and build an UPDATE_PROGRESS result.
+
+        Upstream services (budsim, budmodel, budcluster) publish ETA events with
+        the estimated time in *minutes* as a string in content["message"].
+        Returns None if the content doesn't contain a valid ETA.
+        """
+        eta_minutes_str = content.get("message", "")
+        try:
+            eta_minutes = max(0, int(eta_minutes_str))
+        except (ValueError, TypeError):
+            return None
+        return EventResult(
+            action=EventAction.UPDATE_PROGRESS,
+            eta_minutes=eta_minutes,
+        )

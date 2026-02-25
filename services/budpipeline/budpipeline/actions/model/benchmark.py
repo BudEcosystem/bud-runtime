@@ -859,6 +859,35 @@ class ModelBenchmarkExecutor(BaseActionExecutor):
                 error=f"{title}: {error_msg}",
             )
 
+        # Forward ETA events as progress updates
+        if event_name == "eta":
+            eta_result = EventResult.eta_from_content(content)
+            if eta_result is not None:
+                logger.info(
+                    "model_benchmark_eta_forwarded",
+                    step_execution_id=context.step_execution_id,
+                    eta_minutes=eta_result.eta_minutes,
+                )
+                return eta_result
+
+        # Forward progress from known intermediate benchmark phases
+        if event_name in ("deploy_model", "run_benchmark") and status_str in (
+            "STARTED",
+            "started",
+        ):
+            progress_map = {"deploy_model": 20.0, "run_benchmark": 50.0}
+            progress = progress_map.get(event_name, 0.0)
+            logger.info(
+                "model_benchmark_progress_update",
+                step_execution_id=context.step_execution_id,
+                event_name=event_name,
+                progress=progress,
+            )
+            return EventResult(
+                action=EventAction.UPDATE_PROGRESS,
+                progress=progress,
+            )
+
         # Event not relevant to completion
         logger.debug(
             "model_benchmark_event_ignored",
