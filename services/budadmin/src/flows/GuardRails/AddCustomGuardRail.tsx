@@ -190,8 +190,9 @@ export default function AddCustomGuardRail() {
     }
 
     // Validate safe_content examples (minItems: 5)
-    if (formData.safe_content.examples.length < 5) {
-      newErrors["safe_content.examples"] = "At least 5 examples are required for safe content";
+    const MIN_SAFE_CONTENT_EXAMPLES = 5;
+    if (formData.safe_content.examples.length < MIN_SAFE_CONTENT_EXAMPLES) {
+      newErrors["safe_content.examples"] = `At least ${MIN_SAFE_CONTENT_EXAMPLES} examples are required for safe content`;
     }
 
     // Validate violations
@@ -205,8 +206,9 @@ export default function AddCustomGuardRail() {
       if (violation.items.length === 0) {
         newErrors[`violations.${vIndex}.items`] = "At least one item is required";
       }
-      if (violation.examples.length < 3) {
-        newErrors[`violations.${vIndex}.examples`] = "At least 3 examples are required";
+      const MIN_VIOLATION_EXAMPLES = 3;
+      if (violation.examples.length < MIN_VIOLATION_EXAMPLES) {
+        newErrors[`violations.${vIndex}.examples`] = `At least ${MIN_VIOLATION_EXAMPLES} examples are required`;
       }
     });
 
