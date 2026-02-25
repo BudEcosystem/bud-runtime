@@ -91,7 +91,6 @@ export default function SelectDeployment() {
     updateWorkflow,
     workflowLoading,
     setSelectedDeployment: setSelectedDeploymentInStore,
-    isStandaloneDeployment,
   } = useGuardrails();
 
   // Reset page when search term changes
@@ -118,7 +117,7 @@ export default function SelectDeployment() {
 
 
   const handleBack = () => {
-    openDrawerWithStep("select-project");
+    openDrawerWithStep("deployment-types");
   };
 
   const handleNext = async () => {
@@ -128,107 +127,13 @@ export default function SelectDeployment() {
     }
 
     try {
-      // Get all state from store
-      const state = useGuardrails.getState();
-      const { currentWorkflow, selectedProvider, selectedProject: projectFromStore, selectedProbes } = state;
-
-      // Build the complete payload with all required fields
+      // Backend accumulates data across steps, so only send step-specific fields
       const payload: any = {
-        step_number: 5, // Deployment/endpoint selection is step 5
-        endpoint_ids: [selectedDeployment], // Send as array per new requirement
-        trigger_workflow: false,
+        step_number: 6,
+        endpoint_ids: [selectedDeployment],
       };
 
-      // REQUIRED: Include workflow_id
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      } else {
-        console.error("Missing workflow_id - this is required!");
-      }
-
-      // REQUIRED: Include provider data from previous steps
-      // Use from selectedProvider first, then fallback to currentWorkflow
-      payload.provider_type = selectedProvider?.provider_type || currentWorkflow?.provider_type || "bud";
-      payload.provider_id = selectedProvider?.id || currentWorkflow?.provider_id;
-
-      if (!payload.provider_id) {
-        console.error("Missing provider_id - this is required!");
-      }
-
-      // REQUIRED: Include probe selections from previous steps
-      // Check multiple sources for probe_selections
-      let probeSelections = null;
-
-      // Priority 1: Check currentWorkflow.probe_selections
-      if (currentWorkflow?.probe_selections && currentWorkflow.probe_selections.length > 0) {
-        probeSelections = currentWorkflow.probe_selections;
-        console.log("Found probe_selections in currentWorkflow");
-      }
-      // Priority 2: Check currentWorkflow.workflow_data
-      else if (currentWorkflow?.workflow_data?.probe_selections && currentWorkflow.workflow_data.probe_selections.length > 0) {
-        probeSelections = currentWorkflow.workflow_data.probe_selections;
-        console.log("Found probe_selections in currentWorkflow.workflow_data");
-      }
-      // Priority 3: Check if it's nested in the response
-      else if (currentWorkflow?.data?.probe_selections && currentWorkflow.data.probe_selections.length > 0) {
-        probeSelections = currentWorkflow.data.probe_selections;
-        console.log("Found probe_selections in currentWorkflow.data");
-      }
-      // Priority 4: Try to reconstruct from selectedProbes in store
-      else if (selectedProbes && selectedProbes.length > 0) {
-        console.log("Reconstructing probe_selections from selectedProbes in store");
-        probeSelections = selectedProbes.map((probe: any) => {
-          // Check if probe has rules information
-          if (probe.rules && Array.isArray(probe.rules)) {
-            return {
-              id: probe.id,
-              rules: probe.rules
-            };
-          }
-          // Otherwise just include the probe id
-          return { id: probe.id };
-        });
-      }
-
-      // CRITICAL: probe_selections is absolutely required
-      if (probeSelections && probeSelections.length > 0) {
-        payload.probe_selections = probeSelections;
-        console.log("Successfully added probe_selections to payload");
-      } else {
-        console.error("CRITICAL ERROR: probe_selections is missing!");
-        console.error("currentWorkflow:", currentWorkflow);
-        console.error("selectedProbes:", selectedProbes);
-
-        // As a last resort, check if we at least have probe IDs somewhere
-        errorToast("Missing probe selections. Please go back and select probes again.");
-        return; // Don't proceed without probe_selections
-      }
-
-      // REQUIRED: Include is_standalone from the store (set in DeploymentTypes step)
-      payload.is_standalone = isStandaloneDeployment;
-
-      // REQUIRED: Include project_id from previous step
-      const projectId = selectedProject?.project?.id || selectedProject?.id ||
-                       projectFromStore?.project?.id || projectFromStore?.id ||
-                       currentWorkflow?.project_id;
-      if (projectId) {
-        payload.project_id = projectId;
-      } else {
-        console.error("Missing project_id - this is required!");
-      }
-
-      console.log("=== FINAL PAYLOAD FOR STEP 5 ===");
-      console.log("workflow_id:", payload.workflow_id);
-      console.log("step_number:", payload.step_number);
-      console.log("provider_type:", payload.provider_type);
-      console.log("provider_id:", payload.provider_id);
-      console.log("probe_selections:", JSON.stringify(payload.probe_selections, null, 2));
-      console.log("is_standalone:", payload.is_standalone);
-      console.log("project_id:", payload.project_id);
-      console.log("endpoint_ids:", payload.endpoint_ids);
-      console.log("================================");
-
-      // Update workflow with complete data and wait for response
+      // Update workflow with step-specific data
       const success = await updateWorkflow(payload);
 
       // Only navigate to next step if API call was successful

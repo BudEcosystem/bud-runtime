@@ -137,6 +137,7 @@ import AddCustomGuardRail from "./GuardRails/AddCustomGuardRail";
 import UploadDataset from "./GuardRails/UploadDataset";
 import TrainingProbe from "./GuardRails/TrainingProbe";
 import GuardRailDetails from "./GuardRails/GuardRailDetails";
+import CustomProbeSuccess from "./GuardRails/CustomProbeSuccess";
 import BudSentinelProbes from "./GuardRails/BudSentinelProbes";
 import PIIDetectionConfig from "./GuardRails/PIIDetectionConfig";
 import DeploymentTypes from "./GuardRails/DeploymentTypes";
@@ -148,6 +149,13 @@ import ProbeDeploymentSuccess from "./GuardRails/ProbeDeploymentSuccess";
 import ProbeDetails from "./GuardRails/ProbeDetails";
 import ViewGuardRailDetails from "./GuardRails/ViewGuardRailDetails";
 import UseGuardrail from "./GuardRails/UseGuardrail";
+import GuardrailSelectCredentials from "./GuardRails/GuardrailSelectCredentials";
+import GuardrailOnboardingStatus from "./GuardRails/GuardrailOnboardingStatus";
+import GuardrailHardwareMode from "./GuardRails/GuardrailHardwareMode";
+import GuardrailDeploySpecs from "./GuardRails/GuardrailDeploySpecs";
+import GuardrailSelectCluster from "./GuardRails/GuardrailSelectCluster";
+import GuardrailSimulationStatus from "./GuardRails/GuardrailSimulationStatus";
+import GuardrailDeploymentStatus from "./GuardRails/GuardrailDeploymentStatus";
 import AddAgentSelectProject from "./AddAgent";
 import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
 import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
@@ -312,6 +320,7 @@ export const StepComponents = {
   "upload-dataset": UploadDataset,
   "training-probe": TrainingProbe,
   "guardrail-details": GuardRailDetails,
+  "custom-probe-success": CustomProbeSuccess,
   "bud-sentinel-probes": BudSentinelProbes,
   "pii-detection-config": PIIDetectionConfig,
   "deployment-types": DeploymentTypes,
@@ -320,6 +329,13 @@ export const StepComponents = {
   "probe-settings": ProbeSettings,
   "deploying-probe": DeployingProbe,
   "probe-deployment-success": ProbeDeploymentSuccess,
+  "guardrail-select-credentials": GuardrailSelectCredentials,
+  "guardrail-onboarding-status": GuardrailOnboardingStatus,
+  "guardrail-hardware-mode": GuardrailHardwareMode,
+  "guardrail-deploy-specs": GuardrailDeploySpecs,
+  "guardrail-select-cluster": GuardrailSelectCluster,
+  "guardrail-simulation-status": GuardrailSimulationStatus,
+  "guardrail-deployment-status": GuardrailDeploymentStatus,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
   "use-guardrail": UseGuardrail,

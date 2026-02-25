@@ -200,33 +200,33 @@ export default function ProbeDetails({ probeData }: ProbeDetailsProps) {
 
               {/* Provider Section */}
               {data.provider && (
-                <div className="mb-[1.5rem] p-[1rem] bg-[#1F1F1F] rounded-[8px]">
+                <div className="mb-[1.5rem] p-[1rem] bg-[#1F1F1F] rounded-[8px] mt-[1.5rem]">
                   <Text_14_600_FFFFFF className="mb-[0.75rem]">
                     Provider Details
                   </Text_14_600_FFFFFF>
                   <div className="space-y-[0.5rem]">
                     <div className="flex items-center gap-[0.5rem]">
-                      <Text_12_400_757575>Name:</Text_12_400_757575>
+                      <Text_12_400_757575 className="min-w-[5.5rem]">Name:</Text_12_400_757575>
                       <Text_14_400_EEEEEE>
                         {data.provider.name}
                       </Text_14_400_EEEEEE>
                     </div>
                     <div className="flex items-center gap-[0.5rem]">
-                      <Text_12_400_757575>Type:</Text_12_400_757575>
+                      <Text_12_400_757575 className="min-w-[5.5rem]">Type:</Text_12_400_757575>
                       <Text_14_400_EEEEEE>
                         {data.provider.type}
                       </Text_14_400_EEEEEE>
                     </div>
                     {data.provider.description && (
                       <div className="flex items-start gap-[0.5rem]">
-                        <Text_12_400_757575>Description:</Text_12_400_757575>
+                        <Text_12_400_757575 className="min-w-[5.5rem]">Description:</Text_12_400_757575>
                         <Text_14_400_EEEEEE className="flex-1">
                           {data.provider.description}
                         </Text_14_400_EEEEEE>
                       </div>
                     )}
                     <div className="flex items-center gap-[0.5rem]">
-                      <Text_12_400_757575>Status:</Text_12_400_757575>
+                      <Text_12_400_757575 className="min-w-[5.5rem]">Status:</Text_12_400_757575>
                       <span
                         className={`px-[0.5rem] py-[0.125rem] rounded-[4px] text-[12px] ${
                           data.provider.is_active

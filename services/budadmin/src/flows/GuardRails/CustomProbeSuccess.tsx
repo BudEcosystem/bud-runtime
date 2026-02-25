@@ -1,16 +1,18 @@
 import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
-import { CheckCircleOutlined } from "@ant-design/icons";
 import React from "react";
 import { useDrawer } from "src/hooks/useDrawer";
-import { Text_12_400_B3B3B3, Text_16_600_FFFFFF, Text_24_600_EEEEEE } from "@/components/ui/text";
+import { Text_12_400_B3B3B3, Text_24_600_EEEEEE } from "@/components/ui/text";
 import { Image } from "antd";
+import useGuardrails from "src/hooks/useGuardrails";
 
-export default function ProbeDeploymentSuccess() {
+export default function CustomProbeSuccess() {
   const { closeDrawer } = useDrawer();
+  const { clearWorkflow } = useGuardrails();
 
   const handleDone = () => {
+    clearWorkflow();
     closeDrawer();
   };
 
@@ -32,16 +34,15 @@ export default function ProbeDeploymentSuccess() {
 
             {/* Success Message */}
             <Text_24_600_EEEEEE className="text-center leading-[2rem] mb-[1.2rem] max-w-[90%]">
-              Probe Successfully Deployed
+              Custom Probe Created Successfully
             </Text_24_600_EEEEEE>
-            {/* Additional Success Details (optional) */}
+            {/* Additional Success Details */}
             <div className="mt-[2rem] text-center space-y-[0.5rem]">
               <Text_12_400_B3B3B3 className="text-center">
-                Your guardrail probe has been successfully deployed and is now
-                active.
+                Your custom guardrail probe has been created successfully.
               </Text_12_400_B3B3B3>
               <div className="text-[#757575] text-[10px] text-center">
-                You can monitor its performance in the Guardrails dashboard.
+                You can now deploy it from the Guardrails dashboard.
               </div>
             </div>
           </div>

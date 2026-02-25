@@ -5,7 +5,7 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import { Input, Checkbox, Spin } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { ChevronRight } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import CustomPopover from "src/flows/components/customPopover";
 import Tags from "src/flows/components/DrawerTags";
@@ -16,6 +16,9 @@ import {
   Text_14_400_EEEEEE,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
+import IconRender from "src/flows/components/BudIconRender";
+
+const PROBES_PAGE_LIMIT = 10;
 
 export default function BudSentinelProbes() {
   const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
@@ -25,6 +28,8 @@ export default function BudSentinelProbes() {
     "all",
   );
   const [hoveredProbe, setHoveredProbe] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const isLoadingMore = useRef(false);
 
   // Use the guardrails hook
   const {
@@ -32,6 +37,7 @@ export default function BudSentinelProbes() {
     probesLoading,
     fetchProbes,
     totalProbes,
+    totalPages,
     fetchProbeById,
     setSelectedProbe: setSelectedProbeInStore,
     setSelectedProbes: setSelectedProbesInStore,
@@ -44,40 +50,59 @@ export default function BudSentinelProbes() {
   // Fetch probes on component mount and when search changes
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      // Build filter payload
+      setPage(1);
+
       const filterPayload: any = {
         page: 1,
-        page_size: 100, // Fetch all probes for now
+        limit: PROBES_PAGE_LIMIT,
       };
 
-      // Add search filter if present
       if (searchTerm) {
-        filterPayload.search = searchTerm;
+        filterPayload.search = true;
+        filterPayload.name = searchTerm;
       }
 
-      // The provider_id will be automatically added from selectedProvider in the fetchProbes function
-      // since we updated useGuardrails to use selectedProvider internally
       fetchProbes(filterPayload);
-    }, 300); // Debounce search
+    }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, selectedProvider?.id]);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category.toLowerCase()) {
-      case "pii":
-      case "personal identifier information":
-      case "data loss prevention (dlp)":
-        return "🔒";
-      case "bias":
-        return "⚖️";
-      case "content":
-      case "secrets & credentials":
-        return "🛡️";
-      default:
-        return "📋";
+  // Load more probes for infinite scroll
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore.current || page >= totalPages) return;
+    isLoadingMore.current = true;
+
+    const nextPage = page + 1;
+    const filterPayload: any = {
+      page: nextPage,
+      limit: PROBES_PAGE_LIMIT,
+      append: true,
+    };
+
+    if (searchTerm) {
+      filterPayload.search = true;
+      filterPayload.name = searchTerm;
     }
-  };
+
+    await fetchProbes(filterPayload);
+    setPage(nextPage);
+    isLoadingMore.current = false;
+  }, [page, totalPages, searchTerm, fetchProbes]);
+
+  // Scroll handler for infinite scroll
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const target = e.currentTarget;
+      const isNearBottom =
+        target.scrollTop + target.clientHeight >= target.scrollHeight - 100;
+
+      if (isNearBottom && !isLoadingMore.current && page < totalPages) {
+        loadMore();
+      }
+    },
+    [loadMore, page, totalPages],
+  );
 
   const handleBack = () => {
     openDrawerWithStep("select-provider");
@@ -104,7 +129,6 @@ export default function BudSentinelProbes() {
           probe_selections: selectedProbes.map(probeId => ({
             id: probeId,
           })),
-          trigger_workflow: false,
         };
 
         // Include workflow_id if available
@@ -112,10 +136,6 @@ export default function BudSentinelProbes() {
           payload.workflow_id = currentWorkflow.workflow_id;
         }
 
-        // Include provider data from previous step
-        if (selectedProvider?.id) {
-          payload.provider_id = selectedProvider.id;
-        }
         if (selectedProvider?.provider_type) {
           payload.provider_type = selectedProvider.provider_type;
         }
@@ -141,8 +161,8 @@ export default function BudSentinelProbes() {
           // PII Detection selected - go to PII configuration page
           openDrawerWithStep("pii-detection-config");
         } else {
-          // For other selections, skip PII config and go to deployment types
-          openDrawerWithStep("deployment-types");
+          // For other selections, skip PII config and go to project selection
+          openDrawerWithStep("select-project");
         }
       } catch (error) {
         console.error("Failed to update workflow:", error);
@@ -174,18 +194,6 @@ export default function BudSentinelProbes() {
 
   const getFilteredProbes = () => {
     let filtered = probes || [];
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (probe) =>
-          probe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          probe.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          probe.tags?.some((tag) =>
-            tag.name.toLowerCase().includes(searchTerm.toLowerCase()),
-          ),
-      );
-    }
 
     // Apply category filter based on tags
     if (activeFilter !== "all") {
@@ -233,7 +241,7 @@ export default function BudSentinelProbes() {
       nextText="Next"
       disableNext={selectedProbes.length === 0 || workflowLoading}
     >
-      <BudWraperBox>
+      <BudWraperBox onScroll={handleScroll}>
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Probes List"
@@ -244,7 +252,7 @@ export default function BudSentinelProbes() {
 
           <div className="pb-[1.35rem]">
             {/* Search Bar */}
-            <div className="mb-[1.5rem] px-[1.35rem]">
+            <div className="mb-[1.5rem] px-[1.35rem] mt-[1.5rem]">
               <Input
                 placeholder="Search"
                 prefix={<SearchOutlined className="text-[#757575]" />}
@@ -259,7 +267,7 @@ export default function BudSentinelProbes() {
             </div>
 
             {/* Filter Buttons */}
-            <div className="flex gap-[0.75rem] mb-[2rem] px-[1.35rem]">
+            <div className="flex gap-[0.75rem] mb-[2rem] px-[1.35rem] hidden">
               <Tags
                 name="PII"
                 color={activeFilter === "pii" ? "#D1B854" : "#757575"}
@@ -335,14 +343,12 @@ export default function BudSentinelProbes() {
                               }`}
                             >
                               {/* Icon Section */}
-                              <div className="bg-[#1F1F1F] rounded-[0.515625rem] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
-                                <span className="text-[1.5rem]">
-                                  {getCategoryIcon(
-                                    probe.name ||
-                                      probe.tags?.[0]?.name ||
-                                      category,
-                                  )}
-                                </span>
+                              <div className="bg-[#1F1F1F] rounded-[5px] w-[2.6875rem] h-[2.6875rem] flex justify-center items-center mr-[1.3rem] shrink-0 grow-0">
+                                <IconRender
+                                  icon={probe?.icon || "🛡️"}
+                                  size={30}
+                                  imageSize={26}
+                                />
                               </div>
 
                               {/* Content Section */}
@@ -416,6 +422,12 @@ export default function BudSentinelProbes() {
                     </div>
                   ),
                 )
+              )}
+
+              {!probesLoading && page < totalPages && (
+                <div className="flex justify-center py-[1rem]">
+                  <Spin size="small" />
+                </div>
               )}
 
               {!probesLoading && Object.keys(groupedProbes).length === 0 && (

@@ -6,7 +6,6 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { Cross1Icon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useWorkflow } from "src/stores/useWorkflow";
-import { useDeployModel } from "src/stores/useDeployModel";
 
 export function CustomBreadcrumb({
   data,
@@ -112,7 +111,6 @@ function DrawerBreadCrumbNavigation({
   showMinimizeButton?: boolean;
 }) {
   const { closeDrawer, setCancelAlert, step, minimizeProcess } = useDrawer();
-  const { currentWorkflow } = useDeployModel();
   return (
     <div
       className=" ant-header-breadcrumb"
@@ -133,7 +131,7 @@ function DrawerBreadCrumbNavigation({
         </button>
         {showMinimizeButton && (
           <button onClick={() => {
-          if (!currentWorkflow) {
+          if (!step?.id) {
             return closeDrawer();
           };
           document.getElementById("bud-drawer")?.classList.toggle("hide-drawer");

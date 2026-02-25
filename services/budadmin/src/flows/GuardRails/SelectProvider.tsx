@@ -88,6 +88,12 @@ export default function SelectProvider() {
       return;
     }
 
+    // Custom probe flow: skip workflow creation here, it happens in SelectProbeType
+    if (selectedProvider === "custom-probe") {
+      openDrawerWithStep("select-probe-type");
+      return;
+    }
+
     setIsCreatingWorkflow(true);
 
     try {
@@ -104,37 +110,13 @@ export default function SelectProvider() {
       // Create workflow with the selected provider and provider_type
       await createWorkflow(selectedProvider, providerType);
 
-      // Always navigate to the Probes List screen
+      // Navigate to the Probes List screen for sentinel/cloud providers
       openDrawerWithStep("bud-sentinel-probes");
     } catch (error) {
       console.error("Failed to create workflow:", error);
     } finally {
       setIsCreatingWorkflow(false);
     }
-
-    // Create workflow with the selected provider
-    //   await createWorkflow(selectedProvider);
-
-    //   // Navigate to the appropriate next step based on provider
-    //   if (selectedProvider === "custom-probe") {
-    //     openDrawerWithStep("select-probe-type");
-    //   } else if (selectedProvider === "azure-ai-foundry") {
-    //     openDrawerWithStep("politeness-detection");
-    //   } else if (
-    //     selectedProviderData?.name?.toLowerCase().includes("bud") ||
-    //     selectedProviderData?.type === "cloud"
-    //   ) {
-    //     // For Bud or cloud providers from API
-    //     openDrawerWithStep("bud-sentinel-probes");
-    //   } else {
-    //     // For other providers, we can add different flows later
-    //     openDrawerWithStep("politeness-detection");
-    //   }
-    // } catch (error) {
-    //   console.error("Failed to create workflow:", error);
-    // } finally {
-    //   setIsCreatingWorkflow(false);
-    // }
   };
 
   // Filter API providers for Bud section (exclude only aws_comprehend)
@@ -143,7 +125,19 @@ export default function SelectProvider() {
       (p) => p.type?.toLowerCase() !== "aws_comprehend"
     ) || [];
 
-  const allBudProviders = [...budProviders];
+  // Add custom probe option to bud providers
+  const customProbeOption = {
+    id: "custom-probe",
+    name: "Create custom probe",
+    description:
+      "Create your custom probe with Bud sentinel for tools, agents, prompts, models or routes.",
+    icon: "⚙️",
+    type: "custom",
+  };
+
+  const allBudProviders = budProviders.length > 0
+    ? [budProviders[0], customProbeOption, ...budProviders.slice(1)]
+    : [customProbeOption];
 
   // Keep static third-party providers for now
   const thirdPartyProviders = providers.filter(
@@ -169,8 +163,8 @@ export default function SelectProvider() {
 
           <div className="px-[1.35rem] pb-[1.35rem]">
             {/* Bud Section */}
-            <div className="mb-[1.5rem]">
-              <Text_14_600_FFFFFF className="mb-[1rem]">Bud</Text_14_600_FFFFFF>
+            <div className="mb-[1.5rem] mt-[1.5rem]">
+              {/* <Text_14_600_FFFFFF className="mb-[1rem]">Bud</Text_14_600_FFFFFF> */}
               {loading ? (
                 <div className="flex justify-center py-[2rem]">
                   <Spin size="default" />

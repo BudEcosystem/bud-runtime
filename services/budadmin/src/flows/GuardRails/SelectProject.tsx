@@ -13,7 +13,6 @@ import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 
 export default function SelectProject() {
-  console.log("Rendering SelectProject component");
   const { openDrawerWithStep } = useDrawer();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -26,8 +25,7 @@ export default function SelectProject() {
   const {
     setSelectedProject: setSelectedProjectInStore,
     updateWorkflow,
-    workflowLoading,
-    isStandaloneDeployment,
+    workflowLoading
   } = useGuardrails();
 
   // Fetch projects on component mount and when search changes
@@ -40,7 +38,7 @@ export default function SelectProject() {
   }, [searchTerm]);
 
   const handleBack = () => {
-    openDrawerWithStep("deployment-types");
+    openDrawerWithStep("bud-sentinel-probes");
   };
 
   const handleNext = async () => {
@@ -50,50 +48,32 @@ export default function SelectProject() {
     }
 
     try {
-      // Get current state BEFORE async operations
-      const { currentWorkflow, selectedProvider } = useGuardrails.getState();
-
-      // Build the complete payload
+      // Backend accumulates data across steps, so only send step-specific fields
       const payload: any = {
-        step_number: 4, // Project selection is step 4
+        step_number: 3,
         project_id: selectedProject,
-        trigger_workflow: false,
       };
 
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      }
+      // Update workflow with step-specific data
+      const success = await updateWorkflow(payload);
 
-      // Include provider data from previous steps
-      if (selectedProvider?.provider_type) {
-        payload.provider_type = selectedProvider.provider_type;
-      }
-      if (selectedProvider?.id) {
-        payload.provider_id = selectedProvider.id;
-      }
-
-      // Include probe selections from previous steps
-      if (currentWorkflow?.probe_selections) {
-        payload.probe_selections = currentWorkflow.probe_selections;
-      }
-
-      // Include is_standalone from the store (set in DeploymentTypes step)
-      payload.is_standalone = isStandaloneDeployment;
-
-      // Update workflow with complete data
-      await updateWorkflow(payload);
+      if (!success) return;
 
       // Save selected project to guardrails store
       setSelectedProjectInStore(selectedProjectData);
 
-      // Check if this is a standalone guardrail endpoint (skip deployment selection)
-      // Use the store flag which was set in DeploymentTypes step
-      if (isStandaloneDeployment) {
-        // Skip deployment selection for guardrail-endpoint type
-        openDrawerWithStep("probe-settings");
+      // Conditional branching based on workflow response
+      const { credentialRequired, modelsRequiringOnboarding, skipToStep } = useGuardrails.getState();
+
+      if (credentialRequired && modelsRequiringOnboarding > 0) {
+        // Models need credentials and onboarding
+        openDrawerWithStep("guardrail-select-credentials");
+      } else if (skipToStep && skipToStep >= 5) {
+        // Backend says skip ahead (all models already onboarded)
+        openDrawerWithStep("deployment-types");
       } else {
-        // Normal flow - go to deployment selection
-        openDrawerWithStep("select-deployment");
+        // Default: proceed to deployment types
+        openDrawerWithStep("deployment-types");
       }
     } catch (error) {
       console.error("Failed to update workflow:", error);

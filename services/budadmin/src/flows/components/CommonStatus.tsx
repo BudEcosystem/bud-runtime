@@ -1,5 +1,5 @@
 import { useSocket } from "@novu/notification-center";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateEta } from "../utils/calculateETA";
 import { WorkflowType } from "src/stores/useWorkflow";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -46,7 +46,10 @@ export default function CommonStatus({
     | 'performance_benchmark'
     | 'deploy_quantization'
     | 'add_adapter'
-    | 'evaluate_model',
+    | 'evaluate_model'
+    | 'guardrail_model_onboarding'
+    | 'guardrail_simulation'
+    | 'guardrail_deployment',
     events_field_id:
     'bud_simulator_events'
     | 'budserve_cluster_events'
@@ -61,16 +64,21 @@ export default function CommonStatus({
     | 'quantization_deployment_events'
     | 'adapter_deployment_events'
     | 'evaluation_workflow_events'
-    | 'evaluation_events',
+    | 'evaluation_events'
+    | 'guardrail_onboarding_events'
+    | 'guardrail_simulation_events'
+    | 'guardrail_deployment_events',
     onCompleted: () => void,
     onFailed: () => void,
 }) {
     const [loading, setLoading] = useState(false);
     const [steps, setSteps] = useState([]);
     const [eta, setEta] = useState("");
+    // Sub-workflow ID extracted from the events data (may differ from parent workflowId)
+    const [eventsWorkflowId, setEventsWorkflowId] = useState<string | null>(null);
     const { socket } = useSocket();
 
-    let timeout: any;
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const failedEvents = useMemo(() => steps?.filter((event) => event?.payload?.content?.status === 'FAILED'), [steps]);
 
     useEffect(() => {
@@ -79,18 +87,25 @@ export default function CommonStatus({
         }
     }, [failedEvents]);
 
+    // Events that use the main budapp API (relative URL via AppRequest)
+    const useMainApi = events_field_id === 'budserve_cluster_events'
+        || events_field_id === "bud_simulator_events"
+        || events_field_id === 'guardrail_onboarding_events'
+        || events_field_id === 'guardrail_simulation_events'
+        || events_field_id === 'guardrail_deployment_events';
+
     const getWorkflow = async () => {
         if (loading) return;
         setSteps([]);
         setLoading(true);
         // bud_simulator_events, budserve_cluster_events
         let url = `${tempApiBaseUrl}/workflows/${workflowId}`;
-        if (events_field_id === 'budserve_cluster_events' || events_field_id === "bud_simulator_events") {
+        if (useMainApi) {
             url = `/workflows/${workflowId}`;
         }
         const response: any = await AppRequest.Get(success_payload_type == 'performance_benchmark' ? `${tempApiBaseUrl}/workflows/${workflowId}` : url);
         let data: WorkflowType;
-        if (events_field_id === 'budserve_cluster_events' || events_field_id === "bud_simulator_events") {
+        if (useMainApi) {
             data = response?.data;
         } else {
             data = response.data;
@@ -98,10 +113,15 @@ export default function CommonStatus({
         if (success_payload_type == 'performance_benchmark') {
             data = response?.data
         }
-        const newSteps = data?.workflow_steps[events_field_id]?.steps;
+        const eventsData = data?.workflow_steps[events_field_id];
+        const newSteps = eventsData?.steps;
         setSteps(newSteps);
-        if (data?.workflow_steps[events_field_id]?.eta) {
-            calculateEta(data?.workflow_steps[events_field_id]?.eta, setEta);
+        // Extract sub-workflow ID from the events data (may differ from parent workflowId)
+        if (eventsData?.workflow_id) {
+            setEventsWorkflowId(eventsData.workflow_id);
+        }
+        if (eventsData?.eta) {
+            calculateEta(eventsData.eta, setEta);
         }
         console.log('response', response)
         setLoading(false);
@@ -120,8 +140,13 @@ export default function CommonStatus({
             if (!data) {
                 return;
             }
-            if (data?.message && data?.message?.payload && data?.message?.payload?.workflow_id !== workflowId) {
-                return;
+            if (data?.message && data?.message?.payload) {
+                const notifWorkflowId = data.message.payload.workflow_id;
+                // If the notification has no workflow_id, let it through (some flows don't include it in real-time)
+                // Otherwise, accept notifications matching either the parent workflow ID or the sub-workflow ID
+                if (notifWorkflowId && notifWorkflowId !== workflowId && notifWorkflowId !== eventsWorkflowId) {
+                    return;
+                }
             }
         } catch (error) {
             return
@@ -131,30 +156,28 @@ export default function CommonStatus({
             setSteps(steps => {
                 const newSteps = steps.map((step) =>
                     data.message.payload.event === step.id && (step.payload.content?.status !== "COMPLETED" && step.payload.content?.status !== "FAILED") ?
-                        // data.message.payload.event && step.payload?.content?.title === data.message.payload.content.title ?
                         { ...step, payload: data.message.payload }
                         : step)
-                // console.log(`newSteps`, newSteps, data.message?.payload, printStatus(data.message.payload), newSteps?.map(step => printStatus(step.payload)))
                 return newSteps;
             });
             if (data.message.payload.event == "eta" && data.message.payload.content.message) {
-                // map the eta to the workflow
-                // console.log(`print eta`, data.message.payload.content.message)
                 calculateEta(data.message.payload.content.message, setEta);
             }
         }
         if (data.message.payload.event == "results" && data?.message?.payload?.content?.status === "COMPLETED") {
-            timeout = setTimeout(() => {
+            timeoutRef.current = setTimeout(() => {
                 onCompleted();
             }, 3000);
         }
         if (data?.message?.payload?.content?.status === "FAILED") {
-            // getWorkflow();
             onFailed();
         }
         console.log(`data.message`, data.message)
-    }, [steps, workflowId]);
-
+    }, [workflowId, eventsWorkflowId, success_payload_type, onCompleted, onFailed]);
+    useEffect(() => {
+        console.log(`steps`, steps)
+        console.log(`eta`, eta)
+    }, [steps, eta]);
     useEffect(() => {
         if (socket) {
             socket.on("notification_received", handleNotification);
@@ -164,11 +187,17 @@ export default function CommonStatus({
             if (socket) {
                 socket.off("notification_received");
             }
-            if (timeout) {
-                clearTimeout(timeout);
+        };
+    }, [socket, handleNotification]);
+
+    // Clean up timeout on unmount only
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
             }
         };
-    }, [socket]);
+    }, []);
 
     return <BudDrawerLayout>
         <div className="flex flex-col	justify-start items-center w-full">

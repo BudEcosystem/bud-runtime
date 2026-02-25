@@ -187,7 +187,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       route: "/guardrails",
       icon: '/icons/guard.png',
       iconWhite: '/icons/guardWhite.png',
-      cmd: "10",
+      cmd: "0",
       hide: !enableDevMode,
     },
     {
@@ -202,7 +202,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       route: "/pipelines",
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
-      cmd: "J",
+      cmd: "u",
       hide: !enableDevMode,
     },
   ]

@@ -6,9 +6,11 @@ import { Checkbox } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast } from "@/components/toast";
+import useGuardrails from "src/hooks/useGuardrails";
 import {
   Text_12_400_757575,
   Text_14_400_EEEEEE,
+  Text_14_600_EEEEEE,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
 
@@ -21,31 +23,35 @@ interface ProbeTypeOption {
 const probeTypes: ProbeTypeOption[] = [
   {
     id: "rule-based",
-    name: "Create Rule based Probe",
+    name: "Create probe with policy",
     description:
-      "Create probes with RegEx, Semantic, Bud Expression, Fuzzy Search",
+      "You can define your own LLM policy",
   },
-  {
-    id: "dataset",
-    name: "Custom probe with dataset",
-    description:
-      "You can upload your custom dataset to train a classifier based probe.",
-  },
+  // {
+  //   id: "dataset",
+  //   name: "Custom probe with dataset",
+  //   description:
+  //     "You can upload your custom dataset to train a classifier based probe.",
+  // },
 ];
 
 export default function SelectProbeType() {
   const { openDrawerWithStep } = useDrawer();
   const [selectedType, setSelectedType] = useState<string>("");
+  const { createCustomProbeWorkflow, workflowLoading } = useGuardrails();
 
   const handleBack = () => {
     openDrawerWithStep("select-provider");
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!selectedType) {
       errorToast("Please select a probe type");
       return;
     }
+
+    const success = await createCustomProbeWorkflow("llm_policy");
+    if (!success) return;
 
     if (selectedType === "rule-based") {
       openDrawerWithStep("add-custom-guardrail");
@@ -57,11 +63,11 @@ export default function SelectProbeType() {
   return (
     <BudForm
       data={{}}
-      disableNext={!selectedType}
+      disableNext={!selectedType || workflowLoading}
       onBack={handleBack}
       onNext={handleNext}
       backText="Back"
-      nextText="Next"
+      nextText={workflowLoading ? "Creating..." : "Next"}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -72,7 +78,7 @@ export default function SelectProbeType() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="px-[1.35rem] pb-[1.35rem] pt-[1.5rem]">
             <div className="space-y-[0.75rem]">
               {probeTypes.map((type) => (
                 <div
@@ -94,9 +100,9 @@ export default function SelectProbeType() {
                       }}
                     />
                     <div className="flex-1">
-                      <Text_14_600_FFFFFF className="mb-[0.25rem]">
+                      <Text_14_600_EEEEEE className="mb-[0.25rem]">
                         {type.name}
-                      </Text_14_600_FFFFFF>
+                      </Text_14_600_EEEEEE>
                       <Text_12_400_757575 className="leading-[1.4]">
                         {type.description}
                       </Text_12_400_757575>
