@@ -46,6 +46,7 @@ class AppConfig(BaseAppConfig):
 
     clickhouse_enable_query_cache: bool = Field(False, alias="CLICKHOUSE_ENABLE_QUERY_CACHE")
     clickhouse_enable_connection_warmup: bool = Field(False, alias="CLICKHOUSE_ENABLE_CONNECTION_WARMUP")
+    clickhouse_ttl_inference_fact: int = Field(90, alias="CLICKHOUSE_TTL_INFERENCE_FACT")
 
 
 class SecretsConfig(BaseSecretsConfig):

@@ -59,7 +59,8 @@ from ..core.schemas import NotificationPayload, NotificationResult
 from ..credential_ops.crud import ProprietaryCredentialDataManager
 from ..credential_ops.models import ProprietaryCredential as ProprietaryCredentialModel
 from ..credential_ops.services import CredentialService
-from ..model_ops.crud import ModelDataManager, ProviderDataManager
+from ..model_ops.crud import CloudModelDataManager, ModelDataManager, ProviderDataManager
+from ..model_ops.models import CloudModel as CloudModelModel
 from ..model_ops.models import Model as ModelsModel
 from ..model_ops.models import Provider as ProviderModel
 from ..model_ops.services import ModelServiceUtil
@@ -564,6 +565,7 @@ class EndpointService(SessionMixin):
             "cluster_id",  # bud_cluster_id
             "endpoint_name",
             "deploy_config",
+            "simulator_id",  # for inference cost lookup
             # Engine configs passed via earlier steps
             "tool_calling_parser_type",
             "reasoning_parser_type",
@@ -682,6 +684,16 @@ class EndpointService(SessionMixin):
             EndpointModel(**endpoint_data.model_dump(exclude_unset=True, exclude_none=True))
         )
         logger.debug(f"Endpoint created successfully: {db_endpoint.id}")
+
+        # Fetch inference cost and save to endpoint JSONB column
+        inference_cost = await self.get_inference_cost(
+            db_endpoint.id,
+            simulator_id=required_data.get("simulator_id"),
+            cluster_id=required_data.get("cluster_id"),
+        )
+        if inference_cost:
+            await EndpointDataManager(self.session).update_by_fields(db_endpoint, {"inference_cost": inference_cost})
+            logger.debug(f"Saved inference_cost for endpoint {db_endpoint.id}")
 
         # Update proxy cache for project
         await self.add_model_to_proxy_cache(
@@ -2047,6 +2059,7 @@ class EndpointService(SessionMixin):
                 supported_endpoints=db_endpoint.supported_endpoints,  # Use parent's supported endpoints
                 encrypted_credential_data=encrypted_credential_data,  # Pass credentials if available
                 include_pricing=False,  # Adapters don't have separate pricing
+                include_inference_cost=False,  # Adapters don't have separate inference cost
             )
             model_table_created = True
             logger.debug(f"Added adapter {db_adapter.id} to proxy cache with model_table entry")
@@ -2461,6 +2474,7 @@ class EndpointService(SessionMixin):
         "hyperbolic": ProxyProviderEnum.HYPERBOLIC,
         "mistral": ProxyProviderEnum.MISTRAL,
         "together": ProxyProviderEnum.TOGETHER,
+        "together_ai": ProxyProviderEnum.TOGETHER,
         "xai": ProxyProviderEnum.XAI,
         "vllm": ProxyProviderEnum.VLLM,
     }
@@ -2474,6 +2488,7 @@ class EndpointService(SessionMixin):
         supported_endpoints: Union[List[str], Dict[str, bool]],
         encrypted_credential_data: Optional[dict] = None,
         include_pricing: bool = True,
+        include_inference_cost: bool = True,
     ) -> None:
         """Add model to proxy cache for a project with pricing information.
 
@@ -2485,6 +2500,7 @@ class EndpointService(SessionMixin):
             supported_endpoints: List of supported endpoints
             encrypted_credential_data: Optional encrypted credential data from ProprietaryCredential.other_provider_creds
             include_pricing: Whether to include pricing information in the cache
+            include_inference_cost: Whether to include actual inference cost in the cache
         """
         endpoints = []
 
@@ -2541,6 +2557,15 @@ class EndpointService(SessionMixin):
                     per_tokens=pricing_info.per_tokens,
                 )
 
+        # Get actual inference cost from endpoint JSONB and convert to ProxyModelPricing
+        inference_cost_pricing = None
+        if include_inference_cost:
+            endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+                EndpointModel, {"id": endpoint_id}, missing_ok=True
+            )
+            if endpoint and endpoint.inference_cost:
+                inference_cost_pricing = self._convert_inference_cost_to_pricing(endpoint.inference_cost)
+
         # Create the proxy model configuration using the schema
         model_config = ProxyModelConfig(
             routing=routing,
@@ -2548,6 +2573,7 @@ class EndpointService(SessionMixin):
             endpoints=endpoints,
             api_key=encrypted_model_api_key,
             pricing=pricing,
+            inference_cost=inference_cost_pricing,
         )
         redis_service = RedisService()
         await redis_service.set(
@@ -2597,6 +2623,34 @@ class EndpointService(SessionMixin):
         except Exception as e:
             logger.error(f"Failed to update pricing in proxy cache: {e}")
             # Don't raise - cache update failure shouldn't block the operation
+
+    async def update_inference_cost_in_proxy_cache(self, endpoint_id: UUID, cost_data: dict) -> None:
+        """Update inference_cost in the model_table cache without touching other fields.
+
+        Args:
+            endpoint_id: The endpoint ID to update inference cost for.
+            cost_data: The inference cost dict (from Endpoint.inference_cost JSONB).
+        """
+        try:
+            redis_service = RedisService()
+            cache_key = f"model_table:{endpoint_id}"
+            cached_data = await redis_service.get(cache_key)
+
+            if cached_data:
+                model_data = json.loads(cached_data)
+                if str(endpoint_id) in model_data:
+                    inference_cost_pricing = self._convert_inference_cost_to_pricing(cost_data)
+                    if inference_cost_pricing:
+                        model_data[str(endpoint_id)]["inference_cost"] = inference_cost_pricing.model_dump()
+                    else:
+                        model_data[str(endpoint_id)].pop("inference_cost", None)
+                    await redis_service.set(cache_key, json.dumps(model_data))
+                    logger.debug(f"Updated inference_cost in model_table for endpoint {endpoint_id}")
+            else:
+                logger.warning(f"No model_table entry found for endpoint {endpoint_id}, skipping cache update")
+
+        except Exception as e:
+            logger.error(f"Failed to update inference_cost in proxy cache for endpoint {endpoint_id}: {e}")
 
     async def delete_model_from_proxy_cache(self, endpoint_id: UUID) -> None:
         """Delete model from proxy cache for a project."""
@@ -3138,6 +3192,121 @@ class EndpointService(SessionMixin):
             Optional[DeploymentPricing]: The current pricing record, or None if not found.
         """
         return await EndpointDataManager(self.session).get_current_pricing(endpoint_id)
+
+    async def get_inference_cost(
+        self,
+        endpoint_id: UUID,
+        simulator_id: Optional[str] = None,
+        cluster_id: Optional[str] = None,
+    ) -> Optional[dict]:
+        """Get actual inference cost dict from CloudModel (cloud) or BudSim (local).
+
+        Returns raw cost dict to store in Endpoint.inference_cost JSONB.
+        The dict structure varies by source/modality.
+
+        Args:
+            endpoint_id: The endpoint ID to get inference cost for.
+            simulator_id: Optional simulator workflow ID for local models (from BudSim).
+            cluster_id: Optional cluster ID for local models (to match BudSim recommendation).
+
+        Returns:
+            Optional[dict]: Cost data dict or None if unavailable.
+        """
+        endpoint = await EndpointDataManager(self.session).retrieve_by_fields(
+            EndpointModel, {"id": endpoint_id}, missing_ok=True
+        )
+        if not endpoint or not endpoint.model:
+            return None
+
+        model = endpoint.model
+
+        # Cloud model path - use provider_type enum
+        if model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL:
+            cloud_model = await CloudModelDataManager(self.session).retrieve_by_fields(
+                CloudModelModel, {"uri": model.uri}, missing_ok=True
+            )
+            if cloud_model:
+                cost_data: Dict[str, Any] = {"currency": "USD"}
+                if cloud_model.input_cost:
+                    cost_data.update(cloud_model.input_cost)
+                if cloud_model.output_cost:
+                    cost_data.update(cloud_model.output_cost)
+                if cost_data.get("input_cost_per_token") or cost_data.get("output_cost_per_token"):
+                    return cost_data
+            return None
+
+        # Local model path - call BudSim recommendations API
+        if simulator_id and cluster_id:
+            cost = await self._get_local_model_cost_from_simulator(simulator_id, cluster_id)
+            if cost:
+                return cost
+
+        return None
+
+    async def _get_local_model_cost_from_simulator(self, simulator_id: str, cluster_id: str) -> Optional[dict]:
+        """Fetch cost from BudSim recommendations API and match by cluster_id.
+
+        BudSim returns a single cost_per_token. We split it 50/50 into
+        input_cost_per_token and output_cost_per_token for normalized storage.
+
+        Args:
+            simulator_id: The simulator workflow ID.
+            cluster_id: The cluster ID to match in recommendations.
+
+        Returns:
+            Optional[dict]: Normalized cost dict or None if unavailable.
+        """
+        try:
+            url = (
+                f"{app_settings.dapr_base_url}/v1.0/invoke/"
+                f"{app_settings.bud_simulator_app_id}/method/simulator/recommendations"
+            )
+            params = {"workflow_id": simulator_id, "limit": 20}
+            async with aiohttp.ClientSession() as http_session:
+                async with http_session.get(url, params=params) as resp:
+                    if resp.status != 200:
+                        return None
+                    data = await resp.json()
+            for cluster in data.get("items", []):
+                if cluster.get("cluster_id") == cluster_id:
+                    metrics = cluster.get("metrics", {})
+                    cost_per_million = metrics.get("cost_per_million_tokens", 0)
+                    if cost_per_million:
+                        cost_per_token = cost_per_million / 1_000_000
+                        half_cost = cost_per_token / 2
+                        return {
+                            "input_cost_per_token": half_cost,
+                            "output_cost_per_token": half_cost,
+                            "currency": "USD",
+                        }
+        except Exception as e:
+            logger.warning(f"Failed to fetch cost from BudSim: {e}")
+        return None
+
+    def _convert_inference_cost_to_pricing(self, cost_data: dict) -> Optional[ProxyModelPricing]:
+        """Convert JSONB inference_cost dict to ProxyModelPricing for gateway.
+
+        JSONB always stores normalized format:
+        {"input_cost_per_token": X, "output_cost_per_token": Y, "currency": "USD"}
+        (BudSim's cost_per_token is split 50/50 at write time in get_inference_cost())
+
+        Args:
+            cost_data: The inference cost dict from Endpoint.inference_cost JSONB.
+
+        Returns:
+            Optional[ProxyModelPricing]: Converted pricing or None if no valid cost data.
+        """
+        input_cpt = cost_data.get("input_cost_per_token")
+        output_cpt = cost_data.get("output_cost_per_token")
+        if input_cpt is None and output_cpt is None:
+            return None
+
+        return ProxyModelPricing(
+            input_cost=input_cpt or 0,
+            output_cost=output_cpt or 0,
+            currency=cost_data.get("currency", "USD"),
+            per_tokens=1,
+        )
 
     async def update_pricing(
         self, endpoint_id: UUID, pricing_data: Dict[str, Any], current_user_id: UUID

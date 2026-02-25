@@ -5,19 +5,23 @@ import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DeployModelSelect from "@/components/ui/bud/deploymentDrawer/DeployModelSelect";
 import ModelFilter from "@/components/ui/bud/deploymentDrawer/ModelFilter";
-import React, { useContext, useEffect } from "react";
+import React, { useContext, useEffect, useRef, useCallback } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useModels } from "src/hooks/useModels";
 import { useDeployModel } from "src/stores/useDeployModel";
 
+const PAGE_SIZE = 50;
+
 export default function ModelList() {
   const { openDrawerWithStep } = useDrawer();
 
-  const [page, setPage] = React.useState(1);
-  const [limit, setLimit] = React.useState(100);
+  const pageRef = useRef(1);
 
   const { selectedProvider, modalityType } = useDeployModel();
   const [models, setModels] = React.useState([]);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const lastScrollTop = useRef(0);
   const { isExpandedViewOpen } = useContext(BudFormContext);
 
   const { loading, fetchModels } = useModels();
@@ -27,6 +31,30 @@ export default function ModelList() {
   const { selectedModel, setSelectedModel, currentWorkflow, updateCloudModel } =
     useDeployModel();
 
+  const getFilterParams = useCallback(() => {
+    const endpoints =
+      modalityType?.endpoints && modalityType.endpoints.length > 0
+        ? modalityType.endpoints
+        : undefined;
+    const modalities =
+      !endpoints &&
+      modalityType?.modalities &&
+      modalityType.modalities.length > 0
+        ? modalityType.modalities
+        : undefined;
+
+    return {
+      table_source: "cloud_model" as const,
+      source: selectedProvider?.type,
+      modality: modalities,
+      supported_endpoints: endpoints,
+    };
+  }, [
+    selectedProvider?.type,
+    modalityType?.modalities,
+    modalityType?.endpoints,
+  ]);
+
   useEffect(() => {
     if (currentWorkflow?.workflow_steps?.model) {
       setSelectedModel(currentWorkflow.workflow_steps.model);
@@ -34,29 +62,74 @@ export default function ModelList() {
   }, [currentWorkflow]);
 
   useEffect(() => {
-    const endpoints = modalityType?.endpoints && modalityType.endpoints.length > 0
-      ? modalityType.endpoints
-      : undefined;
-    const modalities = !endpoints && modalityType?.modalities && modalityType.modalities.length > 0
-      ? modalityType.modalities
-      : undefined;
-
     if (!selectedProvider?.type) {
       setModels([]);
+      setHasMore(false);
       return;
     }
 
+    pageRef.current = 1;
+    setHasMore(true);
+
     fetchModels({
-      page,
-      limit,
-      table_source: "cloud_model",
-      source: selectedProvider?.type,
-      modality: modalities,
-      supported_endpoints: endpoints,
+      page: 1,
+      limit: PAGE_SIZE,
+      ...getFilterParams(),
     }).then((data) => {
-      setModels(data);
+      const items = data || [];
+      setModels(items);
+      setHasMore(items.length >= PAGE_SIZE);
     });
-  }, [selectedProvider?.type, modalityType?.modalities, modalityType?.endpoints, page, limit, fetchModels]);
+  }, [
+    selectedProvider?.type,
+    modalityType?.modalities,
+    modalityType?.endpoints,
+    fetchModels,
+    getFilterParams,
+  ]);
+
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore || loading) return;
+
+    setIsLoadingMore(true);
+    const nextPage = pageRef.current + 1;
+
+    fetchModels({
+      page: nextPage,
+      limit: PAGE_SIZE,
+      ...getFilterParams(),
+    })
+      .then((data) => {
+        const items = data || [];
+        if (items.length > 0) {
+          setModels((prev) => [...prev, ...items]);
+          pageRef.current = nextPage;
+        }
+        setHasMore(items.length >= PAGE_SIZE);
+      })
+      .finally(() => {
+        setIsLoadingMore(false);
+      });
+  }, [isLoadingMore, hasMore, loading, fetchModels, getFilterParams]);
+
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const target = e.currentTarget;
+      const { scrollTop, scrollHeight, clientHeight } = target;
+
+      if (scrollTop <= lastScrollTop.current) {
+        lastScrollTop.current = scrollTop;
+        return;
+      }
+      lastScrollTop.current = scrollTop;
+
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+      if (isNearBottom) {
+        loadMore();
+      }
+    },
+    [loadMore],
+  );
 
   useEffect(() => {
     if (!selectedModel) {
@@ -96,7 +169,7 @@ export default function ModelList() {
         }
       }}
     >
-      <BudWraperBox>
+      <BudWraperBox onScroll={handleScroll}>
         <BudDrawerLayout>
           <DrawerTitleCard
             title={`Select a Model from ${selectedProvider?.name}`}
@@ -108,6 +181,7 @@ export default function ModelList() {
             setSelectedModel={setSelectedModel}
             selectedModel={selectedModel}
             hideSeeMore
+            isLoadingMore={isLoadingMore}
           >
             <ModelFilter
               search={search}

@@ -20,7 +20,11 @@ depends_on = None
 
 def upgrade() -> None:
     """Update check constraint to use uppercase enum names."""
-    # Drop the old constraint using raw SQL
+    # Drop both possible constraint names: the SQLAlchemy-generated prefixed
+    # name and the short name used in migration 001.
+    op.execute(
+        'ALTER TABLE execution_subscription DROP CONSTRAINT IF EXISTS "ck_execution_subscription_chk_execution_subscription_status"'
+    )
     op.execute(
         'ALTER TABLE execution_subscription DROP CONSTRAINT IF EXISTS "chk_execution_subscription_status"'
     )

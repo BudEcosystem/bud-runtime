@@ -109,7 +109,9 @@ async def create_pipeline(
             step_count=pipeline["step_count"],
             user_id=pipeline.get("user_id"),
             system_owned=pipeline.get("system_owned", False),
+            description=pipeline.get("description"),
             icon=pipeline.get("icon"),
+            dag=pipeline.get("dag"),
         )
     except DuplicatePipelineNameError as e:
         raise HTTPException(
@@ -260,7 +262,11 @@ async def update_pipeline(
             step_count=pipeline["step_count"],
             user_id=pipeline.get("user_id"),
             system_owned=pipeline.get("system_owned", False),
+            description=pipeline.get("description"),
             icon=pipeline.get("icon"),
+            dag=pipeline.get("dag"),
+            execution_count=pipeline.get("execution_count", 0),
+            last_execution_at=pipeline.get("last_execution_at"),
         )
     except WorkflowNotFoundError:
         raise HTTPException(

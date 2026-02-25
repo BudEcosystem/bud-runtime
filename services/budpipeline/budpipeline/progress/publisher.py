@@ -120,6 +120,9 @@ class EventPublisher:
         self._retry_queue: deque[RetryableEvent] = deque(maxlen=max_queue_size)
         self._retry_task: asyncio.Task | None = None
         self._running = False
+        # Keep strong references to fire-and-forget publish tasks to prevent
+        # garbage collection before completion (Python asyncio requirement).
+        self._background_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         """Start the retry processor."""
@@ -185,7 +188,7 @@ class EventPublisher:
 
         # 1. Dual-publish to budnotify if subscriber_ids present and topic configured
         if subscriber_ids and settings.notify_service_topic:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 self._publish_single_topic(
                     topic=settings.notify_service_topic,
                     execution_id=execution_id,
@@ -193,6 +196,8 @@ class EventPublisher:
                     payload=payload,
                 )
             )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
             published_topics.append(settings.notify_service_topic)
 
         # 2. Always publish to callback_topics (existing behavior)
@@ -207,7 +212,7 @@ class EventPublisher:
             return []
 
         for topic in topics:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 self._publish_single_topic(
                     topic=topic,
                     execution_id=execution_id,
@@ -215,10 +220,12 @@ class EventPublisher:
                     payload=payload,
                 )
             )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
         published_topics.extend(topics)
 
-        logger.debug(
+        logger.info(
             "Queued event for publishing",
             execution_id=str(execution_id),
             event_type=event_type,
@@ -290,8 +297,8 @@ class EventPublisher:
             pct = data.get("progress_percentage", 0)
             message = f"Progress: {pct}%"
         elif event_type == EventType.ETA_UPDATE:
-            eta = data.get("eta_seconds")
-            message = f"ETA: {eta}s" if eta is not None else "ETA update"
+            eta = data.get("eta_minutes")
+            message = str(eta) if eta is not None else "0"
         else:
             message = event_type
 
@@ -350,10 +357,10 @@ class EventPublisher:
     ) -> bool:
         """Publish event to a single topic.
 
-        Constructs a full CloudEvent envelope and publishes with
-        application/cloudevents+json content type. This prevents Dapr from
-        injecting its own id/datacontenttype fields, which budnotify's
-        CloudEventBase(extra="forbid") would reject with 422.
+        Sends flat payload data with CloudEvent attributes passed via
+        publish_metadata, matching the budmicroframe publish_to_topic
+        pattern. This avoids injecting extra fields (id, datacontenttype)
+        into the JSON body that downstream subscribers would reject.
 
         Args:
             topic: Target topic.
@@ -370,35 +377,30 @@ class EventPublisher:
 
             # Copy payload to avoid mutating the shared dict across topics
             event_payload = payload.copy()
-            correlation_id = event_payload.pop("correlation_id", None)
+            event_payload["source"] = settings.name
+            event_payload["source_topic"] = topic
 
-            # Construct a full CloudEvent envelope so Dapr does not inject
-            # its own id/datacontenttype fields (which budnotify rejects).
-            # Extension attributes (source_topic, correlation_id) go at the
-            # envelope level, not inside data.
-            cloud_event: dict[str, Any] = {
-                "specversion": "1.0",
-                "id": str(uuid4()),
-                "source": settings.name,
-                "type": event_type,
-                "datacontenttype": "application/json",
-                "source_topic": topic,
-                "data": event_payload,
+            # Pass CloudEvent attributes via publish_metadata so Dapr
+            # does not inject them into the JSON body.
+            event_id = str(uuid4())
+            publish_metadata = {
+                "cloudevent.id": event_id,
+                "cloudevent.source": settings.name,
+                "cloudevent.type": event_type,
             }
-            if correlation_id:
-                cloud_event["correlation_id"] = correlation_id
 
             async with DaprClient() as client:
                 await client.publish_event(
                     pubsub_name=self.pubsub_name,
                     topic_name=topic,
-                    data=json.dumps(cloud_event, cls=_DecimalEncoder),
+                    data=json.dumps(event_payload, cls=_DecimalEncoder),
                     data_content_type="application/cloudevents+json",
+                    publish_metadata=publish_metadata,
                 )
 
             record_event_published(event_type)
 
-            logger.debug(
+            logger.info(
                 "Published event to topic",
                 topic=topic,
                 execution_id=str(execution_id),
@@ -727,7 +729,7 @@ class EventPublisher:
     async def publish_eta_update(
         self,
         execution_id: UUID,
-        eta_seconds: int,
+        eta_minutes: int,
         progress_percentage: Decimal,
         correlation_id: str | None = None,
         subscriber_ids: str | None = None,
@@ -738,7 +740,7 @@ class EventPublisher:
 
         Args:
             execution_id: Execution UUID.
-            eta_seconds: Updated estimated time.
+            eta_minutes: Updated estimated time in minutes.
             progress_percentage: Current progress.
             correlation_id: Optional correlation ID.
             subscriber_ids: Optional user ID(s) for Novu delivery.
@@ -749,7 +751,7 @@ class EventPublisher:
             List of topics published to.
         """
         data: dict[str, Any] = {
-            "eta_seconds": eta_seconds,
+            "eta_minutes": eta_minutes,
             "progress_percentage": float(progress_percentage),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }

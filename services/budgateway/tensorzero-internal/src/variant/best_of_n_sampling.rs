@@ -1251,6 +1251,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                inference_cost: None,
                 guardrail_profile: None,
             },
         )]))
@@ -1355,6 +1356,7 @@ mod tests {
                     retry_config: None,
                     rate_limits: None,
                     pricing: None,
+                    inference_cost: None,
                     guardrail_profile: None,
                 },
             );
@@ -1425,6 +1427,7 @@ mod tests {
                     retry_config: None,
                     rate_limits: None,
                     pricing: None,
+                    inference_cost: None,
                     guardrail_profile: None,
                 },
             );
@@ -1512,6 +1515,7 @@ mod tests {
                 retry_config: None,
                 rate_limits: None,
                 pricing: None,
+                inference_cost: None,
                 guardrail_profile: None,
             },
         );

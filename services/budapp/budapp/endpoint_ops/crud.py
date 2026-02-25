@@ -414,6 +414,8 @@ class EndpointDataManager(DataManagerUtils):
 
         # Generate statements according to search or filters
         if search:
+            # Pop name for separate AND filtering (not OR'd with other conditions)
+            endpoint_name = filters.pop("name", None)
             if explicit_filters["model_name"]:
                 # For search, query using like operator
                 model_name_condition = Model.name.ilike(f"%{explicit_filters['model_name']}%")
@@ -457,6 +459,10 @@ class EndpointDataManager(DataManagerUtils):
                 .filter(or_(*search_conditions, *explicit_conditions))
                 .filter(EndpointModel.status == EndpointStatusEnum.RUNNING)
             )
+            if endpoint_name:
+                name_condition = func.lower(EndpointModel.name).like(f"%{endpoint_name.lower()}%")
+                stmt = stmt.filter(name_condition)
+                count_stmt = count_stmt.filter(name_condition)
         else:
             if explicit_filters["model_name"]:
                 model_name_condition = Model.name == explicit_filters["model_name"]
@@ -677,6 +683,27 @@ class EndpointDataManager(DataManagerUtils):
             stmt = stmt.filter(EndpointModel.project_id == project_id)
 
         return self.execute_scalar(stmt)
+
+    async def get_active_endpoints_by_cloud_model_uris(self, uris: set[str]) -> list[EndpointModel]:
+        """Get active endpoints linked to cloud models with the given URIs.
+
+        Args:
+            uris: Set of cloud model URIs to match against.
+
+        Returns:
+            list[EndpointModel]: Active endpoints whose model URI is in the given set.
+        """
+        active_statuses = (EndpointStatusEnum.RUNNING, EndpointStatusEnum.PENDING, EndpointStatusEnum.DEPLOYING)
+        stmt = (
+            select(EndpointModel)
+            .join(Model, EndpointModel.model_id == Model.id)
+            .where(
+                Model.provider_type == ModelProviderTypeEnum.CLOUD_MODEL,
+                Model.uri.in_(uris),
+                EndpointModel.status.in_(active_statuses),
+            )
+        )
+        return self.scalars_all(stmt)
 
 
 class PublicationHistoryDataManager(DataManagerUtils):

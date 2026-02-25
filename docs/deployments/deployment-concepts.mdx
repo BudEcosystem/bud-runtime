@@ -1,0 +1,77 @@
+---
+title: "Deployment Concepts"
+description: "Understand endpoint usage, publishing, tabs, and lifecycle controls"
+---
+
+## What is a Deployment?
+
+A deployment is a managed runtime endpoint that binds a selected model to infrastructure, execution settings, and access controls. It is the unit used for serving inference traffic in Bud AI Foundry projects.
+
+## Deploy vs Use vs Publish
+
+- **Deploy**: Creates an endpoint and makes it available for inference once active.
+- **Use this model**: Gives ready-to-copy cURL, Python, and JavaScript snippets to call that endpoint.
+- **Publish**: Lists the model in the **Customer Dashboard portal** for customer-facing consumption and pricing governance.
+
+## Deployment Building Blocks
+
+```mermaid
+flowchart LR
+    A[Model Source] --> D[Deployment]
+    B[Cluster Target] --> D
+    C[Runtime Config] --> D
+    D --> E[Active Endpoint]
+    E --> F[Use this model Snippets]
+    E --> G[Optional Publish to Customer Portal]
+```
+
+## Deployment Types
+
+### Cloud Deployments
+
+Use managed cloud model providers when you need fast setup and external model access.
+
+### Local Deployments
+
+Use local model artifacts (for example Hugging Face or disk-based assets) when you need infrastructure control or custom runtime tuning.
+
+## Deployment Detail Tabs
+
+### General
+
+Shows model, cluster, and status-level summary information.
+
+### Workers
+
+Available for local deployments. Shows worker state, placement, and capacity signals.
+
+### Settings
+
+Central place to configure rate limits, retries, and fallback behavior.
+
+## Lifecycle States
+
+```mermaid
+stateDiagram-v2
+    [*] --> Creating
+    Creating --> Active
+    Active --> UsableByAPIClients
+    UsableByAPIClients --> PublishedToCustomerPortal
+    PublishedToCustomerPortal --> Unpublished
+    Unpublished --> PublishedToCustomerPortal
+    Active --> Failed
+    Failed --> Active
+    Active --> Deleted
+    Unpublished --> Deleted
+    Deleted --> [*]
+```
+
+## Reliability Concepts
+
+- **Rate Limiting** controls traffic volume and burst behavior.
+- **Retry Limits** define automatic re-attempt behavior.
+- **Fallback Chains** route traffic to alternate endpoints during failure conditions.
+
+## Permission Model
+
+Deployment actions are permission-aware. View-only users can inspect metadata, while manage permissions are required for create, edit, publish, and delete actions.

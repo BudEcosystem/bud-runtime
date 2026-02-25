@@ -30,6 +30,13 @@ import { PermissionEnum, useUser } from "src/stores/useUser";
 import IconRender from "../components/BudIconRender";
 import { useMemo } from "react";
 
+const TAB_KEYS = {
+  GENERAL: "1",
+  // EVALUATIONS: "2",
+  ADVANCED: "2",
+  ADAPTERS: "3",
+};
+
 export default function ViewModel() {
   const { isExpandedViewOpen } = useContext(BudFormContext);
   const { currentWorkflow, setCurrentWorkflow } = useDeployModel();
@@ -57,7 +64,7 @@ export default function ViewModel() {
     // }
 
     closeExpandedStep();
-    if (key == "5") {
+    if (key === TAB_KEYS.ADAPTERS) {
       setToAdapter(true);
     } else {
       setToAdapter(false);
@@ -70,22 +77,22 @@ export default function ViewModel() {
   const items: TabsProps["items"] = useMemo(
     () => [
       {
-        key: "1",
+        key: TAB_KEYS.GENERAL,
         label: "General",
         children: <General data={selectedModel} />,
       },
+      // {
+      //   key: TAB_KEYS.EVALUATIONS,
+      //   label: "Evaluations",
+      //   children: <Evaluations model={selectedModel} />,
+      // },
       {
-        key: "2",
-        label: "Evaluations",
-        children: <Evaluations model={selectedModel} />,
-      },
-      {
-        key: "4",
+        key: TAB_KEYS.ADVANCED,
         label: "Advanced",
         children: <Advanced data={selectedModel} />,
       },
       {
-        key: "5",
+        key: TAB_KEYS.ADAPTERS,
         label: "Adapters",
         children: (
           <General
@@ -259,7 +266,7 @@ export default function ViewModel() {
               }}
             >
               <Tabs
-                defaultActiveKey="1"
+                defaultActiveKey={TAB_KEYS.GENERAL}
                 items={filteredItems}
                 onChange={onChange}
                 className="generalTabs"

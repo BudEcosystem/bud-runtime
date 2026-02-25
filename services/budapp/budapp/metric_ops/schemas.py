@@ -564,7 +564,9 @@ class BlockingRuleSyncRequest(BaseModel):
 class AggregatedMetricsRequest(BaseModel):
     """Request schema for aggregated metrics with server-side calculations."""
 
-    from_date: datetime = Field(..., description="Start date for the analysis")
+    from_date: Optional[datetime] = Field(
+        None, description="Start date for the analysis (defaults to full retention window)"
+    )
     to_date: Optional[datetime] = Field(None, description="End date for the analysis")
     group_by: Optional[List[Literal["model", "project", "endpoint", "user", "user_project"]]] = Field(
         None, description="Dimensions to group by"
@@ -590,8 +592,15 @@ class AggregatedMetricsRequest(BaseModel):
             "throughput_avg",
             "error_rate",
             "unique_users",
+            "p95_inference_cost",
+            "max_inference_cost",
+            "min_inference_cost",
         ]
     ] = Field(..., description="Metrics to calculate")
+    data_source: Literal["inference", "prompt"] = Field(
+        default="inference",
+        description="Filter by data source: 'inference' for standard requests, 'prompt' for prompt analytics",
+    )
 
     @field_validator("to_date")
     @classmethod

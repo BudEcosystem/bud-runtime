@@ -2918,7 +2918,15 @@ class ObservabilityMetricsService:
         to_date = request.to_date or datetime.now()
 
         # Metrics that require raw data for percentile calculations
-        raw_data_metrics = {"p95_latency", "p99_latency", "ttft_p95", "ttft_p99"}
+        raw_data_metrics = {
+            "p95_latency",
+            "p99_latency",
+            "ttft_p95",
+            "ttft_p99",
+            "p95_inference_cost",
+            "max_inference_cost",
+            "min_inference_cost",
+        }
         # Dimensions that require InferenceFact (not available in rollup tables)
         raw_data_dimensions = {"user"}
         needs_raw_data = any(m in raw_data_metrics for m in request.metrics) or (
@@ -3125,6 +3133,14 @@ class ObservabilityMetricsService:
                 select_fields.append("AVG(CASE WHEN NOT ifact.is_success THEN 1.0 ELSE 0.0 END) * 100 as error_rate")
             elif metric == "unique_users":
                 select_fields.append("uniqExact(ifact.user_id) as unique_users")
+            elif metric == "p95_inference_cost":
+                select_fields.append("quantile(0.95)(ifact.inference_cost) as p95_inference_cost")
+            elif metric == "max_inference_cost":
+                select_fields.append("max(ifact.inference_cost) as max_inference_cost")
+            elif metric == "min_inference_cost":
+                select_fields.append(
+                    "minIf(ifact.inference_cost, ifact.inference_cost IS NOT NULL) as min_inference_cost"
+                )
 
         # Build WHERE clause
         where_conditions = [
@@ -3164,6 +3180,9 @@ class ObservabilityMetricsService:
                 elif filter_key == "endpoint_id":
                     where_conditions.append("ifact.endpoint_id = %(endpoint_id)s")
                     params["endpoint_id"] = filter_value
+                elif filter_key == "prompt_id":
+                    where_conditions.append("ifact.prompt_id = %(prompt_id)s")
+                    params["prompt_id"] = filter_value
 
         # Add data_source filter for prompt analytics
         if hasattr(request, "data_source"):
@@ -4723,6 +4742,10 @@ class ObservabilityMetricsService:
         # Cost metrics
         elif metric in ["total_cost", "avg_cost"]:
             return f"${value:.4f}", "$"
+
+        # Inference cost metrics (per-request provider costs, higher precision)
+        elif metric in ["p95_inference_cost", "max_inference_cost", "min_inference_cost"]:
+            return f"${value:.6f}", "$"
 
         # Count metrics
         elif metric in ["total_requests", "unique_users"]:

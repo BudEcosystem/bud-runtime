@@ -7,6 +7,7 @@ import { useDrawer } from "src/hooks/useDrawer";
 import { useRouter } from "next/router";
 import { InputNumber, Switch } from "antd";
 import { errorToast } from "@/components/toast";
+import { extractApiErrorMessage } from "@/utils/extractApiErrorMessage";
 import TextInput from "../components/TextInput";
 import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 import InfoLabel from "@/components/ui/bud/dataEntry/InfoLabel";
@@ -292,7 +293,7 @@ export default function AgentConfiguration() {
         }
       } catch (error) {
         console.error("Failed to save agent configuration:", error);
-        errorToast("Failed to save agent configuration");
+        errorToast(extractApiErrorMessage(error, "Failed to save agent configuration"));
       } finally {
         setIsSubmitting(false);
       }

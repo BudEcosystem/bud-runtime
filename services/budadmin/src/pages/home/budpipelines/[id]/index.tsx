@@ -1,6 +1,6 @@
 "use client";
 import { Box, Flex } from "@radix-ui/themes";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import React from "react";
 import { useRouter } from "next/router";
 import DashBoardLayout from "../../layout";
@@ -29,10 +29,10 @@ import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 import { useDrawer } from "src/hooks/useDrawer";
 import { useConfirmAction } from "src/hooks/useConfirmAction";
 import StepDetailDrawer from "@/components/pipelineEditor/components/StepDetailDrawer";
-import { Button, Tag, Empty, Table, notification } from "antd";
+import { Button, Tag, Empty, Table, Tooltip, notification } from "antd";
 import { successToast, errorToast } from "@/components/toast";
-import { PipelineEditor, PipelineTriggersPanel } from "@/components/pipelineEditor";
-import { formatDistanceToNow } from "date-fns";
+import { PipelineEditor, PipelineTriggersPanel, type PipelineEditorRef } from "@/components/pipelineEditor";
+import { format, formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
 
 const WorkflowDetail = () => {
@@ -67,6 +67,7 @@ const WorkflowDetail = () => {
 
   // Always in edit mode
   const isEditing = true;
+  const pipelineEditorRef = useRef<PipelineEditorRef>(null);
   const [loadingDataSources, setLoadingDataSources] = useState<Set<string>>(new Set());
   const [isExecuting, setIsExecuting] = useState(false);
   const { openDrawer } = useDrawer();
@@ -105,6 +106,10 @@ const WorkflowDetail = () => {
       label: p.name,
       value: p.id,
     })),
+    providerTypeMap: providers.reduce((map: Record<string, string>, p) => {
+      map[p.id] = p.type;
+      return map;
+    }, {}),
     credentials: proprietaryCredentials.map((c) => ({
       label: `${c.name} (${c.type})`,
       value: c.id,
@@ -357,10 +362,30 @@ const WorkflowDetail = () => {
 
   // Save handler
   const handleSaveEditing = async () => {
-    if (editedDag && id && typeof id === "string") {
+    // Auto-save any unsaved action changes before saving the pipeline
+    let dagToSave = editedDag;
+    if (pipelineEditorRef.current) {
+      const flushResult = await pipelineEditorRef.current.flushUnsavedActionChanges();
+      if (flushResult === false) {
+        // Validation failed - error toast already shown by ActionConfigPanel
+        return;
+      }
+      if (flushResult && dagToSave) {
+        // Apply the flushed action updates to our local dag copy
+        dagToSave = {
+          ...dagToSave,
+          steps: dagToSave.steps.map((step) =>
+            step.id === flushResult.stepId ? { ...step, ...flushResult.updates } : step
+          ),
+        };
+        setEditedDag(dagToSave);
+      }
+    }
+
+    if (dagToSave && id && typeof id === "string") {
       try {
         setIsSaving(true);
-        const result = await updateWorkflow(id, editedDag);
+        const result = await updateWorkflow(id, dagToSave);
         if (result) {
           successToast("Pipeline saved");
           // Refresh the pipeline to get the updated data
@@ -641,6 +666,7 @@ const WorkflowDetail = () => {
         {activeTab === "dag" && (
           <Box style={{ height: "calc(100vh - 73px)", minHeight: "500px" }}>
             <PipelineEditor
+              ref={pipelineEditorRef}
               dag={isEditing && editedDag ? editedDag : (selectedWorkflow.dag || {
                 name: selectedWorkflow.name || "Untitled Pipeline",
                 steps: [],
@@ -680,12 +706,17 @@ const WorkflowDetail = () => {
                     title: "Run #",
                     key: "run_number",
                     render: (_: unknown, __: any, index: number) => {
-                      // Calculate the correct run number based on pagination
+                      // Use server-side pagination metadata to keep run numbers
+                      // in sync with the displayed data during page transitions
                       const totalCount = executionsPagination?.total_count || 0;
-                      const offset = (executionsPage - 1) * executionsPageSize;
+                      const page = executionsPagination?.page || executionsPage;
+                      const pageSize = executionsPagination?.page_size || executionsPageSize;
+                      const offset = (page - 1) * pageSize;
+                      const runNumber = totalCount - offset - index;
+                      if (runNumber <= 0) return <Text_11_400_808080>—</Text_11_400_808080>;
                       return (
                         <Text_11_400_808080>
-                          #{totalCount - offset - index}
+                          #{runNumber}
                         </Text_11_400_808080>
                       );
                     },
@@ -727,11 +758,14 @@ const WorkflowDetail = () => {
                     title: "Started",
                     dataIndex: "started_at",
                     key: "started_at",
+                    width: 180,
                     render: (value: string) => (
                       <Text_11_400_808080>
-                        {value
-                          ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                          : "—"}
+                        {value ? (
+                          <Tooltip title={`${format(new Date(value), "MMM d, yyyy, h:mm:ss a")} (${formatDistanceToNow(new Date(value), { addSuffix: true })})`}>
+                            <span className="whitespace-nowrap">{format(new Date(value), "MMM d, yyyy, h:mm:ss a")}</span>
+                          </Tooltip>
+                        ) : "—"}
                       </Text_11_400_808080>
                     ),
                   },
@@ -739,11 +773,14 @@ const WorkflowDetail = () => {
                     title: "Completed",
                     dataIndex: "completed_at",
                     key: "completed_at",
+                    width: 180,
                     render: (value: string) => (
                       <Text_11_400_808080>
-                        {value
-                          ? formatDistanceToNow(new Date(value), { addSuffix: true })
-                          : "—"}
+                        {value ? (
+                          <Tooltip title={`${format(new Date(value), "MMM d, yyyy, h:mm:ss a")} (${formatDistanceToNow(new Date(value), { addSuffix: true })})`}>
+                            <span className="whitespace-nowrap">{format(new Date(value), "MMM d, yyyy, h:mm:ss a")}</span>
+                          </Tooltip>
+                        ) : "—"}
                       </Text_11_400_808080>
                     ),
                   },

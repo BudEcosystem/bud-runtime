@@ -94,7 +94,23 @@
             "group": "Deployments",
             "icon": "rocket",
             "pages": [
-              "deployments/deployments"
+              "deployments/introduction",
+              "deployments/quickstart",
+              "deployments/deployment-concepts",
+              "deployments/creating-first-deployment",
+              {
+                "group": "Guides",
+                "pages": [
+                  "deployments/guides/deployment-lifecycle-management"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "deployments/reference/deployment-actions-reference"
+                ]
+              },
+              "deployments/troubleshooting"
             ]
           },
           {
@@ -125,7 +141,24 @@
             "group": "Clusters",
             "icon": "server",
             "pages": [
-              "clusters/cluster"
+              "clusters/introduction",
+              "clusters/quickstart",
+              "clusters/cluster-concepts",
+              "clusters/creating-first-cluster",
+              {
+                "group": "Guides",
+                "pages": [
+                  "clusters/guides/cluster-operations",
+                  "clusters/guides/cluster-settings-and-storage"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "clusters/reference/cluster-tabs-reference"
+                ]
+              },
+              "clusters/troubleshooting"
             ]
           },
           {

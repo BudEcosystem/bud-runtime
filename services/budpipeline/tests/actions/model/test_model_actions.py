@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
 
@@ -252,9 +253,10 @@ class TestModelBenchmarkAction:
     async def test_execute_no_cluster_info(self) -> None:
         """Test execution fails when cluster info cannot be fetched."""
         executor = ModelBenchmarkExecutor()
+        test_cluster_id = str(uuid4())
         context = make_action_context(
             model_id="model-123",
-            cluster_id="cluster-123",
+            cluster_id=test_cluster_id,
         )
 
         # Mock invoke_service to return empty cluster info
@@ -267,15 +269,17 @@ class TestModelBenchmarkAction:
             result = await executor.execute(context)
 
         assert result.success is False
-        assert "cluster info" in result.error.lower()
+        assert "cluster" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_execute_success(self) -> None:
         """Test successful benchmark execution."""
         executor = ModelBenchmarkExecutor()
+        test_cluster_id = str(uuid4())
+        bud_cluster_id = str(uuid4())
         context = make_action_context(
             model_id="model-123",
-            cluster_id="cluster-123",
+            cluster_id=test_cluster_id,
         )
 
         # Mock all service calls
@@ -286,7 +290,7 @@ class TestModelBenchmarkAction:
             call_count += 1
             if "clusters/" in method_path and "nodes" not in method_path:
                 # Cluster details from budapp
-                return {"cluster": {"cluster_id": "bud-cluster-456"}}
+                return {"cluster": {"id": test_cluster_id, "cluster_id": bud_cluster_id}}
             elif "nodes" in method_path:
                 # Nodes from budcluster
                 return {
@@ -486,14 +490,16 @@ class TestModelBenchmarkEdgeCases:
     async def test_execute_no_nodes(self) -> None:
         """Test execution fails when no nodes found."""
         executor = ModelBenchmarkExecutor()
+        test_cluster_id = str(uuid4())
+        bud_cluster_id = str(uuid4())
         context = make_action_context(
             model_id="model-123",
-            cluster_id="cluster-123",
+            cluster_id=test_cluster_id,
         )
 
         async def mock_invoke(app_id, method_path, **kwargs):
             if "clusters/" in method_path and "nodes" not in method_path:
-                return {"cluster": {"cluster_id": "bud-cluster-456"}}
+                return {"cluster": {"id": test_cluster_id, "cluster_id": bud_cluster_id}}
             elif "nodes" in method_path:
                 return {"param": {"nodes": []}}  # Empty nodes
             return {}
@@ -512,14 +518,16 @@ class TestModelBenchmarkEdgeCases:
         nodes without 'name' field result in empty hostname and are filtered out.
         """
         executor = ModelBenchmarkExecutor()
+        test_cluster_id = str(uuid4())
+        bud_cluster_id = str(uuid4())
         context = make_action_context(
             model_id="model-123",
-            cluster_id="cluster-123",
+            cluster_id=test_cluster_id,
         )
 
         async def mock_invoke(app_id, method_path, **kwargs):
             if "clusters/" in method_path and "nodes" not in method_path:
-                return {"cluster": {"cluster_id": "bud-cluster-456"}}
+                return {"cluster": {"id": test_cluster_id, "cluster_id": bud_cluster_id}}
             elif "nodes" in method_path:
                 # Nodes with valid name but then we mock hostnames extraction
                 # to return nodes that get filtered out

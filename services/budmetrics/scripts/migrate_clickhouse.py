@@ -1138,6 +1138,7 @@ class ClickHouseMigration:
             -- ===== STATUS & COST (from model_inference_details.*) =====
             is_success Bool DEFAULT true,
             cost Nullable(Float64) CODEC(Gorilla, ZSTD(1)),
+            inference_cost Nullable(Float64) CODEC(Gorilla, ZSTD(1)),
             status_code Nullable(UInt16) CODEC(ZSTD(1)),
             request_ip Nullable(IPv4) CODEC(ZSTD(1)),
             response_analysis Nullable(String) CODEC(ZSTD(1)),
@@ -1424,6 +1425,7 @@ class ClickHouseMigration:
                          toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code']), 500) < 400
             ) AS is_success,
             toFloat64OrNull(h.SpanAttributes['model_inference_details.cost']) AS cost,
+            toFloat64OrNull(h.SpanAttributes['model_inference_details.inference_cost']) AS inference_cost,
             COALESCE(
                 toUInt16OrNull(h.SpanAttributes['model_inference_details.status_code']),
                 toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code'])
@@ -1699,6 +1701,7 @@ class ClickHouseMigration:
             -- ===== STATUS & COST =====
             h.SpanAttributes['model_inference_details.is_success'] = 'true' AS is_success,
             toFloat64OrNull(h.SpanAttributes['model_inference_details.cost']) AS cost,
+            toFloat64OrNull(h.SpanAttributes['model_inference_details.inference_cost']) AS inference_cost,
             COALESCE(
                 toUInt16OrNull(h.SpanAttributes['model_inference_details.status_code']),
                 toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code'])
@@ -2700,6 +2703,59 @@ class ClickHouseMigration:
 
         logger.info("Prompt analytics columns migration to InferenceFact completed successfully")
 
+    async def add_inference_cost_column(self):
+        """Add inference_cost column to existing InferenceFact table.
+
+        This column stores the actual provider inference cost per request,
+        separate from the existing 'cost' column which stores admin-set billing pricing.
+        - cost (existing): Admin-set billing price for BudCustomer
+        - inference_cost (NEW): Actual provider inference cost from BudConnect/BudSim
+
+        The column is added AFTER the existing 'cost' column.
+        """
+        logger.info("Adding inference_cost column to InferenceFact table...")
+
+        # Check if the table exists first
+        try:
+            table_exists = await self.client.execute_query("EXISTS TABLE InferenceFact")
+            if not table_exists or not table_exists[0][0]:
+                logger.info("InferenceFact table does not exist. Skipping inference_cost column migration.")
+                return
+        except Exception as e:
+            logger.error(f"Error checking if InferenceFact table exists: {e}")
+            return
+
+        # Check if column already exists
+        try:
+            check_column_query = """
+            SELECT COUNT(*)
+            FROM system.columns
+            WHERE table = 'InferenceFact'
+              AND database = currentDatabase()
+              AND name = 'inference_cost'
+            """
+            result = await self.client.execute_query(check_column_query)
+            column_exists = result[0][0] > 0 if result else False
+
+            if not column_exists:
+                alter_query = """
+                ALTER TABLE InferenceFact
+                ADD COLUMN IF NOT EXISTS inference_cost Nullable(Float64) CODEC(Gorilla, ZSTD(1))
+                AFTER cost
+                """
+                await self.client.execute_query(alter_query)
+                logger.info("Added inference_cost column to InferenceFact table")
+            else:
+                logger.debug("Column inference_cost already exists in InferenceFact table")
+
+        except Exception as e:
+            if "already exists" in str(e).lower():
+                logger.debug("Column inference_cost already exists")
+            else:
+                logger.error(f"Error adding inference_cost column: {e}")
+
+        logger.info("Inference cost column migration to InferenceFact completed successfully")
+
     async def create_mv_otel_blocking_to_inference_fact(self):
         """Create Materialized View for blocked-only requests to InferenceFact.
 
@@ -2750,6 +2806,7 @@ class ClickHouseMigration:
             -- ===== STATUS (blocked = failed) =====
             any(false) AS is_success,
             any(CAST(NULL AS Nullable(Float64))) AS cost,
+            any(CAST(NULL AS Nullable(Float64))) AS inference_cost,
             any(toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code'])) AS status_code,
             any(toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip'])) AS request_ip,
             any(CAST(NULL AS Nullable(String))) AS response_analysis,
@@ -2937,6 +2994,15 @@ class ClickHouseMigration:
                 true
             ) AS is_success,
             CAST(NULL AS Nullable(Float64)) AS cost,  -- Cost calculated separately if needed
+            if(
+                -- Error detected AND no inference_cost recorded on the response span
+                (r.SpanAttributes['error.type'] != '' OR r.SpanAttributes['error.message'] != '' OR r.SpanAttributes['gen_ai.response.status'] = 'failed')
+                AND toFloat64OrNull(r.SpanAttributes['gen_ai.inference_cost']) IS NULL,
+                -- Error with no cost: recover from inner handler spans via LEFT JOIN
+                ic.total_inner_cost,
+                -- Success (or error with cost already recorded): use directly recorded value
+                toFloat64OrNull(r.SpanAttributes['gen_ai.inference_cost'])
+            ) AS inference_cost,
             toUInt16OrNull(g.SpanAttributes['gateway_analytics.status_code']) AS status_code,
             toIPv4OrNull(g.SpanAttributes['gateway_analytics.client_ip']) AS request_ip,
             CAST(NULL AS Nullable(String)) AS response_analysis,
@@ -3068,6 +3134,14 @@ class ClickHouseMigration:
             ON r.TraceId = g.TraceId
             AND g.SpanName = 'gateway_analytics'
             AND g.SpanAttributes['gateway_analytics.path'] = '/v1/responses'
+        LEFT JOIN (
+            SELECT TraceId, SUM(toFloat64OrNull(SpanAttributes['model_inference_details.inference_cost'])) AS total_inner_cost
+            FROM otel_traces
+            WHERE SpanName LIKE '%%_handler_observability'
+              AND SpanName != 'response_create_handler_observability'
+              AND SpanAttributes['model_inference_details.inference_cost'] != ''
+            GROUP BY TraceId
+        ) ic ON r.TraceId = ic.TraceId
         WHERE r.SpanName = 'response_create_handler_observability'
           AND r.SpanAttributes['bud.project_id'] != ''
         """
@@ -3721,6 +3795,7 @@ class ClickHouseMigration:
                 self.add_endpoint_specific_columns_to_inference_fact()
             )  # Add audio/image/embedding/TTS/document columns
             await self.add_prompt_analytics_columns()  # Add prompt analytics columns for /v1/responses
+            await self.add_inference_cost_column()  # Add inference_cost column for actual provider cost tracking
             await self.create_mv_otel_to_inference_fact()  # Create MV to populate InferenceFact from otel_traces
             # NOTE: mv_handler_to_inference_fact was removed to avoid duplicates - the main MV handles both cases
             await (

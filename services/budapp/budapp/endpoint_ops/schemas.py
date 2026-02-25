@@ -51,6 +51,7 @@ class EndpointCreate(BaseModel):
     deployment_config: dict | None
     node_list: list | None
     supported_endpoints: list[ModelEndpointEnum]
+    inference_cost: Optional[dict] = None
 
 
 class EndpointFilter(BaseModel):
@@ -504,6 +505,7 @@ class ProxyModelConfig(BaseModel):
     endpoints: list[str]
     api_key: Optional[str] = None
     pricing: Optional[ProxyModelPricing] = None
+    inference_cost: Optional[ProxyModelPricing] = None
 
 
 class RateLimitConfig(BaseModel):
