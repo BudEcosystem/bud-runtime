@@ -286,6 +286,8 @@ const modalityTypes = [
   { label: "Video", value: "video" },
 ];
 
+const GUARDRAILS_PAGE_LIMIT = 10;
+
 const defaultFilter = {
   name: "",
   provider: [],
@@ -389,7 +391,7 @@ export default function GuardRails() {
 
   // for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = GUARDRAILS_PAGE_LIMIT;
   const [tempFilter, setTempFilter] = useState<GuardRailFilters>({});
   const [filter, setFilter] = useState<GuardRailFilters>(defaultFilter);
   const [filterOpen, setFilterOpen] = React.useState(false);
