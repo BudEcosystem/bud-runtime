@@ -345,6 +345,30 @@ class KeycloakManager:
             logger.error(f"Error fetching Keycloak user by email {email}: {str(e)}")
             return None
 
+    def get_keycloak_user_by_id(self, user_id: str, realm_name: str) -> Optional[Dict]:
+        """Get Keycloak user details by user ID (UUID).
+
+        This is useful for JIT provisioning from access tokens where we have
+        the user's Keycloak UUID (from the 'sub' claim) but need full user details.
+
+        Args:
+            user_id: Keycloak user UUID (from token 'sub' claim)
+            realm_name: Name of the realm
+
+        Returns:
+            User dict if found, None otherwise
+        """
+        try:
+            realm_admin = self.get_realm_admin(realm_name)
+            user = realm_admin.get_user(user_id)
+            return user
+        except KeycloakGetError:
+            logger.warning(f"User {user_id} not found in Keycloak realm {realm_name}")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching Keycloak user by ID {user_id}: {str(e)}")
+            return None
+
     def get_user_realm_roles(self, user_id: str, realm_name: str) -> Optional[list[str]]:
         """Get realm roles assigned to a user in Keycloak.
 
