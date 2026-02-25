@@ -4512,12 +4512,13 @@ const addGuardrail: DrawerFlowType = {
 const addGuardrailDeployment: DrawerFlowType = {
   title: "Deploy Guardrail",
   description: "Deploy guardrail probes to your infrastructure",
-  totalSteps: 12,
+  totalSteps: 15,
   steps: [
+    // Step 1: Select Probes (backend step 2)
     {
       navigation: () => ["Guardrails", "Probes List"],
       id: "bud-sentinel-probes",
-      step: 2,
+      step: 1,
       component: StepComponents["bud-sentinel-probes"],
       progress: [
         {
@@ -4535,6 +4536,7 @@ const addGuardrailDeployment: DrawerFlowType = {
       ],
       confirmClose: true,
     },
+    // Step 2: PII Detection Config (backend step 2 sub)
     {
       navigation: () => ["Guardrails", "Configure Rules"],
       id: "pii-detection-config",
@@ -4556,6 +4558,7 @@ const addGuardrailDeployment: DrawerFlowType = {
       ],
       confirmClose: true,
     },
+    // Step 3: Select Project (backend step 3)
     {
       navigation: () => ["Guardrails", "Select Project"],
       id: "select-project",
@@ -4572,11 +4575,12 @@ const addGuardrailDeployment: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Credentials",
+          title: "Deploy Type",
         },
       ],
       confirmClose: true,
     },
+    // Step 4: Select Credentials (backend step 4, conditional)
     {
       navigation: () => ["Guardrails", "Select Credentials"],
       id: "guardrail-select-credentials",
@@ -4593,15 +4597,16 @@ const addGuardrailDeployment: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Hardware",
+          title: "Deploy Type",
         },
       ],
       confirmClose: true,
     },
+    // Step 5: Onboarding Status (backend step 4 async, conditional)
     {
       navigation: () => ["Guardrails", "Onboarding Models"],
       id: "guardrail-onboarding-status",
-      step: 4,
+      step: 5,
       component: StepComponents["guardrail-onboarding-status"],
       progress: [
         {
@@ -4614,108 +4619,25 @@ const addGuardrailDeployment: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.notCompleted,
-          title: "Hardware",
+          title: "Deploy Type",
         },
       ],
       confirmClose: true,
     },
-    {
-      navigation: () => ["Guardrails", "Hardware Mode"],
-      id: "guardrail-hardware-mode",
-      step: 5,
-      component: StepComponents["guardrail-hardware-mode"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Onboarding",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Hardware Mode",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Specifications",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Guardrails", "Deploy Specifications"],
-      id: "guardrail-deploy-specs",
-      step: 6,
-      component: StepComponents["guardrail-deploy-specs"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Hardware Mode",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Specifications",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Select Cluster",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Guardrails", "Select Cluster"],
-      id: "guardrail-select-cluster",
-      step: 7,
-      component: StepComponents["guardrail-select-cluster"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Specifications",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Select Cluster",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Deployment Type",
-        },
-      ],
-      confirmClose: true,
-    },
+    // Step 6: Deployment Types (backend step 5)
     {
       navigation: () => ["Guardrails", "Deployment Types"],
       id: "deployment-types",
-      step: 8,
+      step: 6,
       component: StepComponents["deployment-types"],
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Cluster",
+          title: "Select Project",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Deployment Type",
-        },
-        {
-          status: FormProgressStatus.notCompleted,
-          title: "Endpoints",
-        },
-      ],
-      confirmClose: true,
-    },
-    {
-      navigation: () => ["Guardrails", "Select Endpoints"],
-      id: "select-deployment",
-      step: 9,
-      component: StepComponents["select-deployment"],
-      progress: [
-        {
-          status: FormProgressStatus.completed,
-          title: "Deployment Type",
-        },
-        {
-          status: FormProgressStatus.inProgress,
-          title: "Select Endpoints",
+          title: "Deploy Type",
         },
         {
           status: FormProgressStatus.notCompleted,
@@ -4724,15 +4646,38 @@ const addGuardrailDeployment: DrawerFlowType = {
       ],
       confirmClose: true,
     },
+    // Step 7: Select Endpoints (backend step 6, conditional)
+    {
+      navigation: () => ["Guardrails", "Select Endpoints"],
+      id: "select-deployment",
+      step: 7,
+      component: StepComponents["select-deployment"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploy Type",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Endpoints",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Settings",
+        },
+      ],
+      confirmClose: true,
+    },
+    // Step 8: Probe Settings (backend step 7)
     {
       navigation: () => ["Guardrails", "Probe Settings"],
       id: "probe-settings",
-      step: 10,
+      step: 8,
       component: StepComponents["probe-settings"],
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Endpoints",
+          title: "Deploy Type",
         },
         {
           status: FormProgressStatus.inProgress,
@@ -4745,11 +4690,12 @@ const addGuardrailDeployment: DrawerFlowType = {
       ],
       confirmClose: true,
     },
+    // Step 9: Hardware Mode (backend step 8, conditional)
     {
-      navigation: () => ["Guardrails", "Deploying"],
-      id: "probe-deployment-success",
-      step: 11,
-      component: StepComponents["probe-deployment-success"],
+      navigation: () => ["Guardrails", "Hardware Mode"],
+      id: "guardrail-hardware-mode",
+      step: 9,
+      component: StepComponents["guardrail-hardware-mode"],
       progress: [
         {
           status: FormProgressStatus.completed,
@@ -4757,7 +4703,117 @@ const addGuardrailDeployment: DrawerFlowType = {
         },
         {
           status: FormProgressStatus.inProgress,
+          title: "Hardware",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Specifications",
+        },
+      ],
+      confirmClose: true,
+    },
+    // Step 10: Deploy Specs (backend step 9, conditional)
+    {
+      navigation: () => ["Guardrails", "Deploy Specifications"],
+      id: "guardrail-deploy-specs",
+      step: 10,
+      component: StepComponents["guardrail-deploy-specs"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Hardware",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Specifications",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Cluster",
+        },
+      ],
+      confirmClose: true,
+    },
+    // Step 11: Simulation Status (backend step 9 async)
+    {
+      navigation: () => ["Guardrails", "Simulation"],
+      id: "guardrail-simulation-status",
+      step: 11,
+      component: StepComponents["guardrail-simulation-status"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Specifications",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Cluster",
+        },
+      ],
+      confirmClose: true,
+    },
+    // Step 12: Select Cluster (backend step 10, conditional)
+    {
+      navigation: () => ["Guardrails", "Select Cluster"],
+      id: "guardrail-select-cluster",
+      step: 12,
+      component: StepComponents["guardrail-select-cluster"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Simulation",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Deploy",
+        },
+      ],
+      confirmClose: true,
+    },
+    // Step 13: Deployment Status (backend step 10 async)
+    {
+      navigation: () => ["Guardrails", "Deploying"],
+      id: "guardrail-deployment-status",
+      step: 13,
+      component: StepComponents["guardrail-deployment-status"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Cluster",
+        },
+        {
+          status: FormProgressStatus.inProgress,
           title: "Deploying",
+        },
+        {
+          status: FormProgressStatus.notCompleted,
+          title: "Success",
+        },
+      ],
+      confirmClose: true,
+    },
+    // Step 14: Success
+    {
+      navigation: () => ["Guardrails", "Success"],
+      id: "probe-deployment-success",
+      step: 14,
+      component: StepComponents["probe-deployment-success"],
+      progress: [
+        {
+          status: FormProgressStatus.completed,
+          title: "Deploying",
+        },
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Success",
         },
       ],
       confirmClose: false,
@@ -4778,11 +4834,11 @@ const addCustomProbe: DrawerFlowType = {
       component: StepComponents["select-probe-type"],
       progress: [
         {
-          status: FormProgressStatus.completed,
-          title: "Select Provider",
+          status: FormProgressStatus.inProgress,
+          title: "Select Probe Type",
         },
         {
-          status: FormProgressStatus.inProgress,
+          status: FormProgressStatus.notCompleted,
           title: "Select Type",
         },
         {
@@ -4800,7 +4856,7 @@ const addCustomProbe: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Select Type",
+          title: "Select Probe Type",
         },
         {
           status: FormProgressStatus.inProgress,
@@ -4867,11 +4923,15 @@ const addCustomProbe: DrawerFlowType = {
       progress: [
         {
           status: FormProgressStatus.completed,
-          title: "Configure",
+          title: "Select Probe Type",
+        },
+        {
+          status: FormProgressStatus.completed,
+          title: "Select Type",
         },
         {
           status: FormProgressStatus.inProgress,
-          title: "Details",
+          title: "Configure",
         },
       ],
       confirmClose: true,

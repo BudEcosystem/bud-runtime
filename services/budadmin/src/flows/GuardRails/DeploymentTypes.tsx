@@ -23,7 +23,7 @@ export default function DeploymentTypes() {
   } = useGuardrails();
 
   const handleBack = () => {
-    openDrawerWithStep("guardrail-select-cluster");
+    openDrawerWithStep("select-project");
   };
 
   const handleNext = async () => {

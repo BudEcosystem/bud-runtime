@@ -16,7 +16,7 @@ export default function ProbeDeploymentSuccess() {
 
   return (
     <BudForm data={{}} onNext={handleDone} nextText="Done" showBack={false}>
-      <BudWraperBox>
+      <BudWraperBox center={true}>
         <BudDrawerLayout>
           <div className="flex flex-col items-center justify-center min-h-[400px] px-[2rem] py-[3rem]">
             {/* Success Icon Container */}

@@ -21,7 +21,16 @@ export default function ProbeSettings() {
   const [profileDescription, setProfileDescription] = useState("");
 
   // Use the guardrails hook
-  const { updateWorkflow, workflowLoading, selectedProbe, selectedDeployment, isStandaloneDeployment } = useGuardrails();
+  const {
+    updateWorkflow,
+    workflowLoading,
+    selectedProbe,
+    selectedDeployment,
+    isStandaloneDeployment,
+    modelsRequiringDeployment,
+  } = useGuardrails();
+
+  const needsDeployment = modelsRequiringDeployment > 0;
 
   const lifecycleOptions = [
     { value: "input", label: "Input" },
@@ -53,21 +62,30 @@ export default function ProbeSettings() {
     }
 
     try {
-      // Backend accumulates data across steps, so only send step-specific fields
-      // Step 10 triggers the final deployment with profile settings
+      // Step 7: probe settings
       const payload: any = {
-        step_number: 10,
+        step_number: 7,
         name: profileName.trim(),
         description: profileDescription.trim() || undefined,
         guard_types: selectedLifecycle,
         severity_threshold: strictnessLevel,
-        trigger_workflow: true,
       };
+
+      // Only trigger final workflow if no models need deployment
+      if (!needsDeployment) {
+        payload.trigger_workflow = true;
+      }
 
       const success = await updateWorkflow(payload);
 
       if (success) {
-        openDrawerWithStep("probe-deployment-success");
+        if (needsDeployment) {
+          // Models need deployment: continue to hardware mode selection
+          openDrawerWithStep("guardrail-hardware-mode");
+        } else {
+          // No deployment needed: go to deployment status (workflow triggered above)
+          openDrawerWithStep("guardrail-deployment-status");
+        }
       }
     } catch (error: any) {
       console.error("Failed to deploy:", error);
@@ -93,7 +111,7 @@ export default function ProbeSettings() {
       onBack={handleBack}
       onNext={handleDeploy}
       backText="Back"
-      nextText="Deploy"
+      nextText={needsDeployment ? "Next" : "Deploy"}
       disableNext={selectedLifecycle.length === 0 || workflowLoading}
     >
       <BudWraperBox>

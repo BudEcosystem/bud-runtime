@@ -55,13 +55,26 @@ export default function SelectProject() {
       };
 
       // Update workflow with step-specific data
-      await updateWorkflow(payload);
+      const success = await updateWorkflow(payload);
+
+      if (!success) return;
 
       // Save selected project to guardrails store
       setSelectedProjectInStore(selectedProjectData);
 
-      // Go to credentials selection
-      openDrawerWithStep("guardrail-select-credentials");
+      // Conditional branching based on workflow response
+      const { credentialRequired, modelsRequiringOnboarding, skipToStep } = useGuardrails.getState();
+
+      if (credentialRequired && modelsRequiringOnboarding > 0) {
+        // Models need credentials and onboarding
+        openDrawerWithStep("guardrail-select-credentials");
+      } else if (skipToStep && skipToStep >= 5) {
+        // Backend says skip ahead (all models already onboarded)
+        openDrawerWithStep("deployment-types");
+      } else {
+        // Default: proceed to deployment types
+        openDrawerWithStep("deployment-types");
+      }
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }

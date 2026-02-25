@@ -50,9 +50,6 @@ export default function GuardrailSimulationStatus() {
               title="Simulation Failed!"
               description="The simulation process failed. Please try again."
               confirmText="Go Back"
-              confirmAction={() => {
-                openDrawerWithStep("guardrail-deploy-specs");
-              }}
             />
           </BudDrawerLayout>
         )}

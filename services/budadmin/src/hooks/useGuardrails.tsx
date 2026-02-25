@@ -65,6 +65,15 @@ interface GuardrailsWorkflow {
   [key: string]: any;
 }
 
+interface DeployConfig {
+  avg_context_length: number;
+  avg_sequence_length: number;
+  concurrent_requests: number;
+  ttft: [number, number];
+  e2e_latency: [number, number];
+  per_session_tokens_per_sec: [number, number];
+}
+
 interface GuardrailsState {
   // Probes state
   probes: Probe[];
@@ -126,6 +135,27 @@ interface GuardrailsState {
   isStandaloneDeployment: boolean;
   setIsStandaloneDeployment: (value: boolean) => void;
 
+  // Step 3 response data (conditional branching)
+  modelStatuses: any[];
+  modelsRequiringOnboarding: number;
+  modelsRequiringDeployment: number;
+  modelsReusable: number;
+  credentialRequired: boolean;
+  skipToStep: number | null;
+
+  // Step 8 - Hardware mode
+  hardwareMode: "dedicated" | "shared" | null;
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => void;
+
+  // Step 9 - Deploy config
+  deployConfig: DeployConfig | null;
+  setDeployConfig: (config: DeployConfig | null) => void;
+
+  // Step 9/10 - Recommended clusters
+  recommendedClusters: any[];
+  selectedCluster: any | null;
+  setSelectedCluster: (cluster: any | null) => void;
+
   // Workflow state
   currentWorkflow: GuardrailsWorkflow | null;
   workflowLoading: boolean;
@@ -183,6 +213,24 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
   // Step data management
   selectedProvider: null,
+
+  // Step 3 response data (conditional branching)
+  modelStatuses: [],
+  modelsRequiringOnboarding: 0,
+  modelsRequiringDeployment: 0,
+  modelsReusable: 0,
+  credentialRequired: false,
+  skipToStep: null,
+
+  // Step 8 - Hardware mode
+  hardwareMode: null,
+
+  // Step 9 - Deploy config
+  deployConfig: null,
+
+  // Step 9/10 - Recommended clusters
+  recommendedClusters: [],
+  selectedCluster: null,
 
   // Workflow state
   currentWorkflow: null,
@@ -345,6 +393,21 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ isStandaloneDeployment: value });
   },
 
+  // Set hardware mode
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => {
+    set({ hardwareMode: mode });
+  },
+
+  // Set deploy config
+  setDeployConfig: (config: DeployConfig | null) => {
+    set({ deployConfig: config });
+  },
+
+  // Set selected cluster
+  setSelectedCluster: (cluster: any | null) => {
+    set({ selectedCluster: cluster });
+  },
+
   // Set selected provider (for step data management)
   setSelectedProvider: (provider: any) => {
     set({ selectedProvider: provider });
@@ -479,8 +542,17 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
         const { workflow_steps, ...rest } = response.data;
         // Flatten workflow_steps into root so fields like endpoint_ids, name, probe_selections
         // are accessible at currentWorkflow.endpoint_ids instead of currentWorkflow.workflow_steps.endpoint_ids
+        const merged = { ...rest, ...(workflow_steps || {}), workflow_steps };
         set({
-          currentWorkflow: { ...rest, ...(workflow_steps || {}), workflow_steps },
+          currentWorkflow: merged,
+          // Always sync branching data from latest workflow data
+          modelStatuses: merged.model_statuses || [],
+          modelsRequiringOnboarding: merged.models_requiring_onboarding ?? 0,
+          modelsRequiringDeployment: merged.models_requiring_deployment ?? 0,
+          modelsReusable: merged.models_reusable ?? 0,
+          credentialRequired: merged.credential_required ?? false,
+          skipToStep: merged.skip_to_step ?? null,
+          recommendedClusters: merged.recommended_clusters || [],
         });
       }
     } catch (error: any) {
@@ -596,6 +668,18 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       selectedProvider: null,
       isStandaloneDeployment: false,
       customProbePolicy: null,
+      // Reset branching state
+      modelStatuses: [],
+      modelsRequiringOnboarding: 0,
+      modelsRequiringDeployment: 0,
+      modelsReusable: 0,
+      credentialRequired: false,
+      skipToStep: null,
+      // Reset deployment state
+      hardwareMode: null,
+      deployConfig: null,
+      recommendedClusters: [],
+      selectedCluster: null,
     });
   },
 
@@ -648,4 +732,4 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 }));
 
 export default useGuardrails;
-export type { Probe, ProbeTag, ProbesResponse, ProbeRule, GuardrailsWorkflow };
+export type { Probe, ProbeTag, ProbesResponse, ProbeRule, GuardrailsWorkflow, DeployConfig };

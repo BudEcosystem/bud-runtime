@@ -153,6 +153,8 @@ import GuardrailOnboardingStatus from "./GuardRails/GuardrailOnboardingStatus";
 import GuardrailHardwareMode from "./GuardRails/GuardrailHardwareMode";
 import GuardrailDeploySpecs from "./GuardRails/GuardrailDeploySpecs";
 import GuardrailSelectCluster from "./GuardRails/GuardrailSelectCluster";
+import GuardrailSimulationStatus from "./GuardRails/GuardrailSimulationStatus";
+import GuardrailDeploymentStatus from "./GuardRails/GuardrailDeploymentStatus";
 import AddAgentSelectProject from "./AddAgent";
 import AddAgentConfiguration from "./AddAgent/AgentConfiguration";
 import AddAgentDeploymentWarning from "./AddAgent/DeploymentWarning";
@@ -338,6 +340,8 @@ export const StepComponents = {
   "guardrail-hardware-mode": GuardrailHardwareMode,
   "guardrail-deploy-specs": GuardrailDeploySpecs,
   "guardrail-select-cluster": GuardrailSelectCluster,
+  "guardrail-simulation-status": GuardrailSimulationStatus,
+  "guardrail-deployment-status": GuardrailDeploymentStatus,
   "probe-details": ProbeDetails,
   "view-guardrail-details": ViewGuardRailDetails,
   "use-guardrail": UseGuardrail,

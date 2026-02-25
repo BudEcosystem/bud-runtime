@@ -49,10 +49,6 @@ export default function GuardrailDeploymentStatus() {
               type="failed"
               title="Deployment Failed!"
               description="The guardrail model deployment failed. Please try again."
-              confirmText="Go Back"
-              confirmAction={() => {
-                openDrawerWithStep("guardrail-select-cluster");
-              }}
             />
           </BudDrawerLayout>
         )}

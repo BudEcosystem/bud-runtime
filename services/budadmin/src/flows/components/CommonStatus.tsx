@@ -1,5 +1,5 @@
 import { useSocket } from "@novu/notification-center";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateEta } from "../utils/calculateETA";
 import { WorkflowType } from "src/stores/useWorkflow";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
@@ -78,7 +78,7 @@ export default function CommonStatus({
     const [eventsWorkflowId, setEventsWorkflowId] = useState<string | null>(null);
     const { socket } = useSocket();
 
-    let timeout: any;
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const failedEvents = useMemo(() => steps?.filter((event) => event?.payload?.content?.status === 'FAILED'), [steps]);
 
     useEffect(() => {
@@ -156,30 +156,28 @@ export default function CommonStatus({
             setSteps(steps => {
                 const newSteps = steps.map((step) =>
                     data.message.payload.event === step.id && (step.payload.content?.status !== "COMPLETED" && step.payload.content?.status !== "FAILED") ?
-                        // data.message.payload.event && step.payload?.content?.title === data.message.payload.content.title ?
                         { ...step, payload: data.message.payload }
                         : step)
-                // console.log(`newSteps`, newSteps, data.message?.payload, printStatus(data.message.payload), newSteps?.map(step => printStatus(step.payload)))
                 return newSteps;
             });
             if (data.message.payload.event == "eta" && data.message.payload.content.message) {
-                // map the eta to the workflow
-                // console.log(`print eta`, data.message.payload.content.message)
                 calculateEta(data.message.payload.content.message, setEta);
             }
         }
         if (data.message.payload.event == "results" && data?.message?.payload?.content?.status === "COMPLETED") {
-            timeout = setTimeout(() => {
+            timeoutRef.current = setTimeout(() => {
                 onCompleted();
             }, 3000);
         }
         if (data?.message?.payload?.content?.status === "FAILED") {
-            // getWorkflow();
             onFailed();
         }
         console.log(`data.message`, data.message)
-    }, [steps, workflowId, eventsWorkflowId]);
-
+    }, [workflowId, eventsWorkflowId, success_payload_type, onCompleted, onFailed]);
+    useEffect(() => {
+        console.log(`steps`, steps)
+        console.log(`eta`, eta)
+    }, [steps, eta]);
     useEffect(() => {
         if (socket) {
             socket.on("notification_received", handleNotification);
@@ -189,11 +187,17 @@ export default function CommonStatus({
             if (socket) {
                 socket.off("notification_received");
             }
-            if (timeout) {
-                clearTimeout(timeout);
-            }
         };
     }, [socket, handleNotification]);
+
+    // Clean up timeout on unmount only
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
+    }, []);
 
     return <BudDrawerLayout>
         <div className="flex flex-col	justify-start items-center w-full">
