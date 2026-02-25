@@ -85,8 +85,12 @@ class EventResult:
         """Validate result state."""
         if self.action == EventAction.COMPLETE and self.status is None:
             raise ValueError("COMPLETE action requires status")
-        if self.action == EventAction.UPDATE_PROGRESS and self.progress is None:
-            raise ValueError("UPDATE_PROGRESS action requires progress")
+        if (
+            self.action == EventAction.UPDATE_PROGRESS
+            and self.progress is None
+            and self.eta_minutes is None
+        ):
+            raise ValueError("UPDATE_PROGRESS action requires progress or eta_minutes")
 
     @staticmethod
     def eta_from_content(content: dict[str, Any]) -> EventResult | None:
@@ -103,6 +107,5 @@ class EventResult:
             return None
         return EventResult(
             action=EventAction.UPDATE_PROGRESS,
-            progress=0.0,
             eta_minutes=eta_minutes,
         )
