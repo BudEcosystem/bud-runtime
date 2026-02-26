@@ -110,8 +110,8 @@ export default function SelectProvider() {
       // Create workflow with the selected provider and provider_type
       await createWorkflow(selectedProvider, providerType);
 
-      // Navigate to the Probes List screen for sentinel/cloud providers
-      openDrawerWithStep("bud-sentinel-probes");
+      // Navigate to the Probes List screen — cloud providers use dedicated flow
+      openDrawerWithStep(providerType === "cloud" ? "cloud-select-probes" : "bud-sentinel-probes");
     } catch (error) {
       console.error("Failed to create workflow:", error);
     } finally {

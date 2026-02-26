@@ -312,6 +312,15 @@ export const StepComponents = {
   "blocking-rule-success": BlockingRuleSuccess,
   "view-blocking-rule": ViewBlockingRuleDetails,
 
+  // GuardRails — Cloud provider flow (cloud-prefixed IDs)
+  "cloud-select-probes": BudSentinelProbes,
+  "cloud-select-project": SelectProject,
+  "cloud-select-credentials": GuardrailSelectCredentials,
+  "cloud-deployment-types": DeploymentTypes,
+  "cloud-select-deployment": SelectDeployment,
+  "cloud-probe-settings": ProbeSettings,
+  "cloud-deployment-success": ProbeDeploymentSuccess,
+
   // GuardRails
   "select-provider": SelectProvider,
   "politeness-detection": PolitenessDetection,

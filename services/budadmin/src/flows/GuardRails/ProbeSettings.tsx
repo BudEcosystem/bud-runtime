@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/text";
 
 export default function ProbeSettings() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [selectedLifecycle, setSelectedLifecycle] = useState<string[]>(["input", "output"]);
   const [strictnessLevel, setStrictnessLevel] = useState(0.5);
   const [profileName, setProfileName] = useState("Guardrail Profile");
@@ -42,10 +43,10 @@ export default function ProbeSettings() {
   const handleBack = () => {
     if (isStandaloneDeployment) {
       // Standalone: endpoint selection was skipped, go back to deployment types
-      openDrawerWithStep("deployment-types");
+      openDrawerWithStep(isCloudFlow ? "cloud-deployment-types" : "deployment-types");
     } else {
       // Normal flow - go back to endpoint selection
-      openDrawerWithStep("select-deployment");
+      openDrawerWithStep(isCloudFlow ? "cloud-select-deployment" : "select-deployment");
     }
   };
 
@@ -71,8 +72,9 @@ export default function ProbeSettings() {
         severity_threshold: strictnessLevel,
       };
 
-      // Only trigger final workflow if no models need deployment
-      if (!needsDeployment) {
+      // Only trigger final workflow for cloud flow (no further steps after this)
+      // Bud Sentinel flow should NOT trigger here — it continues to later steps
+      if (isCloudFlow && !needsDeployment) {
         payload.trigger_workflow = true;
       }
 
@@ -82,18 +84,12 @@ export default function ProbeSettings() {
         if (needsDeployment) {
           // Models need deployment: continue to hardware mode selection
           openDrawerWithStep("guardrail-hardware-mode");
+        } else if (isCloudFlow) {
+          // Cloud flow: no async deployment, go straight to success
+          openDrawerWithStep("cloud-deployment-success");
         } else {
-          // No deployment needed: workflow was triggered above
-          // Cloud providers with pre-onboarded models complete synchronously —
-          // skip the async deployment status screen and go straight to success
-          const { selectedProvider: sp } = useGuardrails.getState();
-          const isCloudProvider = sp?.type && sp.type !== "bud_sentinel" && sp.type !== "custom";
-
-          if (isCloudProvider) {
-            openDrawerWithStep("probe-deployment-success");
-          } else {
-            openDrawerWithStep("guardrail-deployment-status");
-          }
+          // Bud Sentinel flow: go to async deployment status screen
+          openDrawerWithStep("guardrail-deployment-status");
         }
       }
     } catch (error: any) {

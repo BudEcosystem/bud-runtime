@@ -13,7 +13,8 @@ import { Text_12_400_757575, Text_14_400_EEEEEE } from "@/components/ui/text";
 import Tags from "../components/DrawerTags";
 
 export default function SelectProject() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedProjectData, setSelectedProjectData] = useState<any>(null);
@@ -38,7 +39,7 @@ export default function SelectProject() {
   }, [searchTerm]);
 
   const handleBack = () => {
-    openDrawerWithStep("bud-sentinel-probes");
+    openDrawerWithStep(isCloudFlow ? "cloud-select-probes" : "bud-sentinel-probes");
   };
 
   const handleNext = async () => {
@@ -62,25 +63,23 @@ export default function SelectProject() {
       // Save selected project to guardrails store
       setSelectedProjectInStore(selectedProjectData);
 
-      // Conditional branching based on workflow response
-      const { credentialRequired, modelsRequiringOnboarding, skipToStep, selectedProvider: storeProvider } = useGuardrails.getState();
-
-      // Cloud providers always require credential_id for deployment validation,
-      // even when models are already onboarded (backend enforces this)
-      const isCloudProvider = storeProvider?.type && storeProvider.type !== "bud_sentinel" && storeProvider.type !== "custom";
-
-      if (credentialRequired && modelsRequiringOnboarding > 0) {
-        // Models need credentials and onboarding
-        openDrawerWithStep("guardrail-select-credentials");
-      } else if (isCloudProvider) {
-        // Cloud providers need credentials for deployment even if models are already onboarded
-        openDrawerWithStep("guardrail-select-credentials");
-      } else if (skipToStep && skipToStep >= 5) {
-        // Backend says skip ahead (all models already onboarded)
-        openDrawerWithStep("deployment-types");
+      if (isCloudFlow) {
+        // Cloud flow always goes to credentials next
+        openDrawerWithStep("cloud-select-credentials");
       } else {
-        // Default: proceed to deployment types
-        openDrawerWithStep("deployment-types");
+        // Bud Sentinel flow: conditional branching based on workflow response
+        const { credentialRequired, modelsRequiringOnboarding, skipToStep } = useGuardrails.getState();
+
+        if (credentialRequired && modelsRequiringOnboarding > 0) {
+          // Models need credentials and onboarding
+          openDrawerWithStep("guardrail-select-credentials");
+        } else if (skipToStep && skipToStep >= 5) {
+          // Backend says skip ahead (all models already onboarded)
+          openDrawerWithStep("deployment-types");
+        } else {
+          // Default: proceed to deployment types
+          openDrawerWithStep("deployment-types");
+        }
       }
     } catch (error) {
       console.error("Failed to update workflow:", error);

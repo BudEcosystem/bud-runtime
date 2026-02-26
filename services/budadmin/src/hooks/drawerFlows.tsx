@@ -5105,6 +5105,120 @@ const addGuardrailDeployment: DrawerFlowType = {
   ],
 };
 
+// Cloud provider guardrail flow — dedicated flow for cloud providers (Azure AI Foundry, AWS Bedrock, etc.)
+const addGuardrailCloud: DrawerFlowType = {
+  title: "Deploy Cloud Guardrail",
+  description: "Deploy guardrail probes via cloud provider",
+  totalSteps: 7,
+  steps: [
+    // Step 1: Select Probes
+    {
+      navigation: () => ["Guardrails", "Probes List"],
+      id: "cloud-select-probes",
+      step: 1,
+      component: StepComponents["cloud-select-probes"],
+      progress: [
+        { status: FormProgressStatus.inProgress, title: "Select Probes" },
+        { status: FormProgressStatus.notCompleted, title: "Select Project" },
+        { status: FormProgressStatus.notCompleted, title: "Select Credentials" },
+        { status: FormProgressStatus.notCompleted, title: "Select Deployment Type" },
+        { status: FormProgressStatus.notCompleted, title: "Probe Settings" },
+      ],
+      confirmClose: true,
+    },
+    // Step 2: Select Project
+    {
+      navigation: () => ["Guardrails", "Select Project"],
+      id: "cloud-select-project",
+      step: 2,
+      component: StepComponents["cloud-select-project"],
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Probes" },
+        { status: FormProgressStatus.inProgress, title: "Select Project" },
+        { status: FormProgressStatus.notCompleted, title: "Select Credentials" },
+        { status: FormProgressStatus.notCompleted, title: "Select Deployment Type" },
+        { status: FormProgressStatus.notCompleted, title: "Probe Settings" },
+      ],
+      confirmClose: true,
+    },
+    // Step 3: Select Credentials
+    {
+      navigation: () => ["Guardrails", "Select Credentials"],
+      id: "cloud-select-credentials",
+      step: 3,
+      component: StepComponents["cloud-select-credentials"],
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Probes" },
+        { status: FormProgressStatus.completed, title: "Select Project" },
+        { status: FormProgressStatus.inProgress, title: "Select Credentials" },
+        { status: FormProgressStatus.notCompleted, title: "Select Deployment Type" },
+        { status: FormProgressStatus.notCompleted, title: "Probe Settings" },
+      ],
+      confirmClose: true,
+    },
+    // Step 4: Deployment Types
+    {
+      navigation: () => ["Guardrails", "Deployment Types"],
+      id: "cloud-deployment-types",
+      step: 4,
+      component: StepComponents["cloud-deployment-types"],
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Probes" },
+        { status: FormProgressStatus.completed, title: "Select Project" },
+        { status: FormProgressStatus.completed, title: "Select Credentials" },
+        { status: FormProgressStatus.inProgress, title: "Select Deployment Type" },
+        { status: FormProgressStatus.notCompleted, title: "Probe Settings" },
+      ],
+      confirmClose: true,
+    },
+    // Step 5: Select Deployment (conditional — existing-deployment path)
+    {
+      navigation: () => ["Guardrails", "Select Deployment"],
+      id: "cloud-select-deployment",
+      step: 5,
+      component: StepComponents["cloud-select-deployment"],
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Probes" },
+        { status: FormProgressStatus.completed, title: "Select Project" },
+        { status: FormProgressStatus.completed, title: "Select Credentials" },
+        { status: FormProgressStatus.inProgress, title: "Select Deployment Type" },
+        { status: FormProgressStatus.notCompleted, title: "Probe Settings" },
+      ],
+      confirmClose: true,
+    },
+    // Step 6: Probe Settings
+    {
+      navigation: () => ["Guardrails", "Probe Settings"],
+      id: "cloud-probe-settings",
+      step: 6,
+      component: StepComponents["cloud-probe-settings"],
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Probes" },
+        { status: FormProgressStatus.completed, title: "Select Project" },
+        { status: FormProgressStatus.completed, title: "Select Credentials" },
+        { status: FormProgressStatus.completed, title: "Select Deployment Type" },
+        { status: FormProgressStatus.inProgress, title: "Probe Settings" },
+      ],
+      confirmClose: true,
+    },
+    // Step 7: Deployment Success
+    {
+      navigation: () => ["Guardrails", "Success"],
+      id: "cloud-deployment-success",
+      step: 7,
+      component: StepComponents["cloud-deployment-success"],
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Probes" },
+        { status: FormProgressStatus.completed, title: "Select Project" },
+        { status: FormProgressStatus.completed, title: "Select Credentials" },
+        { status: FormProgressStatus.completed, title: "Select Deployment Type" },
+        { status: FormProgressStatus.completed, title: "Probe Settings" },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
 // Custom probe creation flow
 const addCustomProbe: DrawerFlowType = {
   title: "Create Custom Probe",
@@ -5572,6 +5686,7 @@ const flows = {
   // guardrails
   "add-guardrail": addGuardrail,
   "add-guardrail-deployment": addGuardrailDeployment,
+  "add-guardrail-cloud": addGuardrailCloud,
   "add-custom-probe": addCustomProbe,
   "probe-details": viewProbeDetails,
   "view-guardrail-details": viewGuardrailDetails,
