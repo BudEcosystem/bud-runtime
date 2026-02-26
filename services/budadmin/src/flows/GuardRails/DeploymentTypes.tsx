@@ -12,7 +12,8 @@ import { Text_14_400_EEEEEE } from "@/components/ui/text";
 type DeploymentType = "guardrail-endpoint" | "existing-deployment" | "";
 
 export default function DeploymentTypes() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [selectedType, setSelectedType] = useState<DeploymentType>("");
 
   // Use the guardrails hook
@@ -23,7 +24,7 @@ export default function DeploymentTypes() {
   } = useGuardrails();
 
   const handleBack = () => {
-    openDrawerWithStep("select-project");
+    openDrawerWithStep(isCloudFlow ? "cloud-select-credentials" : "select-project");
   };
 
   const handleNext = async () => {
@@ -58,9 +59,9 @@ export default function DeploymentTypes() {
       // Standalone: skip endpoint selection, go to probe settings
       // Not standalone: go to endpoint selection
       if (mappedValues.is_standalone) {
-        openDrawerWithStep("probe-settings");
+        openDrawerWithStep(isCloudFlow ? "cloud-probe-settings" : "probe-settings");
       } else {
-        openDrawerWithStep("select-deployment");
+        openDrawerWithStep(isCloudFlow ? "cloud-select-deployment" : "select-deployment");
       }
     } catch (error) {
       console.error("Failed to update workflow:", error);

@@ -21,7 +21,8 @@ import IconRender from "src/flows/components/BudIconRender";
 const PROBES_PAGE_LIMIT = 10;
 
 export default function BudSentinelProbes() {
-  const { openDrawerWithStep, openDrawerWithExpandedStep } = useDrawer();
+  const { openDrawerWithStep, openDrawerWithExpandedStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProbes, setSelectedProbes] = useState<string[]>([]);
   const [activeFilter, setActiveFilter] = useState<"all" | "pii" | "bias">(
@@ -158,11 +159,11 @@ export default function BudSentinelProbes() {
 
         // Navigate to specific configuration page based on selection
         if (hasPIIProbe) {
-          // PII Detection selected - go to PII configuration page
-          openDrawerWithStep("pii-detection-config");
+          // PII Detection selected - cloud flow skips PII config
+          openDrawerWithStep(isCloudFlow ? "cloud-select-project" : "pii-detection-config");
         } else {
           // For other selections, skip PII config and go to project selection
-          openDrawerWithStep("select-project");
+          openDrawerWithStep(isCloudFlow ? "cloud-select-project" : "select-project");
         }
       } catch (error) {
         console.error("Failed to update workflow:", error);
