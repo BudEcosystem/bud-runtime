@@ -40,9 +40,15 @@ TAG_PREFIX_CONNECTOR_ID = "connector-id"
 TAG_PREFIX_CLIENT = "client"
 TAG_PREFIX_SOURCE = "source"
 TAG_SOURCE_BUDAPP = "source:budapp"
-TAG_CLIENT_DASHBOARD = "client:dashboard"
-TAG_CLIENT_CHAT = "client:chat"
-DEFAULT_CLIENT_TAGS = [TAG_CLIENT_DASHBOARD, TAG_CLIENT_CHAT]
+TAG_CLIENT_STUDIO = "client:studio"
+TAG_CLIENT_PROMPT = "client:prompt"
+DEFAULT_CLIENT_TAGS = [TAG_CLIENT_STUDIO, TAG_CLIENT_PROMPT]
+
+# Legacy tag mapping: new client name → old tag value (for migration period)
+_LEGACY_CLIENT_TAGS = {
+    "studio": "client:dashboard",
+    "prompt": "client:chat",
+}
 
 # ─── OAuth constants ────────────────────────────────────────────────────────
 OAUTH_REFRESH_THRESHOLD_SECONDS = 300
@@ -382,16 +388,18 @@ class ConnectorService:
         """List tools scoped to a specific gateway via get_gateway_by_id."""
         gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
 
-        # Validate gateway is enabled and accessible to dashboard clients
+        # Validate gateway is enabled and accessible to studio clients
         if not gateway.get("enabled", True):
             raise ClientException(
                 message="Gateway is disabled",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         tags = gateway.get("tags", [])
-        if tags and TAG_CLIENT_DASHBOARD not in tags:
+        # Accept both new (client:studio) and legacy (client:dashboard) tags during migration
+        legacy_studio_tag = _LEGACY_CLIENT_TAGS.get("studio")
+        if tags and TAG_CLIENT_STUDIO not in tags and (not legacy_studio_tag or legacy_studio_tag not in tags):
             raise ClientException(
-                message="Gateway is not accessible to the dashboard client",
+                message="Gateway is not accessible to the studio client",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -422,8 +430,11 @@ class ConnectorService:
                 continue
             if not include_disabled and not gw.get("enabled", True):
                 continue
-            if client and f"{TAG_PREFIX_CLIENT}:{client}" not in tags:
-                continue
+            if client:
+                new_tag = f"{TAG_PREFIX_CLIENT}:{client}"
+                legacy_tag = _LEGACY_CLIENT_TAGS.get(client)
+                if new_tag not in tags and (not legacy_tag or legacy_tag not in tags):
+                    continue
             configured.append((gw, connector_id))
 
         # 3. Single registry call → build lookup map (replaces N sequential get_connector_by_id calls)
@@ -503,7 +514,7 @@ class ConnectorService:
         return await mcp_foundry_service.update_gateway(gateway_id, {"enabled": enabled})
 
     async def update_connector_clients(self, gateway_id: str, clients: List[str]) -> Dict[str, Any]:
-        """Update which clients (dashboard, chat) can access a gateway."""
+        """Update which clients (studio, prompt) can access a gateway."""
         gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
         current_tags = gateway.get("tags", [])
         # Remove existing client:* tags, add new ones

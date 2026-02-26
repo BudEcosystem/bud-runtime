@@ -50,7 +50,7 @@ class ClientsRequest(BaseModel):
 
     clients: List[str] = Field(
         default_factory=list,
-        description="List of client identifiers (e.g. 'dashboard', 'chat')",
+        description="List of client identifiers (e.g. 'studio', 'prompt')",
     )
 
 
