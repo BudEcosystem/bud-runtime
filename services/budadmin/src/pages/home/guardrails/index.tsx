@@ -413,6 +413,7 @@ export default function GuardRails() {
           page: params?.page || 1,
           limit: params?.limit || pageSize,
           search: params?.isSearching === true ? true : false,
+          order_by: '-created_at',
         };
 
         // Add optional filters
