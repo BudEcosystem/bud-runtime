@@ -306,6 +306,8 @@ impl ClientBuilder {
                                     tensorzero_internal::guardrail_table::GuardrailTable::new(),
                                 )),
                                 inference_batcher: None, // Embedded client uses direct writes
+                                use_case_proxy:
+                                    tensorzero_internal::gateway_util::UseCaseProxyState::default(),
                             },
                         },
                         timeout: *timeout,

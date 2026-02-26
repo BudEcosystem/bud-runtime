@@ -169,6 +169,10 @@
 {{- end }}
 
 
+{{- define "bud.usecases.domain" -}}
+{{- .Values.usecases.domain | default (printf "usecases.%s" .Values.global.ingress.hosts.root) }}
+{{- end }}
+
 {{- define "bud.externalServices.minio.endpoint" -}}
 {{- if .Values.externalServices.minio.endpoint }}
 {{- print .Values.externalServices.minio.endpoint  }}

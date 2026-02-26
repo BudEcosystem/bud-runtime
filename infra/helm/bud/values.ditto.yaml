@@ -10,12 +10,13 @@ imagePullPolicy: Always
 
 microservices:
     budmodel:
+        enabled: false
         storageSize: "1Ti"
     buddoc:
         enabled: false
         image: dittops/buddoc:nightly
     budadmin:
-        image: budstudio/budadmin:nightly
+        image: dittops/budadmin:nightly
     budapp:
         image: lostnull/budfoundry-app:development
     budgateway:
@@ -36,7 +37,10 @@ microservices:
     budpipeline:
         image: dittops/budpipeline:nightly
     budmetrics:
+        enabled: false
         image: dittops/budmetrics:nightly
+    budusecases:
+        image: dittops/budusecases:nightly
     budprompt:
         enabled: false
     budplayground:

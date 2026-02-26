@@ -196,6 +196,11 @@ export default {
         source: '/connectors',
         destination: '/home/connectors',
       },
+      // Use Cases
+      {
+        source: '/usecases',
+        destination: '/home/usecases',
+      },
     ];
   },
   env: {

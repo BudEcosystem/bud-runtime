@@ -113,15 +113,12 @@ impl BudSentinelProvider {
         dynamic_api_keys: &InferenceCredentials,
     ) -> Result<(), Error> {
         if let Some(bearer_token) = dynamic_api_keys.get("authorization") {
-            let value = MetadataValue::try_from(format!(
-                "Bearer {}",
-                bearer_token.expose_secret()
-            ))
-            .map_err(|e| {
-                Error::new(ErrorDetails::Config {
-                    message: format!("Invalid Bud Sentinel bearer token metadata value: {e}"),
-                })
-            })?;
+            let value = MetadataValue::try_from(format!("Bearer {}", bearer_token.expose_secret()))
+                .map_err(|e| {
+                    Error::new(ErrorDetails::Config {
+                        message: format!("Invalid Bud Sentinel bearer token metadata value: {e}"),
+                    })
+                })?;
             request.metadata_mut().insert("authorization", value);
         }
 

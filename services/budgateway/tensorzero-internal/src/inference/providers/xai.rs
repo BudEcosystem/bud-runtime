@@ -592,13 +592,10 @@ impl ImageGenerationProvider for XAIProvider {
             .bearer_auth(api_key.expose_secret())
             .body(request_json.clone());
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(
-                e,
-                PROVIDER_TYPE,
-                Some(request_json.clone()),
-            )
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone())))?;
 
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),

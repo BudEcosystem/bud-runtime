@@ -31,5 +31,6 @@ pub fn get_unit_test_app_state_data(
         blocking_manager: None,
         guardrails: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         inference_batcher: None, // Not used in tests
+        use_case_proxy: crate::gateway_util::UseCaseProxyState::default(),
     }
 }

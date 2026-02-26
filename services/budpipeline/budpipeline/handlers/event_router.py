@@ -100,6 +100,7 @@ async def _publish_step_event(
     subscriber_ids: str | None = None,
     payload_type: str | None = None,
     notification_workflow_id: str | None = None,
+    outputs: dict | None = None,
 ) -> None:
     """Non-blocking step event publish. Mirrors persistence_service._publish_step_event."""
     try:
@@ -122,6 +123,7 @@ async def _publish_step_event(
                 subscriber_ids=subscriber_ids,
                 payload_type=payload_type,
                 notification_workflow_id=notification_workflow_id,
+                outputs=outputs,
             )
         elif status in (StepStatus.FAILED, StepStatus.TIMEOUT):
             await event_publisher.publish_step_failed(
@@ -324,6 +326,7 @@ async def route_event(
             subscriber_ids=execution.subscriber_ids if execution else None,
             payload_type=execution.payload_type if execution else None,
             notification_workflow_id=execution.notification_workflow_id if execution else None,
+            outputs=final_outputs,
         )
 
         return EventRouteResult(

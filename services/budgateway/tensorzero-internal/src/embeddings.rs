@@ -704,10 +704,7 @@ pub mod multimodal {
     ];
 
     /// Fetch content from a URL and return as base64-encoded data URI
-    pub async fn fetch_url_as_data_uri(
-        client: &Client,
-        url: &str,
-    ) -> Result<String, Error> {
+    pub async fn fetch_url_as_data_uri(client: &Client, url: &str) -> Result<String, Error> {
         let response = client.get(url).send().await.map_err(|e| {
             Error::new(ErrorDetails::InvalidRequest {
                 message: format!("Failed to fetch URL {}: {}", url, e),
@@ -716,11 +713,7 @@ pub mod multimodal {
 
         if !response.status().is_success() {
             return Err(Error::new(ErrorDetails::InvalidRequest {
-                message: format!(
-                    "Failed to fetch URL {}: HTTP {}",
-                    url,
-                    response.status()
-                ),
+                message: format!("Failed to fetch URL {}: HTTP {}", url, response.status()),
             }));
         }
 
@@ -772,10 +765,7 @@ pub mod multimodal {
     }
 
     /// Validate that the media type is appropriate for the modality
-    pub fn validate_media_type_for_modality(
-        media_type: &str,
-        modality: &str,
-    ) -> Result<(), Error> {
+    pub fn validate_media_type_for_modality(media_type: &str, modality: &str) -> Result<(), Error> {
         match modality {
             "image" => {
                 if !IMAGE_MEDIA_TYPES.contains(&media_type) {

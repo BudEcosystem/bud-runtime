@@ -288,7 +288,7 @@ class PipelineExecution(Base):
         comment="Error details if failed (error_type, message, stack_trace)",
     )
 
-    # Notification fields
+    # Notification metadata (for callback event publishing)
     subscriber_ids: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,

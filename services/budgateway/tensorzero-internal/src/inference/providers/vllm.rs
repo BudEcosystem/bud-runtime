@@ -835,9 +835,7 @@ impl ClassificationProvider for VLLMProvider {
             .json(&request_body)
             .send()
             .await
-            .map_err(|e| {
-                handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone()))
-            })?;
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
         };

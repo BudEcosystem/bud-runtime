@@ -302,3 +302,18 @@ class ClusterHealthResponse(SuccessResponse):
     """Cluster health check response schema."""
 
     data: Dict[str, HealthCheckStatus]
+
+
+class CreateHTTPRouteRequest(BaseModel):
+    """Request to create HTTPRoute and ReferenceGrant for a use case deployment."""
+
+    deployment_id: str
+    namespace: str
+    service_name: str
+    access_config: dict
+
+
+class DeleteNamespaceRequest(BaseModel):
+    """Request to delete a Kubernetes namespace."""
+
+    namespace: str

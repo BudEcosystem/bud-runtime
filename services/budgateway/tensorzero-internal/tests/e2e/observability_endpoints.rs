@@ -8,7 +8,9 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::{common::get_gateway_endpoint, providers::common::make_embedded_gateway};
-use tensorzero_internal::clickhouse::test_helpers::{clickhouse_flush_async_insert, get_clickhouse};
+use tensorzero_internal::clickhouse::test_helpers::{
+    clickhouse_flush_async_insert, get_clickhouse,
+};
 
 // Helper function to select data from new observability tables
 async fn select_embedding_inference_clickhouse(

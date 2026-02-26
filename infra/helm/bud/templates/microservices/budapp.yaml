@@ -115,6 +115,8 @@ spec:
             value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_PASSWORD }}
           - name: OAUTH_RETURN_URL_ALLOWED_DOMAINS
             value: "{{ include "bud.ingress.hosts.budadmin" . }},{{ include "bud.ingress.hosts.onyx" . }},localhost,127.0.0.1"
+          - name: USECASE_DOMAIN
+            value: {{ include "bud.usecases.domain" $ | quote }}
 {{- if (default .Values.microservices.budsentinel.enabled false) }}
           - name: BUD_SENTINEL_BASE_URL
             value: {{ .Release.Name }}-budsentinel:50051
