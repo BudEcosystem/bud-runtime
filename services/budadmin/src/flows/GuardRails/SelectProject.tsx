@@ -63,10 +63,17 @@ export default function SelectProject() {
       setSelectedProjectInStore(selectedProjectData);
 
       // Conditional branching based on workflow response
-      const { credentialRequired, modelsRequiringOnboarding, skipToStep } = useGuardrails.getState();
+      const { credentialRequired, modelsRequiringOnboarding, skipToStep, selectedProvider: storeProvider } = useGuardrails.getState();
+
+      // Cloud providers always require credential_id for deployment validation,
+      // even when models are already onboarded (backend enforces this)
+      const isCloudProvider = storeProvider?.type && storeProvider.type !== "bud_sentinel" && storeProvider.type !== "custom";
 
       if (credentialRequired && modelsRequiringOnboarding > 0) {
         // Models need credentials and onboarding
+        openDrawerWithStep("guardrail-select-credentials");
+      } else if (isCloudProvider) {
+        // Cloud providers need credentials for deployment even if models are already onboarded
         openDrawerWithStep("guardrail-select-credentials");
       } else if (skipToStep && skipToStep >= 5) {
         // Backend says skip ahead (all models already onboarded)

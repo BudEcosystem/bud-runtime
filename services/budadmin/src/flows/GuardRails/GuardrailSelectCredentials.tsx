@@ -38,7 +38,14 @@ export default function GuardrailSelectCredentials() {
 
       const success = await updateWorkflow(payload);
       if (success) {
-        openDrawerWithStep("guardrail-onboarding-status");
+        // Check if models actually need onboarding; if not, skip onboarding status
+        // (cloud providers may only need credential_id for deployment validation)
+        const { modelsRequiringOnboarding } = useGuardrails.getState();
+        if (modelsRequiringOnboarding > 0) {
+          openDrawerWithStep("guardrail-onboarding-status");
+        } else {
+          openDrawerWithStep("deployment-types");
+        }
       }
     } catch (error) {
       console.error("Failed to update workflow:", error);

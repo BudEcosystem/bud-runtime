@@ -83,8 +83,17 @@ export default function ProbeSettings() {
           // Models need deployment: continue to hardware mode selection
           openDrawerWithStep("guardrail-hardware-mode");
         } else {
-          // No deployment needed: go to deployment status (workflow triggered above)
-          openDrawerWithStep("guardrail-deployment-status");
+          // No deployment needed: workflow was triggered above
+          // Cloud providers with pre-onboarded models complete synchronously —
+          // skip the async deployment status screen and go straight to success
+          const { selectedProvider: sp } = useGuardrails.getState();
+          const isCloudProvider = sp?.type && sp.type !== "bud_sentinel" && sp.type !== "custom";
+
+          if (isCloudProvider) {
+            openDrawerWithStep("probe-deployment-success");
+          } else {
+            openDrawerWithStep("guardrail-deployment-status");
+          }
         }
       }
     } catch (error: any) {
