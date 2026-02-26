@@ -430,7 +430,9 @@ impl UsageLimiter {
             let result: Result<Vec<redis::Value>, _> = match timeout_result {
                 Ok(r) => r,
                 Err(_) => {
-                    warn!("Redis timeout on atomic increment, clearing connection for reconnection");
+                    warn!(
+                        "Redis timeout on atomic increment, clearing connection for reconnection"
+                    );
                     drop(redis_client);
                     self.clear_connection_for_reconnect().await;
                     return Err(Error::new(ErrorDetails::Config {

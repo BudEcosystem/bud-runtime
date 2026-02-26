@@ -15,6 +15,7 @@ pub mod observability;
 pub mod openai_compatible;
 pub mod otlp_proxy;
 pub mod status;
+pub mod usecase_proxy;
 
 pub fn validate_tags(tags: &HashMap<String, String>, internal: bool) -> Result<(), Error> {
     if internal {

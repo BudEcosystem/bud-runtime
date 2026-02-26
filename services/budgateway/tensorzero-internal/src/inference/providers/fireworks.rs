@@ -443,13 +443,7 @@ impl EmbeddingProvider for FireworksProvider {
             .body(raw_request.clone())
             .send()
             .await
-            .map_err(|e| {
-                handle_reqwest_error(
-                    e,
-                    PROVIDER_TYPE,
-                    Some(raw_request.clone()),
-                )
-            })?;
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
 
         let status = res.status();
         if status.is_success() {

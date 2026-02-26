@@ -14,7 +14,7 @@ use crate::config_parser::ProviderTypesConfig;
 use crate::encryption::{decrypt_api_key, is_decryption_enabled, load_private_key};
 use crate::endpoints::inference::InferenceCredentials;
 use crate::error::{Error, ErrorDetails};
-use crate::gateway_util::AppStateData;
+use crate::gateway_util::{AppStateData, DeploymentRoute};
 use crate::guardrail::{build_bud_sentinel_profile, custom_rules_to_value};
 use crate::guardrail_table::GuardrailConfig;
 use crate::inference::providers::bud_sentinel::BudSentinelProvider;
@@ -25,6 +25,7 @@ const API_KEY_KEY_PREFIX: &str = "api_key:";
 const PUBLISHED_MODEL_INFO_KEY: &str = "published_model_info";
 const GUARDRAIL_KEY_PREFIX: &str = "guardrail_table:";
 const BLOCKING_RULES_KEY_PREFIX: &str = "blocking_rules:";
+const DEPLOYMENT_ROUTE_PREFIX: &str = "deployment_route:";
 const DEFAULT_CONFIG_GET_RETRIES: u32 = 3;
 
 pub struct RedisClient {
@@ -513,8 +514,7 @@ impl RedisClient {
                 "rule_overrides_json".to_string(),
                 serde_json::Value::String(profile.rule_overrides_json.clone()),
             );
-            let custom_rules_value =
-                custom_rules_to_value(&profile.custom_rules, guardrail_id)?;
+            let custom_rules_value = custom_rules_to_value(&profile.custom_rules, guardrail_id)?;
             config_obj.insert("custom_rules".to_string(), custom_rules_value);
             config_obj.insert(
                 "profile_sync_pending".to_string(),
@@ -732,6 +732,35 @@ impl RedisClient {
                     );
                 }
             }
+            k if k.starts_with(DEPLOYMENT_ROUTE_PREFIX) => {
+                let value = Self::get_with_retry::<String>(conn, key, DEFAULT_CONFIG_GET_RETRIES)
+                    .await
+                    .map_err(|e| {
+                        Error::new(ErrorDetails::Config {
+                            message: format!(
+                                "Failed to get value for key {key} from Redis after retries: {e}"
+                            ),
+                        })
+                    })?;
+
+                let deployment_id = key
+                    .strip_prefix(DEPLOYMENT_ROUTE_PREFIX)
+                    .unwrap_or(key)
+                    .to_string();
+
+                match serde_json::from_str::<DeploymentRoute>(&value) {
+                    Ok(route) => {
+                        let mut routes = app_state.use_case_proxy.deployment_routes.write().await;
+                        routes.insert(deployment_id.clone(), route);
+                        tracing::debug!("Updated deployment route: {deployment_id}");
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to parse deployment route from redis (key: {key}): {e}"
+                        );
+                    }
+                }
+            }
             k if k.starts_with("usage_limit:") => {
                 // Usage limit keys are handled by other components, ignore silently
             }
@@ -824,6 +853,16 @@ impl RedisClient {
                         key
                     );
                 }
+            }
+            k if k.starts_with(DEPLOYMENT_ROUTE_PREFIX) => {
+                let deployment_id = key
+                    .strip_prefix(DEPLOYMENT_ROUTE_PREFIX)
+                    .unwrap_or(key)
+                    .to_string();
+
+                let mut routes = app_state.use_case_proxy.deployment_routes.write().await;
+                routes.remove(&deployment_id);
+                tracing::info!("Deleted deployment route: {deployment_id}");
             }
             k if k.starts_with("usage_limit:") => {
                 // Usage limit keys are handled by other components, ignore silently

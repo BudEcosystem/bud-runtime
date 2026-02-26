@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::time::Duration;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::debug_handler;
@@ -4008,11 +4008,7 @@ pub async fn embedding_handler(
     // Validate input for the specified modality
     raw_input
         .validate_for_modality(openai_compatible_params.modality.as_deref())
-        .map_err(|e| {
-            Error::new(ErrorDetails::InvalidOpenAICompatibleRequest {
-                message: e,
-            })
-        })?;
+        .map_err(|e| Error::new(ErrorDetails::InvalidOpenAICompatibleRequest { message: e }))?;
 
     // Process multimodal inputs (fetch URLs for image/audio modality)
     let internal_input = crate::embeddings::multimodal::process_inputs_for_modality(
@@ -4103,7 +4099,10 @@ pub async fn embedding_handler(
     {
         let span = tracing::Span::current();
         span.record("model_inference.raw_request", response.raw_request.as_str());
-        span.record("model_inference.raw_response", response.raw_response.as_str());
+        span.record(
+            "model_inference.raw_response",
+            response.raw_response.as_str(),
+        );
         // Record gateway_request (the user-facing request)
         if let Some(ref gw_req) = gateway_request_json {
             span.record("model_inference.gateway_request", gw_req.as_str());
@@ -4530,7 +4529,10 @@ pub async fn classify_handler(
     {
         let span = tracing::Span::current();
         span.record("model_inference.raw_request", response.raw_request.as_str());
-        span.record("model_inference.raw_response", response.raw_response.as_str());
+        span.record(
+            "model_inference.raw_response",
+            response.raw_response.as_str(),
+        );
         // Record gateway_request (the user-facing request)
         if let Some(ref gw_req) = gateway_request_json {
             span.record("model_inference.gateway_request", gw_req.as_str());
@@ -4584,7 +4586,10 @@ pub async fn classify_handler(
     // Capture and record the gateway response (without null values)
     if let Some(gateway_response_json) = serialize_without_nulls(&openai_response).ok() {
         let span = tracing::Span::current();
-        span.record("model_inference.gateway_response", gateway_response_json.as_str());
+        span.record(
+            "model_inference.gateway_response",
+            gateway_response_json.as_str(),
+        );
     }
 
     Ok(Json(openai_response).into_response())
@@ -7629,7 +7634,10 @@ pub async fn response_create_handler(
     let inference_id = uuid::Uuid::now_v7();
     let span = tracing::Span::current();
     span.record("gen_ai.inference_id", inference_id.to_string().as_str());
-    span.record("gen_ai.request_arrival_time", request_arrival_time.to_rfc3339().as_str());
+    span.record(
+        "gen_ai.request_arrival_time",
+        request_arrival_time.to_rfc3339().as_str(),
+    );
 
     // Capture prompt info for analytics headers (before params is moved into async block)
     let prompt_id = params.prompt.as_ref().map(|p| p.id.clone());
@@ -8311,7 +8319,10 @@ pub async fn response_create_handler(
         }
 
         // Record total processing time even for errors (handler start to error)
-        span.record("gen_ai.processing_time_ms", processing_start_time.elapsed().as_millis() as i64);
+        span.record(
+            "gen_ai.processing_time_ms",
+            processing_start_time.elapsed().as_millis() as i64,
+        );
     }
 
     // Helper to add analytics headers to a response
@@ -9297,8 +9308,8 @@ mod tests {
     use tracing_test::traced_test;
 
     use crate::cache::CacheEnabledMode;
-    use crate::inference::types::{Text, TextChunk};
     use crate::guardrail_table::{GuardrailResult, ProviderGuardrailResult};
+    use crate::inference::types::{Text, TextChunk};
 
     #[test]
     fn guardrail_retry_policy_classifies_errors() {

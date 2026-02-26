@@ -615,9 +615,7 @@ mod tests {
 
         let value = serde_json::to_value(&result).unwrap();
         assert!(value.get("other_categories").is_some());
-        let other_category_score = value["other_categories"]["new-category"]
-            .as_f64()
-            .unwrap();
+        let other_category_score = value["other_categories"]["new-category"].as_f64().unwrap();
         let other_score = value["category_scores"]["other"].as_f64().unwrap();
         assert!((other_category_score - 0.72).abs() < 1e-6);
         assert!((other_score - 0.72).abs() < 1e-6);

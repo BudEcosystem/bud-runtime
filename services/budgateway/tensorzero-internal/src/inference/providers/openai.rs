@@ -939,17 +939,13 @@ impl AudioTranscriptionProvider for OpenAIProvider {
             request_builder = request_builder.bearer_auth(api_key.expose_secret());
         }
 
-        let res = request_builder
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|e| {
-                handle_reqwest_error(
-                    e,
-                    PROVIDER_TYPE,
-                    Some(format!("Audio file: {}", request.filename)),
-                )
-            })?;
+        let res = request_builder.multipart(form).send().await.map_err(|e| {
+            handle_reqwest_error(
+                e,
+                PROVIDER_TYPE,
+                Some(format!("Audio file: {}", request.filename)),
+            )
+        })?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
