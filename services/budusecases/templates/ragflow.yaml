@@ -1,0 +1,109 @@
+name: ragflow
+display_name: RAGFlow
+version: "1.7.0"
+description: |
+  RAGFlow is an open-source RAG engine that provides deep document understanding
+  and truthful question answering. It includes built-in document parsing,
+  chunking, embedding, and retrieval capabilities.
+
+  This template deploys a complete RAGFlow instance via Helm chart, including
+  MySQL, MinIO, Redis, and the Infinity document search engine.
+
+category: rag
+tags:
+  - rag
+  - document-understanding
+  - ragflow
+  - helm
+
+access:
+  ui:
+    enabled: true
+    port: 80
+    path: /
+  api:
+    enabled: true
+    port: 80
+    service_suffix: "-api"
+    base_path: /
+    spec:
+      - path: /v1/api/new_conversation
+        method: POST
+        description: "Create a new conversation"
+      - path: /v1/api/completion
+        method: POST
+        description: "Get RAG completion"
+        request_body:
+          content_type: application/json
+          schema:
+            conversation_id: { type: string }
+            messages: { type: array }
+
+components:
+  - name: ragflow
+    display_name: RAGFlow
+    description: Complete RAGFlow deployment with all dependencies (MySQL, MinIO, Redis, Infinity)
+    type: helm
+    required: true
+    chart:
+      git_repo: https://github.com/infiniflow/ragflow.git
+      git_ref: main
+      chart_subpath: helm
+      values:
+        ragflow:
+          image:
+            tag: "v0.24.0"
+          service:
+            type: ClusterIP
+          env:
+            DOC_ENGINE: "{{ params.doc_engine }}"
+            MAX_UPLOAD_SIZE: "{{ params.max_upload_size }}"
+            DOC_BULK_SIZE: "{{ params.doc_bulk_size }}"
+            EMBEDDING_BATCH_SIZE: "{{ params.embedding_batch_size }}"
+            MAX_CONTENT_LENGTH: "{{ params.max_content_length }}"
+
+parameters:
+
+  doc_engine:
+    type: string
+    default: infinity
+    description: Document search engine to use (infinity or elasticsearch)
+
+  max_upload_size:
+    type: string
+    default: 128m
+    description: Maximum file upload size
+
+  doc_bulk_size:
+    type: integer
+    default: 4
+    min: 1
+    max: 64
+    description: Number of document chunks processed per batch during parsing
+
+  embedding_batch_size:
+    type: integer
+    default: 16
+    min: 1
+    max: 256
+    description: Number of text chunks processed per batch during embedding
+
+  max_content_length:
+    type: integer
+    default: 128
+    min: 1
+    max: 1024
+    description: Maximum file size for uploads in megabytes
+
+resources:
+  minimum:
+    cpu: 4
+    memory: 16Gi
+    gpu: 0
+  recommended:
+    cpu: 8
+    memory: 32Gi
+    gpu: 0
+
+deployment_order:
+  - ragflow

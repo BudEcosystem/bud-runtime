@@ -609,6 +609,7 @@ class WorkflowTypeEnum(StrEnum):
     PROMPT_CREATION = auto()
     PROMPT_SCHEMA_CREATION = auto()
     CUSTOM_PROBE_CREATION = auto()
+    USECASE_DEPLOYMENT = auto()
 
 
 class NotificationType(Enum):
@@ -666,6 +667,7 @@ class PayloadType(str, Enum):
     GUARDRAIL_MODEL_ONBOARDING = "guardrail_model_onboarding"
     GUARDRAIL_DEPLOYMENT = "guardrail_deployment"
     GUARDRAIL_SIMULATION = "guardrail_simulation"
+    USECASE_DEPLOYMENT = "usecase_deployment"
 
 
 class BudServeWorkflowStepEventName(str, Enum):
@@ -697,6 +699,7 @@ class BudServeWorkflowStepEventName(str, Enum):
     GUARDRAIL_DEPLOYMENT_EVENTS = "guardrail_deployment_events"
     GUARDRAIL_SIMULATION_EVENTS = "guardrail_simulation_events"
     PROMPT_SCHEMA_EVENTS = "prompt_schema_events"
+    USECASE_DEPLOYMENT_EVENTS = "usecase_deployment_events"
 
 
 # Mapping between payload types and workflow step event names.
@@ -722,6 +725,7 @@ PAYLOAD_TO_WORKFLOW_STEP_EVENT: dict[PayloadType, BudServeWorkflowStepEventName]
     PayloadType.GUARDRAIL_MODEL_ONBOARDING: BudServeWorkflowStepEventName.GUARDRAIL_ONBOARDING_EVENTS,
     PayloadType.GUARDRAIL_DEPLOYMENT: BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS,
     PayloadType.GUARDRAIL_SIMULATION: BudServeWorkflowStepEventName.GUARDRAIL_SIMULATION_EVENTS,
+    PayloadType.USECASE_DEPLOYMENT: BudServeWorkflowStepEventName.USECASE_DEPLOYMENT_EVENTS,
 }
 
 

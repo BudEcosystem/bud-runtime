@@ -13,11 +13,7 @@ pub trait Migration {
             .unwrap_or("Unknown migration");
         // Strip any lifetime annotations like <'_> from the type name
         // e.g., "Migration0029<'_>" -> "Migration0029"
-        full_name
-            .split('<')
-            .next()
-            .unwrap_or(full_name)
-            .to_string()
+        full_name.split('<').next().unwrap_or(full_name).to_string()
     }
     async fn can_apply(&self) -> Result<(), Error>;
     async fn should_apply(&self) -> Result<bool, Error>;

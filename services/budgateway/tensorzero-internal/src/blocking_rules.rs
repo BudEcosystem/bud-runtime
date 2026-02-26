@@ -890,9 +890,9 @@ impl BlockingRulesManager {
                     &rule_clone,
                     client_ip_clone,
                     country_code_clone,
-                    user_agent_clone,      // Now populated (was TODO)
-                    request_path_clone,    // Now populated (was TODO)
-                    request_method_clone,  // Now populated (was TODO)
+                    user_agent_clone,     // Now populated (was TODO)
+                    request_path_clone,   // Now populated (was TODO)
+                    request_method_clone, // Now populated (was TODO)
                     reason_clone,
                 );
 

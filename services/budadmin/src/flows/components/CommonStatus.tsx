@@ -49,7 +49,8 @@ export default function CommonStatus({
     | 'evaluate_model'
     | 'guardrail_model_onboarding'
     | 'guardrail_simulation'
-    | 'guardrail_deployment',
+    | 'guardrail_deployment'
+    | 'usecase_deployment',
     events_field_id:
     'bud_simulator_events'
     | 'budserve_cluster_events'
@@ -67,7 +68,8 @@ export default function CommonStatus({
     | 'evaluation_events'
     | 'guardrail_onboarding_events'
     | 'guardrail_simulation_events'
-    | 'guardrail_deployment_events',
+    | 'guardrail_deployment_events'
+    | 'usecase_deployment_events',
     onCompleted: () => void,
     onFailed: () => void,
 }) {

@@ -413,6 +413,11 @@ async def run_ephemeral_execution(
         # Validate the inline pipeline definition
         is_valid, errors, warnings = pipeline_service.validate_dag(request.pipeline_definition)
         if not is_valid:
+            logger.error(
+                "DAG validation failed",
+                errors=errors,
+                pipeline_name=request.pipeline_definition.get("name"),
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"error": "Invalid pipeline definition", "errors": errors},

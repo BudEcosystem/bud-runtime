@@ -906,13 +906,7 @@ impl EmbeddingProvider for MistralProvider {
             .body(raw_request.clone())
             .send()
             .await
-            .map_err(|e| {
-                handle_reqwest_error(
-                    e,
-                    PROVIDER_TYPE,
-                    Some(raw_request.clone()),
-                )
-            })?;
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
 
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
@@ -1107,13 +1101,7 @@ impl ModerationProvider for MistralProvider {
             .body(raw_request.clone())
             .send()
             .await
-            .map_err(|e| {
-                handle_reqwest_error(
-                    e,
-                    PROVIDER_TYPE,
-                    Some(raw_request.clone()),
-                )
-            })?;
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
 
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
