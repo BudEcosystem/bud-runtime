@@ -147,7 +147,7 @@ microservices:
   # frontend services
   budadmin:
     enabled: true
-    image: budstudio/budadmin:0.7.0
+    image: budstudio/budadmin:0.8.0
     # Branding configuration - customize logos per customer deployment
     # Leave empty to use default Bud logos
     env:
@@ -171,7 +171,7 @@ microservices:
       scaleUpStabilizationSeconds: 30
   budcustomer:
     enabled: true
-    image: budstudio/budcustomer:0.7.0
+    image: budstudio/budcustomer:0.8.0
     env: {}
     nodeSelector: {}
     affinity: {}
@@ -186,7 +186,7 @@ microservices:
       scaleUpStabilizationSeconds: 30
   budplayground:
     enabled: true
-    image: budstudio/budplayground:0.7.0
+    image: budstudio/budplayground:0.8.0
     env: {}
     nodeSelector: {}
     affinity: {}
@@ -202,7 +202,7 @@ microservices:
   # backend exposed services
   budgateway:
     enabled: true
-    image: budstudio/budgateway:0.7.0
+    image: budstudio/budgateway:0.8.0
     env:
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4317"
       OTEL_EXPORTER_OTLP_HTTP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
@@ -260,7 +260,7 @@ microservices:
       scaleUpStabilizationSeconds: 30
   askbud:
     enabled: true
-    image: budstudio/askbud:0.7.0
+    image: budstudio/askbud:0.8.0
     daprid: askbud
     model: bud-gpt-oss-20b-ada28b58
     env:
@@ -279,7 +279,7 @@ microservices:
       scaleUpStabilizationSeconds: 30
   budapp:
     enabled: true
-    image: budstudio/budapp:0.7.0
+    image: budstudio/budapp:0.8.0
     daprid: budapp
     corsOrigins:
       - "http://localhost:3000"
@@ -311,7 +311,7 @@ microservices:
   # backend internal services
   budcluster:
     enabled: true
-    image: budstudio/budcluster:0.7.0
+    image: budstudio/budcluster:0.8.0
     daprid: budcluster
     env:
       LOG_LEVEL: INFO
@@ -352,7 +352,7 @@ microservices:
   budmetrics:
     enabled: true
     daprid: budmetrics
-    image: budstudio/budmetrics:0.7.0
+    image: budstudio/budmetrics:0.8.0
     env:
       #deadlink
       INFERENCE_URL: http://172.184.137.177:8502/classify
@@ -376,7 +376,7 @@ microservices:
       scaleUpStabilizationSeconds: 30
   budmodel:
     enabled: true
-    image: budstudio/budmodel:0.7.0
+    image: budstudio/budmodel:0.8.0
     daprid: budmodel
     storageClassName: nfs-csi
     storageSize: "32Gi"
@@ -395,7 +395,7 @@ microservices:
       scaleUpStabilizationSeconds: 60
   budeval:
     enabled: true
-    image: budstudio/budeval:0.7.0
+    image: budstudio/budeval:0.8.0
     daprid: budeval
     storageClassName: nfs-csi
     env: {}
@@ -412,7 +412,7 @@ microservices:
       scaleUpStabilizationSeconds: 60
   budsim:
     enabled: true
-    image: budstudio/budsim:0.7.0
+    image: budstudio/budsim:0.8.0
     daprid: budsim
     env:
       LOG_LEVEL: INFO
@@ -429,7 +429,7 @@ microservices:
       scaleUpStabilizationSeconds: 60
   buddoc:
     enabled: true
-    image: budstudio/buddoc:0.7.0
+    image: budstudio/buddoc:0.8.0
     daprid: buddoc
     env:
       LOG_LEVEL: INFO
@@ -450,7 +450,7 @@ microservices:
       scaleUpStabilizationSeconds: 60
   budnotify:
     enabled: true
-    image: budstudio/budnotify:0.7.0
+    image: budstudio/budnotify:0.8.0
     daprid: budnotify
     pubsubTopic: notificationMessages
     env:
@@ -470,7 +470,7 @@ microservices:
   budprompt:
     enabled: true
     daprid: budprompt
-    image: budstudio/budprompt:0.7.0
+    image: budstudio/budprompt:0.8.0
     env:
       LOG_LEVEL: INFO
       BUD_GATEWAY_BASE_URL: http://{{ .Release.Name }}-budgateway:3000/v1
@@ -493,7 +493,7 @@ microservices:
       scaleUpStabilizationSeconds: 30
   budpipeline:
     enabled: true
-    image: budstudio/budpipeline:0.7.0
+    image: budstudio/budpipeline:0.8.0
     daprid: budpipeline
     pubsubTopic: budpipelineEvents
     env:
