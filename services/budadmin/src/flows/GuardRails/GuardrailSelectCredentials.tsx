@@ -7,7 +7,8 @@ import useGuardrails from "src/hooks/useGuardrails";
 import ProprietaryCredentialsFormList from "../components/ProprietaryCredentialsFormList";
 
 export default function GuardrailSelectCredentials() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const { selectedCredentials } = useDeployModel();
   const {
     updateWorkflow,
@@ -23,7 +24,7 @@ export default function GuardrailSelectCredentials() {
     "huggingface";
 
   const handleBack = () => {
-    openDrawerWithStep("select-project");
+    openDrawerWithStep(isCloudFlow ? "cloud-select-project" : "select-project");
   };
 
   const handleNext = async () => {
@@ -38,13 +39,17 @@ export default function GuardrailSelectCredentials() {
 
       const success = await updateWorkflow(payload);
       if (success) {
-        // Check if models actually need onboarding; if not, skip onboarding status
-        // (cloud providers may only need credential_id for deployment validation)
-        const { modelsRequiringOnboarding } = useGuardrails.getState();
-        if (modelsRequiringOnboarding > 0) {
-          openDrawerWithStep("guardrail-onboarding-status");
+        if (isCloudFlow) {
+          // Cloud flow: no onboarding step, go straight to deployment types
+          openDrawerWithStep("cloud-deployment-types");
         } else {
-          openDrawerWithStep("deployment-types");
+          // Bud Sentinel flow: check if models need onboarding
+          const { modelsRequiringOnboarding } = useGuardrails.getState();
+          if (modelsRequiringOnboarding > 0) {
+            openDrawerWithStep("guardrail-onboarding-status");
+          } else {
+            openDrawerWithStep("deployment-types");
+          }
         }
       }
     } catch (error) {

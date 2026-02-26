@@ -29,7 +29,8 @@ interface Deployment {
 }
 
 export default function SelectDeployment() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<string>("");
   const [selectedDeploymentData, setSelectedDeploymentData] =
@@ -117,7 +118,7 @@ export default function SelectDeployment() {
 
 
   const handleBack = () => {
-    openDrawerWithStep("deployment-types");
+    openDrawerWithStep(isCloudFlow ? "cloud-deployment-types" : "deployment-types");
   };
 
   const handleNext = async () => {
@@ -141,7 +142,7 @@ export default function SelectDeployment() {
         // Store the selected deployment in the guardrails store
         setSelectedDeploymentInStore(selectedDeploymentData);
         // Move to probe settings
-        openDrawerWithStep("probe-settings");
+        openDrawerWithStep(isCloudFlow ? "cloud-probe-settings" : "probe-settings");
       }
       // If not successful, stay on current page (error toast is shown by updateWorkflow)
     } catch (error) {
