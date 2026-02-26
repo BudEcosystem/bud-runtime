@@ -300,7 +300,15 @@ const CallsChart: React.FC<CallsChartProps> = ({ promptId }) => {
 
   // Update chart when data changes
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
 
     // Calculate which labels to show (every Nth label for readability)
     const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 10));
@@ -510,7 +518,14 @@ const UsersChart: React.FC<UsersChartProps> = ({ promptId }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
     const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 8));
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
@@ -722,7 +737,14 @@ const TokenUsageChart: React.FC<TokenUsageChartProps> = ({ promptId }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
     const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 8));
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
@@ -955,7 +977,14 @@ const RequestCountByApiKeyChart: React.FC<RequestCountByApiKeyChartProps> = ({ p
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels },
       series: [{ data: chartData.data }],
@@ -1210,7 +1239,17 @@ const ErrorSuccessChart: React.FC<ErrorSuccessChartProps> = ({ promptId }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [
+          { name: "Error Requests", data: [] },
+          { name: "Successful Requests", data: [] },
+        ],
+      });
+      return;
+    }
     const labelInterval = Math.max(1, Math.ceil(chartData.labels.length / 8));
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels, axisLabel: { interval: (index: number) => index % labelInterval === 0 } },
@@ -1372,7 +1411,14 @@ const E2ELatencyChart: React.FC<E2ELatencyChartProps> = ({ promptId }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels },
       series: [{ data: chartData.data }],
@@ -1530,7 +1576,14 @@ const TTFTChart: React.FC<TTFTChartProps> = ({ promptId }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels },
       series: [{ data: chartData.data }],
@@ -1690,7 +1743,14 @@ const ThroughputChart: React.FC<ThroughputChartProps> = ({ promptId }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!chartInstanceRef.current || chartData.labels.length === 0) return;
+    if (!chartInstanceRef.current) return;
+    if (chartData.labels.length === 0) {
+      chartInstanceRef.current.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }],
+      });
+      return;
+    }
     chartInstanceRef.current.setOption({
       xAxis: { data: chartData.labels },
       series: [{ data: chartData.data }],

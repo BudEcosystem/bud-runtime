@@ -719,10 +719,6 @@ export default function LogDetailsDrawer() {
     <BudForm
       data={{}}
       onBack={() => closeDrawer()}
-      nextText="Close"
-      onNext={async () => {
-        closeDrawer();
-      }}
       showMinimizeButton={false}
     >
       <BudWraperBox classNames="mt-[2.2rem]">

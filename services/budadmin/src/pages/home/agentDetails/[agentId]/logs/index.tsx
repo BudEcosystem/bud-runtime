@@ -89,6 +89,7 @@ interface LogEntry {
   scopeName?: string; // otel scope name
   inputTokens?: string; // gen_ai.usage.input_tokens
   outputTokens?: string; // gen_ai.usage.output_tokens
+  tokenCost?: string; // gen_ai.inference_cost (raw string from API)
   serviceName?: string; // service_name for badge
   // Exception fields
   hasException?: boolean; // true if this span has an exception/error
@@ -218,17 +219,27 @@ const aggregateTracesIntoBuckets = (
   });
 };
 
+// Format token cost: 2 decimal places for row display
+const formatCostShort = (raw?: string): string => {
+  if (!raw) return "0";
+  const num = parseFloat(raw);
+  if (isNaN(num)) return "0";
+  return num.toFixed(2);
+};
+
 // Token metrics popover component - reusable for LogRow and FlatLogRow
 const TokenMetricsPopover = ({
+  tokenCost,
   inputTokens,
   outputTokens,
   scopeName,
 }: {
+  tokenCost?: string;
   inputTokens?: string;
   outputTokens?: string;
   scopeName?: string;
 }) => {
-  if (!inputTokens && !outputTokens) return null;
+  if (!inputTokens && !outputTokens && !tokenCost) return null;
 
   return (
     <Popover
@@ -249,12 +260,16 @@ const TokenMetricsPopover = ({
               <span className="text-[#757575]">Amount</span>
             </div>
             <div className="flex justify-between items-center text-[.625rem] py-1">
-              <span className="text-[#B3B3B3]">Input</span>
+              <span className="text-[#B3B3B3] pr-[.5rem]">Input:</span>
               <span className="text-[#EEEEEE]">↗ {inputTokens || 0}</span>
             </div>
             <div className="flex justify-between items-center text-[.625rem] py-1">
-              <span className="text-[#B3B3B3]">Output</span>
+              <span className="text-[#B3B3B3] pr-[.5rem]">Output:</span>
               <span className="text-[#EEEEEE]">↙ {outputTokens || 0}</span>
+            </div>
+            <div className="flex justify-between items-center text-[.625rem] py-1">
+              <span className="text-[#B3B3B3] pr-[.5rem]">Cost:</span>
+              <span className="text-[#EEEEEE] flex justify-center items-center"><div className="leading-[100%] mt-[-.2rem] pr-[.2rem]">∑</div> <div>{tokenCost || 0}</div></span>
             </div>
           </div>
         </div>
@@ -262,9 +277,9 @@ const TokenMetricsPopover = ({
     >
       <div className="cursor-pointer">
         <Tag className="bg-[#2a2a2a] border-[#3a3a3a] text-[.5rem] text-[#B3B3B3] w-fit pointer-events-none px-[.2rem] w-full text-center flex justify-center items-center gap-x-[.3rem] leading-[200%]">
-          <div className="text-[.75rem]">∅</div>
+          <div className="text-[.75rem] mt-[-.15rem]">∅</div>
           <div className="flex justify-center items-center gap-x-[.1rem]">
-            {/* <div className="text-[.4rem]">∑</div> */}
+            <div className="flex justify-center items-center"><div className="text-[.4rem] mt-[-.1rem] pr-[.1rem]">∑</div><div>{formatCostShort(tokenCost)}</div></div>
             <div className="text-[.4rem]">↗</div>{inputTokens || 0}
             <div className="text-[.4rem]">↙</div>{outputTokens || 0}
           </div>
@@ -506,6 +521,7 @@ const LogRow = ({
           <div className="flex gap-2 items-center flex-shrink-0 mr-3">
             {/* Token metrics with original icon style */}
             <TokenMetricsPopover
+              tokenCost={row.tokenCost}
               inputTokens={row.inputTokens}
               outputTokens={row.outputTokens}
               scopeName={row.scopeName}
@@ -573,8 +589,8 @@ const FlatLogRow = ({
   return (
     <div
       className={`w-full flex-auto relative transition-colors border-b border-[rgba(255,255,255,0.08)] ${isSelected
-          ? "bg-[#1a1a1a] border-l-2 border-l-[#965CDE]"
-          : "hover:bg-[rgba(255,255,255,0.03)] border-l-2 border-l-transparent"
+        ? "bg-[#1a1a1a] border-l-2 border-l-[#965CDE]"
+        : "hover:bg-[rgba(255,255,255,0.03)] border-l-2 border-l-transparent"
         }`}
     >
       <div
@@ -613,6 +629,7 @@ const FlatLogRow = ({
           <div className="flex gap-2 items-center flex-shrink-0 mr-3">
             {/* Token metrics with original icon style */}
             <TokenMetricsPopover
+              tokenCost={row.tokenCost}
               inputTokens={row.inputTokens}
               outputTokens={row.outputTokens}
               scopeName={row.scopeName}
@@ -919,6 +936,7 @@ const traceSpanToLogEntry = (
     scopeName: span.scope_name || "",
     inputTokens: attrs["gen_ai.usage.input_tokens"],
     outputTokens: attrs["gen_ai.usage.output_tokens"],
+    tokenCost: attrs["gen_ai.inference_cost"] != null ? String(attrs["gen_ai.inference_cost"]) : undefined,
     serviceName: span.service_name,
     // Exception fields
     hasException,
@@ -1085,7 +1103,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
   const liveChartTracesRef = useRef<{ timestamp: number; status?: string; duration?: number }[]>([]);
   const chartUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Time-series API data points for merging with live traces
-  const timeSeriesDataRef = useRef<{ timestamp: number; value: number }[]>([]);
+  const timeSeriesDataRef = useRef<{ timestamp: number; value: number; successCount: number; errorCount: number }[]>([]);
 
 
   // Live streaming state
@@ -1769,21 +1787,23 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       const totalDuration = successDuration + errorDuration;
 
       // In live mode, also add historical counts from time-series API
-      let apiCount = 0;
+      let apiSuccessCount = 0;
+      let apiErrorCount = 0;
       if (isLive && timeSeriesDataRef.current.length > 0) {
-        apiCount = timeSeriesDataRef.current
-          .filter(d => d.timestamp >= bucketStart && d.timestamp < bucketEnd)
-          .reduce((sum, d) => sum + d.value, 0);
+        const matchingPoints = timeSeriesDataRef.current
+          .filter(d => d.timestamp >= bucketStart && d.timestamp < bucketEnd);
+        apiSuccessCount = matchingPoints.reduce((sum, d) => sum + d.successCount, 0);
+        apiErrorCount = matchingPoints.reduce((sum, d) => sum + d.errorCount, 0);
       }
 
       successData.push({
-        value: successTraces.length + apiCount,
+        value: successTraces.length + apiSuccessCount,
         bucketStart,
         bucketEnd,
         totalDuration,
       });
       errorData.push({
-        value: errorTraces.length,
+        value: errorTraces.length + apiErrorCount,
         bucketStart,
         bucketEnd,
         totalDuration,
@@ -1825,20 +1845,35 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
     const response = await fetchPromptTimeSeries(
       from_date,
       to_date,
-      [METRICS.requests],
+      [METRICS.requests, METRICS.error_count, METRICS.success_count],
       { prompt_id: [promptId] },
       { dataSource: "prompt", fillGaps: true }
     );
 
     if (response && response.groups && response.groups.length > 0) {
-      const aggregatedData: Map<string, number> = new Map();
+      const aggregatedData: Map<string, { total: number; successCount: number; errorCount: number }> = new Map();
 
       response.groups.forEach((group) => {
         group.data_points.forEach((point) => {
           const timestamp = point.timestamp;
-          const value = point.values[METRICS.requests] || 0;
-          const existing = aggregatedData.get(timestamp) || 0;
-          aggregatedData.set(timestamp, existing + value);
+          const total = point.values[METRICS.requests] || 0;
+          const rawErrorCount = point.values[METRICS.error_count] || 0;
+          const rawSuccessCount = point.values[METRICS.success_count] || 0;
+
+          // If API returns both as 0 but total > 0, treat all as success
+          const errorCount = rawErrorCount;
+          const successCount = (rawSuccessCount === 0 && rawErrorCount === 0 && total > 0)
+            ? total
+            : rawSuccessCount;
+
+          const existing = aggregatedData.get(timestamp);
+          if (existing) {
+            existing.total += total;
+            existing.successCount += successCount;
+            existing.errorCount += errorCount;
+          } else {
+            aggregatedData.set(timestamp, { total, successCount, errorCount });
+          }
         });
       });
 
@@ -1847,9 +1882,11 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       );
 
       // Always store in ref for live mode merging
-      timeSeriesDataRef.current = sortedEntries.map(([timestamp, value]) => ({
+      timeSeriesDataRef.current = sortedEntries.map(([timestamp, data]) => ({
         timestamp: new Date(timestamp).getTime(),
-        value,
+        value: data.total,
+        successCount: data.successCount,
+        errorCount: data.errorCount,
       }));
 
       // Only update chart directly in non-live mode
@@ -1857,14 +1894,28 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
       if (!isLive && chartInstanceRef.current) {
         const labels = sortedEntries.map(([timestamp]) => formatChartLabel(timestamp));
 
-        const successData: ExtendedBucketData[] = sortedEntries.map(([timestamp, value], index) => {
+        const successData: ExtendedBucketData[] = sortedEntries.map(([timestamp, data], index) => {
           const currentTime = new Date(timestamp).getTime();
           const nextTime =
             index < sortedEntries.length - 1
               ? new Date(sortedEntries[index + 1][0]).getTime()
               : currentTime + ONE_HOUR_MS;
           return {
-            value,
+            value: data.successCount,
+            bucketStart: currentTime,
+            bucketEnd: nextTime,
+            totalDuration: 0,
+          };
+        });
+
+        const errorData: ExtendedBucketData[] = sortedEntries.map(([timestamp, data], index) => {
+          const currentTime = new Date(timestamp).getTime();
+          const nextTime =
+            index < sortedEntries.length - 1
+              ? new Date(sortedEntries[index + 1][0]).getTime()
+              : currentTime + ONE_HOUR_MS;
+          return {
+            value: data.errorCount,
             bucketStart: currentTime,
             bucketEnd: nextTime,
             totalDuration: 0,
@@ -1880,7 +1931,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
               interval: (index: number) => index % labelInterval === 0,
             },
           },
-          series: [{ data: [] }, { data: successData }],
+          series: [{ data: errorData }, { data: successData }],
         });
       }
     } else {
@@ -1923,7 +1974,7 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
         confine: true, // Keep tooltip within chart bounds
         extraCssText: 'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);',
         formatter: function (params: any) {
-          // Extract data from the series (Error is first, Success is second)
+          // params order matches series definition: [0]=Error, [1]=Success
           const errorParam = params[0];
           const successParam = params[1];
 
@@ -1931,7 +1982,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           const bucketData = errorParam?.data as ExtendedBucketData;
           const bucketStart = bucketData?.bucketStart || Date.now();
           const bucketEnd = bucketData?.bucketEnd || Date.now();
-          const totalDuration = bucketData?.totalDuration || 0;
 
           // Get counts (handle both number and object data formats)
           const error = typeof errorParam?.data === 'object' ? errorParam?.data?.value || 0 : errorParam?.value || 0;
@@ -1943,14 +1993,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
             const date = new Date(timestamp);
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
               date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          };
-
-          // Format duration
-          const formatDurationTooltip = (seconds: number) => {
-            if (seconds === 0) return '0s';
-            if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
-            if (seconds < 60) return `${seconds.toFixed(2)}s`;
-            return `${(seconds / 60).toFixed(2)}m`;
           };
 
           // Calculate cursor point (middle of bucket)
@@ -1972,10 +2014,6 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
                 <tr>
                   <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Count</td>
                   <td style="color: #fafafa; text-align: right;">${total}</td>
-                </tr>
-                <tr>
-                  <td style="color: #71717a; padding: 2px 12px 2px 0; white-space: nowrap;">Duration</td>
-                  <td style="color: #fafafa; text-align: right;">${formatDurationTooltip(totalDuration)}</td>
                 </tr>
               </table>
               ${total > 0 ? `
@@ -2162,8 +2200,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
           <div className="flex items-center border border-[#3a3a3a] rounded-md overflow-hidden max-h-[1.6rem]">
             <button
               className={`p-[.4rem] border-r border-[#3a3a3a] transition-colors ${viewMode === 'traces'
-                  ? "bg-[#2a2a2a] text-white"
-                  : "bg-[#1a1a1a] text-[#B3B3B3] hover:text-white hover:bg-[#2a2a2a]"
+                ? "bg-[#2a2a2a] text-white"
+                : "bg-[#1a1a1a] text-[#B3B3B3] hover:text-white hover:bg-[#2a2a2a]"
                 }`}
               title="Traces view"
               onClick={() => setViewMode('traces')}
@@ -2179,8 +2217,8 @@ const LogsTab: React.FC<LogsTabProps> = ({ promptName, promptId, projectId }) =>
             </button>
             <button
               className={`p-[.4rem] transition-colors ${viewMode === 'flatten'
-                  ? "bg-[#2a2a2a] text-white"
-                  : "bg-[#1a1a1a] text-[#B3B3B3] hover:text-white hover:bg-[#2a2a2a]"
+                ? "bg-[#2a2a2a] text-white"
+                : "bg-[#1a1a1a] text-[#B3B3B3] hover:text-white hover:bg-[#2a2a2a]"
                 }`}
               title="Flatten view"
               onClick={() => setViewMode('flatten')}
