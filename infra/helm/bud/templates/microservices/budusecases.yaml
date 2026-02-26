@@ -1,0 +1,142 @@
+{{- if (default .Values.microservices.budusecases.enabled false) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-budusecases
+  annotations:
+    {{- range $key, $value := .Values.deploymentAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-budusecases
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-budusecases
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: {{ .Values.microservices.budusecases.daprid }}
+        dapr.io/app-port: "9084"
+        dapr.io/app-token-secret: "{{ .Release.Name }}-app-api-token"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $nodeSelector := include "bud.nodeSelector" (dict "service" .Values.microservices.budusecases "global" .Values.global "context" $) }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $affinity := include "bud.affinity" (dict "service" .Values.microservices.budusecases "global" .Values.global "context" $) }}
+      {{- if $affinity }}
+      affinity:
+        {{- $affinity | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: budusecases
+        image: {{ .Values.microservices.budusecases.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command: ["sh", "-c", "alembic upgrade head && uvicorn budusecases.main:app --host 0.0.0.0 --port 9084"]
+        ports:
+        - containerPort: 9084
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name }}-bud-global
+        env:
+          - name: APP_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-app-api-token
+                key: token
+          - name: SERVICE_NAME
+            value: "budusecases"
+          - name: SERVICE_PORT
+            value: "9084"
+          - name: DAPR_HTTP_PORT
+            value: "3500"
+          - name: STATE_STORE_NAME
+            value: "{{ .Release.Name }}-dapr-statestore"
+          - name: PUBSUB_NAME
+            value: "{{ .Release.Name }}-pubsub"
+          # Service discovery - Dapr app IDs
+          - name: BUDAPP_APP_ID
+            value: "{{ .Values.microservices.budapp.daprid }}"
+          - name: BUDCLUSTER_APP_ID
+            value: "{{ .Values.microservices.budcluster.daprid }}"
+          - name: BUDMODEL_APP_ID
+            value: "{{ .Values.microservices.budmodel.daprid }}"
+          - name: BUDSIM_APP_ID
+            value: "{{ .Values.microservices.budsim.daprid }}"
+          - name: BUDNOTIFY_APP_ID
+            value: "{{ .Values.microservices.budnotify.daprid }}"
+          - name: BUDMETRICS_APP_ID
+            value: "{{ .Values.microservices.budmetrics.daprid }}"
+          # PostgreSQL configuration
+          - name: PSQL_HOST
+            value: {{ include "bud.externalServices.postgresql.host" . }}
+          - name: PSQL_PORT
+            value: {{ .Values.externalServices.postgresql.port | quote }}
+          - name: PSQL_USER
+            value: {{ .Values.externalServices.postgresql.databases.budusecases.username }}
+          - name: PSQL_PASSWORD
+            value: {{ .Values.externalServices.postgresql.databases.budusecases.password }}
+          - name: PSQL_DB_NAME
+            value: {{ .Values.externalServices.postgresql.databases.budusecases.name }}
+          # Template configuration
+          - name: TEMPLATES_PATH
+            value: "/app/templates"
+          - name: TEMPLATES_SYNC_ON_STARTUP
+            value: "true"
+          {{- range $key, $value := .Values.microservices.budusecases.env }}
+          - name: {{ $key }}
+            value: {{ tpl (toString $value) $ | quote }}
+          {{- end }}
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 500m
+          requests:
+            memory: 256Mi
+            cpu: 250m
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9084
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 9084
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-budusecases
+spec:
+  ports:
+  - port: 9084
+    targetPort: 9084
+  selector:
+    app: {{ .Release.Name }}-budusecases
+  type: ClusterIP
+---
+apiVersion: dapr.io/v2alpha1
+kind: Subscription
+metadata:
+  name: {{ .Release.Name }}-budusecases-pubsub-subscription
+spec:
+  topic: {{ .Values.microservices.budusecases.pubsubTopic }}
+  routes:
+    default: /budusecases-events
+  pubsubname: {{ .Release.Name }}-pubsub
+  deadLetterTopic: poisonMessages
+scopes:
+  - budusecases
+{{ end }}

@@ -2,7 +2,7 @@ use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::HeaderValue;
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{any, delete, get, post, put};
 use axum::Router;
 use clap::Parser;
 use mimalloc::MiMalloc;
@@ -463,12 +463,21 @@ async fn main() {
             get(move || std::future::ready(metrics_handle.render())),
         );
 
+    // Use case proxy routes — handles authentication internally
+    // because it validates API key project_id against the deployment's project_id,
+    // which differs from the standard model-based auth middleware flow.
+    let usecase_proxy_routes = Router::new().route(
+        "/usecases/{deployment_id}/api/{*rest}",
+        any(endpoints::usecase_proxy::usecase_api_proxy_handler),
+    );
+
     let mut router = Router::new()
         .merge(openai_routes);
     // NOTE: OTLP routes are merged AFTER analytics/blocking middleware layers (below)
     // so they bypass analytics_middleware, blocking_middleware, TraceLayer, and the 100MB body limit.
     router = router
         .merge(public_routes)
+        .merge(usecase_proxy_routes)
         .fallback(endpoints::fallback::handle_404)
         .layer(axum::middleware::from_fn(add_version_header))
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // increase the default body limit from 2MB to 100MB

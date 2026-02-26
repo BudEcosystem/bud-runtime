@@ -160,9 +160,15 @@ impl AnalyticsBatcher {
         let batch_len = buffer.len();
         debug!("Flushing analytics batch: {} records", batch_len);
 
-        match clickhouse.write(buffer.as_slice(), "GatewayAnalytics").await {
+        match clickhouse
+            .write(buffer.as_slice(), "GatewayAnalytics")
+            .await
+        {
             Ok(_) => {
-                debug!("Successfully wrote {} analytics records to ClickHouse", batch_len);
+                debug!(
+                    "Successfully wrote {} analytics records to ClickHouse",
+                    batch_len
+                );
             }
             Err(e) => {
                 error!(

@@ -13,6 +13,7 @@ export const playGroundUrl = process.env.NEXT_PUBLIC_PLAYGROUND_URL;
 export const askBudUrl = process.env.NEXT_PUBLIC_ASK_BUD_URL;
 export const askBudModel = process.env.NEXT_PUBLIC_ASK_BUD_MODEL;
 export const enableDevMode = process.env.NEXT_PUBLIC_ENABLE_DEV_MODE === 'true';
+export const usecaseDomain = process.env.NEXT_PUBLIC_USECASE_DOMAIN || "";
 export const observabilitySocketUrl = process.env.NEXT_PUBLIC_BUDNOTIFY_SERVICE_PUBLIC;
 
 // Branding configuration with defaults

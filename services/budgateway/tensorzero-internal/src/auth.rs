@@ -399,7 +399,9 @@ pub async fn require_api_key(
                 endpoint_id: metadata.endpoint_id.clone(),
                 model_id: metadata.model_id.clone(),
                 api_key_id: auth_meta.as_ref().and_then(|m| m.api_key_id.clone()),
-                api_key_project_id: auth_meta.as_ref().and_then(|m| m.api_key_project_id.clone()),
+                api_key_project_id: auth_meta
+                    .as_ref()
+                    .and_then(|m| m.api_key_project_id.clone()),
                 user_id: auth_meta.as_ref().and_then(|m| m.user_id.clone()),
             };
 

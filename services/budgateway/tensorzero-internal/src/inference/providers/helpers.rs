@@ -38,10 +38,7 @@ pub fn handle_reqwest_error(
     } else {
         Error::new(ErrorDetails::InferenceClient {
             status_code: e.status(),
-            message: format!(
-                "Error sending request: {}",
-                DisplayOrDebugGateway::new(e)
-            ),
+            message: format!("Error sending request: {}", DisplayOrDebugGateway::new(e)),
             provider_type: provider_type.to_string(),
             raw_request,
             raw_response: None,

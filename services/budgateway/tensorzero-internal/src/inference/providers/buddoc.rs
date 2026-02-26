@@ -182,9 +182,10 @@ impl DocumentProcessingProvider for BudDocProvider {
         }
 
         // Send the request
-        let response = req_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone()))
-        })?;
+        let response = req_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
 
         let status = response.status();
         let raw_response = response.text().await.map_err(|e| {

@@ -740,6 +740,168 @@ class KubernetesHandler(BaseClusterHandler):
         )
         return result["status"]
 
+    def create_httproute(self, values: dict) -> tuple[str, str | None]:
+        """Create HTTPRoute and ReferenceGrant for a use case deployment.
+
+        Args:
+            values: Dict with deployment_id, namespace, service_name, access_config.
+
+        Returns:
+            Tuple of (status, gateway_endpoint or None).
+        """
+        access_config = values.get("access_config", {})
+        ui_config = access_config.get("ui", {})
+        api_config = access_config.get("api", {})
+
+        extra_vars = {
+            "kubeconfig_content": self.config,
+            "usecase_deployment_id": values["deployment_id"],
+            "namespace": values["namespace"],
+            "helm_service_name": values["service_name"],
+            "access_ui_enabled": ui_config.get("enabled", False),
+            "access_ui_port": ui_config.get("port", 80),
+            "access_ui_path": ui_config.get("path", "/"),
+            "access_api_enabled": api_config.get("enabled", False),
+            "access_api_port": api_config.get("port", 8080),
+            "access_api_base_path": api_config.get("base_path", "/"),
+            "access_ui_service_suffix": ui_config.get("service_suffix", ""),
+            "access_api_service_suffix": api_config.get("service_suffix", ""),
+        }
+
+        result = self.ansible_executor.run_playbook(
+            playbook="CREATE_HTTPROUTE",
+            extra_vars=extra_vars,
+        )
+        logger.info(f"Create HTTPRoute playbook result: {result['status']}")
+
+        gateway_endpoint = None
+        for event in result.get("events", []):
+            if event.get("task") == "Extract gateway endpoint" and event.get("status") == "runner_on_ok":
+                gateway_endpoint = (
+                    event.get("event_data", {}).get("res", {}).get("ansible_facts", {}).get("gateway_endpoint")
+                )
+
+        # Fallback to the cluster's ingress_url when the Gateway service wasn't discovered
+        if not gateway_endpoint and self.ingress_url:
+            gateway_endpoint = self.ingress_url.rstrip("/")
+            logger.info(f"Gateway endpoint not discovered, using cluster ingress_url: {gateway_endpoint}")
+
+        return result["status"], gateway_endpoint
+
+    def delete_httproute(self, deployment_id: str, namespace: str) -> str:
+        """Delete HTTPRoute and ReferenceGrant for a use case deployment.
+
+        Args:
+            deployment_id: The deployment ID used to name the HTTPRoute.
+            namespace: The namespace containing the ReferenceGrant.
+
+        Returns:
+            Status string from the playbook execution.
+        """
+        extra_vars = {
+            "kubeconfig_content": self.config,
+            "usecase_deployment_id": deployment_id,
+            "namespace": namespace,
+        }
+
+        result = self.ansible_executor.run_playbook(
+            playbook="DELETE_HTTPROUTE",
+            extra_vars=extra_vars,
+        )
+        logger.info(f"Delete HTTPRoute playbook result: {result['status']}")
+        return result["status"]
+
+    def deploy_helm_chart(
+        self,
+        release_name: str,
+        chart_ref: str,
+        namespace: str = "default",
+        values: dict | None = None,
+        chart_version: str | None = None,
+        wait: bool = True,
+        timeout: str = "600s",
+        create_namespace: bool = True,
+        delete_on_failure: bool = True,
+        git_repo: str = "",
+        git_ref: str = "main",
+        chart_subpath: str = ".",
+    ) -> tuple[str, dict]:
+        """Deploy a Helm chart to this cluster via Ansible playbook.
+
+        Args:
+            release_name: Helm release name.
+            chart_ref: Chart reference (OCI, HTTPS, or local path).
+            namespace: Kubernetes namespace.
+            values: Helm values to override defaults.
+            chart_version: Specific chart version.
+            wait: Wait for readiness.
+            timeout: Helm timeout.
+            create_namespace: Create namespace if missing.
+            delete_on_failure: Clean up namespace on failure.
+            git_repo: Git repo URL containing the chart.
+            git_ref: Git branch/tag/commit.
+            chart_subpath: Path to chart within git repo.
+
+        Returns:
+            Tuple of (status, result_info dict).
+
+        Raises:
+            KubernetesException: If deployment fails and delete_on_failure is True.
+        """
+        extra_vars = {
+            "kubeconfig_content": self.config,
+            "helm_release_name": release_name,
+            "helm_chart_ref": chart_ref,
+            "namespace": namespace,
+            "values": values or {},
+            "helm_wait": wait,
+            "helm_timeout": timeout,
+            "create_namespace": create_namespace,
+        }
+        if chart_version:
+            extra_vars["helm_chart_version"] = chart_version
+        if git_repo:
+            extra_vars["helm_git_repo"] = git_repo
+            extra_vars["helm_git_ref"] = git_ref
+            extra_vars["helm_chart_subpath"] = chart_subpath
+
+        result = self.ansible_executor.run_playbook(
+            playbook="DEPLOY_HELM_CHART",
+            extra_vars=extra_vars,
+        )
+        logger.info(f"Deploy Helm chart playbook result: {result['status']}")
+
+        if result["status"] != "successful":
+            if delete_on_failure:
+                self.delete_namespace(namespace)
+                raise KubernetesException(f"Failed to deploy Helm chart '{release_name}' in namespace '{namespace}'")
+            return result["status"], {"release_name": release_name, "namespace": namespace, "services": []}
+
+        # Extract service info from the Ansible result
+        services = []
+        for event in result.get("events", []):
+            if event.get("task") == "Gather deployed Service resources" and event.get("status") == "runner_on_ok":
+                resources = event.get("event_data", {}).get("res", {}).get("resources", [])
+                for svc in resources:
+                    svc_meta = svc.get("metadata", {})
+                    svc_spec = svc.get("spec", {})
+                    services.append(
+                        {
+                            "name": svc_meta.get("name"),
+                            "namespace": svc_meta.get("namespace"),
+                            "cluster_ip": svc_spec.get("clusterIP"),
+                            "type": svc_spec.get("type"),
+                            "ports": svc_spec.get("ports", []),
+                        }
+                    )
+
+        result_info = {
+            "release_name": release_name,
+            "namespace": namespace,
+            "services": services,
+        }
+        return result["status"], result_info
+
     def delete_cluster(self) -> None:
         """Delete the cluster on the Kubernetes cluster."""
         result = self.ansible_executor.run_playbook(

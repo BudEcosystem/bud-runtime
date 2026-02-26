@@ -75,14 +75,14 @@ pub async fn blocking_middleware(
 
         (
             client_ip,
-            None,                          // country_code
-            user_agent_from_header,        // user_agent
-            uri.path().to_string(),        // request_path
-            method.to_string(),            // request_method
-            None,                          // api_key_id
-            None,                          // project_id
-            None,                          // endpoint_id
-            None,                          // model_name
+            None,                   // country_code
+            user_agent_from_header, // user_agent
+            uri.path().to_string(), // request_path
+            method.to_string(),     // request_method
+            None,                   // api_key_id
+            None,                   // project_id
+            None,                   // endpoint_id
+            None,                   // model_name
         )
     };
 

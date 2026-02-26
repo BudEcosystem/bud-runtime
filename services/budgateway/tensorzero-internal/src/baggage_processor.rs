@@ -46,7 +46,10 @@ impl SpanProcessor for BaggageSpanProcessor {
             span.set_attribute(KeyValue::new(keys::PROMPT_ID, value.as_str().to_string()));
         }
         if let Some(value) = baggage.get(keys::PROMPT_VERSION_ID) {
-            span.set_attribute(KeyValue::new(keys::PROMPT_VERSION_ID, value.as_str().to_string()));
+            span.set_attribute(KeyValue::new(
+                keys::PROMPT_VERSION_ID,
+                value.as_str().to_string(),
+            ));
         }
         // Only set endpoint_id if auth has processed the request (baggage has correct value).
         // For spans created before auth (gateway_analytics), analytics_middleware sets endpoint_id.
@@ -62,7 +65,10 @@ impl SpanProcessor for BaggageSpanProcessor {
             span.set_attribute(KeyValue::new(keys::API_KEY_ID, value.as_str().to_string()));
         }
         if let Some(value) = baggage.get(keys::API_KEY_PROJECT_ID) {
-            span.set_attribute(KeyValue::new(keys::API_KEY_PROJECT_ID, value.as_str().to_string()));
+            span.set_attribute(KeyValue::new(
+                keys::API_KEY_PROJECT_ID,
+                value.as_str().to_string(),
+            ));
         }
         if let Some(value) = baggage.get(keys::USER_ID) {
             span.set_attribute(KeyValue::new(keys::USER_ID, value.as_str().to_string()));

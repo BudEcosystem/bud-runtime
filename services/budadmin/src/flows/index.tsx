@@ -165,6 +165,14 @@ import AgentEditDrawer from "./EditAgent/AgentEditDrawer";
 import LogDetailsDrawer from "src/pages/home/agentDetails/[agentId]/logs/LogDetailsDrawer";
 import NewPipeline from "./Pipeline/NewPipeline";
 import EditPipeline from "./Pipeline/EditPipeline";
+import CreateUseCaseTemplate from "./UseCases/CreateTemplate";
+import ViewUseCaseTemplate from "./UseCases/TemplateDetail";
+import DeploymentProgress from "./UseCases/DeploymentProgress";
+import SelectTemplate from "./UseCases/SelectTemplate";
+import DeploymentName from "./UseCases/DeploymentName";
+import UseCaseSelectCluster from "./UseCases/SelectCluster";
+import ConfigureDeployment from "./UseCases/ConfigureDeployment";
+import DeployUseCaseSuccess from "./UseCases/DeployUseCaseSuccess";
 
 
 export const StepComponents = {
@@ -353,6 +361,16 @@ export const StepComponents = {
   "new-pipeline": NewPipeline,
   "edit-pipeline": EditPipeline,
 
+  // UseCases
+  "create-usecase-template": CreateUseCaseTemplate,
+  "view-usecase-template": ViewUseCaseTemplate,
+  "deployment-progress": DeploymentProgress,
+  "deploy-usecase-select-template": SelectTemplate,
+  "deploy-usecase-name": DeploymentName,
+  "deploy-usecase-select-cluster": UseCaseSelectCluster,
+  "deploy-usecase-configure": ConfigureDeployment,
+  "deploy-usecase-progress": DeploymentProgress,
+  "deploy-usecase-success": DeployUseCaseSuccess,
 };
 
 export type StepComponentsType = keyof typeof StepComponents;

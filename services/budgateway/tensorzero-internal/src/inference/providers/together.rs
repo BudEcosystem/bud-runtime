@@ -1150,9 +1150,10 @@ impl ImageGenerationProvider for TogetherProvider {
             .bearer_auth(api_key.expose_secret())
             .body(request_json.clone());
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone()))
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone())))?;
 
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
@@ -1288,9 +1289,10 @@ impl TextToSpeechProvider for TogetherProvider {
             .bearer_auth(api_key.expose_secret())
             .body(request_json.clone());
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone()))
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(request_json.clone())))?;
 
         let latency = Latency::NonStreaming {
             response_time: start_time.elapsed(),
@@ -2172,10 +2174,8 @@ mod tests {
             chunking: None,
             extra: HashMap::new(),
         };
-        let together_request = TogetherEmbeddingRequest::new(
-            "togethercomputer/m2-bert-80M-8k-retrieval",
-            &request,
-        );
+        let together_request =
+            TogetherEmbeddingRequest::new("togethercomputer/m2-bert-80M-8k-retrieval", &request);
 
         assert_eq!(
             together_request.model,

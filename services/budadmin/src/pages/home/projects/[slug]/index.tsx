@@ -31,6 +31,7 @@ import InferenceListView from "./inferences";
 import GuardrailListView from "./guardrails";
 import { enableDevMode } from "@/components/environment";
 import AgentsPromptsListTable from "@/components/ui/bud/table/AgentsPromptsListTable";
+import UseCaseDeployments from "./components/UseCaseDeployments";
 
 // Tab Icons
 const DeploymentsIcon = () => (
@@ -158,6 +159,21 @@ const ClustersIcon = () => (
   </svg>
 );
 
+const UseCasesIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width=".875rem"
+    height=".875rem"
+    viewBox="0 0 24 24"
+    fill="none"
+  >
+    <path
+      d="M12 2L4 6V12C4 16.42 7.42 20.74 12 22C16.58 20.74 20 16.42 20 12V6L12 2ZM12 11.99H18C17.47 15.11 15.07 17.9 12 18.93V12H6V7.3L12 4.19V11.99Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
 const ObservabilityIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -222,6 +238,7 @@ const ProjectDetailsPage = () => {
     "5": "clusters",
     "6": "observability",
     "7": "guardrails",
+    "8": "usecases",
   };
 
   const pathToTab: Record<string, string> = {
@@ -232,6 +249,7 @@ const ProjectDetailsPage = () => {
     "clusters": "5",
     "observability": "6",
     "guardrails": "7",
+    "usecases": "8",
   };
 
   // Initialize tab from URL query parameter on mount
@@ -338,7 +356,7 @@ const ProjectDetailsPage = () => {
       label: <TabLabel icon={<RoutesIcon />} label="Routes" isActive={activeTab === "3"} />,
       key: "3",
       children: <RoutesComponent data={0} />,
-      hide: !enableDevMode,
+      hide: true,
     },
     {
       label: <TabLabel icon={<AnalyticsIcon />} label="Analytics" isActive={activeTab === "4"} />,
@@ -373,6 +391,12 @@ const ProjectDetailsPage = () => {
       ),
       key: "7",
       children: <GuardrailListView projectId={selectedProjectId} />,
+      hide: !enableDevMode,
+    },
+    {
+      label: <TabLabel icon={<UseCasesIcon />} label="Use Cases" isActive={activeTab === "8"} />,
+      key: "8",
+      children: <UseCaseDeployments projectId={selectedProjectId} />,
       hide: !enableDevMode,
     },
   ];

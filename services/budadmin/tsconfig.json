@@ -44,6 +44,12 @@
       ],
       "@/services/*": [
         "src/services/*"
+      ],
+      "@/pages/*": [
+        "src/pages/*"
+      ],
+      "@/flows/*": [
+        "src/flows/*"
       ]
     }
   },

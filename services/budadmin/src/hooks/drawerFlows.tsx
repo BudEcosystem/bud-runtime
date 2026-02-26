@@ -8,6 +8,7 @@ import { useWorkers } from "./useWorkers";
 import { StepComponents } from "src/flows";
 import { useEndPoints } from "./useEndPoint";
 import { useDeployModel } from "src/stores/useDeployModel";
+import { useUseCases } from "src/stores/useUseCases";
 import ChooseCloudSource from "src/flows/Cluster/ChooseCloudSource";
 import { create } from "domain";
 
@@ -26,6 +27,7 @@ export type DrawerFlowType = {
   totalSteps: number;
   title: string;
   description: string;
+  fullPage?: boolean;
 };
 
 // Flow For Cloud Providers -- add-new-cloud-provider"
@@ -5509,6 +5511,183 @@ const pipelineCreateSchedule: DrawerFlowType = {
 };
 
 
+// Flow For Create Use Case Template
+const createUseCaseTemplate: DrawerFlowType = {
+  title: "Create Template",
+  description: "Create a use case deployment template",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Templates", "Create Template"],
+      id: "create-usecase-template",
+      step: 1,
+      component: StepComponents["create-usecase-template"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Create Template",
+        },
+      ],
+      confirmClose: true,
+    },
+  ],
+};
+
+const viewUseCaseTemplate: DrawerFlowType = {
+  title: "Template Details",
+  description: "View use case template details",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Templates", "Template Details"],
+      id: "view-usecase-template",
+      step: 1,
+      component: StepComponents["view-usecase-template"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Template Details",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+const deploymentProgress: DrawerFlowType = {
+  title: "Deployment Progress",
+  description: "View real-time deployment progress",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Deployments", "Deployment Progress"],
+      id: "deployment-progress",
+      step: 1,
+      component: StepComponents["deployment-progress"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Deployment Progress",
+        },
+      ],
+      confirmClose: false,
+    },
+  ],
+};
+
+// Flow For Deploy Use Case (5-step wizard)
+const deployUseCase: DrawerFlowType = {
+  title: "Deploy Use Case",
+  description: "Deploy a use case template",
+  totalSteps: 5,
+  steps: [
+    {
+      navigation: () => ["Use Cases", "Deploy", "Select Template"],
+      id: "deploy-usecase-select-template",
+      component: StepComponents["deploy-usecase-select-template"],
+      step: 1,
+      confirmClose: true,
+      progress: [
+        { status: FormProgressStatus.inProgress, title: "Select Template" },
+        { status: FormProgressStatus.notCompleted, title: "Name" },
+        { status: FormProgressStatus.notCompleted, title: "Cluster" },
+        { status: FormProgressStatus.notCompleted, title: "Configure" },
+        { status: FormProgressStatus.notCompleted, title: "Deploying" },
+      ],
+    },
+    {
+      navigation: () => [
+        "Use Cases",
+        "Deploy",
+        useUseCases.getState().selectedTemplate?.display_name || "Name",
+      ],
+      id: "deploy-usecase-name",
+      component: StepComponents["deploy-usecase-name"],
+      step: 2,
+      confirmClose: true,
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Template" },
+        { status: FormProgressStatus.inProgress, title: "Name" },
+        { status: FormProgressStatus.notCompleted, title: "Cluster" },
+        { status: FormProgressStatus.notCompleted, title: "Configure" },
+        { status: FormProgressStatus.notCompleted, title: "Deploying" },
+      ],
+    },
+    {
+      navigation: () => [
+        "Use Cases",
+        "Deploy",
+        "Select Cluster",
+      ],
+      id: "deploy-usecase-select-cluster",
+      component: StepComponents["deploy-usecase-select-cluster"],
+      step: 3,
+      confirmClose: true,
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Template" },
+        { status: FormProgressStatus.completed, title: "Name" },
+        { status: FormProgressStatus.inProgress, title: "Cluster" },
+        { status: FormProgressStatus.notCompleted, title: "Configure" },
+        { status: FormProgressStatus.notCompleted, title: "Deploying" },
+      ],
+    },
+    {
+      navigation: () => [
+        "Use Cases",
+        "Deploy",
+        useUseCases.getState().selectedTemplate?.display_name || "Configure",
+      ],
+      id: "deploy-usecase-configure",
+      component: StepComponents["deploy-usecase-configure"],
+      step: 4,
+      confirmClose: true,
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Template" },
+        { status: FormProgressStatus.completed, title: "Name" },
+        { status: FormProgressStatus.completed, title: "Cluster" },
+        { status: FormProgressStatus.inProgress, title: "Configure" },
+        { status: FormProgressStatus.notCompleted, title: "Deploying" },
+      ],
+    },
+    {
+      navigation: () => [
+        "Use Cases",
+        "Deploy",
+        useUseCases.getState().selectedDeployment?.name || "Deploying",
+      ],
+      id: "deploy-usecase-progress",
+      component: StepComponents["deploy-usecase-progress"],
+      step: 5,
+      confirmClose: true,
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Template" },
+        { status: FormProgressStatus.completed, title: "Name" },
+        { status: FormProgressStatus.completed, title: "Cluster" },
+        { status: FormProgressStatus.completed, title: "Configure" },
+        { status: FormProgressStatus.inProgress, title: "Deploying" },
+      ],
+    },
+    {
+      navigation: () => [
+        "Use Cases",
+        "Deploy",
+        useUseCases.getState().selectedDeployment?.name || "Success",
+      ],
+      id: "deploy-usecase-success",
+      component: StepComponents["deploy-usecase-success"],
+      step: 5,
+      confirmClose: false,
+      progress: [
+        { status: FormProgressStatus.completed, title: "Select Template" },
+        { status: FormProgressStatus.completed, title: "Name" },
+        { status: FormProgressStatus.completed, title: "Cluster" },
+        { status: FormProgressStatus.completed, title: "Configure" },
+        { status: FormProgressStatus.completed, title: "Deploying" },
+      ],
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -5587,6 +5766,11 @@ const flows = {
   "edit-pipeline": editPipeline,
   "pipeline-execution-details": pipelineExecutionDetails,
   "pipeline-create-schedule": pipelineCreateSchedule,
+  // use case templates
+  "create-usecase-template": createUseCaseTemplate,
+  "view-usecase-template": viewUseCaseTemplate,
+  "deployment-progress": deploymentProgress,
+  "deploy-usecase": deployUseCase,
 };
 
 export const flowMapping: {
@@ -5623,7 +5807,8 @@ export const inProgressSteps = [
   "deploy-quantization-status",
   "quantization-simulation-status",
   "quantization-deployment-status",
-  "run-evaluation-status"
+  "run-evaluation-status",
+  "deploy-usecase-progress"
 ];
 
 export type Flow = keyof typeof flows;

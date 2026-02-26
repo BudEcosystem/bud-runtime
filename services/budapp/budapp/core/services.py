@@ -17,6 +17,7 @@
 
 """Implements core services and business logic that power the microservices, including key functionality and integrations."""
 
+import copy
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -457,6 +458,42 @@ class NotificationService(SessionMixin):
         if payload.content.status == "FAILED":
             await self._update_guardrail_workflow_status(payload, "failed", "Simulation failed")
 
+    async def update_usecase_deployment_events(self, payload: NotificationPayload) -> None:
+        """Update the usecase deployment events for a workflow step."""
+        event_name = BudServeWorkflowStepEventName.USECASE_DEPLOYMENT_EVENTS.value
+        try:
+            await self._update_workflow_step_events(event_name, payload)
+            await self._update_workflow_progress(event_name, payload)
+        except Exception as exc:
+            logger.error("Failed to update usecase deployment workflow step events", exc_info=exc)
+
+        if payload.event == "results" and payload.content.status == "COMPLETED":
+            await self._update_usecase_deployment_workflow_status(payload, "completed", "Deployment completed")
+        if payload.content.status == "FAILED":
+            await self._update_usecase_deployment_workflow_status(payload, "failed", "Deployment failed")
+
+    async def _update_usecase_deployment_workflow_status(
+        self, payload: NotificationPayload, status: str, reason: str
+    ) -> None:
+        """Update the usecase deployment workflow status."""
+        try:
+            db_workflow = await WorkflowDataManager(self.session).retrieve_by_fields(
+                WorkflowModel, {"id": payload.workflow_id}
+            )
+            if db_workflow:
+                from budapp.commons.constants import WorkflowStatusEnum
+
+                workflow_status = WorkflowStatusEnum.COMPLETED if status == "completed" else WorkflowStatusEnum.FAILED
+                self.session.refresh(db_workflow)
+                await WorkflowDataManager(self.session).update_by_fields(
+                    db_workflow, {"status": workflow_status, "reason": reason}
+                )
+                logger.info(f"Updated usecase deployment workflow status to {status} for {payload.workflow_id}")
+        except Exception as exc:
+            logger.error(
+                f"Failed to update usecase deployment workflow status for {payload.workflow_id}", exc_info=exc
+            )
+
     async def _handle_guardrail_simulation_results(self, payload: NotificationPayload) -> None:
         """Handle guardrail simulation completion by computing recommended_clusters.
 
@@ -729,7 +766,7 @@ class NotificationService(SessionMixin):
         Returns:
             The updated step data or None if the update failed.
         """
-        data = step.data
+        data = copy.deepcopy(step.data)
         simulator_events = data.get(event_name, {})
         steps = simulator_events.get("steps", [])
 
@@ -864,6 +901,7 @@ class SubscriberHandler:
             PayloadType.GUARDRAIL_MODEL_ONBOARDING: self._handle_guardrail_model_onboarding,
             PayloadType.GUARDRAIL_DEPLOYMENT: self._handle_guardrail_deployment,
             PayloadType.GUARDRAIL_SIMULATION: self._handle_guardrail_simulation,
+            PayloadType.USECASE_DEPLOYMENT: self._handle_usecase_deployment,
         }
 
         handler = handlers.get(payload.type)
@@ -1041,6 +1079,14 @@ class SubscriberHandler:
         return NotificationResponse(
             object="notification",
             message="Updated guardrail simulation event",
+        ).to_http_response()
+
+    async def _handle_usecase_deployment(self, payload: NotificationPayload) -> NotificationResponse:
+        """Handle the usecase deployment event."""
+        await NotificationService(self.session).update_usecase_deployment_events(payload)
+        return NotificationResponse(
+            object="notification",
+            message="Updated usecase deployment event",
         ).to_http_response()
 
 

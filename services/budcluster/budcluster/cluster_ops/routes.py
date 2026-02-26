@@ -32,6 +32,8 @@ from .schemas import (
     ClusterCreateRequest,
     ClusterDeleteRequest,
     ClusterHealthResponse,
+    CreateHTTPRouteRequest,
+    DeleteNamespaceRequest,
     EditClusterRequest,
     NodeEventsCountSuccessResponse,
     NodeEventsResponse,
@@ -714,4 +716,130 @@ async def periodic_node_status_update():
         logger.exception("Error in periodic node status update: %s", str(e))
         response = ErrorResponse(message="Error in periodic node status update", code=500)
 
+    return response.to_http_response()
+
+
+@cluster_router.post(
+    "/{cluster_id}/httproute",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "HTTPRoute created successfully",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Create HTTPRoute and ReferenceGrant for a use case deployment",
+    tags=["Clusters"],
+)
+async def create_httproute(
+    cluster_id: UUID,
+    request: CreateHTTPRouteRequest,
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Create HTTPRoute and ReferenceGrant for a use case deployment."""
+    try:
+        from .crud import ClusterDataManager
+        from .kubernetes import KubernetesHandler
+
+        db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+        k8s_handler = KubernetesHandler(db_cluster.config_file_dict, db_cluster.ingress_url)
+        route_status, gateway_endpoint = k8s_handler.create_httproute(request.model_dump())
+
+        if route_status != "successful":
+            response = ErrorResponse(message=f"Failed to create HTTPRoute: {route_status}")
+        else:
+            response = SuccessResponse(
+                message="HTTPRoute created successfully",
+                param={"gateway_endpoint": gateway_endpoint},
+            )
+    except HTTPException as e:
+        response = ErrorResponse(code=e.status_code, message=e.detail)
+    except Exception as e:
+        logger.exception(f"Failed to create HTTPRoute for cluster {cluster_id}: {e}")
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e))
+    return response.to_http_response()
+
+
+@cluster_router.delete(
+    "/{cluster_id}/httproute/{deployment_id}",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "HTTPRoute deleted successfully",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Delete HTTPRoute and ReferenceGrant for a use case deployment",
+    tags=["Clusters"],
+)
+async def delete_httproute(
+    cluster_id: UUID,
+    deployment_id: str,
+    namespace: str = Query(..., description="Namespace containing the ReferenceGrant"),
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete HTTPRoute and ReferenceGrant for a use case deployment."""
+    try:
+        from .crud import ClusterDataManager
+        from .kubernetes import KubernetesHandler
+
+        db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+        k8s_handler = KubernetesHandler(db_cluster.config_file_dict, db_cluster.ingress_url)
+        route_status = k8s_handler.delete_httproute(deployment_id, namespace)
+
+        if route_status != "successful":
+            response = ErrorResponse(message=f"Failed to delete HTTPRoute: {route_status}")
+        else:
+            response = SuccessResponse(message="HTTPRoute deleted successfully")
+    except HTTPException as e:
+        response = ErrorResponse(code=e.status_code, message=e.detail)
+    except Exception as e:
+        logger.exception(f"Failed to delete HTTPRoute for cluster {cluster_id}: {e}")
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e))
+    return response.to_http_response()
+
+
+@cluster_router.post(
+    "/{cluster_id}/delete-namespace",
+    responses={
+        status.HTTP_200_OK: {
+            "model": SuccessResponse,
+            "description": "Namespace deleted successfully",
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "model": ErrorResponse,
+            "description": "Internal server error",
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    description="Delete a Kubernetes namespace on the cluster",
+    tags=["Clusters"],
+)
+async def delete_cluster_namespace(
+    cluster_id: UUID,
+    request: DeleteNamespaceRequest,
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Union[SuccessResponse, ErrorResponse]:
+    """Delete a Kubernetes namespace on the cluster."""
+    try:
+        from . import delete_namespace
+        from .crud import ClusterDataManager
+
+        db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
+        await delete_namespace(db_cluster.config_file_dict, request.namespace, db_cluster.platform)
+
+        response = SuccessResponse(message=f"Namespace '{request.namespace}' deleted successfully")
+    except HTTPException as e:
+        response = ErrorResponse(code=e.status_code, message=e.detail)
+    except Exception as e:
+        logger.exception(f"Failed to delete namespace for cluster {cluster_id}: {e}")
+        response = ErrorResponse(code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=str(e))
     return response.to_http_response()

@@ -677,11 +677,13 @@ async fn test_bad_clickhouse_write() {
         json!({"target_id": Uuid::now_v7(), "value": true, "name": "test", "id": Uuid::now_v7()});
     // With async inserts, the write returns Ok immediately (fire-and-forget)
     // The actual validation happens asynchronously in ClickHouse
-    let result = clickhouse
-        .write(&[payload], "BooleanMetricFeedback")
-        .await;
+    let result = clickhouse.write(&[payload], "BooleanMetricFeedback").await;
     // Async inserts return Ok immediately - validation errors are handled asynchronously
-    assert!(result.is_ok(), "Expected Ok for async insert, got: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Expected Ok for async insert, got: {:?}",
+        result
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
