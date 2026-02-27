@@ -370,8 +370,6 @@ microservices:
     enabled: true
     image: budstudio/budmodel:0.5.0
     daprid: budmodel
-    storageClassName: nfs-csi
-    storageSize: "32Gi"
     env:
       LOG_LEVEL: INFO
     nodeSelector: {}
@@ -389,7 +387,6 @@ microservices:
     enabled: true
     image: budstudio/budeval:0.5.0
     daprid: budeval
-    storageClassName: nfs-csi
     env: {}
     nodeSelector: {}
     affinity: {}
