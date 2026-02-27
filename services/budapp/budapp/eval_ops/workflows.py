@@ -85,28 +85,37 @@ class EvalDataSyncWorkflows:
             manifest = asyncio.run(sync_service.fetch_manifest(repository_url))
             logger.info(f"Fetched manifest version: {manifest.version_info.current_version}")
 
-            # Get current version from database
+            # Get current version from database and record sync start if needed
             with Session(engine) as db:
                 current_version = sync_service.get_current_version(db)
 
-            result = {
-                "checked": True,
-                "repository_url": repository_url,
-                "current_version": current_version or "none",
-                "latest_version": manifest.version_info.current_version,
-                "updated": False,
-                "message": "No updates available",
-                "manifest": {
-                    "total_datasets": len(manifest.get_all_datasets()),
-                    "total_size_mb": manifest.get_total_size_mb(),
-                    "sources": list(manifest.datasets.keys()),
-                },
-            }
+                result = {
+                    "checked": True,
+                    "repository_url": repository_url,
+                    "current_version": current_version or "none",
+                    "latest_version": manifest.version_info.current_version,
+                    "updated": False,
+                    "message": "No updates available",
+                    "manifest": {
+                        "total_datasets": len(manifest.get_all_datasets()),
+                        "total_size_mb": manifest.get_total_size_mb(),
+                        "sources": list(manifest.datasets.keys()),
+                    },
+                }
 
-            logger.info(f"Current version: {current_version}")
-            logger.info(f"Manifest version: {manifest.version_info.current_version}")
+                logger.info(f"Current version: {current_version}")
+                logger.info(f"Manifest version: {manifest.version_info.current_version}")
 
-            # Check if sync is needed
+                # Check if sync is needed — record start within same session
+                if force_sync or current_version != manifest.version_info.current_version:
+                    sync_service.record_sync_results(
+                        db,
+                        manifest.version_info.current_version,
+                        "in_progress",
+                        {"source": "local" if app_settings.eval_sync_local_mode else "cloud"},
+                    )
+
+            # Perform sync outside the session (long-running async operations)
             if force_sync or current_version != manifest.version_info.current_version:
                 logger.info(
                     "Sync required: current=%s, latest=%s", current_version, manifest.version_info.current_version
@@ -115,15 +124,6 @@ class EvalDataSyncWorkflows:
                 # Run migrations if needed
                 if manifest.requires_migration(current_version):
                     asyncio.run(sync_service.run_migrations(manifest, current_version))
-
-                # Record sync start
-                with Session(engine) as db:
-                    sync_service.record_sync_results(
-                        db,
-                        manifest.version_info.current_version,
-                        "in_progress",
-                        {"source": "local" if app_settings.eval_sync_local_mode else "cloud"},
-                    )
 
                 # Sync dataset metadata
                 sync_results = asyncio.run(sync_service.sync_datasets(manifest, current_version, force_sync))
