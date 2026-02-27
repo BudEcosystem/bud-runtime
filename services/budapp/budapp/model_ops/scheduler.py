@@ -103,14 +103,12 @@ class CloudModelSyncScheduler:
         provider_types = [provider["provider_type"] for provider in providers]
         logger.debug("Provider types: %s", provider_types)
 
-        # Update is_active to False for previous version of providers
+        # Update is_active to False for previous version of providers, then upsert new providers
+        provider_type_id_mapper = {}
         with Session(engine) as session:
             await ProviderDataManager(session).soft_delete_non_supported_providers(provider_types)
             logger.debug("Soft deleted non-supported providers")
 
-        # Upsert new providers
-        provider_type_id_mapper = {}
-        with Session(engine) as session:
             for provider in providers:
                 provider_data = ProviderCreate(
                     name=provider["name"],
@@ -192,74 +190,56 @@ class CloudModelSyncScheduler:
             logger.error("No cloud model data found from cloud service")
             return
 
-        # Get model ids from model zoo of deprecated cloud models
-        deprecated_model_ids = []
+        # Deprecate, clean up, upsert cloud models, and refresh inference costs — single session
         with Session(engine) as session:
+            # Get model ids from model zoo of deprecated cloud models
             deprecated_models = await ModelDataManager(session).get_deprecated_cloud_models(cloud_model_uris)
             deprecated_model_ids = [db_model.id for db_model in deprecated_models]
             logger.debug("Found %s deprecated cloud models", deprecated_model_ids)
 
-        # Mark endpoints as deprecated
-        with Session(engine) as session:
+            # Mark endpoints as deprecated
             await EndpointDataManager(session).mark_as_deprecated(deprecated_model_ids)
             logger.debug("Marked endpoints as deprecated")
 
-        # Remove deprecated cloud models
-        with Session(engine) as session:
+            # Remove deprecated cloud models
             await CloudModelDataManager(session).remove_non_supported_cloud_models(cloud_model_uris)
             logger.debug("Removed non-supported cloud models")
 
-        # Upsert new cloud models
-        with Session(engine) as session:
+            # Upsert new cloud models
             for cloud_model in cloud_model_data:
                 await CloudModelDataManager(session).upsert_one(CloudModelModel, cloud_model.model_dump(), ["uri"])
                 logger.debug("Upserted cloud model: %s", cloud_model)
-        logger.debug("Upserted %s cloud models", len(cloud_model_data))
+            logger.debug("Upserted %s cloud models", len(cloud_model_data))
 
-        # Refresh inference costs on active endpoints affected by the sync
-        await self._refresh_endpoint_inference_costs(cloud_model_data)
+            # Refresh inference costs on active endpoints affected by the sync
+            synced_uris = {cm.uri for cm in cloud_model_data}
+            if synced_uris:
+                checked = 0
+                updated = 0
+                endpoints = await EndpointDataManager(session).get_active_endpoints_by_cloud_model_uris(synced_uris)
 
-    async def _refresh_endpoint_inference_costs(self, cloud_model_data: List[CloudModelCreate]) -> None:
-        """Refresh Endpoint.inference_cost and Redis cache for endpoints linked to synced CloudModels.
+                endpoint_svc = EndpointService(session)
+                for endpoint in endpoints:
+                    checked += 1
+                    try:
+                        new_cost = await endpoint_svc.get_inference_cost(endpoint.id)
+                        if new_cost is None:
+                            continue
 
-        Args:
-            cloud_model_data: The list of CloudModelCreate objects that were just upserted.
-        """
-        synced_uris = {cm.uri for cm in cloud_model_data}
-        if not synced_uris:
-            return
+                        if endpoint.inference_cost == new_cost:
+                            continue
 
-        checked = 0
-        updated = 0
-        with Session(engine) as session:
-            endpoints = await EndpointDataManager(session).get_active_endpoints_by_cloud_model_uris(synced_uris)
+                        await EndpointDataManager(session).update_by_fields(endpoint, {"inference_cost": new_cost})
+                        await endpoint_svc.update_inference_cost_in_proxy_cache(endpoint.id, new_cost)
+                        updated += 1
+                    except Exception:
+                        logger.exception("Failed to refresh inference cost for endpoint %s", endpoint.id)
 
-            endpoint_svc = EndpointService(session)
-            for endpoint in endpoints:
-                checked += 1
-                try:
-                    new_cost = await endpoint_svc.get_inference_cost(endpoint.id)
-                    if new_cost is None:
-                        continue
-
-                    # Skip if unchanged
-                    if endpoint.inference_cost == new_cost:
-                        continue
-
-                    # Update Endpoint.inference_cost in PostgreSQL
-                    await EndpointDataManager(session).update_by_fields(endpoint, {"inference_cost": new_cost})
-
-                    # Update Redis cache
-                    await endpoint_svc.update_inference_cost_in_proxy_cache(endpoint.id, new_cost)
-                    updated += 1
-                except Exception:
-                    logger.exception("Failed to refresh inference cost for endpoint %s", endpoint.id)
-
-        logger.debug(
-            "Inference cost refresh complete: checked %d endpoints, updated %d",
-            checked,
-            updated,
-        )
+                logger.debug(
+                    "Inference cost refresh complete: checked %d endpoints, updated %d",
+                    checked,
+                    updated,
+                )
 
 
 if __name__ == "__main__":
