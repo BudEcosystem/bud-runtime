@@ -2,4 +2,4 @@ release_name = "bud"
 namespace = "bud"
 value_paths = [ "example.standalone.yaml", "example.secrets.yaml" ]
 optional_value_paths = [ "~/.local/share/bud/bud.override.yaml" ]
-dependencies = [ "cert-manager", "cert-manager-issuer", "dapr", "nfs-csi"]
+dependencies = [ "cert-manager", "cert-manager-issuer", "dapr"]
