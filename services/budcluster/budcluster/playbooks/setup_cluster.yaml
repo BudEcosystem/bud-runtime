@@ -669,6 +669,8 @@
     - name: Deploy DCGM Exporter for GPU metrics
       kubernetes.core.k8s:
         state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
         definition:
           apiVersion: v1
           kind: Service
@@ -693,6 +695,8 @@
     - name: Create DCGM Exporter DaemonSet
       kubernetes.core.k8s:
         state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
         definition:
           apiVersion: apps/v1
           kind: DaemonSet
@@ -737,6 +741,8 @@
     - name: Create ServiceMonitor for DCGM Exporter
       kubernetes.core.k8s:
         state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
         definition:
           apiVersion: monitoring.coreos.com/v1
           kind: ServiceMonitor
