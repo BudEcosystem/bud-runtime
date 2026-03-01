@@ -335,7 +335,7 @@
         hami_scheduler.resources[0].status.availableReplicas > 0
       when:
         - has_nvidia_gpus | default(false)
-        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed' or update_existing_components | default(false) | bool
 
     # HPU Detection and Device Plugin Deployment
     - name: Check for Intel Gaudi HPUs via NFD labels
@@ -716,7 +716,6 @@
               app: dcgm-exporter
       when:
         - has_nvidia_gpus | default(false)
-        - prometheus_needs_deployment | default(true)
 
     - name: Create DCGM Exporter DaemonSet
       kubernetes.core.k8s:
@@ -762,7 +761,6 @@
                       path: /var/lib/kubelet/pod-resources
       when:
         - has_nvidia_gpus | default(false)
-        - prometheus_needs_deployment | default(true)
 
     - name: Create ServiceMonitor for DCGM Exporter
       kubernetes.core.k8s:
@@ -787,7 +785,6 @@
                 path: /metrics
       when:
         - has_nvidia_gpus | default(false)
-        - prometheus_needs_deployment | default(true)
 
     # Wait for NFD to label nodes
     - name: Wait for NFD to label nodes
@@ -821,7 +818,7 @@
           - Aibrix Components: {{ 'Deployed' if aibrix_needs_deployment | default(true) else 'Already exists' }}
           - Scaler: {{ 'Deployed' if scaler_needs_deployment | default(true) else 'Already exists' }}
           - Prometheus Stack: {{ 'Deployed' if prometheus_needs_deployment | default(true) else 'Already exists' }}
-          - DCGM Exporter: {{ 'Deployed' if (has_nvidia_gpus | default(false) and prometheus_needs_deployment | default(true)) else 'Not needed' }}
+          - DCGM Exporter: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
 
           Monitoring Status:
           - Prometheus collecting metrics from all nodes
