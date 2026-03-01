@@ -410,7 +410,7 @@
     - name: Install Aibrix dependencies
       kubernetes.core.k8s:
         state: present
-        src: https://github.com/BudEcosystem/aibrix/releases/download/v0.3.0/aibrix-dependency-v0.3.0.yaml
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.3.0/aibrix-dependency-v0.3.0.yaml
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       when: aibrix_needs_deployment | default(true)
@@ -418,7 +418,7 @@
     - name: Install Aibrix core components
       kubernetes.core.k8s:
         state: present
-        src: https://github.com/BudEcosystem/aibrix/releases/download/v0.3.0/aibrix-core-v0.3.0.yaml
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.3.0/aibrix-core-v0.3.0.yaml
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       when: aibrix_needs_deployment | default(true)
