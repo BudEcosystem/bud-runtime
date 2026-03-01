@@ -203,6 +203,21 @@
       debug:
         msg: "NVIDIA GPUs detected: {{ has_nvidia_gpus }}"
 
+    - name: Detect k3s cluster
+      set_fact:
+        is_k3s_cluster: >-
+          {{
+            cluster_nodes.resources |
+            selectattr('status.nodeInfo.containerRuntimeVersion', 'defined') |
+            map(attribute='status.nodeInfo.containerRuntimeVersion') |
+            select('search', 'k3s') |
+            list | length > 0
+          }}
+
+    - name: Debug cluster runtime detection
+      debug:
+        msg: "k3s cluster detected: {{ is_k3s_cluster }}"
+
     - name: Add NVIDIA Helm repository
       kubernetes.core.helm_repository:
         name: nvidia
@@ -230,6 +245,17 @@
             enabled: true
           toolkit:
             enabled: true
+            env:
+              - name: CONTAINERD_CONFIG
+                value: "{{ '/var/lib/rancher/k3s/agent/etc/containerd/config.toml' if is_k3s_cluster | default(false) | bool else '/etc/containerd/config.toml' }}"
+              - name: CONTAINERD_SOCKET
+                value: "{{ '/run/k3s/containerd/containerd.sock' if is_k3s_cluster | default(false) | bool else '/run/containerd/containerd.sock' }}"
+              - name: CONTAINERD_RUNTIME_CLASS
+                value: nvidia
+              - name: CONTAINERD_SET_AS_DEFAULT
+                value: "true"
+              - name: NVIDIA_CONTAINER_RUNTIME_MODE
+                value: legacy
           devicePlugin:
             enabled: true
           gfd:
