@@ -280,7 +280,7 @@
             securityContext:
               privileged: true
             nodeSelector:
-              gpu: "on"
+              nvidia.com/gpu.present: "true"
             extraVolumes:
               - name: dev
                 hostPath:
