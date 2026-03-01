@@ -259,7 +259,7 @@
         validate_certs: "{{ validate_certs }}"
       when:
         - has_nvidia_gpus | default(false)
-        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed' or update_existing_components | default(false) | bool
 
     - name: Deploy HAMI for GPU Time-Slicing
       kubernetes.core.helm:
@@ -290,7 +290,7 @@
                 mountPath: /dev
       when:
         - has_nvidia_gpus | default(false)
-        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed' or update_existing_components | default(false) | bool
 
     - name: Wait for HAMI scheduler to be ready
       kubernetes.core.k8s_info:
