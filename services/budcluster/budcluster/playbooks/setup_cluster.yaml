@@ -344,25 +344,10 @@
           {{
             cluster_nodes.resources |
             selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1020', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1020', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1021', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1021', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
             map(attribute='metadata.labels') |
             map('dict2items') |
             flatten |
-            selectattr('key', 'match', '^feature\\.node\\.kubernetes\\.io/pci-.*8086\\.device-(1020|1021|1022)$') |
+            selectattr('key', 'match', '^feature\.node\.kubernetes\.io/pci-8086\.device-(1020|1021|1022)$') |
             selectattr('value', 'equalto', 'true') |
             list | length > 0
           }}
@@ -811,9 +796,11 @@
         msg: |
           Cluster Setup Complete:
           - NFD Status: {{ 'Deployed' if nfd_needs_deployment | default(true) else 'Already exists' }}
+          - Cluster Runtime: {{ 'k3s' if is_k3s_cluster | default(false) | bool else 'standard containerd' }}
           - NVIDIA GPUs Detected: {{ has_nvidia_gpus | default(false) }}
           - Intel HPUs Detected: {{ has_intel_hpus | default(false) }}
           - GPU Operator: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
+          - HAMI GPU Time-Slicing: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
           - Intel Device Plugin: {{ 'Deployed' if has_intel_hpus | default(false) else 'Not needed' }}
           - Aibrix Components: {{ 'Deployed' if aibrix_needs_deployment | default(true) else 'Already exists' }}
           - Scaler: {{ 'Deployed' if scaler_needs_deployment | default(true) else 'Already exists' }}
