@@ -219,7 +219,7 @@
         create_namespace: true
         atomic: true
         wait: true
-        wait_timeout: 600
+        wait_timeout: 600s
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
@@ -269,7 +269,7 @@
         create_namespace: false
         atomic: true
         wait: true
-        wait_timeout: 300
+        wait_timeout: 300s
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
@@ -348,7 +348,7 @@
         release_namespace: "{{ namespace }}"
         atomic: true
         wait: true
-        wait_timeout: 300
+        wait_timeout: 300s
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
