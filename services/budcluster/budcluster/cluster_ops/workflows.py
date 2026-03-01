@@ -236,8 +236,8 @@ class RegisterClusterWorkflow:
                     # Update cluster status to NOT_AVAILABLE when configuration fails
                     try:
                         from ..commons.constants import ClusterStatusEnum
-                        from ..db.crud import ClusterDataManager
-                        from ..db.session import DBSession
+                        from .crud import ClusterDataManager
+                        from budmicroframe.shared.psql_service import DBSession
 
                         if cluster_id:
                             with DBSession() as session:
@@ -990,8 +990,8 @@ class RegisterClusterWorkflow:
             # Update cluster status to NOT_AVAILABLE if cluster was created
             try:
                 from ..commons.constants import ClusterStatusEnum
-                from ..db.crud import ClusterDataManager
-                from ..db.session import DBSession
+                from .crud import ClusterDataManager
+                from budmicroframe.shared.psql_service import DBSession
 
                 # Try to get cluster_id from the configure_cluster_result or workflow data
                 cluster_id = configure_cluster_result.get("param", {}).get("cluster_id")
@@ -1096,8 +1096,8 @@ class RegisterClusterWorkflow:
             # Mark cluster as failed in DB since registration failed
             try:
                 from ..commons.constants import ClusterStatusEnum
-                from ..db.crud import ClusterDataManager
-                from ..db.session import DBSession
+                from .crud import ClusterDataManager
+                from budmicroframe.shared.psql_service import DBSession
 
                 with DBSession() as session:
                     db_cluster = asyncio.run(
