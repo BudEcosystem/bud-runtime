@@ -507,7 +507,9 @@ async def delete_prompt_version(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a prompt version by its ID. Cannot delete the default version."""
     try:
-        await PromptVersionService(session).delete_prompt_version(prompt_id, version_id)
+        await PromptVersionService(session).delete_prompt_version(
+            prompt_id, version_id, user_token=current_user.raw_token
+        )
         logger.debug(f"Prompt version deleted: {version_id} for prompt {prompt_id}")
 
         return SuccessResponse(
@@ -789,6 +791,7 @@ async def list_connectors(
             filters=filters_dict,
             order_by=order_by,
             search=search,
+            user_token=current_user.raw_token,
         )
 
         return ConnectorListResponse(
@@ -848,7 +851,7 @@ async def get_connector(
     """
     try:
         # Get the connector from service
-        connector = await PromptService(session).get_connector_by_id(connector_id)
+        connector = await PromptService(session).get_connector_by_id(connector_id, user_token=current_user.raw_token)
 
         return ConnectorResponse(
             connector=connector,
@@ -919,6 +922,7 @@ async def register_connector(
             credentials=request.credentials,
             version=request.version,
             permanent=request.permanent,
+            user_token=current_user.raw_token,
         )
 
         return RegisterConnectorResponse(
@@ -995,6 +999,7 @@ async def disconnect_connector(
             connector_id=connector_id,
             version=version,
             permanent=permanent,
+            user_token=current_user.raw_token,
         )
 
         return DisconnectConnectorResponse(
@@ -1074,6 +1079,7 @@ async def add_tool(
             tool_ids=request.tool_ids,
             version=request.version,
             permanent=request.permanent,
+            user_token=current_user.raw_token,
         )
 
         return AddToolResponse(
@@ -1157,6 +1163,7 @@ async def list_tools(
             filters=filters_dict,
             order_by=order_by,
             search=search,
+            user_token=current_user.raw_token,
         )
 
         return ToolListResponse(
@@ -1195,7 +1202,7 @@ async def get_tool(
     """
     try:
         prompt_service = PromptService(session)
-        tool = await prompt_service.get_tool_by_id(tool_id)
+        tool = await prompt_service.get_tool_by_id(tool_id, user_token=current_user.raw_token)
 
         return ToolResponse(
             tool=tool,
@@ -1334,6 +1341,7 @@ async def initiate_oauth(
             prompt_id=request.prompt_id,
             connector_id=request.connector_id,
             version=request.version,
+            user_token=current_user.raw_token,
         )
 
         return OAuthInitiateResponse(
@@ -1410,6 +1418,7 @@ async def get_oauth_status(
             prompt_id=prompt_id,
             connector_id=connector_id,
             version=version,
+            user_token=current_user.raw_token,
         )
 
         return OAuthStatusResponse(
@@ -1473,6 +1482,7 @@ async def fetch_tools_after_oauth(
             prompt_id=request.prompt_id,
             connector_id=request.connector_id,
             version=request.version,
+            user_token=current_user.raw_token,
         )
 
         return SuccessResponse(
@@ -1521,6 +1531,7 @@ async def oauth_callback(
         callback_data = await prompt_service.handle_oauth_callback(
             code=request.code,
             state=request.state,
+            user_token=current_user.raw_token,
         )
 
         return OAuthCallbackResponse(
@@ -1572,7 +1583,7 @@ async def delete_prompt(
 ) -> Union[SuccessResponse, ErrorResponse]:
     """Delete a prompt by its ID."""
     try:
-        _ = await PromptService(session).delete_active_prompt(prompt_id)
+        _ = await PromptService(session).delete_active_prompt(prompt_id, user_token=current_user.raw_token)
         logger.debug(f"Prompt deleted: {prompt_id}")
 
         return SuccessResponse(
