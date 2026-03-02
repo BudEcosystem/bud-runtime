@@ -80,6 +80,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Make an HTTP request to MCP Foundry API with retry logic.
 
@@ -100,8 +101,9 @@ class MCPFoundryService(metaclass=SingletonMeta):
 
         # Prepare headers
         request_headers = headers or {}
-        if self.api_key:
-            request_headers["Authorization"] = f"Bearer {self.api_key}"
+        effective_token = auth_token or self.api_key
+        if effective_token:
+            request_headers["Authorization"] = f"Bearer {effective_token}"
 
         last_exception = None
 
@@ -190,7 +192,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         logger.error(error_msg)
         raise MCPFoundryException(error_msg, status_code=503)
 
-    async def get_tool_by_id(self, tool_id: Union[str, UUID]) -> Dict[str, Any]:
+    async def get_tool_by_id(self, tool_id: Union[str, UUID], auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Get a single tool by its ID.
 
         Args:
@@ -215,6 +217,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="GET",
                 endpoint=f"/tools/{tool_id_str}",
+                auth_token=auth_token,
             )
 
             logger.debug(
@@ -241,6 +244,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         name: Optional[str] = None,
         offset: int = 0,
         limit: int = 10,
+        auth_token: Optional[str] = None,
     ) -> tuple[List[Dict[str, Any]], int]:
         """List connectors from MCP registry.
 
@@ -282,6 +286,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="GET",
                 endpoint="/admin/mcp-registry/servers",
                 params=params,
+                auth_token=auth_token,
             )
 
             servers = response.get("servers", [])
@@ -301,7 +306,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def get_connector_by_id(self, connector_id: str) -> Dict[str, Any]:
+    async def get_connector_by_id(self, connector_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Get a single connector by its ID from MCP Foundry.
 
         Since the MCP Foundry API doesn't have a direct /connectors/{id} endpoint,
@@ -327,7 +332,11 @@ class MCPFoundryService(metaclass=SingletonMeta):
             while True:
                 # Fetch a page of connectors
                 connectors, total = await self.list_connectors(
-                    show_registered_only=False, show_available_only=True, offset=offset, limit=page_size
+                    show_registered_only=False,
+                    show_available_only=True,
+                    offset=offset,
+                    limit=page_size,
+                    auth_token=auth_token,
                 )
 
                 # Search for connector ID in this batch
@@ -368,6 +377,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         name: Optional[str] = None,
         offset: int = 0,
         limit: int = 10,
+        auth_token: Optional[str] = None,
     ) -> tuple[List[Dict[str, Any]], int]:
         """List connectors from MCP registry filtered by connector IDs.
 
@@ -417,6 +427,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                     method="GET",
                     endpoint="/admin/mcp-registry/servers",
                     params=params,
+                    auth_token=auth_token,
                 )
 
                 servers = response.get("servers", [])
@@ -477,6 +488,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         visibility: str = "public",
         auth_config: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a gateway in MCP Foundry.
 
@@ -526,6 +538,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="POST",
                 endpoint="/gateways",
                 json_data=payload,
+                auth_token=auth_token,
             )
 
             logger.debug(
@@ -545,7 +558,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def get_gateway_by_id(self, gateway_id: str) -> Dict[str, Any]:
+    async def get_gateway_by_id(self, gateway_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Get a gateway by ID from MCP Foundry.
 
         Returns gateway details including all associated tools in the 'tools' array.
@@ -567,6 +580,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="GET",
                 endpoint=f"/gateways/{gateway_id}",
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully retrieved gateway {gateway_id} with {len(response.get('tools', []))} tools")
@@ -586,6 +600,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         name: str,
         associated_tools: List[str],
         visibility: str = "public",
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a virtual server in MCP Foundry.
 
@@ -623,6 +638,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="POST",
                 endpoint="/servers",
                 json_data=payload,
+                auth_token=auth_token,
             )
 
             logger.debug(
@@ -646,6 +662,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         self,
         server_id: str,
         associated_tools: List[str],
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update a virtual server's associated tools.
 
@@ -676,6 +693,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="PUT",
                 endpoint=f"/servers/{server_id}",
                 json_data=payload,
+                auth_token=auth_token,
             )
 
             logger.debug(
@@ -698,6 +716,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         self,
         offset: int = 0,
         limit: int = 20,
+        auth_token: Optional[str] = None,
     ) -> tuple[List[Dict[str, Any]], int]:
         """List all gateways from MCP Foundry.
 
@@ -727,6 +746,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="GET",
                 endpoint="/gateways",
                 params=params,
+                auth_token=auth_token,
             )
 
             if isinstance(response, dict):
@@ -755,6 +775,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         self,
         gateway_id: str,
         update_data: Dict[str, Any],
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update a gateway in MCP Foundry.
 
@@ -779,6 +800,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="PUT",
                 endpoint=f"/gateways/{gateway_id}",
                 json_data=update_data,
+                auth_token=auth_token,
             )
 
             logger.debug(
@@ -798,6 +820,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
     async def delete_gateway(
         self,
         gateway_id: str,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Delete a gateway from MCP Foundry.
 
@@ -817,6 +840,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="DELETE",
                 endpoint=f"/gateways/{gateway_id}",
+                auth_token=auth_token,
             )
             logger.debug(f"Successfully deleted gateway {gateway_id}")
             return response
@@ -832,6 +856,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
     async def delete_virtual_server(
         self,
         server_id: str,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Delete a virtual server from MCP Foundry.
 
@@ -848,6 +873,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="DELETE",
                 endpoint=f"/servers/{server_id}",
+                auth_token=auth_token,
             )
             logger.debug(f"Successfully deleted virtual server {server_id}")
             return response
@@ -860,7 +886,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 return {}
             raise
 
-    async def initiate_oauth(self, gateway_id: str) -> Dict[str, Any]:
+    async def initiate_oauth(self, gateway_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Initiate OAuth flow for a gateway.
 
         Args:
@@ -884,6 +910,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="POST",
                 endpoint="/oauth/api/initiate",
                 params={"gateway_id": gateway_id},
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully initiated OAuth for gateway {gateway_id}")
@@ -898,7 +925,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def get_oauth_status(self, gateway_id: str) -> Dict[str, Any]:
+    async def get_oauth_status(self, gateway_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Get OAuth status for a gateway.
 
         Args:
@@ -924,6 +951,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="GET",
                 endpoint=f"/oauth/status/{gateway_id}",
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully retrieved OAuth status for gateway {gateway_id}")
@@ -938,7 +966,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def fetch_tools_after_oauth(self, gateway_id: str) -> Dict[str, Any]:
+    async def fetch_tools_after_oauth(self, gateway_id: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Fetch tools after OAuth completion for a gateway.
 
         Args:
@@ -959,6 +987,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="POST",
                 endpoint=f"/oauth/fetch-tools/{gateway_id}",
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully fetched tools for gateway {gateway_id}")
@@ -973,7 +1002,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+    async def handle_oauth_callback(self, code: str, state: str, auth_token: Optional[str] = None) -> Dict[str, Any]:
         """Handle OAuth callback by forwarding to MCP Foundry.
 
         Args:
@@ -999,6 +1028,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="POST",
                 endpoint="/oauth/api/callback",
                 params={"code": code, "state": state},
+                auth_token=auth_token,
             )
 
             logger.debug("OAuth callback handled successfully")
@@ -1013,7 +1043,9 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def get_oauth_token_status(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+    async def get_oauth_token_status(
+        self, gateway_id: str, user_id: str, auth_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Check if a user has an active OAuth token for a gateway.
 
         Args:
@@ -1034,6 +1066,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="GET",
                 endpoint=f"/oauth/api/tokens/{gateway_id}",
                 headers={"X-User-ID": user_id},
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully retrieved OAuth token status for gateway {gateway_id}")
@@ -1046,7 +1079,9 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def revoke_oauth_token(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+    async def revoke_oauth_token(
+        self, gateway_id: str, user_id: str, auth_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Revoke the current user's OAuth token for a gateway.
 
         Args:
@@ -1066,6 +1101,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 method="DELETE",
                 endpoint=f"/oauth/api/tokens/{gateway_id}",
                 headers={"X-User-ID": user_id},
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully revoked OAuth token for gateway {gateway_id}")
@@ -1078,7 +1114,9 @@ class MCPFoundryService(metaclass=SingletonMeta):
             logger.error(error_msg, exc_info=True)
             raise MCPFoundryException(error_msg, status_code=500)
 
-    async def admin_revoke_oauth_token(self, gateway_id: str, user_email: str) -> Dict[str, Any]:
+    async def admin_revoke_oauth_token(
+        self, gateway_id: str, user_email: str, auth_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Admin: Revoke another user's OAuth token for a gateway.
 
         Args:
@@ -1097,6 +1135,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             response = await self._make_request(
                 method="DELETE",
                 endpoint=f"/oauth/api/tokens/{gateway_id}/{user_email}",
+                auth_token=auth_token,
             )
 
             logger.debug(f"Successfully admin-revoked OAuth token for gateway {gateway_id}, user {user_email}")
@@ -1115,6 +1154,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         endpoint: str,
         data: aiohttp.FormData,
         params: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Make a multipart/form-data HTTP request to MCP Foundry API.
 
@@ -1123,6 +1163,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             endpoint: API endpoint path
             data: FormData object with file and other fields
             params: Query parameters
+            auth_token: Optional per-user JWT token; falls back to static API key
 
         Returns:
             Dict[str, Any]: Response data
@@ -1133,8 +1174,9 @@ class MCPFoundryService(metaclass=SingletonMeta):
         url = f"{self.base_url}{endpoint}"
 
         request_headers = {}
-        if self.api_key:
-            request_headers["Authorization"] = f"Bearer {self.api_key}"
+        effective_token = auth_token or self.api_key
+        if effective_token:
+            request_headers["Authorization"] = f"Bearer {effective_token}"
 
         last_exception = None
 

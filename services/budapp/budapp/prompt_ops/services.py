@@ -204,7 +204,7 @@ class PromptService(SessionMixin):
 
         return versions_list, count
 
-    async def delete_active_prompt(self, prompt_id: UUID) -> PromptModel:
+    async def delete_active_prompt(self, prompt_id: UUID, user_token: Optional[str] = None) -> PromptModel:
         """Delete an active prompt by updating its status to DELETED."""
         # Retrieve and validate prompt
         db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
@@ -258,7 +258,7 @@ class PromptService(SessionMixin):
                     for gateway_id in gateway_ids:
                         # delete_gateway already handles 404 gracefully
                         # Any other errors will be raised and propagated
-                        await mcp_foundry_service.delete_gateway(gateway_id)
+                        await mcp_foundry_service.delete_gateway(gateway_id, auth_token=user_token)
                         logger.debug(f"Successfully deleted MCP Foundry gateway {gateway_id}")
 
         if total_gateways > 0:
@@ -278,7 +278,7 @@ class PromptService(SessionMixin):
 
                     try:
                         # delete_virtual_server handles 404 gracefully (returns empty dict)
-                        await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                        await mcp_foundry_service.delete_virtual_server(virtual_server_id, auth_token=user_token)
                         logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
                     except MCPFoundryException as e:
                         # Log error but continue - don't block prompt deletion
@@ -1002,6 +1002,7 @@ class PromptService(SessionMixin):
         filters: dict = {},
         order_by: list = [],
         search: bool = False,
+        user_token: Optional[str] = None,
     ) -> tuple[list[ConnectorListItem], int]:
         """Get connectors list from MCP Foundry.
 
@@ -1074,6 +1075,7 @@ class PromptService(SessionMixin):
                         name=name_filter,
                         offset=offset,
                         limit=limit,
+                        auth_token=user_token,
                     )
                     logger.debug(f"Successfully fetched {total_count} registered connectors from MCP Foundry")
 
@@ -1094,6 +1096,7 @@ class PromptService(SessionMixin):
                             name=name_filter,
                             offset=fetch_offset,
                             limit=page_size,
+                            auth_token=user_token,
                         )
 
                         # Add to our list
@@ -1135,6 +1138,7 @@ class PromptService(SessionMixin):
                         name=name_filter,
                         offset=offset,
                         limit=limit,
+                        auth_token=user_token,
                     )
                     logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
             except MCPFoundryException as e:
@@ -1153,7 +1157,12 @@ class PromptService(SessionMixin):
             # Call MCP Foundry API
             try:
                 mcp_foundry_response, total_count = await mcp_foundry_service.list_connectors(
-                    show_registered_only=False, show_available_only=True, name=name_filter, offset=offset, limit=limit
+                    show_registered_only=False,
+                    show_available_only=True,
+                    name=name_filter,
+                    offset=offset,
+                    limit=limit,
+                    auth_token=user_token,
                 )
                 logger.debug(f"Successfully fetched {total_count} connectors from MCP Foundry")
             except MCPFoundryException as e:
@@ -1186,7 +1195,7 @@ class PromptService(SessionMixin):
 
         return connector_items, total_count
 
-    async def get_connector_by_id(self, connector_id: str) -> Connector:
+    async def get_connector_by_id(self, connector_id: str, user_token: Optional[str] = None) -> Connector:
         """Get a single connector by its ID from MCP Foundry.
 
         Args:
@@ -1202,7 +1211,7 @@ class PromptService(SessionMixin):
 
         try:
             # Use the new get_connector_by_id method which fetches all connectors with pagination
-            connector_data = await mcp_foundry_service.get_connector_by_id(connector_id)
+            connector_data = await mcp_foundry_service.get_connector_by_id(connector_id, auth_token=user_token)
 
             # Map MCP Foundry auth_type to our enum using mapping table
             auth_type_str = connector_data.get("auth_type", "Open")
@@ -1379,6 +1388,7 @@ class PromptService(SessionMixin):
         credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials],
         version: Optional[int] = None,
         permanent: bool = False,
+        user_token: Optional[str] = None,
     ) -> GatewayResponse:
         """Register a connector for a prompt by creating gateway in MCP Foundry.
 
@@ -1440,7 +1450,7 @@ class PromptService(SessionMixin):
 
         # Get connector details from MCP Foundry
         try:
-            connector = await self.get_connector_by_id(connector_id)
+            connector = await self.get_connector_by_id(connector_id, user_token=user_token)
         except ClientException as e:
             logger.error(f"Failed to retrieve connector {connector_id}: {e}")
             raise
@@ -1475,7 +1485,12 @@ class PromptService(SessionMixin):
         # Create gateway in MCP Foundry
         try:
             gateway_response = await mcp_foundry_service.create_gateway(
-                name=gateway_name, url=connector.url, transport=transport, visibility="public", auth_config=auth_config
+                name=gateway_name,
+                url=connector.url,
+                transport=transport,
+                visibility="public",
+                auth_config=auth_config,
+                auth_token=user_token,
             )
 
             gateway_id = gateway_response.get("id", gateway_response.get("gateway_id"))
@@ -1570,6 +1585,7 @@ class PromptService(SessionMixin):
         tool_ids: List[str],
         version: Optional[int] = None,
         permanent: bool = False,
+        user_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add tools for a prompt by creating/updating virtual server in MCP Foundry.
 
@@ -1643,7 +1659,7 @@ class PromptService(SessionMixin):
         all_tool_names = []
         for tool_id in all_tool_ids:
             try:
-                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id, auth_token=user_token)
                 original_name = tool_data["originalName"]
                 tool_name = tool_data["name"]
                 all_tool_original_names.append(original_name)
@@ -1669,13 +1685,13 @@ class PromptService(SessionMixin):
                 # Update existing virtual server with ALL tools from ALL connectors
                 logger.debug(f"Updating virtual server {virtual_server_id} with {len(all_tool_ids)} tools")
                 await mcp_foundry_service.update_virtual_server(
-                    server_id=virtual_server_id, associated_tools=all_tool_ids
+                    server_id=virtual_server_id, associated_tools=all_tool_ids, auth_token=user_token
                 )
             else:
                 # Create new virtual server with ALL tools
                 logger.debug(f"Creating virtual server for prompt {prompt_id} version {target_version}")
                 vs_response = await mcp_foundry_service.create_virtual_server(
-                    name=virtual_server_name, associated_tools=all_tool_ids, visibility="public"
+                    name=virtual_server_name, associated_tools=all_tool_ids, visibility="public", auth_token=user_token
                 )
                 virtual_server_id = vs_response.get("id")
 
@@ -1760,7 +1776,12 @@ class PromptService(SessionMixin):
         }
 
     async def disconnect_connector_from_prompt(
-        self, budprompt_id: str, connector_id: str, version: Optional[int] = None, permanent: bool = False
+        self,
+        budprompt_id: str,
+        connector_id: str,
+        version: Optional[int] = None,
+        permanent: bool = False,
+        user_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Disconnect a connector from a prompt by deleting gateway and cleaning config.
 
@@ -1817,7 +1838,7 @@ class PromptService(SessionMixin):
         tool_names_to_remove = []
         for tool_id in tool_ids_to_remove:
             try:
-                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id)
+                tool_data = await mcp_foundry_service.get_tool_by_id(tool_id, auth_token=user_token)
                 original_name = tool_data["originalName"]
                 tool_name = tool_data["name"]
                 tool_original_names_to_remove.append(original_name)
@@ -1829,7 +1850,7 @@ class PromptService(SessionMixin):
 
         # Step 4: Delete gateway in MCP Foundry (auto-removes tools from virtual server)
         try:
-            await mcp_foundry_service.delete_gateway(gateway_id)
+            await mcp_foundry_service.delete_gateway(gateway_id, auth_token=user_token)
             logger.debug(f"Successfully deleted gateway {gateway_id}")
         except MCPFoundryException as e:
             logger.error(f"Failed to delete gateway {gateway_id}: {e}")
@@ -1863,7 +1884,7 @@ class PromptService(SessionMixin):
             deleted_virtual_server_id = virtual_server_id  # Track for metadata cleanup
             if virtual_server_id:
                 try:
-                    await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                    await mcp_foundry_service.delete_virtual_server(virtual_server_id, auth_token=user_token)
                     virtual_server_deleted = True  # Track successful deletion for metadata cleanup
                     logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
                 except MCPFoundryException as e:
@@ -2154,6 +2175,7 @@ class PromptService(SessionMixin):
         filters: dict = {},
         order_by: list = [],
         search: bool = False,
+        user_token: Optional[str] = None,
     ) -> tuple[list[ToolListItem], int]:
         """Get tools list from MCP Foundry for a specific prompt and connector.
 
@@ -2206,7 +2228,7 @@ class PromptService(SessionMixin):
 
         # 3. Fetch gateway with all tools from MCP Foundry
         try:
-            gateway_data = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+            gateway_data = await mcp_foundry_service.get_gateway_by_id(gateway_id, auth_token=user_token)
             all_tools = gateway_data.get("tools", [])
 
             logger.debug(f"Successfully fetched gateway {gateway_id} with {len(all_tools)} tools from MCP Foundry")
@@ -2243,7 +2265,7 @@ class PromptService(SessionMixin):
 
         return tool_items, total_count
 
-    async def get_tool_by_id(self, tool_id: UUID) -> Tool:
+    async def get_tool_by_id(self, tool_id: UUID, user_token: Optional[str] = None) -> Tool:
         """Get a single tool by ID from MCP Foundry.
 
         Args:
@@ -2259,7 +2281,7 @@ class PromptService(SessionMixin):
 
         # Fetch from MCP Foundry
         try:
-            mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(tool_id)
+            mcp_foundry_response = await mcp_foundry_service.get_tool_by_id(tool_id, auth_token=user_token)
             logger.debug(f"Successfully fetched tool from MCP Foundry: {tool_id}")
 
         except MCPFoundryException as e:
@@ -2394,6 +2416,7 @@ class PromptService(SessionMixin):
         prompt_id: str,
         connector_id: str,
         version: Optional[int] = 1,
+        user_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Initiate OAuth flow for a connector.
 
@@ -2444,7 +2467,7 @@ class PromptService(SessionMixin):
             logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
 
             # 5. Call MCP Foundry to initiate OAuth
-            oauth_response = await mcp_foundry_service.initiate_oauth(gateway_id)
+            oauth_response = await mcp_foundry_service.initiate_oauth(gateway_id, auth_token=user_token)
 
             logger.debug(f"OAuth flow initiated successfully for gateway {gateway_id}")
             return oauth_response
@@ -2469,6 +2492,7 @@ class PromptService(SessionMixin):
         prompt_id: str,
         connector_id: str,
         version: Optional[int] = 1,
+        user_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get OAuth status for a connector.
 
@@ -2515,7 +2539,7 @@ class PromptService(SessionMixin):
             logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
 
             # 5. Call MCP Foundry to get OAuth status
-            oauth_status = await mcp_foundry_service.get_oauth_status(gateway_id)
+            oauth_status = await mcp_foundry_service.get_oauth_status(gateway_id, auth_token=user_token)
 
             logger.debug(f"OAuth status retrieved successfully for gateway {gateway_id}")
             return oauth_status
@@ -2540,6 +2564,7 @@ class PromptService(SessionMixin):
         prompt_id: str,
         connector_id: str,
         version: Optional[int] = 1,
+        user_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch tools after OAuth for a connector.
 
@@ -2586,7 +2611,7 @@ class PromptService(SessionMixin):
             logger.debug(f"Found gateway_id {gateway_id} for connector {connector_id}")
 
             # 5. Call MCP Foundry to fetch tools
-            fetch_response = await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+            fetch_response = await mcp_foundry_service.fetch_tools_after_oauth(gateway_id, auth_token=user_token)
 
             logger.debug(f"Tools fetched successfully for gateway {gateway_id}")
             return fetch_response
@@ -2601,7 +2626,7 @@ class PromptService(SessionMixin):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             ) from e
 
-    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+    async def handle_oauth_callback(self, code: str, state: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Handle OAuth callback.
 
         Args:
@@ -2618,7 +2643,7 @@ class PromptService(SessionMixin):
 
         try:
             # Forward to MCP Foundry
-            callback_response = await mcp_foundry_service.handle_oauth_callback(code, state)
+            callback_response = await mcp_foundry_service.handle_oauth_callback(code, state, auth_token=user_token)
 
             logger.debug("OAuth callback handled successfully")
             return callback_response
@@ -3591,7 +3616,7 @@ class PromptVersionService(SessionMixin):
 
         return version_response
 
-    async def delete_prompt_version(self, prompt_id: UUID, version_id: UUID) -> None:
+    async def delete_prompt_version(self, prompt_id: UUID, version_id: UUID, user_token: Optional[str] = None) -> None:
         """Delete a prompt version (soft delete) with validation."""
         # Retrieve the prompt to check default version
         db_prompt = await PromptDataManager(self.session).retrieve_by_fields(
@@ -3653,7 +3678,7 @@ class PromptVersionService(SessionMixin):
                 for gateway_id in gateway_ids:
                     # delete_gateway already handles 404 gracefully, so we can call directly
                     # Any other errors will be raised and propagated
-                    await mcp_foundry_service.delete_gateway(gateway_id)
+                    await mcp_foundry_service.delete_gateway(gateway_id, auth_token=user_token)
                     logger.debug(f"Successfully deleted MCP Foundry gateway {gateway_id}")
 
         # Delete virtual server if present in version metadata
@@ -3667,7 +3692,7 @@ class PromptVersionService(SessionMixin):
 
                 try:
                     # delete_virtual_server handles 404 gracefully (returns empty dict)
-                    await mcp_foundry_service.delete_virtual_server(virtual_server_id)
+                    await mcp_foundry_service.delete_virtual_server(virtual_server_id, auth_token=user_token)
                     logger.debug(f"Successfully deleted virtual server {virtual_server_id}")
                 except MCPFoundryException as e:
                     # Log error but continue - don't block version deletion
