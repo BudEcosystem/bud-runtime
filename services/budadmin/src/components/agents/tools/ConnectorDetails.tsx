@@ -508,7 +508,7 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
     }
   }, [selectedConnectorDetails?.url]); // Re-measure when connection URL changes (can affect height)
 
-  // Auto-populate redirect URI with current browser URL when it becomes visible
+  // Auto-populate form fields with defaults from credential_schema and redirect URI
   useEffect(() => {
     if (typeof window === 'undefined' || !selectedConnectorDetails?.credential_schema) return;
 
@@ -517,22 +517,31 @@ export const ConnectorDetails: React.FC<ConnectorDetailsProps> = ({
       if (!field.visible_when || field.visible_when.length === 0) return true;
       return grantTypeValue && field.visible_when.includes(grantTypeValue);
     });
-    const redirectField = visibleFields.find(f => isRedirectUriField(f.field));
 
-    if (redirectField) {
-      // Use full URL, but clean OAuth-specific params to avoid issues on re-authentication
-      const url = new URL(window.location.href);
-      url.searchParams.delete('code');
-      url.searchParams.delete('state');
-      const currentUrl = url.toString();
-      setFormData(prev => {
-        // Only set if not already populated
-        if (!prev[redirectField.field]) {
-          return { ...prev, [redirectField.field]: currentUrl };
+    setFormData(prev => {
+      const updated = { ...prev };
+      let changed = false;
+
+      // Populate default values from credential_schema (e.g. token_url, authorization_url)
+      for (const field of visibleFields) {
+        if (field.default && !updated[field.field]) {
+          updated[field.field] = field.default;
+          changed = true;
         }
-        return prev;
-      });
-    }
+      }
+
+      // Auto-populate redirect URI with current browser URL
+      const redirectField = visibleFields.find(f => isRedirectUriField(f.field));
+      if (redirectField && !updated[redirectField.field]) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        updated[redirectField.field] = url.toString();
+        changed = true;
+      }
+
+      return changed ? updated : prev;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConnectorDetails?.credential_schema, formData.grant_type]);
 

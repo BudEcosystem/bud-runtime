@@ -279,7 +279,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
       const initialForm: Record<string, string> = {};
       if (connector.credential_schema) {
         for (const field of connector.credential_schema) {
-          initialForm[field.field] = "";
+          initialForm[field.field] = field.default || "";
         }
       }
       setSelectedConnector(connector);
@@ -311,20 +311,31 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
     });
   }, [credentialSchema, credentialForm]);
 
-  // Auto-populate redirect URI with the /agents page URL (where useOAuthCallback runs)
+  // Auto-populate defaults from credential_schema and redirect URI
   useEffect(() => {
     if (typeof window === "undefined" || !selectedConnector?.credential_schema) return;
 
-    const redirectField = visibleFields.find((f) => isRedirectUriField(f.field));
-    if (redirectField) {
-      const callbackUrl = `${window.location.origin}/oauth/callback`;
-      setCredentialForm((prev) => {
-        if (!prev[redirectField.field]) {
-          return { ...prev, [redirectField.field]: callbackUrl };
+    setCredentialForm((prev) => {
+      const updated = { ...prev };
+      let changed = false;
+
+      // Populate default values from credential_schema (e.g. token_url, authorization_url)
+      for (const field of visibleFields) {
+        if (field.default && !updated[field.field]) {
+          updated[field.field] = field.default;
+          changed = true;
         }
-        return prev;
-      });
-    }
+      }
+
+      // Auto-populate redirect URI with the /oauth/callback URL
+      const redirectField = visibleFields.find((f) => isRedirectUriField(f.field));
+      if (redirectField && !updated[redirectField.field]) {
+        updated[redirectField.field] = `${window.location.origin}/oauth/callback`;
+        changed = true;
+      }
+
+      return changed ? updated : prev;
+    });
   }, [selectedConnector?.credential_schema, visibleFields]);
 
   const isFormValid = useMemo(() => {

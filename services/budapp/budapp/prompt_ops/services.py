@@ -1217,8 +1217,10 @@ class PromptService(SessionMixin):
             auth_type_str = connector_data.get("auth_type", "Open")
             auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
 
-            # Get credential schema based on auth type
-            credential_schema = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+            # Get credential schema with defaults from oauth_config
+            from ..connector_ops.services import _enrich_credential_schema
+
+            credential_schema = _enrich_credential_schema(connector_data)
 
             # Build Connector object
             connector = Connector(
