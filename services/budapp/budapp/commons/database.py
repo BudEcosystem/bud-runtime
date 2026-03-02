@@ -56,10 +56,11 @@ def get_engine() -> Engine:
 
     return create_engine(
         postgres_url,
-        pool_size=20,  # Increased from default 5
-        max_overflow=40,  # Increased from default 10
+        pool_size=30,  # Increased from 20
+        max_overflow=60,  # Increased from 40 (total: 90)
         pool_pre_ping=True,  # Verify connections before using them
         pool_recycle=3600,  # Recycle connections after 1 hour
+        pool_timeout=10,  # Fail fast instead of hanging when pool exhausted
         echo_pool=True,  # Enable pool logging for debugging
     )
 
