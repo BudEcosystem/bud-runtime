@@ -208,6 +208,45 @@ def _transform_credentials_to_mcp_format(
     return auth_config
 
 
+def _enrich_credential_schema(connector: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Build credential_schema with defaults from the connector's oauth_config.
+
+    MCP Foundry returns an ``oauth_config`` block on OAuth connectors containing
+    provider-specific values such as ``token_url`` and ``authorize_url``.  This
+    helper copies the hardcoded field definitions from
+    ``CONNECTOR_AUTH_CREDENTIALS_MAP`` and injects those values as ``default``
+    entries so the frontend can pre-populate the form.
+    """
+    auth_type_str = connector.get("auth_type", "Open")
+    auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
+    # Deep-copy so we never mutate the module-level constant
+    base_schema = [dict(f) for f in CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])]
+
+    oauth_cfg = connector.get("oauth_config") or {}
+    if not oauth_cfg:
+        return base_schema
+
+    # Map oauth_config keys → credential_schema field names
+    defaults_map: Dict[str, str] = {}
+    if oauth_cfg.get("token_url"):
+        defaults_map["token_url"] = oauth_cfg["token_url"]
+    if oauth_cfg.get("authorize_url"):
+        defaults_map["authorization_url"] = oauth_cfg["authorize_url"]
+    if oauth_cfg.get("scopes"):
+        scopes = oauth_cfg["scopes"]
+        if isinstance(scopes, list):
+            defaults_map["scopes"] = " ".join(scopes)
+        elif isinstance(scopes, str):
+            defaults_map["scopes"] = scopes
+
+    for field in base_schema:
+        default_val = defaults_map.get(field["field"])
+        if default_val:
+            field["default"] = default_val
+
+    return base_schema
+
+
 class ConnectorService:
     """Service for global connector operations — thin proxy to MCP Foundry."""
 
@@ -229,11 +268,9 @@ class ConnectorService:
             limit=limit,
             auth_token=user_token,
         )
-        # Enrich each connector with credential_schema and normalize logo_url → icon
+        # Enrich each connector with credential_schema (with defaults) and normalize logo_url → icon
         for c in connectors:
-            auth_type_str = c.get("auth_type", "Open")
-            auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
-            c["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+            c["credential_schema"] = _enrich_credential_schema(c)
             # Map logo_url to icon for frontend consistency
             if "logo_url" in c:
                 c["icon"] = c.pop("logo_url")
@@ -242,10 +279,8 @@ class ConnectorService:
     async def get_registry_connector(self, connector_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Get a single connector from the registry."""
         connector = await mcp_foundry_service.get_connector_by_id(connector_id, auth_token=user_token)
-        # Enrich with credential_schema and normalize logo_url → icon
-        auth_type_str = connector.get("auth_type", "Open")
-        auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
-        connector["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+        # Enrich with credential_schema (with defaults) and normalize logo_url → icon
+        connector["credential_schema"] = _enrich_credential_schema(connector)
         if "logo_url" in connector:
             connector["icon"] = connector.pop("logo_url")
         return connector
