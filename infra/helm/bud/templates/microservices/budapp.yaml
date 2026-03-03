@@ -109,10 +109,6 @@ spec:
             value: "false"
           - name: MCP_FOUNDRY_BASE_URL
             value: http://{{ .Release.Name }}-mcpgateway:4444
-          - name: ENTRYPOINT_MCPGATEWAY_EMAIL
-            value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_EMAIL }}
-          - name: ENTRYPOINT_MCPGATEWAY_PASSWORD
-            value: {{ .Values.microservices.mcpgateway.env.PLATFORM_ADMIN_PASSWORD }}
           - name: OAUTH_RETURN_URL_ALLOWED_DOMAINS
             value: "{{ include "bud.ingress.hosts.budadmin" . }},{{ include "bud.ingress.hosts.onyx" . }},localhost,127.0.0.1"
           - name: USECASE_DOMAIN
