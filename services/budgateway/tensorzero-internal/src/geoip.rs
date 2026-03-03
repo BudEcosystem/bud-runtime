@@ -1,4 +1,4 @@
-use maxminddb::{geoip2, MaxMindDBError, Reader};
+use maxminddb::{geoip2, Reader};
 use std::net::IpAddr;
 use std::path::Path;
 use std::sync::Arc;
@@ -59,59 +59,53 @@ impl GeoIpService {
         };
 
         // Perform lookup
-        match reader.lookup::<geoip2::City>(ip) {
-            Ok(city_data) => {
+        let lookup_result = match reader.lookup(ip) {
+            Ok(result) => result,
+            Err(e) => {
+                error!("GeoIP lookup error for IP {}: {}", ip, e);
+                return;
+            }
+        };
+
+        if !lookup_result.has_data() {
+            debug!("No GeoIP data found for IP: {}", ip);
+            return;
+        }
+
+        match lookup_result.decode::<geoip2::City>() {
+            Ok(Some(city_data)) => {
                 // Country information
-                if let Some(country) = city_data.country {
-                    record.country_code = country.iso_code.map(|s| s.to_string());
-                    if let Some(names) = country.names {
-                        record.country_name = names.get("en").map(|s| s.to_string());
-                    }
+                if let Some(iso_code) = city_data.country.iso_code {
+                    record.country_code = Some(iso_code.to_string());
                 }
+                record.country_name = city_data.country.names.english.map(|s| s.to_string());
 
                 // Region/State information
-                if let Some(subdivisions) = city_data.subdivisions {
-                    if let Some(subdivision) = subdivisions.first() {
-                        record.region = subdivision
-                            .iso_code
-                            .or_else(|| {
-                                subdivision
-                                    .names
-                                    .as_ref()
-                                    .and_then(|n| n.get("en").copied())
-                            })
-                            .map(|s| s.to_string());
-                    }
+                if let Some(subdivision) = city_data.subdivisions.first() {
+                    record.region = subdivision
+                        .iso_code
+                        .or(subdivision.names.english)
+                        .map(|s| s.to_string());
                 }
 
                 // City information
-                if let Some(city) = city_data.city {
-                    if let Some(names) = city.names {
-                        record.city = names.get("en").map(|s| s.to_string());
-                    }
-                }
+                record.city = city_data.city.names.english.map(|s| s.to_string());
 
                 // Location information
-                if let Some(location) = city_data.location {
-                    record.latitude = location.latitude.map(|v| v as f32);
-                    record.longitude = location.longitude.map(|v| v as f32);
-                    record.timezone = location.time_zone.map(|s| s.to_string());
-                }
-
-                // Network information
-                // Note: ASN/ISP information is typically only available in GeoIP2 ISP or Enterprise databases
-                // The City database we're using doesn't include this information
+                record.latitude = city_data.location.latitude.map(|v| v as f32);
+                record.longitude = city_data.location.longitude.map(|v| v as f32);
+                record.timezone = city_data.location.time_zone.map(|s| s.to_string());
 
                 debug!(
                     "GeoIP lookup successful for {}: country={:?}, city={:?}",
                     ip, record.country_code, record.city
                 );
             }
-            Err(MaxMindDBError::AddressNotFoundError(_)) => {
+            Ok(None) => {
                 debug!("No GeoIP data found for IP: {}", ip);
             }
             Err(e) => {
-                error!("GeoIP lookup error for IP {}: {}", ip, e);
+                error!("GeoIP decode error for IP {}: {}", ip, e);
             }
         }
     }

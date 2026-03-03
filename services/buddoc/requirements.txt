@@ -3,11 +3,11 @@ dapr >= 1.13.0
 budmicroframe @ git+https://github.com/BudEcosystem/bud-microframe.git
 
 # API
-fastapi >= 0.111.1
-uvicorn >= 0.30.3
+fastapi >= 0.115.0
+uvicorn >= 0.34.0
 pydantic >= 2.8.2
 pydantic-settings >= 2.3.4
-python-multipart >= 0.0.6  # For file upload support
+python-multipart >= 0.0.22  # For file upload support
 
 # Document Processing
 docling >= 2.0.0  # Document OCR and VLM processing

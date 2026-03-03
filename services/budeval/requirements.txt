@@ -2,15 +2,15 @@
 dapr >= 1.13.0
 
 # API
-fastapi >= 0.111.1
-uvicorn >= 0.30.3
+fastapi >= 0.115.0
+uvicorn >= 0.34.0
 pydantic >= 2.8.2
 pydantic-settings >= 2.3.4
 
 # Utils
 structlog >= 24.4.0
 cachetools >= 5.4.0
-aiohttp >= 3.8.0
+aiohttp >= 3.13.3
 aiofiles >= 23.0.0
 
 # ClickHouse

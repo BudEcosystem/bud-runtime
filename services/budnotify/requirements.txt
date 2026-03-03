@@ -3,11 +3,11 @@ dapr >= 1.13.0
 dapr-ext-workflow
 
 # API
-fastapi >= 0.111.1
-uvicorn >= 0.30.3
+fastapi >= 0.115.0
+uvicorn >= 0.34.0
 pydantic >= 2.8.2
 pydantic-settings >= 2.3.4
-aiohttp>=3.10.5
+aiohttp>=3.13.3
 ujson >= 5.10.0
 
 # Utils
