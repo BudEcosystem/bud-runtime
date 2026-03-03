@@ -240,7 +240,6 @@ class AppConfig(BaseAppConfig):
     bud_sentinel_base_url: Optional[str] = Field(default=None, alias="BUD_SENTINEL_BASE_URL")
     # MCP Foundry
     mcp_foundry_base_url: AnyHttpUrl = Field(alias="MCP_FOUNDRY_BASE_URL")
-    mcp_foundry_api_key: str = Field(alias="MCP_FOUNDRY_API_KEY")
 
     # OAuth return URL allowed domains (comma-separated)
     oauth_return_url_allowed_domains: str = Field(

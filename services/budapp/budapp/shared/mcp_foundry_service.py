@@ -41,7 +41,6 @@ class MCPFoundryService(metaclass=SingletonMeta):
     def __init__(self):
         """Initialize the MCP Foundry service."""
         self.base_url = str(app_settings.mcp_foundry_base_url).rstrip("/")
-        self.api_key = app_settings.mcp_foundry_api_key
         self.timeout = aiohttp.ClientTimeout(total=30)
         self.max_retries = 3
         self.retry_delay = 1  # seconds
@@ -49,11 +48,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         # Initialize session as None, will be created on demand
         self._session: Optional[aiohttp.ClientSession] = None
 
-        logger.debug(
-            "MCP Foundry service initialized",
-            base_url=self.base_url,
-            has_api_key=bool(self.api_key),
-        )
+        logger.debug("MCP Foundry service initialized", base_url=self.base_url)
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create the aiohttp session.
@@ -101,9 +96,8 @@ class MCPFoundryService(metaclass=SingletonMeta):
 
         # Prepare headers
         request_headers = headers or {}
-        effective_token = auth_token or self.api_key
-        if effective_token:
-            request_headers["Authorization"] = f"Bearer {effective_token}"
+        if auth_token:
+            request_headers["Authorization"] = f"Bearer {auth_token}"
 
         last_exception = None
 
@@ -1174,9 +1168,8 @@ class MCPFoundryService(metaclass=SingletonMeta):
         url = f"{self.base_url}{endpoint}"
 
         request_headers = {}
-        effective_token = auth_token or self.api_key
-        if effective_token:
-            request_headers["Authorization"] = f"Bearer {effective_token}"
+        if auth_token:
+            request_headers["Authorization"] = f"Bearer {auth_token}"
 
         last_exception = None
 
