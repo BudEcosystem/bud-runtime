@@ -183,20 +183,18 @@
           {{
             cluster_nodes.resources |
             selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.nvidia\\.com/gpu\\.present', 'defined') |
-            selectattr('metadata.labels.nvidia\\.com/gpu\\.present', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-10de\\.present', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-10de\\.present', 'equalto', 'true') |
+            map(attribute='metadata.labels') |
+            map('dict2items') |
+            flatten |
+            selectattr('key', 'equalto', 'nvidia.com/gpu.present') |
+            selectattr('value', 'equalto', 'true') |
             list | length > 0 or
             cluster_nodes.resources |
             selectattr('metadata.labels', 'defined') |
             map(attribute='metadata.labels') |
             map('dict2items') |
             flatten |
-            selectattr('key', 'match', '^feature\\.node\\.kubernetes\\.io/pci-.*10de\\.present$') |
+            selectattr('key', 'equalto', 'feature.node.kubernetes.io/pci-10de.present') |
             selectattr('value', 'equalto', 'true') |
             list | length > 0
           }}
@@ -204,6 +202,21 @@
     - name: Debug GPU detection result
       debug:
         msg: "NVIDIA GPUs detected: {{ has_nvidia_gpus }}"
+
+    - name: Detect k3s cluster
+      set_fact:
+        is_k3s_cluster: >-
+          {{
+            cluster_nodes.resources |
+            selectattr('status.nodeInfo.containerRuntimeVersion', 'defined') |
+            map(attribute='status.nodeInfo.containerRuntimeVersion') |
+            select('search', 'k3s') |
+            list | length > 0
+          }}
+
+    - name: Debug cluster runtime detection
+      debug:
+        msg: "k3s cluster detected: {{ is_k3s_cluster }}"
 
     - name: Add NVIDIA Helm repository
       kubernetes.core.helm_repository:
@@ -221,7 +234,7 @@
         create_namespace: true
         atomic: true
         wait: true
-        wait_timeout: 600
+        wait_timeout: 600s
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
@@ -232,6 +245,17 @@
             enabled: true
           toolkit:
             enabled: true
+            env:
+              - name: CONTAINERD_CONFIG
+                value: "{{ '/var/lib/rancher/k3s/agent/etc/containerd/config.toml' if is_k3s_cluster | default(false) | bool else '/etc/containerd/config.toml' }}"
+              - name: CONTAINERD_SOCKET
+                value: "{{ '/run/k3s/containerd/containerd.sock' if is_k3s_cluster | default(false) | bool else '/run/containerd/containerd.sock' }}"
+              - name: CONTAINERD_RUNTIME_CLASS
+                value: nvidia
+              - name: CONTAINERD_SET_AS_DEFAULT
+                value: "true"
+              - name: NVIDIA_CONTAINER_RUNTIME_MODE
+                value: legacy
           devicePlugin:
             enabled: true
           gfd:
@@ -261,7 +285,7 @@
         validate_certs: "{{ validate_certs }}"
       when:
         - has_nvidia_gpus | default(false)
-        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed' or update_existing_components | default(false) | bool
 
     - name: Deploy HAMI for GPU Time-Slicing
       kubernetes.core.helm:
@@ -271,7 +295,7 @@
         create_namespace: false
         atomic: true
         wait: true
-        wait_timeout: 300
+        wait_timeout: 300s
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
@@ -282,7 +306,7 @@
             securityContext:
               privileged: true
             nodeSelector:
-              gpu: "on"
+              nvidia.com/gpu.present: "true"
             extraVolumes:
               - name: dev
                 hostPath:
@@ -292,7 +316,7 @@
                 mountPath: /dev
       when:
         - has_nvidia_gpus | default(false)
-        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed' or update_existing_components | default(false) | bool
 
     - name: Wait for HAMI scheduler to be ready
       kubernetes.core.k8s_info:
@@ -311,7 +335,7 @@
         hami_scheduler.resources[0].status.availableReplicas > 0
       when:
         - has_nvidia_gpus | default(false)
-        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed'
+        - hami_helm_info.failed or hami_helm_info.status.status | default('') != 'deployed' or update_existing_components | default(false) | bool
 
     # HPU Detection and Device Plugin Deployment
     - name: Check for Intel Gaudi HPUs via NFD labels
@@ -320,25 +344,10 @@
           {{
             cluster_nodes.resources |
             selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1020', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1020', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1021', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1021', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'defined') |
-            selectattr('metadata.labels.feature\\.node\\.kubernetes\\.io/pci-8086\\.device-1022', 'equalto', 'true') |
-            list | length > 0 or
-            cluster_nodes.resources |
-            selectattr('metadata.labels', 'defined') |
             map(attribute='metadata.labels') |
             map('dict2items') |
             flatten |
-            selectattr('key', 'match', '^feature\\.node\\.kubernetes\\.io/pci-.*8086\\.device-(1020|1021|1022)$') |
+            selectattr('key', 'match', '^feature\.node\.kubernetes\.io/pci-8086\.device-(1020|1021|1022)$') |
             selectattr('value', 'equalto', 'true') |
             list | length > 0
           }}
@@ -350,7 +359,7 @@
         release_namespace: "{{ namespace }}"
         atomic: true
         wait: true
-        wait_timeout: 300
+        wait_timeout: 300s
         force: true
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
@@ -410,7 +419,7 @@
     - name: Install Aibrix dependencies
       kubernetes.core.k8s:
         state: present
-        src: https://github.com/BudEcosystem/aibrix/releases/download/v0.3.0/aibrix-dependency-v0.3.0.yaml
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.3.0/aibrix-dependency-v0.3.0.yaml
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       when: aibrix_needs_deployment | default(true)
@@ -418,7 +427,7 @@
     - name: Install Aibrix core components
       kubernetes.core.k8s:
         state: present
-        src: https://github.com/BudEcosystem/aibrix/releases/download/v0.3.0/aibrix-core-v0.3.0.yaml
+        src: https://github.com/BudEcosystem/aibrix/releases/download/0.3.0/aibrix-core-v0.3.0.yaml
         kubeconfig: "{{ kubeconfig_path }}"
         validate_certs: "{{ validate_certs }}"
       when: aibrix_needs_deployment | default(true)
@@ -671,6 +680,8 @@
     - name: Deploy DCGM Exporter for GPU metrics
       kubernetes.core.k8s:
         state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
         definition:
           apiVersion: v1
           kind: Service
@@ -690,11 +701,12 @@
               app: dcgm-exporter
       when:
         - has_nvidia_gpus | default(false)
-        - prometheus_needs_deployment | default(true)
 
     - name: Create DCGM Exporter DaemonSet
       kubernetes.core.k8s:
         state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
         definition:
           apiVersion: apps/v1
           kind: DaemonSet
@@ -734,11 +746,12 @@
                       path: /var/lib/kubelet/pod-resources
       when:
         - has_nvidia_gpus | default(false)
-        - prometheus_needs_deployment | default(true)
 
     - name: Create ServiceMonitor for DCGM Exporter
       kubernetes.core.k8s:
         state: present
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
         definition:
           apiVersion: monitoring.coreos.com/v1
           kind: ServiceMonitor
@@ -757,7 +770,6 @@
                 path: /metrics
       when:
         - has_nvidia_gpus | default(false)
-        - prometheus_needs_deployment | default(true)
 
     # Wait for NFD to label nodes
     - name: Wait for NFD to label nodes
@@ -784,14 +796,16 @@
         msg: |
           Cluster Setup Complete:
           - NFD Status: {{ 'Deployed' if nfd_needs_deployment | default(true) else 'Already exists' }}
+          - Cluster Runtime: {{ 'k3s' if is_k3s_cluster | default(false) | bool else 'standard containerd' }}
           - NVIDIA GPUs Detected: {{ has_nvidia_gpus | default(false) }}
           - Intel HPUs Detected: {{ has_intel_hpus | default(false) }}
           - GPU Operator: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
+          - HAMI GPU Time-Slicing: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
           - Intel Device Plugin: {{ 'Deployed' if has_intel_hpus | default(false) else 'Not needed' }}
           - Aibrix Components: {{ 'Deployed' if aibrix_needs_deployment | default(true) else 'Already exists' }}
           - Scaler: {{ 'Deployed' if scaler_needs_deployment | default(true) else 'Already exists' }}
           - Prometheus Stack: {{ 'Deployed' if prometheus_needs_deployment | default(true) else 'Already exists' }}
-          - DCGM Exporter: {{ 'Deployed' if (has_nvidia_gpus | default(false) and prometheus_needs_deployment | default(true)) else 'Not needed' }}
+          - DCGM Exporter: {{ 'Deployed' if has_nvidia_gpus | default(false) else 'Not needed' }}
 
           Monitoring Status:
           - Prometheus collecting metrics from all nodes

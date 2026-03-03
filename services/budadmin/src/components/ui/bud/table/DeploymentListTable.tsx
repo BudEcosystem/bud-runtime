@@ -19,6 +19,7 @@ import useHandleRouteChange from '@/lib/useHandleRouteChange';
 import { PermissionEnum, useUser } from 'src/stores/useUser';
 import { endpointStatusMapping } from '@/lib/colorMapping';
 import { errorToast, successToast } from '@/components/toast';
+import { extractApiErrorMessage } from '@/utils/extractApiErrorMessage';
 import { SortIcon } from './SortIcon';
 import { useConfirmAction } from 'src/hooks/useConfirmAction';
 import { useLoaderOnLoding } from 'src/hooks/useLoaderOnLoading';
@@ -122,12 +123,16 @@ function DeploymentListTable() {
                     return;
                 };
                 setConfirmLoading(true);
-                const result = await deleteEndPoint(record?.id, projectId as string);
-                if (result?.data) {
-                    await getData();
-                    successToast('Deployment deleted successfully');
-                } else {
-                    errorToast('Failed to delete deployment');
+                try {
+                    const result = await deleteEndPoint(record?.id, projectId as string);
+                    if (result?.data) {
+                        await getData();
+                        successToast('Deployment deleted successfully');
+                    } else {
+                        errorToast('Failed to delete deployment');
+                    }
+                } catch (error) {
+                    errorToast(extractApiErrorMessage(error, 'Failed to delete deployment'));
                 }
                 await getData();
                 setConfirmLoading(false);

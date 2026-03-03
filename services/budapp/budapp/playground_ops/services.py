@@ -25,10 +25,12 @@ from uuid import UUID
 
 import jwt
 from fastapi import status
+from sqlalchemy.exc import IntegrityError
 
 from budapp.shared.redis_service import RedisService
 
 from ..auth.schemas import RefreshTokenRequest
+from ..auth.services import AuthService
 from ..commons import logging
 from ..commons.config import app_settings
 from ..commons.constants import EndpointStatusEnum, ProjectStatusEnum, ProjectTypeEnum, PromptStatusEnum, UserTypeEnum
@@ -602,8 +604,50 @@ class PlaygroundService(SessionMixin):
             )
 
             if not db_user:
-                logger.error(f"User not found for auth_id: {auth_id}")
-                raise ClientException(status_code=status.HTTP_404_NOT_FOUND, message="User not found")
+                logger.info(f"User not found for auth_id: {auth_id}. Attempting JIT provisioning from Keycloak...")
+
+                # Fetch full user details from Keycloak Admin API
+                keycloak_user = keycloak_manager.get_keycloak_user_by_id(auth_id, app_settings.default_realm_name)
+
+                if not keycloak_user:
+                    logger.error(f"User {auth_id} not found in Keycloak. Cannot JIT provision.")
+                    raise ClientException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        message="User not found in identity provider",
+                    )
+
+                try:
+                    auth_service = AuthService(self.session)
+                    db_user = await auth_service._create_user_from_keycloak(
+                        keycloak_user=keycloak_user,
+                        tenant_client=tenant_client,
+                        tenant=tenant,
+                        realm_name=app_settings.default_realm_name,
+                    )
+                    logger.info(
+                        f"JIT provisioning successful for user {db_user.email} "
+                        f"(auth_id: {auth_id}) via access token flow"
+                    )
+                except IntegrityError:
+                    # Race condition — another request already created this user
+                    logger.warning(f"JIT provisioning race condition for auth_id {auth_id}. Re-checking DB...")
+                    db_user = await UserDataManager(self.session).retrieve_by_fields(
+                        UserModel, {"auth_id": auth_id}, missing_ok=True
+                    )
+                    if not db_user:
+                        logger.error(
+                            f"JIT provisioning failed after race condition and user still not found: {auth_id}"
+                        )
+                        raise ClientException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            message="Failed to provision user account. Please try again or contact support.",
+                        )
+                except Exception as e:
+                    logger.error(f"Unexpected error during JIT provisioning for auth_id {auth_id}: {e}", exc_info=True)
+                    raise ClientException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        message="Failed to provision user account. Please try again or contact support.",
+                    )
 
             # Set the access token for permission checks
             db_user.raw_token = access_token

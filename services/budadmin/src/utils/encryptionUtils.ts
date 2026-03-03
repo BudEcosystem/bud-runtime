@@ -32,6 +32,10 @@ export async function decryptString(
   encrypedKey: string,
 ): Promise<string | null> {
   try {
+    if (!encrypedKey || typeof encrypedKey !== "string") {
+      return null;
+    }
+
     // Check if private key is available
     if (!decodedString) {
       throw new Error(

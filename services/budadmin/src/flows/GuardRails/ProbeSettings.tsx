@@ -14,15 +14,24 @@ import {
 } from "@/components/ui/text";
 
 export default function ProbeSettings() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [selectedLifecycle, setSelectedLifecycle] = useState<string[]>(["input", "output"]);
   const [strictnessLevel, setStrictnessLevel] = useState(0.5);
   const [profileName, setProfileName] = useState("Guardrail Profile");
   const [profileDescription, setProfileDescription] = useState("");
 
   // Use the guardrails hook
-  const { updateWorkflow, workflowLoading, selectedProbe, selectedDeployment, isStandaloneDeployment } =
-    useGuardrails();
+  const {
+    updateWorkflow,
+    workflowLoading,
+    selectedProbe,
+    selectedDeployment,
+    isStandaloneDeployment,
+    modelsRequiringDeployment,
+  } = useGuardrails();
+
+  const needsDeployment = modelsRequiringDeployment > 0;
 
   const lifecycleOptions = [
     { value: "input", label: "Input" },
@@ -32,14 +41,12 @@ export default function ProbeSettings() {
   ];
 
   const handleBack = () => {
-    // Check if this is a standalone guardrail endpoint (deployment selection was skipped)
-    // Use the store flag which was set in DeploymentTypes step
     if (isStandaloneDeployment) {
-      // Go back to project selection (deployment was skipped)
-      openDrawerWithStep("select-project");
+      // Standalone: endpoint selection was skipped, go back to deployment types
+      openDrawerWithStep(isCloudFlow ? "cloud-deployment-types" : "deployment-types");
     } else {
-      // Normal flow - go back to deployment selection
-      openDrawerWithStep("select-deployment");
+      // Normal flow - go back to endpoint selection
+      openDrawerWithStep(isCloudFlow ? "cloud-select-deployment" : "select-deployment");
     }
   };
 
@@ -56,122 +63,38 @@ export default function ProbeSettings() {
     }
 
     try {
-      // Get all state from store to build complete payload
-      const state = useGuardrails.getState();
-      const { currentWorkflow, selectedProvider, selectedProject, selectedProbes } = state;
-
-      // Build the complete payload with all required fields
+      // Step 7: probe settings
       const payload: any = {
-        step_number: 6, // Probe settings is the final step 6
+        step_number: 7,
         name: profileName.trim(),
         description: profileDescription.trim() || undefined,
         guard_types: selectedLifecycle,
         severity_threshold: strictnessLevel,
-        trigger_workflow: true, // This triggers the actual deployment
       };
 
-      // REQUIRED: Include workflow_id
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      } else {
-        console.error("Missing workflow_id!");
-        errorToast("Workflow ID missing. Please restart the process.");
-        return;
+      // Only trigger final workflow for cloud flow (no further steps after this)
+      // Bud Sentinel flow should NOT trigger here — it continues to later steps
+      if (isCloudFlow && !needsDeployment) {
+        payload.trigger_workflow = true;
       }
 
-      // Include provider data
-      payload.provider_type = selectedProvider?.provider_type || currentWorkflow?.provider_type || "bud";
-      payload.provider_id = selectedProvider?.id || currentWorkflow?.provider_id;
-
-      if (!payload.provider_id) {
-        console.error("Missing provider_id!");
-      }
-
-      // Include probe selections with rules from previous steps
-      let probeSelections = currentWorkflow?.probe_selections;
-
-      // Try multiple sources for probe_selections
-      if (!probeSelections || probeSelections.length === 0) {
-        if (currentWorkflow?.workflow_data?.probe_selections) {
-          probeSelections = currentWorkflow.workflow_data.probe_selections;
-        } else if (selectedProbes && selectedProbes.length > 0) {
-          // Reconstruct if needed (note: this is a fallback, ideally probe_selections should come from workflow)
-          probeSelections = selectedProbes.map((probe: any) => {
-            // Build probe selection object
-            const probeSelection: any = { id: probe.id };
-
-            // Add rules if available
-            if (probe.rules && Array.isArray(probe.rules)) {
-              probeSelection.rules = probe.rules;
-            }
-
-            return probeSelection;
-          });
-        }
-      }
-
-      if (probeSelections && probeSelections.length > 0) {
-        payload.probe_selections = probeSelections;
-      } else {
-        console.error("Missing probe_selections!");
-        errorToast("Probe selections missing. Please go back and select probes.");
-        return;
-      }
-
-      // Include is_standalone from the store (set in DeploymentTypes step)
-      payload.is_standalone = isStandaloneDeployment;
-
-      // Include project_id
-      const projectId = selectedProject?.project?.id || selectedProject?.id || currentWorkflow?.project_id;
-      if (projectId) {
-        payload.project_id = projectId;
-      } else {
-        console.error("Missing project_id!");
-      }
-
-      // Include endpoint_ids from previous step
-      if (currentWorkflow?.endpoint_ids) {
-        payload.endpoint_ids = currentWorkflow.endpoint_ids;
-      } else if (currentWorkflow?.endpoint_id) {
-        // Fallback to single endpoint_id as array
-        payload.endpoint_ids = [currentWorkflow.endpoint_id];
-      }
-
-      console.log("=== FINAL DEPLOYMENT PAYLOAD (STEP 6) ===");
-      console.log(JSON.stringify(payload, null, 2));
-      console.log("=========================================");
-
-      // Update workflow with complete payload and trigger deployment
-      console.log("Calling updateWorkflow...");
       const success = await updateWorkflow(payload);
 
-      console.log("updateWorkflow returned:", success);
-
-      // Check if the update was successful
-      if (success === true) {
-        console.log("✅ Workflow update successful, navigating to deployment progress screen");
-
-        // Navigate to deployment progress screen only on success
-        openDrawerWithStep("probe-deployment-success");
-      } else {
-        console.error("❌ Workflow update failed - staying on current page");
-        console.error("Success value was:", success, "Type:", typeof success);
-
-        // Error toast is already shown by updateWorkflow function
-        // User stays on current page to fix issues
+      if (success) {
+        if (needsDeployment) {
+          // Models need deployment: continue to hardware mode selection
+          openDrawerWithStep("guardrail-hardware-mode");
+        } else if (isCloudFlow) {
+          // Cloud flow: no async deployment, go straight to success
+          openDrawerWithStep("cloud-deployment-success");
+        } else {
+          // Bud Sentinel flow: go to async deployment status screen
+          openDrawerWithStep("guardrail-deployment-status");
+        }
       }
     } catch (error: any) {
-      // This catch block should rarely be reached now since updateWorkflow returns false on error
-      // But keeping it for any unexpected errors
-      console.error("Unexpected error in handleDeploy:", error);
-
-      // Show error message if not already shown
-      const errorMessage = error?.response?.data?.detail ||
-                          error?.response?.data?.message ||
-                          error?.message ||
-                          "An unexpected error occurred. Please try again.";
-
-      errorToast(errorMessage);
+      console.error("Failed to deploy:", error);
+      errorToast(error?.response?.data?.detail || error?.message || "Deployment failed. Please try again.");
     }
   };
 
@@ -193,7 +116,7 @@ export default function ProbeSettings() {
       onBack={handleBack}
       onNext={handleDeploy}
       backText="Back"
-      nextText="Deploy"
+      nextText={needsDeployment ? "Next" : "Deploy"}
       disableNext={selectedLifecycle.length === 0 || workflowLoading}
     >
       <BudWraperBox>

@@ -332,6 +332,40 @@ class DeploymentDeleteExecutor(BaseActionExecutor):
                     error=error_msg,
                 )
 
+        # Forward ETA events as progress updates
+        if event_type == "notification" and event_name == "eta":
+            eta_result = EventResult.eta_from_content(content)
+            if eta_result is not None:
+                logger.info(
+                    "deployment_delete_eta_forwarded",
+                    step_execution_id=context.step_execution_id,
+                    eta_minutes=eta_result.eta_minutes,
+                )
+                return eta_result
+
+        # Forward progress from known intermediate deletion phases
+        if (
+            event_type == "notification"
+            and event_name
+            in (
+                "deployment_deletion_status",
+                "delete_namespace",
+            )
+            and status_str in ("STARTED", "started")
+        ):
+            progress_map = {"deployment_deletion_status": 30.0, "delete_namespace": 70.0}
+            progress = progress_map.get(event_name, 0.0)
+            logger.info(
+                "deployment_delete_progress_update",
+                step_execution_id=context.step_execution_id,
+                event_name=event_name,
+                progress=progress,
+            )
+            return EventResult(
+                action=EventAction.UPDATE_PROGRESS,
+                progress=progress,
+            )
+
         # Event not relevant to completion - ignore and keep waiting
         logger.debug(
             "deployment_delete_event_ignored",

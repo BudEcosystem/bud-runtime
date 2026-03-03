@@ -327,7 +327,7 @@ async def delete_gateway(
 async def list_configured(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Session = Depends(get_session),
-    client: str = Query(None, description="Filter by client tag (dashboard, chat)"),
+    client: str = Query(None, description="Filter by client tag (studio, prompt)"),
     include_disabled: bool = Query(False, description="Include disabled gateways"),
     page: int = Query(1, ge=1),
     limit: int = Query(100, ge=1, le=500),
@@ -551,20 +551,20 @@ async def public_oauth_callback(
     responses={
         status.HTTP_200_OK: {"description": "Successfully listed available connectors"},
     },
-    description="List enabled, dashboard-accessible configured connectors enriched with registry data",
+    description="List enabled configured connectors enriched with registry data, optionally filtered by client",
 )
-@require_permissions(permissions=[PermissionEnum.ENDPOINT_VIEW])
 async def list_available_connectors(
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Session = Depends(get_session),
+    client: Optional[str] = Query(None, description="Filter by client tag (studio, prompt)"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ) -> Dict[str, Any]:
-    """User: List enabled, dashboard-accessible connectors with registry enrichment."""
+    """User: List enabled connectors with registry enrichment, optionally filtered by client."""
     offset = (page - 1) * limit
     try:
         connectors, total = await ConnectorService().list_configured(
-            client="dashboard", include_disabled=False, offset=offset, limit=limit
+            client=client, include_disabled=False, offset=offset, limit=limit
         )
         return {
             "success": True,

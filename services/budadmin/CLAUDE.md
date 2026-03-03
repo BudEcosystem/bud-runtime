@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT: Dev Mode Configuration**
 
-The `NEXT_PUBLIC_ENABLE_DEV_MODE` flag controls visibility of dev-only features (Prompts, Evaluations, Guard Rails menu items). This **MUST** be set at Docker **BUILD TIME**, not runtime, because Next.js performs tree-shaking during build that eliminates unreachable code.
+The `NEXT_PUBLIC_ENABLE_DEV_MODE` flag controls visibility of dev-only features (Prompts, Evaluations menu items). This **MUST** be set at Docker **BUILD TIME**, not runtime, because Next.js performs tree-shaking during build that eliminates unreachable code.
 
 Build commands:
 - **Production**: `docker build -t budadmin:prod .` - Dev features hidden (default)
@@ -85,7 +85,7 @@ Critical environment variables that must be set:
 - `NEXT_PUBLIC_PASSWORD` - Authentication password
 - `NEXT_PUBLIC_PRIVATE_KEY` - Encryption key
 - `NEXT_PUBLIC_PLAYGROUND_URL` - Playground URL
-- `NEXT_PUBLIC_ENABLE_DEV_MODE` - **Build-time only** flag to enable dev features (Prompts, Evaluations, Guard Rails)
+- `NEXT_PUBLIC_ENABLE_DEV_MODE` - **Build-time only** flag to enable dev features (Prompts, Evaluations)
 - Various `NEXT_PUBLIC_NOVU_*` for notifications
 
 **Note**: Most `NEXT_PUBLIC_*` variables are set at runtime via Helm/environment, but `NEXT_PUBLIC_ENABLE_DEV_MODE` must be set at Docker build time to prevent tree-shaking.

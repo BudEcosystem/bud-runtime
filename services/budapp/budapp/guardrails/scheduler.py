@@ -203,7 +203,6 @@ class GuardrailSyncScheduler:
 
                 # Upsert provider (create if doesn't exist, update if exists)
                 db_provider = await ProviderDataManager(session).upsert_one(Provider, provider_data, ["type"])
-                session.commit()
 
                 provider_id_by_type[provider_type] = str(db_provider.id)
                 logger.debug("Upserted provider %s with ID %s", provider_type, db_provider.id)
@@ -261,11 +260,11 @@ class GuardrailSyncScheduler:
             logger.error("No valid probes found from cloud service")
             return
 
-        # Get existing probe IDs to check which ones are deprecated
-        stale_probe_ids = []
+        # Deprecate stale probes/rules and upsert new ones — single session
         with Session(engine) as session:
             data_manager = GuardrailsProbeRulesDataManager(session)
-            # Get all active probes
+
+            # Get existing probe IDs to check which ones are deprecated
             existing_probes, _ = await data_manager.get_all_probes(
                 offset=0,
                 limit=10000,  # Large limit to get all
@@ -274,59 +273,51 @@ class GuardrailSyncScheduler:
             stale_probe_ids = [str(probe[0].id) for probe in existing_probes if probe[0].uri not in probe_uris]
             logger.debug("Found %s existing probes, %s to be deprecated", len(existing_probes), len(stale_probe_ids))
 
-        # Soft delete deprecated probes (this will also soft delete their rules)
-        if stale_probe_ids:
-            with Session(engine) as session:
-                data_manager = GuardrailsProbeRulesDataManager(session)
+            # Soft delete deprecated probes (this will also soft delete their rules)
+            if stale_probe_ids:
                 await data_manager.soft_delete_deprecated_probes(stale_probe_ids)
                 logger.debug("Soft deleted %s deprecated probes", len(stale_probe_ids))
 
-        # Upsert probes and their rules
-        for probe_uri, probe_info in probe_data_by_uri.items():
-            probe = probe_info["probe"]
-            provider_id = probe_info["provider_id"]
-            provider_type = (
-                GuardrailProviderTypeEnum.BUD
-                if probe_info["provider_type"] == "bud_sentinel"
-                else GuardrailProviderTypeEnum.CLOUD
-            )
+            # Upsert probes and their rules
+            for probe_uri, probe_info in probe_data_by_uri.items():
+                probe = probe_info["probe"]
+                provider_id = probe_info["provider_id"]
+                provider_type = (
+                    GuardrailProviderTypeEnum.BUD
+                    if probe_info["provider_type"] == "bud_sentinel"
+                    else GuardrailProviderTypeEnum.CLOUD
+                )
 
-            # Convert string tags to Tag objects
-            tag_strings = probe.get("tags", [])
-            tag_objects = GuardrailSyncScheduler.convert_string_tags_to_tag_objects(tag_strings)
+                # Convert string tags to Tag objects
+                tag_strings = probe.get("tags", [])
+                tag_objects = GuardrailSyncScheduler.convert_string_tags_to_tag_objects(tag_strings)
 
-            # Create probe data
-            probe_data = GuardrailProbeCreate(
-                name=probe.get("name", ""),
-                uri=probe_uri,
-                description=probe.get("description"),
-                icon=probe.get("icon"),
-                provider_id=UUID(provider_id),
-                provider_type=provider_type,
-                status=GuardrailStatusEnum.ACTIVE,
-                tags=tag_objects,
-            ).model_dump(mode="json", exclude_none=True)
+                # Create probe data
+                probe_data = GuardrailProbeCreate(
+                    name=probe.get("name", ""),
+                    uri=probe_uri,
+                    description=probe.get("description"),
+                    icon=probe.get("icon"),
+                    provider_id=UUID(provider_id),
+                    provider_type=provider_type,
+                    status=GuardrailStatusEnum.ACTIVE,
+                    tags=tag_objects,
+                ).model_dump(mode="json", exclude_none=True)
 
-            # Upsert probe
-            with Session(engine) as session:
-                data_manager = GuardrailsProbeRulesDataManager(session)
+                # Upsert probe
                 db_probe = await data_manager.upsert_one(GuardrailProbeModel, probe_data, ["uri"])
-                session.commit()
                 probe_id = str(db_probe.id)
                 logger.debug("Upserted probe: %s (ID: %s)", probe_uri, probe_id)
 
-            # Fetch and sync rules for this probe
-            rules = await self.get_probe_rules(probe.get("id", ""))
-            logger.debug("Found %s rules for probe %s", len(rules), probe_uri)
+                # Fetch and sync rules for this probe
+                rules = await self.get_probe_rules(probe.get("id", ""))
+                logger.debug("Found %s rules for probe %s", len(rules), probe_uri)
 
-            if rules:
-                # Get rule URIs to identify deprecated rules
-                rule_uris = [rule.get("uri", "") for rule in rules if rule.get("uri")]
+                if rules:
+                    # Get rule URIs to identify deprecated rules
+                    rule_uris = [rule.get("uri", "") for rule in rules if rule.get("uri")]
 
-                # Get existing rules for this probe
-                stale_rule_ids = []
-                with Session(engine) as session:
-                    data_manager = GuardrailsProbeRulesDataManager(session)
+                    # Get existing rules for this probe
                     existing_rules, _ = await data_manager.get_all_probe_rules(
                         probe_id=UUID(probe_id),
                         offset=0,
@@ -341,52 +332,45 @@ class GuardrailSyncScheduler:
                         len(stale_rule_ids),
                     )
 
-                # Soft delete deprecated rules
-                if stale_rule_ids:
-                    with Session(engine) as session:
-                        data_manager = GuardrailsProbeRulesDataManager(session)
+                    # Soft delete deprecated rules
+                    if stale_rule_ids:
                         await data_manager.soft_delete_deprecated_rules(stale_rule_ids)
                         logger.debug("Soft deleted %s deprecated rules for probe %s", len(stale_rule_ids), probe_uri)
 
-                # Upsert rules
-                for rule in rules:
-                    rule_uri = rule.get("uri", "")
-                    if not rule_uri:
-                        continue
+                    # Upsert rules
+                    for rule in rules:
+                        rule_uri = rule.get("uri", "")
+                        if not rule_uri:
+                            continue
 
-                    # Log raw rule data from bud connect for debugging
-                    logger.debug(
-                        "Raw rule from bud connect: scanner_type=%s, model_id=%s, model_provider_type=%s, is_gated=%s",
-                        rule.get("scanner_type"),
-                        rule.get("model_id"),
-                        rule.get("model_provider_type"),
-                        rule.get("is_gated"),
-                    )
+                        logger.debug(
+                            "Raw rule from bud connect: scanner_type=%s, model_id=%s, model_provider_type=%s, is_gated=%s",
+                            rule.get("scanner_type"),
+                            rule.get("model_id"),
+                            rule.get("model_provider_type"),
+                            rule.get("is_gated"),
+                        )
 
-                    rule_data = GuardrailRuleCreate(
-                        name=rule.get("name", ""),
-                        uri=rule_uri,
-                        description=rule.get("description"),
-                        icon=rule.get("icon"),
-                        probe_id=UUID(probe_id),
-                        status=GuardrailStatusEnum.ACTIVE,
-                        guard_types=rule.get("guard_types", []),
-                        modality_types=rule.get("modality_types", []),
-                        examples=rule.get("examples", []),
-                        # Model-based rule fields
-                        scanner_type=rule.get("scanner_type"),
-                        model_uri=rule.get("model_id"),  # bud connect uses model_id for the URI
-                        model_provider_type=rule.get("model_provider_type"),
-                        is_gated=rule.get("is_gated", False),
-                        model_config_json=rule.get("model_config_json"),
-                    ).model_dump(mode="json", exclude_none=True)
+                        rule_data = GuardrailRuleCreate(
+                            name=rule.get("name", ""),
+                            uri=rule_uri,
+                            description=rule.get("description"),
+                            icon=rule.get("icon"),
+                            probe_id=UUID(probe_id),
+                            status=GuardrailStatusEnum.ACTIVE,
+                            guard_types=rule.get("guard_types", []),
+                            modality_types=rule.get("modality_types", []),
+                            examples=rule.get("examples", []),
+                            scanner_type=rule.get("scanner_type"),
+                            model_uri=rule.get("model_id"),  # bud connect uses model_id for the URI
+                            model_provider_type=rule.get("model_provider_type"),
+                            is_gated=rule.get("is_gated", False),
+                            model_config_json=rule.get("model_config_json"),
+                        ).model_dump(mode="json", exclude_none=True)
 
-                    logger.debug("Rule data after model_dump: %s", rule_data)
+                        logger.debug("Rule data after model_dump: %s", rule_data)
 
-                    with Session(engine) as session:
-                        data_manager = GuardrailsProbeRulesDataManager(session)
                         await data_manager.upsert_one(GuardrailRuleModel, rule_data, ["uri"])
-                        session.commit()
                         logger.debug("Upserted rule: %s for probe %s", rule_uri, probe_uri)
 
         logger.info("Guardrail sync completed successfully")

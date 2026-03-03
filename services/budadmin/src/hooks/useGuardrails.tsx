@@ -65,6 +65,15 @@ interface GuardrailsWorkflow {
   [key: string]: any;
 }
 
+interface DeployConfig {
+  avg_context_length: number;
+  avg_sequence_length: number;
+  concurrent_requests: number;
+  ttft: [number, number];
+  e2e_latency: [number, number];
+  per_session_tokens_per_sec: [number, number];
+}
+
 interface GuardrailsState {
   // Probes state
   probes: Probe[];
@@ -93,9 +102,11 @@ interface GuardrailsState {
     user_id?: string;
     project_id?: string;
     endpoint_id?: string;
-    search?: string;
+    search?: boolean;
+    name?: string;
     page?: number;
-    page_size?: number;
+    limit?: number;
+    append?: boolean;
   }) => Promise<void>;
 
   setSearchTerm: (search: string) => void;
@@ -124,6 +135,27 @@ interface GuardrailsState {
   isStandaloneDeployment: boolean;
   setIsStandaloneDeployment: (value: boolean) => void;
 
+  // Step 3 response data (conditional branching)
+  modelStatuses: any[];
+  modelsRequiringOnboarding: number;
+  modelsRequiringDeployment: number;
+  modelsReusable: number;
+  credentialRequired: boolean;
+  skipToStep: number | null;
+
+  // Step 8 - Hardware mode
+  hardwareMode: "dedicated" | "shared" | null;
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => void;
+
+  // Step 9 - Deploy config
+  deployConfig: DeployConfig | null;
+  setDeployConfig: (config: DeployConfig | null) => void;
+
+  // Step 9/10 - Recommended clusters
+  recommendedClusters: any[];
+  selectedCluster: any | null;
+  setSelectedCluster: (cluster: any | null) => void;
+
   // Workflow state
   currentWorkflow: GuardrailsWorkflow | null;
   workflowLoading: boolean;
@@ -134,6 +166,12 @@ interface GuardrailsState {
   updateWorkflow: (data: Partial<GuardrailsWorkflow>) => Promise<boolean>;
   getWorkflow: (workflowId?: string) => Promise<void>;
   clearWorkflow: () => void;
+
+  // Custom probe workflow
+  customProbePolicy: any | null;
+  setCustomProbePolicy: (policy: any) => void;
+  createCustomProbeWorkflow: (probeTypeOption: string) => Promise<boolean>;
+  updateCustomProbeWorkflow: (data: Record<string, any>) => Promise<boolean>;
 
   // Probe rules
   probeRules: ProbeRule[];
@@ -159,7 +197,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   probesError: null,
   totalProbes: 0,
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 10,
   totalPages: 0,
 
   searchTerm: "",
@@ -176,10 +214,29 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   // Step data management
   selectedProvider: null,
 
+  // Step 3 response data (conditional branching)
+  modelStatuses: [],
+  modelsRequiringOnboarding: 0,
+  modelsRequiringDeployment: 0,
+  modelsReusable: 0,
+  credentialRequired: false,
+  skipToStep: null,
+
+  // Step 8 - Hardware mode
+  hardwareMode: null,
+
+  // Step 9 - Deploy config
+  deployConfig: null,
+
+  // Step 9/10 - Recommended clusters
+  recommendedClusters: [],
+  selectedCluster: null,
+
   // Workflow state
   currentWorkflow: null,
   workflowLoading: false,
   workflowError: null,
+  customProbePolicy: null,
 
   // Probe rules state
   probeRules: [],
@@ -189,12 +246,13 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
   // Fetch probes with filtering and pagination
   fetchProbes: async (params) => {
-    set({ probesLoading: true, probesError: null });
+    const isAppend = params?.append === true;
+    set({ probesLoading: !isAppend, probesError: null });
 
     try {
       const queryParams: any = {
         page: params?.page || get().currentPage,
-        page_size: params?.page_size || get().pageSize,
+        limit: params?.limit || get().pageSize,
       };
 
       // Add optional filters
@@ -219,8 +277,12 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       if (params?.endpoint_id) {
         queryParams.endpoint_id = params.endpoint_id;
       }
+      // search is a boolean flag, name is the search text
       if (params?.search) {
-        queryParams.search = params.search;
+        queryParams.search = true;
+      }
+      if (params?.name) {
+        queryParams.name = params.name;
       }
       const response = await AppRequest.Get("/guardrails/probes", {
         params: queryParams,
@@ -228,8 +290,9 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 
       if (response.data) {
         const data: ProbesResponse = response.data;
+        const newProbes = data.probes || [];
         set({
-          probes: data.probes || [],
+          probes: isAppend ? [...get().probes, ...newProbes] : newProbes,
           totalProbes: data.total_record || 0,
           currentPage: data.page || 1,
           totalPages: data.total_pages || 0,
@@ -241,7 +304,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       set({
         probesError: error?.message || "Failed to fetch probes",
         probesLoading: false,
-        probes: [],
+        ...(isAppend ? {} : { probes: [] }),
       });
     }
   },
@@ -330,6 +393,21 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ isStandaloneDeployment: value });
   },
 
+  // Set hardware mode
+  setHardwareMode: (mode: "dedicated" | "shared" | null) => {
+    set({ hardwareMode: mode });
+  },
+
+  // Set deploy config
+  setDeployConfig: (config: DeployConfig | null) => {
+    set({ deployConfig: config });
+  },
+
+  // Set selected cluster
+  setSelectedCluster: (cluster: any | null) => {
+    set({ selectedCluster: cluster });
+  },
+
   // Set selected provider (for step data management)
   setSelectedProvider: (provider: any) => {
     set({ selectedProvider: provider });
@@ -346,8 +424,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
           provider_id: providerId,
           provider_type: providerType,
           step_number: 1,
-          workflow_total_steps: 5, // Not counting the first step
-          trigger_workflow: false,
+          workflow_total_steps: 10,
         },
       );
 
@@ -446,6 +523,8 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   },
 
   // Get workflow
+  // The GET /workflows/{id} response has: { workflow_id, status, workflow_steps: { name, endpoint_ids, ... } }
+  // We flatten workflow_steps into the root so components can access fields directly
   getWorkflow: async (workflowId?: string) => {
     const id = workflowId || get().currentWorkflow?.workflow_id;
     if (!id) {
@@ -460,8 +539,20 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       );
 
       if (response.data) {
+        const { workflow_steps, ...rest } = response.data;
+        // Flatten workflow_steps into root so fields like endpoint_ids, name, probe_selections
+        // are accessible at currentWorkflow.endpoint_ids instead of currentWorkflow.workflow_steps.endpoint_ids
+        const merged = { ...rest, ...(workflow_steps || {}), workflow_steps };
         set({
-          currentWorkflow: response.data,
+          currentWorkflow: merged,
+          // Always sync branching data from latest workflow data
+          modelStatuses: merged.model_statuses || [],
+          modelsRequiringOnboarding: merged.models_requiring_onboarding ?? 0,
+          modelsRequiringDeployment: merged.models_requiring_deployment ?? 0,
+          modelsReusable: merged.models_reusable ?? 0,
+          credentialRequired: merged.credential_required ?? false,
+          skipToStep: merged.skip_to_step ?? null,
+          recommendedClusters: merged.recommended_clusters || [],
         });
       }
     } catch (error: any) {
@@ -471,6 +562,97 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       });
     } finally {
       // Ensure workflowLoading is always set to false
+      set({ workflowLoading: false });
+    }
+  },
+
+  // Set custom probe policy
+  setCustomProbePolicy: (policy: any) => {
+    set({ customProbePolicy: policy });
+  },
+
+  // Create custom probe workflow (step 1)
+  createCustomProbeWorkflow: async (probeTypeOption: string): Promise<boolean> => {
+    set({ workflowLoading: true, workflowError: null });
+
+    try {
+      const response = await AppRequest.Post(
+        "/guardrails/custom-probe-workflow",
+        {
+          workflow_total_steps: 3,
+          step_number: 1,
+          trigger_workflow: false,
+          probe_type_option: probeTypeOption,
+        },
+      );
+
+      if (response && response.status >= 200 && response.status < 300 && response.data) {
+        set({ currentWorkflow: response.data });
+
+        // Fetch the workflow data after creation
+        await get().getWorkflow(response.data.workflow_id);
+
+        return true;
+      }
+
+      const errorMsg = response?.data?.detail || response?.data?.message || "Failed to create custom probe workflow";
+      errorToast(errorMsg);
+      return false;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+                          error?.response?.data?.message ||
+                          error?.message ||
+                          "Failed to create custom probe workflow";
+      errorToast(errorMessage);
+      set({ workflowError: errorMessage });
+      return false;
+    } finally {
+      set({ workflowLoading: false });
+    }
+  },
+
+  // Update custom probe workflow (steps 2 & 3)
+  updateCustomProbeWorkflow: async (data: Record<string, any>): Promise<boolean> => {
+    const currentWorkflow = get().currentWorkflow;
+    if (!currentWorkflow?.workflow_id) {
+      errorToast("No active workflow found");
+      return false;
+    }
+
+    set({ workflowLoading: true, workflowError: null });
+
+    try {
+      const payload = {
+        workflow_id: currentWorkflow.workflow_id,
+        ...data,
+      };
+
+      const response = await AppRequest.Post(
+        "/guardrails/custom-probe-workflow",
+        payload,
+      );
+
+      if (response && response.status >= 200 && response.status < 300 && response.data) {
+        set({ currentWorkflow: response.data });
+
+        // Fetch the workflow data after update
+        await get().getWorkflow(currentWorkflow.workflow_id);
+
+        return true;
+      }
+
+      const errorMsg = response?.data?.detail || response?.data?.message || "Failed to update custom probe workflow";
+      errorToast(errorMsg);
+      return false;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail ||
+                          error?.response?.data?.message ||
+                          error?.message ||
+                          "Failed to update custom probe workflow";
+      errorToast(errorMessage);
+      set({ workflowError: errorMessage });
+      return false;
+    } finally {
       set({ workflowLoading: false });
     }
   },
@@ -485,6 +667,19 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       selectedDeployment: null,
       selectedProvider: null,
       isStandaloneDeployment: false,
+      customProbePolicy: null,
+      // Reset branching state
+      modelStatuses: [],
+      modelsRequiringOnboarding: 0,
+      modelsRequiringDeployment: 0,
+      modelsReusable: 0,
+      credentialRequired: false,
+      skipToStep: null,
+      // Reset deployment state
+      hardwareMode: null,
+      deployConfig: null,
+      recommendedClusters: [],
+      selectedCluster: null,
     });
   },
 
@@ -537,4 +732,4 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
 }));
 
 export default useGuardrails;
-export type { Probe, ProbeTag, ProbesResponse, ProbeRule, GuardrailsWorkflow };
+export type { Probe, ProbeTag, ProbesResponse, ProbeRule, GuardrailsWorkflow, DeployConfig };

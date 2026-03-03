@@ -342,6 +342,17 @@ class ModelAddExecutor(BaseActionExecutor):
                         },
                     )
 
+        # Forward ETA events from budmodel as progress updates
+        if event_type == "notification" and event_name == "eta":
+            eta_result = EventResult.eta_from_content(content)
+            if eta_result is not None:
+                logger.info(
+                    "model_add_eta_forwarded",
+                    step_execution_id=context.step_execution_id,
+                    eta_minutes=eta_result.eta_minutes,
+                )
+                return eta_result
+
         # Event not relevant to completion
         logger.debug(
             "model_add_event_ignored",

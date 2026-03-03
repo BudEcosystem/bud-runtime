@@ -344,6 +344,42 @@ async def route_event(
             )
             logger.info(f"Step {step.id} progress updated to {result.progress}%")
 
+        # Publish ETA/progress update to callback topics
+        if result.eta_minutes is not None or result.progress is not None:
+            # Use step's current progress as fallback for ETA-only updates
+            current_progress = (
+                result.progress
+                if result.progress is not None
+                else float(step.progress_percentage or 0)
+            )
+            execution_crud = PipelineExecutionCRUD(session)
+            execution = await execution_crud.get_by_id(step.execution_id)
+            if execution:
+                try:
+                    if result.eta_minutes is not None:
+                        await event_publisher.publish_eta_update(
+                            execution_id=step.execution_id,
+                            eta_minutes=result.eta_minutes,
+                            progress_percentage=Decimal(str(current_progress)),
+                            subscriber_ids=execution.subscriber_ids,
+                            payload_type=execution.payload_type,
+                            notification_workflow_id=execution.notification_workflow_id,
+                        )
+                    else:
+                        await event_publisher.publish_workflow_progress(
+                            execution_id=step.execution_id,
+                            progress_percentage=Decimal(str(current_progress)),
+                            subscriber_ids=execution.subscriber_ids,
+                            payload_type=execution.payload_type,
+                            notification_workflow_id=execution.notification_workflow_id,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "publish_progress_eta_failed",
+                        step_id=str(step.id),
+                        error=str(e),
+                    )
+
         return EventRouteResult(
             routed=True,
             step_execution_id=step.id,

@@ -12,41 +12,19 @@ import { Text_14_400_EEEEEE } from "@/components/ui/text";
 type DeploymentType = "guardrail-endpoint" | "existing-deployment" | "";
 
 export default function DeploymentTypes() {
-  const { openDrawerWithStep } = useDrawer();
+  const { openDrawerWithStep, currentFlow } = useDrawer();
+  const isCloudFlow = currentFlow === "add-guardrail-cloud";
   const [selectedType, setSelectedType] = useState<DeploymentType>("");
 
   // Use the guardrails hook
   const {
     updateWorkflow,
     workflowLoading,
-    currentWorkflow,
-    selectedProvider,
-    selectedProbes,
-    selectedProbe,
     setIsStandaloneDeployment
   } = useGuardrails();
 
   const handleBack = () => {
-    // Get the selected probes
-    const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
-
-    // Check if any selected probe is a PII probe (same logic as BudSentinelProbes)
-    const hasPIIProbe = probesArray.some(probe =>
-      probe.name?.toLowerCase().includes("personal identifier") ||
-      probe.name?.toLowerCase().includes("pii") ||
-      probe.tags?.some(
-        (tag: any) =>
-          tag.name.toLowerCase().includes("dlp") ||
-          tag.name.toLowerCase().includes("personal"),
-      )
-    );
-
-    // Navigate back based on whether PII probes were selected
-    if (hasPIIProbe) {
-      openDrawerWithStep("pii-detection-config");
-    } else {
-      openDrawerWithStep("bud-sentinel-probes");
-    }
+    openDrawerWithStep(isCloudFlow ? "cloud-select-credentials" : "select-project");
   };
 
   const handleNext = async () => {
@@ -68,46 +46,23 @@ export default function DeploymentTypes() {
       // Store the standalone flag in the store (persists across workflow updates)
       setIsStandaloneDeployment(mappedValues.is_standalone);
 
-      // Build the complete workflow payload
+      // Backend accumulates data across steps, so only send step-specific fields
       const payload: any = {
-        step_number: 3, // Deployment type selection is step 3
+        step_number: 5,
         deployment_type: mappedValues.deployment_type,
         is_standalone: mappedValues.is_standalone,
-        trigger_workflow: false,
       };
 
-      // Include workflow_id if available
-      if (currentWorkflow?.workflow_id) {
-        payload.workflow_id = currentWorkflow.workflow_id;
-      }
-
-      // Include provider data from previous steps
-      if (selectedProvider?.id) {
-        payload.provider_id = selectedProvider.id;
-      }
-      if (selectedProvider?.provider_type) {
-        payload.provider_type = selectedProvider.provider_type;
-      }
-
-      // Include probe selections from previous steps
-      if (currentWorkflow?.probe_selections) {
-        // Use existing probe_selections from workflow (which should have rules)
-        payload.probe_selections = currentWorkflow.probe_selections;
-      } else {
-        // Fallback: build from selectedProbes if needed
-        const probesArray = selectedProbes?.length > 0 ? selectedProbes : (selectedProbe ? [selectedProbe] : []);
-        if (probesArray.length > 0) {
-          payload.probe_selections = probesArray.map(probe => ({
-            id: probe.id
-          }));
-        }
-      }
-
-      // Update workflow with complete data
+      // Update workflow with step-specific data
       await updateWorkflow(payload);
 
-      // Both deployment types go to project selection
-      openDrawerWithStep("select-project");
+      // Standalone: skip endpoint selection, go to probe settings
+      // Not standalone: go to endpoint selection
+      if (mappedValues.is_standalone) {
+        openDrawerWithStep(isCloudFlow ? "cloud-probe-settings" : "probe-settings");
+      } else {
+        openDrawerWithStep(isCloudFlow ? "cloud-select-deployment" : "select-deployment");
+      }
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }
@@ -142,7 +97,7 @@ export default function DeploymentTypes() {
             descriptionClass="pt-[.3rem] text-[#B3B3B3] leading-[1.5]"
           />
 
-          <div className="px-[1.35rem] pb-[1.35rem]">
+          <div className="px-[1.35rem] pb-[1.35rem] mt-[1.5rem]">
             <div className="space-y-[0.75rem]">
               {deploymentOptions.map((option) => (
                 <div

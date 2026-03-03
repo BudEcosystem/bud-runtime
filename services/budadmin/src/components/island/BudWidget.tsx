@@ -139,25 +139,8 @@ export function BudWidget({
     );
   }
 
-  useEffect(() => {
-    console.log("data.workflow_type", data.workflow_type);
-  }, [data.workflow_type]);
-
-  useEffect(() => {
-    console.log("flowMapping", flowMapping);
-  }, []);
-
-  // useEffect(() => {
-  //     console.log('index', index)
-  // }, [index]);
-
-  useEffect(() => {
-    console.log("flow", flow);
-  }, [flow]);
-
   const openWidget = async () => {
     let workflow: WorkflowType;
-    console.log('WorkflowType data', data)
     setLoading(true);
     if (data.workflow_type === "model_deployment") {
       workflow = await getWorkflowCloud(data.id);
@@ -212,8 +195,6 @@ export function BudWidget({
         ...workflow.workflow_steps.credential,
       });
     }
-    console.log('WorkflowType', workflow)
-
     // resovles the workflow type to the flow id and get the flow details
     if (!flow) {
       errorToast(`Flow not found for ${data.workflow_type}`);

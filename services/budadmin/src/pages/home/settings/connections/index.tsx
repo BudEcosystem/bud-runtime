@@ -114,9 +114,15 @@ interface DetailDrawerProps {
 
 /** Map of client tag values to display labels */
 const CLIENT_LABELS: { key: string; label: string }[] = [
-  { key: "dashboard", label: "Studio" },
-  { key: "chat", label: "Prompt" },
+  { key: "studio", label: "Studio" },
+  { key: "prompt", label: "Prompt" },
 ];
+
+/** Legacy tag values → new key (migration period) */
+const LEGACY_CLIENT_MAP: Record<string, string> = {
+  dashboard: "studio",
+  chat: "prompt",
+};
 
 const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, onDelete }) => {
   const { listToolsForGateway, updateClients } = useGlobalConnectors();
@@ -153,11 +159,14 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
 
   if (!connector) return null;
 
-  // Parse active client tags from connector tags
+  // Parse active client tags from connector tags, normalizing legacy values
   const activeClients = new Set(
     connector.tags
       .filter((t) => t.startsWith(TAG_PREFIX_CLIENT))
-      .map((t) => t.slice(TAG_PREFIX_CLIENT.length))
+      .map((t) => {
+        const raw = t.slice(TAG_PREFIX_CLIENT.length);
+        return LEGACY_CLIENT_MAP[raw] ?? raw;
+      })
   );
 
   // Extract non-client tags for display (e.g. category, source tags)

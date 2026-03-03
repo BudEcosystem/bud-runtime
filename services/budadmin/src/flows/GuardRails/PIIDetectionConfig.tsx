@@ -204,7 +204,6 @@ export default function PIIDetectionConfig() {
       const updatePayload: any = {
         step_number: 2,
         probe_selections: probeSelections,
-        trigger_workflow: false,
       };
 
       // Include workflow_id if available
@@ -212,10 +211,6 @@ export default function PIIDetectionConfig() {
         updatePayload.workflow_id = currentWorkflow.workflow_id;
       }
 
-      // Include provider data from previous step
-      if (selectedProvider?.id) {
-        updatePayload.provider_id = selectedProvider.id;
-      }
       if (selectedProvider?.provider_type) {
         updatePayload.provider_type = selectedProvider.provider_type;
       }
@@ -223,8 +218,8 @@ export default function PIIDetectionConfig() {
       // Update workflow with selected rules
       await updateWorkflow(updatePayload);
 
-      // Move to deployment types selection
-      openDrawerWithStep("deployment-types");
+      // Move to project selection
+      openDrawerWithStep("select-project");
     } catch (error) {
       console.error("Failed to update workflow:", error);
     }
