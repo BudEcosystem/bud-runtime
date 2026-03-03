@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
-import { Button, Image, Empty, Spin } from "antd";
+import { Button, Image, Empty, Spin, Tooltip } from "antd";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { useAddAgent } from "@/stores/useAddAgent";
@@ -348,27 +348,30 @@ export default function LoadModel({ sessionId, open, setOpen }: LoadModelProps) 
       {/* Load Model Button */}
       <div ref={buttonRef}>
         {session?.selectedDeployment ? (
-          <Button
-            type="default"
-            className="w-[12.25rem] h-[2rem] border-[1px] border-[#1F1F1F] bg-transparent hover:bg-[#1A1A1A] flex items-center justify-center gap-2"
-            onClick={() => setOpen(!open)}
-            style={{
-              backgroundColor: 'transparent',
-              color: '#EEEEEE'
-            }}
-          >
-            <Image
-              src={modelIconUrl}
-              fallback={DEFAULT_MODEL_ICON}
-              preview={false}
-              alt="model"
+          <Tooltip title={session.selectedDeployment.name} placement="bottom">
+            <Button
+              type="default"
+              className="w-[12.25rem] h-[2rem] border-[1px] border-[#1F1F1F] bg-transparent hover:bg-[#1A1A1A] flex items-center justify-center gap-2 overflow-hidden"
+              onClick={() => setOpen(!open)}
               style={{
-                width: ".875rem",
-                height: ".875rem",
+                backgroundColor: 'transparent',
+                color: '#EEEEEE'
               }}
-            />
-            <span className="text-[#EEEEEE] text-xs Open-Sans">{session.selectedDeployment.name}</span>
-          </Button>
+            >
+              <Image
+                src={modelIconUrl}
+                fallback={DEFAULT_MODEL_ICON}
+                preview={false}
+                alt="model"
+                style={{
+                  width: ".875rem",
+                  height: ".875rem",
+                  flexShrink: 0,
+                }}
+              />
+              <span className="text-[#EEEEEE] text-xs Open-Sans truncate">{session.selectedDeployment.name}</span>
+            </Button>
+          </Tooltip>
         ) : (
           <Button
             type="default"
