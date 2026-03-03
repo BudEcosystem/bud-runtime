@@ -208,6 +208,45 @@ def _transform_credentials_to_mcp_format(
     return auth_config
 
 
+def _enrich_credential_schema(connector: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Build credential_schema with defaults from the connector's oauth_config.
+
+    MCP Foundry returns an ``oauth_config`` block on OAuth connectors containing
+    provider-specific values such as ``token_url`` and ``authorize_url``.  This
+    helper copies the hardcoded field definitions from
+    ``CONNECTOR_AUTH_CREDENTIALS_MAP`` and injects those values as ``default``
+    entries so the frontend can pre-populate the form.
+    """
+    auth_type_str = connector.get("auth_type", "Open")
+    auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
+    # Deep-copy so we never mutate the module-level constant
+    base_schema = [dict(f) for f in CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])]
+
+    oauth_cfg = connector.get("oauth_config") or {}
+    if not oauth_cfg:
+        return base_schema
+
+    # Map oauth_config keys → credential_schema field names
+    defaults_map: Dict[str, str] = {}
+    if oauth_cfg.get("token_url"):
+        defaults_map["token_url"] = oauth_cfg["token_url"]
+    if oauth_cfg.get("authorize_url"):
+        defaults_map["authorization_url"] = oauth_cfg["authorize_url"]
+    if oauth_cfg.get("scopes"):
+        scopes = oauth_cfg["scopes"]
+        if isinstance(scopes, list):
+            defaults_map["scopes"] = " ".join(scopes)
+        elif isinstance(scopes, str):
+            defaults_map["scopes"] = scopes
+
+    for field in base_schema:
+        default_val = defaults_map.get(field["field"])
+        if default_val:
+            field["default"] = default_val
+
+    return base_schema
+
+
 class ConnectorService:
     """Service for global connector operations — thin proxy to MCP Foundry."""
 
@@ -218,6 +257,7 @@ class ConnectorService:
         name: Optional[str] = None,
         offset: int = 0,
         limit: int = 20,
+        user_token: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """List available connectors from MCP Foundry registry."""
         connectors, total = await mcp_foundry_service.list_connectors(
@@ -226,24 +266,21 @@ class ConnectorService:
             name=name,
             offset=offset,
             limit=limit,
+            auth_token=user_token,
         )
-        # Enrich each connector with credential_schema and normalize logo_url → icon
+        # Enrich each connector with credential_schema (with defaults) and normalize logo_url → icon
         for c in connectors:
-            auth_type_str = c.get("auth_type", "Open")
-            auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
-            c["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+            c["credential_schema"] = _enrich_credential_schema(c)
             # Map logo_url to icon for frontend consistency
             if "logo_url" in c:
                 c["icon"] = c.pop("logo_url")
         return connectors, total
 
-    async def get_registry_connector(self, connector_id: str) -> Dict[str, Any]:
+    async def get_registry_connector(self, connector_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Get a single connector from the registry."""
-        connector = await mcp_foundry_service.get_connector_by_id(connector_id)
-        # Enrich with credential_schema and normalize logo_url → icon
-        auth_type_str = connector.get("auth_type", "Open")
-        auth_type = MCP_AUTH_TYPE_MAPPING.get(auth_type_str, ConnectorAuthTypeEnum.OPEN)
-        connector["credential_schema"] = CONNECTOR_AUTH_CREDENTIALS_MAP.get(auth_type, [])
+        connector = await mcp_foundry_service.get_connector_by_id(connector_id, auth_token=user_token)
+        # Enrich with credential_schema (with defaults) and normalize logo_url → icon
+        connector["credential_schema"] = _enrich_credential_schema(connector)
         if "logo_url" in connector:
             connector["icon"] = connector.pop("logo_url")
         return connector
@@ -254,6 +291,7 @@ class ConnectorService:
         self,
         connector_id: str,
         credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials],
+        user_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Configure a global connector by creating a gateway with credentials.
 
@@ -263,7 +301,7 @@ class ConnectorService:
         4. Create gateway in MCP Foundry
         """
         # 1. Fetch connector details
-        connector = await mcp_foundry_service.get_connector_by_id(connector_id)
+        connector = await mcp_foundry_service.get_connector_by_id(connector_id, auth_token=user_token)
 
         # 2. Validate credentials match auth_type
         raw_auth_type = connector.get("auth_type", "")
@@ -307,6 +345,7 @@ class ConnectorService:
             visibility="public",
             auth_config=auth_config,
             tags=tags,
+            auth_token=user_token,
         )
 
         logger.info(
@@ -317,41 +356,45 @@ class ConnectorService:
 
         return gateway_response
 
-    async def list_gateways(self, offset: int = 0, limit: int = 20) -> Tuple[List[Dict[str, Any]], int]:
+    async def list_gateways(
+        self, offset: int = 0, limit: int = 20, user_token: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """List all gateways."""
-        return await mcp_foundry_service.list_gateways(offset=offset, limit=limit)
+        return await mcp_foundry_service.list_gateways(offset=offset, limit=limit, auth_token=user_token)
 
-    async def get_gateway(self, gateway_id: str) -> Dict[str, Any]:
+    async def get_gateway(self, gateway_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Get a gateway by ID."""
-        return await mcp_foundry_service.get_gateway_by_id(gateway_id)
+        return await mcp_foundry_service.get_gateway_by_id(gateway_id, auth_token=user_token)
 
-    async def update_gateway(self, gateway_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_gateway(
+        self, gateway_id: str, update_data: Dict[str, Any], user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Update a gateway."""
-        return await mcp_foundry_service.update_gateway(gateway_id, update_data)
+        return await mcp_foundry_service.update_gateway(gateway_id, update_data, auth_token=user_token)
 
-    async def delete_gateway(self, gateway_id: str) -> Dict[str, Any]:
+    async def delete_gateway(self, gateway_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Delete a gateway."""
-        return await mcp_foundry_service.delete_gateway(gateway_id)
+        return await mcp_foundry_service.delete_gateway(gateway_id, auth_token=user_token)
 
     # ─── User: OAuth & Tools ─────────────────────────────────────────────
 
-    async def initiate_oauth(self, gateway_id: str) -> Dict[str, Any]:
+    async def initiate_oauth(self, gateway_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Initiate OAuth flow for a gateway."""
-        return await mcp_foundry_service.initiate_oauth(gateway_id)
+        return await mcp_foundry_service.initiate_oauth(gateway_id, auth_token=user_token)
 
-    async def handle_oauth_callback(self, code: str, state: str) -> Dict[str, Any]:
+    async def handle_oauth_callback(self, code: str, state: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Handle OAuth callback and auto-fetch tools from the MCP server.
 
         After the token exchange succeeds, we trigger tool discovery so that
         the tool list is populated immediately rather than staying empty until
         a manual fetch-tools call.
         """
-        result = await mcp_foundry_service.handle_oauth_callback(code, state)
+        result = await mcp_foundry_service.handle_oauth_callback(code, state, auth_token=user_token)
 
         gateway_id = result.get("gateway_id")
         if gateway_id and re.fullmatch(r"[0-9a-fA-F\-]{1,64}", gateway_id):
             try:
-                await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+                await mcp_foundry_service.fetch_tools_after_oauth(gateway_id, auth_token=user_token)
                 logger.info("Auto-fetched tools after OAuth", gateway_id=gateway_id)
             except (MCPFoundryException, Exception) as fetch_err:
                 logger.warning(
@@ -364,29 +407,37 @@ class ConnectorService:
 
         return result
 
-    async def get_oauth_status(self, gateway_id: str) -> Dict[str, Any]:
+    async def get_oauth_status(self, gateway_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Get OAuth status for a gateway."""
-        return await mcp_foundry_service.get_oauth_status(gateway_id)
+        return await mcp_foundry_service.get_oauth_status(gateway_id, auth_token=user_token)
 
-    async def fetch_tools(self, gateway_id: str) -> Dict[str, Any]:
+    async def fetch_tools(self, gateway_id: str, user_token: Optional[str] = None) -> Dict[str, Any]:
         """Fetch tools after OAuth completion."""
-        return await mcp_foundry_service.fetch_tools_after_oauth(gateway_id)
+        return await mcp_foundry_service.fetch_tools_after_oauth(gateway_id, auth_token=user_token)
 
-    async def get_oauth_token_status(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+    async def get_oauth_token_status(
+        self, gateway_id: str, user_id: str, user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Check if a user has an active OAuth token for a gateway."""
-        return await mcp_foundry_service.get_oauth_token_status(gateway_id, user_id)
+        return await mcp_foundry_service.get_oauth_token_status(gateway_id, user_id, auth_token=user_token)
 
-    async def revoke_oauth_token(self, gateway_id: str, user_id: str) -> Dict[str, Any]:
+    async def revoke_oauth_token(
+        self, gateway_id: str, user_id: str, user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Revoke the current user's OAuth token for a gateway."""
-        return await mcp_foundry_service.revoke_oauth_token(gateway_id, user_id)
+        return await mcp_foundry_service.revoke_oauth_token(gateway_id, user_id, auth_token=user_token)
 
-    async def admin_revoke_oauth_token(self, gateway_id: str, user_email: str) -> Dict[str, Any]:
+    async def admin_revoke_oauth_token(
+        self, gateway_id: str, user_email: str, user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Admin: Revoke another user's OAuth token for a gateway."""
-        return await mcp_foundry_service.admin_revoke_oauth_token(gateway_id, user_email)
+        return await mcp_foundry_service.admin_revoke_oauth_token(gateway_id, user_email, auth_token=user_token)
 
-    async def list_tools(self, gateway_id: str, offset: int = 0, limit: int = 100) -> Tuple[List[Dict[str, Any]], int]:
+    async def list_tools(
+        self, gateway_id: str, offset: int = 0, limit: int = 100, user_token: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """List tools scoped to a specific gateway via get_gateway_by_id."""
-        gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+        gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id, auth_token=user_token)
 
         # Validate gateway is enabled and accessible to studio clients
         if not gateway.get("enabled", True):
@@ -416,10 +467,11 @@ class ConnectorService:
         include_disabled: bool = False,
         offset: int = 0,
         limit: int = 100,
+        user_token: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """List gateways that have a connector-id:* tag, enriched with registry data."""
         # 1. Fetch all gateways from MCP Foundry
-        gateways, _ = await mcp_foundry_service.list_gateways(offset=0, limit=500)
+        gateways, _ = await mcp_foundry_service.list_gateways(offset=0, limit=500, auth_token=user_token)
 
         # 2. Filter: only gateways with a connector-id:* tag
         configured: List[Tuple[Dict[str, Any], str]] = []
@@ -443,7 +495,11 @@ class ConnectorService:
         if unique_ids:
             try:
                 all_connectors, _ = await mcp_foundry_service.list_connectors(
-                    show_registered_only=False, show_available_only=True, offset=0, limit=500
+                    show_registered_only=False,
+                    show_available_only=True,
+                    offset=0,
+                    limit=500,
+                    auth_token=user_token,
                 )
                 for c in all_connectors:
                     cid = c.get("id")
@@ -458,14 +514,14 @@ class ConnectorService:
         # 4. Fetch tool counts and OAuth status in parallel
         async def _tool_count(gw_id: str) -> Tuple[str, int]:
             try:
-                detail = await mcp_foundry_service.get_gateway_by_id(gw_id)
+                detail = await mcp_foundry_service.get_gateway_by_id(gw_id, auth_token=user_token)
                 return gw_id, len(detail.get("tools", []))
             except Exception:
                 return gw_id, 0
 
         async def _oauth_connected(gw_id: str) -> Tuple[str, bool]:
             try:
-                oauth_status = await mcp_foundry_service.get_oauth_status(gw_id)
+                oauth_status = await mcp_foundry_service.get_oauth_status(gw_id, auth_token=user_token)
                 return gw_id, bool(
                     oauth_status.get("oauth_enabled")
                     or oauth_status.get("connected")
@@ -509,22 +565,28 @@ class ConnectorService:
         paginated = results[offset : offset + limit]
         return paginated, total
 
-    async def toggle_connector(self, gateway_id: str, enabled: bool) -> Dict[str, Any]:
+    async def toggle_connector(
+        self, gateway_id: str, enabled: bool, user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Enable or disable a configured connector gateway."""
-        return await mcp_foundry_service.update_gateway(gateway_id, {"enabled": enabled})
+        return await mcp_foundry_service.update_gateway(gateway_id, {"enabled": enabled}, auth_token=user_token)
 
-    async def update_connector_clients(self, gateway_id: str, clients: List[str]) -> Dict[str, Any]:
+    async def update_connector_clients(
+        self, gateway_id: str, clients: List[str], user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Update which clients (studio, prompt) can access a gateway."""
-        gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+        gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id, auth_token=user_token)
         current_tags = gateway.get("tags", [])
         # Remove existing client:* tags, add new ones
         new_tags = [t for t in current_tags if not t.startswith(f"{TAG_PREFIX_CLIENT}:")]
         new_tags.extend(f"{TAG_PREFIX_CLIENT}:{c}" for c in clients)
-        return await mcp_foundry_service.update_gateway(gateway_id, {"tags": new_tags})
+        return await mcp_foundry_service.update_gateway(gateway_id, {"tags": new_tags}, auth_token=user_token)
 
-    async def tag_existing_gateway(self, gateway_id: str, connector_id: str) -> Dict[str, Any]:
+    async def tag_existing_gateway(
+        self, gateway_id: str, connector_id: str, user_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Backfill tags on an existing gateway that was created before tag support."""
-        gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id)
+        gateway = await mcp_foundry_service.get_gateway_by_id(gateway_id, auth_token=user_token)
         current_tags = gateway.get("tags", [])
         new_tags = list(
             set(current_tags)
@@ -534,4 +596,4 @@ class ConnectorService:
                 *DEFAULT_CLIENT_TAGS,
             }
         )
-        return await mcp_foundry_service.update_gateway(gateway_id, {"tags": new_tags})
+        return await mcp_foundry_service.update_gateway(gateway_id, {"tags": new_tags}, auth_token=user_token)

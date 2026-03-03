@@ -37,6 +37,7 @@ export interface CredentialSchemaField {
   description: string;
   options?: string[];
   visible_when?: string[];
+  default?: string;
 }
 
 // Type for key-value pair entries (used with key-value-array field type)

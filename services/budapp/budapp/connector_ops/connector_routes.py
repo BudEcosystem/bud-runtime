@@ -64,7 +64,9 @@ async def list_registry(
     """Browse available connectors from the MCP Foundry registry."""
     offset = (page - 1) * limit
     try:
-        connectors, total = await ConnectorService().list_registry(name=name, offset=offset, limit=limit)
+        connectors, total = await ConnectorService().list_registry(
+            name=name, offset=offset, limit=limit, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Registry connectors listed successfully",
@@ -103,7 +105,7 @@ async def get_registry_connector(
 ) -> Dict[str, Any]:
     """Get details of a single connector from the registry."""
     try:
-        connector = await ConnectorService().get_registry_connector(connector_id)
+        connector = await ConnectorService().get_registry_connector(connector_id, user_token=current_user.raw_token)
         return {
             "success": True,
             "message": "Connector retrieved successfully",
@@ -143,6 +145,7 @@ async def configure_connector(
         gateway = await ConnectorService().configure_connector(
             connector_id=request.connector_id,
             credentials=request.credentials,
+            user_token=current_user.raw_token,
         )
         return {
             "success": True,
@@ -180,7 +183,9 @@ async def list_gateways(
     """Admin: List all global gateways."""
     offset = (page - 1) * limit
     try:
-        gateways, total = await ConnectorService().list_gateways(offset=offset, limit=limit)
+        gateways, total = await ConnectorService().list_gateways(
+            offset=offset, limit=limit, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Gateways listed successfully",
@@ -219,7 +224,7 @@ async def get_gateway(
 ) -> Dict[str, Any]:
     """Admin: Get gateway details including tools."""
     try:
-        gateway = await ConnectorService().get_gateway(gateway_id)
+        gateway = await ConnectorService().get_gateway(gateway_id, user_token=current_user.raw_token)
         return {
             "success": True,
             "message": "Gateway retrieved successfully",
@@ -256,7 +261,7 @@ async def update_gateway(
 ) -> Dict[str, Any]:
     """Admin: Update a gateway."""
     try:
-        gateway = await ConnectorService().update_gateway(gateway_id, update_data)
+        gateway = await ConnectorService().update_gateway(gateway_id, update_data, user_token=current_user.raw_token)
         return {
             "success": True,
             "message": "Gateway updated successfully",
@@ -291,7 +296,7 @@ async def delete_gateway(
 ) -> Dict[str, Any]:
     """Admin: Delete a gateway."""
     try:
-        await ConnectorService().delete_gateway(gateway_id)
+        await ConnectorService().delete_gateway(gateway_id, user_token=current_user.raw_token)
         return {
             "success": True,
             "message": "Gateway deleted successfully",
@@ -336,7 +341,11 @@ async def list_configured(
     offset = (page - 1) * limit
     try:
         connectors, total = await ConnectorService().list_configured(
-            client=client, include_disabled=include_disabled, offset=offset, limit=limit
+            client=client,
+            include_disabled=include_disabled,
+            offset=offset,
+            limit=limit,
+            user_token=current_user.raw_token,
         )
         return {
             "success": True,
@@ -377,7 +386,9 @@ async def toggle_connector(
 ) -> Dict[str, Any]:
     """Admin: Toggle a configured connector gateway on or off."""
     try:
-        gateway = await ConnectorService().toggle_connector(gateway_id, request.enabled)
+        gateway = await ConnectorService().toggle_connector(
+            gateway_id, request.enabled, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": f"Gateway {'enabled' if request.enabled else 'disabled'} successfully",
@@ -414,7 +425,9 @@ async def update_connector_clients(
 ) -> Dict[str, Any]:
     """Admin: Update client access tags for a configured connector gateway."""
     try:
-        gateway = await ConnectorService().update_connector_clients(gateway_id, request.clients)
+        gateway = await ConnectorService().update_connector_clients(
+            gateway_id, request.clients, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Client tags updated successfully",
@@ -451,7 +464,9 @@ async def tag_existing_gateway(
 ) -> Dict[str, Any]:
     """Admin: Add connector-id and standard tags to an existing gateway."""
     try:
-        gateway = await ConnectorService().tag_existing_gateway(gateway_id, request.connector_id)
+        gateway = await ConnectorService().tag_existing_gateway(
+            gateway_id, request.connector_id, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Gateway tagged successfully",
@@ -564,7 +579,7 @@ async def list_available_connectors(
     offset = (page - 1) * limit
     try:
         connectors, total = await ConnectorService().list_configured(
-            client=client, include_disabled=False, offset=offset, limit=limit
+            client=client, include_disabled=False, offset=offset, limit=limit, user_token=current_user.raw_token
         )
         return {
             "success": True,
@@ -607,7 +622,7 @@ async def initiate_oauth(
         # Validate return_url early (before calling MCP Foundry) to fail fast
         validated_return_url = validate_return_url(return_url) if return_url else None
 
-        result = await ConnectorService().initiate_oauth(gateway_id)
+        result = await ConnectorService().initiate_oauth(gateway_id, user_token=current_user.raw_token)
         if validated_return_url:
             oauth_state = result.get("state", "")
             if oauth_state:
@@ -647,7 +662,9 @@ async def handle_oauth_callback(
 ) -> Dict[str, Any]:
     """User: Handle OAuth callback with authorization code."""
     try:
-        result = await ConnectorService().handle_oauth_callback(code=request.code, state=request.state)
+        result = await ConnectorService().handle_oauth_callback(
+            code=request.code, state=request.state, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "OAuth callback handled successfully",
@@ -682,7 +699,7 @@ async def fetch_tools(
 ) -> Dict[str, Any]:
     """User: Fetch tools after OAuth completion for a gateway."""
     try:
-        result = await ConnectorService().fetch_tools(gateway_id)
+        result = await ConnectorService().fetch_tools(gateway_id, user_token=current_user.raw_token)
         return {
             "success": True,
             "message": "Tools fetched successfully",
@@ -720,7 +737,9 @@ async def list_tools(
     """User: List tools from a gateway."""
     offset = (page - 1) * limit
     try:
-        tools, total = await ConnectorService().list_tools(gateway_id=gateway_id, offset=offset, limit=limit)
+        tools, total = await ConnectorService().list_tools(
+            gateway_id=gateway_id, offset=offset, limit=limit, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Tools listed successfully",
@@ -758,7 +777,7 @@ async def get_oauth_status(
 ) -> Dict[str, Any]:
     """User: Check OAuth authorization status for a gateway."""
     try:
-        result = await ConnectorService().get_oauth_status(gateway_id)
+        result = await ConnectorService().get_oauth_status(gateway_id, user_token=current_user.raw_token)
         return {
             "success": True,
             "message": "OAuth status retrieved",
@@ -794,7 +813,9 @@ async def get_oauth_token_status(
 ) -> Dict[str, Any]:
     """User: Check if current user has an active OAuth token for a gateway."""
     try:
-        result = await ConnectorService().get_oauth_token_status(gateway_id, current_user.email)
+        result = await ConnectorService().get_oauth_token_status(
+            gateway_id, current_user.email, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Token status retrieved",
@@ -830,7 +851,9 @@ async def revoke_oauth_token(
 ) -> Dict[str, Any]:
     """User: Revoke current user's OAuth token for a gateway."""
     try:
-        result = await ConnectorService().revoke_oauth_token(gateway_id, current_user.email)
+        result = await ConnectorService().revoke_oauth_token(
+            gateway_id, current_user.email, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": "Token revoked successfully",
@@ -868,7 +891,9 @@ async def admin_revoke_oauth_token(
 ) -> Dict[str, Any]:
     """Admin: Revoke another user's OAuth token for a gateway."""
     try:
-        result = await ConnectorService().admin_revoke_oauth_token(gateway_id, user_email)
+        result = await ConnectorService().admin_revoke_oauth_token(
+            gateway_id, user_email, user_token=current_user.raw_token
+        )
         return {
             "success": True,
             "message": f"Token revoked successfully for user {user_email}",
