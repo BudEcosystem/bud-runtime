@@ -1,4 +1,4 @@
-import { Button, Image } from "antd";
+import { Button, Image, Tooltip } from "antd";
 import React, { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useConfig } from "@/app/context/ConfigContext";
@@ -169,7 +169,7 @@ export default function LoadModel(props: LoadModelProps) {
             {chat?.selectedDeployment ? (
                 <Button
                     type="default"
-                    className={`w-[12.25rem] 2rem border-[1px] border-[#1F1F1F] ${isLocked ? 'cursor-not-allowed opacity-75' : ''}`}
+                    className={`w-[12.25rem] 2rem border-[1px] border-[#1F1F1F] overflow-hidden ${isLocked ? 'cursor-not-allowed opacity-75' : ''}`}
                     onClick={() => {
                         if (!isLocked) {
                             props.setOpen(!props.open);
@@ -190,9 +190,11 @@ export default function LoadModel(props: LoadModelProps) {
                             height: ".875rem",
                         }}
                     />
-                    <Text_12_400_EEEEEE className="Open-Sans">
-                        {chat.selectedDeployment.name}
-                    </Text_12_400_EEEEEE>
+                    <Tooltip title={chat.selectedDeployment.name}>
+                        <Text_12_400_EEEEEE className="Open-Sans truncate">
+                            {chat.selectedDeployment.name}
+                        </Text_12_400_EEEEEE>
+                    </Tooltip>
                 </Button>
             ) : (
                 <Button
