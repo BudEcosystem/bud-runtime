@@ -13,6 +13,7 @@ export type Session = {
     active?: boolean;
     selectedDeployment?: Endpoint;
     deploymentLocked?: boolean;
+    isPromptSession?: boolean;
 };
 
 export type Usage = {
