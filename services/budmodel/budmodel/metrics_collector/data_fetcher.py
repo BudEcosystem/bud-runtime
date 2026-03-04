@@ -154,6 +154,7 @@ async def extract_data():
 
     browser_config = BrowserConfig(headless=False, browser_type="chromium")
     async with AsyncWebCrawler(config=browser_config) as crawler:
+        crawler.crawler_strategy.set_hook("on_execution_started", on_execution_started_hook)
         try:
             run_config = CrawlerRunConfig(
                 extraction_strategy=extraction_strategy,

@@ -20,7 +20,7 @@ import json
 from typing import Any, Dict, List
 
 from budmicroframe.commons import logging
-from crawl4ai import AsyncWebCrawler, BrowserConfig, JsonCssExtractionStrategy
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, JsonCssExtractionStrategy
 
 from ..commons.constants import CrawlerType
 from ..commons.exceptions import CrawlerException
@@ -72,13 +72,20 @@ class Crawl4aiCrawler(BaseCrawler):
             List[Dict[str, Any]]: The extracted data.
         """
         # Build the config
-        config = self.build_config(config)
+        config_dict = self.build_config(config)
+        url = config_dict.pop("url")
+        config_dict.pop("schema", None)
+
+        browser_config = BrowserConfig(
+            headless=config_dict.pop("headless", True),
+            browser_type=config_dict.pop("browser_type", "chromium"),
+        )
+        run_config = CrawlerRunConfig(**config_dict)
 
         # Run the crawler
-        browser_config = BrowserConfig(headless=True)
         async with AsyncWebCrawler(config=browser_config) as crawler:
             logger.debug("Crawling the page %s", self.url)
-            result = await crawler.arun(**config)
+            result = await crawler.arun(url=url, config=run_config)
 
         # Check if the result is successful
         if not result.success:
