@@ -1,8 +1,7 @@
 import asyncio
 import json
 
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, JsonCssExtractionStrategy
 
 
 async def extract_data(url, schema, wait_for="", js_code="", css_base_selector=""):
@@ -18,35 +17,28 @@ async def extract_data(url, schema, wait_for="", js_code="", css_base_selector="
     Returns:
         Extracted data in JSON format.
     """
-    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
+    extraction_strategy = JsonCssExtractionStrategy(schema)
 
-    async def on_execution_started_hook(page):
-        print(f"Execution started on page: {page.url}")
-
-    async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
-        crawler.crawler_strategy.set_hook("on_execution_started", on_execution_started_hook)
+    browser_config = BrowserConfig(headless=True, browser_type="chromium")
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         print(wait_for)
         print(js_code)
         try:
-            params = {
-                "url": url,
+            run_params = {
                 "extraction_strategy": extraction_strategy,
                 "bypass_cache": True,
-                "browser_type": "chromium",
                 "page_timeout": 120000,
                 "delay_before_return_html": 100,
             }
-            #
-            # if wait_for:
-            #     params["wait_for"] = wait_for
 
             if js_code:
-                params["js_code"] = [js_code]
+                run_params["js_code"] = [js_code]
 
             if css_base_selector:
-                params["css_selector"] = css_base_selector
+                run_params["css_selector"] = css_base_selector
 
-            result = await crawler.arun(**params)
+            run_config = CrawlerRunConfig(**run_params)
+            result = await crawler.arun(url=url, config=run_config)
 
             assert result.success, "Failed to crawl the page"
             with open("crawler_result.txt", "w") as file:

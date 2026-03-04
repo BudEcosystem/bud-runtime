@@ -11,7 +11,6 @@ sys.modules["aria2p.api"] = MagicMock()
 sys.modules["aria2p.client"] = MagicMock()
 sys.modules["json_repair"] = MagicMock()
 sys.modules["crawl4ai"] = MagicMock()
-sys.modules["crawl4ai.extraction_strategy"] = MagicMock()
 
 from budmodel.model_info.services import ModelExtractionETAObserver, SecurityScanETAObserver
 from budmicroframe.commons.schemas import NotificationRequest, NotificationContent

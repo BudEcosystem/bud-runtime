@@ -1,8 +1,6 @@
 import asyncio
 
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, LLMConfig, LLMExtractionStrategy
 from pydantic import BaseModel, Field
 
 from budmodel.commons.config import get_secrets_config
@@ -106,19 +104,16 @@ async def crawl_huggingface_leaderboard():
     }
     """
 
-    async with AsyncWebCrawler(verbose=True, crawler_strategy=AsyncPlaywrightCrawlerStrategy()) as crawler:
-        # Run the crawler with specific strategies and dynamic content loading
-        result = await crawler.arun(
-            url="https://huggingface.co/spaces/mteb/leaderboard",
-            # js_code=js_code,
-            wait_for=wait_for,
-            css_selector="#component-4",  # Adjust to the actual element needed
-            extraction_strategy=LLMExtractionStrategy(
-                provider="openai/gpt-4o",
-                api_token=API_KEY,
-                schema=OpenAIModelFee.schema(),
-                extraction_type="schema",
-                instruction="""Extract all models' names and metrics. Each entry should look like this:
+    browser_config = BrowserConfig(headless=True)
+    llm_config = LLMConfig(provider="openai/gpt-4o", api_token=API_KEY)
+    run_config = CrawlerRunConfig(
+        wait_for=wait_for,
+        css_selector="#component-4",
+        extraction_strategy=LLMExtractionStrategy(
+            llm_config=llm_config,
+            schema=OpenAIModelFee.schema(),
+            extraction_type="schema",
+            instruction="""Extract all models' names and metrics. Each entry should look like this:
                 {
                     "model_name": "GPT-4",
                     "rank": 1,
@@ -137,8 +132,12 @@ async def crawl_huggingface_leaderboard():
                     "url": "https://model_url"
                 }
                 """,
-            ),
-            # chunking_strategy=RegexChunking(),  # Optional, for splitting content efficiently
+        ),
+    )
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        result = await crawler.arun(
+            url="https://huggingface.co/spaces/mteb/leaderboard",
+            config=run_config,
         )
 
     # Display the extracted structured result

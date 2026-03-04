@@ -1,8 +1,7 @@
 import asyncio
 import json
 
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, JsonCssExtractionStrategy
 
 
 async def extract_data():
@@ -25,7 +24,7 @@ async def extract_data():
         ],
     }
 
-    extraction_strategy = JsonCssExtractionStrategy(schema, verbose=True)
+    extraction_strategy = JsonCssExtractionStrategy(schema)
 
     wait_for = """
     () => {
@@ -153,21 +152,21 @@ async def extract_data():
     async def on_execution_started_hook(page):
         print(f"Execution started on page: {page.url}")
 
-    async with AsyncWebCrawler(verbose=True, headless=False) as crawler:
+    browser_config = BrowserConfig(headless=False, browser_type="chromium")
+    async with AsyncWebCrawler(config=browser_config) as crawler:
         crawler.crawler_strategy.set_hook("on_execution_started", on_execution_started_hook)
-
         try:
-            result = await crawler.arun(
-                url="https://lmarena-ai-chatbot-arena-leaderboard.hf.space/",
+            run_config = CrawlerRunConfig(
                 extraction_strategy=extraction_strategy,
                 bypass_cache=True,
-                headless=False,
-                browser_type="chromium",
                 wait_for=wait_for,
-                # css_selector="svelte-virtual-table-viewport table",
                 page_timeout=120000,
                 js_code=js_code,
                 delay_before_return_html=100,
+            )
+            result = await crawler.arun(
+                url="https://lmarena-ai-chatbot-arena-leaderboard.hf.space/",
+                config=run_config,
             )
 
             assert result.success, "Failed to crawl the page"
