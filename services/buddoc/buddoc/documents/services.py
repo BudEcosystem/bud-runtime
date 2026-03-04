@@ -319,6 +319,25 @@ class DocumentService:
                     )
                 )
 
+            # Check if VLM processing actually produced content
+            # (docling may silently swallow VLM errors and return empty pages)
+            has_content = any(p.markdown for p in pages)
+            if not has_content and not extracted_text:
+                logger.error(f"VLM produced no content for document {document_id}")
+                return DocumentOCRResult(
+                    document_id=document_id,
+                    status=DocumentStatus.FAILED,
+                    pages=[],
+                    metadata=None,
+                    usage_info=UsageInfo(
+                        pages_processed=0,
+                        size_bytes=document_size,
+                        filename=filename,
+                    ),
+                    error_message="Document processing failed: VLM produced no content",
+                    created_at=datetime.now(timezone.utc),
+                )
+
             # Create usage info
             usage_info = UsageInfo(
                 pages_processed=len(pages),
