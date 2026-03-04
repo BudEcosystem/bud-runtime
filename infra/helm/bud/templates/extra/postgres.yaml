@@ -3,10 +3,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-postgres-db-create-script
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "-5"
-    "helm.sh/hook-delete-policy": before-hook-creation
 data:
   script.sh: |-
     export PGPASSWORD="{{ $.Values.postgresql.auth.postgresPassword }}"
@@ -38,12 +34,7 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-postgres-db-create
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "-4"
-    "helm.sh/hook-delete-policy": before-hook-creation
-    checksum/databases: "{{ join "-" $.Values.postgresqlExtra.autoCreateDB | sha256sum }}"
+  name: "{{ .Release.Name }}-postgres-db-create-{{ join "-" $.Values.postgresqlExtra.autoCreateDB | sha256sum }}"
 spec:
   ttlSecondsAfterFinished: 300
   template:
