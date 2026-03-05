@@ -44,19 +44,18 @@ flowchart LR
   Use production-approved storage classes only.
 </Check>
 
- <Check>
+<Check>
   Document rationale when deviating from recommended access mode.
 </Check>
 
- <Check>
+<Check>
   Revalidate settings after cluster upgrades or CSI changes.
 </Check>
-
 
 ## Troubleshooting Signals
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[Settings Load Fails] --> B[Check Cluster Connectivity]
     B --> C[Confirm Storage Class API Response]
     C --> D[Retry Save]
