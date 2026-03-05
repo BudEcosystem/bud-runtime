@@ -96,10 +96,10 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
     switch (status?.toLowerCase()) {
       case 'active':
         return { color: '#479d5f', label: 'Active' };
-      case 'inactive':
-        return { color: '#F59E0B', label: 'Inactive' };
-      case 'draft':
-        return { color: '#6B7280', label: 'Draft' };
+      case 'disabled':
+        return { color: '#F59E0B', label: 'Disabled' };
+      case 'deleted':
+        return { color: '#EF4444', label: 'Deleted' };
       default:
         return { color: '#6B7280', label: status || 'Unknown' };
     }
@@ -331,8 +331,8 @@ const GuardrailsListTable: React.FC<GuardrailsListTableProps> = ({ projectId: pr
               >
                 <Select.Option value="">All Status</Select.Option>
                 <Select.Option value="active">Active</Select.Option>
-                <Select.Option value="inactive">Inactive</Select.Option>
-                <Select.Option value="draft">Draft</Select.Option>
+                <Select.Option value="disabled">Disabled</Select.Option>
+                <Select.Option value="deleted">Deleted</Select.Option>
               </Select>
               <PrimaryButton
                 onClick={() => fetchGuardrails(projectId as string)}

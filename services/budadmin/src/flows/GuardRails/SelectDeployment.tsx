@@ -2,30 +2,38 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Input, Checkbox, Spin, Button, Popover } from "antd";
+import { Input, Checkbox, Spin, Popover } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast } from "@/components/toast";
-import { useEndPoints } from "src/hooks/useEndPoint";
 import useGuardrails from "src/hooks/useGuardrails";
 import {
   Text_12_400_757575,
+  Text_12_400_B3B3B3,
   Text_14_400_EEEEEE,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
 import IconRender from "../components/BudIconRender";
 import Tags from "../components/DrawerTags";
 import { endpointStatusMapping } from "@/lib/colorMapping";
+import { AppRequest } from "src/pages/api/requests";
+import { tempApiBaseUrl } from "@/components/environment";
 
 
-interface Deployment {
-  id: string;
-  name: string;
-  type: "model" | "route" | "tool" | "agent";
+interface EndpointItem {
+  id?: string;
+  endpoint_id?: string;
+  name?: string;
+  endpoint_name?: string;
+  endpoint_url?: string;
   description?: string;
   status?: string;
-  icon?: string;
+  model?: {
+    icon?: string;
+    provider_type?: string;
+    [key: string]: any;
+  };
 }
 
 export default function SelectDeployment() {
@@ -76,17 +84,16 @@ export default function SelectDeployment() {
     return "#757575"; // Gray as default
   };
 
-  // Pagination states
-  const [endpointsPage, setEndpointsPage] = useState(1);
+  // Infinite scroll pagination states
   const pageSize = 10;
+  const [allEndpoints, setAllEndpoints] = useState<EndpointItem[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecordCount, setTotalRecordCount] = useState(0);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Use hooks for API data
-  const {
-    endPoints,
-    loading: endpointsLoading,
-    getEndPoints,
-    totalRecords: totalEndpoints,
-  } = useEndPoints();
   const {
     selectedProject,
     updateWorkflow,
@@ -94,27 +101,113 @@ export default function SelectDeployment() {
     setSelectedDeployment: setSelectedDeploymentInStore,
   } = useGuardrails();
 
-  // Reset page when search term changes
-  useEffect(() => {
-    setEndpointsPage(1);
-  }, [searchTerm]);
-
-  // Fetch endpoints when component mounts or search/page changes
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
+  // Local fetch that accumulates results
+  const fetchEndpoints = useCallback(
+    async (page: number, search?: string, append: boolean = false) => {
       const projectId = selectedProject?.project?.id || selectedProject?.id;
-      if (projectId) {
-        getEndPoints({
-          id: projectId,
-          page: endpointsPage,
-          limit: pageSize,
-          name: searchTerm || undefined,
-        });
+      if (!projectId) return;
+
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setInitialLoading(true);
       }
+
+      try {
+        const params: Record<string, string | number | boolean> = {
+          page,
+          limit: pageSize,
+          search: !!search,
+          order_by: "-created_at",
+        };
+        if (search) {
+          params.name = search;
+        }
+        if (projectId) {
+          params.project_id = projectId;
+        }
+
+        const response = await AppRequest.Get(
+          `${tempApiBaseUrl}/endpoints/`,
+          {
+            params,
+            headers: {
+              "x-resource-type": "project",
+              "x-entity-id": projectId,
+            },
+          }
+        );
+
+        const listData = response?.data;
+        if (listData?.endpoints) {
+          const newEndpoints = listData.endpoints;
+          const totalPages = listData.total_pages || Math.ceil((listData.total_record || 0) / pageSize);
+
+          if (append) {
+            setAllEndpoints((prev) => [...prev, ...newEndpoints]);
+          } else {
+            setAllEndpoints(newEndpoints);
+          }
+
+          setTotalRecordCount(listData.total_record || 0);
+          setHasMore(page < totalPages);
+        }
+      } catch (error) {
+        console.error("Failed to fetch endpoints:", error);
+        if (!append) {
+          setAllEndpoints([]);
+        }
+      } finally {
+        if (append) {
+          setLoadingMore(false);
+        } else {
+          setInitialLoading(false);
+        }
+      }
+    },
+    [selectedProject]
+  );
+
+  // Reset and fetch on search change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+      setHasMore(true);
+      fetchEndpoints(1, searchTerm || undefined, false);
     }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, endpointsPage, selectedProject]);
+    return () => clearTimeout(timer);
+  }, [searchTerm, selectedProject, fetchEndpoints]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !loadingMore && !initialLoading) {
+          const nextPage = currentPage + 1;
+          setCurrentPage(nextPage);
+          fetchEndpoints(nextPage, searchTerm || undefined, true);
+        }
+      },
+      {
+        root: null,
+        rootMargin: "100px",
+        threshold: 0.1,
+      }
+    );
+
+    const sentinel = sentinelRef.current;
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+
+    return () => {
+      if (sentinel) {
+        observer.unobserve(sentinel);
+      }
+    };
+  }, [hasMore, loadingMore, initialLoading, currentPage, searchTerm, fetchEndpoints]);
 
 
   const handleBack = () => {
@@ -160,7 +253,7 @@ export default function SelectDeployment() {
 
 
   // Render deployment/endpoint item
-  const renderDeploymentListItem = (endpoint: any) => {
+  const renderDeploymentListItem = (endpoint: EndpointItem) => {
     const description = endpoint.endpoint_url || endpoint.description || "";
     const isLongDescription = description.length > 60;
 
@@ -289,53 +382,32 @@ export default function SelectDeployment() {
               <div className="flex items-center gap-[0.5rem] px-[1.35rem] mb-[1rem]">
                 <Text_14_600_FFFFFF>Deployments</Text_14_600_FFFFFF>
                 <Text_12_400_757575>
-                  ({totalEndpoints || 0})
+                  ({totalRecordCount || 0})
                 </Text_12_400_757575>
               </div>
-                {endpointsLoading ? (
+                {initialLoading ? (
                   <div className="flex justify-center py-[2rem]">
                     <Spin size="large" />
                   </div>
                 ) : (
                   <>
-                    {endPoints && endPoints.length > 0 ? (
+                    {allEndpoints.length > 0 ? (
                       <>
                         <div className="space-y-0">
-                          {endPoints.map((endpoint) =>
+                          {allEndpoints.map((endpoint) =>
                             renderDeploymentListItem(endpoint),
                           )}
                         </div>
-                        {totalEndpoints > pageSize && (
-                          <div className="flex justify-between items-center px-[1.35rem] py-[1rem]">
-                            <Button
-                              onClick={() =>
-                                setEndpointsPage((prev) =>
-                                  Math.max(1, prev - 1),
-                                )
-                              }
-                              disabled={endpointsPage === 1}
-                              className="bg-[#1F1F1F] text-[#EEEEEE] border-[#757575] hover:bg-[#2A2A2A] hover:border-[#EEEEEE]"
-                            >
-                              Previous
-                            </Button>
-                            <Text_12_400_757575>
-                              Page {endpointsPage} of{" "}
-                              {Math.ceil(totalEndpoints / pageSize)}
-                            </Text_12_400_757575>
-                            <Button
-                              onClick={() =>
-                                setEndpointsPage((prev) => prev + 1)
-                              }
-                              disabled={
-                                endpointsPage >=
-                                Math.ceil(totalEndpoints / pageSize)
-                              }
-                              className="bg-[#1F1F1F] text-[#EEEEEE] border-[#757575] hover:bg-[#2A2A2A] hover:border-[#EEEEEE]"
-                            >
-                              Next
-                            </Button>
-                          </div>
-                        )}
+                        {/* Infinite scroll sentinel */}
+                        <div
+                          ref={sentinelRef}
+                          className="flex justify-center items-center py-4"
+                        >
+                          {loadingMore && <Spin size="default" />}
+                          {!hasMore && allEndpoints.length > 0 && (
+                            <Text_12_400_B3B3B3>No more deployments to load</Text_12_400_B3B3B3>
+                          )}
+                        </div>
                       </>
                     ) : (
                       <div className="text-center py-[2rem]">
