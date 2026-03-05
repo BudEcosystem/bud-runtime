@@ -127,7 +127,7 @@ export default function SelectDeployment() {
           params.project_id = projectId;
         }
 
-        const response: any = await AppRequest.Get(
+        const response = await AppRequest.Get(
           `${tempApiBaseUrl}/endpoints/`,
           {
             params,
