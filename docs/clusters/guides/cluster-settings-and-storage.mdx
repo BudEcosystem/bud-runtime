@@ -30,6 +30,8 @@ flowchart LR
 2. Prefer the recommended mode shown by storage class metadata.
 3. Save changes and verify values persist on reload.
 
+![Image](/images/image-36.png)
+
 ## Validation Checklist
 
 - Storage class list loads without API errors.
@@ -38,9 +40,18 @@ flowchart LR
 
 ## Operational Guardrails
 
-<Check>Use production-approved storage classes only.</Check>
-<Check>Document rationale when deviating from recommended access mode.</Check>
-<Check>Revalidate settings after cluster upgrades or CSI changes.</Check>
+<Check>
+  Use production-approved storage classes only.
+</Check>
+
+ <Check>
+  Document rationale when deviating from recommended access mode.
+</Check>
+
+ <Check>
+  Revalidate settings after cluster upgrades or CSI changes.
+</Check>
+
 
 ## Troubleshooting Signals
 
