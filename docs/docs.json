@@ -165,7 +165,24 @@
             "group": "API Integration",
             "icon": "code",
             "pages": [
-              "api-integration/api-integration"
+              "api-integration/introduction",
+              "api-integration/quickstart",
+              "api-integration/api-integration-concepts",
+              "api-integration/creating-first-api-integration",
+              {
+                "group": "Guides",
+                "pages": [
+                  "api-integration/guides/openai-compatible-clients",
+                  "api-integration/guides/webhook-and-retry-patterns"
+                ]
+              },
+              {
+                "group": "Reference",
+                "pages": [
+                  "api-integration/reference/request-response-reference"
+                ]
+              },
+              "api-integration/troubleshooting"
             ]
           },
           {

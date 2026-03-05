@@ -1,0 +1,55 @@
+---
+title: "Request & Response Reference"
+description: "Headers, payload patterns, and status handling for API Integration"
+---
+
+## Required Request Headers
+
+| Header | Required | Description |
+|---|---|---|
+| `Authorization` | Yes | `Bearer <API_KEY>` project-scoped token |
+| `Content-Type` | JSON routes | Typically `application/json` |
+
+## Core Request Examples
+
+### Chat Completions
+
+```json
+{
+  "model": "YOUR_MODEL_NAME",
+  "messages": [{ "role": "user", "content": "Hello" }],
+  "max_tokens": 256
+}
+```
+
+### Embeddings
+
+```json
+{
+  "model": "YOUR_MODEL_NAME",
+  "input": "Text to embed"
+}
+```
+
+### Audio Transcription (multipart)
+
+- `file`: binary upload
+- `model`: model name
+- optional format fields
+
+## Status Code Handling
+
+| Status | Meaning | Action |
+|---|---|---|
+| `200` | Success | Parse response and continue |
+| `400/422` | Invalid payload | Fix input schema or fields |
+| `401/403` | Auth/permission error | Verify key, scope, and access |
+| `404` | Endpoint not found | Confirm base URL and route path |
+| `429` | Rate limited | Retry with backoff |
+| `5xx` | Server/transient issue | Retry with bounded attempts |
+
+## Response Validation Checklist
+
+<Check>Response status and JSON schema are validated</Check>
+<Check>Error payloads are logged with status code</Check>
+<Check>Sensitive fields are redacted before logging</Check>
