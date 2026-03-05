@@ -114,13 +114,15 @@ export default function SelectDeployment() {
       }
 
       try {
-        const params: any = {
+        const params: Record<string, string | number | boolean> = {
           page,
           limit: pageSize,
-          search: search ? true : false,
-          name: search || undefined,
+          search: !!search,
           order_by: "-created_at",
         };
+        if (search) {
+          params.name = search;
+        }
         if (projectId) {
           params.project_id = projectId;
         }
