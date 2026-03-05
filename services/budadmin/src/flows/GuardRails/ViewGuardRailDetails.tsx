@@ -87,8 +87,9 @@ export default function ViewGuardRailDetails() {
       successToast("Guardrail deleted successfully");
       drawerProps?.onDelete?.();
       closeDrawer();
-    } catch (error: any) {
-      errorToast(error?.response?.data?.detail || "Failed to delete guardrail");
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      errorToast(detail || "Failed to delete guardrail");
     } finally {
       setDeleteLoading(false);
       setShowConfirm(false);
