@@ -9,7 +9,7 @@ export interface GuardrailProfile {
   description?: string;
   project_id: string;
   project_name?: string;
-  status: "active" | "inactive" | "draft";
+  status: "active" | "disabled" | "deleted";
   created_at: string;
   modified_at?: string;
   created_by?: string;

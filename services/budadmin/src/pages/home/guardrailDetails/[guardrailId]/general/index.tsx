@@ -34,10 +34,10 @@ const GeneralTab = () => {
     switch (status?.toLowerCase()) {
       case 'active':
         return { color: '#479d5f', label: 'Active' };
-      case 'inactive':
-        return { color: '#F59E0B', label: 'Inactive' };
-      case 'draft':
-        return { color: '#6B7280', label: 'Draft' };
+      case 'disabled':
+        return { color: '#F59E0B', label: 'Disabled' };
+      case 'deleted':
+        return { color: '#EF4444', label: 'Deleted' };
       default:
         return { color: '#6B7280', label: status || 'Unknown' };
     }

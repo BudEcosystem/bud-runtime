@@ -2,18 +2,23 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Tag, Divider } from "antd";
+import { Tag, Divider, Image } from "antd";
 import React, { useState, useEffect } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import {
   Text_11_400_808080,
   Text_12_400_757575,
   Text_12_400_B3B3B3,
+  Text_12_400_EEEEEE,
   Text_13_400_B3B3B3,
   Text_14_400_EEEEEE,
   Text_14_600_FFFFFF,
   Text_16_600_FFFFFF,
 } from "@/components/ui/text";
+import { AppRequest } from "src/pages/api/requests";
+import { successToast, errorToast } from "@/components/toast";
+import BudStepAlert from "src/flows/components/BudStepAlert";
+import CustomDropDown from "src/flows/components/CustomDropDown";
 
 interface GuardRailDetail {
   id: string;
@@ -44,6 +49,8 @@ interface GuardRailDetail {
 export default function ViewGuardRailDetails() {
   const { openDrawerWithStep, closeDrawer, drawerProps } = useDrawer();
   const [guardrail, setGuardrail] = useState<GuardRailDetail | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Get guardrail data
   useEffect(() => {
@@ -70,6 +77,22 @@ export default function ViewGuardRailDetails() {
 
   const handleBack = () => {
     closeDrawer();
+  };
+
+  const handleDelete = async () => {
+    if (!guardrail?.id) return;
+    setDeleteLoading(true);
+    try {
+      await AppRequest.Delete(`/guardrails/probe/${guardrail.id}`);
+      successToast("Guardrail deleted successfully");
+      drawerProps?.onDelete?.();
+      closeDrawer();
+    } catch (error: any) {
+      errorToast(error?.response?.data?.detail || "Failed to delete guardrail");
+    } finally {
+      setDeleteLoading(false);
+      setShowConfirm(false);
+    }
   };
 
   const getTypeIcon = (guardrail?: GuardRailDetail) => {
@@ -105,25 +128,64 @@ export default function ViewGuardRailDetails() {
       nextText="Deploy"
     >
       <BudWraperBox>
+        {showConfirm && (
+          <BudDrawerLayout>
+            <BudStepAlert
+              type="warning"
+              title="You're about to delete this guardrail"
+              description="Are you sure you want to delete this guardrail? This action cannot be undone."
+              confirmText="Delete Guardrail"
+              cancelText="Cancel"
+              loading={deleteLoading}
+              confirmAction={handleDelete}
+              cancelAction={() => setShowConfirm(false)}
+            />
+          </BudDrawerLayout>
+        )}
         <BudDrawerLayout>
           {/* Header */}
           <div className="px-[1.35rem] pt-[1rem]">
-            <div className="flex items-start gap-[1rem] mb-[1.5rem]">
-              <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.5rem]">
-                {getTypeIcon(guardrail)}
+            <div className="flex items-start justify-between w-full">
+              <div className="flex items-start gap-[1rem] mb-[1.5rem]">
+                <div className="w-[3rem] h-[3rem] bg-[#1F1F1F] rounded-[8px] flex items-center justify-center text-[1.5rem]">
+                  {getTypeIcon(guardrail)}
+                </div>
+                <div className="flex-1">
+                  <Text_16_600_FFFFFF className="mb-[0.25rem]">
+                    {guardrail.name}
+                  </Text_16_600_FFFFFF>
+                  {guardrail.provider && (
+                    <Text_12_400_B3B3B3 className="mb-[0.5rem]">
+                      by {typeof guardrail.provider === 'object' ? guardrail.provider.name : guardrail.provider}
+                    </Text_12_400_B3B3B3>
+                  )}
+                  <Text_13_400_B3B3B3 className="leading-[1.4]">
+                    {guardrail.description}
+                  </Text_13_400_B3B3B3>
+                </div>
               </div>
-              <div className="flex-1">
-                <Text_16_600_FFFFFF className="mb-[0.25rem]">
-                  {guardrail.name}
-                </Text_16_600_FFFFFF>
-                {guardrail.provider && (
-                  <Text_12_400_B3B3B3 className="mb-[0.5rem]">
-                    by {typeof guardrail.provider === 'object' ? guardrail.provider.name : guardrail.provider}
-                  </Text_12_400_B3B3B3>
-                )}
-                <Text_13_400_B3B3B3 className="leading-[1.4]">
-                  {guardrail.description}
-                </Text_13_400_B3B3B3>
+              <div>
+                <CustomDropDown
+                  buttonContent={
+                    <div className="px-[.3rem] my-[0] py-[0.02rem]">
+                      <Image
+                        preview={false}
+                        src="/images/drawer/threeDots.png"
+                        alt="info"
+                        style={{ width: "0.1125rem", height: ".6rem" }}
+                      />
+                    </div>
+                  }
+                  parentClassNames="!min-h-[auto]"
+
+                  items={[
+                    {
+                      key: "1",
+                      label: <Text_12_400_EEEEEE>Delete</Text_12_400_EEEEEE>,
+                      onClick: () => setShowConfirm(true),
+                    },
+                  ]}
+                />
               </div>
             </div>
 
@@ -132,8 +194,8 @@ export default function ViewGuardRailDetails() {
             {/* Metadata Section */}
             <div className="space-y-[1.5rem] mb-[1.5rem]">
               {/* Modality */}
-              <div>
-                <Text_12_400_757575 className="mb-[0.5rem]">
+              <div className="flex justify-start items-center mb-[0.5rem]">
+                <Text_12_400_757575 className="min-w-[6.5rem]">
                   Modality:
                 </Text_12_400_757575>
                 <div className="flex flex-wrap gap-[0.5rem]">
@@ -147,8 +209,8 @@ export default function ViewGuardRailDetails() {
               </div>
 
               {/* Scanner Type */}
-              <div>
-                <Text_12_400_757575 className="mb-[0.5rem]">
+              <div className="flex justify-start items-center mb-[0.5rem]">
+                <Text_12_400_757575 className="min-w-[6.5rem]">
                   Scanner type:
                 </Text_12_400_757575>
                 <div className="flex flex-wrap gap-[0.5rem]">
@@ -162,8 +224,8 @@ export default function ViewGuardRailDetails() {
               </div>
 
               {/* Guard Type */}
-              <div>
-                <Text_12_400_757575 className="mb-[0.5rem]">
+              <div className="flex justify-start items-center mb-[0.5rem]">
+                <Text_12_400_757575 className="min-w-[6.5rem]">
                   Guard type:
                 </Text_12_400_757575>
                 <div className="flex flex-wrap gap-[0.5rem]">
@@ -177,19 +239,21 @@ export default function ViewGuardRailDetails() {
               </div>
 
               {/* Type */}
-              <div>
-                <Text_12_400_757575 className="mb-[0.5rem]">
-                  Type:
-                </Text_12_400_757575>
-                <div className="flex flex-wrap gap-[0.5rem]">
-                  {guardrail.typeCategories?.map((item, idx) => (
-                    <span key={idx} className="text-[#EEEEEE] text-[0.75rem]">
-                      {item}
-                      {idx < guardrail.typeCategories!.length - 1 ? " | " : ""}
-                    </span>
-                  ))}
+              {guardrail.typeCategories && guardrail.typeCategories.length > 0 && (
+                <div className="flex justify-start items-center mb-[0.5rem]">
+                  <Text_12_400_757575 className="min-w-[6.5rem]">
+                    Type:
+                  </Text_12_400_757575>
+                  <div className="flex flex-wrap gap-[0.5rem]">
+                    {guardrail.typeCategories.map((item, idx) => (
+                      <span key={idx} className="text-[#EEEEEE] text-[0.75rem]">
+                        {item}
+                        {idx < guardrail.typeCategories!.length - 1 ? " | " : ""}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <Divider className="bg-[#1F1F1F] my-[1.5rem]" />

@@ -61,7 +61,7 @@ interface GuardRail {
   examples?: string[];
 }
 
-function GuardRailCard({ item, index }: { item: any; index: number }) {
+function GuardRailCard({ item, index, onDelete }: { item: any; index: number; onDelete?: () => void }) {
   const { openDrawer } = useDrawer();
   const [isOverflowing, setIsOverflowing] = useState(false);
   const descriptionRef = useRef<HTMLDivElement>(null);
@@ -84,10 +84,10 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
     switch (status) {
       case 'active':
         return '#52C41A';
-      case 'inactive':
-        return '#757575';
-      case 'pending':
-        return '#FAAD14';
+      case 'disabled':
+        return '#F59E0B';
+      case 'deleted':
+        return '#EF4444';
       default:
         return '#757575';
     }
@@ -98,7 +98,7 @@ function GuardRailCard({ item, index }: { item: any; index: number }) {
       className="flex flex-col projectCards min-h-[325px] 1680px:min-h-[400px] 2048px:min-h-[475px] border border-[#1F1F1F] rounded-lg cursor-pointer text-[1rem] 1680px:text-[1.1rem]  hover:shadow-[1px_1px_6px_-1px_#2e3036] bg-[#101010] overflow-hidden"
       key={index}
       onClick={() => {
-        openDrawer("view-guardrail-details", { guardrail: item });
+        openDrawer("view-guardrail-details", { guardrail: item, onDelete });
       }}
     >
       <div className="flex flex-col justify-start pr-[1.5em] pl-[1.5em] pt-[1.6em] h-full">
@@ -519,6 +519,12 @@ export default function GuardRails() {
     }
   }, [loadingMore, probesLoading, hasMore, currentPage, filter, load]);
 
+  const refreshProbes = useCallback(() => {
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchMainPageProbes({ page: 1, limit: pageSize, isSearching: false });
+  }, [fetchMainPageProbes, pageSize]);
+
   const handleOpenChange = (open: boolean) => {
     setFilterOpen(open);
     setTempFilter(filter);
@@ -720,8 +726,8 @@ export default function GuardRails() {
                                     className="drawerInp !bg-[transparent] text-[#EEEEEE] py-[.15rem] font-[300] text-[.75rem] shadow-none w-full indent-[.4rem] border-0 outline-0 hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] h-[2.59338rem] outline-none"
                                     options={[
                                       { label: "Active", value: "active" },
-                                      { label: "Inactive", value: "inactive" },
-                                      { label: "Pending", value: "pending" },
+                                      { label: "Disabled", value: "disabled" },
+                                      { label: "Deleted", value: "deleted" },
                                     ]}
                                     onChange={(value) => {
                                       setTempFilter({
@@ -855,7 +861,7 @@ export default function GuardRails() {
                   <>
                     <div className="grid gap-[1.5rem] grid-cols-3 pb-[1.5rem]">
                       {filteredGuardRails.map((item: any, index: number) => (
-                        <GuardRailCard key={item.id} item={item} index={index} />
+                        <GuardRailCard key={item.id} item={item} index={index} onDelete={refreshProbes} />
                       ))}
                     </div>
                     {/* Infinite scroll sentinel */}
