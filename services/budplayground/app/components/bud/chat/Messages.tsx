@@ -97,7 +97,6 @@ function UserMessage(props: MessageProps & { onEdit: (message: string) => void }
         defaultValue={props.content}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        // size="large"
         className="w-[100%] h-[100%] bg-transparent text-[#EEEEEE] border-none focus:border-none outline-none"
         />
         <div className="flex justify-end items-center gap-[.5rem]">
