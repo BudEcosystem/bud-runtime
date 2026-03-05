@@ -30,6 +30,8 @@ flowchart TD
 - Confirm deployment status, worker counts, and routing behavior.
 - Escalate unhealthy deployments before cluster-wide degradation.
 
+![Image](/images/image-35.png)
+
 ## 3) Node Diagnostics
 
 - Use **Nodes** tab for request-vs-allocatable analysis.
@@ -55,7 +57,18 @@ flowchart LR
 
 ## Best Practices
 
-<Check>Separate production and non-production clusters with clear naming.</Check>
-<Check>Review node events before and after major deployment rollouts.</Check>
-<Check>Avoid destructive operations during unresolved incidents.</Check>
-<Check>Align cluster actions with RBAC and audit policy requirements.</Check>
+<Check>
+  Separate production and non-production clusters with clear naming.
+</Check>
+
+ <Check>
+  Review node events before and after major deployment rollouts.
+</Check>
+
+ <Check>
+  Avoid destructive operations during unresolved incidents.
+</Check>
+
+ <Check>
+  Align cluster actions with RBAC and audit policy requirements.
+</Check>

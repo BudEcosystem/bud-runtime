@@ -6,6 +6,7 @@ description: "Step-by-step workflow to onboard, validate, and prepare a cluster"
 ## What You'll Build
 
 In this walkthrough, you will:
+
 1. Register a new or existing cluster.
 2. Validate health and node readiness.
 3. Review running deployments on the cluster.
@@ -20,7 +21,7 @@ In this walkthrough, you will:
 ## Step 1: Start Cluster Onboarding
 
 1. Go to **Clusters**.
-2. Click **+ Cluster**.
+2. Click **\+ Cluster**.
 3. Select **Create New Cluster** or **Connect to Existing Cluster**.
 
 ## Step 2: Enter Core Configuration
@@ -29,6 +30,8 @@ In this walkthrough, you will:
 2. Choose provider or upload existing cluster configuration.
 3. Provide ingress URL and required connection details.
 4. Continue to submit onboarding.
+
+![Image](/images/image-33.png)
 
 ## Step 3: Confirm in Cluster Listing
 
@@ -41,6 +44,8 @@ In this walkthrough, you will:
 1. Open the cluster details page.
 2. In **General**, check available nodes and resource summaries.
 3. Use time filters to compare recent utilization.
+
+![Image](/images/image-34.png)
 
 ## Step 5: Inspect Nodes and Events
 
@@ -69,19 +74,29 @@ flowchart LR
 
 ## Operational Checklist
 
-<Check>Cluster appears in list and is selectable.</Check>
-<Check>General tab shows healthy resource indicators.</Check>
-<Check>Nodes tab has no unresolved critical events.</Check>
-<Check>Settings are saved with expected storage defaults.</Check>
+<Check>
+  Cluster appears in list and is selectable.
+</Check>
+
+<Check>
+  General tab shows healthy resource indicators.
+</Check>
+
+<Check>
+  Nodes tab has no unresolved critical events.
+</Check>
+
+<Check>
+  Settings are saved with expected storage defaults.
+</Check>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Cluster Operations Guide" icon="screwdriver-wrench" href="/clusters/guides/cluster-operations">
+  <Card icon="screwdriver-wrench" href="/clusters/guides/cluster-operations" title="Cluster Operations Guide">
     Learn day-2 management patterns
   </Card>
-
-  <Card title="Troubleshooting" icon="triangle-exclamation" href="/clusters/troubleshooting">
+  <Card icon="triangle-exclamation" href="/clusters/troubleshooting" title="Troubleshooting">
     Handle onboarding and runtime issues quickly
   </Card>
 </CardGroup>
