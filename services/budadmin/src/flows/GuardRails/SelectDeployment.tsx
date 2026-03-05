@@ -21,13 +21,19 @@ import { AppRequest } from "src/pages/api/requests";
 import { tempApiBaseUrl } from "@/components/environment";
 
 
-interface Deployment {
-  id: string;
-  name: string;
-  type: "model" | "route" | "tool" | "agent";
+interface EndpointItem {
+  id?: string;
+  endpoint_id?: string;
+  name?: string;
+  endpoint_name?: string;
+  endpoint_url?: string;
   description?: string;
   status?: string;
-  icon?: string;
+  model?: {
+    icon?: string;
+    provider_type?: string;
+    [key: string]: any;
+  };
 }
 
 export default function SelectDeployment() {
@@ -80,7 +86,7 @@ export default function SelectDeployment() {
 
   // Infinite scroll pagination states
   const pageSize = 10;
-  const [allEndpoints, setAllEndpoints] = useState<any[]>([]);
+  const [allEndpoints, setAllEndpoints] = useState<EndpointItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRecordCount, setTotalRecordCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -245,7 +251,7 @@ export default function SelectDeployment() {
 
 
   // Render deployment/endpoint item
-  const renderDeploymentListItem = (endpoint: any) => {
+  const renderDeploymentListItem = (endpoint: EndpointItem) => {
     const description = endpoint.endpoint_url || endpoint.description || "";
     const isLongDescription = description.length > 60;
 
