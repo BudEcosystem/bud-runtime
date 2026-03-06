@@ -350,15 +350,27 @@ impl InferenceProvider for OpenRouterProvider {
 }
 
 pub async fn convert_stream_error(provider_type: String, e: reqwest_eventsource::Error) -> Error {
-    let message = e.to_string();
-    let mut raw_response = None;
-    if let reqwest_eventsource::Error::InvalidStatusCode(_, resp) = e {
-        raw_response = resp.text().await.ok();
+    let fallback_message = e.to_string();
+    if let reqwest_eventsource::Error::InvalidStatusCode(status_code, resp) = e {
+        let raw_response = resp.text().await.ok();
+        // Use the actual response body as the message if available,
+        // since it contains the real error from the provider
+        let message = raw_response
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&fallback_message)
+            .to_string();
+        return handle_openrouter_error(
+            "",
+            status_code,
+            &message,
+            &provider_type,
+        );
     }
     ErrorDetails::InferenceServer {
-        message,
+        message: fallback_message,
         raw_request: None,
-        raw_response,
+        raw_response: None,
         provider_type,
     }
     .into()

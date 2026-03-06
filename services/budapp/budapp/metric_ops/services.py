@@ -446,8 +446,18 @@ class BudMetricService(SessionMixin):
                     try:
                         response_data["gateway_response"] = json.loads(response_data["gateway_response"])
                     except (json.JSONDecodeError, TypeError):
-                        # If parsing fails, set to None (schema expects Dict or None)
-                        response_data["gateway_response"] = None
+                        # Streaming responses are stored as newline-delimited JSON chunks.
+                        # Try parsing each line as a separate JSON object.
+                        try:
+                            raw = response_data["gateway_response"]
+                            chunks = [
+                                json.loads(line)
+                                for line in raw.splitlines()
+                                if line.strip()
+                            ]
+                            response_data["gateway_response"] = {"streaming_chunks": chunks}
+                        except (json.JSONDecodeError, TypeError):
+                            response_data["gateway_response"] = {"raw": response_data["gateway_response"]}
 
                 # Convert to response model - extra fields will be ignored due to extra="ignore" in model config
                 return InferenceDetailResponse(**response_data)
