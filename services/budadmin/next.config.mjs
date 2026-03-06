@@ -201,6 +201,10 @@ export default {
         source: '/usecases',
         destination: '/home/usecases',
       },
+      {
+        source: '/usecases/:deploymentId',
+        destination: '/home/usecases/[deploymentId]',
+      },
     ];
   },
   env: {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/router";
 import { Button, Table } from "antd";
 import { RocketOutlined } from "@ant-design/icons";
 import ProjectTags from "src/flows/components/ProjectTags";
@@ -35,6 +36,7 @@ interface UseCaseDeploymentsProps {
 }
 
 const UseCaseDeployments: React.FC<UseCaseDeploymentsProps> = ({ projectId }) => {
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -225,8 +227,7 @@ const UseCaseDeployments: React.FC<UseCaseDeploymentsProps> = ({ projectId }) =>
           onRow={(record) => ({
             className: "group",
             onClick: () => {
-              selectDeployment(record);
-              openDrawer("deployment-progress", { deployment: record });
+              router.push(`/usecases/${record.id}${projectId ? `?projectId=${projectId}` : ""}`);
             },
           })}
           onChange={(_pagination, _filters, sorter: any) => {
