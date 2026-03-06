@@ -450,11 +450,7 @@ class BudMetricService(SessionMixin):
                         # Try parsing each line as a separate JSON object.
                         try:
                             raw = response_data["gateway_response"]
-                            chunks = [
-                                json.loads(line)
-                                for line in raw.splitlines()
-                                if line.strip()
-                            ]
+                            chunks = [json.loads(line) for line in raw.splitlines() if line.strip()]
                             response_data["gateway_response"] = {"streaming_chunks": chunks}
                         except (json.JSONDecodeError, TypeError, AttributeError):
                             response_data["gateway_response"] = {"raw": response_data["gateway_response"]}

@@ -1498,7 +1498,7 @@ mod tests {
 
         let (status_code, body) = error.to_response_json();
 
-        assert_eq!(status_code, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(status_code, StatusCode::BAD_GATEWAY);
 
         let error_obj = body.get("error").expect("Should have error object");
         let message = error_obj.get("message").and_then(|v| v.as_str());
