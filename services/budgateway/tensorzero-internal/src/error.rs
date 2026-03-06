@@ -1148,6 +1148,13 @@ impl Error {
                     let provider_error = parse_provider_error_message(message);
                     Some((provider_error, *status_code))
                 }
+                ErrorDetails::InferenceServer {
+                    message,
+                    ..
+                } => {
+                    let provider_error = parse_provider_error_message(message);
+                    Some((provider_error, Some(StatusCode::BAD_GATEWAY)))
+                }
                 ErrorDetails::ProviderTimeout { timeout_secs, .. } => {
                     let provider_error = json!({
                         "message": format!("Request timed out after {} seconds", timeout_secs),
@@ -1176,11 +1183,12 @@ impl Error {
 
         // Helper function to extract clean error message from provider error JSON
         fn extract_error_message(provider_error: &Value, fallback: &str) -> Value {
-            // Use Option combinators instead of nested if-let
+            // Try to get message from JSON object, then fall back to plain string value
             let message_str = provider_error
                 .as_object()
                 .and_then(|obj| obj.get("message"))
-                .and_then(|v| v.as_str());
+                .and_then(|v| v.as_str())
+                .or_else(|| provider_error.as_str());
 
             let message_str = match message_str {
                 Some(s) => s,
@@ -1262,6 +1270,19 @@ impl Error {
             } => {
                 let provider_error = parse_provider_error_message(message);
                 build_provider_error_response(self, provider_error, *provider_status_code)
+            }
+            // For provider server errors, include the provider error details
+            // Use BAD_GATEWAY since this is an upstream provider failure, not a gateway error
+            ErrorDetails::InferenceServer {
+                message,
+                ..
+            } => {
+                let provider_error = parse_provider_error_message(message);
+                build_provider_error_response(
+                    self,
+                    provider_error,
+                    Some(StatusCode::BAD_GATEWAY),
+                )
             }
             // For all variants failed, try to extract the underlying provider error
             ErrorDetails::AllVariantsFailed { errors } => {
@@ -1430,6 +1451,65 @@ mod tests {
         assert_eq!(
             error_obj.get("type").and_then(|v| v.as_str()),
             Some("timeout_error")
+        );
+    }
+
+    #[test]
+    fn test_inference_server_error_response_json() {
+        // Test that InferenceServer errors return provider error details
+        let error = Error::new(ErrorDetails::InferenceServer {
+            message: r#"{"error":{"message":"The model is currently overloaded","type":"server_error"}}"#.to_string(),
+            raw_request: None,
+            raw_response: Some(r#"{"error":{"message":"The model is currently overloaded","type":"server_error"}}"#.to_string()),
+            provider_type: "openai".to_string(),
+        });
+
+        let (status_code, body) = error.to_response_json();
+
+        // Should return 502 BAD_GATEWAY since this is an upstream provider failure
+        assert_eq!(status_code, StatusCode::BAD_GATEWAY);
+
+        // Should have provider_error in the response
+        assert!(body.get("provider_error").is_some(), "Should include provider_error");
+
+        // Should extract the clean error message
+        let error_obj = body.get("error").expect("Should have error object");
+        let message = error_obj.get("message").and_then(|v| v.as_str());
+        assert!(
+            message.is_some(),
+            "Error should have a message field"
+        );
+        assert!(
+            message.unwrap().contains("overloaded"),
+            "Message should contain the provider error: {:?}",
+            message
+        );
+    }
+
+    #[test]
+    fn test_inference_server_plain_string_error_response_json() {
+        // Test that InferenceServer errors with plain string messages are handled
+        let error = Error::new(ErrorDetails::InferenceServer {
+            message: "Connection refused".to_string(),
+            raw_request: None,
+            raw_response: None,
+            provider_type: "openai".to_string(),
+        });
+
+        let (status_code, body) = error.to_response_json();
+
+        assert_eq!(status_code, StatusCode::BAD_GATEWAY);
+
+        let error_obj = body.get("error").expect("Should have error object");
+        let message = error_obj.get("message").and_then(|v| v.as_str());
+        assert!(
+            message.is_some(),
+            "Error should have a message field"
+        );
+        assert!(
+            message.unwrap().contains("Connection refused"),
+            "Message should contain the original error: {:?}",
+            message
         );
     }
 }

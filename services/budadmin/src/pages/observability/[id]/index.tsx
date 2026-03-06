@@ -739,7 +739,7 @@ const ObservabilityDetailPage: React.FC = () => {
                   </Button>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
                   {inferenceData.messages.map((message, index) => (
                     <div
                       key={index}
@@ -920,7 +920,7 @@ const ObservabilityDetailPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                <div className="bg-[#1A1A1A] border border-[#2F2F2F] rounded-md p-3 overflow-x-auto">
+                <div className="bg-[#1A1A1A] border border-[#2F2F2F] rounded-md p-3 overflow-x-auto max-h-[500px] overflow-y-auto">
                   <pre className="text-[#B3B3B3] mb-0 text-sm">
                     <code>
                       {(() => {
@@ -1003,7 +1003,7 @@ const ObservabilityDetailPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                <div className="bg-[#1A1A1A] border border-[#2F2F2F] rounded-md p-3 overflow-x-auto">
+                <div className="bg-[#1A1A1A] border border-[#2F2F2F] rounded-md p-3 overflow-x-auto max-h-[500px] overflow-y-auto">
                   <pre className="text-[#B3B3B3] mb-0 text-sm">
                     <code>
                       {(() => {

@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::HeaderValue;
 use axum::middleware::Next;
