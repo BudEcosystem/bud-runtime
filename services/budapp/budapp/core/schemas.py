@@ -119,6 +119,11 @@ class NotificationRequest(CloudEventBase):
     topic_keys: Optional[Union[str, List[str]]] = None
     payload: NotificationPayload
 
+    # Fields added by BudPipeline's EventPublisher for pipeline callback events.
+    # CloudEventBase uses extra="forbid", so these must be declared explicitly.
+    execution_id: Optional[str] = None
+    pipeline_event_type: Optional[str] = None
+
     @model_validator(mode="before")
     def log_notification_hits(cls, data):
         """Log the notification hits for debugging purposes."""

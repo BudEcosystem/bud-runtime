@@ -1,0 +1,37 @@
+---
+- name: Delete HTTPRoute for Use Case Access
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/common.yaml
+
+  vars:
+    deployment_id: "{{ usecase_deployment_id }}"
+    gateway_namespace: "{{ envoy_gateway_namespace | default('aibrix-system') }}"
+    target_namespace: "{{ namespace }}"
+
+  roles:
+    - create_kubeconfig
+
+  tasks:
+    - name: Delete HTTPRoute
+      kubernetes.core.k8s:
+        state: absent
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        api_version: gateway.networking.k8s.io/v1
+        kind: HTTPRoute
+        name: "usecase-{{ deployment_id }}"
+        namespace: "{{ gateway_namespace }}"
+
+    - name: Delete ReferenceGrant
+      kubernetes.core.k8s:
+        state: absent
+        kubeconfig: "{{ kubeconfig_path }}"
+        validate_certs: "{{ validate_certs }}"
+        api_version: gateway.networking.k8s.io/v1beta1
+        kind: ReferenceGrant
+        name: "allow-aibrix-gateway"
+        namespace: "{{ target_namespace }}"

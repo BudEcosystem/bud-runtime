@@ -21,6 +21,7 @@ import Image from "next/image";
 import loaderIcn from "public/icons/loader.gif";
 import Head from "next/head";
 import BudDrawer from "@/components/ui/bud/drawer/BudDrawer";
+import UseCaseAppOverlay from "@/components/usecases/UseCaseAppOverlay";
 import {
   NotificationBell,
   NovuProvider,
@@ -254,6 +255,7 @@ function App({ Component, pageProps }: { Component: any; pageProps: any }) {
       <LoaderWrapper />
       <Component className="z-[999]" {...pageProps} />
       <BudDrawer />
+      <UseCaseAppOverlay />
     </NovuProvider>
   );
 }

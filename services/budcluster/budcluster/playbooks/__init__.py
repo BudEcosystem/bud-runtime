@@ -13,6 +13,8 @@ _PLAYBOOK_MAP = {
     "DEPLOY_RUNTIME": "deploy_runtime.yaml",
     "UPDATE_AUTOSCALE": "update_autoscale.yaml",
     "DELETE_NAMESPACE": "delete_namespace.yaml",
+    "CREATE_HTTPROUTE": "create_httproute.yaml",
+    "DELETE_HTTPROUTE": "delete_httproute.yaml",
     "GET_DEPLOYMENT_STATUS": "get_deployment_status.yaml",
     "MODEL_TRANSFER": "model_transfer_playbook.yml",
     "GET_MODEL_TRANSFER_STATUS": "get_model_transfer_status.yaml",
@@ -23,6 +25,7 @@ _PLAYBOOK_MAP = {
     "GET_POD_STATUS": "get_worker_status.yaml",
     "DEPLOY_QUANTIZATION_JOB": "deploy_quantization_job.yaml",
     "GET_QUANTIZATION_STATUS": "get_quantization_status.yaml",
+    "DEPLOY_HELM_CHART": "deploy_helm_chart.yaml",
 }
 
 

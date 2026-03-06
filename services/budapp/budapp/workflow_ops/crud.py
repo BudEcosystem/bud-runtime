@@ -16,7 +16,8 @@
 
 """The crud package, containing essential business logic, services, and routing configurations for the workflow ops."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+from uuid import UUID
 
 from sqlalchemy import and_, func, select
 
@@ -67,6 +68,68 @@ class WorkflowDataManager(DataManagerUtils):
         result = self.scalars_all(stmt)
 
         return result, count
+
+    def find_workflow_by_deployment_id(
+        self,
+        deployment_id: str,
+        workflow_type: str,
+    ) -> Optional[WorkflowModel]:
+        """Find the most recent workflow whose progress JSONB contains the given deployment_id."""
+        stmt = (
+            select(WorkflowModel)
+            .filter(
+                WorkflowModel.workflow_type == workflow_type,
+                WorkflowModel.progress.op("->>")(  # type: ignore[union-attr]
+                    "deployment_id"
+                )
+                == deployment_id,
+            )
+            .order_by(WorkflowModel.created_at.desc())
+            .limit(1)
+        )
+        return self.scalar_one_or_none(stmt)
+
+    def find_workflows_by_deployment_ids(
+        self,
+        deployment_ids: List[str],
+        workflow_type: str,
+    ) -> Dict[str, UUID]:
+        """Find the most recent workflow for each deployment_id.
+
+        Returns a dict mapping deployment_id -> workflow.id.
+
+        Uses a SQL window function (ROW_NUMBER) to select only the most
+        recent record per deployment_id in the database, avoiding
+        over-fetching and Python-side deduplication.
+        """
+        if not deployment_ids:
+            return {}
+
+        dep_id_expr = WorkflowModel.progress.op("->>")(  # type: ignore[union-attr]
+            "deployment_id"
+        )
+        subquery = (
+            select(
+                dep_id_expr.label("deployment_id"),
+                WorkflowModel.id,
+                func.row_number()
+                .over(
+                    partition_by=dep_id_expr,
+                    order_by=WorkflowModel.created_at.desc(),
+                )
+                .label("rn"),
+            )
+            .filter(
+                WorkflowModel.workflow_type == workflow_type,
+                dep_id_expr.in_(deployment_ids),
+            )
+            .subquery()
+        )
+
+        stmt = select(subquery.c.deployment_id, subquery.c.id).where(subquery.c.rn == 1)
+        rows = self.session.execute(stmt).all()
+
+        return {str(row.deployment_id): row.id for row in rows}
 
 
 class WorkflowStepDataManager(DataManagerUtils):

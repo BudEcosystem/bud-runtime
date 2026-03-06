@@ -11,6 +11,7 @@ use axum::Router;
 use reqwest::{Client, Proxy};
 use secrecy::SecretString;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
 
@@ -29,6 +30,29 @@ use crate::model::ModelTable;
 use crate::rate_limit::DistributedRateLimiter;
 use crate::redis_client::RedisClient;
 use crate::usage_limit::{UsageLimiter, UsageLimiterConfig};
+
+/// State for use-case deployment proxy routing
+#[derive(Clone)]
+pub struct UseCaseProxyState {
+    pub deployment_routes: Arc<tokio::sync::RwLock<HashMap<String, DeploymentRoute>>>,
+}
+
+impl Default for UseCaseProxyState {
+    fn default() -> Self {
+        Self {
+            deployment_routes: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+/// A deployment route entry loaded from Redis (`deployment_route:{deployment_id}`)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentRoute {
+    pub deployment_id: String,
+    pub project_id: String,
+    pub ingress_url: String,
+    pub status: String,
+}
 
 /// Represents the authentication state of the gateway
 #[derive(Clone)]
@@ -54,6 +78,8 @@ pub struct AppStateData {
     pub guardrails: Arc<tokio::sync::RwLock<GuardrailTable>>,
     /// Inference batcher for batching ClickHouse writes (reduces connection overhead)
     pub inference_batcher: Option<InferenceBatcher>,
+    /// Use-case proxy state for routing deployment requests to ingress endpoints
+    pub use_case_proxy: UseCaseProxyState,
 }
 pub type AppState = axum::extract::State<AppStateData>;
 
@@ -125,6 +151,7 @@ impl AppStateData {
             blocking_manager: None, // Will be initialized later with Redis client
             guardrails: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             inference_batcher,
+            use_case_proxy: UseCaseProxyState::default(),
         })
     }
     pub async fn update_model_table(&self, mut new_models: ModelTable) {
@@ -570,7 +597,8 @@ where
 
 // This is set high enough that it should never be hit for a normal model response.
 // In the future, we may want to allow overriding this at the model provider level.
-pub const DEFAULT_HTTP_CLIENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20 * 60);
+pub const DEFAULT_HTTP_CLIENT_TIMEOUT: std::time::Duration =
+    std::time::Duration::from_secs(20 * 60);
 
 pub fn setup_http_client() -> Result<Client, Error> {
     let mut http_client_builder = Client::builder().timeout(DEFAULT_HTTP_CLIENT_TIMEOUT);

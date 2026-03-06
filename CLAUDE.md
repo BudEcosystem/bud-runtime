@@ -36,16 +36,19 @@ Bud AI Foundry is a control panel for GenAI deployments, designed to maximize in
 - `infra/helm/` - Main Helm chart with all dependencies
 - `infra/tofu/` - Terraform/OpenTofu modules for multi-cloud
 
+## Bug Fixing
+
+When fixing bugs, always read the relevant code and understand the full call chain before proposing changes. Do not start implementing a fix until you've traced the error to its root cause.
+
+## Task Planning
+
+When restructuring task lists or plans, always complete the full restructuring AND begin at least one concrete implementation step before considering the task done.
+
+## Languages & Conventions
+
+Primary languages in this codebase: Python (primary), Markdown, TypeScript, Rust, Go. Use idiomatic patterns for each. For Python, follow PEP 8 and use type hints.
+
 ## Quick Start
-
-### Development Environment
-```bash
-# Nix shell (recommended) - includes Python 3.11, Node 20, Rust, Dapr tooling
-nix develop
-
-# Install pre-commit hooks after cloning
-./scripts/install_hooks.sh
-```
 
 ### Running Services
 ```bash
@@ -259,6 +262,3 @@ This research phase should inform the implementation plan and help avoid reinven
 - Dapr state store (Valkey/Redis) - existing state will be abandoned (001-rename-budworkflow-to-budpipeline)
 - Python 3.11 (budpipeline service), TypeScript 5.x (budadmin frontend if needed) + FastAPI, PostgreSQL, SQLAlchemy, Alembic, Pydantic, Dapr (pub/sub, service invocation), structlog (002-pipeline-event-persistence)
 - PostgreSQL with Alembic migrations (budpipeline and budapp databases) (002-pipeline-event-persistence)
-
-## Recent Changes
-- 001-rename-budworkflow-to-budpipeline: Added Python 3.11 (service), TypeScript 5.x (frontend), Rust 1.70+ (unaffected gateway) + FastAPI, Dapr, Next.js 14, Zustand, Helm, Docker

@@ -31,7 +31,7 @@ function TextInput(props: BudInputProps) {
     ...props.style,
     paddingTop: ".75rem",
     paddingBottom: ".75rem",
-    paddingLeft: ".5rem",
+    paddingLeft: "1rem",
     paddingRight: "1rem",
   };
 

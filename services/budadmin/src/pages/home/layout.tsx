@@ -32,6 +32,7 @@ import { branding } from "@/components/environment";
 import { useShortCut } from "../../hooks/useShortCut";
 import { useRouter } from "next/router";
 import { useDrawer } from "src/hooks/useDrawer";
+import flows from "src/hooks/drawerFlows";
 import { useOverlay } from "src/context/overlayContext";
 import { useIsland } from "src/hooks/useIsland";
 import BudIsland from "@/components/island/BudIsland";
@@ -95,7 +96,7 @@ function ShortCutComponent({
 
 const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
   const router = useRouter();
-  const { isDrawerOpen, showMinimizedItem } = useDrawer();
+  const { isDrawerOpen, showMinimizedItem, currentFlow } = useDrawer();
   const [isHydrated, setIsHydrated] = useState(false);
   const oauthProcessedRef = React.useRef(false);
   const [isHovered, setIsHovered] = useState<any>();
@@ -202,6 +203,14 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
       cmd: "u",
+      hide: !enableDevMode,
+    },
+    {
+      label: "Use Cases",
+      route: "/usecases",
+      icon: '/images/icons/rocket-white.png',
+      iconWhite: '/images/icons/rocket-white.png',
+      cmd: "K",
       hide: !enableDevMode,
     },
   ]
@@ -695,7 +704,7 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
           <div className="blur-sm" />
           <div className="rightWrap py-[0.75rem] pr-[0.6875rem]">
             <div
-              className={`rightDiv rounded-[17px] overflow-hidden ${isDrawerOpen && !showMinimizedItem ? "blur-sm" : ""
+              className={`rightDiv rounded-[17px] overflow-hidden ${isDrawerOpen && !showMinimizedItem && !(currentFlow && flows[currentFlow]?.fullPage) ? "blur-sm" : ""
                 // className={`rightDiv rounded-xl overflow-hidden	my-[0.5em] mr-[0.5em] ${isDrawerOpen ? "blur-sm" : ""
                 }`}
             >

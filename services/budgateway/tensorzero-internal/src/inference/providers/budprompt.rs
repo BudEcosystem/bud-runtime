@@ -161,7 +161,10 @@ impl ResponseProvider for BudPromptProvider {
             base_context
         };
         let mut http_headers = http::HeaderMap::new();
-        tracing_opentelemetry_instrumentation_sdk::http::inject_context(&context, &mut http_headers);
+        tracing_opentelemetry_instrumentation_sdk::http::inject_context(
+            &context,
+            &mut http_headers,
+        );
         if let Some(traceparent) = http_headers.get("traceparent") {
             if let Ok(value) = traceparent.to_str() {
                 request_builder = request_builder.header("traceparent", value);
@@ -176,17 +179,18 @@ impl ResponseProvider for BudPromptProvider {
         if let Some(baggage_header) = http_headers.get("baggage") {
             if let Ok(value) = baggage_header.to_str() {
                 request_builder = request_builder.header("baggage", value);
-                tracing::debug!("Forwarding baggage header to budprompt (create_response): {}", value);
+                tracing::debug!(
+                    "Forwarding baggage header to budprompt (create_response): {}",
+                    value
+                );
             }
         }
 
-        let res = request_builder.json(&request).send().await.map_err(|e| {
-            handle_reqwest_error(
-                e,
-                PROVIDER_TYPE,
-                Some(raw_request.clone()),
-            )
-        })?;
+        let res = request_builder
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, Some(raw_request.clone())))?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
@@ -259,7 +263,10 @@ impl ResponseProvider for BudPromptProvider {
             base_context
         };
         let mut http_headers = http::HeaderMap::new();
-        tracing_opentelemetry_instrumentation_sdk::http::inject_context(&context, &mut http_headers);
+        tracing_opentelemetry_instrumentation_sdk::http::inject_context(
+            &context,
+            &mut http_headers,
+        );
         if let Some(traceparent) = http_headers.get("traceparent") {
             if let Ok(value) = traceparent.to_str() {
                 request_builder = request_builder.header("traceparent", value);
@@ -274,7 +281,10 @@ impl ResponseProvider for BudPromptProvider {
         if let Some(baggage_header) = http_headers.get("baggage") {
             if let Ok(value) = baggage_header.to_str() {
                 request_builder = request_builder.header("baggage", value);
-                tracing::debug!("Forwarding baggage header to budprompt (stream_response): {}", value);
+                tracing::debug!(
+                    "Forwarding baggage header to budprompt (stream_response): {}",
+                    value
+                );
             }
         }
 
@@ -395,9 +405,10 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
         }
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, None)
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, None))?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
@@ -459,9 +470,10 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
         }
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, None)
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, None))?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
@@ -523,9 +535,10 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
         }
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, None)
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, None))?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
@@ -587,9 +600,10 @@ impl ResponseProvider for BudPromptProvider {
             request_builder = request_builder.bearer_auth(static_key.expose_secret());
         }
 
-        let res = request_builder.send().await.map_err(|e| {
-            handle_reqwest_error(e, PROVIDER_TYPE, None)
-        })?;
+        let res = request_builder
+            .send()
+            .await
+            .map_err(|e| handle_reqwest_error(e, PROVIDER_TYPE, None))?;
 
         if res.status().is_success() {
             let raw_response = res.text().await.map_err(|e| {
