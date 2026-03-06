@@ -1153,7 +1153,7 @@ impl Error {
                     ..
                 } => {
                     let provider_error = parse_provider_error_message(message);
-                    Some((provider_error, Some(StatusCode::INTERNAL_SERVER_ERROR)))
+                    Some((provider_error, Some(StatusCode::BAD_GATEWAY)))
                 }
                 ErrorDetails::ProviderTimeout { timeout_secs, .. } => {
                     let provider_error = json!({
@@ -1272,6 +1272,7 @@ impl Error {
                 build_provider_error_response(self, provider_error, *provider_status_code)
             }
             // For provider server errors, include the provider error details
+            // Use BAD_GATEWAY since this is an upstream provider failure, not a gateway error
             ErrorDetails::InferenceServer {
                 message,
                 ..
@@ -1280,7 +1281,7 @@ impl Error {
                 build_provider_error_response(
                     self,
                     provider_error,
-                    Some(StatusCode::INTERNAL_SERVER_ERROR),
+                    Some(StatusCode::BAD_GATEWAY),
                 )
             }
             // For all variants failed, try to extract the underlying provider error
@@ -1465,8 +1466,8 @@ mod tests {
 
         let (status_code, body) = error.to_response_json();
 
-        // Should return 500 INTERNAL_SERVER_ERROR
-        assert_eq!(status_code, StatusCode::INTERNAL_SERVER_ERROR);
+        // Should return 502 BAD_GATEWAY since this is an upstream provider failure
+        assert_eq!(status_code, StatusCode::BAD_GATEWAY);
 
         // Should have provider_error in the response
         assert!(body.get("provider_error").is_some(), "Should include provider_error");

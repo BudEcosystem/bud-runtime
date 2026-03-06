@@ -456,7 +456,7 @@ class BudMetricService(SessionMixin):
                                 if line.strip()
                             ]
                             response_data["gateway_response"] = {"streaming_chunks": chunks}
-                        except (json.JSONDecodeError, TypeError):
+                        except (json.JSONDecodeError, TypeError, AttributeError):
                             response_data["gateway_response"] = {"raw": response_data["gateway_response"]}
 
                 # Convert to response model - extra fields will be ignored due to extra="ignore" in model config
