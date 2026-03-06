@@ -75,8 +75,9 @@ const UseCaseDetailPage = () => {
     }
   };
 
-  // Initial load
+  // Initial load + reset polling when deploymentId changes
   useEffect(() => {
+    stopPolling();
     if (deploymentId) {
       fetchDeployment(true);
     }

@@ -14,7 +14,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Tag, Collapse, Image } from "antd";
+import { Button, Tag, Collapse } from "antd";
 import { RightOutlined } from "@ant-design/icons";
 import { ExternalLink, Monitor, Copy } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -82,7 +82,8 @@ function generateCurlForEndpoint(
   apiBaseUrl: string,
   endpoint: ApiEndpointSpec,
 ): string {
-  const url = `${apiBaseUrl}${endpoint.path}`;
+  const escapeShell = (str: string) => str.replace(/'/g, "'\\''");
+  const url = escapeShell(`${apiBaseUrl}${endpoint.path}`);
   const method = endpoint.method.toUpperCase();
 
   if (method === "GET" || method === "DELETE" || method === "HEAD") {
@@ -93,7 +94,7 @@ function generateCurlForEndpoint(
     ? JSON.stringify(endpoint.request_body.schema, null, 2)
     : "{}";
 
-  return `curl --location --request ${method} '${url}' \\\n  --header 'Authorization: Bearer {API_KEY_HERE}' \\\n  --header 'Content-Type: application/json' \\\n  --data '${body}'`;
+  return `curl --location --request ${method} '${url}' \\\n  --header 'Authorization: Bearer {API_KEY_HERE}' \\\n  --header 'Content-Type: application/json' \\\n  --data '${escapeShell(body)}'`;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,13 +222,6 @@ interface AccessProps {
 export default function Access({ deployment }: AccessProps) {
   const deploymentId = deployment?.id || "";
   const apiBaseUrl = useMemo(() => buildApiBaseUrl(deploymentId), [deploymentId]);
-  const [urlCopied, setUrlCopied] = useState(false);
-
-  useEffect(() => {
-    if (!urlCopied) return;
-    const t = setTimeout(() => setUrlCopied(false), 2000);
-    return () => clearTimeout(t);
-  }, [urlCopied]);
 
   if (!deployment) return null;
 
@@ -241,16 +235,6 @@ export default function Access({ deployment }: AccessProps) {
     const token = getAuthToken();
     const url = buildUiUrl(deploymentId, token);
     window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const handleCopyUrl = async () => {
-    await copyToClipboard(apiBaseUrl, {
-      onSuccess: () => {
-        setUrlCopied(true);
-        successToast("API base URL copied to clipboard");
-      },
-      enableLogging: false,
-    });
   };
 
   const parameters = deployment.parameters;
@@ -352,23 +336,7 @@ export default function Access({ deployment }: AccessProps) {
               <Text_12_400_EEEEEE className="flex-1 font-mono break-all">
                 {apiBaseUrl}
               </Text_12_400_EEEEEE>
-              <CustomPopover
-                title={urlCopied ? "Copied" : "Copy URL"}
-                contentClassNames="py-[.3rem]"
-                Placement="top"
-              >
-                <div
-                  className="w-[1.5rem] h-[1.5rem] rounded-[4px] flex justify-center items-center cursor-pointer hover:bg-[#FFFFFF10] transition-colors shrink-0"
-                  onClick={handleCopyUrl}
-                >
-                  <Image
-                    preview={false}
-                    src="/images/drawer/Copy.png"
-                    alt="Copy"
-                    style={{ height: ".75rem" }}
-                  />
-                </div>
-              </CustomPopover>
+              <CopyButton text={apiBaseUrl} />
             </div>
 
             <div className="bg-[#FFFFFF05] rounded-[6px] px-[.75rem] py-[.5rem] border border-[#FFFFFF08]">
