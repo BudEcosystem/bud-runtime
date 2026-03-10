@@ -1114,9 +1114,9 @@ class ProprietaryCredentialService(SessionMixin):
                 detail="User does not have permission to delete this credential",
             )
 
-        endpoints = db_credential.endpoints
-        if endpoints:
-            project_names = [endpoint.project.name for endpoint in endpoints]
+        active_endpoints = [ep for ep in db_credential.endpoints if ep.status != EndpointStatusEnum.DELETED]
+        if active_endpoints:
+            project_names = [endpoint.project.name for endpoint in active_endpoints]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"""Credential is associated with deployed models in the below projects :

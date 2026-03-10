@@ -46,7 +46,8 @@ use super::helpers::{handle_reqwest_error, inject_extra_request_data};
 use super::helpers_thinking_block::{process_think_blocks, ThinkingState};
 use super::{
     openai::{
-        get_chat_url, handle_openai_error, prepare_openai_tools, tensorzero_to_openai_messages,
+        convert_stream_error, get_chat_url, handle_openai_error, prepare_openai_tools,
+        tensorzero_to_openai_messages,
         OpenAIRequestMessage, OpenAISystemRequestMessage, OpenAITool, OpenAIToolChoice,
         OpenAIToolType, OpenAIUsage,
     },
@@ -629,17 +630,7 @@ fn stream_together(
         while let Some(ev) = event_source.next().await {
             match ev {
                 Err(e) => {
-                    let message = e.to_string();
-                    let mut raw_response = None;
-                    if let reqwest_eventsource::Error::InvalidStatusCode(_, resp) = e {
-                        raw_response = resp.text().await.ok();
-                    }
-                    yield Err(ErrorDetails::InferenceServer {
-                        message,
-                        raw_request: None,
-                        raw_response,
-                        provider_type: PROVIDER_TYPE.to_string(),
-                    }.into());
+                    yield Err(convert_stream_error(PROVIDER_TYPE.to_string(), e).await);
                 }
                 Ok(event) => match event {
                     Event::Open => continue,

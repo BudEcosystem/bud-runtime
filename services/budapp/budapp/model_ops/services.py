@@ -4000,10 +4000,15 @@ class ModelService(SessionMixin):
 
         # Generate namespace and deployment URL
         # Use model.uri as namespace for cloud models
-        # Remove provider prefix if present (e.g., "openai/gpt-4" -> "gpt-4")
+        # Only strip the prefix if it matches the provider source name
+        # e.g., "openai/gpt-4" with source="openai" -> "gpt-4"
+        # but "moonshotai/Kimi-K2.5" with source="together_ai" stays as-is
         namespace = db_model.uri
+        source_lower = (db_model.source or "").lower().replace("_", "").replace("-", "")
         if "/" in namespace:
-            namespace = namespace.split("/", 1)[1]
+            prefix = namespace.split("/", 1)[0].lower().replace("_", "").replace("-", "")
+            if prefix == source_lower:
+                namespace = namespace.split("/", 1)[1]
 
         # Use the proxy service URL for cloud models
         deployment_url = "budproxy-service.svc.cluster.local"
