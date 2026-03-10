@@ -1,22 +1,50 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
+let
+  privateCIDR = [
+    "192.168.0.0/16"
+    "10.0.0.0/8"
+    "172.16.0.0/12"
+    "fd00::/8"
+  ];
+  privateTCPPorts = [
+    # HA with embedded etcd
+    2379
+    2380
+    # K3s supervisor and Kubernetes API Server
+    6443
+    # Kubelet metrics
+    10250
+  ];
+  privateUDPPorts = [
+    # Flannel VXLAN
+    8472
+  ];
+
+  allowCIDRPorts =
+    cidrs: ports: proto:
+    lib.flatten (
+      map (
+        cidr:
+        (map (
+          port:
+          "iptables -A nixos-fw --source ${cidr} -p ${proto} -m ${proto} --dport ${toString port} -j nixos-fw-accept"
+        ) ports)
+      ) cidrs
+    );
+in
 {
   # k3s ingress
   networking.firewall = {
-    # Flannel VXLAN
-    allowedUDPPorts = [ 8472 ];
-
     allowedTCPPorts = [
       # http ingress
       80
       443
-      # HA with embedded etcd
-      2379
-      2380
-      # K3s supervisor and Kubernetes API Server
-      6443
-      # Kubelet metrics
-      10250
     ];
+
+    extraCommands = lib.concatLines (
+      (allowCIDRPorts privateCIDR privateUDPPorts "udp")
+      ++ (allowCIDRPorts privateCIDR privateTCPPorts "tcp")
+    );
   };
 
   environment = {
