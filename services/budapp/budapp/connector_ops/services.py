@@ -30,6 +30,12 @@ from ..commons.constants import CONNECTOR_AUTH_CREDENTIALS_MAP, MCP_AUTH_TYPE_MA
 from ..commons.exceptions import ClientException, MCPFoundryException
 from ..prompt_ops.schemas import HeadersCredentials, OAuthCredentials, OpenCredentials
 from ..shared.mcp_foundry_service import mcp_foundry_service
+from ..shared.mcp_foundry_utils import (
+    OAUTH_REFRESH_THRESHOLD_SECONDS,
+    detect_transport_from_url,
+    enrich_oauth_credentials_with_dcr,
+    transform_credentials_to_mcp_format,
+)
 from ..shared.redis_service import RedisService
 
 
@@ -40,6 +46,7 @@ TAG_PREFIX_CONNECTOR_ID = "connector-id"
 TAG_PREFIX_CLIENT = "client"
 TAG_PREFIX_SOURCE = "source"
 TAG_SOURCE_BUDAPP = "source:budapp"
+TAG_SOURCE_CUSTOM = "source:custom"
 TAG_CLIENT_STUDIO = "client:studio"
 TAG_CLIENT_PROMPT = "client:prompt"
 DEFAULT_CLIENT_TAGS = [TAG_CLIENT_STUDIO, TAG_CLIENT_PROMPT]
@@ -49,9 +56,6 @@ _LEGACY_CLIENT_TAGS = {
     "studio": "client:dashboard",
     "prompt": "client:chat",
 }
-
-# ─── OAuth constants ────────────────────────────────────────────────────────
-OAUTH_REFRESH_THRESHOLD_SECONDS = 300
 
 # ─── OAuth return_url helpers ───────────────────────────────────────────────
 _RETURN_URL_TTL_SECONDS = 600  # 10 minutes
@@ -128,10 +132,7 @@ async def pop_return_url(state: str) -> Optional[str]:
 
 def _detect_transport_from_url(url: str) -> str:
     """Detect transport type from connector URL."""
-    normalized_url = url.rstrip("/")
-    if normalized_url.endswith("/sse"):
-        return "SSE"
-    return "STREAMABLEHTTP"
+    return detect_transport_from_url(url)
 
 
 def _extract_tag_value(tags: List[str], prefix: str) -> Optional[str]:
@@ -142,70 +143,24 @@ def _extract_tag_value(tags: List[str], prefix: str) -> Optional[str]:
     return None
 
 
+_MCP_AUTH_TYPE_LABELS = {
+    "oauth": "OAuth2.1",
+    "authheaders": "Headers",
+}
+
+
+def _derive_auth_type(gw: Dict[str, Any]) -> str:
+    """Derive a human-readable auth_type from the gateway detail."""
+    # MCP Foundry returns authType (camelCase) at top level
+    raw = gw.get("authType") or gw.get("auth_type") or ""
+    return _MCP_AUTH_TYPE_LABELS.get(raw, "Open")
+
+
 def _transform_credentials_to_mcp_format(
     credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials],
 ) -> Dict[str, Any]:
-    """Transform credentials to MCP Foundry gateway payload format.
-
-    Args:
-        credentials: Typed credentials object
-
-    Returns:
-        Dictionary with auth configuration for MCP Foundry API
-
-    Raises:
-        ClientException: If transformation fails or unsupported auth type
-    """
-    auth_config: Dict[str, Any] = {}
-
-    if isinstance(credentials, OAuthCredentials):
-        oauth_config = {
-            "grant_type": credentials.grant_type,
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
-            "token_url": credentials.token_url,
-            "authorization_url": credentials.authorization_url,
-            "redirect_uri": credentials.redirect_uri,
-            "token_management": {
-                "store_tokens": True,
-                "auto_refresh": True,
-                "refresh_threshold_seconds": OAUTH_REFRESH_THRESHOLD_SECONDS,
-            },
-        }
-        if credentials.scopes:
-            oauth_config["scopes"] = credentials.scopes
-
-        auth_config["auth_type"] = "oauth"
-        auth_config["oauth_config"] = oauth_config
-
-        if credentials.passthrough_headers:
-            auth_config["passthrough_headers"] = credentials.passthrough_headers
-
-    elif isinstance(credentials, HeadersCredentials):
-        auth_config["auth_type"] = "authheaders"
-        auth_config["auth_headers"] = credentials.auth_headers
-        auth_config["oauth_grant_type"] = "client_credentials"
-        auth_config["oauth_store_tokens"] = True
-        auth_config["oauth_auto_refresh"] = True
-
-        if credentials.passthrough_headers:
-            auth_config["passthrough_headers"] = credentials.passthrough_headers
-
-    elif isinstance(credentials, OpenCredentials):
-        auth_config["oauth_grant_type"] = "client_credentials"
-        auth_config["oauth_store_tokens"] = True
-        auth_config["oauth_auto_refresh"] = True
-
-        if credentials.passthrough_headers:
-            auth_config["passthrough_headers"] = credentials.passthrough_headers
-
-    else:
-        raise ClientException(
-            message=f"Unsupported credential type: {type(credentials).__name__}",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
-    return auth_config
+    """Transform credentials to MCP Foundry gateway payload format."""
+    return transform_credentials_to_mcp_format(credentials)
 
 
 def _enrich_credential_schema(connector: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -239,10 +194,17 @@ def _enrich_credential_schema(connector: Dict[str, Any]) -> List[Dict[str, Any]]
         elif isinstance(scopes, str):
             defaults_map["scopes"] = scopes
 
+    # Check if connector supports DCR — make client_id/secret optional
+    supports_dcr = oauth_cfg.get("supports_dcr", False)
+
     for field in base_schema:
         default_val = defaults_map.get(field["field"])
         if default_val:
             field["default"] = default_val
+        # If DCR is supported, client_id and client_secret become optional
+        if supports_dcr and field["field"] in ("client_id", "client_secret"):
+            field["required"] = False
+            field["placeholder"] = "Leave empty for auto-registration via DCR"
 
     return base_schema
 
@@ -323,6 +285,11 @@ class ConnectorService:
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        # For DCR-capable OAuth servers, enrich credentials with DCR info from registry
+        if auth_type == ConnectorAuthTypeEnum.OAUTH and isinstance(credentials, OAuthCredentials):
+            connector_oauth_cfg = connector.get("oauth_config") or {}
+            enrich_oauth_credentials_with_dcr(credentials, connector_oauth_cfg)
+
         # 3. Transform credentials
         auth_config = _transform_credentials_to_mcp_format(credentials)
 
@@ -352,6 +319,49 @@ class ConnectorService:
             "Created global gateway for connector",
             connector_id=connector_id,
             gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+        )
+
+        return gateway_response
+
+    async def create_custom_gateway(
+        self,
+        name: str,
+        url: str,
+        description: Optional[str] = None,
+        transport: Optional[str] = None,
+        credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials, None] = None,
+        user_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a custom MCP gateway directly (bypassing registry lookup).
+
+        This allows users to connect to any MCP server by providing its URL,
+        without requiring the server to be registered in the MCP Foundry registry.
+        """
+        if credentials is None:
+            credentials = OpenCredentials()
+
+        if transport is None:
+            transport = _detect_transport_from_url(url)
+
+        auth_config = _transform_credentials_to_mcp_format(credentials)
+
+        tags = [TAG_SOURCE_CUSTOM, *DEFAULT_CLIENT_TAGS]
+
+        gateway_response = await mcp_foundry_service.create_gateway(
+            name=name,
+            url=url,
+            description=description,
+            transport=transport,
+            visibility="public",
+            auth_config=auth_config,
+            tags=tags,
+            auth_token=user_token,
+        )
+
+        logger.info(
+            "Created custom gateway",
+            gateway_id=gateway_response.get("id", gateway_response.get("gateway_id")),
+            name=name,
         )
 
         return gateway_response
@@ -473,12 +483,13 @@ class ConnectorService:
         # 1. Fetch all gateways from MCP Foundry
         gateways, _ = await mcp_foundry_service.list_gateways(offset=0, limit=500, auth_token=user_token)
 
-        # 2. Filter: only gateways with a connector-id:* tag
-        configured: List[Tuple[Dict[str, Any], str]] = []
+        # 2. Filter: gateways with a connector-id:* tag or source:custom tag
+        configured: List[Tuple[Dict[str, Any], Optional[str]]] = []
         for gw in gateways:
             tags = gw.get("tags", [])
             connector_id = _extract_tag_value(tags, TAG_PREFIX_CONNECTOR_ID)
-            if not connector_id:
+            is_custom = TAG_SOURCE_CUSTOM in tags
+            if not connector_id and not is_custom:
                 continue
             if not include_disabled and not gw.get("enabled", True):
                 continue
@@ -490,7 +501,7 @@ class ConnectorService:
             configured.append((gw, connector_id))
 
         # 3. Single registry call → build lookup map (replaces N sequential get_connector_by_id calls)
-        unique_ids = {cid for _, cid in configured}
+        unique_ids = {cid for _, cid in configured if cid}
         registry_map: Dict[str, Optional[Dict[str, Any]]] = {}
         if unique_ids:
             try:
@@ -511,13 +522,13 @@ class ConnectorService:
             for cid in unique_ids:
                 registry_map.setdefault(cid, None)
 
-        # 4. Fetch tool counts and OAuth status in parallel
-        async def _tool_count(gw_id: str) -> Tuple[str, int]:
+        # 4. Fetch gateway details and OAuth status in parallel
+        async def _gateway_detail(gw_id: str) -> Tuple[str, Dict[str, Any]]:
             try:
                 detail = await mcp_foundry_service.get_gateway_by_id(gw_id, auth_token=user_token)
-                return gw_id, len(detail.get("tools", []))
+                return gw_id, detail
             except Exception:
-                return gw_id, 0
+                return gw_id, {}
 
         async def _oauth_connected(gw_id: str) -> Tuple[str, bool]:
             try:
@@ -531,33 +542,36 @@ class ConnectorService:
                 return gw_id, False
 
         gw_ids = [gw.get("id") for gw, _ in configured]
-        tool_results, oauth_results = await asyncio.gather(
-            asyncio.gather(*[_tool_count(gid) for gid in gw_ids]),
+        detail_results, oauth_results = await asyncio.gather(
+            asyncio.gather(*[_gateway_detail(gid) for gid in gw_ids]),
             asyncio.gather(*[_oauth_connected(gid) for gid in gw_ids]),
         )
-        tool_count_map: Dict[str, int] = dict(tool_results)
+        detail_map: Dict[str, Dict[str, Any]] = dict(detail_results)
         oauth_map: Dict[str, bool] = dict(oauth_results)
 
         # 5. Build enriched response
         results = []
         for gw, connector_id in configured:
-            registry = registry_map.get(connector_id) or {}
+            registry = registry_map.get(connector_id) or {} if connector_id else {}
             gw_id = gw.get("id")
+            is_custom = TAG_SOURCE_CUSTOM in gw.get("tags", [])
+            detail = detail_map.get(gw_id, {})
             results.append(
                 {
                     "id": gw_id,
                     "gateway_id": gw_id,
                     "connector_id": connector_id,
-                    "name": gw.get("name", registry.get("name", connector_id)),
+                    "name": gw.get("name", registry.get("name", connector_id or "")),
                     "enabled": gw.get("enabled", True),
                     "tags": gw.get("tags", []),
                     "icon": registry.get("logo_url"),
-                    "description": registry.get("description"),
-                    "category": registry.get("category"),
-                    "auth_type": registry.get("auth_type"),
+                    "description": gw.get("description") if is_custom else registry.get("description"),
+                    "category": "Custom" if is_custom else registry.get("category"),
+                    "auth_type": _derive_auth_type(detail) if is_custom else registry.get("auth_type"),
                     "documentation_url": registry.get("documentation_url"),
-                    "tool_count": tool_count_map.get(gw_id, 0),
+                    "tool_count": len(detail.get("tools", [])),
                     "oauth_connected": oauth_map.get(gw_id, False),
+                    "is_custom": is_custom,
                 }
             )
 

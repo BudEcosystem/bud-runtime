@@ -24,14 +24,21 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from budapp.commons import logging
-from budapp.commons.constants import PermissionEnum
+from budapp.commons.constants import CONNECTOR_AUTH_CREDENTIALS_MAP, ConnectorAuthTypeEnum, PermissionEnum
 from budapp.commons.dependencies import get_current_active_user, get_session
 from budapp.commons.exceptions import ClientException, MCPFoundryException
 from budapp.commons.permission_handler import require_permissions
 from budapp.commons.schemas import ErrorResponse, SuccessResponse
 from budapp.user_ops.schemas import User
 
-from .schemas import ClientsRequest, ConfigureConnectorRequest, OAuthCallbackRequest, TagExistingRequest, ToggleRequest
+from .schemas import (
+    ClientsRequest,
+    ConfigureConnectorRequest,
+    CreateCustomGatewayRequest,
+    OAuthCallbackRequest,
+    TagExistingRequest,
+    ToggleRequest,
+)
 from .services import ConnectorService, pop_return_url, store_return_url, validate_return_url
 
 
@@ -164,6 +171,71 @@ async def configure_connector(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Failed to configure connector",
         ).to_http_response()
+
+
+@connector_router.post(
+    "/custom",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_201_CREATED: {"description": "Custom gateway created successfully"},
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse},
+    },
+    description="Create a custom MCP gateway directly (bypassing registry)",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def create_custom_gateway(
+    request: CreateCustomGatewayRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """Admin: Create a custom MCP gateway by providing a URL directly."""
+    try:
+        gateway = await ConnectorService().create_custom_gateway(
+            name=request.name,
+            url=request.url,
+            description=request.description,
+            transport=request.transport,
+            credentials=request.credentials,
+            user_token=current_user.raw_token,
+        )
+        return {
+            "success": True,
+            "message": "Custom gateway created successfully",
+            "gateway": gateway,
+        }
+    except (ClientException, MCPFoundryException) as e:
+        logger.exception(f"Failed to create custom gateway: {e}")
+        return ErrorResponse(
+            code=getattr(e, "status_code", status.HTTP_400_BAD_REQUEST),
+            message=str(e),
+        ).to_http_response()
+    except Exception as e:
+        logger.exception(f"Failed to create custom gateway: {e}")
+        return ErrorResponse(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to create custom gateway",
+        ).to_http_response()
+
+
+@connector_router.get(
+    "/custom/credential-schema",
+    responses={
+        status.HTTP_200_OK: {"description": "Credential schema returned"},
+    },
+    description="Get credential field schema for custom connector auth types",
+)
+@require_permissions(permissions=[PermissionEnum.ENDPOINT_MANAGE])
+async def get_custom_credential_schema(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """Admin: Return the credential schema for each auth type."""
+    schema = {auth_type.value: fields for auth_type, fields in CONNECTOR_AUTH_CREDENTIALS_MAP.items()}
+    return {
+        "success": True,
+        "message": "Credential schema returned",
+        "schema": schema,
+    }
 
 
 @connector_router.get(

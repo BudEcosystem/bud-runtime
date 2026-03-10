@@ -480,6 +480,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
         url: str,
         transport: str = "SSE",
         visibility: str = "public",
+        description: Optional[str] = None,
         auth_config: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
         auth_token: Optional[str] = None,
@@ -491,6 +492,7 @@ class MCPFoundryService(metaclass=SingletonMeta):
             url: MCP server URL from connector details
             transport: Transport type (SSE, stdio) - default SSE
             visibility: Gateway visibility (public, private) - default public
+            description: Optional human-readable description of the gateway
             auth_config: Optional authentication configuration (OAuth, Headers, etc.)
             tags: Optional list of tags to attach to the gateway
 
@@ -518,6 +520,10 @@ class MCPFoundryService(metaclass=SingletonMeta):
                 "transport": transport,
                 "visibility": visibility,
             }
+
+            # Add description if provided
+            if description:
+                payload["description"] = description
 
             # Add tags if provided
             if tags:

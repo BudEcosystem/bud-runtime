@@ -42,6 +42,14 @@ export interface OAuthCallbackPayload {
   state: string;
 }
 
+export interface CreateCustomGatewayPayload {
+  name: string;
+  url: string;
+  description?: string;
+  transport?: string;
+  credentials?: Record<string, any>;
+}
+
 export class GlobalConnectorService {
   // ═══ Admin: Registry ═══════════════════════════════════════════════════════
 
@@ -108,6 +116,21 @@ export class GlobalConnectorService {
     return await AppRequest.Post(
       `${tempApiBaseUrl}/connectors/gateways`,
       payload
+    );
+  }
+
+  /** Create a custom MCP gateway (bypass registry) */
+  static async createCustomGateway(payload: CreateCustomGatewayPayload) {
+    return await AppRequest.Post(
+      `${tempApiBaseUrl}/connectors/custom`,
+      payload
+    );
+  }
+
+  /** Get credential field schema for custom connector auth types */
+  static async getCustomCredentialSchema() {
+    return await AppRequest.Get(
+      `${tempApiBaseUrl}/connectors/custom/credential-schema`
     );
   }
 

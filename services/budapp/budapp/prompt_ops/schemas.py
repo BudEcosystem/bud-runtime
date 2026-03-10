@@ -844,12 +844,33 @@ class OAuthCredentials(PassthroughHeadersMixin):
     """OAuth authentication credentials."""
 
     grant_type: Literal["client_credentials", "authorization_code"] = Field(..., description="OAuth grant type")
-    client_id: str = Field(..., min_length=1, description="OAuth client ID")
-    client_secret: str = Field(..., min_length=1, description="OAuth client secret")
+    client_id: Optional[str] = Field(default=None, min_length=1, description="OAuth client ID")
+    client_secret: Optional[str] = Field(default=None, min_length=1, description="OAuth client secret")
     token_url: str = Field(..., description="OAuth token endpoint URL")
-    authorization_url: str = Field(..., description="OAuth authorization endpoint URL")
-    redirect_uri: str = Field(..., description="OAuth callback/redirect URI")
+    authorization_url: Optional[str] = Field(default=None, description="OAuth authorization endpoint URL")
+    redirect_uri: Optional[str] = Field(default=None, description="OAuth callback/redirect URI")
     scopes: Optional[List[str]] = Field(None, description="List of OAuth scopes (e.g., ['repo', 'read:user'])")
+    supports_dcr: bool = Field(
+        default=False, description="Whether server supports Dynamic Client Registration (RFC 7591)"
+    )
+    registration_url: Optional[str] = Field(None, description="DCR registration endpoint URL")
+
+    @field_validator("client_id", "client_secret", "authorization_url", "redirect_uri", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v: Any) -> Any:
+        """Coerce empty strings to None so Optional fields with min_length don't reject them."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @model_validator(mode="after")
+    def validate_client_credentials_pair(self) -> "OAuthCredentials":
+        """Validate that client_id and client_secret are provided together (both or neither)."""
+        has_client_id = self.client_id is not None
+        has_client_secret = self.client_secret is not None
+        if has_client_id != has_client_secret:
+            raise ValueError("client_id and client_secret must be provided together (both or neither)")
+        return self
 
 
 class HeadersCredentials(PassthroughHeadersMixin):
