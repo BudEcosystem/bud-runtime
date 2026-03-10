@@ -59,6 +59,7 @@ const AUTH_TYPE_OPTIONS = [
 ];
 
 const TRANSPORT_OPTIONS = [
+  { label: "Auto-detect", value: "" },
   { label: "STREAMABLEHTTP", value: "STREAMABLEHTTP" },
   { label: "SSE", value: "SSE" },
 ];
@@ -80,7 +81,7 @@ const ConnectMCPDrawer: React.FC<ConnectMCPDrawerProps> = ({ open, onClose, onSu
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
-  const [transport, setTransport] = useState("STREAMABLEHTTP");
+  const [transport, setTransport] = useState("");
   const [authType, setAuthType] = useState("Open");
   const [credentialForm, setCredentialForm] = useState<Record<string, string>>({});
   const [credentialSchemaMap, setCredentialSchemaMap] = useState<Record<string, CredentialSchemaField[]>>({});
@@ -111,7 +112,7 @@ const ConnectMCPDrawer: React.FC<ConnectMCPDrawerProps> = ({ open, onClose, onSu
           setCredentialSchemaMap(res.data.schema);
         }
       })
-      .catch(() => {});
+      .catch((err) => console.error("Failed to fetch credential schema:", err));
   }, []);
 
   // Reset form when drawer closes
@@ -120,7 +121,7 @@ const ConnectMCPDrawer: React.FC<ConnectMCPDrawerProps> = ({ open, onClose, onSu
       setName("");
       setUrl("");
       setDescription("");
-      setTransport("STREAMABLEHTTP");
+      setTransport("");
       setAuthType("Open");
       setCredentialForm({});
       setIsSubmitting(false);
@@ -227,6 +228,7 @@ const ConnectMCPDrawer: React.FC<ConnectMCPDrawerProps> = ({ open, onClose, onSu
       url: url.trim(),
       description: description.trim() || undefined,
       transport: transport || undefined,
+      auth_type: authType,
       credentials,
     });
 

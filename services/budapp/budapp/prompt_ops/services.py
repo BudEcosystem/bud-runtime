@@ -59,6 +59,11 @@ from ..model_ops.models import Provider as ProviderModel
 from ..project_ops.crud import ProjectDataManager
 from ..project_ops.models import Project as ProjectModel
 from ..shared.mcp_foundry_service import mcp_foundry_service
+from ..shared.mcp_foundry_utils import (
+    detect_transport_from_url,
+    enrich_oauth_credentials_with_dcr,
+    transform_credentials_to_mcp_format,
+)
 from ..shared.redis_service import RedisService
 from ..workflow_ops.crud import WorkflowDataManager, WorkflowStepDataManager
 from ..workflow_ops.models import Workflow as WorkflowModel
@@ -1293,16 +1298,12 @@ class PromptService(SessionMixin):
 
     def _detect_transport_from_url(self, url: str) -> str:
         """Detect transport type from connector URL."""
-        from ..shared.mcp_foundry_utils import detect_transport_from_url
-
         return detect_transport_from_url(url)
 
     def _transform_credentials_to_mcp_format(
         self, credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials]
     ) -> Dict[str, Any]:
         """Transform credentials to MCP Foundry gateway payload format."""
-        from ..shared.mcp_foundry_utils import transform_credentials_to_mcp_format
-
         return transform_credentials_to_mcp_format(credentials)
 
     async def register_connector_for_prompt(
@@ -1406,8 +1407,6 @@ class PromptService(SessionMixin):
 
         # For DCR-capable OAuth servers, enrich credentials with DCR info from registry
         if auth_type == ConnectorAuthTypeEnum.OAUTH and isinstance(credentials, OAuthCredentials):
-            from ..shared.mcp_foundry_utils import enrich_oauth_credentials_with_dcr
-
             connector_oauth_cfg = connector_data.get("oauth_config") or {}
             enrich_oauth_credentials_with_dcr(credentials, connector_oauth_cfg)
 

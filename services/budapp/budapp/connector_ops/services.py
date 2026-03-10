@@ -31,7 +31,6 @@ from ..commons.exceptions import ClientException, MCPFoundryException
 from ..prompt_ops.schemas import HeadersCredentials, OAuthCredentials, OpenCredentials
 from ..shared.mcp_foundry_service import mcp_foundry_service
 from ..shared.mcp_foundry_utils import (
-    OAUTH_REFRESH_THRESHOLD_SECONDS,
     detect_transport_from_url,
     enrich_oauth_credentials_with_dcr,
     transform_credentials_to_mcp_format,
@@ -527,7 +526,8 @@ class ConnectorService:
             try:
                 detail = await mcp_foundry_service.get_gateway_by_id(gw_id, auth_token=user_token)
                 return gw_id, detail
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to fetch gateway detail", gateway_id=gw_id, error=str(e))
                 return gw_id, {}
 
         async def _oauth_connected(gw_id: str) -> Tuple[str, bool]:

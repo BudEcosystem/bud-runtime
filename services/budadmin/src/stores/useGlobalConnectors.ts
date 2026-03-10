@@ -78,7 +78,7 @@ interface GlobalConnectorsState {
   fetchRegistry: (params?: { name?: string; page?: number; limit?: number }, append?: boolean) => Promise<void>;
   fetchRegistryConnector: (connectorId: string) => Promise<RegistryConnector | null>;
   configureConnector: (connectorId: string, credentials: Record<string, any>) => Promise<boolean>;
-  createCustomGateway: (payload: { name: string; url: string; description?: string; transport?: string; credentials?: Record<string, any> }) => Promise<boolean>;
+  createCustomGateway: (payload: { name: string; url: string; description?: string; transport?: string; auth_type?: string; credentials?: Record<string, any> }) => Promise<boolean>;
   fetchGateways: (params?: { page?: number; limit?: number }) => Promise<void>;
   getGateway: (gatewayId: string) => Promise<Gateway | null>;
   deleteGateway: (gatewayId: string) => Promise<boolean>;

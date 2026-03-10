@@ -47,6 +47,7 @@ export interface CreateCustomGatewayPayload {
   url: string;
   description?: string;
   transport?: string;
+  auth_type?: string;
   credentials?: Record<string, any>;
 }
 

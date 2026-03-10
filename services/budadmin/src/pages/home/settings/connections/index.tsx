@@ -105,7 +105,14 @@ const OAuthBadge = ({ connected }: { connected: boolean }) => {
 // ToolCard — tool description with 2-line clamp and "see more"
 // ---------------------------------------------------------------------------
 
-const ToolCard = ({ tool, idx }: { tool: any; idx: number }) => {
+interface ToolInfo {
+  id?: string;
+  name?: string;
+  displayName?: string;
+  description?: string;
+}
+
+const ToolCard = ({ tool, idx }: { tool: ToolInfo; idx: number }) => {
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);

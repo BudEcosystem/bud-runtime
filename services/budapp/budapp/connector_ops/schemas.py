@@ -16,9 +16,9 @@
 
 """Pydantic schemas for the global connector operations module."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..prompt_ops.schemas import HeadersCredentials, OAuthCredentials, OpenCredentials
 
@@ -39,6 +39,9 @@ class CreateCustomGatewayRequest(BaseModel):
     url: str = Field(..., description="MCP server URL")
     description: Optional[str] = Field(None, max_length=1000, description="Gateway description")
     transport: Optional[str] = Field(None, description="SSE or STREAMABLEHTTP; auto-detected if omitted")
+    auth_type: Literal["OAuth", "Headers", "Open"] = Field(
+        default="Open", description="Auth type; used to validate credentials match"
+    )
     credentials: Union[OAuthCredentials, HeadersCredentials, OpenCredentials] = Field(
         default_factory=OpenCredentials, description="Credentials matching auth type"
     )
@@ -56,6 +59,22 @@ class CreateCustomGatewayRequest(BaseModel):
         if v is not None and v not in ("SSE", "STREAMABLEHTTP"):
             raise ValueError("Transport must be SSE or STREAMABLEHTTP")
         return v
+
+    @model_validator(mode="after")
+    def validate_credentials_match_auth_type(self) -> "CreateCustomGatewayRequest":
+        """Ensure the resolved credential type matches the declared auth_type."""
+        expected_type = {
+            "OAuth": OAuthCredentials,
+            "Headers": HeadersCredentials,
+            "Open": OpenCredentials,
+        }
+        expected_cls = expected_type[self.auth_type]
+        if not isinstance(self.credentials, expected_cls):
+            raise ValueError(
+                f"credentials do not match auth_type '{self.auth_type}': "
+                f"expected {expected_cls.__name__}, got {type(self.credentials).__name__}"
+            )
+        return self
 
 
 class OAuthCallbackRequest(BaseModel):
