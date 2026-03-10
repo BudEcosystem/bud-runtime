@@ -27,11 +27,11 @@ in
             "nixos-rebuild"
             "switch"
             "--flake"
-            ".#primary-dev"
+            ".#primary-dev-azure"
             "-L"
           ];
           watch_paths = [
-            "infra/nixos/primary-dev"
+            "infra/nixos/primary-dev-azure"
           ];
         };
         OpenTofu = {
@@ -42,6 +42,8 @@ in
             "run"
             ".#workflow_tofu_apply"
             "-L"
+            "--"
+            "budk8s-azure"
           ];
           watch_paths = [
             "flake.nix"
