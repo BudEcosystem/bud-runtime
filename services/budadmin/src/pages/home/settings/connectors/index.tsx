@@ -306,6 +306,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
   const visibleFields = useMemo(() => {
     const grantTypeValue = credentialForm["grant_type"];
     return credentialSchema.filter((field) => {
+      if (field.type === 'hidden') return false;
       if (!field.visible_when || field.visible_when.length === 0) return true;
       return grantTypeValue && field.visible_when.includes(grantTypeValue);
     });
@@ -443,7 +444,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
             {renderLabel()}
             <Input
               type="password"
-              placeholder={field.label}
+              placeholder={field.placeholder || field.label}
               value={credentialForm[field.field] || ""}
               onChange={(e) =>
                 handleCredentialChange(field.field, e.target.value)
@@ -569,7 +570,7 @@ const Connectors: React.FC<ConnectorsProps> = ({ searchTerm: externalSearchTerm,
           <div key={field.field} className="w-full flex justify-between items-center gap-[.8rem]">
             {renderLabel()}
             <Input
-              placeholder={field.label}
+              placeholder={field.placeholder || field.label}
               value={credentialForm[field.field] || ""}
               onChange={(e) =>
                 handleCredentialChange(field.field, e.target.value)
