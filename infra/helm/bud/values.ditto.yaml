@@ -51,18 +51,15 @@ microservices:
 
 storage:
     budmodelRegistry:
-        className: "nfs-csi"
         size: "1Ti"
-    budevalDataset:
-        className: "nfs-csi"
 
 # Disable prometheus-adapter to avoid ClusterRole conflict with bud-dev
 prometheus-adapter:
-  enabled: false
+    enabled: false
 onyx:
-  enabled: false
-  ingress:
-    hosts:
-      root: ditto.bud.studio
-  global:
-    version: "nightly"
+    enabled: false
+    ingress:
+        hosts:
+            root: ditto.bud.studio
+    global:
+        version: "nightly"
