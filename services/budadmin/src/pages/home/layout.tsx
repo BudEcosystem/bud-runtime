@@ -180,7 +180,6 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
       cmd: "9",
-      hide: !enableDevMode,
     },
     {
       label: "Guard Rails",
@@ -202,7 +201,6 @@ const DashBoardLayout: React.FC<LayoutProps> = ({ children, headerItems }) => {
       icon: '/icons/simulations.png',
       iconWhite: '/icons/simulationsWhite.svg',
       cmd: "u",
-      hide: !enableDevMode,
     },
   ]
 
