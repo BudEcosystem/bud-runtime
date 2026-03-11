@@ -620,7 +620,7 @@ export default function AddCustomGuardRail() {
                         />
                       )}
                     </div>
-                    <div className="">
+                    <div className="space-y-[0.5rem]">
                       <TextInput
                         name={`def_term_${def.id}`}
                         placeholder="Term"
@@ -666,7 +666,7 @@ export default function AddCustomGuardRail() {
                   }
                   key="interpretation"
                 >
-                  <div className="">
+                  <div className="space-y-[0.5rem]">
                     {formData.interpretation.map((_item, index) => (
                       <div key={index} className="flex items-center gap-[0.5rem]">
                         <TextInput
@@ -806,7 +806,7 @@ export default function AddCustomGuardRail() {
                           />
                         )}
                       </div>
-                      <div className="">
+                      <div className="space-y-[0.5rem]">
                         <TextInput
                           name={`sc_item_name_${item.id}`}
                           placeholder="Name"
@@ -864,7 +864,7 @@ export default function AddCustomGuardRail() {
                           className="text-[#B3B3B3] cursor-pointer hover:text-[#ec7575]"
                         />
                       </div>
-                      <div className="">
+                      <div className="space-y-[0.5rem]">
                         <Input.TextArea
                           value={example.input}
                           onChange={(e) => updateSafeContentExample(example.id, "input", e.target.value)}
@@ -1065,7 +1065,7 @@ export default function AddCustomGuardRail() {
                                   className="text-[#757575] cursor-pointer hover:text-[#ec7575] text-[12px]"
                                 />
                               </div>
-                              <div className="">
+                              <div className="space-y-[0.25rem]">
                                 <Input.TextArea
                                   value={example.input}
                                   onChange={(e) => updateViolationExample(violation.id, example.id, "input", e.target.value)}
