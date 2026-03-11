@@ -12,7 +12,6 @@ in
     ../disk/configuration.nix
   ];
 
-  boot.supportedFilesystems = [ "nfs" ];
   services.k3s.serverAddr = "https://${primaryIp}:6443";
 
   # ingress nodes are not part of the scid job

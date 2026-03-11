@@ -8,13 +8,16 @@ import Connectors from "../settings/connectors";
 import Connections from "../settings/connections";
 import SearchHeaderInput from "src/flows/components/SearchHeaderInput";
 import { useGlobalConnectors } from "@/stores/useGlobalConnectors";
+import ConnectMCPDrawer from "../settings/connectors/ConnectMCPDrawer";
+import { PrimaryButton } from "@/components/ui/bud/form/Buttons";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
 export default function ConnectorsPage() {
   const [activeTab, setActiveTab] = useState("1");
   const [searchTerm, setSearchTerm] = useState("");
-  const { fetchRegistry } = useGlobalConnectors();
+  const [connectMCPOpen, setConnectMCPOpen] = useState(false);
+  const { fetchRegistry, fetchConfigured } = useGlobalConnectors();
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSearchChange = useCallback(
@@ -67,14 +70,29 @@ export default function ConnectorsPage() {
             headding="Connectors"
             classNames="!items-center"
             rightComponent={
-              activeTab === "1" ? (
-                <SearchHeaderInput
-                  placeholder="Search connectors..."
-                  searchValue={searchTerm}
-                  setSearchValue={handleSearchChange}
-                  classNames="mr-[.6rem]"
-                />
-              ) : undefined
+              <div className="flex items-center gap-3">
+                {activeTab === "1" && (
+                  <SearchHeaderInput
+                    placeholder="Search connectors..."
+                    searchValue={searchTerm}
+                    setSearchValue={handleSearchChange}
+                    classNames="mr-[.6rem]"
+                  />
+                )}
+                <PrimaryButton
+                  onClick={() => setConnectMCPOpen(true)}
+                  classNames="h-[1.75rem] rounded-[0.3rem]"
+                  textClass="!text-[0.6875rem] !font-[500]"
+                >
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
+                    </svg>
+                    Connect MCP
+                  </span>
+                </PrimaryButton>
+              </div>
             }
           />
         </div>
@@ -87,6 +105,15 @@ export default function ConnectorsPage() {
           />
         </div>
       </div>
+      <ConnectMCPDrawer
+        open={connectMCPOpen}
+        onClose={() => setConnectMCPOpen(false)}
+        onSuccess={() => {
+          setConnectMCPOpen(false);
+          setActiveTab("2");
+          fetchConfigured({ include_disabled: true });
+        }}
+      />
     </DashBoardLayout>
   );
 }

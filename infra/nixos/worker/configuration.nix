@@ -11,7 +11,6 @@ in
     ../disk/configuration.nix
   ];
 
-  boot.supportedFilesystems = [ "nfs" ];
   services.k3s = {
     role = "agent";
     serverAddr = "https://${primaryIp}:6443";

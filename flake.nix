@@ -194,7 +194,8 @@
 
       nixosModules = lib.genAttrs [ "common" "primary" ] makeModule;
       nixosConfigurations = lib.genAttrs [
-        "primary-dev"
+        "primary-dev-azure"
+        "primary-dev-e2e"
         "primary-disk"
         "ingress"
         "worker"

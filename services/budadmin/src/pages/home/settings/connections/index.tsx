@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Spin, Empty, Switch, Table, ConfigProvider, Drawer, Tooltip, Button, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -102,6 +102,55 @@ const OAuthBadge = ({ connected }: { connected: boolean }) => {
 };
 
 // ---------------------------------------------------------------------------
+// ToolCard — tool description with 2-line clamp and "see more"
+// ---------------------------------------------------------------------------
+
+interface ToolInfo {
+  id?: string;
+  name?: string;
+  displayName?: string;
+  description?: string;
+}
+
+const ToolCard = ({ tool, idx }: { tool: ToolInfo; idx: number }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const descRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = descRef.current;
+    if (el) {
+      // Check if text overflows 2 lines
+      setClamped(el.scrollHeight > el.clientHeight);
+    }
+  }, [tool.description]);
+
+  return (
+    <div className="p-3 rounded-lg border border-[#1F1F1F] bg-[rgba(255,255,255,0.02)] hover:border-[#2A2A2A] transition-colors">
+      <Text_12_400_EEEEEE className="!leading-[1.3]">{tool.name || tool.displayName || `Tool ${idx + 1}`}</Text_12_400_EEEEEE>
+      {tool.description && (
+        <div className="mt-1">
+          <div
+            ref={descRef}
+            className={expanded ? "" : "line-clamp-2"}
+          >
+            <Text_12_400_757575 className="!leading-[1.4]">{tool.description}</Text_12_400_757575>
+          </div>
+          {clamped && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-[0.6875rem] text-[#965CDE] hover:text-[#B07FEE] mt-0.5 transition-colors"
+            >
+              {expanded ? "see less" : "see more"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Detail Drawer — follows standard drawerBackground / form-layout pattern
 // ---------------------------------------------------------------------------
 
@@ -185,9 +234,9 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
 
   const infoRows: { label: string; value: React.ReactNode }[] = [
     connector.auth_type ? { label: "Auth Type", value: connector.auth_type } : null,
-    connector.category ? { label: "Category", value: connector.category } : null,
+    { label: "Category", value: connector.is_custom ? "Custom" : (connector.category || "-") },
     { label: "OAuth", value: connector.oauth_connected ? <OAuthBadge connected /> : <Text_12_400_757575>Not connected</Text_12_400_757575> },
-    { label: "Connector ID", value: <span className="font-mono text-[0.6875rem] text-[#B3B3B3]">{connector.connector_id}</span> },
+    connector.is_custom ? null : { label: "Connector ID", value: <span className="font-mono text-[0.6875rem] text-[#B3B3B3]">{connector.connector_id}</span> },
     { label: "Gateway ID", value: <span className="font-mono text-[0.6875rem] text-[#B3B3B3] break-all">{connector.gateway_id}</span> },
   ].filter(Boolean) as { label: string; value: React.ReactNode }[];
 
@@ -222,9 +271,9 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
             {/* Title card */}
             <div className="form-layout !mb-[1.1rem]">
               <div className="px-[1.4rem] rounded-ss-lg rounded-se-lg" style={{ paddingTop: "1.1rem", paddingBottom: ".9rem" }}>
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <ConnectorIcon icon={connector.icon} name={connector.name} size="2.40125rem" />
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 flex-1 min-w-0">
                     <Text_14_400_EEEEEE className="p-0 m-0 text-[1.125rem]">
                       {connector.name}
                     </Text_14_400_EEEEEE>
@@ -232,6 +281,17 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
                       <Text_12_400_757575 className="p-0 m-0 !leading-[1.4]">
                         {connector.description}
                       </Text_12_400_757575>
+                    )}
+                    {connector.documentation_url && (
+                      <a
+                        href={connector.documentation_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 mt-1 text-[0.75rem] text-[#965CDE] hover:text-[#B07FEE] transition-colors"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
+                        Documentation
+                      </a>
                     )}
                   </div>
                 </div>
@@ -242,17 +302,6 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
                       <ProjectTags key={tag} name={tag} color="#757575" textClass="text-[.625rem]" />
                     ))}
                   </div>
-                )}
-                {connector.documentation_url && (
-                  <a
-                    href={connector.documentation_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 mt-3 text-[0.75rem] text-[#965CDE] hover:text-[#B07FEE] transition-colors"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                    Documentation
-                  </a>
                 )}
               </div>
             </div>
@@ -318,10 +367,7 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ open, onClose, connector, o
                 ) : (
                   <div className="space-y-2">
                     {tools.map((tool: any, idx: number) => (
-                      <div key={tool.id || idx} className="p-3 rounded-lg border border-[#1F1F1F] bg-[rgba(255,255,255,0.02)] hover:border-[#2A2A2A] transition-colors">
-                        <Text_12_400_EEEEEE className="!leading-[1.3]">{tool.name || tool.displayName || `Tool ${idx + 1}`}</Text_12_400_EEEEEE>
-                        {tool.description && <Text_12_400_757575 className="mt-1 !leading-[1.4]">{tool.description}</Text_12_400_757575>}
-                      </div>
+                      <ToolCard key={tool.id || idx} tool={tool} idx={idx} />
                     ))}
                   </div>
                 )}
@@ -531,6 +577,9 @@ const Connections = () => {
           <div className="flex items-center gap-3">
             <ConnectorIcon icon={record.icon} name={record.name} />
             <Text_12_400_EEEEEE className="truncate">{record.name}</Text_12_400_EEEEEE>
+            {record.is_custom && (
+              <ProjectTags name="Custom" color="#6366F1" textClass="text-[.625rem]" />
+            )}
           </div>
         ),
       },
@@ -629,7 +678,7 @@ const Connections = () => {
       <div className="flex flex-col items-center justify-center" style={{ minHeight: "20rem" }}>
         <Empty description={false} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         <Text_14_400_757575 className="mt-[1rem]">No connections configured</Text_14_400_757575>
-        <Text_12_400_B3B3B3 className="mt-[0.4rem]">Configure connectors from the Connectors tab to see them here.</Text_12_400_B3B3B3>
+        <Text_12_400_B3B3B3 className="mt-[0.4rem]">Configure connectors from the Connectors tab or use Connect MCP to add custom servers.</Text_12_400_B3B3B3>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { GlobalConnectorService } from "@/services/globalConnectorService";
+import { GlobalConnectorService, type CreateCustomGatewayPayload } from "@/services/globalConnectorService";
 import { errorToast, successToast } from "@/components/toast";
 
 const TAG_PREFIX_CLIENT = "client:";
@@ -36,6 +36,7 @@ export interface ConfiguredConnector {
   documentation_url?: string;
   tool_count: number;
   oauth_connected: boolean;
+  is_custom?: boolean;
 }
 
 export interface RegistryConnector {
@@ -77,6 +78,7 @@ interface GlobalConnectorsState {
   fetchRegistry: (params?: { name?: string; page?: number; limit?: number }, append?: boolean) => Promise<void>;
   fetchRegistryConnector: (connectorId: string) => Promise<RegistryConnector | null>;
   configureConnector: (connectorId: string, credentials: Record<string, any>) => Promise<boolean>;
+  createCustomGateway: (payload: { name: string; url: string; description?: string; transport?: string; auth_type?: string; credentials?: Record<string, any> }) => Promise<boolean>;
   fetchGateways: (params?: { page?: number; limit?: number }) => Promise<void>;
   getGateway: (gatewayId: string) => Promise<Gateway | null>;
   deleteGateway: (gatewayId: string) => Promise<boolean>;
@@ -152,6 +154,21 @@ export const useGlobalConnectors = create<GlobalConnectorsState>((set) => ({
       return false;
     } catch (e: any) {
       errorToast(e?.response?.data?.message || "Failed to configure connector");
+      return false;
+    }
+  },
+
+  createCustomGateway: async (payload) => {
+    try {
+      const res = await GlobalConnectorService.createCustomGateway(payload);
+      if (res?.data?.success) {
+        successToast("Custom gateway created successfully");
+        return true;
+      }
+      errorToast(res?.data?.message || "Failed to create custom gateway");
+      return false;
+    } catch (e: any) {
+      errorToast(e?.response?.data?.message || "Failed to create custom gateway");
       return false;
     }
   },
