@@ -34,7 +34,7 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "{{ .Release.Name }}-postgres-db-create-{{ join "-" $.Values.postgresqlExtra.autoCreateDB | sha256sum }}"
+  name: "{{ .Release.Name }}-postgres-db-create-{{ join "-" $.Values.postgresqlExtra.autoCreateDB | sha256sum | trunc 8 }}"
 spec:
   ttlSecondsAfterFinished: 300
   template:
