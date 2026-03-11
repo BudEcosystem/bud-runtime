@@ -2,7 +2,7 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Checkbox, Slider, Input } from "antd";
+import { Checkbox, Slider } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import useGuardrails from "src/hooks/useGuardrails";
@@ -12,6 +12,8 @@ import {
   Text_14_400_EEEEEE,
   Text_14_600_FFFFFF,
 } from "@/components/ui/text";
+import TextInput from "src/flows/components/TextInput";
+import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 
 export default function ProbeSettings() {
   const { openDrawerWithStep, currentFlow } = useDrawer();
@@ -20,6 +22,11 @@ export default function ProbeSettings() {
   const [strictnessLevel, setStrictnessLevel] = useState(0.5);
   const [profileName, setProfileName] = useState("Guardrail Profile");
   const [profileDescription, setProfileDescription] = useState("");
+
+  const formData = {
+    name: profileName,
+    description: profileDescription,
+  };
 
   // Use the guardrails hook
   const {
@@ -112,12 +119,16 @@ export default function ProbeSettings() {
 
   return (
     <BudForm
-      data={{}}
+      data={formData}
       onBack={handleBack}
       onNext={handleDeploy}
       backText="Back"
       nextText={needsDeployment ? "Next" : "Deploy"}
       disableNext={selectedLifecycle.length === 0 || workflowLoading}
+      onValuesChange={(changedValues) => {
+        if (changedValues.name !== undefined) setProfileName(changedValues.name);
+        if (changedValues.description !== undefined) setProfileDescription(changedValues.description);
+      }}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -136,38 +147,21 @@ export default function ProbeSettings() {
                   Guardrail Profile
                 </Text_14_600_FFFFFF>
 
-                <div className="mb-[1rem]">
-                  <Text_12_400_757575 className="mb-[0.5rem] block">
-                    Profile Name *
-                  </Text_12_400_757575>
-                  <Input
-                    placeholder="Enter guardrail profile name"
-                    value={profileName}
-                    onChange={(e) => setProfileName(e.target.value)}
-                    className="bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE]"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#EEEEEE",
-                    }}
-                  />
-                </div>
+                <TextInput
+                  name="name"
+                  label="Profile Name"
+                  placeholder="Enter guardrail profile name"
+                  infoText="Name for your guardrail profile"
+                  rules={[{ required: true, message: "Please enter a profile name" }]}
+                />
 
-                <div>
-                  <Text_12_400_757575 className="mb-[0.5rem] block">
-                    Description (Optional)
-                  </Text_12_400_757575>
-                  <Input.TextArea
-                    placeholder="Enter a description for this guardrail profile"
-                    value={profileDescription}
-                    onChange={(e) => setProfileDescription(e.target.value)}
-                    rows={3}
-                    className="bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE]"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#EEEEEE",
-                    }}
-                  />
-                </div>
+                <TextAreaInput
+                  name="description"
+                  label="Description"
+                  placeholder="Enter a description for this guardrail profile"
+                  info="Optional description for this guardrail profile"
+                  rules={[]}
+                />
               </div>
             </div>
 

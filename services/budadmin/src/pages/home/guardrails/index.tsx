@@ -262,30 +262,6 @@ function GuardRailCard({ item, index, onDelete }: { item: any; index: number; on
   );
 }
 
-const providerTypes = [
-  { label: "Bud Sentinel", value: "bud-sentinel" },
-  { label: "Azure AI", value: "azure-ai" },
-  { label: "AWS Bedrock", value: "aws-bedrock" },
-  { label: "Custom", value: "custom" },
-];
-
-const guardRailTypes = [
-  { label: "PII Detection", value: "pii" },
-  { label: "Jailbreak Protection", value: "jailbreak" },
-  { label: "Toxicity Filter", value: "toxicity" },
-  { label: "Bias Detection", value: "bias" },
-  { label: "Profanity Filter", value: "profanity" },
-  { label: "Custom Regex", value: "regex" },
-];
-
-const modalityTypes = [
-  { label: "Text", value: "text" },
-  { label: "Image", value: "image" },
-  { label: "Audio", value: "audio" },
-  { label: "Code", value: "code" },
-  { label: "Video", value: "video" },
-];
-
 const GUARDRAILS_PAGE_LIMIT = 10;
 
 const defaultFilter = {
@@ -367,7 +343,7 @@ export default function GuardRails() {
     totalPages,
   } = useModels();
   const { showLoader, hideLoader } = useLoader();
-  const { openDrawer } = useDrawer();
+  const { openDrawer, isDrawerOpen } = useDrawer();
   const { reset } = useDeployModel();
 
   // Use the guardrails hook (but we won't use its fetchProbes for the main listing)
@@ -611,6 +587,18 @@ export default function GuardRails() {
     }
   }, [loadingUser]);
 
+  // Refresh data when drawer closes (e.g., after guardrail creation/deployment)
+  const prevDrawerOpen = useRef(false);
+  useEffect(() => {
+    if (prevDrawerOpen.current && !isDrawerOpen) {
+      // Drawer just closed — refresh the list
+      setCurrentPage(1);
+      setHasMore(true);
+      fetchMainPageProbes({ page: 1, limit: pageSize, isSearching: false });
+    }
+    prevDrawerOpen.current = isDrawerOpen;
+  }, [isDrawerOpen]);
+
   // Infinite scroll with IntersectionObserver
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -643,7 +631,7 @@ export default function GuardRails() {
       <div className="boardPageView" id="model-container">
         <div className="boardPageTop">
           <PageHeader
-            headding="Guard Rails"
+            headding="Guardrails"
             buttonLabel="Add Guardrail"
             buttonPermission={hasPermission(PermissionEnum.ModelManage)}
             buttonAction={() => {

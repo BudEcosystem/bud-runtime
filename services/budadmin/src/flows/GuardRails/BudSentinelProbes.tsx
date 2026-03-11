@@ -246,7 +246,7 @@ export default function BudSentinelProbes() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Probes List"
-            description="Description of What probes are"
+            description="Select probes to scan your model's inputs and outputs for risks like PII exposure, bias, toxicity, and other safety concerns."
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />

@@ -2,17 +2,14 @@ import { BudWraperBox } from "@/components/ui/bud/card/wraperBox";
 import { BudDrawerLayout } from "@/components/ui/bud/dataEntry/BudDrawerLayout";
 import { BudForm } from "@/components/ui/bud/dataEntry/BudForm";
 import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
-import { Input } from "antd";
 import React, { useState } from "react";
 import { useDrawer } from "src/hooks/useDrawer";
 import { errorToast } from "@/components/toast";
 import useGuardrails from "src/hooks/useGuardrails";
-import { Text_12_400_757575 } from "@/components/ui/text";
 import CustomSelect from "../components/CustomSelect";
 import GuardTypeSelect from "../components/GuardTypeSelect";
 import TextInput from "../components/TextInput";
-
-const { TextArea } = Input;
+import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
 
 // Modality options (single select)
 const MODALITY_OPTIONS = [
@@ -23,10 +20,6 @@ const MODALITY_OPTIONS = [
   { label: "Code", value: "code" },
   { label: "Math", value: "math" },
 ];
-
-// Reusable input styles
-const inputClassName = "bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE]";
-const inputStyle = { backgroundColor: "transparent", color: "#EEEEEE" };
 
 export default function GuardRailDetails() {
   const { openDrawerWithStep } = useDrawer();
@@ -107,16 +100,13 @@ export default function GuardRailDetails() {
 
             {/* Guardrail Description */}
             <div className="mb-[1.5rem]">
-              <Text_12_400_757575 className="mb-[0.5rem] block">
-                Guardrail Description
-              </Text_12_400_757575>
-              <TextArea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+              <TextAreaInput
+                name="description"
+                label="Guardrail Description"
                 placeholder="Enter guardrail description"
-                rows={4}
-                className={inputClassName}
-                style={inputStyle}
+                info="Provide a brief description of what this guardrail does"
+                rules={[]}
+                onChange={(value) => setDescription(value)}
               />
             </div>
 
@@ -126,6 +116,7 @@ export default function GuardRailDetails() {
                 value={guardTypes}
                 onChange={(values) => setGuardTypes(values)}
                 placeholder="Select guard types"
+                info="Select which part of inference lifecycle to guard"
               />
             </div>
 
@@ -136,8 +127,10 @@ export default function GuardRailDetails() {
                 label="Modality"
                 value={modality}
                 onChange={(value) => setModality(value)}
-                placeholder="Select modality"
+                info="Select the modality for the guardrail"
                 selectOptions={MODALITY_OPTIONS}
+                placeholder="Select modality"
+                InputClasses="h-[2.875rem]"
               />
             </div>
           </div>
