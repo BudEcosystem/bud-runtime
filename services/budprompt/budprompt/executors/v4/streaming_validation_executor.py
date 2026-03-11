@@ -35,6 +35,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
+    TextPart,
     TextPartDelta,
     ToolCallPart,
     ToolCallPartDelta,
@@ -43,6 +44,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.output import NativeOutput
 from pydantic_ai.run import AgentRunResultEvent
 
+from ...commons.exceptions import PromptExecutionException
 from ...prompt.schemas import MCPToolConfig, Message
 from ...prompt.schemas import ModelSettings as ModelSettingsSchema
 from .openai_response_formatter import OpenAIResponseFormatter_V4
@@ -212,11 +214,11 @@ class StreamingValidationExecutor:
 
                 # Attempt streaming with validation
                 success = False
-                async for event in self._attempt_stream(attempt):
-                    if isinstance(event, str):
-                        # OpenAI event - yield it
-                        yield event
-                    elif isinstance(event, dict) and event.get("success"):
+                async for sse_event, _raw in self._attempt_stream(attempt):
+                    if isinstance(sse_event, str):
+                        # OpenAI sse_event - yield it
+                        yield sse_event
+                    elif isinstance(sse_event, dict) and sse_event.get("success"):
                         # Streaming completed successfully
                         success = True
                         break
@@ -321,6 +323,69 @@ class StreamingValidationExecutor:
                 ),
             )
         )
+
+    async def stream_raw(self) -> AsyncGenerator:
+        """Stream raw pydantic-ai events with validation + retry, without OpenAI formatting.
+
+        Reuses _attempt_stream() for all validation/retry logic. Yields only the raw_event
+        element of each tuple — pydantic-ai events and AgentRunResultEvent.
+
+        StreamingValidationExecutor acts as a fake pydantic-ai agent:
+        - MCP tool events passed through directly
+        - Structured output emitted as synthetic PartStartEvent(TextPart) + PartDeltaEvent(TextPartDelta)
+        - Final result yielded as AgentRunResultEvent (consistent with _run_agent_raw_stream)
+
+        Used by A2A bridge for direct pydantic-ai → A2A conversion.
+
+        Yields:
+            PartStartEvent / PartDeltaEvent for MCP tool calls (yielded immediately as they arrive)
+            PartStartEvent(TextPart) [synthetic] + PartDeltaEvent(TextPartDelta) [synthetic] for output
+            AgentRunResultEvent when execution completes (validated)
+
+        Raises:
+            PromptExecutionException: If all retry attempts fail
+        """
+        for attempt in range(self.retry_limit):
+            try:
+                success = False
+                async for sse, raw_evt in self._attempt_stream(attempt):
+                    if isinstance(sse, dict) and sse.get("success"):
+                        yield raw_evt  # AgentRunResultEvent
+                        success = True
+                        break
+                    if raw_evt is not None:
+                        yield raw_evt  # pydantic-ai event
+
+                if success:
+                    return
+
+            except (ValueError, ValidationError, UnexpectedModelBehavior) as e:
+                self.validation_errors.append(str(e))
+                logger.debug(f"Raw stream attempt {attempt + 1} validation failed: {str(e)}")
+                if attempt < self.retry_limit - 1:
+                    self.formatter.reset_for_retry()
+                    self.message_item_started = False
+                    self.last_sent_fields = {}
+                    continue
+                else:
+                    logger.error(f"Validation failed after {self.retry_limit} attempts")
+                    break
+
+            except Exception as e:
+                logger.error(f"Raw streaming error on attempt {attempt + 1}: {str(e)}")
+                self.validation_errors.append(f"Unexpected error: {str(e)}")
+                if attempt < self.retry_limit - 1:
+                    self.formatter.reset_for_retry()
+                    self.message_item_started = False
+                    self.last_sent_fields = {}
+                    continue
+                else:
+                    break
+
+        error_message = f"Validation failed after {self.retry_limit} attempts"
+        if self.validation_errors:
+            error_message += f": {self.validation_errors[-1]}"
+        raise PromptExecutionException(error_message)
 
     def _filter_final_result_tool_calls(self, messages: List[ModelMessage]) -> List[ModelMessage]:
         """Remove final_result tool calls from message history for retry.
@@ -507,8 +572,11 @@ class StreamingValidationExecutor:
                             logger.debug("Emitting message item lifecycle events before field deltas")
 
                             # Emit lifecycle events with proper sequences
-                            yield self.formatter.format_output_item_added()
-                            yield self.formatter.format_content_part_added()
+                            yield self.formatter.format_output_item_added(), None
+                            yield (
+                                self.formatter.format_content_part_added(),
+                                PartStartEvent(index=0, part=TextPart(content="")),
+                            )
 
                             self.message_item_started = True
 
@@ -535,16 +603,26 @@ class StreamingValidationExecutor:
                             )
 
                             # Emit cumulative JSON - formatter extracts the delta
+                            prev_accumulated = self.formatter.accumulated_text
                             delta_event = self.formatter.format_output_text_delta(cumulative_json)
                             if delta_event:
-                                yield delta_event
+                                actual_delta = cumulative_json[len(prev_accumulated) :]
+                                yield (
+                                    delta_event,
+                                    PartDeltaEvent(index=0, delta=TextPartDelta(content_delta=actual_delta)),
+                                )
 
                         # After all fields emitted, close the JSON object
                         final_json = self._build_cumulative_json_from_fields(self.last_sent_fields, close_object=True)
                         # Emit the closing brace as a delta
+                        prev_accumulated = self.formatter.accumulated_text
                         closing_delta = self.formatter.format_output_text_delta(final_json)
                         if closing_delta:
-                            yield closing_delta
+                            actual_closing = final_json[len(prev_accumulated) :]
+                            yield (
+                                closing_delta,
+                                PartDeltaEvent(index=0, delta=TextPartDelta(content_delta=actual_closing)),
+                            )
 
                         # Store for retry context
                         self.last_attempted_data = final_validated_data
@@ -566,7 +644,7 @@ class StreamingValidationExecutor:
                             }
 
                         # Success! Signal completion
-                        yield {"success": True}
+                        yield {"success": True}, event  # AgentRunResultEvent (the original wrapper)
                         return
 
                 except (ValueError, ValidationError) as e:
@@ -609,8 +687,8 @@ class StreamingValidationExecutor:
                             event_dict["sequence_number"] = self.formatter._next_sequence()
                             events_with_sequences.append(type(openai_event)(**event_dict))
 
-                        for event_with_seq in events_with_sequences:
-                            yield self.formatter.format_sse_from_event(event_with_seq)
+                        for i, event_with_seq in enumerate(events_with_sequences):
+                            yield self.formatter.format_sse_from_event(event_with_seq), event if i == 0 else None
 
                         continue
 
@@ -661,8 +739,11 @@ class StreamingValidationExecutor:
                                         # EMIT lifecycle events ONCE before first field delta
                                         if not self.message_item_started:
                                             logger.debug("Emitting message item lifecycle events before field deltas")
-                                            yield self.formatter.format_output_item_added()
-                                            yield self.formatter.format_content_part_added()
+                                            yield self.formatter.format_output_item_added(), None
+                                            yield (
+                                                self.formatter.format_content_part_added(),
+                                                PartStartEvent(index=0, part=TextPart(content="")),
+                                            )
                                             self.message_item_started = True
 
                                         # Update what we've sent BEFORE building cumulative JSON
@@ -675,9 +756,16 @@ class StreamingValidationExecutor:
                                         )
 
                                         # Emit cumulative JSON - formatter extracts the delta
+                                        prev_accumulated = self.formatter.accumulated_text
                                         delta_event = self.formatter.format_output_text_delta(cumulative_json)
                                         if delta_event:
-                                            yield delta_event
+                                            actual_delta = cumulative_json[len(prev_accumulated) :]
+                                            yield (
+                                                delta_event,
+                                                PartDeltaEvent(
+                                                    index=0, delta=TextPartDelta(content_delta=actual_delta)
+                                                ),
+                                            )
 
                                     # Update our validated fields
                                     self.validated_fields.update(current_validated)
@@ -735,16 +823,16 @@ class StreamingValidationExecutor:
                     events_with_sequences.append(type(openai_event)(**event_dict))
 
                 # Emit events with proper sequences
-                for event_with_seq in events_with_sequences:
-                    yield self.formatter.format_sse_from_event(event_with_seq)
+                for i, event_with_seq in enumerate(events_with_sequences):
+                    yield self.formatter.format_sse_from_event(event_with_seq), event if i == 0 else None
                 continue
 
             # For all other events (reasoning, text, etc), pass through V4 formatter
             openai_events = await self.formatter.map_event(event)
 
             # Emit each OpenAI event
-            for openai_event in openai_events:
-                yield self.formatter.format_sse_from_event(openai_event)
+            for i, openai_event in enumerate(openai_events):
+                yield self.formatter.format_sse_from_event(openai_event), event if i == 0 else None
 
     def _build_prompt(self, attempt: int) -> str:
         """Build prompt for this attempt.

@@ -127,7 +127,8 @@ class SimplePromptExecutor_V4:
         tools: Optional[List[MCPToolConfig]] = None,
         system_prompt: Optional[str] = None,
         variables: Optional[Dict[str, Any]] = None,
-    ) -> Union[Dict[str, Any], str, AsyncGenerator[str, None]]:
+        return_raw: bool = False,
+    ) -> Union[Dict[str, Any], str, AsyncGenerator[Any, None]]:
         """Execute a prompt with structured or unstructured input and output.
 
         Args:
@@ -251,9 +252,11 @@ class SimplePromptExecutor_V4:
                         output_schema=output_schema,
                     )
 
-                    return executor.stream()
+                    return executor.stream_raw() if return_raw else executor.stream()
                 else:
                     logger.debug("Performing streaming with unstructured output")
+                    if return_raw:
+                        return self._run_agent_raw_stream(agent, user_prompt, message_history)
                     return self._run_agent_stream(
                         agent,
                         user_prompt,
@@ -273,6 +276,9 @@ class SimplePromptExecutor_V4:
                     message_history,
                     output_schema,
                 )
+
+                if return_raw:
+                    return result
 
                 # Format to official OpenAI Response
                 openai_response = await self.response_formatter.format_response(
@@ -975,3 +981,25 @@ class SimplePromptExecutor_V4:
                     ),
                 )
             )
+
+    async def _run_agent_raw_stream(
+        self,
+        agent: Agent,
+        user_prompt: Optional[str],
+        message_history: List[ModelMessage],
+    ) -> AsyncGenerator:
+        """Run agent yielding raw pydantic-ai events without OpenAI formatting.
+
+        For unstructured streaming output (no output_schema / output_validation).
+        All pydantic-ai stream events are passed through as-is.
+
+        Used by A2A bridge for direct pydantic-ai → A2A conversion.
+
+        Yields:
+            All pydantic-ai AgentStreamEvent subtypes as they arrive
+        """
+        async for event in agent.run_stream_events(
+            user_prompt=user_prompt,
+            message_history=message_history,
+        ):
+            yield event

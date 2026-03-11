@@ -86,6 +86,9 @@ class OpenAIStreamingValidationFormatter_V4(OpenAIStreamingFormatter_V4):
 
         self.text_item_id = f"msg_{uuid.uuid4().hex}"
 
+        # Accumulated text for output_text delta tracking
+        self.accumulated_text = ""
+
         # Flag to control sequence assignment (for lazy sequence assignment)
         self.should_assign_sequence = True  # Default: always assign sequences
 
