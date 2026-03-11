@@ -722,7 +722,7 @@ keycloak:
   proxy: edge
   resources:
     limits:
-      memory: 2Gi
+      memory: 4Gi
   enabled: true
   # Keycloak admin credentials (for provisioning and management)
   auth:
