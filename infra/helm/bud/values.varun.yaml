@@ -22,9 +22,3 @@ microservices:
             VOLUME_TYPE: nfs
     budgateway:
         image: budstudio/budgateway:nightly
-
-storage:
-    budmodelRegistry:
-        className: nfs-csi
-    budevalDataset:
-        className: "nfs-csi"
