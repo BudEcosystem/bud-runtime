@@ -1,6 +1,12 @@
 { pkgs, lib, ... }:
 let
-  privateCIDR = [
+  privateCIDR4 = [
+    "192.168.0.0/16"
+    "10.0.0.0/8"
+    "172.16.0.0/12"
+    "fd00::/8"
+  ];
+  privateCIDR6 = [
     "192.168.0.0/16"
     "10.0.0.0/8"
     "172.16.0.0/12"
@@ -21,13 +27,16 @@ let
   ];
 
   allowCIDRPorts =
-    cidrs: ports: proto:
+    cidrs: ports: proto: isIPv6:
+    let
+      cmd = if isIPv6 then "ip6tables" else "iptables";
+    in
     lib.flatten (
       map (
         cidr:
         (map (
           port:
-          "iptables -A nixos-fw --source ${cidr} -p ${proto} -m ${proto} --dport ${toString port} -j nixos-fw-accept"
+          "${cmd} -A nixos-fw --source ${cidr} -p ${proto} -m ${proto} --dport ${toString port} -j nixos-fw-accept"
         ) ports)
       ) cidrs
     );
@@ -42,8 +51,10 @@ in
     ];
 
     extraCommands = lib.concatLines (
-      (allowCIDRPorts privateCIDR privateUDPPorts "udp")
-      ++ (allowCIDRPorts privateCIDR privateTCPPorts "tcp")
+      (allowCIDRPorts privateCIDR4 privateUDPPorts "udp" false)
+      ++ (allowCIDRPorts privateCIDR6 privateUDPPorts "udp" true)
+      ++ (allowCIDRPorts privateCIDR4 privateTCPPorts "tcp" false)
+      ++ (allowCIDRPorts privateCIDR6 privateTCPPorts "tcp" true)
     );
   };
 
