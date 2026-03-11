@@ -4006,9 +4006,9 @@ class ModelService(SessionMixin):
         namespace = db_model.uri
         source_lower = (db_model.source or "").lower().replace("_", "").replace("-", "")
         if "/" in namespace:
-            prefix = namespace.split("/", 1)[0].lower().replace("_", "").replace("-", "")
-            if prefix == source_lower:
-                namespace = namespace.split("/", 1)[1]
+            prefix, rest = namespace.split("/", 1)
+            if prefix.lower().replace("_", "").replace("-", "") == source_lower:
+                namespace = rest
 
         # Use the proxy service URL for cloud models
         deployment_url = "budproxy-service.svc.cluster.local"

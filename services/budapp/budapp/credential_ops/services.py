@@ -1114,7 +1114,10 @@ class ProprietaryCredentialService(SessionMixin):
                 detail="User does not have permission to delete this credential",
             )
 
-        active_endpoints = [ep for ep in db_credential.endpoints if ep.status != EndpointStatusEnum.DELETED]
+        active_endpoints = [
+            ep for ep in db_credential.endpoints
+            if ep.status not in (EndpointStatusEnum.DELETED, EndpointStatusEnum.DELETING)
+        ]
         if active_endpoints:
             project_names = [endpoint.project.name for endpoint in active_endpoints]
             raise HTTPException(
