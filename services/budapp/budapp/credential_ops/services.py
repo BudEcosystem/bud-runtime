@@ -1115,7 +1115,8 @@ class ProprietaryCredentialService(SessionMixin):
             )
 
         active_endpoints = [
-            ep for ep in db_credential.endpoints
+            ep
+            for ep in db_credential.endpoints
             if ep.status not in (EndpointStatusEnum.DELETED, EndpointStatusEnum.DELETING)
         ]
         if active_endpoints:
