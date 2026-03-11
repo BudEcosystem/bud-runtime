@@ -73,7 +73,7 @@ export default function SelectProbeType() {
         <BudDrawerLayout>
           <DrawerTitleCard
             title="Create Custom Probe"
-            description="Create a custom probe for guardrailing Agents, prompts or models either by uploading your dataset or by setting custom rules."
+            description="Create a custom probe for guardrailing agents, prompts or models either by uploading your dataset or by setting custom rules."
             classNames="pt-[.8rem]"
             descriptionClass="pt-[.3rem] text-[#B3B3B3]"
           />

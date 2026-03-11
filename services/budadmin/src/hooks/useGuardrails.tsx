@@ -170,6 +170,8 @@ interface GuardrailsState {
   // Custom probe workflow
   customProbePolicy: any | null;
   setCustomProbePolicy: (policy: any) => void;
+  customGuardRailFormData: any | null;
+  setCustomGuardRailFormData: (data: any | null) => void;
   createCustomProbeWorkflow: (probeTypeOption: string) => Promise<boolean>;
   updateCustomProbeWorkflow: (data: Record<string, any>) => Promise<boolean>;
 
@@ -237,6 +239,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
   workflowLoading: false,
   workflowError: null,
   customProbePolicy: null,
+  customGuardRailFormData: null,
 
   // Probe rules state
   probeRules: [],
@@ -571,6 +574,11 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
     set({ customProbePolicy: policy });
   },
 
+  // Set custom guard rail form data (persists across step navigation)
+  setCustomGuardRailFormData: (data: any | null) => {
+    set({ customGuardRailFormData: data });
+  },
+
   // Create custom probe workflow (step 1)
   createCustomProbeWorkflow: async (probeTypeOption: string): Promise<boolean> => {
     set({ workflowLoading: true, workflowError: null });
@@ -668,6 +676,7 @@ const useGuardrails = create<GuardrailsState>((set, get) => ({
       selectedProvider: null,
       isStandaloneDeployment: false,
       customProbePolicy: null,
+      customGuardRailFormData: null,
       // Reset branching state
       modelStatuses: [],
       modelsRequiringOnboarding: 0,

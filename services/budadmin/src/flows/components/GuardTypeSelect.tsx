@@ -1,7 +1,8 @@
 import React from "react";
-import { ConfigProvider, Select, Tag } from "antd";
+import { ConfigProvider, Select, Tag, Image } from "antd";
 import { Text_12_400_EEEEEE } from "@/components/ui/text";
 import { getChromeColor } from "@/components/ui/bud/dataEntry/TagsInputData";
+import CustomPopover from "./customPopover";
 
 // Guard type options with their designated colors
 const GUARD_TYPE_OPTIONS = [
@@ -24,6 +25,7 @@ export interface GuardTypeSelectProps {
   onChange?: (values: string[]) => void;
   placeholder?: string;
   label?: string;
+  info?: string;
   disabled?: boolean;
   className?: string;
 }
@@ -33,6 +35,7 @@ function GuardTypeSelect({
   onChange,
   placeholder = "Select guard types",
   label = "Guard type",
+  info,
   disabled = false,
   className = "",
 }: GuardTypeSelectProps) {
@@ -87,6 +90,16 @@ function GuardTypeSelect({
         <div className="w-full">
           <Text_12_400_EEEEEE className="absolute px-[.2rem] -top-1.5 left-[1.1rem] tracking-[.035rem] z-10 flex items-center gap-1 text-nowrap floatingLabel">
             {label}
+            {info && (
+              <CustomPopover title={info}>
+                <Image
+                  src="/images/info.png"
+                  preview={false}
+                  alt="info"
+                  style={{ width: '.75rem', height: '.75rem' }}
+                />
+              </CustomPopover>
+            )}
           </Text_12_400_EEEEEE>
         </div>
       )}

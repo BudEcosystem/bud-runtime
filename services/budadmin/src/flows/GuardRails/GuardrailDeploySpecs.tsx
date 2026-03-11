@@ -13,12 +13,10 @@ import {
   Text_12_400_757575,
   Text_14_400_EEEEEE,
 } from "@/components/ui/text";
+import TextInput from "src/flows/components/TextInput";
 
 const inputBoxClass =
   "inputClass border border-[#EEEEEE] px-[.5rem] text-center pt-[.3rem] pb-[.15rem] rounded-[0.31275rem] hover:!border-[#CFCFCF] hover:!bg-[#FFFFFF08] shadow-none !placeholder-[#808080] !placeholder:text-[#808080] !placeholder:font-[300] text-[#EEE] text-[0.75rem] font-[400] leading-[100%]";
-
-const textInputClass =
-  "drawerInp py-[.65rem] bg-transparent text-[#EEEEEE] font-[300] border-[0.5px] border-[#757575] rounded-[6px] hover:border-[#EEEEEE] focus:border-[#EEEEEE] active:border-[#EEEEEE] text-[.75rem] shadow-none w-full indent-[.4rem]";
 
 const sliderStyles = {
   track: { backgroundColor: "#965CDE" },
@@ -84,12 +82,18 @@ export default function GuardrailDeploySpecs() {
 
   return (
     <BudForm
-      data={{}}
+      data={{ concurrent_requests: concurrentRequests }}
       onBack={handleBack}
       onNext={handleNext}
       backText="Back"
       nextText="Run Simulation"
       disableNext={workflowLoading}
+      onValuesChange={(changedValues) => {
+        if (changedValues.concurrent_requests !== undefined) {
+          const value = changedValues.concurrent_requests;
+          setConcurrentRequests(value === "" ? "" : value);
+        }
+      }}
     >
       <BudWraperBox>
         <BudDrawerLayout>
@@ -110,42 +114,16 @@ export default function GuardrailDeploySpecs() {
               </Text_12_400_757575>
             </div>
             <div className="px-[1.4rem] pt-[2.15rem] pb-[2.15rem] w-full">
-              {/* Concurrent Requests & Context/Sequence Length */}
+              {/* Concurrent Requests */}
               <div className="flex gap-[1.5rem] w-full flex-row mb-[1.3rem]">
-                <div className="w-[48%] relative">
-                  <Text_12_300_EEEEEE className="absolute px-1.5 bg-[#101010] -top-1.5 left-1.5 tracking-[.035rem] z-10 flex items-center gap-1 text-[.75rem] text-[#EEEEEE] font-[400]">
-                    Concurrent&nbsp;Requests
-                    <CustomPopover title="The number of requests you want the model to handle at the same time.">
-                      <Image
-                        preview={false}
-                        src="/images/info.png"
-                        alt="info"
-                        style={{ width: ".75rem", height: ".75rem" }}
-                      />
-                    </CustomPopover>
-                  </Text_12_300_EEEEEE>
-                  <Input
-                    type="number"
+                <div className="w-[48%]">
+                  <TextInput
+                    name="concurrent_requests"
+                    label="Concurrent Requests"
                     placeholder="Enter value"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#EEEEEE",
-                      border: "0.5px solid #757575",
-                    }}
-                    min={1}
-                    value={concurrentRequests}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === "" || /^\d+$/.test(value)) {
-                        setConcurrentRequests(value === "" ? "" : value);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      const value = parseInt(e.target.value, 10) || 0;
-                      if (value < 1) setConcurrentRequests(1);
-                    }}
-                    size="large"
-                    className={textInputClass}
+                    infoText="The number of requests you want the model to handle at the same time."
+                    allowOnlyNumbers
+                    rules={[{ required: true, message: "Please enter concurrent requests" }]}
                   />
                 </div>
               </div>

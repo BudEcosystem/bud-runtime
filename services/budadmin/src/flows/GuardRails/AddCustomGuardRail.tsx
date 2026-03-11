@@ -5,7 +5,6 @@ import DrawerTitleCard from "@/components/ui/bud/card/DrawerTitleCard";
 import {
   Input,
   Button,
-  Select,
   ConfigProvider,
   Switch,
   Collapse,
@@ -25,8 +24,10 @@ import {
   Text_14_400_EEEEEE,
   Text_14_600_EEEEEE,
 } from "@/components/ui/text";
+import TextInput from "src/flows/components/TextInput";
+import TextAreaInput from "@/components/ui/bud/dataEntry/TextArea";
+import CustomSelect from "src/flows/components/CustomSelect";
 
-const { TextArea } = Input;
 const { Panel } = Collapse;
 
 // Types based on the JSON schema
@@ -117,33 +118,33 @@ const DEFAULT_AMBIGUITY = [
   { id: generateId(), condition: "unclear", action: "downgrade severity by 1 level" },
 ];
 
-// Reusable input styles
-const inputClassName = "bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE]";
-const inputStyle = { backgroundColor: "transparent", color: "#EEEEEE" };
 
 export default function AddCustomGuardRail() {
   const { openDrawerWithStep } = useDrawer();
-  const { updateCustomProbeWorkflow, setCustomProbePolicy, workflowLoading } = useGuardrails();
+  const { updateCustomProbeWorkflow, setCustomProbePolicy, workflowLoading, customGuardRailFormData, setCustomGuardRailFormData } = useGuardrails();
 
-  // Form state
-  const [formData, setFormData] = useState<CustomGuardRailFormData>({
-    task: "",
-    definitions: [{ id: generateId(), term: "", definition: "" }],
-    interpretation: [...DEFAULT_INTERPRETATION],
-    evaluation: { ...DEFAULT_EVALUATION },
-    safe_content: {
-      category: "safe",
-      description: "",
-      items: [{ id: generateId(), name: "", description: "", example: "" }],
-      examples: [],
-    },
-    violations: [],
-    ambiguity: [...DEFAULT_AMBIGUITY],
-  });
+  // Form state - initialize from store if available (persists across step navigation)
+  const [formData, setFormData] = useState<CustomGuardRailFormData>(() =>
+    customGuardRailFormData ?? {
+      task: "",
+      definitions: [{ id: generateId(), term: "", definition: "" }],
+      interpretation: [...DEFAULT_INTERPRETATION],
+      evaluation: { ...DEFAULT_EVALUATION },
+      safe_content: {
+        category: "safe",
+        description: "",
+        items: [{ id: generateId(), name: "", description: "", example: "" }],
+        examples: [],
+      },
+      violations: [],
+      ambiguity: [...DEFAULT_AMBIGUITY],
+    }
+  );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleBack = () => {
+    setCustomGuardRailFormData(formData);
     openDrawerWithStep("select-probe-type");
   };
 
@@ -268,6 +269,7 @@ export default function AddCustomGuardRail() {
     };
 
     setCustomProbePolicy(outputJson);
+    setCustomGuardRailFormData(formData);
 
     const success = await updateCustomProbeWorkflow({
       step_number: 2,
@@ -575,19 +577,16 @@ export default function AddCustomGuardRail() {
               <Text_12_400_757575 className="mb-[0.5rem] block">
                 Brief description of what to classify and identify
               </Text_12_400_757575>
-              <TextArea
-                value={formData.task}
-                onChange={(e) => updateField("task", e.target.value)}
+              <TextAreaInput
+                name="task"
+                label="Task Description"
                 placeholder="e.g., Classify content for policy violations related to harmful speech"
-                rows={2}
-                className={`${inputClassName} ${hasError("task") ? "!border-[#ec7575]" : ""}`}
-                style={inputStyle}
+                info="Brief description of what to classify and identify"
+                rules={[{ required: true, message: "Task description is required" }]}
+                required={true}
+                onChange={(value) => updateField("task", value)}
+
               />
-              {hasError("task") && (
-                <Text_12_400_757575 className="text-[#ec7575] mt-[0.25rem]">
-                  {errors.task}
-                </Text_12_400_757575>
-              )}
             </div>
 
             {/* Definitions Section */}
@@ -621,21 +620,20 @@ export default function AddCustomGuardRail() {
                         />
                       )}
                     </div>
-                    <div className="space-y-[0.5rem]">
-                      <Input
-                        value={def.term}
-                        onChange={(e) => updateDefinition(def.id, "term", e.target.value)}
+                    <div className="">
+                      <TextInput
+                        name={`def_term_${def.id}`}
                         placeholder="Term"
-                        className={`${inputClassName} ${hasError(`definitions.${index}.term`) ? "!border-[#ec7575]" : ""}`}
-                        style={inputStyle}
+                        rules={[]}
+                        onChange={(value) => updateDefinition(def.id, "term", value)}
                       />
-                      <TextArea
+                      <Input.TextArea
                         value={def.definition}
                         onChange={(e) => updateDefinition(def.id, "definition", e.target.value)}
                         placeholder="Full definition - preserve verbatim from source policy"
                         rows={2}
-                        className={`${inputClassName} ${hasError(`definitions.${index}.definition`) ? "!border-[#ec7575]" : ""}`}
-                        style={inputStyle}
+                        className="bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE] p-[1rem]"
+                        style={{ backgroundColor: "transparent", color: "#EEEEEE" }}
                       />
                     </div>
                   </div>
@@ -668,15 +666,15 @@ export default function AddCustomGuardRail() {
                   }
                   key="interpretation"
                 >
-                  <div className="space-y-[0.5rem]">
-                    {formData.interpretation.map((item, index) => (
+                  <div className="">
+                    {formData.interpretation.map((_item, index) => (
                       <div key={index} className="flex items-center gap-[0.5rem]">
-                        <Input
-                          value={item}
-                          onChange={(e) => updateInterpretation(index, e.target.value)}
+                        <TextInput
+                          name={`interp_${index}`}
                           placeholder="Interpretation rule"
-                          className={inputClassName}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateInterpretation(index, value)}
+                          ClassNames="flex-1"
                         />
                         <MinusCircleOutlined
                           onClick={() => removeInterpretation(index)}
@@ -724,43 +722,36 @@ export default function AddCustomGuardRail() {
                   key="evaluation"
                 >
                   <div className="space-y-[0.75rem]">
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-[0.25rem] block">Depiction</Text_12_400_B3B3B3>
-                      <Input
-                        value={formData.evaluation.depiction}
-                        onChange={(e) =>
-                          updateField("evaluation", { ...formData.evaluation, depiction: e.target.value })
-                        }
-                        placeholder="Does the content CONTAIN policy violations?"
-                        className={inputClassName}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-[0.25rem] block">Request</Text_12_400_B3B3B3>
-                      <Input
-                        value={formData.evaluation.request}
-                        onChange={(e) =>
-                          updateField("evaluation", { ...formData.evaluation, request: e.target.value })
-                        }
-                        placeholder="Is the user ASKING to generate violating content?"
-                        className={inputClassName}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <Text_12_400_B3B3B3 className="mb-[0.25rem] block">Guidance</Text_12_400_B3B3B3>
-                      <TextArea
-                        value={formData.evaluation.guidance}
-                        onChange={(e) =>
-                          updateField("evaluation", { ...formData.evaluation, guidance: e.target.value })
-                        }
-                        placeholder="Return the HIGHEST severity that applies..."
-                        rows={2}
-                        className={inputClassName}
-                        style={inputStyle}
-                      />
-                    </div>
+                    <TextInput
+                      name="eval_depiction"
+                      label="Depiction"
+                      placeholder="Does the content CONTAIN policy violations?"
+                      rules={[]}
+                      onChange={(value) =>
+                        updateField("evaluation", { ...formData.evaluation, depiction: value })
+                      }
+                      infoText="Content depiction evaluation question"
+                    />
+                    <TextInput
+                      name="eval_request"
+                      label="Request"
+                      placeholder="Is the user ASKING to generate violating content?"
+                      rules={[]}
+                      onChange={(value) =>
+                        updateField("evaluation", { ...formData.evaluation, request: value })
+                      }
+                      infoText="Request evaluation question"
+                    />
+                    <TextAreaInput
+                      name="eval_guidance"
+                      label="Guidance"
+                      placeholder="Return the HIGHEST severity that applies..."
+                      info="Guidance for evaluation"
+                      rules={[]}
+                      onChange={(value) =>
+                        updateField("evaluation", { ...formData.evaluation, guidance: value })
+                      }
+                    />
                   </div>
                 </Panel>
               </Collapse>
@@ -775,19 +766,18 @@ export default function AddCustomGuardRail() {
 
               {/* Safe Content Description */}
               <div className="mb-[1rem]">
-                <Text_12_400_B3B3B3 className="mb-[0.25rem] block">Description *</Text_12_400_B3B3B3>
-                <TextArea
-                  value={formData.safe_content.description}
-                  onChange={(e) =>
+                <TextAreaInput
+                  name="sc_description"
+                  label="Description"
+                  placeholder="Summary of what constitutes safe/legitimate content"
+                  info="Description of what constitutes safe content"
+                  rules={[{ required: true, message: "Safe content description is required" }]}
+                  onChange={(value) =>
                     setFormData((prev) => ({
                       ...prev,
-                      safe_content: { ...prev.safe_content, description: e.target.value },
+                      safe_content: { ...prev.safe_content, description: value },
                     }))
                   }
-                  placeholder="Summary of what constitutes safe/legitimate content"
-                  rows={2}
-                  className={`${inputClassName} ${hasError("safe_content.description") ? "!border-[#ec7575]" : ""}`}
-                  style={inputStyle}
                 />
               </div>
 
@@ -816,27 +806,24 @@ export default function AddCustomGuardRail() {
                           />
                         )}
                       </div>
-                      <div className="space-y-[0.5rem]">
-                        <Input
-                          value={item.name}
-                          onChange={(e) => updateSafeContentItem(item.id, "name", e.target.value)}
+                      <div className="">
+                        <TextInput
+                          name={`sc_item_name_${item.id}`}
                           placeholder="Name"
-                          className={inputClassName}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateSafeContentItem(item.id, "name", value)}
                         />
-                        <Input
-                          value={item.description}
-                          onChange={(e) => updateSafeContentItem(item.id, "description", e.target.value)}
+                        <TextInput
+                          name={`sc_item_desc_${item.id}`}
                           placeholder="Description"
-                          className={inputClassName}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateSafeContentItem(item.id, "description", value)}
                         />
-                        <Input
-                          value={item.example}
-                          onChange={(e) => updateSafeContentItem(item.id, "example", e.target.value)}
+                        <TextInput
+                          name={`sc_item_example_${item.id}`}
                           placeholder="Example"
-                          className={inputClassName}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateSafeContentItem(item.id, "example", value)}
                         />
                       </div>
                     </div>
@@ -869,7 +856,7 @@ export default function AddCustomGuardRail() {
                 )}
                 <div className="space-y-[0.75rem]">
                   {formData.safe_content.examples.map((example, index) => (
-                    <div key={example.id} className="p-[0.75rem] bg-[#FFFFFF05] rounded-[6px] border border-[#1F1F1F]">
+                    <div key={example.id} className="p-[0.75rem] pb-[0] bg-[#FFFFFF05] rounded-[6px] border border-[#1F1F1F]">
                       <div className="flex justify-between items-start mb-[0.5rem]">
                         <Text_12_400_757575>Example {index + 1}</Text_12_400_757575>
                         <MinusCircleOutlined
@@ -877,28 +864,26 @@ export default function AddCustomGuardRail() {
                           className="text-[#B3B3B3] cursor-pointer hover:text-[#ec7575]"
                         />
                       </div>
-                      <div className="space-y-[0.5rem]">
-                        <TextArea
+                      <div className="">
+                        <Input.TextArea
                           value={example.input}
                           onChange={(e) => updateSafeContentExample(example.id, "input", e.target.value)}
                           placeholder="Input text"
                           rows={2}
-                          className={inputClassName}
-                          style={inputStyle}
+                          className="mb-[1.5rem] bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE] p-[1rem]"
+                          style={{ backgroundColor: "transparent", color: "#EEEEEE" }}
                         />
-                        <Input
-                          value={example.expectedOutput}
-                          onChange={(e) => updateSafeContentExample(example.id, "expectedOutput", e.target.value)}
+                        <TextInput
+                          name={`sc_ex_output_${example.id}`}
                           placeholder="Expected output"
-                          className={inputClassName}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateSafeContentExample(example.id, "expectedOutput", value)}
                         />
-                        <Input
-                          value={example.rationale}
-                          onChange={(e) => updateSafeContentExample(example.id, "rationale", e.target.value)}
+                        <TextInput
+                          name={`sc_ex_rationale_${example.id}`}
                           placeholder="Rationale"
-                          className={inputClassName}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateSafeContentExample(example.id, "rationale", value)}
                         />
                       </div>
                     </div>
@@ -949,45 +934,33 @@ export default function AddCustomGuardRail() {
                     <div className="space-y-[0.75rem]">
                       {/* Category Name */}
                       <div>
-                        <Text_12_400_B3B3B3 className="mb-[0.25rem] block">
-                          Category Name * (snake_case, e.g., hate_speech)
-                        </Text_12_400_B3B3B3>
-                        <Input
-                          value={violation.category}
-                          onChange={(e) => updateViolation(violation.id, "category", e.target.value)}
+                        <TextInput
+                          name={`v_category_${violation.id}`}
+                          label="Category Name"
                           placeholder="hate_speech"
-                          className={`${inputClassName} ${hasError(`violations.${vIndex}.category`) ? "!border-[#ec7575]" : ""}`}
-                          style={inputStyle}
+                          rules={[]}
+                          onChange={(value) => updateViolation(violation.id, "category", value)}
+                          infoText="snake_case, e.g., hate_speech"
                         />
                       </div>
 
                       {/* Severity and Escalate */}
-                      <div className="flex gap-[1rem]">
+                      <div className="flex gap-[1rem] pb-[1rem]">
                         <div className="flex-1">
-                          <Text_12_400_B3B3B3 className="mb-[0.25rem] block">Severity *</Text_12_400_B3B3B3>
-                          <ConfigProvider
-                            theme={{
-                              token: {
-                                colorTextPlaceholder: "#808080",
-                                colorBgElevated: "#101010",
-                                colorBorder: "#757575",
-                              },
+                          <CustomSelect
+                            name={`v_severity_${violation.id}`}
+                            label="Severity *"
+                            info="Severity level for this violation category"
+                            value={violation.severity}
+                            selectOptions={SEVERITY_OPTIONS}
+                            onChange={(value) => {
+                              updateViolation(violation.id, "severity", value);
+                              // Auto-set escalate for Critical severity
+                              if (value === "Critical" || value === "Maximum") {
+                                updateViolation(violation.id, "escalate", true);
+                              }
                             }}
-                          >
-                            <Select
-                              value={violation.severity}
-                              onChange={(value) => {
-                                updateViolation(violation.id, "severity", value);
-                                // Auto-set escalate for Critical severity
-                                if (value === "Critical" || value === "Maximum") {
-                                  updateViolation(violation.id, "escalate", true);
-                                }
-                              }}
-                              options={SEVERITY_OPTIONS}
-                              className="w-full"
-                              style={{ backgroundColor: "transparent" }}
-                            />
-                          </ConfigProvider>
+                          />
                         </div>
                         <div className="flex items-center gap-[0.5rem] pt-[1.5rem]">
                           <Switch
@@ -1001,14 +974,13 @@ export default function AddCustomGuardRail() {
 
                       {/* Description */}
                       <div>
-                        <Text_12_400_B3B3B3 className="mb-[0.25rem] block">Description *</Text_12_400_B3B3B3>
-                        <TextArea
-                          value={violation.description}
-                          onChange={(e) => updateViolation(violation.id, "description", e.target.value)}
+                        <TextAreaInput
+                          name={`v_description_${violation.id}`}
+                          label="Description"
                           placeholder="Description of this violation category"
-                          rows={2}
-                          className={`${inputClassName} ${hasError(`violations.${vIndex}.description`) ? "!border-[#ec7575]" : ""}`}
-                          style={inputStyle}
+                          info="Description of this violation category"
+                          rules={[]}
+                          onChange={(value) => updateViolation(violation.id, "description", value)}
                         />
                       </div>
 
@@ -1038,29 +1010,23 @@ export default function AddCustomGuardRail() {
                                 )}
                               </div>
                               <div className="space-y-[0.25rem]">
-                                <Input
-                                  value={item.name}
-                                  onChange={(e) => updateViolationItem(violation.id, item.id, "name", e.target.value)}
+                                <TextInput
+                                  name={`v_item_name_${violation.id}_${item.id}`}
                                   placeholder="Name"
-                                  size="small"
-                                  className={inputClassName}
-                                  style={inputStyle}
+                                  rules={[]}
+                                  onChange={(value) => updateViolationItem(violation.id, item.id, "name", value)}
                                 />
-                                <Input
-                                  value={item.description}
-                                  onChange={(e) => updateViolationItem(violation.id, item.id, "description", e.target.value)}
+                                <TextInput
+                                  name={`v_item_desc_${violation.id}_${item.id}`}
                                   placeholder="Description"
-                                  size="small"
-                                  className={inputClassName}
-                                  style={inputStyle}
+                                  rules={[]}
+                                  onChange={(value) => updateViolationItem(violation.id, item.id, "description", value)}
                                 />
-                                <Input
-                                  value={item.example}
-                                  onChange={(e) => updateViolationItem(violation.id, item.id, "example", e.target.value)}
+                                <TextInput
+                                  name={`v_item_example_${violation.id}_${item.id}`}
                                   placeholder="Example"
-                                  size="small"
-                                  className={inputClassName}
-                                  style={inputStyle}
+                                  rules={[]}
+                                  onChange={(value) => updateViolationItem(violation.id, item.id, "example", value)}
                                 />
                               </div>
                             </div>
@@ -1099,31 +1065,26 @@ export default function AddCustomGuardRail() {
                                   className="text-[#757575] cursor-pointer hover:text-[#ec7575] text-[12px]"
                                 />
                               </div>
-                              <div className="space-y-[0.25rem]">
-                                <TextArea
+                              <div className="">
+                                <Input.TextArea
                                   value={example.input}
                                   onChange={(e) => updateViolationExample(violation.id, example.id, "input", e.target.value)}
                                   placeholder="Input text"
                                   rows={2}
-                                  size="small"
-                                  className={inputClassName}
-                                  style={inputStyle}
+                                  className="mb-[1.5rem] bg-transparent text-[#EEEEEE] border-[#757575] hover:border-[#EEEEEE] focus:border-[#EEEEEE] p-[1rem]"
+                                  style={{ backgroundColor: "transparent", color: "#EEEEEE" }}
                                 />
-                                <Input
-                                  value={example.expectedOutput}
-                                  onChange={(e) => updateViolationExample(violation.id, example.id, "expectedOutput", e.target.value)}
+                                <TextInput
+                                  name={`v_ex_output_${violation.id}_${example.id}`}
                                   placeholder="Expected output"
-                                  size="small"
-                                  className={inputClassName}
-                                  style={inputStyle}
+                                  rules={[]}
+                                  onChange={(value) => updateViolationExample(violation.id, example.id, "expectedOutput", value)}
                                 />
-                                <Input
-                                  value={example.rationale}
-                                  onChange={(e) => updateViolationExample(violation.id, example.id, "rationale", e.target.value)}
+                                <TextInput
+                                  name={`v_ex_rationale_${violation.id}_${example.id}`}
                                   placeholder="Rationale"
-                                  size="small"
-                                  className={inputClassName}
-                                  style={inputStyle}
+                                  rules={[]}
+                                  onChange={(value) => updateViolationExample(violation.id, example.id, "rationale", value)}
                                 />
                               </div>
                             </div>
@@ -1175,19 +1136,17 @@ export default function AddCustomGuardRail() {
                     {formData.ambiguity.map((rule) => (
                       <div key={rule.id} className="flex items-start gap-[0.5rem]">
                         <div className="flex-1 space-y-[0.25rem]">
-                          <Input
-                            value={rule.condition}
-                            onChange={(e) => updateAmbiguity(rule.id, "condition", e.target.value)}
+                          <TextInput
+                            name={`amb_condition_${rule.id}`}
                             placeholder="Condition (e.g., unclear)"
-                            className={inputClassName}
-                            style={inputStyle}
+                            rules={[]}
+                            onChange={(value) => updateAmbiguity(rule.id, "condition", value)}
                           />
-                          <Input
-                            value={rule.action}
-                            onChange={(e) => updateAmbiguity(rule.id, "action", e.target.value)}
+                          <TextInput
+                            name={`amb_action_${rule.id}`}
                             placeholder="Action (e.g., downgrade severity by 1 level)"
-                            className={inputClassName}
-                            style={inputStyle}
+                            rules={[]}
+                            onChange={(value) => updateAmbiguity(rule.id, "action", value)}
                           />
                         </div>
                         <MinusCircleOutlined
