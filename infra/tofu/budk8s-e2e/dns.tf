@@ -61,9 +61,7 @@ locals {
     ]),
   ))
 
-  ingress_ipv4 = merge(module.azure.ip.ingress.v4, {
-    "primary" = [ "164.52.194.215" ]
-  })
+  primary_ipv4 = "164.52.194.215"
 
   ingress_domain = "ingress.k8s.${var.zone.domain}"
 }
@@ -73,17 +71,16 @@ resource "cloudflare_dns_record" "primary_ipv4" {
   name    = "primary.k8s.${var.zone.domain}"
   ttl     = 3600
   type    = "A"
-  content = module.azure.ip.primary.v4
+  content = local.primary_ipv4
   proxied = false
 }
 
 resource "cloudflare_dns_record" "ingress_ipv4" {
-  for_each = local.ingress_ipv4
   zone_id  = var.zone.id
   name     = local.ingress_domain
   ttl      = 3600
   type     = "A"
-  content  = each.value
+  content  = local.primary_ipv4
   proxied  = false
 }
 

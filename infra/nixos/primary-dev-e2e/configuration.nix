@@ -1,8 +1,8 @@
+{ lib, ... }:
 {
   imports = [
     ../primary/configuration.nix
     ../dev/configuration.nix
-    ../disk/configuration.nix
     ./disko.nix
 
     ./modules/scid
@@ -10,4 +10,9 @@
   ];
 
   facter.reportPath = ./facter.json;
+
+  boot.loader = {
+    systemd-boot.enable = lib.mkForce false;
+    grub.enable = true;
+  };
 }
