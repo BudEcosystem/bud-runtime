@@ -162,15 +162,27 @@ class ModelStore:
 
         # Cache of buckets verified to exist (avoids repeated HEAD requests)
         self._verified_buckets: set[str] = set()
+        self._bucket_lock = threading.Lock()
 
     def _ensure_bucket_exists(self, bucket_name: str) -> None:
-        """Check if a bucket exists and create it if not, caching the result."""
+        """Check if a bucket exists and create it if not, caching the result.
+
+        Thread-safe via double-checked locking so concurrent uploads
+        don't race to create the same bucket.
+        """
         if bucket_name in self._verified_buckets:
             return
-        if not self.client.bucket_exists(bucket_name):
-            self.client.make_bucket(bucket_name)
-            logger.info("Created MinIO bucket: %s", bucket_name)
-        self._verified_buckets.add(bucket_name)
+        with self._bucket_lock:
+            if bucket_name in self._verified_buckets:
+                return
+            if not self.client.bucket_exists(bucket_name):
+                self.client.make_bucket(bucket_name)
+                logger.info("Created MinIO bucket: %s", bucket_name)
+            self._verified_buckets.add(bucket_name)
+
+    def _invalidate_bucket_cache(self, bucket_name: str) -> None:
+        """Remove a bucket from the verified cache so the next operation rechecks."""
+        self._verified_buckets.discard(bucket_name)
 
     def _wait_for_io_clearance(self, disk_path: str) -> None:
         """Wait for I/O stress to clear before proceeding.
@@ -238,7 +250,16 @@ class ModelStore:
 
             except S3Error as err:
                 # Check if it's a transient error worth retrying
-                is_transient = err.code in ["IncompleteBody", "RequestTimeout", "SlowDown", "ServiceUnavailable"]
+                is_transient = err.code in [
+                    "IncompleteBody",
+                    "RequestTimeout",
+                    "SlowDown",
+                    "ServiceUnavailable",
+                    "NoSuchBucket",
+                ]
+
+                if err.code == "NoSuchBucket":
+                    self._invalidate_bucket_cache(bucket_name)
 
                 if attempt < self.upload_retry_attempts - 1 and is_transient:
                     backoff = self.upload_retry_backoff**attempt
@@ -289,7 +310,16 @@ class ModelStore:
                 return True
 
             except S3Error as err:
-                is_transient = err.code in ["IncompleteBody", "RequestTimeout", "SlowDown", "ServiceUnavailable"]
+                is_transient = err.code in [
+                    "IncompleteBody",
+                    "RequestTimeout",
+                    "SlowDown",
+                    "ServiceUnavailable",
+                    "NoSuchBucket",
+                ]
+
+                if err.code == "NoSuchBucket":
+                    self._invalidate_bucket_cache(bucket_name)
 
                 if attempt < self.upload_retry_attempts - 1 and is_transient:
                     backoff = self.upload_retry_backoff**attempt
