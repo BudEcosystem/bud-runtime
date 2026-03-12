@@ -171,7 +171,7 @@ mkShell {
     export_sops_secret_silent s3 secret_key AWS_SECRET_ACCESS_KEY
 
     # budk8s access
-    budk8s_tailscale_host="budk8s-primary"
+    budk8s_tailscale_host="primary-dev-e2e"
     budk8s_wireguard_ip="10.54.132.1"
     if sops -d ${./budk8s.kubeconfig.enc.yaml} > "$bud_temp_path/kube.config" 2> /dev/null; then
         export KUBECONFIG="$bud_temp_path/kube.config"
