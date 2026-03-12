@@ -8,9 +8,23 @@ on:
       - "services/budgateway/**"
   workflow_dispatch:
 
+env:
+  IMAGE: budstudio/budgateway
+
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+            suffix: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            suffix: arm64
+
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -25,14 +39,29 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up QEMU for multi-platform builds
-        uses: docker/setup-qemu-action@v3
-
-      - name: Build and push Docker image
+      - name: Build and push platform image
         uses: docker/build-push-action@v5
         with:
           context: ./services/budgateway
           push: true
           file: ./services/budgateway/gateway/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          tags: budstudio/budgateway:nightly
+          platforms: ${{ matrix.platform }}
+          tags: ${{ env.IMAGE }}:nightly-${{ matrix.suffix }}
+
+  manifest:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker manifest create ${{ env.IMAGE }}:nightly \
+            ${{ env.IMAGE }}:nightly-amd64 \
+            ${{ env.IMAGE }}:nightly-arm64
+          docker manifest push ${{ env.IMAGE }}:nightly
