@@ -126,16 +126,8 @@ spec:
               readOnly: true
           {{- end }}
           resources:
-            {{- with .Values.microservices.mcpgateway.resources }}
-            {{- toYaml . | nindent 12 }}
-            {{- else }}
-            limits:
-              cpu: 2000m
-              memory: 4096Mi
-            requests:
-              cpu: 1000m
-              memory: 2048Mi
-            {{- end }}
+            {{- $defaultResources := dict "limits" (dict "cpu" "2000m" "memory" "4096Mi") "requests" (dict "cpu" "1000m" "memory" "2048Mi") }}
+            {{- toYaml (default $defaultResources .Values.microservices.mcpgateway.resources) | nindent 12 }}
       {{- if .Values.microservices.mcpgateway.sso.enabled }}
       volumes:
         - name: keycloak-init-script

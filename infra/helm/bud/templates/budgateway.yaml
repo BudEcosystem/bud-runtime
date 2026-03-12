@@ -113,16 +113,8 @@ spec:
             - name: rsa-keys
               mountPath: /app/keys
           resources:
-            {{- with .Values.microservices.budgateway.resources }}
-            {{- toYaml . | nindent 12 }}
-            {{- else }}
-            limits:
-              cpu: 4000m
-              memory: 8192Mi
-            requests:
-              cpu: 4000m
-              memory: 8192Mi
-            {{- end }}
+            {{- $defaultResources := dict "limits" (dict "cpu" "4000m" "memory" "8192Mi") "requests" (dict "cpu" "4000m" "memory" "8192Mi") }}
+            {{- toYaml (default $defaultResources .Values.microservices.budgateway.resources) | nindent 12 }}
       volumes:
         - name: {{ .Release.Name }}-budgateway-config
           configMap:

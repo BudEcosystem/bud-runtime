@@ -654,7 +654,7 @@ clickhouse:
   resources:
     requests:
       memory: 4Gi
-      cpu: 500m
+      cpu: 1000m
     limits:
       memory: 8Gi
       cpu: 4000m
@@ -1032,7 +1032,7 @@ onyx:
     replicaCount: 1
     resources:
       requests:
-        cpu: 250m
+        cpu: 1000m
         memory: 1Gi
       limits:
         cpu: 2000m
