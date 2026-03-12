@@ -70,7 +70,7 @@ export default function GuardrailSimulationStatus() {
               configuration for your guardrail models.
             </>
           }
-          extraInfo="This may take some time..."
+          // extraInfo="This may take some time..."
         />
       </BudWraperBox>
     </BudForm>
