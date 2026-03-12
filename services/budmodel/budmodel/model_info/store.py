@@ -160,6 +160,18 @@ class ModelStore:
         self.upload_retry_attempts = getattr(app_settings, "upload_retry_attempts", 3)
         self.upload_retry_backoff = getattr(app_settings, "upload_retry_backoff_factor", 2.0)
 
+        # Cache of buckets verified to exist (avoids repeated HEAD requests)
+        self._verified_buckets: set[str] = set()
+
+    def _ensure_bucket_exists(self, bucket_name: str) -> None:
+        """Check if a bucket exists and create it if not, caching the result."""
+        if bucket_name in self._verified_buckets:
+            return
+        if not self.client.bucket_exists(bucket_name):
+            self.client.make_bucket(bucket_name)
+            logger.info("Created MinIO bucket: %s", bucket_name)
+        self._verified_buckets.add(bucket_name)
+
     def _wait_for_io_clearance(self, disk_path: str) -> None:
         """Wait for I/O stress to clear before proceeding.
 
@@ -188,6 +200,8 @@ class ModelStore:
         Returns:
             bool: True if the upload was successful, False otherwise
         """
+        self._ensure_bucket_exists(bucket_name)
+
         # Check if file already exists (idempotency)
         if self.check_object_exists(object_name, bucket_name):
             logger.info(f"{object_name} already exists in MinIO, skipping upload")
@@ -321,8 +335,8 @@ class ModelStore:
             self.client.stat_object(bucket_name, object_name)
             return True
         except S3Error as err:
-            # NoSuchKey is expected for new uploads, log as debug
-            if err.code == "NoSuchKey":
+            # NoSuchKey/NoSuchBucket is expected for new uploads, log as debug
+            if err.code in ("NoSuchKey", "NoSuchBucket"):
                 logger.debug(
                     "Object %s does not exist in bucket %s (expected for new uploads)", object_name, bucket_name
                 )
@@ -466,9 +480,7 @@ class ModelStore:
         Returns:
             bool: True if the upload was successful, False otherwise
         """
-        found = self.client.bucket_exists(app_settings.minio_bucket)
-        if not found:
-            self.client.make_bucket(app_settings.minio_bucket)
+        self._ensure_bucket_exists(app_settings.minio_bucket)
 
         local_folder_path = os.path.join(self.model_download_dir, prefix)
 
@@ -588,14 +600,20 @@ class ModelStore:
         Returns:
             bool: True if the removal was successful, False otherwise
         """
-        delete_object_list = [
-            DeleteObject(x.object_name)
-            for x in self.client.list_objects(
-                bucket_name,
-                prefix,
-                recursive=recursive,
-            )
-        ]
+        try:
+            delete_object_list = [
+                DeleteObject(x.object_name)
+                for x in self.client.list_objects(
+                    bucket_name,
+                    prefix,
+                    recursive=recursive,
+                )
+            ]
+        except S3Error as err:
+            if err.code == "NoSuchBucket":
+                logger.debug("Bucket %s does not exist, nothing to remove", bucket_name)
+                return True
+            raise
 
         # Remove the objects
         try:
