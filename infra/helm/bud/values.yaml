@@ -143,6 +143,9 @@ ingress:
   # NOTE: used to derive public urls for client side services: (external|internal|disabled)
   https: disabled
   # NOTE: hosts moved to global.ingress.hosts for subchart access
+usecases:
+  # Set domain to enable wildcard ingress for usecases (e.g., "usecases.bud.example.com")
+  domain: ""
 microservices:
   # frontend services
   budadmin:
@@ -651,7 +654,7 @@ clickhouse:
   resources:
     requests:
       memory: 4Gi
-      cpu: 1000m
+      cpu: 500m
     limits:
       memory: 8Gi
       cpu: 4000m
@@ -1029,7 +1032,7 @@ onyx:
     replicaCount: 1
     resources:
       requests:
-        cpu: 1000m
+        cpu: 250m
         memory: 1Gi
       limits:
         cpu: 2000m

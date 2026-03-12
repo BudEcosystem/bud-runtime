@@ -47,12 +47,16 @@ spec:
               value: {{ tpl $value $root | quote }}
           {{- end }}
           resources:
+            {{- with .Values.microservices.budsentinel.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- else }}
             limits:
               cpu: 8
               memory: 8192Mi
             requests:
               cpu: 4
               memory: 4096Mi
+            {{- end }}
 ---
 apiVersion: v1
 kind: Service
