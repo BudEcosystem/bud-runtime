@@ -1662,8 +1662,10 @@ class ClusterOpsService:
 
             # Mark all as active in state
             batch_tasks = []
+            syncing_cluster_ids = []
             for cluster in clusters_to_sync:
                 cluster_id_str = str(cluster.id)
+                syncing_cluster_ids.append(cluster_id_str)
                 sync_state["active_syncs"][cluster_id_str] = {
                     "started_at": current_time.isoformat(),
                     "workflow_id": None,
@@ -1679,28 +1681,34 @@ class ClusterOpsService:
                 except Exception as e:
                     logger.debug(f"Could not save sync state to state store (locking): {e}")
 
-            # Execute all cluster syncs concurrently (limited by semaphore)
-            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            try:
+                # Execute all cluster syncs concurrently (limited by semaphore)
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
-            # Process results
-            for cluster, result in zip(clusters_to_sync, batch_results, strict=True):
-                cluster_id_str = str(cluster.id)
+                # Process results
+                for cluster, result in zip(clusters_to_sync, batch_results, strict=True):
+                    cluster_id_str = str(cluster.id)
 
-                # Remove from active syncs
-                sync_state["active_syncs"].pop(cluster_id_str, None)
+                    # Remove from active syncs
+                    sync_state["active_syncs"].pop(cluster_id_str, None)
 
-                if isinstance(result, Exception):
-                    logger.error(f"Failed to sync cluster {cluster_id_str}: {result}")
-                    failed_count += 1
-                    sync_state["failed_clusters"][cluster_id_str] = {
-                        "error": str(result),
-                        "failed_at": current_time.isoformat(),
-                    }
-                else:
-                    update_count += 1
-                    sync_state["last_sync_times"][cluster_id_str] = current_time.isoformat()
-                    # Clear from failed if it was there
-                    sync_state["failed_clusters"].pop(cluster_id_str, None)
+                    if isinstance(result, Exception):
+                        logger.error(f"Failed to sync cluster {cluster_id_str}: {result}")
+                        failed_count += 1
+                        sync_state["failed_clusters"][cluster_id_str] = {
+                            "error": str(result),
+                            "failed_at": current_time.isoformat(),
+                        }
+                    else:
+                        update_count += 1
+                        sync_state["last_sync_times"][cluster_id_str] = current_time.isoformat()
+                        # Clear from failed if it was there
+                        sync_state["failed_clusters"].pop(cluster_id_str, None)
+            finally:
+                # On cancellation or unexpected error, clear active_syncs to prevent
+                # clusters being stuck as "in progress" until stale cleanup runs
+                for cid in syncing_cluster_ids:
+                    sync_state["active_syncs"].pop(cid, None)
 
             # Final state save (if state store is available)
             if use_state_store:
@@ -1720,10 +1728,10 @@ class ClusterOpsService:
             return SuccessResponse(
                 message=message,
                 param={
-                    "total": len(active_clusters),
+                    "total": len(all_clusters),
                     "updated": update_count,
                     "failed": failed_count,
-                    "skipped": len(active_clusters) - len(clusters_to_sync),
+                    "skipped": len(all_clusters) - len(clusters_to_sync),
                     "max_concurrent": MAX_CONCURRENT_SYNCS,
                 },
             )

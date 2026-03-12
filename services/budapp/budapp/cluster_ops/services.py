@@ -1741,7 +1741,7 @@ class ClusterService(SessionMixin):
                     if metrics_resp.status != 200:
                         try:
                             error_data = await metrics_resp.json()
-                        except Exception:
+                        except (json.JSONDecodeError, aiohttp.ContentTypeError):
                             error_data = {"raw": await metrics_resp.text()}
                         logger.error(
                             f"Failed to get node metrics from budmetrics: status={metrics_resp.status}, error={error_data}"
