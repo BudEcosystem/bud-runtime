@@ -1739,10 +1739,22 @@ class ClusterService(SessionMixin):
                 async with metrics_task as metrics_resp, events_task as events_resp:
                     # Handle metrics response
                     if metrics_resp.status != 200:
-                        error_data = await metrics_resp.json()
-                        logger.error(f"Failed to get node metrics from budmetrics: {error_data}")
+                        try:
+                            error_data = await metrics_resp.json()
+                        except Exception:
+                            error_data = {"raw": await metrics_resp.text()}
+                        logger.error(f"Failed to get node metrics from budmetrics: status={metrics_resp.status}, error={error_data}")
+                        # Extract error message from various response formats:
+                        # FastAPI: {"detail": "..."}, Dapr: {"message": "..."}, other: str(error_data)
+                        error_msg = (
+                            error_data.get("detail")
+                            or error_data.get("message")
+                            or error_data.get("raw")
+                            or str(error_data)
+                        )
                         raise ClientException(
-                            f"Failed to get node metrics: {error_data.get('detail', 'Unknown error')}"
+                            f"Failed to get node metrics: {error_msg}",
+                            status_code=metrics_resp.status,
                         )
 
                     metrics_response = await metrics_resp.json()

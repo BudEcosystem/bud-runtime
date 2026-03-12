@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from budmicroframe.commons.logging import get_logger
 from budmicroframe.shared.psql_service import Database
 from sqlalchemy import MetaData
@@ -21,6 +23,25 @@ engine = get_engine()
 
 # Create session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@contextmanager
+def IndependentSession():
+    """Create an independent DB session not tied to thread-local scope.
+
+    Use instead of DBSession() when running concurrent async tasks via
+    asyncio.gather, since DBSession's scoped_session is thread-local and
+    breaks when multiple tasks share the same event loop thread.
+    """
+    session = SessionLocal()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
 
 # Constraint naming convention to fix alembic autogenerate command issues
 # NOTE: https://docs.sqlalchemy.org/en/20/core/constraints.html#constraint-naming-conventions
