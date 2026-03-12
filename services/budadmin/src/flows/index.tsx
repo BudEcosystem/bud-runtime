@@ -172,6 +172,7 @@ import SelectTemplate from "./UseCases/SelectTemplate";
 import DeploymentName from "./UseCases/DeploymentName";
 import UseCaseSelectCluster from "./UseCases/SelectCluster";
 import ConfigureDeployment from "./UseCases/ConfigureDeployment";
+import ModelPickerPanel from "@/components/usecases/ModelPickerPanel";
 import DeployUseCaseSuccess from "./UseCases/DeployUseCaseSuccess";
 
 
@@ -377,6 +378,7 @@ export const StepComponents = {
   "deploy-usecase-select-template": SelectTemplate,
   "deploy-usecase-name": DeploymentName,
   "deploy-usecase-select-cluster": UseCaseSelectCluster,
+  "usecase-model-picker": ModelPickerPanel,
   "deploy-usecase-configure": ConfigureDeployment,
   "deploy-usecase-progress": DeploymentProgress,
   "deploy-usecase-success": DeployUseCaseSuccess,

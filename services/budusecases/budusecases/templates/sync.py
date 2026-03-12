@@ -179,6 +179,7 @@ class TemplateSyncService:
                 default_component=comp_schema.default_component,
                 compatible_components=comp_schema.compatible_components,
                 chart=comp_schema.chart.model_dump() if comp_schema.chart else None,
+                model_capability=comp_schema.model_capability,
                 sort_order=idx,
             )
 
@@ -228,6 +229,7 @@ class TemplateSyncService:
                 default_component=comp_schema.default_component,
                 compatible_components=comp_schema.compatible_components,
                 chart=comp_schema.chart.model_dump() if comp_schema.chart else None,
+                model_capability=comp_schema.model_capability,
                 sort_order=idx,
             )
 

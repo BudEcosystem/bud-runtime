@@ -44,6 +44,7 @@ const COMPONENT_TYPE_COLORS: Record<ComponentType, string> = {
   vector_db: "#10B981",
   memory_store: "#F59E0B",
   helm: "#06B6D4",
+  deploy_model: "#A855F7",
 };
 
 /** Human-readable labels for component types */
@@ -55,6 +56,7 @@ const COMPONENT_TYPE_LABELS: Record<ComponentType, string> = {
   vector_db: "Vector DB",
   memory_store: "Memory Store",
   helm: "Helm Chart",
+  deploy_model: "Deploy Model",
 };
 
 // ---------------------------------------------------------------------------

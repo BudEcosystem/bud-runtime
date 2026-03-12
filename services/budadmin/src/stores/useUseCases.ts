@@ -43,6 +43,7 @@ interface UseCasesState {
 
   // Component selections for deployment
   selectedComponents: Record<string, string>; // slot name -> component name
+  credentialSelections: Record<string, string>;
 
   // Deployment wizard
   wizardStep: DeploymentWizardStep;
@@ -80,6 +81,8 @@ interface UseCasesActions {
   // Component actions
   selectComponent: (slot: string, componentName: string) => void;
   clearComponentSelections: () => void;
+  setCredentialSelection: (slot: string, credentialId: string) => void;
+  clearCredentialSelections: () => void;
 
   // Wizard actions
   setWizardStep: (step: DeploymentWizardStep) => void;
@@ -126,6 +129,7 @@ const initialState: UseCasesState = {
 
   // Component selections
   selectedComponents: {},
+  credentialSelections: {},
 
   // Wizard
   wizardStep: "select-template",
@@ -269,6 +273,19 @@ export const useUseCases = create<UseCasesStore>((set, get) => ({
     set({ selectedComponents: {} });
   },
 
+  setCredentialSelection: (slot, credentialId) => {
+    set((state) => ({
+      credentialSelections: {
+        ...state.credentialSelections,
+        [slot]: credentialId,
+      },
+    }));
+  },
+
+  clearCredentialSelections: () => {
+    set({ credentialSelections: {} });
+  },
+
   // -------------------------------------------------------------------------
   // Wizard Actions
   // -------------------------------------------------------------------------
@@ -300,6 +317,7 @@ export const useUseCases = create<UseCasesStore>((set, get) => ({
       wizardStep: "select-template",
       selectedTemplate: null,
       selectedComponents: {},
+      credentialSelections: {},
       deploymentName: "",
       deploymentParameters: {},
       selectedClusterId: null,
@@ -350,7 +368,7 @@ export const useUseCases = create<UseCasesStore>((set, get) => ({
   },
 
   createDeployment: async () => {
-    const { selectedTemplate, selectedComponents, deploymentName, deploymentParameters, selectedClusterId } = get();
+    const { selectedTemplate, selectedComponents, deploymentName, deploymentParameters, selectedClusterId, credentialSelections } = get();
 
     if (!selectedTemplate || !selectedClusterId || !deploymentName) {
       errorToast("Missing required fields for deployment");
@@ -368,6 +386,7 @@ export const useUseCases = create<UseCasesStore>((set, get) => ({
         components: selectedComponents,
         parameters: deploymentParameters,
         ...(projectId ? { project_id: projectId } : {}),
+        ...(Object.keys(credentialSelections).length > 0 ? { credential_selections: credentialSelections } : {}),
       };
 
       const deployment = await BudUseCasesAPI.deployments.create(request);

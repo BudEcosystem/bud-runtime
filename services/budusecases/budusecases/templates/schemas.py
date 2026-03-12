@@ -115,6 +115,9 @@ class TemplateComponentSchema(BaseModel):
     default_component: str | None = Field(None, description="Default component name from registry")
     compatible_components: list[str] = Field(default_factory=list, description="List of compatible component names")
     chart: HelmChartConfig | None = Field(None, description="Helm chart configuration (required for helm type)")
+    model_capability: str | None = Field(
+        None, description="Model capability filter (e.g. chat, embedding) for deploy_model components"
+    )
 
     @model_validator(mode="after")
     def validate_chart_for_helm_type(self) -> "TemplateComponentSchema":
@@ -124,17 +127,27 @@ class TemplateComponentSchema(BaseModel):
             raise ValueError("'chart' configuration is only allowed for helm type components")
         return self
 
+    @model_validator(mode="after")
+    def validate_model_capability(self) -> "TemplateComponentSchema":
+        if self.model_capability is not None and self.type != "deploy_model":
+            raise ValueError("'model_capability' is only allowed for deploy_model type components")
+        return self
+
 
 class TemplateParameterSchema(BaseModel):
     """Schema for a template parameter definition."""
 
     model_config = ConfigDict(extra="forbid")
 
-    type: str = Field(..., description="Parameter type (integer, float, string, boolean)")
+    type: str = Field(..., description="Parameter type (integer, float, string, boolean, select)")
     default: Any = Field(..., description="Default value for the parameter")
     min: float | None = Field(None, description="Minimum value for numeric types")
     max: float | None = Field(None, description="Maximum value for numeric types")
     description: str = Field(..., description="Parameter description")
+    options: list[dict[str, str]] | None = Field(
+        None,
+        description="Options for select type: [{label: 'Display', value: 'val'}]",
+    )
 
 
 class TemplateResourcesSchema(BaseModel):
@@ -275,4 +288,5 @@ class TemplateComponentResponseSchema(BaseModel):
     default_component: str | None
     compatible_components: list[str]
     chart: dict[str, Any] | None = None
+    model_capability: str | None = None
     sort_order: int

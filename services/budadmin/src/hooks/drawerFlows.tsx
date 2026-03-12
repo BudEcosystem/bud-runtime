@@ -5802,6 +5802,28 @@ const deployUseCase: DrawerFlowType = {
   ],
 };
 
+// Single-step flow for the expanded model picker drawer (used by ConfigureDeployment)
+const usecaseModelPicker: DrawerFlowType = {
+  title: "Select Model",
+  description: "Pick a model for a use case component",
+  totalSteps: 1,
+  steps: [
+    {
+      navigation: () => ["Use Cases", "Select Model"],
+      id: "usecase-model-picker",
+      confirmClose: false,
+      step: 1,
+      component: StepComponents["usecase-model-picker"],
+      progress: [
+        {
+          status: FormProgressStatus.inProgress,
+          title: "Select Model",
+        },
+      ],
+    },
+  ],
+};
+
 const flows = {
   "new-project": newProject,
   "deploy-model": deployModel,
@@ -5886,6 +5908,7 @@ const flows = {
   "view-usecase-template": viewUseCaseTemplate,
   "deployment-progress": deploymentProgress,
   "deploy-usecase": deployUseCase,
+  "usecase-model-picker": usecaseModelPicker,
 };
 
 export const flowMapping: {

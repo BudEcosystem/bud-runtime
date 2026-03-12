@@ -23,7 +23,7 @@ const UseCasesRequest = {
 // Types
 // ============================================================================
 
-export type ComponentType = "model" | "llm" | "embedder" | "reranker" | "vector_db" | "memory_store" | "helm";
+export type ComponentType = "model" | "llm" | "embedder" | "reranker" | "vector_db" | "memory_store" | "helm" | "deploy_model";
 
 export interface HelmChartConfig {
   ref: string;
@@ -41,6 +41,7 @@ export interface TemplateComponent {
   default_component: string | null;
   compatible_components: string[];
   chart?: HelmChartConfig;
+  model_capability?: string;
   sort_order: number;
 }
 
@@ -91,11 +92,12 @@ export interface Template {
 }
 
 export interface TemplateParameter {
-  type: "integer" | "float" | "string" | "boolean";
+  type: "integer" | "float" | "string" | "boolean" | "select";
   default: any;
   min?: number;
   max?: number;
   description: string;
+  options?: { label: string; value: string }[];
 }
 
 export interface TemplateResources {
@@ -166,6 +168,7 @@ export interface CreateDeploymentRequest {
   components?: Record<string, string>;
   parameters?: Record<string, any>;
   metadata?: Record<string, any>;
+  credential_selections?: Record<string, string>;
 }
 
 export interface TemplateComponentInput {

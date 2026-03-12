@@ -22,6 +22,7 @@ const COMPONENT_TYPE_OPTIONS: Array<{ label: string; value: ComponentType }> = [
   { label: "Reranker", value: "reranker" },
   { label: "Vector DB", value: "vector_db" },
   { label: "Memory Store", value: "memory_store" },
+  { label: "Deploy Model", value: "deploy_model" },
   { label: "Helm Chart", value: "helm" },
 ];
 

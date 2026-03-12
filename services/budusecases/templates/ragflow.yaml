@@ -1,6 +1,6 @@
 name: ragflow
 display_name: RAGFlow
-version: "1.7.0"
+version: "1.10.0"
 description: |
   RAGFlow is an open-source RAG engine that provides deep document understanding
   and truthful question answering. It includes built-in document parsing,
@@ -40,6 +40,20 @@ access:
             messages: { type: array }
 
 components:
+  - name: llm
+    display_name: LLM Model
+    description: Large Language Model for RAGFlow chat completions
+    type: deploy_model
+    required: true
+    model_capability: chat
+
+  - name: embedder
+    display_name: Embedding Model
+    description: Embedding model for RAGFlow document vectorization
+    type: deploy_model
+    required: true
+    model_capability: embedding
+
   - name: ragflow
     display_name: RAGFlow
     description: Complete RAGFlow deployment with all dependencies (MySQL, MinIO, Redis, Infinity)
@@ -61,8 +75,52 @@ components:
             DOC_BULK_SIZE: "{{ params.doc_bulk_size }}"
             EMBEDDING_BATCH_SIZE: "{{ params.embedding_batch_size }}"
             MAX_CONTENT_LENGTH: "{{ params.max_content_length }}"
+          service_conf:
+            user_default_llm:
+              default_models:
+                chat_model:
+                  name: "{{ steps.deploy_llm.outputs.endpoint_name }}"
+                  factory: "OpenAI-API-Compatible"
+                  api_key: "not-needed"
+                  base_url: "{{ steps.deploy_llm.outputs.endpoint_url }}"
+                embedding_model:
+                  name: "{{ steps.deploy_embedder.outputs.endpoint_name }}"
+                  factory: "OpenAI-API-Compatible"
+                  api_key: "not-needed"
+                  base_url: "{{ steps.deploy_embedder.outputs.endpoint_url }}"
 
 parameters:
+
+  hardware_mode:
+    type: select
+    default: shared
+    description: GPU allocation mode for model deployments
+    options:
+      - label: Shared GPU (Time-slicing)
+        value: shared
+      - label: Dedicated GPU
+        value: dedicated
+
+  concurrent_requests:
+    type: integer
+    default: 1
+    min: 1
+    max: 1000
+    description: Number of concurrent requests each model endpoint should handle
+
+  avg_context_length:
+    type: integer
+    default: 4096
+    min: 1
+    max: 200000
+    description: Average input context length in tokens
+
+  avg_sequence_length:
+    type: integer
+    default: 512
+    min: 1
+    max: 10000
+    description: Average output sequence length in tokens
 
   doc_engine:
     type: string
@@ -106,4 +164,6 @@ resources:
     gpu: 0
 
 deployment_order:
+  - llm
+  - embedder
   - ragflow

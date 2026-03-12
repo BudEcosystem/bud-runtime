@@ -77,6 +77,7 @@ def build_deployment_dag(
     parameters: dict[str, Any] | None = None,
     access_config: dict[str, Any] | None = None,
     project_id: str | None = None,
+    credential_selections: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build a BudPipeline DAG dict from a use case deployment definition.
 
@@ -100,12 +101,15 @@ def build_deployment_dag(
             component identifier (e.g. model name or chart ref override).
         parameters: Optional user-supplied deployment parameters used to
             resolve ``{{ params.XXX }}`` placeholders in Helm values.
+        credential_selections: Optional mapping of component slot name to
+            credential ID for cloud/deploy_model components.
 
     Returns:
         A dict conforming to the BudPipeline DAG schema, ready to be submitted
         via the pipeline API.
     """
     params = parameters or {}
+    cred_selections = credential_selections or {}
 
     # ------------------------------------------------------------------
     # 1. Build component lookup
@@ -189,16 +193,20 @@ def build_deployment_dag(
                 "depends_on": [previous_step_id],
             }
         else:
-            # Model types (model, llm, embedder, reranker)
+            # Model types (model, llm, embedder, reranker, deploy_model)
             model_step_params: dict[str, Any] = {
                 "cluster_id": cluster_id,
                 "model_id": selected_component,
                 "endpoint_name": f"{deployment_name}-{comp_name}",
+                "concurrent_requests": params.get("concurrent_requests", 1),
+                "avg_sequence_length": params.get("avg_sequence_length", 512),
+                "avg_context_length": params.get("avg_context_length", 4096),
+                "hardware_mode": params.get("hardware_mode", "shared"),
             }
             if project_id:
                 model_step_params["project_id"] = project_id
-            if params:
-                model_step_params["parameters"] = params
+            if comp_name in cred_selections:
+                model_step_params["credential_id"] = cred_selections[comp_name]
 
             step = {
                 "id": step_id,

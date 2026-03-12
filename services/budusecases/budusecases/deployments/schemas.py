@@ -34,6 +34,10 @@ class DeploymentCreateSchema(BaseModel):
         default_factory=dict, description="Component selections (slot -> component name)"
     )
     parameters: dict[str, Any] = Field(default_factory=dict, description="Deployment parameters")
+    credential_selections: dict[str, str] = Field(
+        default_factory=dict,
+        description="Credential selections for cloud model components (slot -> credential_id)",
+    )
     metadata_: dict[str, Any] = Field(default_factory=dict, alias="metadata", description="Additional metadata")
 
 

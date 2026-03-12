@@ -29,6 +29,7 @@ const componentTypeColors: Record<ComponentType, string> = {
   vector_db: "#10B981",
   memory_store: "#3B82F6",
   helm: "#06B6D4",
+  deploy_model: "#A855F7",
 };
 
 // Category display labels

@@ -62,6 +62,7 @@ class TemplateComponentResponse(BaseModel):
     default_component: str | None
     compatible_components: list[str]
     chart: dict[str, Any] | None = None
+    model_capability: str | None = None
     sort_order: int
 
 
@@ -133,6 +134,7 @@ def _template_to_response(template) -> TemplateResponse:
                 default_component=c.default_component,
                 compatible_components=c.compatible_components,
                 chart=c.chart,
+                model_capability=c.model_capability,
                 sort_order=c.sort_order,
             )
             for c in template.components

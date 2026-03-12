@@ -94,6 +94,7 @@ class TemplateComponent(PSQLBase):
     default_component: Mapped[str | None] = mapped_column(String(255), nullable=True)
     compatible_components: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     chart: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    model_capability: Mapped[str | None] = mapped_column(String(50), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

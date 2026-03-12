@@ -270,6 +270,7 @@ class TemplateDataManager:
         default_component: str | None = None,
         compatible_components: list[str] | None = None,
         chart: dict[str, Any] | None = None,
+        model_capability: str | None = None,
     ) -> TemplateComponent:
         """Add a component to a template.
 
@@ -284,6 +285,7 @@ class TemplateDataManager:
             default_component: Optional default component name.
             compatible_components: Optional list of compatible components.
             chart: Optional Helm chart configuration (for helm-type components).
+            model_capability: Optional model capability filter (for deploy_model components).
 
         Returns:
             Created TemplateComponent instance.
@@ -298,6 +300,7 @@ class TemplateDataManager:
             default_component=default_component,
             compatible_components=compatible_components or [],
             chart=chart,
+            model_capability=model_capability,
             sort_order=sort_order,
         )
         self.session.add(component)

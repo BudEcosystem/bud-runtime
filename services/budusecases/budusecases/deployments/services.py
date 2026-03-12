@@ -60,6 +60,7 @@ COMPONENT_TYPE_TO_JOB_TYPE = {
     "llm": JobType.MODEL_DEPLOYMENT,  # Template slot type
     "embedder": JobType.MODEL_DEPLOYMENT,  # Template slot type
     "reranker": JobType.MODEL_DEPLOYMENT,  # Template slot type
+    "deploy_model": JobType.MODEL_DEPLOYMENT,
     "helm": JobType.HELM_DEPLOY,
 }
 
@@ -213,6 +214,9 @@ class DeploymentOrchestrationService:
             "parameters": template.parameters or {},
         }
 
+        # Extract credential_selections from deployment metadata
+        credential_selections = (deployment.metadata_ or {}).get("credential_selections", {})
+
         # Build DAG (pure computation, no I/O)
         dag = build_deployment_dag(
             deployment_id=str(deployment.id),
@@ -224,6 +228,7 @@ class DeploymentOrchestrationService:
             parameters=deployment.parameters or {},
             access_config=deployment.access_config,
             project_id=str(deployment.project_id) if deployment.project_id else None,
+            credential_selections=credential_selections,
         )
 
         # Update statuses to DEPLOYING immediately (before pipeline submission)
@@ -903,6 +908,10 @@ class DeploymentOrchestrationService:
         access_config: dict[str, Any] | None = None,
     ) -> UseCaseDeployment:
         """Create deployment and component records."""
+        metadata = dict(request.metadata_)
+        if request.credential_selections:
+            metadata["credential_selections"] = request.credential_selections
+
         deployment = self.deployment_manager.create_deployment(
             name=request.name,
             template_id=template.id,
@@ -910,7 +919,7 @@ class DeploymentOrchestrationService:
             user_id=user_id,
             project_id=project_id,
             parameters=request.parameters,
-            metadata_=request.metadata_,
+            metadata_=metadata,
             access_config=access_config,
         )
 
