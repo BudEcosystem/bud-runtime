@@ -1743,7 +1743,9 @@ class ClusterService(SessionMixin):
                             error_data = await metrics_resp.json()
                         except Exception:
                             error_data = {"raw": await metrics_resp.text()}
-                        logger.error(f"Failed to get node metrics from budmetrics: status={metrics_resp.status}, error={error_data}")
+                        logger.error(
+                            f"Failed to get node metrics from budmetrics: status={metrics_resp.status}, error={error_data}"
+                        )
                         # Extract error message from various response formats:
                         # FastAPI: {"detail": "..."}, Dapr: {"message": "..."}, other: str(error_data)
                         error_msg = (
