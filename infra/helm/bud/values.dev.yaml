@@ -28,6 +28,13 @@ microservices:
         image: budstudio/budplayground:nightly
     budgateway:
         image: budstudio/budgateway:nightly
+        resources:
+            limits:
+                cpu: 500m
+                memory: 1024Mi
+            requests:
+                cpu: 250m
+                memory: 512Mi
     askbud:
         image: budstudio/askbud:nightly
     budapp:
@@ -50,6 +57,21 @@ microservices:
         image: budstudio/budnotify:nightly
     budsentinel:
         enabled: true
+        resources:
+            limits:
+                cpu: 500m
+                memory: 1024Mi
+            requests:
+                cpu: 250m
+                memory: 512Mi
+    mcpgateway:
+        resources:
+            limits:
+                cpu: 500m
+                memory: 1024Mi
+            requests:
+                cpu: 250m
+                memory: 512Mi
     budprompt:
         image: budstudio/budprompt:nightly
         env:

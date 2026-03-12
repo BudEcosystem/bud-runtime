@@ -20,6 +20,13 @@ microservices:
         image: lostnull/budfoundry-app:development
     budgateway:
         image: budstudio/budgateway:nightly
+        resources:
+            limits:
+                cpu: 500m
+                memory: 1024Mi
+            requests:
+                cpu: 250m
+                memory: 512Mi
     budsim:
         image: budstudio/budsim:nightly
         env:
@@ -37,6 +44,16 @@ microservices:
         image: dittops/budpipeline:nightly
     budmetrics:
         image: dittops/budmetrics:nightly
+    budusecases:
+        image: dittops/budusecases:nightly
+    mcpgateway:
+        resources:
+            limits:
+                cpu: 500m
+                memory: 1024Mi
+            requests:
+                cpu: 250m
+                memory: 512Mi
     budprompt:
         enabled: false
     budplayground:

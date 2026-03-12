@@ -143,6 +143,9 @@ ingress:
   # NOTE: used to derive public urls for client side services: (external|internal|disabled)
   https: disabled
   # NOTE: hosts moved to global.ingress.hosts for subchart access
+usecases:
+  # Set domain to enable wildcard ingress for usecases (e.g., "usecases.bud.example.com")
+  domain: ""
 microservices:
   # frontend services
   budadmin:

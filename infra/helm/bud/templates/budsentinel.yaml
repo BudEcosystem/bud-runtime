@@ -47,12 +47,8 @@ spec:
               value: {{ tpl $value $root | quote }}
           {{- end }}
           resources:
-            limits:
-              cpu: 8
-              memory: 8192Mi
-            requests:
-              cpu: 4
-              memory: 4096Mi
+            {{- $defaultResources := dict "limits" (dict "cpu" "8" "memory" "8192Mi") "requests" (dict "cpu" "4" "memory" "4096Mi") }}
+            {{- toYaml (default $defaultResources .Values.microservices.budsentinel.resources) | nindent 12 }}
 ---
 apiVersion: v1
 kind: Service
