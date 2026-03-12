@@ -11,6 +11,8 @@
 
   facter.reportPath = ./facter.json;
 
+  programs.nix-ld.enable = true;
+
   boot.loader = {
     systemd-boot.enable = lib.mkForce false;
     grub.enable = true;
