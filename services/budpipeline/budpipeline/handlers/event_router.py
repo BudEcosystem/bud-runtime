@@ -733,7 +733,7 @@ async def _check_and_finalize_execution(
         for s in fresh_steps:
             if s.status == StepStatus.PENDING:
                 await step_crud.update_with_version(
-                    step_id=s.id,
+                    s.id,
                     expected_version=s.version,
                     status=StepStatus.SKIPPED,
                     error_message="Skipped due to prior step failure",
