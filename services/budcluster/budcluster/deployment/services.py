@@ -46,6 +46,7 @@ from ..cluster_ops.crud import ClusterDataManager
 from ..cluster_ops.models import Cluster as ClusterModel
 from ..commons.base_crud import SessionMixin
 from ..commons.config import app_settings
+from ..commons.database import IndependentSession
 from ..commons.utils import (
     get_workflow_data_from_statestore,
     save_workflow_status_in_statestore,
@@ -346,7 +347,7 @@ class DeploymentOpsService:
 
         try:
             # Get cluster and decrypt config, also check if workers exist in DB
-            with DBSession() as session:
+            with IndependentSession() as session:
                 db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields(
                     {"id": cluster_id}, missing_ok=True
                 )
@@ -399,7 +400,7 @@ class DeploymentOpsService:
                 raise
 
             # Get workers info from db and update
-            with DBSession() as session:
+            with IndependentSession() as session:
                 worker_info_filters = {
                     "cluster_id": cluster_id,
                     "namespace": deployment_name,

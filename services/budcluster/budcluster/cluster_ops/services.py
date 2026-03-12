@@ -45,6 +45,7 @@ from fastapi import BackgroundTasks, HTTPException, status
 from ..commons.base_crud import SessionMixin
 from ..commons.config import app_settings
 from ..commons.constants import ClusterPlatformEnum, ClusterStatusEnum
+from ..commons.database import IndependentSession
 from ..commons.utils import (
     get_workflow_data_from_statestore,
     save_workflow_status_in_statestore,
@@ -921,7 +922,7 @@ class ClusterOpsService:
             config_dict: Optional pre-decrypted config dictionary. If not provided, will decrypt from db_cluster.
         """
         logger.info(f"Updating node status for cluster_id: {cluster_id}")
-        with DBSession() as session:
+        with IndependentSession() as session:
             # Get cluster info
             db_cluster = await ClusterDataManager(session).retrieve_cluster_by_fields(
                 {"id": cluster_id}, missing_ok=True
@@ -1463,7 +1464,7 @@ class ClusterOpsService:
         notification_data = None  # Track what to notify after transaction
 
         try:
-            with DBSession() as session:
+            with IndependentSession() as session:
                 cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
 
                 if not cluster:
@@ -1520,7 +1521,7 @@ class ClusterOpsService:
         notification_data = None  # Track what to notify after transaction
 
         try:
-            with DBSession() as session:
+            with IndependentSession() as session:
                 cluster = await ClusterDataManager(session).retrieve_cluster_by_fields({"id": cluster_id})
 
                 if not cluster:
@@ -1572,7 +1573,6 @@ class ClusterOpsService:
         from budmicroframe.shared.dapr_service import DaprService
 
         # Configuration
-        BATCH_SIZE = 2  # Process max 2 clusters concurrently (reduced from 5 to prevent OOM)
         STALE_THRESHOLD_MINUTES = 20  # Consider sync stale after 20 minutes
         STATE_STORE_KEY = "cluster_node_sync_state"
         ERROR_RETRY_HOURS = 24  # Retry ERROR clusters every 24 hours
@@ -1647,35 +1647,46 @@ class ClusterOpsService:
                 f"Will sync {len(clusters_to_sync)} clusters (excluding {len(active_clusters) - len(clusters_to_sync)} already in progress)"
             )
 
-            # Process clusters in batches
+            # Process clusters concurrently using asyncio.gather with semaphore
+            # Safe because update_node_status, _handle_cluster_failure, and
+            # _handle_cluster_success use IndependentSession (not thread-local DBSession)
+            MAX_CONCURRENT_SYNCS = 10  # Limit concurrent syncs to prevent OOM
             update_count = 0
             failed_count = 0
 
-            for i in range(0, len(clusters_to_sync), BATCH_SIZE):
-                batch = clusters_to_sync[i : i + BATCH_SIZE]
-                logger.info(f"Processing batch {i // BATCH_SIZE + 1} with {len(batch)} clusters")
+            semaphore = asyncio.Semaphore(MAX_CONCURRENT_SYNCS)
 
-                # Process batch concurrently
-                batch_tasks = []
-                for cluster in batch:
-                    cluster_id_str = str(cluster.id)
+            async def _throttled_sync(cluster_item):
+                async with semaphore:
+                    return await cls._sync_single_cluster(cluster_item, sync_state)
 
-                    # Mark as active in state
-                    sync_state["active_syncs"][cluster_id_str] = {
-                        "started_at": current_time.isoformat(),
-                        "workflow_id": None,
-                    }
+            # Mark all as active in state
+            batch_tasks = []
+            syncing_cluster_ids = []
+            for cluster in clusters_to_sync:
+                cluster_id_str = str(cluster.id)
+                syncing_cluster_ids.append(cluster_id_str)
+                sync_state["active_syncs"][cluster_id_str] = {
+                    "started_at": current_time.isoformat(),
+                    "workflow_id": None,
+                }
+                batch_tasks.append(_throttled_sync(cluster))
 
-                    # Create async task for this cluster
-                    batch_tasks.append(cls._sync_single_cluster(cluster, sync_state))
+            # Save state BEFORE processing to lock these clusters
+            if use_state_store:
+                try:
+                    await dapr_service.save_to_statestore(
+                        store_name=app_settings.statestore_name, key=STATE_STORE_KEY, value=sync_state
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not save sync state to state store (locking): {e}")
 
-                # Execute batch concurrently and collect results
-                import asyncio
-
+            try:
+                # Execute all cluster syncs concurrently (limited by semaphore)
                 batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
-                # Process batch results
-                for cluster, result in zip(batch, batch_results, strict=False):
+                # Process results
+                for cluster, result in zip(clusters_to_sync, batch_results, strict=True):
                     cluster_id_str = str(cluster.id)
 
                     # Remove from active syncs
@@ -1693,15 +1704,11 @@ class ClusterOpsService:
                         sync_state["last_sync_times"][cluster_id_str] = current_time.isoformat()
                         # Clear from failed if it was there
                         sync_state["failed_clusters"].pop(cluster_id_str, None)
-
-                # Save state after each batch (if state store is available)
-                if use_state_store:
-                    try:
-                        await dapr_service.save_to_statestore(
-                            store_name=app_settings.statestore_name, key=STATE_STORE_KEY, value=sync_state
-                        )
-                    except Exception as e:
-                        logger.debug(f"Could not save sync state to state store: {e}")
+            finally:
+                # On cancellation or unexpected error, clear active_syncs to prevent
+                # clusters being stuck as "in progress" until stale cleanup runs
+                for cid in syncing_cluster_ids:
+                    sync_state["active_syncs"].pop(cid, None)
 
             # Final state save (if state store is available)
             if use_state_store:
@@ -1721,11 +1728,11 @@ class ClusterOpsService:
             return SuccessResponse(
                 message=message,
                 param={
-                    "total": len(active_clusters),
+                    "total": len(all_clusters),
                     "updated": update_count,
                     "failed": failed_count,
-                    "skipped": len(active_clusters) - len(clusters_to_sync),
-                    "batch_size": BATCH_SIZE,
+                    "skipped": len(all_clusters) - len(clusters_to_sync),
+                    "max_concurrent": MAX_CONCURRENT_SYNCS,
                 },
             )
 
@@ -1737,12 +1744,12 @@ class ClusterOpsService:
     async def _sync_single_cluster(cls, cluster, sync_state: dict) -> bool:
         """Sync a single cluster's node status by directly calling update_node_status.
 
-        This method performs synchronous updates instead of spawning workflows,
-        ensuring true batch processing with controlled concurrency.
+        Called concurrently via asyncio.gather with semaphore-controlled
+        concurrency. Uses IndependentSession for thread-safe DB access.
 
         Args:
             cluster: The cluster to sync
-            sync_state: The current sync state dictionary
+            sync_state: The current sync state dictionary (read-only within this method)
 
         Returns:
             bool: True if successful, raises exception on failure
