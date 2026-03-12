@@ -25,12 +25,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set up QEMU for multi-platform builds
+        uses: docker/setup-qemu-action@v3
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./services/budgateway
           push: true
           file: ./services/budgateway/gateway/Dockerfile
+          platforms: linux/amd64,linux/arm64
           tags: |
             budstudio/budgateway:${{ inputs.release_tag }}
             budstudio/budgateway:latest
