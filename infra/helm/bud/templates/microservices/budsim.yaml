@@ -63,13 +63,10 @@ spec:
         envFrom:
           - configMapRef:
               name: {{ .Release.Name}}-bud-global
+        {{- with .Values.microservices.budsim.resources }}
         resources:
-          limits:
-            memory: 1024Mi
-            cpu: 2
-          requests:
-            memory: 256Mi
-            cpu: 250m
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - name: models-registry
           mountPath: /data/models-registry

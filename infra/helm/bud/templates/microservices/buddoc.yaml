@@ -63,13 +63,10 @@ spec:
         envFrom:
           - configMapRef:
               name: {{ .Release.Name}}-bud-global
+        {{- with .Values.microservices.buddoc.resources }}
         resources:
-          limits:
-            memory: 4096Mi
-            cpu: 500m
-          requests:
-            memory: 1024Mi
-            cpu: 100m
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - name: temp-uploads
           mountPath: /tmp/buddoc_uploads

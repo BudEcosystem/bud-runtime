@@ -92,13 +92,10 @@ spec:
           - name: {{ $key }}
             value: {{ tpl (toString $value) $ | quote }}
           {{- end }}
+        {{- with .Values.microservices.budpipeline.resources }}
         resources:
-          limits:
-            memory: 512Mi
-            cpu: 500m
-          requests:
-            memory: 256Mi
-            cpu: 250m
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /health
