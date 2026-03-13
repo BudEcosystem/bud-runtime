@@ -70,7 +70,7 @@ export default function GuardrailDeploymentStatus() {
               services.
             </>
           }
-          extraInfo="This may take some time..."
+          // extraInfo="This may take some time..."
         />
       </BudWraperBox>
     </BudForm>

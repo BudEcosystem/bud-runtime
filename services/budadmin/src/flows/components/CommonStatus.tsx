@@ -10,12 +10,6 @@ import { StatusEvents } from "./StatusIcons";
 import { ProgressWithBudList } from "./ProgressWithBud";
 import { StatusEstimatedTime } from "./StatusEstimatedTime";
 
-function printStatus(payload: any) {
-    if (payload?.content?.status) {
-        return `${payload?.content?.status} ${payload?.content?.title}`;
-    }
-    return `No status ${payload?.content?.title}`;
-}
 
 export default function CommonStatus({
     workflowId,
@@ -209,7 +203,7 @@ export default function CommonStatus({
                     {description}
                 </Text_12_400_757575>
             </div>
-            {extraInfo && <div className="flex justify-start items-center w-full px-[1.35rem] pt-[1.3rem] pb-[1rem] text-[#B3B3B3] text-[.75rem]">
+            {extraInfo && steps?.length === 0 && <div className="flex justify-start items-center w-full px-[1.35rem] pt-[1.3rem] pb-[1rem] text-[#B3B3B3] text-[.75rem]">
                 {extraInfo}
             </div>}
             <ProgressWithBudList events={steps} />

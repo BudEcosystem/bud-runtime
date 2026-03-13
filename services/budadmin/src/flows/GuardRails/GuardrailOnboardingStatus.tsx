@@ -73,7 +73,7 @@ export default function GuardrailOnboardingStatus() {
               guardrail models required for the selected probes.
             </>
           }
-          extraInfo="This may take some time..."
+          // extraInfo="This may take some time..."
         />
       </BudWraperBox>
     </BudForm>
