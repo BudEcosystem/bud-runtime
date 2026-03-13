@@ -163,7 +163,11 @@ microservices:
     # Optional per-service node scheduling (overrides global)
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 131Mi
+      limits:
+        memory: 231Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -178,7 +182,11 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 370Mi
+      limits:
+        memory: 470Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -193,7 +201,11 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 234Mi
+      limits:
+        memory: 334Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -211,7 +223,11 @@ microservices:
       OTEL_EXPORTER_OTLP_HTTP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration for budgateway
+    resources:
+      requests:
+        memory: 454Mi
+      limits:
+        memory: 8096Mi
     autoscaling:
       enabled: true
       minReplicas: 1
@@ -238,6 +254,11 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
+    resources:
+      requests:
+        memory: 4096Mi
+      limits:
+        memory: 8192Mi
   mcpgateway:
     enabled: true
     image: budstudio/mcpgateway:latest
@@ -252,7 +273,11 @@ microservices:
       # keycloakBaseUrl: override if external Keycloak (defaults to internal http://{release}-keycloak/)
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 399Mi
+      limits:
+        memory: 499Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -271,7 +296,11 @@ microservices:
       INFERENCE_URL: http://52.241.253.58/v1/
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 153Mi
+      limits:
+        memory: 253Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -302,7 +331,11 @@ microservices:
       BUD_PROMPT_SERVICE_URL: "http://{{ $.Release.Name }}-budprompt:3015/v1/"
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 479Mi
+      limits:
+        memory: 579Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -343,7 +376,11 @@ microservices:
       PROMETHEUS_PORT: "9090"
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration (longer stabilization for workflows)
+    resources:
+      requests:
+        memory: 2434Mi
+      limits:
+        memory: 5500Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -368,7 +405,11 @@ microservices:
       CLICKHOUSE_TTL_CLUSTER_METRICS: "30"
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 140Mi
+      limits:
+        memory: 240Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -385,7 +426,11 @@ microservices:
       LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration (lower CPU due to I/O-bound workload)
+    resources:
+      requests:
+        memory: 1470Mi
+      limits:
+        memory: 1570Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -401,7 +446,11 @@ microservices:
     env: {}
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration (longer stabilization for evaluation workflows)
+    resources:
+      requests:
+        memory: 1470Mi
+      limits:
+        memory: 2000Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -418,7 +467,11 @@ microservices:
       LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration (longer stabilization for ML optimization workflows)
+    resources:
+      requests:
+        memory: 999Mi
+      limits:
+        memory: 1099Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -439,7 +492,11 @@ microservices:
       TEMP_UPLOAD_DIR: /tmp/buddoc_uploads
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration (lower CPU due to document processing)
+    resources:
+      requests:
+        memory: 630Mi
+      limits:
+        memory: 730Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -458,7 +515,11 @@ microservices:
       KEYCLOAK_REALM: bud-keycloak
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration (fast scale-up for notifications)
+    resources:
+      requests:
+        memory: 121Mi
+      limits:
+        memory: 221Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -482,7 +543,11 @@ microservices:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ $.Release.Name }}-otel-collector:4318"
     nodeSelector: {}
     affinity: {}
-    # Autoscaling configuration
+    resources:
+      requests:
+        memory: 263Mi
+      limits:
+        memory: 363Mi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -500,6 +565,11 @@ microservices:
       LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
+    resources:
+      requests:
+        memory: 141Mi
+      limits:
+        memory: 241Mi
   global:
     env:
       PROMETHEUS_URL: https://metric.bud.studio
@@ -614,11 +684,9 @@ valkey:
   primary:
     resources:
       requests:
-        memory: 512Mi
-        cpu: 250m
+        memory: 20Mi
       limits:
         memory: 1Gi
-        cpu: 1000m
   # Optional node scheduling for Valkey (Redis)
   master:
     nodeSelector: {}
@@ -626,11 +694,9 @@ valkey:
     # Resource limits to prevent OOM and pod restarts
     resources:
       requests:
-        memory: 512Mi
-        cpu: 250m
+        memory: 20Mi
       limits:
         memory: 1Gi
-        cpu: 1000m
     # Improved liveness probe to handle AOF loading and memory pressure
     livenessProbe:
       enabled: true
@@ -653,11 +719,9 @@ clickhouse:
     password: bud
   resources:
     requests:
-      memory: 4Gi
-      cpu: 1000m
+      memory: 908Mi
     limits:
-      memory: 8Gi
-      cpu: 4000m
+      memory: 2Gi
   keeper:
     replicaCount: 1
     image:
@@ -724,6 +788,8 @@ keycloak:
     repository: bitnamilegacy/keycloak
   proxy: edge
   resources:
+    requests:
+      memory: 966Mi
     limits:
       memory: 4Gi
   enabled: true
@@ -817,9 +883,9 @@ minio:
   enabled: true
   resources:
     requests:
-      memory: 512Mi
+      memory: 385Mi
     limits:
-      memory: 1536Mi
+      memory: 512Mi
   provisioning:
     enabled: true
     buckets:
@@ -844,12 +910,10 @@ otelCollector:
   memoryLimit: 2048
   memorySpikeLimit: 512
   resources:
-    limits:
-      memory: 2Gi
-      cpu: 1000m
     requests:
+      memory: 262Mi
+    limits:
       memory: 512Mi
-      cpu: 100m
   clickhouse:
     host: clickhouse # Will be templated in the deployment
     port: 9000
@@ -880,11 +944,9 @@ prometheus:
     retention: "2h"
     resources:
       requests:
-        cpu: 250m
-        memory: 512Mi
+        memory: 881Mi
       limits:
-        cpu: 500m
-        memory: 4Gi
+        memory: 2Gi
     nodeSelector: {}
     affinity: {}
   # Scrape configuration for budgateway metrics
@@ -918,8 +980,8 @@ prometheus-adapter:
       - seriesQuery: 'gateway_processing_seconds{quantile="0.95"}'
         resources:
           overrides:
-            pod: {resource: "pod"}
-            namespace: {resource: "namespace"}
+            pod: { resource: "pod" }
+            namespace: { resource: "namespace" }
         name:
           as: "gateway_processing_seconds_p95"
         metricsQuery: 'gateway_processing_seconds{quantile="0.95",<<.LabelMatchers>>}'
@@ -951,10 +1013,8 @@ onyx:
     replicaCount: 1
     resources:
       requests:
-        cpu: 4000m
         memory: 8000Mi
       limits:
-        cpu: 8000m
         memory: 32000Mi
   nginx:
     enabled: false # Disabled - bud uses traefik for ingress
@@ -1023,19 +1083,15 @@ onyx:
     replicaCount: 1
     resources:
       requests:
-        cpu: 200m
         memory: 512Mi
       limits:
-        cpu: 1000m
         memory: 1Gi
   api:
     replicaCount: 1
     resources:
       requests:
-        cpu: 1000m
         memory: 1Gi
       limits:
-        cpu: 2000m
         memory: 2Gi
   celery_beat:
     replicaCount: 1

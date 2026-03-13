@@ -53,13 +53,10 @@ spec:
         envFrom:
           - configMapRef:
               name: {{ .Release.Name}}-bud-global
+        {{- with .Values.microservices.budnotify.resources }}
         resources:
-          limits:
-            memory: 256Mi
-            cpu: 500m
-          requests:
-            memory: 128Mi
-            cpu: 250m
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
