@@ -167,7 +167,7 @@ microservices:
       requests:
         memory: 131Mi
       limits:
-        memory: 231Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -186,7 +186,7 @@ microservices:
       requests:
         memory: 370Mi
       limits:
-        memory: 470Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -205,7 +205,7 @@ microservices:
       requests:
         memory: 234Mi
       limits:
-        memory: 334Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -227,7 +227,7 @@ microservices:
       requests:
         memory: 454Mi
       limits:
-        memory: 8096Mi
+        memory: 8Gi
     autoscaling:
       enabled: true
       minReplicas: 1
@@ -256,9 +256,9 @@ microservices:
     affinity: {}
     resources:
       requests:
-        memory: 4096Mi
+        memory: 4Gi
       limits:
-        memory: 8192Mi
+        memory: 8Gi
   mcpgateway:
     enabled: true
     image: budstudio/mcpgateway:latest
@@ -277,7 +277,7 @@ microservices:
       requests:
         memory: 399Mi
       limits:
-        memory: 499Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -300,7 +300,7 @@ microservices:
       requests:
         memory: 153Mi
       limits:
-        memory: 253Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -335,7 +335,7 @@ microservices:
       requests:
         memory: 479Mi
       limits:
-        memory: 579Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -380,7 +380,7 @@ microservices:
       requests:
         memory: 2434Mi
       limits:
-        memory: 5500Mi
+        memory: 8Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -409,7 +409,7 @@ microservices:
       requests:
         memory: 140Mi
       limits:
-        memory: 240Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -430,7 +430,7 @@ microservices:
       requests:
         memory: 1470Mi
       limits:
-        memory: 1570Mi
+        memory: 4Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -450,7 +450,7 @@ microservices:
       requests:
         memory: 1470Mi
       limits:
-        memory: 2000Mi
+        memory: 4Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -471,7 +471,7 @@ microservices:
       requests:
         memory: 999Mi
       limits:
-        memory: 1099Mi
+        memory: 4Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -496,7 +496,7 @@ microservices:
       requests:
         memory: 630Mi
       limits:
-        memory: 730Mi
+        memory: 4Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -519,7 +519,7 @@ microservices:
       requests:
         memory: 121Mi
       limits:
-        memory: 221Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -547,7 +547,7 @@ microservices:
       requests:
         memory: 263Mi
       limits:
-        memory: 363Mi
+        memory: 1Gi
     autoscaling:
       enabled: false
       minReplicas: 1
@@ -569,7 +569,7 @@ microservices:
       requests:
         memory: 141Mi
       limits:
-        memory: 241Mi
+        memory: 1Gi
   global:
     env:
       PROMETHEUS_URL: https://metric.bud.studio
@@ -686,7 +686,7 @@ valkey:
       requests:
         memory: 20Mi
       limits:
-        memory: 1Gi
+        memory: 4Gi
   # Optional node scheduling for Valkey (Redis)
   master:
     nodeSelector: {}
@@ -696,7 +696,7 @@ valkey:
       requests:
         memory: 20Mi
       limits:
-        memory: 1Gi
+        memory: 4Gi
     # Improved liveness probe to handle AOF loading and memory pressure
     livenessProbe:
       enabled: true
@@ -721,7 +721,7 @@ clickhouse:
     requests:
       memory: 908Mi
     limits:
-      memory: 2Gi
+      memory: 8Gi
   keeper:
     replicaCount: 1
     image:
@@ -759,7 +759,7 @@ postgresql:
       requests:
         memory: 256Mi
       limits:
-        memory: 512Mi
+        memory: 4Gi
     # Optional node scheduling for PostgreSQL primary
     nodeSelector: {}
     affinity: {}
@@ -791,7 +791,7 @@ keycloak:
     requests:
       memory: 966Mi
     limits:
-      memory: 4Gi
+      memory: 8Gi
   enabled: true
   # Keycloak admin credentials (for provisioning and management)
   auth:
@@ -816,9 +816,9 @@ kafka:
   controller:
     resources:
       requests:
-        memory: 1024Mi
+        memory: 1227Mi
       limits:
-        memory: 2048Mi
+        memory: 8Gi
     # Optional node scheduling for Kafka controller
     nodeSelector: {}
     affinity: {}
@@ -885,7 +885,7 @@ minio:
     requests:
       memory: 385Mi
     limits:
-      memory: 512Mi
+      memory: 4Gi
   provisioning:
     enabled: true
     buckets:
@@ -913,7 +913,7 @@ otelCollector:
     requests:
       memory: 262Mi
     limits:
-      memory: 512Mi
+      memory: 1Gi
   clickhouse:
     host: clickhouse # Will be templated in the deployment
     port: 9000
@@ -946,7 +946,7 @@ prometheus:
       requests:
         memory: 881Mi
       limits:
-        memory: 2Gi
+        memory: 4Gi
     nodeSelector: {}
     affinity: {}
   # Scrape configuration for budgateway metrics
