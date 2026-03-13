@@ -29,7 +29,6 @@ use crate::error::{Error, ErrorDetails};
 use crate::function::FunctionConfig;
 use crate::function::{sample_variant, FunctionConfigChat};
 use crate::gateway_util::{AppState, AppStateData, StructuredJson};
-use crate::inference_batcher::InferenceBatcher;
 use crate::inference::types::extra_body::UnfilteredInferenceExtraBody;
 use crate::inference::types::extra_headers::UnfilteredInferenceExtraHeaders;
 use crate::inference::types::resolved_input::{FileWithPath, ResolvedInput};
@@ -43,6 +42,7 @@ use crate::inference::types::{
     ModelInferenceResponseWithMetadata, ModerationInferenceDatabaseInsert, RequestMessage,
     ResolvedInputMessageContent, Usage,
 };
+use crate::inference_batcher::InferenceBatcher;
 use crate::jsonschema_util::DynamicJSONSchema;
 use crate::kafka::KafkaConnectionInfo;
 use crate::model::ModelTable;
@@ -485,7 +485,8 @@ pub async fn inference(
     tracing::Span::current().record("episode_id", episode_id.to_string());
 
     let models = config.models.read().await;
-    let (function, function_name) = find_function(&params, &config, &models).map_err(|e| (e, None))?;
+    let (function, function_name) =
+        find_function(&params, &config, &models).map_err(|e| (e, None))?;
     // Release the read lock on the models table before potentially spawning
     drop(models);
 
@@ -1353,12 +1354,10 @@ pub async fn write_inference(
                     .first()
                     .and_then(|msg| msg.content.first())
                     .and_then(|content| match content {
-                        ResolvedInputMessageContent::Text { value } => {
-                            match value {
-                                serde_json::Value::String(s) => Some(s.clone()),
-                                _ => value.as_str().map(|s| s.to_string()),
-                            }
-                        }
+                        ResolvedInputMessageContent::Text { value } => match value {
+                            serde_json::Value::String(s) => Some(s.clone()),
+                            _ => value.as_str().map(|s| s.to_string()),
+                        },
                         _ => None,
                     })
                     .unwrap_or_else(|| "moderation input".to_string());
@@ -1440,8 +1439,9 @@ pub async fn write_inference(
                         })
                         .unwrap_or_else(|| "text input".to_string());
 
-                    let audio_inference =
-                        AudioInferenceDatabaseInsert::new_text_to_speech(result, text_input, metadata);
+                    let audio_inference = AudioInferenceDatabaseInsert::new_text_to_speech(
+                        result, text_input, metadata,
+                    );
                     let _ = clickhouse_connection_info
                         .write(&[audio_inference], "AudioInference")
                         .await;
@@ -1459,7 +1459,8 @@ pub async fn write_inference(
                         })
                         .unwrap_or_else(|| "image prompt".to_string());
 
-                    let image_inference = ImageInferenceDatabaseInsert::new(result, prompt, metadata);
+                    let image_inference =
+                        ImageInferenceDatabaseInsert::new(result, prompt, metadata);
                     let _ = clickhouse_connection_info
                         .write(&[image_inference], "ImageInference")
                         .await;
@@ -1470,12 +1471,10 @@ pub async fn write_inference(
                         .first()
                         .and_then(|msg| msg.content.first())
                         .and_then(|content| match content {
-                            ResolvedInputMessageContent::Text { value } => {
-                                match value {
-                                    serde_json::Value::String(s) => Some(s.clone()),
-                                    _ => value.as_str().map(|s| s.to_string()),
-                                }
-                            }
+                            ResolvedInputMessageContent::Text { value } => match value {
+                                serde_json::Value::String(s) => Some(s.clone()),
+                                _ => value.as_str().map(|s| s.to_string()),
+                            },
                             _ => None,
                         })
                         .unwrap_or_else(|| "moderation input".to_string());

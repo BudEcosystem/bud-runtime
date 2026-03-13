@@ -205,6 +205,9 @@ class WorkflowService(SessionMixin):
             guardrail_deployment_events = required_data.get(
                 BudServeWorkflowStepEventName.GUARDRAIL_DEPLOYMENT_EVENTS.value
             )
+            usecase_deployment_events = required_data.get(
+                BudServeWorkflowStepEventName.USECASE_DEPLOYMENT_EVENTS.value
+            )
             simulation_step_mapping = required_data.get("simulation_step_mapping")
             simulation_models = required_data.get("simulation_models")
             # Pending profile data: stored when deployment is in progress, used to create profile after deployment completes
@@ -476,6 +479,7 @@ class WorkflowService(SessionMixin):
                 guardrail_onboarding_events=guardrail_onboarding_events if guardrail_onboarding_events else None,
                 guardrail_simulation_events=guardrail_simulation_events if guardrail_simulation_events else None,
                 guardrail_deployment_events=guardrail_deployment_events if guardrail_deployment_events else None,
+                usecase_deployment_events=usecase_deployment_events if usecase_deployment_events else None,
                 simulation_step_mapping=simulation_step_mapping if simulation_step_mapping else None,
                 simulation_models=simulation_models if simulation_models else None,
                 # Pending profile data: stored when deployment is in progress
@@ -730,6 +734,10 @@ class WorkflowService(SessionMixin):
                 "modality_types",
                 "probe_id",
                 "model_id",
+                "workflow_execution_status",
+            ],
+            "usecase_deployment": [
+                BudServeWorkflowStepEventName.USECASE_DEPLOYMENT_EVENTS.value,
                 "workflow_execution_status",
             ],
         }

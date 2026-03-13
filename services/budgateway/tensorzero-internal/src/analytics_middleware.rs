@@ -136,8 +136,7 @@ pub async fn analytics_middleware(
     );
 
     // Extract parent context from incoming traceparent/tracestate headers
-    let parent_ctx =
-        tracing_opentelemetry_instrumentation_sdk::http::extract_context(&headers);
+    let parent_ctx = tracing_opentelemetry_instrumentation_sdk::http::extract_context(&headers);
 
     // Remove AUTH_PROCESSED marker from incoming baggage before setting parent.
     // This prevents BaggageSpanProcessor from setting endpoint_id on gateway_analytics.
@@ -532,7 +531,10 @@ pub async fn analytics_middleware(
 
 /// Records pre-request span attributes (called before next.run())
 /// Option fields are only recorded if they have a value (null otherwise)
-fn record_pre_request_span_attributes(span: &tracing::Span, record: &GatewayAnalyticsDatabaseInsert) {
+fn record_pre_request_span_attributes(
+    span: &tracing::Span,
+    record: &GatewayAnalyticsDatabaseInsert,
+) {
     // Core
     span.record("gateway_analytics.id", record.id.to_string().as_str());
 
@@ -541,7 +543,10 @@ fn record_pre_request_span_attributes(span: &tracing::Span, record: &GatewayAnal
     if let Some(ref proxy_chain) = record.proxy_chain {
         span.record("gateway_analytics.proxy_chain", proxy_chain.as_str());
     }
-    span.record("gateway_analytics.protocol_version", record.protocol_version.as_str());
+    span.record(
+        "gateway_analytics.protocol_version",
+        record.protocol_version.as_str(),
+    );
 
     // GeoIP (all optional)
     if let Some(ref country_code) = record.country_code {
@@ -583,7 +588,10 @@ fn record_pre_request_span_attributes(span: &tracing::Span, record: &GatewayAnal
         span.record("gateway_analytics.browser_name", browser_name.as_str());
     }
     if let Some(ref browser_version) = record.browser_version {
-        span.record("gateway_analytics.browser_version", browser_version.as_str());
+        span.record(
+            "gateway_analytics.browser_version",
+            browser_version.as_str(),
+        );
     }
     if let Some(ref os_name) = record.os_name {
         span.record("gateway_analytics.os_name", os_name.as_str());
@@ -605,7 +613,10 @@ fn record_pre_request_span_attributes(span: &tracing::Span, record: &GatewayAnal
     if let Some(body_size) = record.body_size {
         span.record("gateway_analytics.body_size", body_size as i64);
     }
-    span.record("gateway_analytics.request_timestamp", record.request_timestamp.to_rfc3339().as_str());
+    span.record(
+        "gateway_analytics.request_timestamp",
+        record.request_timestamp.to_rfc3339().as_str(),
+    );
 
     // Auth (all optional)
     if let Some(ref api_key_id) = record.api_key_id {
@@ -618,20 +629,38 @@ fn record_pre_request_span_attributes(span: &tracing::Span, record: &GatewayAnal
         span.record("gateway_analytics.user_id", user_id.as_str());
     }
     if let Some(project_id) = record.project_id {
-        span.record("gateway_analytics.project_id", project_id.to_string().as_str());
+        span.record(
+            "gateway_analytics.project_id",
+            project_id.to_string().as_str(),
+        );
     }
     if let Some(endpoint_id) = record.endpoint_id {
-        span.record("gateway_analytics.endpoint_id", endpoint_id.to_string().as_str());
+        span.record(
+            "gateway_analytics.endpoint_id",
+            endpoint_id.to_string().as_str(),
+        );
     }
 }
 
 /// Records post-response span attributes (called after next.run() and response processing)
 /// Option fields are only recorded if they have a value (null otherwise)
-fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAnalyticsDatabaseInsert) {
+fn record_post_response_span_attributes(
+    span: &tracing::Span,
+    record: &GatewayAnalyticsDatabaseInsert,
+) {
     // Performance
-    span.record("gateway_analytics.response_timestamp", record.response_timestamp.to_rfc3339().as_str());
-    span.record("gateway_analytics.total_duration_ms", record.total_duration_ms as i64);
-    span.record("gateway_analytics.gateway_processing_ms", record.gateway_processing_ms as i64);
+    span.record(
+        "gateway_analytics.response_timestamp",
+        record.response_timestamp.to_rfc3339().as_str(),
+    );
+    span.record(
+        "gateway_analytics.total_duration_ms",
+        record.total_duration_ms as i64,
+    );
+    span.record(
+        "gateway_analytics.gateway_processing_ms",
+        record.gateway_processing_ms as i64,
+    );
 
     // Response
     span.record("gateway_analytics.status_code", record.status_code as i64);
@@ -642,7 +671,10 @@ fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAn
         span.record("gateway_analytics.response_headers", headers_json.as_str());
     }
     if let Some(inference_id) = record.inference_id {
-        span.record("gateway_analytics.inference_id", inference_id.to_string().as_str());
+        span.record(
+            "gateway_analytics.inference_id",
+            inference_id.to_string().as_str(),
+        );
     }
 
     // Model (all optional)
@@ -656,7 +688,10 @@ fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAn
         span.record("gateway_analytics.model_version", model_version.as_str());
     }
     if let Some(ref routing_decision) = record.routing_decision {
-        span.record("gateway_analytics.routing_decision", routing_decision.as_str());
+        span.record(
+            "gateway_analytics.routing_decision",
+            routing_decision.as_str(),
+        );
     }
 
     // Error (all optional)
@@ -672,13 +707,25 @@ fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAn
 
     if let Some(ref blocking_event) = record.blocking_event {
         // Event identifiers (unique fields from BlockingEventData)
-        span.record("gateway_blocking_events.id", blocking_event.id.to_string().as_str());
-        span.record("gateway_blocking_events.rule_id", blocking_event.rule_id.to_string().as_str());
+        span.record(
+            "gateway_blocking_events.id",
+            blocking_event.id.to_string().as_str(),
+        );
+        span.record(
+            "gateway_blocking_events.rule_id",
+            blocking_event.rule_id.to_string().as_str(),
+        );
 
         // Client information (from analytics record - overlapping fields)
-        span.record("gateway_blocking_events.client_ip", record.client_ip.as_str());
+        span.record(
+            "gateway_blocking_events.client_ip",
+            record.client_ip.as_str(),
+        );
         if let Some(ref country_code) = record.country_code {
-            span.record("gateway_blocking_events.country_code", country_code.as_str());
+            span.record(
+                "gateway_blocking_events.country_code",
+                country_code.as_str(),
+            );
         }
         if let Some(ref user_agent) = record.user_agent {
             span.record("gateway_blocking_events.user_agent", user_agent.as_str());
@@ -686,34 +733,64 @@ fn record_post_response_span_attributes(span: &tracing::Span, record: &GatewayAn
 
         // Request context (from analytics record - overlapping fields)
         span.record("gateway_blocking_events.request_path", record.path.as_str());
-        span.record("gateway_blocking_events.request_method", record.method.as_str());
+        span.record(
+            "gateway_blocking_events.request_method",
+            record.method.as_str(),
+        );
         if let Some(ref api_key_id) = record.api_key_id {
             span.record("gateway_blocking_events.api_key_id", api_key_id.as_str());
         }
 
         // Project/endpoint context (from analytics record - overlapping fields)
         if let Some(project_id) = record.project_id {
-            span.record("gateway_blocking_events.project_id", project_id.to_string().as_str());
+            span.record(
+                "gateway_blocking_events.project_id",
+                project_id.to_string().as_str(),
+            );
         }
         if let Some(endpoint_id) = record.endpoint_id {
-            span.record("gateway_blocking_events.endpoint_id", endpoint_id.to_string().as_str());
+            span.record(
+                "gateway_blocking_events.endpoint_id",
+                endpoint_id.to_string().as_str(),
+            );
         }
         if let Some(ref model_name) = record.model_name {
             span.record("gateway_blocking_events.model_name", model_name.as_str());
         }
 
         // Rule information (unique fields from BlockingEventData)
-        span.record("gateway_blocking_events.rule_type", blocking_event.rule_type.as_str());
-        span.record("gateway_blocking_events.rule_name", blocking_event.rule_name.as_str());
-        span.record("gateway_blocking_events.rule_priority", blocking_event.rule_priority as i64);
+        span.record(
+            "gateway_blocking_events.rule_type",
+            blocking_event.rule_type.as_str(),
+        );
+        span.record(
+            "gateway_blocking_events.rule_name",
+            blocking_event.rule_name.as_str(),
+        );
+        span.record(
+            "gateway_blocking_events.rule_priority",
+            blocking_event.rule_priority as i64,
+        );
 
         // Block details (unique fields from BlockingEventData)
-        span.record("gateway_blocking_events.block_reason", blocking_event.block_reason.as_str());
-        span.record("gateway_blocking_events.action_taken", blocking_event.action_taken.as_str());
+        span.record(
+            "gateway_blocking_events.block_reason",
+            blocking_event.block_reason.as_str(),
+        );
+        span.record(
+            "gateway_blocking_events.action_taken",
+            blocking_event.action_taken.as_str(),
+        );
 
         // Timing (unique field from BlockingEventData)
-        let blocked_at_formatted = blocking_event.blocked_at.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
-        span.record("gateway_blocking_events.blocked_at", blocked_at_formatted.as_str());
+        let blocked_at_formatted = blocking_event
+            .blocked_at
+            .format("%Y-%m-%d %H:%M:%S%.3f")
+            .to_string();
+        span.record(
+            "gateway_blocking_events.blocked_at",
+            blocked_at_formatted.as_str(),
+        );
     }
 
     // Tags

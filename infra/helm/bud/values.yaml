@@ -119,6 +119,10 @@ externalServices:
         name: "budpipeline"
         username: "budpipeline"
         password: "budpipeline"
+      budusecases:
+        name: "budusecases"
+        username: "budusecases"
+        password: "budusecases"
       onyx:
         name: "onyx"
         username: "onyx"
@@ -500,6 +504,24 @@ microservices:
       LOG_LEVEL: INFO
     nodeSelector: {}
     affinity: {}
+  budusecases:
+    enabled: true
+    image: budstudio/budusecases:0.6.0
+    daprid: budusecases
+    pubsubTopic: budusecasesEvents
+    env:
+      LOG_LEVEL: INFO
+    nodeSelector: {}
+    affinity: {}
+    # Autoscaling configuration
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 75
+      scaleDownStabilizationSeconds: 300
+      scaleUpStabilizationSeconds: 30
   global:
     env:
       PROMETHEUS_URL: https://metric.bud.studio
@@ -718,6 +740,7 @@ postgresqlExtra:
     - budprompt
     - mcpgateway
     - budpipeline
+    - budusecases
     - onyx
 keycloak:
   image:

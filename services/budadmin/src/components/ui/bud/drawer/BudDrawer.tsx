@@ -6,6 +6,7 @@ import { useForm } from "src/hooks/useForm";
 import BudStepAlert from "src/flows/components/BudStepAlert";
 import { BudForm } from "../dataEntry/BudForm";
 import { useAddAgent } from "@/stores/useAddAgent";
+import flows from "src/hooks/drawerFlows";
 
 const BudDrawer: React.FC = () => {
   const {
@@ -30,10 +31,13 @@ const BudDrawer: React.FC = () => {
   }
 
   const screenWidth = window.innerWidth;
+  const isFullPage = !!(currentFlow && flows[currentFlow]?.fullPage);
 
   let width = 400;
 
-  if (screenWidth > 2560) {
+  if (isFullPage) {
+    width = screenWidth;
+  } else if (screenWidth > 2560) {
     width = screenWidth * 0.35;
   } else if (screenWidth > 1920) {
     width = screenWidth * 0.4322;
@@ -44,7 +48,7 @@ const BudDrawer: React.FC = () => {
   }
 
   const isExpanded = Boolean(expandedStep);
-  const drawerWidth = isExpanded ? width * 2 : width;
+  const drawerWidth = isFullPage ? screenWidth : (isExpanded ? width * 2 : width);
 
   return (
     <Drawer
@@ -52,9 +56,12 @@ const BudDrawer: React.FC = () => {
       className="drawerRoot bg-transparent flex  flex-col shadow-none w-full border relative visible-drawer pr-[.6rem]"
       closeIcon={null}
       classNames={{
-        wrapper:
-          "bg-transparent my-[.75rem] mr-[0.6875rem]rounded-[17px] shadow-none",
-        mask: "bg-transparent bud-drawer-mask",
+        wrapper: isFullPage
+          ? "shadow-none"
+          : "bg-transparent my-[.75rem] mr-[0.6875rem]rounded-[17px] shadow-none",
+        mask: isFullPage
+          ? "bud-drawer-mask"
+          : "bg-transparent bud-drawer-mask",
         body: "flex flex-row bg-transparent",
       }}
       styles={{
@@ -76,7 +83,7 @@ const BudDrawer: React.FC = () => {
         <div
           className="drawerBackground"
           style={{
-            width,
+            width: isFullPage ? "100%" : width,
             // paddingRight: ".7rem",
             height: "100%",
           }}

@@ -79,10 +79,7 @@ pub fn record_inference_result(result: &InferenceResult) {
 pub fn record_metadata(metadata: &InferenceDatabaseInsertMetadata) {
     let span = Span::current();
 
-    span.record(
-        "chat_inference.function_name",
-        "budgateway::default",
-    );
+    span.record("chat_inference.function_name", "budgateway::default");
     span.record(
         "chat_inference.variant_name",
         metadata.variant_name.as_str(),
@@ -130,7 +127,10 @@ pub fn record_model_inference(
         );
 
         // 3. raw_request
-        span.record("model_inference.raw_request", model_inf.raw_request.as_str());
+        span.record(
+            "model_inference.raw_request",
+            model_inf.raw_request.as_str(),
+        );
 
         // 4. raw_response
         span.record(
@@ -236,7 +236,10 @@ pub fn record_error_model_inference(
     let span = Span::current();
 
     // Record all 20 fields (matching record_model_inference() structure)
-    span.record("model_inference.id", model_inference.id.to_string().as_str());
+    span.record(
+        "model_inference.id",
+        model_inference.id.to_string().as_str(),
+    );
     span.record(
         "model_inference.inference_id",
         model_inference.inference_id.to_string().as_str(),
@@ -411,7 +414,10 @@ pub fn record_model_inference_details(
         span.record("model_inference_details.error_code", err.error_code);
         span.record("model_inference_details.error_message", err.error_message);
         span.record("model_inference_details.error_type", err.error_type);
-        span.record("model_inference_details.status_code", err.status_code as i64);
+        span.record(
+            "model_inference_details.status_code",
+            err.status_code as i64,
+        );
     }
 }
 
@@ -448,7 +454,10 @@ pub fn record_response_request(params: &crate::responses::OpenAIResponseCreatePa
         span.record("gen_ai.request.model", model.as_str());
     }
     if let Some(ref previous_response_id) = params.previous_response_id {
-        span.record("gen_ai.request.previous_response_id", previous_response_id.as_str());
+        span.record(
+            "gen_ai.request.previous_response_id",
+            previous_response_id.as_str(),
+        );
     }
     if let Some(ref service_tier) = params.service_tier {
         span.record("gen_ai.request.service_tier", service_tier.as_str());
@@ -582,7 +591,10 @@ pub fn record_response_result(response: &crate::responses::OpenAIResponse) {
 
     // Optional numeric fields
     if let Some(max_output_tokens) = response.max_output_tokens {
-        span.record("gen_ai.response.max_output_tokens", max_output_tokens as i64);
+        span.record(
+            "gen_ai.response.max_output_tokens",
+            max_output_tokens as i64,
+        );
     }
     if let Some(temperature) = response.temperature {
         span.record("gen_ai.response.temperature", temperature as f64);
@@ -681,7 +693,10 @@ pub fn record_embedding_response(
     let span = Span::current();
 
     span.record("embedding_inference.id", id);
-    span.record("embedding_inference.embedding_count", embedding_count as i64);
+    span.record(
+        "embedding_inference.embedding_count",
+        embedding_count as i64,
+    );
     span.record("model_inference.model_name", model_name);
     span.record("model_inference.input_tokens", input_tokens as i64);
     span.record("model_inference.response_time_ms", response_time_ms as i64);
@@ -691,7 +706,10 @@ pub fn record_embedding_response(
 /// Records embedding processing time as span attribute
 pub fn record_embedding_processing_time(processing_time_ms: u64) {
     let span = Span::current();
-    span.record("embedding_inference.processing_time_ms", processing_time_ms as i64);
+    span.record(
+        "embedding_inference.processing_time_ms",
+        processing_time_ms as i64,
+    );
 }
 
 /// Records classify inference request as span attributes
@@ -728,7 +746,10 @@ pub fn record_classify_response(
 /// Records classify processing time as span attribute
 pub fn record_classify_processing_time(processing_time_ms: u64) {
     let span = Span::current();
-    span.record("classify_inference.processing_time_ms", processing_time_ms as i64);
+    span.record(
+        "classify_inference.processing_time_ms",
+        processing_time_ms as i64,
+    );
 }
 
 // =============================================================================

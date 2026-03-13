@@ -186,6 +186,14 @@ class EventPublisher:
 
         published_topics: list[str] = []
 
+        logger.debug(
+            "publish_to_topics called",
+            execution_id=str(execution_id),
+            event_type=event_type,
+            subscriber_ids=subscriber_ids,
+            payload_type=payload_type,
+        )
+
         # 1. Dual-publish to budnotify if subscriber_ids present and topic configured
         if subscriber_ids and settings.notify_service_topic:
             task = asyncio.create_task(
@@ -202,6 +210,11 @@ class EventPublisher:
 
         # 2. Always publish to callback_topics (existing behavior)
         topics = await subscription_service.get_active_topics(execution_id)
+        logger.debug(
+            "Active topics retrieved",
+            execution_id=str(execution_id),
+            topics=topics,
+        )
 
         if not topics and not published_topics:
             logger.debug(
@@ -326,6 +339,8 @@ class EventPublisher:
                 result_data["duration_seconds"] = data["duration_seconds"]
             if data.get("sequence_number") is not None:
                 result_data["sequence_number"] = data["sequence_number"]
+            if data.get("outputs"):
+                result_data["outputs"] = data["outputs"]
             if result_data:
                 content["result"] = result_data
 
@@ -338,6 +353,7 @@ class EventPublisher:
                 "type": payload_type or _DEFAULT_PAYLOAD_TYPE,
                 "event": event_key,
                 "workflow_id": notification_workflow_id or str(execution_id),
+                "execution_id": str(execution_id),
                 "source": "budpipeline",
                 "content": content,
             },
@@ -409,12 +425,13 @@ class EventPublisher:
             return True
 
         except Exception as e:
-            logger.warning(
+            logger.error(
                 "Failed to publish event, queueing for retry",
                 topic=topic,
                 execution_id=str(execution_id),
                 event_type=event_type,
                 error=str(e),
+                exc_info=True,
             )
 
             # Queue for retry (FR-046)
@@ -601,6 +618,7 @@ class EventPublisher:
         subscriber_ids: str | None = None,
         payload_type: str | None = None,
         notification_workflow_id: str | None = None,
+        outputs: dict[str, Any] | None = None,
     ) -> list[str]:
         """Publish step completed event.
 
@@ -614,6 +632,7 @@ class EventPublisher:
             subscriber_ids: Optional user ID(s) for Novu delivery.
             payload_type: Optional custom payload.type for routing.
             notification_workflow_id: Optional override for payload.workflow_id.
+            outputs: Optional step outputs to include in the event.
 
         Returns:
             List of topics published to.
@@ -624,6 +643,7 @@ class EventPublisher:
             "progress_percentage": float(progress_percentage),
             "duration_seconds": duration_seconds,
             "completed_at": datetime.now(timezone.utc).isoformat(),
+            "outputs": outputs,
         }
 
         return await self.publish_to_topics(

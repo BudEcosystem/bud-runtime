@@ -89,7 +89,10 @@ pub fn context_with_baggage(
             _ => false,
         };
         if !will_override {
-            baggage_items.push(KeyValue::new(key.clone(), string_value.as_str().to_string()));
+            baggage_items.push(KeyValue::new(
+                key.clone(),
+                string_value.as_str().to_string(),
+            ));
         }
     }
 
@@ -147,7 +150,10 @@ pub fn remove_auth_marker_from_context(ctx: Context) -> Context {
     // Copy all baggage items except AUTH_PROCESSED
     for (key, (string_value, _metadata)) in existing_baggage.iter() {
         if key.as_str() != keys::AUTH_PROCESSED {
-            baggage_items.push(KeyValue::new(key.clone(), string_value.as_str().to_string()));
+            baggage_items.push(KeyValue::new(
+                key.clone(),
+                string_value.as_str().to_string(),
+            ));
         }
     }
 
@@ -339,7 +345,17 @@ mod tests {
     #[test]
     fn test_context_with_baggage_no_values() {
         let base_ctx = Context::new();
-        let ctx = context_with_baggage(base_ctx.clone(), None, None, None, None, None, None, None, None);
+        let ctx = context_with_baggage(
+            base_ctx.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         // Should return the same context when no values provided
         let baggage = ctx.baggage();

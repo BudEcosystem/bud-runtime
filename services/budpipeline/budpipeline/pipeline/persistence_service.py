@@ -463,6 +463,13 @@ class PersistenceService:
 
                     # Publish step events to callback topics (T048)
                     if execution_id and step_id and step_name:
+                        logger.debug(
+                            "Publishing step event",
+                            execution_id=str(execution_id),
+                            step_id=step_id,
+                            step_name=step_name,
+                            status=status.value,
+                        )
                         await self._publish_step_event(
                             execution_id=execution_id,
                             step_id=step_id,

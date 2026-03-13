@@ -1,0 +1,62 @@
+include:
+  - ./docker-compose-redis.yaml
+  - ./docker-compose-psql.yaml
+
+services:
+  budusecases:
+    image: budserve/$APP_NAME:$NAMESPACE
+    profiles:
+      - app
+    container_name: budserve-$NAMESPACE-$APP_NAME
+    build:
+      context: ..
+      dockerfile: ./deploy/Dockerfile.dev
+    command: [ "sh", "-c", "alembic upgrade head && uvicorn $APP_NAME.main:app --host 0.0.0.0 --port $APP_PORT --reload" ]
+    volumes:
+      - ../:/app/
+      - ../alembic:/app/alembic
+      - ../templates:/app/templates
+    env_file:
+      - path: ../.env
+        required: true
+    depends_on:
+      - budusecases-redis
+      - budusecases-postgres
+      - budusecases-placement
+    network_mode: "host"
+  budusecases-sidecar:
+    container_name: budserve-$NAMESPACE-$APP_NAME-dapr
+    image: "daprio/daprd:edge"
+    command: [ "./daprd", "--app-id", "$APP_NAME", "--app-port", "$APP_PORT", "--dapr-http-port", "$DAPR_HTTP_PORT", "--dapr-grpc-port", "$DAPR_GRPC_PORT", "--dapr-internal-grpc-port", "${DAPR_INTERNAL_GRPC_PORT:-50002}", "--placement-host-address", "$DAPR_PLACEMENT_HOST:$DAPR_PLACEMENT_PORT", "--scheduler-host-address", "${DAPR_SCHEDULER_HOST:-0.0.0.0}:${DAPR_SCHEDULER_PORT:-50006}", "--metrics-port", "$DAPR_METRICS_PORT", "--resources-path", "/components", "--config", "/config/appconfig.yaml", "--log-as-json" ]
+    env_file:
+      - path: ../.env
+        required: true
+    volumes:
+      - "${DAPR_COMPONENTS:-../.dapr/components/}:/components"
+      - "${DAPR_APP_CONFIG:-../.dapr/appconfig-dev.yaml}:/config/appconfig.yaml"
+    network_mode: "host"
+  budusecases-placement:
+    container_name: budserve-$NAMESPACE-$APP_NAME-placement
+    image: "daprio/placement:edge"
+    command: [ "./placement", "--port", "$DAPR_PLACEMENT_PORT", "--log-as-json" ]
+    ports:
+      - "$DAPR_PLACEMENT_PORT:$DAPR_PLACEMENT_PORT"
+    networks:
+      - budusecases-network
+  budusecases-scheduler:
+    image: "daprio/dapr"
+    command: [ "./scheduler", "--port", "$DAPR_SCHEDULER_PORT", "--log-as-json" ]
+    ports:
+      - "$DAPR_SCHEDULER_PORT:$DAPR_SCHEDULER_PORT"
+    volumes:
+      - type: tmpfs
+        target: /data
+        tmpfs:
+          size: 10GB
+    privileged: true
+    networks:
+      - budusecases-network
+networks:
+  budusecases-network:
+    name: budserve-$NAMESPACE-$APP_NAME
+    driver: bridge

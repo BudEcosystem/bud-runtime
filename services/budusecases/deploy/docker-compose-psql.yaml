@@ -1,0 +1,26 @@
+services:
+  budusecases-postgres:
+    container_name: budserve-$NAMESPACE-$APP_NAME-postgres
+    image: postgres:alpine
+    ports:
+      - "$PSQL_PORT:$PSQL_PORT"
+    environment:
+      POSTGRES_USER: "${PSQL_USER:?PSQL_USER variable is not set}"
+      POSTGRES_PASSWORD: "${PSQL_PASSWORD:?PSQL_PASSWORD variable is not set}"
+      POSTGRES_DB: "${PSQL_DB_NAME:?PSQL_DB_NAME variable is not set}"
+    volumes:
+      - budusecases_postgres_data:/var/lib/postgresql/data
+    command: [ "postgres", "-c", "fsync=off", "-p", "$PSQL_PORT" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $PSQL_USER -p $PSQL_PORT" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - budusecases-network
+volumes:
+  budusecases_postgres_data:
+networks:
+  budusecases-network:
+    name: budserve-$NAMESPACE-$APP_NAME
+    driver: bridge
