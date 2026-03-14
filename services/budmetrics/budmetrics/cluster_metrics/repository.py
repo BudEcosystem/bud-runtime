@@ -16,6 +16,10 @@ from ..observability.models import ClickHouseClient
 
 logger = get_logger(__name__)
 
+# Time window for HAMI GPU/slice queries to exclude stale/removed devices.
+# HAMI metrics are scraped every 10 minutes, so 1 hour provides ample margin.
+_HAMI_STALENESS_INTERVAL = "1 HOUR"
+
 
 class ClusterMetricsRepository:
     """Repository for cluster metrics data access.
@@ -1154,16 +1158,19 @@ class ClusterMetricsRepository:
              total_cores_percent, shared_containers_count, hardware_mode, last_update,
              temperature_celsius, power_watts, gpu_utilization_percent)
         """
-        # Query gets the LATEST data per device (no time window filter on HAMI data)
+        # Query gets the LATEST data per device within a 1-hour window
+        # This prevents stale/removed GPU devices from appearing in results
+        # HAMI metrics are scraped every 10 minutes, so 1 hour provides ample margin
         # DCGM enrichment still uses a short window for real-time hardware metrics
-        query = """
+        query = f"""
         WITH latest_ts AS (
-            -- Get the latest timestamp per device (no time filter)
+            -- Get the latest timestamp per device (within 1-hour window to exclude stale devices)
             SELECT
                 device_uuid,
                 max(ts) AS max_ts
             FROM metrics.HAMIGPUMetrics
             WHERE cluster_id = %(cluster_id)s
+              AND ts >= now() - INTERVAL {_HAMI_STALENESS_INTERVAL}
             GROUP BY device_uuid
         ),
         dcgm_metrics AS (
@@ -1221,11 +1228,12 @@ class ClusterMetricsRepository:
              node_name, memory_limit_bytes, memory_used_bytes, core_limit_percent,
              core_used_percent, gpu_utilization_percent, status)
         """
-        # Query gets the LATEST slice data per pod+device (no time window filter on HAMI data)
+        # Query gets the LATEST slice data per pod+device within a 1-hour window
+        # This prevents stale slices from removed GPUs from appearing in results
         # Enrichment CTEs still use time windows for real-time data
-        query = """
+        query = f"""
         WITH latest_slice_ts AS (
-            -- Get the latest timestamp per slice (pod+device combination)
+            -- Get the latest timestamp per slice (within 1-hour window to exclude stale data)
             SELECT
                 pod_name,
                 pod_namespace,
@@ -1233,6 +1241,7 @@ class ClusterMetricsRepository:
                 max(ts) AS max_ts
             FROM metrics.HAMISliceMetrics
             WHERE cluster_id = %(cluster_id)s
+              AND ts >= now() - INTERVAL {_HAMI_STALENESS_INTERVAL}
             GROUP BY pod_name, pod_namespace, device_uuid
         ),
         pod_status AS (
@@ -1305,19 +1314,21 @@ class ClusterMetricsRepository:
         Returns:
             List of tuples containing HAMI GPU device metrics for the node
         """
-        # Query gets the LATEST data per device (no time window filter on HAMI data)
+        # Query gets the LATEST data per device within a 1-hour window
+        # This prevents stale/removed GPU devices from appearing in results
         # DCGM enrichment still uses a short window for real-time hardware metrics
         # Note: DCGM_FI_PROF_GR_ENGINE_ACTIVE (0-1 ratio) is used instead of DCGM_FI_DEV_GPU_UTIL
         # because DEV_GPU_UTIL doesn't capture time-sliced workloads correctly in HAMI mode
-        query = """
+        query = f"""
         WITH latest_ts AS (
-            -- Get the latest timestamp per device (no time filter)
+            -- Get the latest timestamp per device (within 1-hour window to exclude stale devices)
             SELECT
                 device_uuid,
                 max(ts) AS max_ts
             FROM metrics.HAMIGPUMetrics
             WHERE cluster_id = %(cluster_id)s
               AND node_name = %(node_name)s
+              AND ts >= now() - INTERVAL {_HAMI_STALENESS_INTERVAL}
             GROUP BY device_uuid
         ),
         dcgm_metrics AS (
@@ -1379,11 +1390,12 @@ class ClusterMetricsRepository:
         Returns:
             List of tuples containing HAMI slice metrics for the node
         """
-        # Query gets the LATEST slice data per pod+device (no time window filter on HAMI data)
+        # Query gets the LATEST slice data per pod+device within a 1-hour window
+        # This prevents stale slices from removed GPUs from appearing in results
         # Enrichment CTEs still use time windows for real-time data
-        query = """
+        query = f"""
         WITH latest_slice_ts AS (
-            -- Get the latest timestamp per slice (pod+device combination)
+            -- Get the latest timestamp per slice (within 1-hour window to exclude stale data)
             SELECT
                 pod_name,
                 pod_namespace,
@@ -1392,6 +1404,7 @@ class ClusterMetricsRepository:
             FROM metrics.HAMISliceMetrics
             WHERE cluster_id = %(cluster_id)s
               AND node_name = %(node_name)s
+              AND ts >= now() - INTERVAL {_HAMI_STALENESS_INTERVAL}
             GROUP BY pod_name, pod_namespace, device_uuid
         ),
         pod_status AS (
