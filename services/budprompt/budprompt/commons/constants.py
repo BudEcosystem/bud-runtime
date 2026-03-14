@@ -83,6 +83,10 @@ class GenAIAttributes:
     GEN_AI_REQUEST_STREAM = "gen_ai.request.stream"
 
 
+# A2A protocol version support
+SUPPORTED_A2A_VERSIONS = {"1.0", "0.3"}
+
+
 class ErrorAttributes:
     """Error semantic convention attribute keys (from stable SDK).
 

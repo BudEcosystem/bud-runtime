@@ -67,6 +67,24 @@ class AppConfig(BaseAppConfig):
     otel_sdk_disabled: bool = Field(default=True, alias="OTEL_SDK_DISABLED")
     otel_exporter_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
 
+    # A2A Protocol Configuration
+    a2a_task_ttl_days: int = Field(default=7, alias="A2A_TASK_TTL_DAYS")
+    a2a_context_ttl_hours: int = Field(default=24, alias="A2A_CONTEXT_TTL_HOURS")
+
+    @property
+    def async_database_url(self) -> str:
+        """Construct async PostgreSQL URL for A2A stores (asyncpg driver)."""
+        from budmicroframe.commons.config import secrets_settings as base_secrets
+
+        user = base_secrets.psql_user or ""
+        password = base_secrets.psql_password or ""
+        host = self.psql_host
+        port = self.psql_port
+        dbname = self.psql_dbname
+        if user and password:
+            return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{dbname}"
+        return f"postgresql+asyncpg://{host}:{port}/{dbname}"
+
     @property
     def redis_url(self) -> str:
         """Construct the complete Redis URL from individual components.

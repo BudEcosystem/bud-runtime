@@ -25,6 +25,7 @@ from budmicroframe.main import configure_app, schedule_secrets_and_config_sync
 from budmicroframe.shared.dapr_workflow import DaprWorkflow
 from fastapi import FastAPI
 
+from .a2a.routes import a2a_router, initialize_a2a_stores, shutdown_a2a_stores
 from .commons.config import app_settings, secrets_settings
 from .prompt.routes import prompt_router
 from .responses.routes import responses_router
@@ -52,6 +53,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize OpenTelemetry for Pydantic AI instrumentation
     otel_manager.configure()
 
+    # Initialize A2A protocol stores
+    await initialize_a2a_stores()
+
     task = asyncio.create_task(schedule_secrets_and_config_sync())
 
     yield
@@ -63,6 +67,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     DaprWorkflow().shutdown_workflow_runtime()
 
+    # Shutdown A2A stores
+    await shutdown_a2a_stores()
+
     # Shutdown OpenTelemetry
     otel_manager.shutdown()
 
@@ -72,3 +79,4 @@ app = configure_app(app_settings, secrets_settings, lifespan=lifespan)
 # Include routers
 app.include_router(prompt_router)
 app.include_router(responses_router)
+app.include_router(a2a_router)

@@ -8,6 +8,8 @@ COPY requirements-dev.txt /app/
 COPY requirements-lint.txt /app/
 COPY requirements-test.txt /app/
 
+# Node.js/npm required by a2a-sdk build hook (protobuf generation via npx @bufbuild/buf)
+RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip
 RUN pip install -r ./requirements.txt

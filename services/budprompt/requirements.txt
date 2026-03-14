@@ -40,3 +40,8 @@ opentelemetry-api>=1.27.0
 opentelemetry-sdk>=1.27.0
 opentelemetry-exporter-otlp-proto-http>=1.27.0
 opentelemetry-instrumentation-httpx>=0.48b0
+
+# A2A Protocol
+a2a-sdk[sql] @ git+https://github.com/a2aproject/a2a-python@164f919
+asyncpg>=0.29.0
+sse-starlette>=1.6.0

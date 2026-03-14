@@ -171,6 +171,19 @@ class OpenAIResponseException(Exception):
         return status.phrase.lower().replace(" ", "_").replace("-", "_")
 
 
+class VersionNotSupportedError(Exception):
+    """Exception raised when the A2A protocol version is not supported."""
+
+    def __init__(self, message: str = "Version not supported"):
+        """Initialize the VersionNotSupportedError.
+
+        Args:
+            message: Error message describing the unsupported version.
+        """
+        self.message = message
+        super().__init__(self.message)
+
+
 class MCPFoundryException(Exception):
     """Exception raised when there is an error with MCP Foundry service.
 
