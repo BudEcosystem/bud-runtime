@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from ..commons.dependencies import get_session, parse_ordering_fields
 from ..commons.exceptions import KubernetesException
+from ..commons.utils import skip_if_running
 from .schemas import (
     AdapterRequest,
     DeleteDeploymentRequest,
@@ -146,6 +147,7 @@ def cancel_deployment(
     description="Periodic job endpoint to update deployment status for all active deployments",
     tags=["Deployments"],
 )
+@skip_if_running("deployment-status-update")
 async def periodic_deployment_status_update():
     """Periodic job endpoint to update deployment status for all active deployments.
 
