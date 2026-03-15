@@ -1,11 +1,13 @@
 """Streaming event translation from pydantic-ai AgentStreamEvent to A2A TaskUpdater updates."""
 
 import logging
+import uuid
 from typing import Any, AsyncGenerator, Dict, Optional
 
-from a2a.types import Part, TaskState
+from a2a.types import Part
 from pydantic import TypeAdapter
 from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import PartStartEvent, TextPart
 from pydantic_ai.run import AgentRunResultEvent
 
 from .context_store import PostgreSQLContextStore
@@ -35,6 +37,8 @@ class A2AStreamingAdapter:
         self._context_store = context_store
         self._context_id = context_id
         self._agent_id = agent_id
+        self._artifact_id: str = str(uuid.uuid4())
+        self._chunk_count: int = 0
 
     async def translate(
         self,
@@ -48,6 +52,7 @@ class A2AStreamingAdapter:
             list of A2A Parts for the final artifact.
         """
         final_result = None
+        buffered_delta: Optional[str] = None
 
         async for event in event_stream:
             if isinstance(event, AgentRunResultEvent):
@@ -64,20 +69,39 @@ class A2AStreamingAdapter:
                         logger.warning("Failed to save context for %s", self._context_id, exc_info=True)
                 continue
 
-            # Extract text deltas from PartDeltaEvent
-            if hasattr(event, "delta") and hasattr(event.delta, "content_delta"):
+            # Extract text from PartStartEvent (first token) or PartDeltaEvent (subsequent)
+            delta_text: Optional[str] = None
+            if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                delta_text = event.part.content
+            elif hasattr(event, "delta") and hasattr(event.delta, "content_delta"):
                 delta_text = event.delta.content_delta
-                if delta_text:
-                    self.full_text += delta_text
-                    await updater.update_status(
-                        state=TaskState.TASK_STATE_WORKING,
-                        message=updater.new_agent_message(parts=[Part(text=delta_text)]),
-                    )
+
+            if delta_text:
+                self.full_text += delta_text
+                # Buffer-one: flush previous delta, hold current
+                if buffered_delta is not None:
+                    await self._emit_chunk(updater, buffered_delta, last_chunk=False)
+                buffered_delta = delta_text
+
+        # Flush final buffered delta with last_chunk=True
+        if buffered_delta is not None:
+            await self._emit_chunk(updater, buffered_delta, last_chunk=True)
 
         # Build final artifact Parts from result
         if final_result:
             return self._result_to_parts(final_result, output_schema)
         return [Part(text=self.full_text)]
+
+    async def _emit_chunk(self, updater: Any, text: str, last_chunk: bool) -> None:
+        """Emit a single artifact chunk via the A2A TaskUpdater."""
+        is_first = self._chunk_count == 0
+        await updater.add_artifact(
+            parts=[Part(text=text)],
+            artifact_id=self._artifact_id,
+            append=not is_first,
+            last_chunk=last_chunk,
+        )
+        self._chunk_count += 1
 
     def _result_to_parts(self, result: Any, output_schema: Optional[Dict[str, Any]]) -> list:
         """Convert AgentRunResult -> A2A v1.0 Parts."""

@@ -7,11 +7,12 @@ Two classes with distinct roles:
 
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from uuid import uuid4
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks.task_updater import TaskUpdater
-from a2a.types import Part, TaskState
+from a2a.types import Part, Task, TaskState, TaskStatus
 from google.protobuf import struct_pb2
 from openai.types.responses import ResponseInputItem
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -221,6 +222,20 @@ class BudPromptAgentExecutor(AgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         """Execute A2A request by delegating to A2APromptExecutor."""
         updater = TaskUpdater(event_queue, context.task_id, context.context_id)
+
+        # A2A v1.0 spec: stream MUST begin with Task object as initial snapshot
+        # Ensure user message has a messageId (protobuf defaults to "" if client omits it)
+        if context.message and not context.message.message_id:
+            context.message.message_id = str(uuid4())
+
+        initial_task = Task(
+            id=context.task_id,
+            context_id=context.context_id,
+            status=TaskStatus(state=TaskState.TASK_STATE_SUBMITTED),
+            history=[context.message] if context.message else [],
+        )
+        await event_queue.enqueue_event(initial_task)
+
         await updater.start_work()
 
         try:
@@ -251,18 +266,29 @@ class BudPromptAgentExecutor(AgentExecutor):
             )
 
             if self._config.stream:
-                # Streaming: use adapter to translate events
+                # Streaming: adapter emits per-chunk artifactUpdate events
                 adapter = A2AStreamingAdapter(
                     context_store=self._context_store,
                     context_id=context.context_id,
                     agent_id=self._agent_id,
                 )
                 parts = await adapter.translate(result, updater, output_schema=self._config.output_schema)
+                if adapter._chunk_count == 0:
+                    # Edge case: no deltas streamed (e.g., structured output)
+                    await updater.add_artifact(parts=parts, last_chunk=True)
+                else:
+                    # Replace accumulated per-token Parts with single coalesced artifact
+                    await updater.add_artifact(
+                        parts=parts,
+                        artifact_id=adapter._artifact_id,
+                        append=False,
+                        last_chunk=True,
+                    )
             else:
                 # Non-streaming: convert result directly
                 parts = self._result_to_parts(result)
+                await updater.add_artifact(parts=parts, last_chunk=True)
 
-            await updater.add_artifact(parts=parts, last_chunk=True)
             agent_msg = updater.new_agent_message(parts=parts)
             # Emit WORKING status with the agent message so the SDK's rotation
             # mechanism appends it to task.history when complete() arrives.
