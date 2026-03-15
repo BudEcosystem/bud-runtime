@@ -5,6 +5,7 @@ from budmicroframe.commons.schemas import ErrorResponse, SuccessResponse
 from fastapi import APIRouter
 
 from ..commons.dependencies import get_session
+from ..commons.utils import skip_if_running
 from .metrics_service import MetricsCollectionService
 
 
@@ -15,6 +16,7 @@ metrics_router = APIRouter(prefix="/metrics", tags=["Metrics Collection"])
 
 
 @metrics_router.post("/collect-all-cluster-metrics")
+@skip_if_running("metrics-collection")
 async def collect_all_cluster_metrics():
     """Periodic job to collect metrics from all clusters and forward to OTel Collector.
 

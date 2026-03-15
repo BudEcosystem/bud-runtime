@@ -28,6 +28,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPE
 from sqlalchemy.orm import Session
 
 from ..commons.dependencies import get_session
+from ..commons.utils import skip_if_running
 from .schemas import (
     ClusterCreateRequest,
     ClusterDeleteRequest,
@@ -661,6 +662,7 @@ async def trigger_manual_sync():
 
 
 @cluster_router.post("/periodic-node-status-update")
+@skip_if_running("node-status-update")
 async def periodic_node_status_update():
     """Periodic job endpoint to update node status for all active clusters.
 
